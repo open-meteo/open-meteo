@@ -21,3 +21,30 @@ Head over to https://open-meteo.com and have a look!
 - Air quality forecast with gases and pollen in hourly resolition
 - 15 minutes weatherforecast for 2 days for temperature, wind and solar radiation
 
+## ☁️ Support
+If you encouter bugs while using Open-Meteo APIs, please file a new issue ticket. For general ideas or Q&A please use the [Discussion](https://github.com/open-meteo/open-meteo/discussions) section on Github. Thanks!
+
+For other enquiries please contact info@open-meteo.com
+
+## 🕵️ Terms & Privacy
+Open-Meteo APIs are free for open-source developer and non-commercial use. We do not restrict access, but ask for fair use.
+
+If your application exceeds 10'000 requests per day, please contact us. We reserve the right to block applications and IP addresses that misuse our service.
+
+For commercial use of Open-Meteo APIs, please contact us.
+
+All data is provided as is without any warrenty.
+
+We do not collect any personal data. We do not share any personal information. We do not integrate any third party analytics, ads, beacons or plugins.
+
+## 📚 License
+API data are offered under Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+
+You are free to share: copy and redistribute the material in any medium or format and adapt: remix, transform, and build upon the material.
+
+Attribution: You must give appropriate credit, provide a link to the license, and indicate if changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor endorses you or your use.
+
+You must include a link next to any location, Open-Meteo data are displayed like:
+
+<a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a>
+NonCommercial: You may not use the material for commercial purposes.
