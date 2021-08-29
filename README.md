@@ -60,4 +60,5 @@ Attribution: You must give appropriate credit, provide a link to the license, an
 You must include a link next to any location, Open-Meteo data are displayed like:
 
 <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a>
+
 NonCommercial: You may not use the material for commercial purposes.
