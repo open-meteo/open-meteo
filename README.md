@@ -9,8 +9,21 @@ Head over to https://open-meteo.com and have a look!
 - Global weather models 11 km with regional up to 2 km resolution
 - No API key required, CORS supported, no ads, no tracking, not even cookies
 - Free for non-commercial use under Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
-- Lighning fast APIs with response times below 10 ms
+- Lightning fast APIs with response times below 10 ms
 - Servers located in Germany (POP for North-America in planning. Sponsors welcome!)
+
+## 🛠 How does Open-Meteo work?
+Open-Meteo is using open-data weather forecasts from national weather providers (NWP). 
+
+NWPs offer numerical weather predictions free to download. Unfortunately working with those models is difficult and requires expert knowledge about binary file formats, grid-systems, projections and fundamentals in weather predictions.
+
+The gap between downloading weather forecasts from NWPs and using weather forecasts in your home automation system, personal website, widgets for Linux or just tinkering around is huge! Even for small pet projects, you have to sign-up with credit-cards to large API vendors, which honestly do not offer properly engineered APIs.
+
+Open-Meteo fills this gap and offers free weather forecast APIs for non-commercial use without any sign-up, credit-card or even an API key required!
+
+- Do you want to build an open-source widget for Ubuntu? Sure!
+- Use Open-Meteo for a React/Angular/Flutter App? Go for it!
+- Improve your home automation system? Automate your robot lawn mower? Optimize your garden irrigation system? Open-Meteo is a good place to start!
 
 ## 🚧 Roadmap 
 - Timezone support for data in localtime
