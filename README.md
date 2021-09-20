@@ -25,11 +25,14 @@ Open-Meteo fills this gap and offers free weather forecast APIs for non-commerci
 - Use Open-Meteo for a React/Angular/Flutter App? Go for it!
 - Improve your home automation system? Automate your robot lawn mower? Optimize your garden irrigation system? Open-Meteo is a good place to start!
 
+## Client SDKs
+- Go https://github.com/HectorMalot/omgo
+
+Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help user users.
+
 ## 🚧 Roadmap 
-- Timezone support for data in localtime
 - Forecasts in 6-hour intervals for `morning`, `afternoon`, `evening` and `night`
 - 14 day weather forecast based on GFS ensemble and ICON ensemble
-- Solar radition forecast in hourly resolution with direct and diffuse shortwave radiation
 - Wave and current forecasts
 - Air quality forecast with gases and pollen in hourly resolition
 - 15 minutes weatherforecast for 2 days for temperature, wind and solar radiation
