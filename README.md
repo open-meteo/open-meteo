@@ -2,7 +2,7 @@
 
 Open-Meteo offers free weather forecast APIs for open-source developers and non-commercial use. No API key is required. You can start using it immediatly!
 
-Head over to https://open-meteo.com and have a look!
+Head over to https://open-meteo.com! Stay up to date with our blog at https://openmeteo.substack.com.
 
 ## Features 
 - Hourly weather forecast for 7 days
