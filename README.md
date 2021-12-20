@@ -30,7 +30,7 @@ Apps:
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
 
 Repositories:
-- Contributions welcome!
+- [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
 
 Other:
 - Contributions welcome!
