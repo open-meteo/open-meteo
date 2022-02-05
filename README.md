@@ -39,6 +39,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 
 ## Client SDKs
 - Go https://github.com/HectorMalot/omgo
+- Python https://github.com/m0rp43us/openmeteopy
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help user users.
 
