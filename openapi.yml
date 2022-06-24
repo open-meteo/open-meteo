@@ -200,4 +200,4 @@ paths:
                   reason:
                     type: string
                     description: Description of the error
-                    example: "Latitude must be in rang of -90 to 90°. Given: 300"
+                    example: "Latitude must be in range of -90 to 90°. Given: 300"
