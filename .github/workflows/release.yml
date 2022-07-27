@@ -41,7 +41,7 @@ jobs:
     - name: Build
       run: |
         ${{ env.swift_build }}
-        mv .build/release/Run build/openmeteo-api
+        mv .build/release/Run openmeteo-api
     - name: Package
       uses: gravitl/github-action-fpm@master
       with:
@@ -52,3 +52,14 @@ jobs:
       with:
         files: 'openmeteo-api_${{github.ref_name}}_amd64.deb'
         draft: true
+    - name: Publish to APT
+      uses: jrandiny/apt-repo-action@v1
+      with:
+        github_token: ${{ secrets.PAT }}
+        arch: amd64
+        version: focal
+        file: 'openmeteo-api_${{github.ref_name}}_amd64.deb'
+        file_target_version: focal
+        public_key: ${{ secrets.GPG_PUBLIC }}
+        private_key: ${{ secrets.GPG_PRIVATE }}
+        key_passphrase: ${{ secrets.GPG_SECRET }}
