@@ -56,8 +56,8 @@ jobs:
       uses: jrandiny/apt-repo-action@v2.0.1
       with:
         github_token: ${{ secrets.PAT }}
-        arch: amd64
-        version: focal
+        repo_supported_arch: amd64
+        repo_supported_version: focal
         file: 'openmeteo-api_${{github.ref_name}}_amd64.deb'
         file_target_version: focal
         public_key: ${{ secrets.GPG_PUBLIC }}
