@@ -1,0 +1,52 @@
+on:
+  push:
+    tags:
+      - '*.*.*'
+
+name: Upload Release Asset
+
+env:
+  swift_package_resolve: swift package resolve
+  swift_build: swift build --enable-test-discovery -c release -Xswiftc -Ounchecked -Xswiftc -g -Xswiftc -static-stdlib -Xswiftc -cross-module-optimization
+  swift_test: swift test
+  cache_version: 1
+
+jobs:
+  linux:
+    runs-on: ubuntu-20.04
+    container: swift:5.6.2-focal
+    name: Linux
+    steps:
+    - name: Get Swift Version
+      id: get-swift-version
+      run: |
+        echo "::set-output name=version::$(swift -version | head -n 1 | sed s/,// )"
+      shell: bash
+    - uses: actions/checkout@v2
+    - name: Cache resolved dependencies
+      id: cache-resolved-dependencies
+      uses: actions/cache@v2
+      with:
+        path: |
+          .build
+          Package.resolved
+        key: ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
+    - name: Resolve dependencies
+      if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
+      run: ${{ env.swift_package_resolve }}
+    - name: Build
+      run: |
+        ${{ env.swift_build }}
+        mv .build/release/Run build/openmeteo-api
+    - name: Package
+      uses: bpicode/github-action-fpm@master
+      with:
+        fpm_args: './build'
+        fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf15 --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-api.service --deb-default build/openmeteo-api.env --before-install build/before-install.sh --before-upgrade build/before-install.sh openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
+    - name: Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: 'openmeteo-api_${{github.ref_name}}_amd64.deb'
+        draft: true

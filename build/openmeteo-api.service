@@ -1,0 +1,15 @@
+[Unit]
+Description = Run Open-Meteo API
+
+[Service]
+EnvironmentFile=/etc/default/openmeteo-api.env
+Type=simple
+User=openmeteo-api
+Group=openmeteo-api
+WorkingDirectory=/var/lib/openmeteo-api/
+ExecStart=/usr/local/bin/openmeteo-api serve -b $BIND --env $ENVIRONMENT
+Restart=always
+RestartSec=1
+
+[Install]
+WantedBy = multi-user.target

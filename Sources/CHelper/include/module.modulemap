@@ -1,0 +1,4 @@
+module CHelper [system] {
+    header "shim.h"
+    export *
+}

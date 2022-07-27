@@ -1,0 +1,45 @@
+# see https://github.com/peripheryapp/periphery/blob/master/.github/workflows/test.yml
+
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  swift_package_resolve: swift package resolve
+  swift_build: swift build --build-tests
+  swift_test: swift test
+  cache_version: 1
+
+jobs:
+  linux:
+    runs-on: ubuntu-20.04
+    container: swift:5.6.2-focal
+    name: Linux
+    steps:
+    - name: Get Swift Version
+      id: get-swift-version
+      run: |
+        echo "::set-output name=version::$(swift -version | head -n 1 | sed s/,// )"
+      shell: bash
+    - uses: actions/checkout@v2
+    - name: Cache resolved dependencies
+      id: cache-resolved-dependencies
+      uses: actions/cache@v2
+      with:
+        path: |
+          .build
+          Package.resolved
+        key: ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
+    - name: Resolve dependencies
+      if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
+      run: ${{ env.swift_package_resolve }}
+    - name: Build
+      run: ${{ env.swift_build }}
+    - name: Test
+      run: ${{ env.swift_test }}
