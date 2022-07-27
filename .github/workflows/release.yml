@@ -53,7 +53,7 @@ jobs:
         files: 'openmeteo-api_${{github.ref_name}}_amd64.deb'
         draft: true
     - name: Publish to APT
-      uses: jrandiny/apt-repo-action@v1
+      uses: jrandiny/apt-repo-action@v2.0.1
       with:
         github_token: ${{ secrets.PAT }}
         arch: amd64
