@@ -3,8 +3,8 @@
 import PackageDescription
 
 #if arch(x86_64)
-let flagsCTurbo = ["-march=native", "-w"]
-let flagsHelper = ["-march=native"]
+let flagsCTurbo = ["-march=skylake", "-w"]
+let flagsHelper = ["-march=skylake"]
 #else
 let flagsCTurbo = ["-w"]
 let flagsHelper = [String]()
