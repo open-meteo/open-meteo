@@ -47,10 +47,12 @@ jobs:
       with:
         fpm_args: './build'
         fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf15 --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-api.service --deb-default build/openmeteo-api.env --before-install build/before-install.sh --before-upgrade build/before-install.sh openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
+    - name: Rename deb file
+      run: mv openmeteo-api_${{github.ref_name}}_amd64.deb openmeteo-api_${{github.ref_name}}_focal_amd64.deb
     - name: Release
       uses: softprops/action-gh-release@v1
       with:
-        files: 'openmeteo-api_${{github.ref_name}}_amd64.deb'
+        files: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
         draft: true
     - name: Publish to APT
       uses: jrandiny/apt-repo-action@v2.0.1
@@ -58,7 +60,7 @@ jobs:
         github_token: ${{ secrets.PAT }}
         repo_supported_arch: amd64
         repo_supported_version: focal
-        file: 'openmeteo-api_${{github.ref_name}}_amd64.deb'
+        file: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
         file_target_version: focal
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}

@@ -68,6 +68,21 @@ This section is under development and should cover:
 - Basic application design
 - Development with docker xcode
 
+Using prebuild Ubuntu 20.04 focal packages:
+```bash
+curl -L https://open-meteo.github.io/open-meteo/public.key | sudo apt-key add -
+echo "deb [arch=amd64] https://open-meteo.github.io/open-meteo/repo $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/openmeteo-api.list
+sudo apt update
+sudo apt install openmeteo-api
+```
+
+This will automatically install and run an empty API instance. It can be checked with
+```bash
+sudo systemctl status openmeteo-api
+sudo systemctl restart openmeteo-api
+sudo journalctl -u openmeteo-api.service
+```
+
 
 ## Terms & Privacy
 Open-Meteo APIs are free for open-source developer and non-commercial use. We do not restrict access, but ask for fair use.
