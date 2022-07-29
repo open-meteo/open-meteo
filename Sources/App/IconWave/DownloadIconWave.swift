@@ -144,7 +144,7 @@ enum IconWaveVariable: String, CaseIterable, Codable {
     
     var scalefactor: Float {
         let period: Float = 20 // 0.05s resolution
-        let height: Float = 20 // 0.05m resolution
+        let height: Float = 50 // 0.002m resolution
         let direction: Float = 1
         switch self {
         case .windspeed_10m:
@@ -174,6 +174,10 @@ enum IconWaveVariable: String, CaseIterable, Codable {
         case .swell_wave_direction:
             return direction
         }
+    }
+    
+    var interpolation: InterpolationType {
+        return .hermite
     }
 }
 

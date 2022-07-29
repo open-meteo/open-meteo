@@ -16,7 +16,7 @@ struct IconWaveController {
             
             let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 11)
             let time = try params.getTimerange(current: currentTime, forecastDays: 7, allowedRange: allowedRange)
-            let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
+            let hourlyTime = time.range.range(dtSeconds: 3600)
             
             let reader = try IconWaveMixer(lat: params.latitude, lon: params.longitude, time: time.range)
             // Start data prefetch to boooooooost API speed :D
@@ -96,14 +96,14 @@ struct IconWaveMixer {
     let time: TimerangeDt
     
     public init(lat: Float, lon: Float, time: Range<Timestamp>) throws {
+        let hourly = time.range(dtSeconds: 3600)
         reader = try IconWaveDomain.allCases.compactMap {
-            let modeltime = time.range(dtSeconds: $0.dtSeconds)
-            return try IconWaveReader(domain: $0, lat: lat, lon: lon, time: modeltime)
+            return try IconWaveReader(domain: $0, lat: lat, lon: lon, time: hourly)
         }
         guard let highresModel = reader.last else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        self.time = time.range(dtSeconds: 3600)
+        self.time = hourly
         modelLat = highresModel.modelLat
         modelLon = highresModel.modelLon
     }
@@ -166,9 +166,63 @@ struct IconWaveReader {
         try omFileSplitter.willNeed(variable: variable.rawValue, location: position, time: time)
     }
     
+    /// Interpolate 3h GWAM to 1 hourly data to match with EWAM
     func get(variable: IconWaveVariable) throws -> [Float] {
-        // TODO interpolation to 1h
+        if time.dtSeconds == domain.dtSeconds {
+            return try omFileSplitter.read(variable: variable.rawValue, location: position, time: time)
+        }
+        if time.dtSeconds > domain.dtSeconds {
+            fatalError()
+        }
         
-        return try omFileSplitter.read(variable: variable.rawValue, location: position, time: time)
+        // TODO: check first timestamp interpolation, check potential negative values (maybe linear for wave height)
+        
+        let interpolationType = variable.interpolation
+        
+        let timeLow = time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
+        let dataLow = try omFileSplitter.read(variable: variable.rawValue, location: position, time: timeLow)
+        
+        var data = [Float]()
+        data.reserveCapacity(time.count)
+        switch interpolationType {
+        case .linear:
+            fatalError("Not implemented")
+        case .nearest:
+            fatalError("Not implemented")
+        case .solar_backwards_averaged:
+            fatalError("Not implemented")
+        case .hermite:
+            for t in time {
+                let index = t.timeIntervalSince1970 / domain.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / domain.dtSeconds
+                let fraction = Float(t.timeIntervalSince1970 % domain.dtSeconds) / Float(domain.dtSeconds)
+                
+                let B = dataLow[index]
+                let A = index-1 < 0 ? B : dataLow[index-1]
+                let C = index+1 >= dataLow.count ? B : dataLow[index+1]
+                let D = index+2 >= dataLow.count ? C : dataLow[index+2]
+                let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+                let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+                let c = -A/2.0 + C/2.0
+                let d = B
+                let h = a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d
+                /// adjust it to scalefactor, otherwise interpolated values show more level of detail
+                data.append(round(h * variable.scalefactor) / variable.scalefactor)
+            }
+        case .hermite_backwards_averaged:
+            fatalError("Not implemented")
+        }
+        return data
+    }
+}
+
+
+extension TimerangeDt {
+    func forInterpolationTo(modelDt: Int) -> TimerangeDt {
+        let start = range.lowerBound.floor(toNearest: modelDt)
+        let end = range.upperBound.ceil(toNearest: modelDt)
+        return TimerangeDt(start: start, to: end, dtSeconds: modelDt)
+    }
+    func expandLeftRight(by: Int) -> TimerangeDt {
+        return TimerangeDt(start: range.lowerBound.add(-1*by), to: range.upperBound.add(by), dtSeconds: dtSeconds)
     }
 }
