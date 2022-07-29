@@ -100,7 +100,9 @@ struct IconWaveMixer {
             let modeltime = time.range(dtSeconds: $0.dtSeconds)
             return try IconWaveReader(domain: $0, lat: lat, lon: lon, time: modeltime)
         }
-        let highresModel = reader.last!
+        guard let highresModel = reader.last else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
         self.time = time.range(dtSeconds: 3600)
         modelLat = highresModel.modelLat
         modelLon = highresModel.modelLon
@@ -148,16 +150,16 @@ struct IconWaveReader {
     let omFileSplitter: OmFileSplitter
     
     public init?(domain: IconWaveDomain, lat: Float, lon: Float, time: TimerangeDt) throws {
-        guard let gridpoint = domain.grid.findPoint(lat: lat, lon: lon) else {
+        guard let gridpoint = try domain.grid.findPointInSea(lat: lat, lon: lon, elevationFile: domain.elevationFile) else {
             return nil
         }
         self.domain = domain
-        self.position = gridpoint
+        self.position = gridpoint.gridpoint
         self.time = time
         
         omFileSplitter = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
-        (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint)
+        (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
     }
     
     func prefetchData(variable: IconWaveVariable) throws {

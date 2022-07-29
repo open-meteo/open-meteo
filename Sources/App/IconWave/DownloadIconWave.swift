@@ -7,8 +7,25 @@ enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnu
     case gwam
     case ewam
     
+    static var gwamElevation = try! OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
+    static var ewamElevation = try! OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
+    
     var omfileDirectory: String {
         return "./data/omfile-\(rawValue)/"
+    }
+    
+    /// Filename of the surface elevation file
+    var surfaceElevationFileOm: String {
+        "\(omfileDirectory)HSURF.om"
+    }
+    
+    var elevationFile: OmFileReader {
+        switch self {
+        case .gwam:
+            return Self.gwamElevation
+        case .ewam:
+            return Self.ewamElevation
+        }
     }
     
     /// Number of time steps in each time series optimised file. 5 days more than each run.
@@ -236,6 +253,16 @@ struct DownloadIconWaveCommand: Command {
                     try Process.grib2ToNetCDFInvertLatitude(in: tempgrib2, out: tempNc)
                 }
                 let data = try NetCDF.readIconWave(file: tempNc)
+                
+                /// Create elevation file for sea mask
+                if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+                    var elevation = data
+                    for i in elevation.indices {
+                        /// `NaN` out of domain, `-999` sea grid point
+                        elevation[i] = elevation[i].isNaN ? .nan : -999
+                    }
+                    try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: elevation)
+                }
                 
                 // Save temporarily as compressed om files
                 try FileManager.default.removeItemIfExists(at: fileDest)
