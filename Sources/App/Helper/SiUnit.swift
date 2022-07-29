@@ -22,6 +22,7 @@ enum SiUnit: String, Codable {
     case kilogramPerSquareMeter = "kg/m²"
     case gramPerKilogram = "g/kg"
     case perSecond = "s⁻¹"
+    case second = "s"
     case qubicMeterPerQubicMeter = "m³/m³"
     case kiloPascal = "kPa"
     case megaJoulesPerSquareMeter = "MJ/m²"
@@ -57,6 +58,7 @@ enum SiUnit: String, Codable {
         case .perSecond: return 2
         case .pascal: return 0
         case .centimeter: return 2
+        case .second: return 0
         }
     }
 }
