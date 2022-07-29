@@ -177,7 +177,34 @@ enum IconWaveVariable: String, CaseIterable, Codable {
     }
     
     var interpolation: InterpolationType {
-        return .hermite
+        switch self {
+        case .windspeed_10m:
+            return .hermite
+        case .winddirection_10m:
+            return .linear
+        case .significant_wave_height:
+            return .linear
+        case .energy_wave_period:
+            return .hermite
+        case .mean_wave_direction:
+            return .linear
+        case .wind_significant_wave_height:
+            return .linear
+        case .wind_wave_period:
+            return .hermite
+        case .wind_wave_peak_period:
+            return .hermite
+        case .wind_wave_direction:
+            return .linear
+        case .swell_significant_wave_height:
+            return .linear
+        case .swell_wave_period:
+            return .hermite
+        case .swell_wave_peak_period:
+            return .hermite
+        case .swell_wave_direction:
+            return .linear
+        }
     }
 }
 

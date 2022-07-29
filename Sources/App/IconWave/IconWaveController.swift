@@ -175,7 +175,7 @@ struct IconWaveReader {
             fatalError()
         }
         
-        // TODO: check first timestamp interpolation, check potential negative values (maybe linear for wave height)
+        // TODO: check first timestamp interpolation
         
         let interpolationType = variable.interpolation
         
@@ -186,7 +186,15 @@ struct IconWaveReader {
         data.reserveCapacity(time.count)
         switch interpolationType {
         case .linear:
-            fatalError("Not implemented")
+            for t in time {
+                let index = t.timeIntervalSince1970 / domain.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / domain.dtSeconds
+                let fraction = Float(t.timeIntervalSince1970 % domain.dtSeconds) / Float(domain.dtSeconds)
+                let A = dataLow[index]
+                let B = index+1 >= dataLow.count ? A : dataLow[index+1]
+                let h = A * (1-fraction) + B * fraction
+                /// adjust it to scalefactor, otherwise interpolated values show more level of detail
+                data.append(round(h * variable.scalefactor) / variable.scalefactor)
+            }
         case .nearest:
             fatalError("Not implemented")
         case .solar_backwards_averaged:
