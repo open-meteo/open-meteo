@@ -1,7 +1,12 @@
 import Foundation
 import Vapor
 
-
+/**
+ TODO:
+ - daily aggregations
+ - docu page
+ - better solution for location dropdown (direct search integration?)
+ */
 struct IconWaveController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
         do {
@@ -75,9 +80,6 @@ struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
         }
         if longitude > 180 || longitude < -180 || longitude.isNaN {
             throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
-        }
-        if let timezone = timezone, !timezone.isEmpty {
-            throw ForecastapiError.timezoneNotSupported
         }
         /*if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
