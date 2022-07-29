@@ -175,8 +175,6 @@ struct IconWaveReader {
             fatalError()
         }
         
-        // TODO: check first timestamp interpolation
-        
         let interpolationType = variable.interpolation
         
         let timeLow = time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
@@ -205,9 +203,9 @@ struct IconWaveReader {
                 let fraction = Float(t.timeIntervalSince1970 % domain.dtSeconds) / Float(domain.dtSeconds)
                 
                 let B = dataLow[index]
-                let A = index-1 < 0 ? B : dataLow[index-1]
-                let C = index+1 >= dataLow.count ? B : dataLow[index+1]
-                let D = index+2 >= dataLow.count ? C : dataLow[index+2]
+                let A = index-1 < 0 ? B : dataLow[index-1].isNaN ? B : dataLow[index-1]
+                let C = index+1 >= dataLow.count ? B : dataLow[index+1].isNaN ? B : dataLow[index+1]
+                let D = index+2 >= dataLow.count ? C : dataLow[index+2].isNaN ? B : dataLow[index+2]
                 let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                 let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                 let c = -A/2.0 + C/2.0
