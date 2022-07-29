@@ -3,7 +3,7 @@ import Vapor
 import SwiftNetCDF
 import SwiftPFor2D
 
-enum IconWaveDomain: String, Codable, LosslessStringConvertibleEnum {
+enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnum {
     case gwam
     case ewam
     
@@ -46,7 +46,7 @@ enum IconWaveDomain: String, Codable, LosslessStringConvertibleEnum {
     }
 }
 
-enum IconWaveVariable: String, CaseIterable {
+enum IconWaveVariable: String, CaseIterable, Codable {
     case windspeed_10m
     case winddirection_10m
     case significant_wave_height
