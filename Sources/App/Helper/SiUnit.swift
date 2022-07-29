@@ -40,7 +40,7 @@ enum SiUnit: String, Codable {
         case .ms: return 2
         case .millimeter: return 2
         case .inch: return 3
-        case .meter: return 0
+        case .meter: return 2
         case .percent: return 0
         case .hectoPascal: return 1
         case .degreeDirection: return 0
@@ -58,7 +58,7 @@ enum SiUnit: String, Codable {
         case .perSecond: return 2
         case .pascal: return 0
         case .centimeter: return 2
-        case .second: return 0
+        case .second: return 2
         }
     }
 }

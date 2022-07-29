@@ -163,6 +163,8 @@ enum IconWaveVariable: String, CaseIterable, Codable {
 /**
  Download wave model form the german weather service
  https://www.dwd.de/DE/leistungen/opendata/help/modelle/legend_ICON_wave_EN_pdf.pdf?__blob=publicationFile&v=3
+ 
+ All equations: https://library.wmo.int/doc_num.php?explnum_id=10979
  */
 struct DownloadIconWaveCommand: Command {
     struct Signature: CommandSignature {
@@ -229,9 +231,9 @@ struct DownloadIconWaveCommand: Command {
                 )
                 try Process.bunzip2(file: tempBz2)
                 if domain == .gwam {
-                    try Process.grib2ToNetcdfShiftLongitude(in: tempgrib2, out: tempNc)
+                    try Process.grib2ToNetcdfShiftLongitudeInvertLatitude(in: tempgrib2, out: tempNc)
                 } else {
-                    try Process.grib2ToNetcdf(in: tempgrib2, out: tempNc)
+                    try Process.grib2ToNetCDFInvertLatitude(in: tempgrib2, out: tempNc)
                 }
                 let data = try NetCDF.readIconWave(file: tempNc)
                 
@@ -268,6 +270,7 @@ struct DownloadIconWaveCommand: Command {
             let startOm = DispatchTime.now()
             let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
             let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
+            //try data2d.writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
             try om.updateFromSpaceOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }

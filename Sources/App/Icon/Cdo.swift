@@ -12,8 +12,8 @@ extension Process {
     }
     
     /// Convert to NetCDF and shift to -180;180 longitude. Only works for global grids
-    static public func grib2ToNetcdfShiftLongitude(in inn: String, out: String) throws {
-        try spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "sellonlatbox,-180,180,-90,90", inn, out])
+    static public func grib2ToNetcdfShiftLongitudeInvertLatitude(in inn: String, out: String) throws {
+        try spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "-invertlat", "-sellonlatbox,-180,180,-90,90", inn, out])
     }
     
     static public func grib2ToNetCDFInvertLatitude(in inn: String, out: String) throws {
