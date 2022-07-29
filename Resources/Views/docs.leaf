@@ -667,14 +667,14 @@
             <td>String array</td>
             <td>No</td>
             <td></td>
-            <td>A list of weather variables which should be returned. Values can be coma separated, or multiple <mark>&hourly=</mark> parameter in the URL can be used.</td>
+            <td>A list of weather variables which should be returned. Values can be comma separated, or multiple <mark>&hourly=</mark> parameter in the URL can be used.</td>
           </tr>
           <tr>
             <th scope="row">daily</th>
             <td>String array</td>
             <td>No</td>
             <td></td>
-            <td>A list of daily weather variable aggregations which should be returned. Values can be coma separated, or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are specified, paramter <mark>timezone</mark> is required.</td>
+            <td>A list of daily weather variable aggregations which should be returned. Values can be comma separated, or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are specified, paramter <mark>timezone</mark> is required.</td>
           </tr>
           <tr>
             <th scope="row">current_weather</th>
@@ -716,14 +716,14 @@
             <td>String</td>
             <td>No</td>
             <td><mark>UTC</mark></td>
-            <td>If <mark>timezone</mark> is set, all timestamps are returned as local-time and data is returned starting at 0:00 local-time. Any time zone name from the <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> is supported.</td>
+            <td>If <mark>timezone</mark> is set, all timestamps are returned as local-time and data is returned starting at 00:00 local-time. Any time zone name from the <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> is supported.</td>
           </tr>
           <tr>
             <th scope="row">past_days</th>
             <td>Integer (0-2)</td>
             <td>No</td>
             <td><mark>0</mark></td>
-            <td>If <mark>past_days</mark> is set, yesterdays or the day before yesterdays data are also returned.</td>
+            <td>If <mark>past_days</mark> is set, yesterday or the day before yesterday data are also returned.</td>
           </tr>
           <tr>
             <th scope="row">start_date<br/>end_date</th>
@@ -738,7 +738,7 @@
       
 
       <h3 class="mt-5">Hourly Parameter Definition</h3>
-      <p>The parameter <mark>&hourly=</mark> accepts the following values. Most weather variables are given as an instantaneous value for the indicated hour. Some variables like precipitation are calculated from the preceding hour as and average or sum.</p>
+      <p>The parameter <mark>&hourly=</mark> accepts the following values. Most weather variables are given as an instantaneous value for the indicated hour. Some variables like precipitation are calculated from the preceding hour as an average or sum.</p>
       <table class="table">
         <thead>
           <tr>
@@ -771,7 +771,7 @@
             <th scope="row">apparent_temperature</th>
             <td>Instant</td>
             <td>°C (°F)</td>
-            <td>Apparent temperature is the perceived feels-like tempertature combinding wind chill factor, realtive humidity and solar radition</td>
+            <td>Apparent temperature is the perceived feels-like temperature combining wind chill factor, relative humidity and solar radiation</td>
           </tr>
           <tr>
             <th scope="row">pressure_msl<br/>surface_pressure</th>
@@ -825,7 +825,7 @@
             <th scope="row">shortwave_radiation</th>
             <td>Preceding hour mean</td>
             <td>W/m²</td>
-            <td>Shortwave solar radiation as average of the preceding hour. This is equals to the total global horizontal irradiation </td>
+            <td>Shortwave solar radiation as average of the preceding hour. This is equal to the total global horizontal irradiation </td>
           </tr>
           <tr>
             <th scope="row">direct_radiation<br/>direct_normal_irradiance</th>
@@ -843,7 +843,7 @@
             <th scope="row">vapor_pressure_deficit</th>
             <td>Instant</td>
             <td>kPa</td>
-            <td>Vapor Pressure Deificit (VPD) in kilo pascal (kPa). For high VPD (&gt;1.6), water transpiration of plants increases. For low VPD (&lt;0.4), transpiration decreases</td>
+            <td>Vapor Pressure Deificit (VPD) in kilopascal (kPa). For high VPD (&gt;1.6), water transpiration of plants increases. For low VPD (&lt;0.4), transpiration decreases</td>
           </tr>
           <tr>
             <th scope="row">evapotranspiration</th>
@@ -983,7 +983,7 @@
           <tr>
             <th scope="row">shortwave_radiation_sum</th>
             <td>MJ/m²</td>
-            <td>The sum of solar radiaion on a given day in Mega Joules</td>
+            <td>The sum of solar radiation on a given day in Megajoules</td>
           </tr>
           <tr>
             <th scope="row">et0_fao_evapotranspiration</th>
@@ -1153,7 +1153,7 @@
         </tr>
       </tbody>
     </table>
-    <p>*) Thunderstorm forecast with hail is only available in Central Europe</p>
+    <p>(*) Thunderstorm forecast with hail is only available in Central Europe</p>
     </div>
 
     <!--<div class=col-12>
