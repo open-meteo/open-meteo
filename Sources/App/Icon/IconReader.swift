@@ -412,7 +412,7 @@ struct IconReader {
     }
     
     func prefetchData(iconVariable: IconVariable) throws {
-        try omFileSplitter.willNeed(variable: iconVariable.rawValue, location: position, time: time)
+        try omFileSplitter.willNeed(variable: iconVariable.dwdVariableName, location: position, time: time)
     }
     
     func get(iconVariable: IconVariable, targetAsl: Float) throws -> [Float] {
