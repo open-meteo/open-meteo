@@ -3,7 +3,7 @@
 [![Test](https://github.com/open-meteo/open-meteo/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/open-meteo/open-meteo/actions/workflows/test.yml) [![codebeat badge](https://codebeat.co/badges/af28fed6-9cbf-41df-96a1-9bba03ae3c53)](https://codebeat.co/projects/github-com-open-meteo-open-meteo-main) [![GitHub license](https://img.shields.io/github/license/open-meteo/open-meteo)](https://github.com/open-meteo/open-meteo/blob/main/LICENSE) [![license: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/) [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/open_meteo.svg?style=social&label=Follow%20%40Open-Meteo)](https://twitter.com/open_meteo)
 
 
-Open-Meteo is an open-source weather API and offers free access for non-commercial use. No API key is required. You can use it immediatly!
+Open-Meteo is an open-source weather API and offers free access for non-commercial use. No API key is required. You can use it inmediately!
 
 Head over to https://open-meteo.com! Stay up to date with our blog at https://openmeteo.substack.com.
 
@@ -46,17 +46,17 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - Go https://github.com/HectorMalot/omgo
 - Python https://github.com/m0rp43us/openmeteopy
 
-Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help user users.
+Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
 
 ## Roadmap 
 - Forecasts in 6-hour intervals for `morning`, `afternoon`, `evening` and `night`
 - 14 day weather forecast based on GFS ensemble and ICON ensemble
 - Wave and current forecasts
-- Air quality forecast with gases and pollen in hourly resolition
-- 15 minutes weatherforecast for 2 days for temperature, wind and solar radiation
+- Air quality forecast with gases and pollen in hourly resolution
+- 15 minutes weather forecast for 2 days for temperature, wind and solar radiation
 
 ## Support
-If you encouter bugs while using Open-Meteo APIs, please file a new issue ticket. For general ideas or Q&A please use the [Discussion](https://github.com/open-meteo/open-meteo/discussions) section on Github. Thanks!
+If you encounter bugs while using Open-Meteo APIs, please file a new issue ticket. For general ideas or Q&A please use the [Discussion](https://github.com/open-meteo/open-meteo/discussions) section on Github. Thanks!
 
 For other enquiries please contact info@open-meteo.com
 
