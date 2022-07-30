@@ -104,21 +104,21 @@
             <td>String</td>
             <td>Yes</td>
             <td></td>
-            <td>String to search for. An empy string or only 1 character will return an empty resultset. 2 characters will only match exact matching locations. 3 and more locations will perform fuzzy matching. The search string can be a location namee or a postal code.</td>
+            <td>String to search for. An empty string or only 1 character will return an empty result. 2 characters will only match exact matching locations. 3 and more characters will perform fuzzy matching. The search string can be a location name or a postal code.</td>
           </tr>
           <tr>
             <th scope="row">count</th>
             <td>Integer</td>
             <td>No</td>
             <td><mark>10</mark></td>
-            <td>The number of search results to return. Up up 100 results can be retrieved.</td>
+            <td>The number of search results to return. Up to 100 results can be retrieved.</td>
           </tr>
           <tr>
             <th scope="row">format</th>
             <td>String</td>
             <td>No</td>
             <td><mark>json</mark></td>
-            <td>Per default, results are returned as JSON. Alternatively, <mark>protobuf</mark> is supported for more efficient encoding and transfer.</td>
+            <td>By default, results are returned as JSON. Alternatively, <mark>protobuf</mark> is supported for more efficient encoding and transfer.</td>
           </tr>
           <tr>
             <th scope="row">language</th>
@@ -132,7 +132,7 @@
             <td>String array</td>
             <td>No</td>
             <td></td>
-            <td>Optionally a coma-separated list of country codes, filters all search results to those countries. Country code must be upper-cased. E.g. <mark>&country_codes=DE,AT,CH</mark> to limit search to Germany, Austria and Switzerland.</td>
+            <td>Optionally a comma-separated list of country codes, filters all search results to those countries. Country code must be upper-cased. E.g. <mark>&country_codes=DE,AT,CH</mark> to limit search to Germany, Austria and Switzerland.</td>
           </tr>-->
         </tbody>
       </table>
@@ -185,7 +185,7 @@
         <tr>
           <th scope="row">id</th>
           <td>Integer</td>
-          <td>Uniq ID for this location</td>
+          <td>Unique ID for this location</td>
         </tr>
         <tr>
           <th scope="row">name</th>
@@ -225,7 +225,7 @@
         <tr>
           <th scope="row">country_id</th>
           <td>Integer</td>
-          <td>Uniq ID for this country</td>
+          <td>Unique ID for this country</td>
         </tr>
         <tr>
           <th scope="row">population</th>
@@ -240,12 +240,12 @@
         <tr>
           <th scope="row">admin1, admin2, admin3, admin4</th>
           <td>String</td>
-          <td>Name of hierachical administrative areas this location resides in. Admin1 is the first administrative level. Admin2 the seconds administrative level. Localized following the <mark>&language=</mark> parameter, if possible</td>
+          <td>Name of hierarchical administrative areas this location resides in. Admin1 is the first administrative level. Admin2 the second administrative level. Localized following the <mark>&language=</mark> parameter, if possible</td>
         </tr>
         <tr>
           <th scope="row">admin1_id, admin2_id, admin3_id, admin4_id</th>
           <td>Integer</td>
-          <td>Uniq IDs for the administrative areas</td>
+          <td>Unique IDs for the administrative areas</td>
         </tr>
       </tbody>
     </table>
