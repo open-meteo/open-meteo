@@ -763,7 +763,7 @@
             <td>String array</td>
             <td>No</td>
             <td></td>
-            <td>A list of weather variables which should be returned. Values can be coma separated, or multiple <mark>&hourly=</mark> parameter in the URL can be used.</td>
+            <td>A list of weather variables which should be returned. Values can be comma separated, or multiple <mark>&hourly=</mark> parameter in the URL can be used.</td>
           </tr>
           <tr>
             <th scope="row">temperature_unit</th>
@@ -791,14 +791,14 @@
             <td>String</td>
             <td>No</td>
             <td><mark>iso8601</mark></td>
-            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please not that all time is then in UTC! For daily values with unix timestamp, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
+            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please note that all time is then in UTC! For daily values with unix timestamp, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
           </tr>
           <tr>
             <th scope="row">past_days</th>
             <td>Integer (0-2)</td>
             <td>No</td>
             <td><mark>0</mark></td>
-            <td>If <mark>past_days</mark> is set, yesterdays or the day before yesterdays data are also returned.</td>
+            <td>If <mark>past_days</mark> is set, yesterday or the day before yesterday data are also returned.</td>
           </tr>
           <tr>
             <th scope="row">start_date<br/>end_date</th>
@@ -858,13 +858,13 @@
             <th scope="row">geopotential_height_1000hPa</th>
             <td>Instant</td>
             <td>gpm</td>
-            <td>Geopotential height on different atmospherc pressure levels</td>
+            <td>Geopotential height on different atmospheric pressure levels</td>
           </tr>
           <tr>
             <th scope="row">windspeed_10m</th>
             <td>Instant</td>
             <td>gpm</td>
-            <td>Geopotential height on different atmospherc pressure levels</td>
+            <td>Geopotential height on different atmospheric pressure levels</td>
           </tr>
           <tr>
             <th scope="row">windspeed_10m<br/>windspeed_1000hPa, ...</th>
@@ -882,25 +882,25 @@
             <th scope="row">relativehumidity_2m<br>relative_humidity_1000hPa, ...</th>
             <td>Instant</td>
             <td>%</td>
-            <td>Relative humidity at 2 meters above ground and atmospherc pressure levels</td>
+            <td>Relative humidity at 2 meters above ground and atmospheric pressure levels</td>
           </tr>
           <tr>
             <th scope="row">specific_humidity_1000hPa, ...</th>
             <td>Instant</td>
             <td>g/kg</td>
-            <td>Specific humidity at different atmospherc pressure levels</td>
+            <td>Specific humidity at different atmospheric pressure levels</td>
           </tr>
           <tr>
             <th scope="row">atmosphere_relative_vorticity_1000hPa, ...</th>
             <td>Instant</td>
             <td>s⁻¹</td>
-            <td>Relative vorticity at different atmospherc pressure levels</td>
+            <td>Relative vorticity at different atmospheric pressure levels</td>
           </tr>
           <tr>
             <th scope="row">divergence_of_wind, ...</th>
             <td>Instant</td>
             <td>s⁻¹</td>
-            <td>Differgence of wind at different atmospherc pressure levels</td>
+            <td>Differgence of wind at different atmospheric pressure levels</td>
           </tr>
         </tbody>
       </table>
