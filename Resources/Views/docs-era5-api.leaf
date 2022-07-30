@@ -596,7 +596,7 @@
           <td>String array</td>
           <td>No</td>
           <td></td>
-          <td>A list of weather variables which should be returned. Values can be coma separated, or multiple
+          <td>A list of weather variables which should be returned. Values can be comma separated, or multiple
             <mark>&hourly=</mark> parameter in the URL can be used.</td>
         </tr>
         <tr>
@@ -604,7 +604,7 @@
           <td>String array</td>
           <td>No</td>
           <td></td>
-          <td>A list of daily weather variable aggregations which should be returned. Values can be coma separated, or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are specified, paramter <mark>timezone</mark> is required.</td>
+          <td>A list of daily weather variable aggregations which should be returned. Values can be comma separated, or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are specified, parameter <mark>timezone</mark> is required.</td>
         </tr>
         <tr>
           <th scope="row">temperature_unit</th>
@@ -633,7 +633,7 @@
           <td>No</td>
           <td><mark>iso8601</mark></td>
           <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds.
-            Please not that all time is then in UTC! For daily values with unix timestamp, please apply
+            Please note that all time is then in UTC! For daily values with unix timestamp, please apply
             <mark>utc_offset_seconds</mark> again to get the correct date.</td>
         </tr>
         <tr>
@@ -641,7 +641,7 @@
           <td>String</td>
           <td>No</td>
           <td><mark>UTC</mark></td>
-          <td>If <mark>timezone</mark> is set, all timestamps are returned as local-time and data is returned starting at 0:00 local-time. Any time zone name from the <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> is supported.</td>
+          <td>If <mark>timezone</mark> is set, all timestamps are returned as local-time and data is returned starting at 00:00 local-time. Any time zone name from the <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> is supported.</td>
         </tr>
       </tbody>
     </table>
@@ -685,7 +685,7 @@
           <th scope="row">apparent_temperature</th>
           <td>Instant</td>
           <td>°C (°F)</td>
-          <td>Apparent temperature is the perceived feels-like tempertature combinding wind chill factor, realtive humidity and solar radition</td>
+          <td>Apparent temperature is the perceived feels-like temperature combining wind chill factor, relative humidity and solar radiation</td>
         </tr>
         <tr>
           <th scope="row">pressure_msl<br/>surface_pressure</th>
@@ -703,7 +703,7 @@
           <th scope="row">rain</th>
           <td>Preceding hour sum</td>
           <td>mm (inch)</td>
-          <td>Only liquid precipitation of the preceding hour including local showers and rai from large scale systems.</td>
+          <td>Only liquid precipitation of the preceding hour including local showers and rain from large scale systems.</td>
         </tr>
         <tr>
           <th scope="row">snowfall</th>
@@ -739,7 +739,7 @@
           <th scope="row">shortwave_radiation</th>
           <td>Preceding hour mean</td>
           <td>W/m²</td>
-          <td>Shortwave solar radiation as average of the preceding hour. This is equals to the total global horizontal irradiation </td>
+          <td>Shortwave solar radiation as average of the preceding hour. This is equal to the total global horizontal irradiation </td>
         </tr>
         <tr>
           <th scope="row">direct_radiation<br/>direct_normal_irradiance</th>
@@ -781,7 +781,7 @@
           <th scope="row">vapor_pressure_deficit</th>
           <td>Instant</td>
           <td>kPa</td>
-          <td>Vapor Pressure Deificit (VPD) in kilo pascal (kPa). For high VPD (&gt;1.6), water transpiration of plants increases. For low VPD (&lt;0.4), transpiration decreases</td>
+          <td>Vapor Pressure Deificit (VPD) in kilopascal (kPa). For high VPD (&gt;1.6), water transpiration of plants increases. For low VPD (&lt;0.4), transpiration decreases</td>
         </tr>
         <tr>
           <th scope="row">soil_temperature_0_to_7cm<br/>soil_temperature_7_to_28cm<br/>soil_temperature_28_to_100cm<br/>soil_temperature_100_to_255cm</th>
@@ -857,7 +857,7 @@
           <tr>
             <th scope="row">shortwave_radiation_sum</th>
             <td>MJ/m²</td>
-            <td>The sum of solar radiaion on a given day in Mega Joules</td>
+            <td>The sum of solar radiaion on a given day in Megajoules</td>
           </tr>
           <tr>
             <th scope="row">et0_fao_evapotranspiration</th>
