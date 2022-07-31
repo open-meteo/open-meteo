@@ -181,7 +181,7 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
         }
     }
     
-    var interpolation: InterpolationType {
+    var interpolation: ReaderInterpolation {
         switch self {
         case .windspeed_10m:
             return .hermite

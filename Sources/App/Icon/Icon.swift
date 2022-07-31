@@ -514,20 +514,4 @@ enum InterpolationType {
     case hermite
     /// Hermite interpolation but for backward averaged data. Used for latent heat flux
     case hermite_backwards_averaged
-    
-    /// How many timesteps on the left and right side are used for interpolation
-    var padding: Int {
-        switch self {
-        case .linear:
-            return 1
-        case .nearest:
-            return 1
-        case .solar_backwards_averaged:
-            return 2
-        case .hermite:
-            return 2
-        case .hermite_backwards_averaged:
-            return 2
-        }
-    }
 }

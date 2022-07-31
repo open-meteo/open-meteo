@@ -21,6 +21,10 @@ protocol GenericDomain {
     var omFileLength: Int { get }
 }
 
+extension GenericDomain {
+    var dtHours: Int { dtSeconds / 3600 }
+}
+
 /**
  Generic variable for the reader implementation
  */
@@ -32,8 +36,30 @@ protocol GenericVariable {
     var scalefactor: Float { get }
     
     /// Kind of interpolation for this variable. Used to interpolate from 1 to 3 hours
-    var interpolation: InterpolationType { get }
+    var interpolation: ReaderInterpolation { get }
+    
+    /// SI unit of this variable
+    var unit: SiUnit { get }
 }
+
+enum ReaderInterpolation {
+    /// Simple linear interpolation
+    case linear
+    
+    /// Hermite interpolation for more smooth interpolation for temperature
+    case hermite
+    
+    /// How many timesteps on the left and right side are used for interpolation
+    var padding: Int {
+        switch self {
+        case .linear:
+            return 1
+        case .hermite:
+            return 2
+        }
+    }
+}
+
 
 /**
  Generic reader implementation that resolves a grid point and interpolates data
@@ -82,9 +108,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     }
     
     /// Read data and interpolate if required
-    func get(variable: Variable) throws -> [Float] {
+    func get(variable: Variable) throws -> DataAndUnit {
         if time.dtSeconds == domain.dtSeconds {
-            return try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
+            let data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
+            return DataAndUnit(data, variable.unit)
         }
         if time.dtSeconds > domain.dtSeconds {
             fatalError()
@@ -108,10 +135,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
                 /// adjust it to scalefactor, otherwise interpolated values show more level of detail
                 data.append(round(h * variable.scalefactor) / variable.scalefactor)
             }
-        case .nearest:
-            fatalError("Not implemented")
-        case .solar_backwards_averaged:
-            fatalError("Not implemented")
         case .hermite:
             for t in time {
                 let index = t.timeIntervalSince1970 / domain.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / domain.dtSeconds
@@ -129,10 +152,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
                 /// adjust it to scalefactor, otherwise interpolated values show more level of detail
                 data.append(round(h * variable.scalefactor) / variable.scalefactor)
             }
-        case .hermite_backwards_averaged:
-            fatalError("Not implemented")
         }
-        return data
+        return DataAndUnit(data, variable.unit)
     }
 }
 

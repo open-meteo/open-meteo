@@ -35,17 +35,17 @@ struct IconWaveMixer {
             try $0.get(variable: variable)
         }
         // global domain
-        var first = datas.first!
+        var first = datas.first!.data
         // default case, just place new data in 1:1
         for d in datas.dropFirst() {
-            for x in d.indices {
-                if d[x].isNaN {
+            for x in d.data.indices {
+                if d.data[x].isNaN {
                     continue
                 }
-                first[x] = d[x]
+                first[x] = d.data[x]
             }
         }
-        return DataAndUnit(first, variable.unit)
+        return DataAndUnit(first, datas.first!.unit)
     }
 }
 

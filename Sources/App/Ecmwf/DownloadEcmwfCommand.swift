@@ -3,7 +3,7 @@ import Vapor
 import SwiftNetCDF
 
 
-enum EcmwfVariable: String, CaseIterable, Hashable, Codable {
+enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     case soil_temperature_0_7cm
     case skin_temperature
     case geopotential_height_1000hPa
@@ -86,6 +86,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable {
     case divergence_of_wind_50hPa
     
     static let pressure_levels = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
+    
+    var omFileName: String {
+        return rawValue
+    }
     
     var nameInFiles: String {
         // TODO: data files should be renamed on storage!
@@ -459,16 +463,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable {
         }
     }
     
-    var interpolation: EcmwfInterpolation {
+    var interpolation: ReaderInterpolation {
         return .hermite
     }
 }
-
-enum EcmwfInterpolation {
-    case linear
-    case hermite
-}
-
 
 
 /**
@@ -507,7 +505,7 @@ struct DownloadEcmwfCommand: Command {
     }
     
     func downloadEcmwf(logger: Logger, run: Timestamp, skipFilesIfExisting: Bool) throws {
-        let domain = EcmwfDomain.instance
+        let domain = EcmwfDomain.ifs04
         let base = "https://data.ecmwf.int/forecasts/"
         
         let dateStr = run.format_YYYYMMdd
@@ -541,7 +539,7 @@ struct DownloadEcmwfCommand: Command {
     }
     
     func convertEcmwf(logger: Logger, run: Timestamp) throws {
-        let domain = EcmwfDomain.instance
+        let domain = EcmwfDomain.ifs04
         let downloadDirectory = "./data/ecmwf-forecast/"
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
@@ -552,8 +550,8 @@ struct DownloadEcmwfCommand: Command {
         /// The time data is placed in the ring
         let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
         
-        try FileManager.default.createDirectory(atPath: EcmwfDomain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: EcmwfDomain.omfileDirectory, nLocations: nLocation, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocation, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
         for variable in EcmwfVariable.allCases {
             logger.debug("Converting \(variable)")
@@ -621,7 +619,7 @@ struct DownloadEcmwfCommand: Command {
             indexTimeEnd += (240 - 90) * 3600
         }
         let indexTimeStart = indexTimeEnd - domain.omFileLength * domain.dtSeconds + 12 * 3600
-        try "\(run.timeIntervalSince1970),\(domain.omFileLength),\(indexTimeStart),\(indexTimeEnd)".write(toFile: "\(EcmwfDomain.omfileDirectory)init.txt", atomically: true, encoding: .utf8)
+        try "\(run.timeIntervalSince1970),\(domain.omFileLength),\(indexTimeStart),\(indexTimeEnd)".write(toFile: "\(domain.omfileDirectory)init.txt", atomically: true, encoding: .utf8)
     }
     
     static func readNetcdf(file: String, variable: String, levelOffset: Int?, nx: Int, ny: Int) throws -> [Float] {

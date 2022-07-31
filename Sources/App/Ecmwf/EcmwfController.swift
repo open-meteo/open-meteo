@@ -18,7 +18,9 @@ struct EcmwfController {
             let time = try params.getTimerange(current: currentTime, forecastDays: 10, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
             
-            let reader = try EcmwfReader(domain: EcmwfDomain.instance, lat: params.latitude, lon: params.longitude, time: time.range)
+            guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest, time: hourlyTime) else {
+                fatalError("Not possible, ECMWF is global")
+            }
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
                 try reader.prefetchData(variables: hourlyVariables)
