@@ -34,13 +34,13 @@
         <h3>Select Coordinates or City</h3>
         <div class="col-md-3">
           <div class="form-floating">
-            <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="52.52">
+            <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="54.3213">
             <label for="latitude">Latitude</label>
           </div>
         </div>
         <div class="col-md-3">
           <div class="form-floating">
-            <input type="number" step="0.0001" class="form-control" name="longitude" id="longitude" value="13.41">
+            <input type="number" step="0.0001" class="form-control" name="longitude" id="longitude" value="10.1348">
             <label for="longitude">Longitude</label>
           </div>
         </div>
