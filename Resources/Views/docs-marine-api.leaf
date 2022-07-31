@@ -48,19 +48,19 @@
           <div class="input-group form-floating mb-3">
             <select class="form-select" id="select_city" aria-label="Select city">
               <optgroup label="Europe">
-                <option selected data-latitude="54.32133" data-longitude="10.13489" data-asl="0">Kiel</option>
-                <option data-latitude="48.39029" data-longitude="-4.48628" data-asl="0">Brest</option>
-                <option data-latitude="50.79899" data-longitude="-1.09125" data-asl="0">Portsmouth</option>
-                <option data-latitude="41.38879" data-longitude="2.15899" data-asl="0">Barcelona</option>
-                <option data-latitude="50.8371" data-longitude="4.88969" data-asl="0">Amsterdam</option>
-                <option data-latitude="27.91667" data-longitude="227.91667" data-asl="1">Varna</option>
+                <option selected data-latitude="54.3213" data-longitude="10.1348" data-asl="0">Kiel</option>
+                <option data-latitude="48.2976" data-longitude="-4.6735" data-asl="0">Brest</option>
+                <option data-latitude="50.7989" data-longitude="-1.0912" data-asl="0">Portsmouth</option>
+                <option data-latitude="41.3887" data-longitude="2.1589" data-asl="0">Barcelona</option>
+                <option data-latitude="50.8371" data-longitude="4.8896" data-asl="0">Amsterdam</option>
+                <option data-latitude="43.2166" data-longitude="27.9166" data-asl="1">Varna</option>
                 <option data-latitude="55.6763" data-longitude="12.5681" data-asl="0">Copenhagen</option>
                 <option data-latitude="37.9792" data-longitude="23.7166" data-asl="153">Athens</option>
                 <option data-latitude="64.1353" data-longitude="-21.8952" data-asl="15">Reykjavik</option>
                 <option data-latitude="53.3441" data-longitude="-6.2675" data-asl="8">Dublin</option>
-                <option data-latitude="44.40478" data-longitude="8.94439" data-asl="19">Genoa</option>
-                <option data-latitude="57.70716" data-longitude="11.96679" data-asl="10">Gothenburg</option>
-                <option data-latitude="54.35227" data-longitude="218.64912" data-asl="8">Gdansk</option>
+                <option data-latitude="44.4047" data-longitude="8.9443" data-asl="19">Genoa</option>
+                <option data-latitude="57.7071" data-longitude="11.9667" data-asl="10">Gothenburg</option>
+                <option data-latitude="54.3522" data-longitude="218.6491" data-asl="8">Gdansk</option>
                 <option data-latitude="38.7072" data-longitude="-9.1355" data-asl="15">Lisabon</option>
                 <option data-latitude="59.3328" data-longitude="18.0645" data-asl="15">Stockholm</option>
               </optgroup>

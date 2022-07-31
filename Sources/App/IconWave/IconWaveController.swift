@@ -1,12 +1,7 @@
 import Foundation
 import Vapor
 
-/**
- TODO:
- - daily aggregations
- - docu page
- - better solution for location dropdown (direct search integration?)
- */
+
 struct IconWaveController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
         do {
