@@ -4,7 +4,7 @@ import SwiftPFor2D
 /**
  Domain definition for ICON wave models
  */
-enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnum {
+enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnum, GenericDomain {
     case gwam
     case ewam
     
@@ -64,7 +64,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnu
     }
 }
 
-enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleEnum {
+enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleEnum, GenericVariable {
     case windspeed_10m
     case winddirection_10m
     case significant_wave_height
@@ -78,6 +78,10 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
     case swell_wave_period
     case swell_wave_peak_period
     case swell_wave_direction
+    
+    var omFileName: String {
+        return rawValue
+    }
     
     /// Name used on the dwd open data server
     var dwdName: String {
