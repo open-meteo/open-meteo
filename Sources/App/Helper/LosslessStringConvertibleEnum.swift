@@ -14,3 +14,12 @@ extension LosslessStringConvertibleEnum where RawValue == String {
         return rawValue
     }
 }
+
+
+extension Array: LosslessStringConvertible where Element: LosslessStringConvertible {
+    public init?(_ description: String) {
+        self = description.split(separator: ",").compactMap {
+            Element(String($0))
+        }
+    }
+}
