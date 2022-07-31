@@ -65,16 +65,16 @@ enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnu
 }
 
 enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleEnum, GenericVariableMixing {
-    case windspeed_10m
-    case winddirection_10m
-    case significant_wave_height
-    case energy_wave_period
-    case mean_wave_direction
-    case wind_significant_wave_height
+    //case windspeed_10m // Disabled, because already available in better quality in regular domains
+    //case winddirection_10m
+    case wave_height
+    case wave_period
+    case wave_direction
+    case wind_wave_height
     case wind_wave_period
     case wind_wave_peak_period
     case wind_wave_direction
-    case swell_significant_wave_height
+    case swell_wave_height
     case swell_wave_period
     case swell_wave_peak_period
     case swell_wave_direction
@@ -94,17 +94,17 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
     /// Name used on the dwd open data server
     var dwdName: String {
         switch self {
-        case .windspeed_10m:
+        /*case .windspeed_10m:
             return "sp_10m"
         case .winddirection_10m:
-            return "dd_10m"
-        case .significant_wave_height:
+            return "dd_10m"*/
+        case .wave_height:
             return "swh"
-        case .energy_wave_period:
+        case .wave_period:
             return "tm10"
-        case .mean_wave_direction:
+        case .wave_direction:
             return "mwd"
-        case .wind_significant_wave_height:
+        case .wind_wave_height:
             return "shww"
         case .wind_wave_period:
             return "mpww"
@@ -112,7 +112,7 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
             return "ppww"
         case .wind_wave_direction:
             return "mdww"
-        case .swell_significant_wave_height:
+        case .swell_wave_height:
             return "shts"
         case .swell_wave_period:
             return "mpts"
@@ -126,17 +126,17 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
     /// Si unit
     var unit: SiUnit {
         switch self {
-        case .windspeed_10m:
+        /*case .windspeed_10m:
             return .ms
         case .winddirection_10m:
-            return .degreeDirection
-        case .significant_wave_height:
+            return .degreeDirection*/
+        case .wave_height:
             return .meter
-        case .energy_wave_period:
+        case .wave_period:
             return .second
-        case .mean_wave_direction:
+        case .wave_direction:
             return .degreeDirection
-        case .wind_significant_wave_height:
+        case .wind_wave_height:
             return .meter
         case .wind_wave_period:
             return .second
@@ -144,7 +144,7 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
             return .second
         case .wind_wave_direction:
             return .degreeDirection
-        case .swell_significant_wave_height:
+        case .swell_wave_height:
             return .meter
         case .swell_wave_period:
             return .second
@@ -160,17 +160,17 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
         let height: Float = 50 // 0.002m resolution
         let direction: Float = 1
         switch self {
-        case .windspeed_10m:
+        /*case .windspeed_10m:
             return 36 // 0.1 kmh resolution
         case .winddirection_10m:
-            return direction
-        case .significant_wave_height:
+            return direction*/
+        case .wave_height:
             return height
-        case .energy_wave_period:
+        case .wave_period:
             return period
-        case .mean_wave_direction:
+        case .wave_direction:
             return direction
-        case .wind_significant_wave_height:
+        case .wind_wave_height:
             return height
         case .wind_wave_period:
             return period
@@ -178,7 +178,7 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
             return period
         case .wind_wave_direction:
             return direction
-        case .swell_significant_wave_height:
+        case .swell_wave_height:
             return height
         case .swell_wave_period:
             return period
@@ -191,17 +191,17 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .windspeed_10m:
+        /*case .windspeed_10m:
             return .hermite
         case .winddirection_10m:
+            return .linear*/
+        case .wave_height:
             return .linear
-        case .significant_wave_height:
-            return .linear
-        case .energy_wave_period:
+        case .wave_period:
             return .hermite
-        case .mean_wave_direction:
+        case .wave_direction:
             return .linear
-        case .wind_significant_wave_height:
+        case .wind_wave_height:
             return .linear
         case .wind_wave_period:
             return .hermite
@@ -209,7 +209,7 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
             return .hermite
         case .wind_wave_direction:
             return .linear
-        case .swell_significant_wave_height:
+        case .swell_wave_height:
             return .linear
         case .swell_wave_period:
             return .hermite

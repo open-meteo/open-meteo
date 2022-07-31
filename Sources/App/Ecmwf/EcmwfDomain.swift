@@ -38,7 +38,7 @@ enum EcmwfDomain: GenericDomain {
     }
     
     var dtSeconds: Int {
-        return dtHours*3600
+        return 3*3600
     }
     
     var grid: RegularGrid {

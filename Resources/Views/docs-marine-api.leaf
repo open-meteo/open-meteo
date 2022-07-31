@@ -29,7 +29,7 @@
 
 <!-- http://127.0.0.1:8080/v1/forecast -->
 <div class="container px-4 py-0" id="featured-3">
-    <form id="api_form" method="get" action="https://api.open-meteo.com/v1/icon-waves">
+    <form id="api_form" method="get" action="https://api.open-meteo.com/v1/marine">
       <div class="row py-3 px-0">
         <h3>Select Coordinates or City</h3>
         <div class="col-md-3">
@@ -129,32 +129,38 @@
         </div>
       </div>
        <div class="row py-3 px-0">
-        <h3>Hourly Weather Variables</h3>
-        <div class="col-md-3">
+        <h3>Hourly Marine Variables</h3>
+        <div class="col-md-4">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="significant_wave_height" id="significant_wave_height" name="hourly" checked>
-            <label class="form-check-label" for="significant_wave_height">
-              Significant Wave Height
+            <input class="form-check-input" type="checkbox" value="wave_height" id="wave_height" name="hourly" checked>
+            <label class="form-check-label" for="wave_height">
+              Wave Height
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="energy_wave_period" id="energy_wave_period" name="hourly">
-            <label class="form-check-label" for="energy_wave_period">
-              Energy Wave Period
+            <input class="form-check-input" type="checkbox" value="wave_direction" id="wave_direction" name="hourly">
+            <label class="form-check-label" for="wave_direction">
+              Wave Direction
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="mean_wave_direction" id="mean_wave_direction" name="hourly">
-            <label class="form-check-label" for="mean_wave_direction">
-              Mean Wave Direction
+            <input class="form-check-input" type="checkbox" value="wave_period" id="wave_period" name="hourly">
+            <label class="form-check-label" for="wave_period">
+              Wave Period
             </label>
           </div>
         </div>
-        <div class="col-md-3">
+        <div class="col-md-4">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="wind_significant_wave_height" id="wind_significant_wave_height" name="hourly">
-            <label class="form-check-label" for="wind_significant_wave_height">
-              Wind Wave Significant Height
+            <input class="form-check-input" type="checkbox" value="wind_wave_height" id="wind_wave_height" name="hourly">
+            <label class="form-check-label" for="wind_wave_height">
+              Wind Wave Height
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="wind_wave_direction" id="wind_wave_direction" name="hourly">
+            <label class="form-check-label" for="wind_wave_direction">
+              Wind Wave Direction
             </label>
           </div>
           <div class="form-check">
@@ -169,18 +175,18 @@
               Wind Wave Peak Period
             </label>
           </div>
+        </div>
+        <div class="col-md-4">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="wind_wave_direction" id="wind_wave_direction" name="hourly">
-            <label class="form-check-label" for="wind_wave_direction">
-              Wind Wave Direction
+            <input class="form-check-input" type="checkbox" value="swell_wave_height" id="swell_wave_height" name="hourly">
+            <label class="form-check-label" for="swell_wave_height">
+              Swell Wave Height
             </label>
           </div>
-        </div>
-        <div class="col-md-3">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="swell_significant_wave_height" id="swell_significant_wave_height" name="hourly">
-            <label class="form-check-label" for="swell_significant_wave_height">
-              Swell Wave Significant Height
+            <input class="form-check-input" type="checkbox" value="swell_wave_direction" id="swell_wave_direction" name="hourly">
+            <label class="form-check-label" for="swell_wave_direction">
+              Swell Wave Direction
             </label>
           </div>
           <div class="form-check">
@@ -195,134 +201,80 @@
               Swell Wave Peak Period
             </label>
           </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="swell_wave_direction" id="swell_wave_direction" name="hourly">
-            <label class="form-check-label" for="swell_wave_direction">
-              Swell Wave Direction
-            </label>
-          </div>
-        </div>
-        <div class="col-md-3">
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_10m" id="windspeed_10m" name="hourly">
-            <label class="form-check-label" for="windspeed_10m">
-              Windspeed 10m
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_10m" id="winddirection_10m" name="hourly">
-            <label class="form-check-label" for="winddirection_10m">
-              Winddirection 10m
-            </label>
-          </div>
         </div>
         </div>
 
         <div class="row py-3 px-0">
-          <h3>Daily Weather Variables <small class="text-muted">(*)</small></h3>
-          <div class="col-md-6">
+          <h3>Daily Marine Variables <small class="text-muted">(*)</small></h3>
+          <div class="col-md-4">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode_daily" name="daily">
-              <label class="form-check-label" for="weathercode_daily">
-                Weathercode
+              <input class="form-check-input" type="checkbox" value="wave_height_max" id="wave_height_max" name="daily">
+              <label class="form-check-label" for="wave_height_max">
+                Wave Height Max
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max" name="daily">
-              <label class="form-check-label" for="temperature_2m_max">
-                Maximum Temperature (2 m)
+              <input class="form-check-input" type="checkbox" value="wave_direction_dominant" id="wave_direction_dominant" name="daily">
+              <label class="form-check-label" for="wave_direction_dominant">
+                Wave Direction Dominant
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min" name="daily">
-              <label class="form-check-label" for="temperature_2m_min">
-                Minimum Temperature (2 m)
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="apparent_temperature_max" id="apparent_temperature_max" name="daily">
-              <label class="form-check-label" for="apparent_temperature_max">
-                Maximum Apparent Temperature (2 m)
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="apparent_temperature_min" id="apparent_temperature_min" name="daily">
-              <label class="form-check-label" for="apparent_temperature_min">
-                Minimum Apparent Temperature (2 m)
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="sunrise" id="sunrise" name="daily">
-              <label class="form-check-label" for="sunrise">
-                Sunrise
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="sunset" id="sunset" name="daily">
-              <label class="form-check-label" for="sunset">
-                Sunset
+              <input class="form-check-input" type="checkbox" value="wave_period_max" id="wave_period_max" name="daily">
+              <label class="form-check-label" for="wave_period_max">
+                Wave Period Max
               </label>
             </div>
           </div>
-          <div class="col-md-6">
+          <div class="col-md-4">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="precipitation_sum" id="precipitation_sum" name="daily">
-              <label class="form-check-label" for="precipitation_sum">
-                Precipitation Sum
+              <input class="form-check-input" type="checkbox" value="wind_wave_height_max" id="wind_wave_height_max" name="daily">
+              <label class="form-check-label" for="wind_wave_height_max">
+                Wind Wave Height Max
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="rain_sum" id="rain_sum" name="daily">
-              <label class="form-check-label" for="rain_sum">
-                Rain Sum
+              <input class="form-check-input" type="checkbox" value="wind_wave_direction_dominant" id="wind_wave_direction_dominant" name="daily">
+              <label class="form-check-label" for="wind_wave_direction_dominant">
+                Wind Wave Direction Dominant
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="showers_sum" id="showers_sum" name="daily">
-              <label class="form-check-label" for="showers_sum">
-                Showers Sum
+              <input class="form-check-input" type="checkbox" value="wind_wave_period_max" id="wind_wave_period_max" name="daily">
+              <label class="form-check-label" for="wind_wave_period_max">
+                Wind Wave Period Max
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="snowfall_sum" id="snowfall_sum" name="daily">
-              <label class="form-check-label" for="snowfall_sum">
-                Snowfall Sum
+              <input class="form-check-input" type="checkbox" value="wind_wave_peak_period_max" id="wind_wave_peak_period_max" name="daily">
+              <label class="form-check-label" for="wind_wave_peak_period_max">
+                Wind Wave Peak Period Max
+              </label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" value="swell_wave_height_max" id="swell_wave_height_max" name="daily">
+              <label class="form-check-label" for="swell_wave_height_max">
+                Swell Wave Height Max
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="precipitation_hours" id="precipitation_hours" name="daily">
-              <label class="form-check-label" for="precipitation_hours">
-                Precipitation Hours
+              <input class="form-check-input" type="checkbox" value="swell_wave_direction_dominant" id="swell_wave_direction_dominant" name="daily">
+              <label class="form-check-label" for="swell_wave_direction_dominant">
+                Swell Wave Direction Dominant
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="windspeed_10m_max" id="windspeed_10m_max" name="daily">
-              <label class="form-check-label" for="windspeed_10m_max">
-                Maximum Wind Speed (10 m)
+              <input class="form-check-input" type="checkbox" value="swell_wave_period_max" id="swell_wave_period_max" name="daily">
+              <label class="form-check-label" for="swell_wave_period_max">
+                Swell Wave Period Max
               </label>
             </div>
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="windgusts_10m_max" id="windgusts_10m_max" name="daily">
-              <label class="form-check-label" for="windgusts_10m_max">
-                Maximum Wind Gusts (10 m)
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="winddirection_10m_dominant" id="winddirection_10m_dominant" name="daily">
-              <label class="form-check-label" for="winddirection_10m_dominant">
-                Dominant Wind Direction (10 m)
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="shortwave_radiation_sum" id="shortwave_radiation_sum" name="daily">
-              <label class="form-check-label" for="shortwave_radiation_sum">
-                Shortwave Radiation Sum
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="et0_fao_evapotranspiration" id="et0_fao_evapotranspiration_daily" name="daily">
-              <label class="form-check-label" for="et0_fao_evapotranspiration_daily">
-                Reference Evapotranspiration (ET₀)
+              <input class="form-check-input" type="checkbox" value="swell_wave_peak_period_max" id="swell_wave_peak_period_max" name="daily">
+              <label class="form-check-label" for="swell_wave_peak_period_max">
+                Swell Wave Peak Period Max
               </label>
             </div>
           </div>
@@ -331,41 +283,6 @@
 
         <div class="row py-3 px-0">
           <h3>Settings</h3>
-          <div class="col-12 pb-3">
-            <div class="form-check form-switch">
-              <input class="form-check-input" type="checkbox" id="current_weather" name="current_weather" value="true">
-              <label class="form-check-label" for="current_weather">Current weather with temperature, windspeed and weather code</label>
-            </div>
-          </div>
-          <div class="col-3">
-            <div class="form-floating mb-3">
-              <select class="form-select" name="temperature_unit" id="temperature_unit" aria-label="Temperature Unit" data-default="celsius">
-                <option selected value="celsius">Celsius °C</option>
-                <option value="fahrenheit">Fahrenheit °F</option>
-              </select>
-              <label for="temperature_unit">Temperature Unit</label>
-            </div>
-          </div>
-          <div class="col-3">
-            <div class="form-floating mb-3">
-              <select class="form-select" name="windspeed_unit" id="windspeed_unit" aria-label="Windspeed Unit" data-default="kmh">
-                <option selected value="kmh">Km/h</option>
-                <option value="ms">m/s</option>
-                <option value="mph">Mph</option>
-                <option value="kn">Knots</option>
-              </select>
-              <label for="windspeed_unit">Wind Speed Unit</label>
-            </div>
-          </div>
-          <div class="col-3">
-            <div class="form-floating mb-3">
-              <select class="form-select" name="precipitation_unit" id="precipitation_unit" aria-label="Precipitation Unit" data-default="mm">
-                <option selected value="mm">Millimeter</option>
-                <option value="inch">Inch</option>
-              </select>
-              <label for="precipitation_unit">Precipitation Unit</label>
-            </div>
-          </div>
           <div class="col-3">
             <div class="form-floating mb-3">
               <select class="form-select" name="timeformat" id="timeformat" aria-label="Timeformat" data-default="iso8601">
@@ -456,7 +373,7 @@
 
     <div class="col-12 py-5">
       <h2 id="api-documentation">API Documentation</h2>
-      <p>The API endpoint <mark>/v1/forecast</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours. All URL parameters are listed below:</p>
+      <p>The API endpoint <mark>/v1/marine</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly marina weather forecast for 7 days. Time always starts at 0:00 today. All URL parameters are listed below:</p>
       <table class="table">
         <thead>
           <tr>
@@ -488,34 +405,6 @@
             <td>No</td>
             <td></td>
             <td>A list of daily weather variable aggregations which should be returned. Values can be comma separated, or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are specified, paramter <mark>timezone</mark> is required.</td>
-          </tr>
-          <tr>
-            <th scope="row">current_weather</th>
-            <td>Bool</td>
-            <td>No</td>
-            <td><mark>false</mark></td>
-            <td>Include current weather conditions in the JSON output.</td>
-          </tr>
-          <tr>
-            <th scope="row">temperature_unit</th>
-            <td>String</td>
-            <td>No</td>
-            <td><mark>celsius</mark></td>
-            <td>If <mark>fahrenheit</mark> is set, all temperature values are converted to Fahrenheit.</td>
-          </tr>
-          <tr>
-            <th scope="row">windspeed_unit</th>
-            <td>String</td>
-            <td>No</td>
-            <td><mark>kmh</mark></td>
-            <td>Other wind speed speed units: <mark>ms</mark>, <mark>mph</mark> and <mark>kn</mark></td>
-          </tr>
-          <tr>
-            <th scope="row">precipitation_unit</th>
-            <td>String</td>
-            <td>No</td>
-            <td><mark>mm</mark></td>
-            <td>Other precipitation amount units: <mark>inch</mark></td>
           </tr>
           <tr>
             <th scope="row">timeformat</th>
@@ -563,166 +452,28 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row">temperature_2m</th>
+            <th scope="row">wave_height<br/>wind_wave_height<br/>swell_wave_height</th>
             <td>Instant</td>
-            <td>°C (°F)</td>
-            <td>Air temperature at 2 meters above ground</td>
+            <td>Meter</td>
+            <td>Wave height of significant mean, wind and swell waves</td>
           </tr>
           <tr>
-            <th scope="row">relativehumidity_2m</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>Relative humidity at 2 meters above ground</td>
-          </tr>
-          <tr>
-            <th scope="row">dewpoint_2m</th>
-            <td>Instant</td>
-            <td>°C (°F)</td>
-            <td>Dew point temperature at 2 meters above ground</td>
-          </tr>
-          <tr>
-            <th scope="row">apparent_temperature</th>
-            <td>Instant</td>
-            <td>°C (°F)</td>
-            <td>Apparent temperature is the perceived feels-like temperature combining wind chill factor, relative humidity and solar radiation</td>
-          </tr>
-          <tr>
-            <th scope="row">pressure_msl<br/>surface_pressure</th>
-            <td>Instant</td>
-            <td>hPa</td>
-            <td>Atmospheric air pressure reduced to mean sea level (msl) or pressure at surface. Typically pressure on mean sea level is used in meteorology. Surface pressure gets lower with increasing elevation.</td>
-          </tr>
-          <tr>
-            <th scope="row">cloudcover</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>Total cloud cover as an area fraction</td>
-          </tr>
-          <tr>
-            <th scope="row">cloudcover_low</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>Low level clouds and fog up to 3 km altitude</td>
-          </tr>
-          <tr>
-            <th scope="row">cloudcover_mid</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>Mid level clouds from 3 to 8 km altitude</td>
-          </tr>
-          <tr>
-            <th scope="row">cloudcover_high</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>High level clouds from 8 km altitude</td>
-          </tr>
-          <tr>
-            <th scope="row">windspeed_10m<br/>windspeed_80m<br>windspeed_120m<br>windspeed_180m</th>
-            <td>Instant</td>
-            <td>km/h (mph, m/s, knots)</td>
-            <td>Wind speed at 10, 80, 120 or 180 meters above ground. Wind speed on 10 meters is the standard level.</td>
-          </tr>
-          <tr>
-            <th scope="row">winddirection_10m<br>winddirection_80m<br/>winddirection_120m<br/>winddirection_180m</th>
+            <th scope="row">wave_direction<br/>wind_wave_direction<br/>swell_wave_direction</th>
             <td>Instant</td>
             <td>°</td>
-            <td>Wind direction at 10, 80, 120 or 180 meters above ground</td>
+            <td>Mean direction of mean, wind and swell waves</td>
           </tr>
           <tr>
-            <th scope="row">windgusts_10m</th>
-            <td>Preceding hour max</td>
-            <td>km/h (mph, m/s, knots)</td>
-            <td>Gusts at 10 meters above ground as a maximum of the preceding hour</td>
-          </tr>
-          <tr>
-            <th scope="row">shortwave_radiation</th>
-            <td>Preceding hour mean</td>
-            <td>W/m²</td>
-            <td>Shortwave solar radiation as average of the preceding hour. This is equal to the total global horizontal irradiation </td>
-          </tr>
-          <tr>
-            <th scope="row">direct_radiation<br/>direct_normal_irradiance</th>
-            <td>Preceding hour mean</td>
-            <td>W/m²</td>
-            <td>Direct solar radiation as average of the preceding hour on the horizontal plane and the normal plane (perpendicular to the sun)</td>
-          </tr>
-          <tr>
-            <th scope="row">diffuse_radiation</th>
-            <td>Preceding hour mean</td>
-            <td>W/m²</td>
-            <td>Diffuse solar radiation as average of the preceding hour</td>
-          </tr>
-          <tr>
-            <th scope="row">vapor_pressure_deficit</th>
+            <th scope="row">wave_period<br/>wind_wave_period<br/>swell_wave_period</th>
             <td>Instant</td>
-            <td>kPa</td>
-            <td>Vapor Pressure Deificit (VPD) in kilopascal (kPa). For high VPD (&gt;1.6), water transpiration of plants increases. For low VPD (&lt;0.4), transpiration decreases</td>
+            <td>Seconds</td>
+            <td>Period between mean, wind and swell waves.</td>
           </tr>
           <tr>
-            <th scope="row">evapotranspiration</th>
-            <td>Preceding hour sum</td>
-            <td>mm (inch)</td>
-            <td>Evapotranspration from land surface and plants that weather models assumes for this location. Available soil water is considered. 1 mm evapotranspiration per hour equals 1 liter of water per spare meter.</td>
-          </tr>
-          <tr>
-            <th scope="row">et0_fao_evapotranspiration</th>
-            <td>Preceding hour sum</td>
-            <td>mm (inch)</td>
-            <td>ET₀ Reference Evapotranspiration of a well watered grass field. Based on <a href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations<a> ET₀ is calculated from temperature, wind speed, humidity and solar radiation. Unlimited soil water is assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
-          </tr>
-          <tr>
-            <th scope="row">precipitation</th>
-            <td>Preceding hour sum</td>
-            <td>mm (inch)</td>
-            <td>Total precipitation (rain, showers, snow) sum of the preceding hour</td>
-          </tr>
-          <tr>
-            <th scope="row">snowfall</th>
-            <td>Preceding hour sum</td>
-            <td>cm (inch)</td>
-            <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by 7. E.g. 7 cm snow = 10 mm precipitation water equivalent</td>
-          </tr>
-          <tr>
-            <th scope="row">rain</th>
-            <td>Preceding hour sum</td>
-            <td>mm (inch)</td>
-            <td>Rain from large scale weather systems of the preceding hour in millimeter</td>
-          </tr>
-          <tr>
-            <th scope="row">showers</th>
-            <td>Preceding hour sum</td>
-            <td>mm (inch)</td>
-            <td>Showers from convective precipitation in millimeters from the preceding hour</td>
-          </tr>
-          <tr>
-            <th scope="row">weathercode</th>
+            <th scope="row">wind_wave_peak_period<br/>swell_wave_peak_period</th>
             <td>Instant</td>
-            <td>WMO code</td>
-            <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for details.</td>
-          </tr>
-          <tr>
-            <th scope="row">snow_depth</th>
-            <td>Instant</td>
-            <td>meters</td>
-            <td>Snow depth on the ground</td>
-          </tr>
-          <tr>
-            <th scope="row">freezinglevel_height</th>
-            <td>Instant</td>
-            <td>meters</td>
-            <td>Altitude above sea level of the 0°C level</td>
-          </tr>
-          <tr>
-            <th scope="row">soil_temperature_0cm<br/>soil_temperature_6cm<br/>soil_temperature_18cm<br/>soil_temperature_54cm</th>
-            <td>Instant</td>
-            <td>°C (°F)</td>
-            <td>Temperature in the soil at 0, 6, 18 and 54 cm depths. 0 cm is the surface temperature on land or water surface temperature on water.</td>
-          </tr>
-          <tr>
-            <th scope="row">soil_moisture_0_1cm<br/>soil_moisture_1_3cm<br/>soil_moisture_3_9cm<br/>soil_moisture_9_27cm<br/>soil_moisture_27_81cm</th>
-            <td>Instant</td>
-            <td>m³/m³</td>
-            <td>Average soil water content as volumetric mixing ratio at 0-1, 1-3, 3-9, 9-27 and 27-81 cm depths.</td>
+            <td>Seconds</td>
+            <td>Peak period between wind and swell waves.</td>
           </tr>
         </tbody>
       </table>
@@ -739,69 +490,24 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row">temperature_2m_max<br>temperature_2m_min</th>
-            <td>°C (°F)</td>
-            <td>Maximum and minimum daily air temperature at 2 meters above ground</td>
+            <th scope="row">wave_height_max<br/>wind_wave_height_max<br/>swell_wave_height_max</th>
+            <td>Meter</td>
+            <td>Maximum wave height on a given day for mean, wind and swell waves</td>
           </tr>
           <tr>
-            <th scope="row">apparent_temperature_max<br>apparent_temperature_min</th>
-            <td>°C (°F)</td>
-            <td>Maximum and minimum daily apparent temperature</td>
-          </tr>
-          <tr>
-            <th scope="row">precipitation_sum</th>
-            <td>mm</td>
-            <td>Sum of daily precipitation (including rain, showers and snowfall)</td>
-          </tr>
-          <tr>
-            <th scope="row">rain_sum</th>
-            <td>mm</td>
-            <td>Sum of daily rain</td>
-          </tr>
-          <tr>
-            <th scope="row">showers_sum</th>
-            <td>mm</td>
-            <td>Sum of daily showers</td>
-          </tr>
-          <tr>
-            <th scope="row">snowfall_sum</th>
-            <td>cm</td>
-            <td>Sum of daily snowfall</td>
-          </tr>
-          <tr>
-            <th scope="row">precipitation_hours</th>
-            <td>hours</td>
-            <td>The number of hours with rain</td>
-          </tr>
-          <tr>
-            <th scope="row">weathercode</th>
-            <td>WMO code</td>
-            <td>The most severe weather condition on a given day</td>
-          </tr>
-          <tr>
-            <th scope="row">sunrise<br>sunset</th>
-            <td>iso8601</td>
-            <td>Sun rise and set times</td>
-          </tr>
-          <tr>
-            <th scope="row">windspeed_10m_max<br/>windgusts_10m_max</th>
-            <td>km/h (mph, m/s, knots)</td>
-            <td>Maximum wind speed and gusts on a day</td>
-          </tr>
-          <tr>
-            <th scope="row">winddirection_10m_dominant</th>
+            <th scope="row">wave_direction_dominant<br/>wind_wave_direction_dominant<br/>swell_wave_direction_dominant</th>
             <td>°</td>
-            <td>Dominant wind direction</td>
+            <td>Dominant wave direction of mean, wind and swell waves</td>
           </tr>
           <tr>
-            <th scope="row">shortwave_radiation_sum</th>
-            <td>MJ/m²</td>
-            <td>The sum of solar radiation on a given day in Megajoules</td>
+            <th scope="row">wave_period_max<br/>wind_wave_period_max<br/>swell_wave_period_max</th>
+            <td>Seconds</td>
+            <td>Maximum wave period of mean, wind and swell</td>
           </tr>
           <tr>
-            <th scope="row">et0_fao_evapotranspiration</th>
-            <td>mm</td>
-            <td>Daily sum of ET₀ Reference Evapotranspiration of a well watered grass field</td>
+            <th scope="row">wind_wave_peak_period_max<br/>swell_wave_peak_period_max</th>
+            <td>Seconds</td>
+            <td>Maximum peak period between wind and swell waves.</td>
           </tr>
         </tbody>
       </table>
@@ -817,18 +523,11 @@
   "utc_offset_seconds": 0,
   "hourly": {
     "time": ["2022-07-01T00:00", "2022-07-01T01:00", "2022-07-01T02:00", ...],
-    "temperature_2m": [13, 12.7, 12.7, 12.5, 12.5, 12.8, 13, 12.9, 13.3, ...]
+    "wave_height": [1, 1.7, 1.7, 1.5, 1.5, 1.8, 2.0, 1.9, 1.3, ...]
   },
   "hourly_units": {
-    "temperature_2m": "°C"
+    "wave_height": "m"
   },
-  "current_weather": {
-    "time": "2022-07-01T09:00",
-    "temperature": 13.3,
-    "weathercode": 3,
-    "windspeed": 10.3,
-    "winddirection": 262
-  }
 }
       </code></pre>
       <table class="table">
@@ -844,11 +543,6 @@
           <th scope="row">latitude, longitude</th>
           <td>Floating point</td>
           <td>WGS84 of the center of the weather grid-cell which was used to generate this forecast. This coordinate might be up to 5 km away.</td>
-        </tr>
-        <tr>
-          <th scope="row">elevation</th>
-          <td>Floating point</td>
-          <td>The elevation in meters of the selected weather grid-cell. In mountain terrain it might differ from the location you would expect.</td>
         </tr>
         <tr>
           <th scope="row">generationtime_ms</th>
@@ -880,11 +574,6 @@
           <td>Object</td>
           <td>For each selected daily weather variable, the unit will be listed here.</td>
         </tr>
-        <tr>
-          <th scope="row">current_weather</th>
-          <td>Object</td>
-          <td>Current weather conditions with the attributes: <mark>time</mark>, <mark>temperature</mark>, <mark>windspeed</mark>, <mark>winddirection</mark> and <mark>weathercode</mark></td>
-        </tr>
       </tbody>
     </table>
     <h3 class="mt-5">Errors</h3>
@@ -897,102 +586,11 @@
       </code></pre>
     </div>
 
+    <h2 id="citation">Citation & Acknowledgement</h2>
+    <p>Generated using ICON Wave forecast from the <a href="https://www.dwd.de/EN/service/copyright/copyright_node.html" target="_blank">German Weather Service DWD</a>.</p>
+    <p>All users of Open-Meteo data must provide a clear attribution to DWD as well as a reference to Open-Meteo.</p>
 
-    <div class="col-12 py-5">
-      <h2 id="weathervariables">Weather variable documentation</h2>
-    </div>
-
-    <div class="col-6">
-    <h3>WMO Weather interpretation codes (WW)</h3>
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Code</th>
-          <th scope="col">Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th scope="row">0</th>
-          <td>Clear sky</td>
-        </tr>
-        <tr>
-          <th scope="row">1, 2, 3</th>
-          <td>Mainly clear, partly cloudy, and overcast</td>
-        </tr>
-        <tr>
-          <th scope="row">45, 48</th>
-          <td>Fog and depositing rime fog</td>
-        </tr>
-        <tr>
-          <th scope="row">51, 53, 55</th>
-          <td>Drizzle: Light, moderate, and dense intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">56, 57</th>
-          <td>Freezing Drizzle: Light and dense intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">61, 63, 65</th>
-          <td>Rain: Slight, moderate and heavy intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">66, 67</th>
-          <td>Freezing Rain: Light and heavy intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">71, 73, 75</th>
-          <td>Snow fall: Slight, moderate, and heavy intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">77</th>
-          <td>Snow grains</td>
-        </tr>
-        <tr>
-          <th scope="row">80, 81, 82</th>
-          <td>Rain showers: Slight, moderate, and violent</td>
-        </tr>
-        <tr>
-          <th scope="row">85, 86</th>
-          <td>Snow showers slight and heavy</td>
-        </tr>
-        <tr>
-          <th scope="row">95 *</th>
-          <td>Thunderstorm: Slight or moderate</td>
-        </tr>
-        <tr>
-          <th scope="row">96, 99 *</th>
-          <td>Thunderstorm with slight and heavy hail</td>
-        </tr>
-      </tbody>
-    </table>
-    <p>(*) Thunderstorm forecast with hail is only available in Central Europe</p>
-    </div>
-
-    <!--<div class=col-12>
-      <h1>Docs</h1>
-      <div id="swagger-ui">
-      </div>
-    </div>-->
   </div>
-
-    <!--<link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.30.0/swagger-ui.css">
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.30.0/swagger-ui-bundle.js"></script>
-    <script>
-        const ui = SwaggerUIBundle({
-            url: '/docs/openapi.yml',
-        oauth2RedirectUrl: window.location.origin + '/docs/oauth2-redirect',
-            dom_id: '#swagger-ui',
-            presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIBundle.SwaggerUIStandalonePreset
-            ],
-            layout: "BaseLayout",
-            deepLinking: true,
-            showExtensions: true,
-            showCommonExtensions: true
-        })
-    </script>-->
 #endexport
 
 #export("footer"):

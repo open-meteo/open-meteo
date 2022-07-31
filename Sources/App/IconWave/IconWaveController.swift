@@ -22,6 +22,7 @@ struct IconWaveController {
             let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 11)
             let time = try params.getTimerange(current: currentTime, forecastDays: 7, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600)
+            let dailyTime = time.range.range(dtSeconds: 3600*24)
             
             guard let reader = try IconWaveMixer(domains: IconWaveDomain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .sea, time: hourlyTime) else {
                 fatalError("Not possible, because GWAM is global")
@@ -30,15 +31,26 @@ struct IconWaveController {
             if let hourlyVariables = params.hourly {
                 try reader.prefetchData(variables: hourlyVariables)
             }
+            if let dailyVariables = params.daily {
+                try reader.prefetchData(variables: dailyVariables)
+            }
             
             let hourly: ApiSection? = try params.hourly.map { variables in
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: variable.rawValue)
+                    let d = try reader.get(variable: variable).toApi(name: variable.rawValue)
                     res.append(d)
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            }
+            
+            let daily: ApiSection? = try params.daily.map { dailyVariables in
+                return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.map { variable in
+                    let d = try reader.getDaily(variable: variable).toApi(name: variable.rawValue)
+                    assert(dailyTime.count == d.data.count)
+                    return d
+                })
             }
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
@@ -49,7 +61,7 @@ struct IconWaveController {
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 current_weather: nil,
-                sections: [hourly].compactMap({$0}),
+                sections: [hourly, daily].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
             )
             return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
@@ -65,9 +77,10 @@ struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
     let hourly: [IconWaveVariable]?
-    let temperature_unit: TemperatureUnit?
-    let windspeed_unit: WindspeedUnit?
-    let precipitation_unit: PrecipitationUnit?
+    let daily: [IconWaveVariableDaily]?
+    //let temperature_unit: TemperatureUnit?
+    //let windspeed_unit: WindspeedUnit?
+    //let precipitation_unit: PrecipitationUnit?
     let timeformat: Timeformat?
     let past_days: Int?
     let format: ForecastResultFormat?
@@ -85,9 +98,9 @@ struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
         if longitude > 180 || longitude < -180 || longitude.isNaN {
             throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
         }
-        /*if daily?.count ?? 0 > 0 && timezone == nil {
+        if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
-        }*/
+        }
     }
     
     var timeformatOrDefault: Timeformat {

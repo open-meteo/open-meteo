@@ -13,7 +13,7 @@ public struct ForecastapiController: RouteCollection {
         let categoriesRoute = corsGroup.grouped("v1")
         categoriesRoute.get("forecast", use: self.query)
         categoriesRoute.get("ecmwf", use: EcmwfController().query)
-        categoriesRoute.get("icon-waves", use: IconWaveController().query)
+        categoriesRoute.get("marine", use: IconWaveController().query)
         categoriesRoute.get("era5", use: Era5Controller().query)
         categoriesRoute.get("elevation", use: DemController().query)
     }

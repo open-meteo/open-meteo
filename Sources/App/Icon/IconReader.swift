@@ -26,7 +26,6 @@ final class GenericReaderMixerCached<Domain: GenericDomain, Variable: GenericVar
     }
 }
 
-// TODO CACHE
 extension IconMixer {
     func getDaily(variable: DailyWeatherVariable, params: ForecastapiQuery) throws -> DataAndUnit {
         switch variable {
