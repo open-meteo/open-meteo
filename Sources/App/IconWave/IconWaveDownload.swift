@@ -89,6 +89,8 @@ struct DownloadIconWaveCommand: Command {
                         /// `NaN` out of domain, `-999` sea grid point
                         elevation[i] = elevation[i].isNaN ? .nan : -999
                     }
+                    //let data2d = Array2DFastSpace(data: elevation, nLocations: elevation.count, nTime: 1)
+                    //try data2d.writeNetcdf(filename: "\(downloadDirectory)elevation.nc", nx: nx, ny: ny)
                     try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: elevation)
                 }
                 

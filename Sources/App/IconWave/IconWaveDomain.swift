@@ -9,7 +9,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnu
     case ewam
     
     static var gwamElevation = try? OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
-    static var ewamElevation = try? OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
+    static var ewamElevation = try? OmFileReader(file: IconWaveDomain.ewam.surfaceElevationFileOm)
     
     var omfileDirectory: String {
         return "./data/omfile-\(rawValue)/"
