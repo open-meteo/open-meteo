@@ -64,7 +64,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnu
     }
 }
 
-enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleEnum, GenericVariable {
+enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleEnum, GenericVariableMixing {
     case windspeed_10m
     case winddirection_10m
     case significant_wave_height
@@ -80,6 +80,10 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
     case swell_wave_direction
     
     var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
     

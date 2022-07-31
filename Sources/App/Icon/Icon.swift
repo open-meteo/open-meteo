@@ -170,7 +170,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     }
 }
 
-enum IconVariable: String, CaseIterable, Codable, GenericVariable {
+enum IconVariable: String, CaseIterable, Codable, GenericVariableMixing {
     case temperature_2m
     case cloudcover // cloudcover total
     case cloudcover_low

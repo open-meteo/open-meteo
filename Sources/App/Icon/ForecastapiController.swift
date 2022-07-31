@@ -33,9 +33,14 @@ public struct ForecastapiController: RouteCollection {
             let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 8)
             let time = try params.getTimerange(current: currentTime, forecastDays: 7, allowedRange: allowedRange)
             
-            let reader = try IconMixer(lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: time.range)
-            let hourlyTime = reader.time
-            let dailyTime = reader.time.range.range(dtSeconds: 3600*24)
+            let hourlyTime = time.range.range(dtSeconds: 3600)
+            let dailyTime = time.range.range(dtSeconds: 3600*24)
+            
+            guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: hourlyTime) else {
+                fatalError("Not possible, as ICON is global")
+            }
+            
+            
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
                 try reader.prefetchData(variables: hourlyVariables)
@@ -58,12 +63,14 @@ public struct ForecastapiController: RouteCollection {
             let currentWeather: ForecastapiResult.CurrentWeather?
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
-                let time = starttime..<starttime.add(3600)
-                let reader = try IconMixer(lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: time)
-                let temperature = try reader.get(iconVariable: .temperature_2m).conertAndRound(params: params)
+                let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
+                guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: time) else {
+                    fatalError("Not possible, as ICON is global")
+                }
+                let temperature = try reader.get(variable: .temperature_2m).conertAndRound(params: params)
                 let winddirection = try reader.get(variable: .winddirection_10m).conertAndRound(params: params)
                 let windspeed = try reader.get(variable: .windspeed_10m).conertAndRound(params: params)
-                let weathercode = try reader.get(iconVariable: .weathercode).conertAndRound(params: params)
+                let weathercode = try reader.get(variable: .weathercode).conertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],
@@ -105,9 +112,9 @@ public struct ForecastapiController: RouteCollection {
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
-                latitude: reader.modelLat,
-                longitude: reader.modelLon,
-                elevation: reader.modelElevation,
+                latitude: reader.mixer.modelLat,
+                longitude: reader.mixer.modelLon,
+                elevation: reader.mixer.targetElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 current_weather: currentWeather,

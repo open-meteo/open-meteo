@@ -23,7 +23,9 @@ struct IconWaveController {
             let time = try params.getTimerange(current: currentTime, forecastDays: 7, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600)
             
-            let reader = try IconWaveMixer(lat: params.latitude, lon: params.longitude, time: time.range)
+            guard let reader = try IconWaveMixer(domains: IconWaveDomain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .sea, time: hourlyTime) else {
+                fatalError("Not possible, because GWAM is global")
+            }
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
                 try reader.prefetchData(variables: hourlyVariables)
@@ -56,6 +58,8 @@ struct IconWaveController {
         }
     }
 }
+
+typealias IconWaveMixer = GenericReaderMixer<IconWaveDomain, IconWaveVariable>
 
 struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
