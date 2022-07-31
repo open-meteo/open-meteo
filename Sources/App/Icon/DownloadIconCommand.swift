@@ -158,7 +158,7 @@ struct DownloadIconCommand: Command {
                     let level = v.level.map({"_\($0)"}) ?? "_2d"
                     filenameFrom = "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable).grib2.bz2"
                 }
-                let filenameDest = "single-level_\(h3)_\(variable.dwdVariableName.uppercased()).fpg"
+                let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
                     continue
                 }
@@ -212,7 +212,7 @@ struct DownloadIconCommand: Command {
             }
             logger.info("Converting \(variable)")
             
-            let v = variable.dwdVariableName.uppercased()
+            let v = variable.omFileName.uppercased()
 
             /// space oriented, but after 72 hours only 3 hour values are filled.
             /// 2.86GB high water for this array
@@ -422,7 +422,7 @@ struct DownloadIconCommand: Command {
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
-            try om.updateFromSpaceOriented(variable: variable.dwdVariableName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: skipLast, scalefactor: variable.scalefactor)
+            try om.updateFromSpaceOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: skipLast, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
         logger.info("write init.txt")

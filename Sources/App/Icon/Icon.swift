@@ -465,12 +465,12 @@ enum IconVariable: String, CaseIterable, Codable, GenericVariable {
         case .v_120m: return ("v", "model-level", domain.numberOfModelFullLevels-3)
         case .u_180m: return ("u", "model-level", domain.numberOfModelFullLevels-4)
         case .v_180m: return ("v", "model-level", domain.numberOfModelFullLevels-4)
-        default: return (dwdVariableName, "single-level", nil)
+        default: return (omFileName, "single-level", nil)
         }
     }
     
     /// Name in dwd filenames
-    var dwdVariableName: String {
+    var omFileName: String {
         switch self {
         case .temperature_2m: return "t_2m"
         case .cloudcover: return "clct"
@@ -511,10 +511,6 @@ enum IconVariable: String, CaseIterable, Codable, GenericVariable {
         case .snowfall_convective_water_equivalent: return "snow_con"
         case .snowfall_water_equivalent: return "snow_gsp"
         }
-    }
-    
-    var omFileName: String {
-        return dwdVariableName
     }
     
     var interpolation: ReaderInterpolation {
