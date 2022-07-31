@@ -10,6 +10,7 @@ enum ForecastapiError: Error {
     case startAndEnddataMustBeSpecified
     case invalidTimezone
     case timezoneNotSupported
+    case noDataAvilableForThisLocation
     case timezoneRequired
     case pastDaysParameterNotAllowedWithStartEndRange
     case latitudeAndLongitudeSameCount
@@ -50,6 +51,8 @@ extension ForecastapiError: AbortError {
             return "Parameter 'latitude' and 'longitude' must not be empty"
         case .latitudeAndLongitudeMaximum(max: let max):
             return "Parameter 'latitude' and 'longitude' must not exceed \(max) coordinates."
+        case .noDataAvilableForThisLocation:
+            return "No data is available for this location"
         }
     }
 }

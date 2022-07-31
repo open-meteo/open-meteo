@@ -20,6 +20,7 @@ public func configure(_ app: Application) throws {
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
     app.commands.use(DownloadIconCommand(), as: "download")
+    app.commands.use(DownloadIconWaveCommand(), as: "download-iconwave")
     app.commands.use(DownloadEcmwfCommand(), as: "download-ecmwf")
     app.commands.use(DownloadEra5Command(), as: "download-era5")
     app.commands.use(DownloadDemCommand(), as: "download-dem")

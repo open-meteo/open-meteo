@@ -50,6 +50,10 @@ public struct Timestamp {
         Timestamp(timeIntervalSince1970 - timeIntervalSince1970 % toNearest)
     }
     
+    public func ceil(toNearest: Int) -> Timestamp {
+        Timestamp(timeIntervalSince1970.ceil(to: toNearest))
+    }
+    
     public func toComponents() -> IsoDate {
         return IsoDate(timeIntervalSince1970: timeIntervalSince1970)
     }

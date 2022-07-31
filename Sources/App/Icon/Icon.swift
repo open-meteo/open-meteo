@@ -4,7 +4,7 @@ import SwiftPFor2D
 
 
 /// Singleton class to keep state for icon domains. E.g. keep files open for fast access.
-final class IconDomain {
+/*final class IconDomain {
     static let icon = IconDomain(.icon)
     static let iconEu = IconDomain(.iconEu)
     static let iconD2 = IconDomain(.iconD2)
@@ -49,20 +49,32 @@ final class IconDomain {
         let start = end - (domain.omFileLength + 24) * 3600
         return Timestamp(start) ..< Timestamp(end)
     }
-}
+}*/
 
 /// Static information about a domain
-enum IconDomains: String, CaseIterable {
+enum IconDomains: String, CaseIterable, GenericDomain {
     /// hourly data until forecast hour 78, then 3 h until 180
     case icon
     case iconEu = "icon-eu"
     case iconD2 = "icon-d2"
     
-    var instance: IconDomain {
+    
+    private static var iconElevataion = try? OmFileReader(file: Self.icon.surfaceElevationFileOm)
+    private static var iconD2Elevataion = try? OmFileReader(file: Self.iconD2.surfaceElevationFileOm)
+    private static var iconEuElevataion = try? OmFileReader(file: Self.iconEu.surfaceElevationFileOm)
+    
+    var dtSeconds: Int {
+        return 3600
+    }
+    
+    var elevationFile: OmFileReader? {
         switch self {
-        case .icon: return .icon
-        case .iconEu: return .iconEu
-        case .iconD2: return .iconD2
+        case .icon:
+            return Self.iconElevataion
+        case .iconEu:
+            return Self.iconEuElevataion
+        case .iconD2:
+            return Self.iconD2Elevataion
         }
     }
 
@@ -158,7 +170,7 @@ enum IconDomains: String, CaseIterable {
     }
 }
 
-enum IconVariable: String, CaseIterable, Codable {
+enum IconVariable: String, CaseIterable, Codable, GenericVariableMixing {
     case temperature_2m
     case cloudcover // cloudcover total
     case cloudcover_low
@@ -453,12 +465,12 @@ enum IconVariable: String, CaseIterable, Codable {
         case .v_120m: return ("v", "model-level", domain.numberOfModelFullLevels-3)
         case .u_180m: return ("u", "model-level", domain.numberOfModelFullLevels-4)
         case .v_180m: return ("v", "model-level", domain.numberOfModelFullLevels-4)
-        default: return (dwdVariableName, "single-level", nil)
+        default: return (omFileName, "single-level", nil)
         }
     }
     
     /// Name in dwd filenames
-    var dwdVariableName: String {
+    var omFileName: String {
         switch self {
         case .temperature_2m: return "t_2m"
         case .cloudcover: return "clct"
@@ -499,6 +511,14 @@ enum IconVariable: String, CaseIterable, Codable {
         case .snowfall_convective_water_equivalent: return "snow_con"
         case .snowfall_water_equivalent: return "snow_gsp"
         }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        fatalError("Icon interpolation not required for reader. Already 1h")
+    }
+    
+    var isElevationCorrectable: Bool {
+        return self == .temperature_2m || self == .dewpoint_2m
     }
 }
 

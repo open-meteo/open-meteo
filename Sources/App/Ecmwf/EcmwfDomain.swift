@@ -1,11 +1,14 @@
 import Foundation
 import Vapor
+import SwiftPFor2D
 
 
-final class EcmwfDomain {
-    static let instance = EcmwfDomain()
-    private init() {
-        initTime = InitTxtReader(Self.initFileName)
+enum EcmwfDomain: GenericDomain {
+    case ifs04
+    
+    /// There is no elevation file for ECMWF
+    var elevationFile: OmFileReader? {
+        return nil
     }
     
     func getDownloadForecastSteps(run: Int) -> [Int] {
@@ -16,11 +19,16 @@ final class EcmwfDomain {
         }
     }
     
-    static var initFileName: String {
+    /// Filename of the surface elevation file
+    var surfaceElevationFileOm: String {
+        "\(omfileDirectory)HSURF.om"
+    }
+    
+    var initFileName: String {
         return "\(omfileDirectory)init.txt"
     }
     
-    static var omfileDirectory: String {
+    var omfileDirectory: String {
         return "./data/omfile-ecmwf/"
     }
     
@@ -29,18 +37,11 @@ final class EcmwfDomain {
         return (240 + 3*24) / dtHours
     }
     
-    var dtHours: Int {
-        return 3
-    }
-    
     var dtSeconds: Int {
-        return dtHours*3600
+        return 3*3600
     }
-    
-    public var initTime: InitTxtReader
     
     var grid: RegularGrid {
-        // TODO is one latitude row useless?
         return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360/900, dy: 180/450)
     }
 }
@@ -70,56 +71,22 @@ enum EcmwfVariableDerived: String, Codable {
 }
 
 
-struct EcmwfReader {
-    let domain: EcmwfDomain
-    
-    /// Grid index in data files
-    let position: Int
-    let time: TimerangeDt
-    
-    /// Elevstion of the grid point
-    // let modelElevation: Float
-    let modelLat: Float
-    let modelLon: Float
-    
-    let omFileSplitter: OmFileSplitter
-    
-    /// Will shrink time according to ring time
-    public init(domain: EcmwfDomain, lat: Float, lon: Float, time: Range<Timestamp>) throws {
-        // check if coordinates are in domain, otherwise return nil
-        guard let gridpoint = domain.grid.findPoint(lat: lat, lon: lon) else {
-            fatalError("ecmwf grid res: not possible")
-        }
-        self.domain = domain
-        self.position = gridpoint
-        self.time = time.range(dtSeconds: domain.dtSeconds)
-        
-        //modelElevation = self.domain.elevationFile.data[gridpoint].toFloat32()
-        //guard modelElevation.isNaN == false else {
-        //    return nil
-        //}
-        
-        omFileSplitter = OmFileSplitter(basePath: EcmwfDomain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        
-        (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint)
-    }
-    
+typealias EcmwfReader = GenericReader<EcmwfDomain, EcmwfVariable>
+
+extension EcmwfReader {
     func prefetchData(variables: [EcmwfHourlyVariable]) throws {
         for variable in variables {
             switch variable {
             case .raw(let ecmwfVariable):
                 try prefetchData(variable: ecmwfVariable)
             case .derived(let ecmwfVariableDerived):
-                try prefetchData(variable: ecmwfVariableDerived)
+                try prefetchData(derived: ecmwfVariableDerived)
             }
         }
     }
     
-    func prefetchData(variable: EcmwfVariable) throws {
-        try omFileSplitter.willNeed(variable: variable.nameInFiles, location: position, time: time)
-    }
-    func prefetchData(variable: EcmwfVariableDerived) throws {
-        switch variable {
+    func prefetchData(derived: EcmwfVariableDerived) throws {
+        switch derived {
         case .windspeed_10m:
             try prefetchData(variable: .northward_wind_10m)
             try prefetchData(variable: .eastward_wind_10m)
@@ -181,123 +148,118 @@ struct EcmwfReader {
             try prefetchData(variable: .northward_wind_50hPa)
             try prefetchData(variable: .eastward_wind_50hPa)
         }
-    }
-    
-    func get(ecmwfVariable: EcmwfVariable) throws -> DataAndUnit {
-        let data = try omFileSplitter.read(variable: ecmwfVariable.nameInFiles, location: position, time: time)
-        return DataAndUnit(data, ecmwfVariable.unit)
     }
     
     func get(variable: EcmwfHourlyVariable) throws -> DataAndUnit {
         switch variable {
         case .raw(let ecmwfVariable):
-            return try get(ecmwfVariable: ecmwfVariable)
+            return try get(variable: ecmwfVariable)
         case .derived(let ecmwfVariableDerived):
-            return try get(variable: ecmwfVariableDerived)
+            return try get(derived: ecmwfVariableDerived)
         }
     }
     
     
-    func get(variable: EcmwfVariableDerived) throws -> DataAndUnit {
-        switch variable {
+    func get(derived: EcmwfVariableDerived) throws -> DataAndUnit {
+        switch derived {
         case .windspeed_10m:
-            let u = try get(ecmwfVariable: .northward_wind_10m)
-            let v = try get(ecmwfVariable: .eastward_wind_10m)
+            let u = try get(variable: .northward_wind_10m)
+            let v = try get(variable: .eastward_wind_10m)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .winddirection_10m:
-            let u = try get(ecmwfVariable: .northward_wind_10m)
-            let v = try get(ecmwfVariable: .eastward_wind_10m)
+            let u = try get(variable: .northward_wind_10m)
+            let v = try get(variable: .eastward_wind_10m)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .windspeed_1000hPa:
-            let u = try get(ecmwfVariable: .northward_wind_1000hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_1000hPa)
+            let u = try get(variable: .northward_wind_1000hPa)
+            let v = try get(variable: .eastward_wind_1000hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .windspeed_925hPa:
-            let u = try get(ecmwfVariable: .northward_wind_925hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_925hPa)
+            let u = try get(variable: .northward_wind_925hPa)
+            let v = try get(variable: .eastward_wind_925hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .windspeed_850hPa:
-            let u = try get(ecmwfVariable: .northward_wind_850hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_850hPa)
+            let u = try get(variable: .northward_wind_850hPa)
+            let v = try get(variable: .eastward_wind_850hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .windspeed_700hPa:
-            let u = try get(ecmwfVariable: .northward_wind_700hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_700hPa)
+            let u = try get(variable: .northward_wind_700hPa)
+            let v = try get(variable: .eastward_wind_700hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .windspeed_500hPa:
-            let u = try get(ecmwfVariable: .northward_wind_500hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_500hPa)
+            let u = try get(variable: .northward_wind_500hPa)
+            let v = try get(variable: .eastward_wind_500hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .windspeed_300hPa:
-            let u = try get(ecmwfVariable: .northward_wind_300hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_300hPa)
+            let u = try get(variable: .northward_wind_300hPa)
+            let v = try get(variable: .eastward_wind_300hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .windspeed_250hPa:
-            let u = try get(ecmwfVariable: .northward_wind_250hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_250hPa)
+            let u = try get(variable: .northward_wind_250hPa)
+            let v = try get(variable: .eastward_wind_250hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .windspeed_200hPa:
-            let u = try get(ecmwfVariable: .northward_wind_200hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_200hPa)
+            let u = try get(variable: .northward_wind_200hPa)
+            let v = try get(variable: .eastward_wind_200hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .windspeed_50hPa:
-            let u = try get(ecmwfVariable: .northward_wind_50hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_50hPa)
+            let u = try get(variable: .northward_wind_50hPa)
+            let v = try get(variable: .eastward_wind_50hPa)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .winddirection_1000hPa:
-            let u = try get(ecmwfVariable: .northward_wind_1000hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_1000hPa)
+            let u = try get(variable: .northward_wind_1000hPa)
+            let v = try get(variable: .eastward_wind_1000hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .winddirection_925hPa:
-            let u = try get(ecmwfVariable: .northward_wind_925hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_925hPa)
+            let u = try get(variable: .northward_wind_925hPa)
+            let v = try get(variable: .eastward_wind_925hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .winddirection_850hPa:
-            let u = try get(ecmwfVariable: .northward_wind_850hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_850hPa)
+            let u = try get(variable: .northward_wind_850hPa)
+            let v = try get(variable: .eastward_wind_850hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .winddirection_700hPa:
-            let u = try get(ecmwfVariable: .northward_wind_700hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_700hPa)
+            let u = try get(variable: .northward_wind_700hPa)
+            let v = try get(variable: .eastward_wind_700hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .winddirection_500hPa:
-            let u = try get(ecmwfVariable: .northward_wind_500hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_500hPa)
+            let u = try get(variable: .northward_wind_500hPa)
+            let v = try get(variable: .eastward_wind_500hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .winddirection_300hPa:
-            let u = try get(ecmwfVariable: .northward_wind_300hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_300hPa)
+            let u = try get(variable: .northward_wind_300hPa)
+            let v = try get(variable: .eastward_wind_300hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .winddirection_250hPa:
-            let u = try get(ecmwfVariable: .northward_wind_250hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_250hPa)
+            let u = try get(variable: .northward_wind_250hPa)
+            let v = try get(variable: .eastward_wind_250hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .winddirection_200hPa:
-            let u = try get(ecmwfVariable: .northward_wind_200hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_200hPa)
+            let u = try get(variable: .northward_wind_200hPa)
+            let v = try get(variable: .eastward_wind_200hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .winddirection_50hPa:
-            let u = try get(ecmwfVariable: .northward_wind_50hPa)
-            let v = try get(ecmwfVariable: .eastward_wind_50hPa)
+            let u = try get(variable: .northward_wind_50hPa)
+            let v = try get(variable: .eastward_wind_50hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         }
@@ -305,7 +267,7 @@ struct EcmwfReader {
 }
 
 
-final class InitTxtReader {
+/*final class InitTxtReader {
     private let lock = Lock()
     private var time = InitTime(initTime: Timestamp(0), length: 0, range: Timestamp(0)..<Timestamp(0))
     private var update: TimeInterval = 0
@@ -338,4 +300,4 @@ final class InitTxtReader {
             return time
         }
     }
-}
+}*/

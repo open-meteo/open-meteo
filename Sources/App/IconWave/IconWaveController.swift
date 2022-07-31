@@ -2,7 +2,7 @@ import Foundation
 import Vapor
 
 
-struct EcmwfController {
+struct IconWaveController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
         do {
             // API should only be used on the subdomain
@@ -10,30 +10,42 @@ struct EcmwfController {
                 throw Abort.init(.notFound)
             }
             let generationTimeStart = Date()
-            let params = try req.query.decode(EcmwfQuery.self)
+            let params = try req.query.decode(IconWaveQuery.self)
             try params.validate()
             let currentTime = Timestamp.now()
             
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 11)
-            let time = try params.getTimerange(current: currentTime, forecastDays: 10, allowedRange: allowedRange)
-            let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
+            let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 11)
+            let time = try params.getTimerange(current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+            let hourlyTime = time.range.range(dtSeconds: 3600)
+            let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest, time: hourlyTime) else {
-                fatalError("Not possible, ECMWF is global")
+            guard let reader = try IconWaveMixer(domains: IconWaveDomain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .sea, time: hourlyTime) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
                 try reader.prefetchData(variables: hourlyVariables)
+            }
+            if let dailyVariables = params.daily {
+                try reader.prefetchData(variables: dailyVariables)
             }
             
             let hourly: ApiSection? = try params.hourly.map { variables in
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: variable.name)
+                    let d = try reader.get(variable: variable).toApi(name: variable.rawValue)
                     res.append(d)
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            }
+            
+            let daily: ApiSection? = try params.daily.map { dailyVariables in
+                return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.map { variable in
+                    let d = try reader.getDaily(variable: variable).toApi(name: variable.rawValue)
+                    assert(dailyTime.count == d.data.count)
+                    return d
+                })
             }
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
@@ -44,7 +56,7 @@ struct EcmwfController {
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 current_weather: nil,
-                sections: [hourly].compactMap({$0}),
+                sections: [hourly, daily].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
             )
             return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
@@ -54,51 +66,16 @@ struct EcmwfController {
     }
 }
 
-enum VariableOrDerived<Raw, Derived>: Codable where Raw: Codable, Raw: RawRepresentable, Derived: Codable, Derived: RawRepresentable, Raw.RawValue == Derived.RawValue {
-    case raw(Raw)
-    case derived(Derived)
-    
-    init(from decoder: Decoder) throws {
-        do {
-            let variable = try Derived(from: decoder)
-            self = .derived(variable)
-            return
-        } catch {
-            let variable = try Raw(from: decoder)
-            self = .raw(variable)
-            return
-        }
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        switch self {
-        case .raw(let value):
-            try value.encode(to: encoder)
-        case .derived(let value):
-            try value.encode(to: encoder)
-        }
-    }
-    
-    var name: Raw.RawValue {
-        switch self {
-        case .raw(let variable): return variable.rawValue
-        case .derived(let variable): return variable.rawValue
-        }
-    }
-}
+typealias IconWaveMixer = GenericReaderMixer<IconWaveDomain, IconWaveVariable>
 
-typealias EcmwfHourlyVariable = VariableOrDerived<EcmwfVariable, EcmwfVariableDerived>
-
-struct EcmwfQuery: Content, QueryWithStartEndDateTimeZone {
+struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let hourly: [EcmwfHourlyVariable]?
-    //let current_weather: Bool?
-    let elevation: Float?
-    //let timezone: String?
-    let temperature_unit: TemperatureUnit?
-    let windspeed_unit: WindspeedUnit?
-    let precipitation_unit: PrecipitationUnit?
+    let hourly: [IconWaveVariable]?
+    let daily: [IconWaveVariableDaily]?
+    //let temperature_unit: TemperatureUnit?
+    //let windspeed_unit: WindspeedUnit?
+    //let precipitation_unit: PrecipitationUnit?
     let timeformat: Timeformat?
     let past_days: Int?
     let format: ForecastResultFormat?
@@ -109,7 +86,6 @@ struct EcmwfQuery: Content, QueryWithStartEndDateTimeZone {
     /// included end date `2022-06-01`
     let end_date: IsoDate?
     
-    
     func validate() throws {
         if latitude > 90 || latitude < -90 || latitude.isNaN {
             throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
@@ -117,12 +93,9 @@ struct EcmwfQuery: Content, QueryWithStartEndDateTimeZone {
         if longitude > 180 || longitude < -180 || longitude.isNaN {
             throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
         }
-        if let timezone = timezone, !timezone.isEmpty {
-            throw ForecastapiError.timezoneNotSupported
-        }
-        /*if daily?.count ?? 0 > 0 && timezone == nil {
+        if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
-        }*/
+        }
     }
     
     var timeformatOrDefault: Timeformat {

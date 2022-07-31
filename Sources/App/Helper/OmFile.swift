@@ -17,7 +17,7 @@ struct OmFileSplitter {
     /// actually also in file
     let nTimePerFile: Int
     
-    /// Compression ratio largly depends on chunk size for location. For small timeranges e.g. icon-d2 (121 timesteps per file the nlocation paramter effects the file size:
+    /// Compression ratio largly depends on chunk size for location. For small timeranges e.g. icon-d2 (121 timesteps per file the nlocation parameter effects the file size:
     /// 1 = 2.09 GB
     /// 2 = 1.15 GB
     /// 6 = 870.7 MB
