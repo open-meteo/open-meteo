@@ -1,5 +1,7 @@
 import Foundation
 
+typealias IconReader = GenericReader<IconDomains, IconVariable>
+
 final class IconMixer {
     let reader: [IconReader]
     let modelElevation: Float
@@ -28,10 +30,10 @@ final class IconMixer {
         
         // Read data from available domains
         let datas = try reader.map {
-            try $0.get(iconVariable: iconVariable, targetAsl: modelElevation)
+            try $0.get(variable: iconVariable)
         }
         // icon global
-        var first = datas.first!
+        var first = datas.first!.data
         
         if iconVariable.requiresOffsetCorrectionForMixing {
             // For soil moisture, we have to correct offsets at model mixing
@@ -43,14 +45,14 @@ final class IconMixer {
             }
             // integrate other models, but use convert to delta
             for d in datas.dropFirst() {
-                for x in d.indices.reversed() {
-                    if d[x].isNaN {
+                for x in d.data.indices.reversed() {
+                    if d.data[x].isNaN {
                         continue
                     }
                     if x > 0 {
-                        first[x] = d[x-1] - d[x]
+                        first[x] = d.data[x-1] - d.data[x]
                     } else {
-                        first[x] = d[x]
+                        first[x] = d.data[x]
                     }
                 }
             }
@@ -61,16 +63,16 @@ final class IconMixer {
         } else {
             // default case, just place new data in 1:1
             for d in datas.dropFirst() {
-                for x in d.indices {
-                    if d[x].isNaN {
+                for x in d.data.indices {
+                    if d.data[x].isNaN {
                         continue
                     }
-                    first[x] = d[x]
+                    first[x] = d.data[x]
                 }
             }
         }
         cache[iconVariable] = first
-        return DataAndUnit(first, iconVariable.unit)
+        return DataAndUnit(first, datas.first!.unit)
     }
     
     func getDaily(variable: DailyWeatherVariable, params: ForecastapiQuery) throws -> DataAndUnit {
@@ -147,7 +149,7 @@ final class IconMixer {
     
     func prefetchData(iconVariable: IconVariable) throws {
         for reader in reader {
-            try reader.prefetchData(iconVariable: iconVariable)
+            try reader.prefetchData(variable: iconVariable)
         }
     }
     
@@ -375,57 +377,3 @@ final class IconMixer {
     }
 }
 
-struct IconReader {
-    let domain: IconDomain
-    
-    /// Grid index in data files
-    let position: Int
-    //let timeIndices: Range<Int>
-    let time: TimerangeDt
-    
-    /// Elevstion of the grid point
-    let modelElevation: Float
-    let modelLat: Float
-    let modelLon: Float
-    
-    /// If set, use new data files
-    let omFileSplitter: OmFileSplitter
-    
-    /// Will shrink time according to ring time
-    public init?(domain: IconDomains, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, time: TimerangeDt) throws {
-        // check if coordinates are in domain, otherwise return nil
-        guard let gridpoint = try domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: domain.instance.elevationFile, mode: mode) else {
-            return nil
-        }
-        self.domain = domain.instance
-        self.position = gridpoint.gridpoint
-        //let runTime = self.domain.getRun()
-        //let commonTime = time.range.clamped(to: runTime)
-        self.time = time
-        
-        // sea grid points are set to -999
-        self.modelElevation = gridpoint.gridElevation
-        
-        omFileSplitter = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        
-        (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
-    }
-    
-    func prefetchData(iconVariable: IconVariable) throws {
-        try omFileSplitter.willNeed(variable: iconVariable.rawValue, location: position, time: time)
-    }
-    
-    func get(iconVariable: IconVariable, targetAsl: Float) throws -> [Float] {
-        // TODO this float array could be reused... e.g. allocate one array per instance
-        // OR use one array to merge all domains already into the same array
-        var data = try omFileSplitter.read(variable: iconVariable.dwdVariableName, location: position, time: time)
-        
-        if iconVariable == .temperature_2m || iconVariable == .dewpoint_2m {
-            for i in data.indices {
-                // correct temperature by 0.65° per 100 m elevation
-                data[i] += (modelElevation - targetAsl) * 0.0065
-            }
-        }
-        return data
-    }
-}

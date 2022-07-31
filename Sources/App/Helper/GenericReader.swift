@@ -40,6 +40,9 @@ protocol GenericVariable {
     
     /// SI unit of this variable
     var unit: SiUnit { get }
+    
+    /// If true, temperature will be corrected by 0.65°K per 100 m
+    var isElevationCorrectable: Bool { get }
 }
 
 enum ReaderInterpolation {
@@ -77,6 +80,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     /// Elevation of the grid point
     let modelElevation: Float
     
+    /// The desired elevation. Used to correct temperature forecasts
+    let targetElevation: Float
+    
     /// Latitude of the grid point
     let modelLat: Float
     
@@ -96,6 +102,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         self.position = gridpoint.gridpoint
         self.time = time
         self.modelElevation = gridpoint.gridElevation
+        self.targetElevation = elevation
         
         omFileSplitter = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
@@ -109,11 +116,18 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     
     /// Read and scale if required
     private func readAndScale(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        let data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
+        var data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
         
         /// Scale pascal to hecto pasal. Case in era5
         if variable.unit == .pascal {
             return DataAndUnit(data.map({$0 / 100}), .hectoPascal)
+        }
+        
+        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN {
+            for i in data.indices {
+                // correct temperature by 0.65° per 100 m elevation
+                data[i] += (modelElevation - targetElevation) * 0.0065
+            }
         }
         
         return DataAndUnit(data, variable.unit)

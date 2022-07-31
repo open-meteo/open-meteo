@@ -33,11 +33,11 @@ final class DataTests: XCTestCase {
     func testElevationMatching() throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: Dem90.omDirectory), "Elevation information unavailable")
         
-        let optimised = try IconDomain.iconD2.domain.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomain.iconD2.elevationFile)!
+        let optimised = try IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.elevationFile!)!
         XCTAssertEqual(optimised.gridpoint, 225405)
         XCTAssertEqual(optimised.gridElevation, 600)
         
-        let nearest = try IconDomain.iconD2.domain.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomain.iconD2.elevationFile)!
+        let nearest = try IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.elevationFile!)!
         XCTAssertEqual(nearest.gridpoint, 225406)
         XCTAssertEqual(nearest.gridElevation, 1006.0)
     }

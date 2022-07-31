@@ -15,7 +15,7 @@ enum Era5: GenericDomain {
         return Self.era5ElevationFile
     }
     
-    private static var era5ElevationFile = try! OmFileReader(file: Self.era5.surfaceElevationFileOm)
+    private static var era5ElevationFile = try? OmFileReader(file: Self.era5.surfaceElevationFileOm)
     
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
@@ -73,6 +73,10 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     case shortwave_radiation
     case precipitation
     case direct_radiation
+    
+    var isElevationCorrectable: Bool {
+        return self == .temperature_2m || self == .dewpoint_2m
+    }
     
     var omFileName: String {
         return rawValue

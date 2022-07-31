@@ -8,8 +8,8 @@ enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnu
     case gwam
     case ewam
     
-    static var gwamElevation = try! OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
-    static var ewamElevation = try! OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
+    static var gwamElevation = try? OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
+    static var ewamElevation = try? OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
     
     var omfileDirectory: String {
         return "./data/omfile-\(rawValue)/"
@@ -78,6 +78,10 @@ enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleE
     case swell_wave_period
     case swell_wave_peak_period
     case swell_wave_direction
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
     
     var omFileName: String {
         return rawValue
