@@ -372,7 +372,7 @@
             <td>String array</td>
             <td>No</td>
             <td></td>
-            <td>A list of daily weather variable aggregations which should be returned. Values can be comma separated, or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are specified, paramter <mark>timezone</mark> is required.</td>
+            <td>A list of daily weather variable aggregations which should be returned. Values can be comma separated, or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are specified, parameter <mark>timezone</mark> is required.</td>
           </tr>
           <tr>
             <th scope="row">timeformat</th>
