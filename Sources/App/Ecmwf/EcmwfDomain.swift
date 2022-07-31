@@ -6,10 +6,9 @@ import SwiftPFor2D
 enum EcmwfDomain: GenericDomain {
     case ifs04
     
-    static var ifs04Elevation = try! OmFileReader(file: EcmwfDomain.ifs04.surfaceElevationFileOm)
-    
-    var elevationFile: OmFileReader {
-        return Self.ifs04Elevation
+    /// There is no elevation file for ECMWF
+    var elevationFile: OmFileReader? {
+        return nil
     }
     
     func getDownloadForecastSteps(run: Int) -> [Int] {

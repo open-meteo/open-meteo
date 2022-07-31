@@ -22,7 +22,9 @@ struct Era5Controller {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            let reader = try Era5Reader(lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: time.range)
+            guard let reader = try Era5Reader(domain: Era5.era5, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: hourlyTime) else {
+                fatalError("Not possible, ERA5 is global")
+            }
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
                 try reader.prefetchData(variables: hourlyVariables)
@@ -198,41 +200,9 @@ struct Era5Query: Content, QueryWithTimezone {
     }*/
 }
 
-struct Era5Reader {
-    //let domain: Era5
-    
-    /// Grid index in data files
-    let position: Int
-    let time: TimerangeDt
-    
-    /// Elevstion of the grid point
-    let modelElevation: Float
-    let modelLat: Float
-    let modelLon: Float
-    
-    let omFileSplitter: OmFileSplitter
-    
-    /// Will shrink time according to ring time
-    public init(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, time: Range<Timestamp>) throws {
-        // check if coordinates are in domain, otherwise return nil
-        let time = time.range(dtSeconds: 3600)
-        guard let gridpoint = try Era5.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: Era5.instance.elevationFile, mode: mode) else {
-            fatalError("ecmwf grid res: not possible")
-        }
-        //self.domain = domain
-        self.position = gridpoint.gridpoint
-        //let initTime = domain.initTime.get()
-        //let ringTime = initTime.ringtime
-        //let commonTime = time.clamped(to: ringTime)
-        self.time = time
-        
-        modelElevation = gridpoint.gridElevation
-        
-        omFileSplitter = OmFileSplitter(basePath: Era5.omfileDirectory, nLocations: Era5.grid.count, nTimePerFile: Era5.omFileLength, yearlyArchivePath: Era5.omfileArchive)
-        
-        (modelLat, modelLon) = Era5.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
-    }
-    
+typealias Era5Reader = GenericReader<Era5, Era5Variable>
+
+extension Era5Reader {
     func prefetchData(variables: [Era5HourlyVariable]) throws {
         for variable in variables {
             switch variable {
@@ -244,9 +214,6 @@ struct Era5Reader {
         }
     }
     
-    func prefetchData(variable: Era5Variable) throws {
-        try omFileSplitter.willNeed(variable: variable.rawValue, location: position, time: time)
-    }
     func prefetchData(derived: Era5VariableDerived) throws {
         switch derived {
         case .windspeed_10m:
@@ -346,17 +313,6 @@ struct Era5Reader {
                 try prefetchData(variable: .snowfall_water_equivalent)
             }
         }
-    }
-    
-    func get(variable: Era5Variable) throws -> DataAndUnit {
-        let data = try omFileSplitter.read(variable: variable.rawValue, location: position, time: time)
-        
-        /// Pressure is scaled in Pa
-        if variable == .pressure_msl {
-            return DataAndUnit(data.map({$0 / 100}), .hectoPascal)
-        }
-        
-        return DataAndUnit(data, variable.unit)
     }
     
     func get(variable: Era5HourlyVariable) throws -> DataAndUnit {

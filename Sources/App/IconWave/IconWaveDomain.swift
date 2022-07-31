@@ -20,7 +20,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnu
         "\(omfileDirectory)HSURF.om"
     }
     
-    var elevationFile: OmFileReader {
+    var elevationFile: OmFileReader? {
         switch self {
         case .gwam:
             return Self.gwamElevation

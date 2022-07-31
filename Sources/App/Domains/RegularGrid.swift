@@ -31,7 +31,15 @@ struct RegularGrid {
         return (lat, lon)
     }
     
-    func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader, mode: GridSelectionMode) throws -> (gridpoint: Int, gridElevation: Float)? {
+    func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader?, mode: GridSelectionMode) throws -> (gridpoint: Int, gridElevation: Float)? {
+        guard let elevationFile = elevationFile else {
+            guard let point = findPoint(lat: lat, lon: lon) else {
+                return nil
+            }
+            return (point, .nan)
+        }
+
+        
         switch mode {
         case .terrainOptimised:
             return try findPointTerrainOptimised(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile)

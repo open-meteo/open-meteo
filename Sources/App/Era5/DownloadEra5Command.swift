@@ -4,31 +4,38 @@ import SwiftNetCDF
 import SwiftPFor2D
 
 
-struct Era5 {
-    static let instance = Era5()
-    private init() {}
+enum Era5: GenericDomain {
+    case era5
     
-    let elevationFile = try! OmFileReader(file: Self.surfaceElevationFileOm)
+    var dtSeconds: Int {
+        return 3600
+    }
+    
+    var elevationFile: OmFileReader? {
+        return Self.era5ElevationFile
+    }
+    
+    private static var era5ElevationFile = try! OmFileReader(file: Self.era5.surfaceElevationFileOm)
     
     /// Filename of the surface elevation file
-    static var surfaceElevationFileOm: String {
+    var surfaceElevationFileOm: String {
         "\(omfileDirectory)HSURF.om"
     }
     
-    static var downloadDirectory: String {
+    var downloadDirectory: String {
         return "./data/era5/"
     }
     
-    static var omfileDirectory: String {
+    var omfileDirectory: String {
         return "./data/omfile-era5/"
     }
     
-    static var omfileArchive: String? {
+    var omfileArchive: String? {
         return "./data/yearly-era5/"
     }
     
     /// Use store 14 days per om file
-    static var omFileLength: Int {
+    var omFileLength: Int {
         // 24 hours over 21 days = 504 timesteps per file
         // Afterwards the om compressor will combine 6 locations to one chunks
         // 6 * 504 = 3024 values per compressed chunk
@@ -36,11 +43,13 @@ struct Era5 {
         return 24 * 21
     }
     
-    static let grid = RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+    var grid: RegularGrid {
+        RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+    }
 }
 
 /// Might be used to decode API queries later
-enum Era5Variable: String, CaseIterable, Codable {
+enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     case temperature_2m
     case wind_u_component_100m
     case wind_v_component_100m
@@ -64,6 +73,14 @@ enum Era5Variable: String, CaseIterable, Codable {
     case shortwave_radiation
     case precipitation
     case direct_radiation
+    
+    var omFileName: String {
+        return rawValue
+    }
+    
+    var interpolation: ReaderInterpolation {
+        fatalError("Interpolation not required for era5")
+    }
     
     /// Name used to query the ECMWF CDS API via python
     var cdsApiName: String {
@@ -246,6 +263,7 @@ struct DownloadEra5Command: Command {
     }
     
     func stripSea(logger: Logger, readFilePath: String, writeFilePath: String, elevation: [Float]) throws {
+        let domain = Era5.era5
         if FileManager.default.fileExists(atPath: writeFilePath) {
             return
         }
@@ -265,7 +283,7 @@ struct DownloadEra5Command: Command {
             try read.willNeed(dim0Slow: locationRange, dim1: 0..<read.dim1)
             var data = try read.read(dim0Slow: locationRange, dim1: nil)
             for loc in locationRange {
-                let (lat,lon) = Era5.grid.getCoordinates(gridpoint: loc)
+                let (lat,lon) = domain.grid.getCoordinates(gridpoint: loc)
                 let isNorthRussia = lon >= 43 && lat > 63
                 let isNorthCanadaGreenlandAlaska = lat > 66 && lon < -26
                 let isAntarctica = lat < -56
@@ -281,11 +299,12 @@ struct DownloadEra5Command: Command {
     }
     
     func downloadElevation(logger: Logger, cdskey: String) throws {
-        if FileManager.default.fileExists(atPath: Era5.surfaceElevationFileOm) {
+        let domain = Era5.era5
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             return
         }
         
-        let downloadDir = Era5.downloadDirectory
+        let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         let tempDownloadNetcdfFile = "\(downloadDir)elevation.nc"
         
@@ -341,28 +360,30 @@ struct DownloadEra5Command: Command {
             }
         }
         
-        try OmFileWriter.write(file: Era5.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: Era5.grid.ny, dim1: Era5.grid.nx, chunk0: 20, chunk1: 20, all: elevation)
+        try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: elevation)
     }
     
     func runStripSea(logger: Logger, year: Int) throws {
+        let domain = Era5.era5
         try FileManager.default.createDirectory(atPath: "./data/era5-no-sea", withIntermediateDirectories: true)
         logger.info("Read elevation")
-        let elevation = try OmFileReader(file: Era5.surfaceElevationFileOm).readAll()
+        let elevation = try OmFileReader(file: domain.surfaceElevationFileOm).readAll()
         
         for variable in Era5Variable.allCases {
             logger.info("Converting variable \(variable)")
-            let fullFile = "\(Era5.omfileArchive!)\(variable)_\(year).om"
+            let fullFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
             let strippedFile = "./data/era5-no-sea/\(variable)_\(year).om"
             try stripSea(logger: logger, readFilePath: fullFile, writeFilePath: strippedFile, elevation: elevation)
         }
     }
     
     func runYear(logger: Logger, year: Int, cdskey: String) throws {
+        let domain = Era5.era5
         let timeinterval = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
         let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
         
-        let nx = Era5.grid.nx // 721
-        let ny = Era5.grid.ny // 1440
+        let nx = domain.grid.nx // 721
+        let ny = domain.grid.ny // 1440
         let nt = timeinterval.count * 24 // 8784
         
         let variables = Era5Variable.allCases
@@ -370,12 +391,12 @@ struct DownloadEra5Command: Command {
         // convert to yearly file
         for variable in variables {
             logger.info("Converting variable \(variable)")
-            let writeFile = "\(Era5.omfileArchive!)\(variable)_\(year).om"
+            let writeFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
             if FileManager.default.fileExists(atPath: writeFile) {
                 continue
             }
             let omFiles = try timeinterval.map { timeinterval -> OmFileReader in
-                let timestampDir = "\(Era5.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
+                let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMdd).om"
                 return try OmFileReader(file: omFile)
             }
@@ -411,10 +432,11 @@ struct DownloadEra5Command: Command {
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
     func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt) throws -> TimerangeDt {
+        let domain = Era5.era5
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
         /// Directory dir, where to place temporary downloaded files
-        let downloadDir = Era5.downloadDirectory
+        let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
                 
         let variables = Era5Variable.allCases // [Era5Variable.wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m]
@@ -431,7 +453,7 @@ struct DownloadEra5Command: Command {
         timeLoop: for timestamp in timeinterval {
             logger.info("Downloading timestamp \(timestamp.iso8601_YYYY_MM_dd)")
             let date = timestamp.toComponents()
-            let timestampDir = "\(Era5.downloadDirectory)\(timestamp.format_YYYYMMdd)"
+            let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
             
             if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd).om") {
                 continue
@@ -534,6 +556,7 @@ struct DownloadEra5Command: Command {
     
     /// Convert daily compressed files to longer compressed files specified by `Era5.omFileLength`. E.g. 14 days in one file.
     func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt) throws {
+        let domain = Era5.era5
         if timeinterval.count == 0 {
             logger.info("No new timesteps could be downloaded. Nothing to do. Existing")
             return
@@ -542,10 +565,10 @@ struct DownloadEra5Command: Command {
         logger.info("Converting timerange \(timeinterval.prettyString())")
        
         /// Directory dir, where to place temporary downloaded files
-        let downloadDir = Era5.downloadDirectory
+        let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         
-        let om = OmFileSplitter(basePath: Era5.omfileDirectory, nLocations: Era5.grid.count, nTimePerFile: Era5.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
         let variables = Era5Variable.allCases // [Era5Variable.wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m]
         
@@ -554,13 +577,13 @@ struct DownloadEra5Command: Command {
             logger.info("Converting variable \(variable)")
             
             let nt = timeinterval.count * 24
-            let nLoc = Era5.grid.count
+            let nLoc = domain.grid.count
             
             var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt*nLoc), nLocations: nLoc, nTime: nt)
             
             for (i,timestamp) in timeinterval.enumerated() {
                 logger.info("Reading timestamp \(timestamp.iso8601_YYYY_MM_dd)")
-                let timestampDir = "\(Era5.downloadDirectory)\(timestamp.format_YYYYMMdd)"
+                let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
                 guard FileManager.default.fileExists(atPath: timestampDir) else {
                     continue
                 }

@@ -12,7 +12,7 @@ protocol GenericDomain {
     var dtSeconds: Int { get }
     
     /// An instance to read elevation and sea mask information
-    var elevationFile: OmFileReader { get }
+    var elevationFile: OmFileReader? { get }
     
     /// Where compressed time series files are stroed
     var omfileDirectory: String { get }
@@ -107,11 +107,22 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         try omFileSplitter.willNeed(variable: variable.omFileName, location: position, time: time)
     }
     
+    /// Read and scale if required
+    private func readAndScale(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
+        let data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
+        
+        /// Scale pascal to hecto pasal. Case in era5
+        if variable.unit == .pascal {
+            return DataAndUnit(data.map({$0 / 100}), .hectoPascal)
+        }
+        
+        return DataAndUnit(data, variable.unit)
+    }
+    
     /// Read data and interpolate if required
     func get(variable: Variable) throws -> DataAndUnit {
         if time.dtSeconds == domain.dtSeconds {
-            let data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
-            return DataAndUnit(data, variable.unit)
+            return try readAndScale(variable: variable, time: time)
         }
         if time.dtSeconds > domain.dtSeconds {
             fatalError()
@@ -120,7 +131,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         let interpolationType = variable.interpolation
         
         let timeLow = time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
-        let dataLow = try omFileSplitter.read(variable: variable.omFileName, location: position, time: timeLow)
+        let read = try readAndScale(variable: variable, time: timeLow)
+        let dataLow = read.data
         
         var data = [Float]()
         data.reserveCapacity(time.count)
@@ -153,7 +165,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
                 data.append(round(h * variable.scalefactor) / variable.scalefactor)
             }
         }
-        return DataAndUnit(data, variable.unit)
+        return DataAndUnit(data, read.unit)
     }
 }
 
