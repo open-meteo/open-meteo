@@ -92,7 +92,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     static let pressure_levels = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
     
     var omFileName: String {
-        return rawValue
+        return nameInFiles
     }
     
     var nameInFiles: String {
