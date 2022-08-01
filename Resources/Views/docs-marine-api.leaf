@@ -341,7 +341,7 @@
 
     <div class="col-12 py-5">
       <h2 id="api-documentation">API Documentation</h2>
-      <p>The API endpoint <mark>/v1/marine</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly marina weather forecast for 7 days. Time always starts at 0:00 today. All URL parameters are listed below:</p>
+      <p>The API endpoint <mark>/v1/marine</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly marine weather forecast for 7 days. Time always starts at 0:00 today. All URL parameters are listed below:</p>
       <table class="table">
         <thead>
           <tr>
