@@ -4,6 +4,10 @@ import XCTest
 @_implementationOnly import CTurboPFor
 
 final class SwiftPFor2DTests: XCTestCase {
+    override func tearDown() {
+        try! FileManager.default.removeItemIfExists(at: "writetest.om")
+    }
+    
     /// Crashes on linux, but fine on macos
     func testALinuxCrash(){
         //let s = String(cString: cpustr(0))
