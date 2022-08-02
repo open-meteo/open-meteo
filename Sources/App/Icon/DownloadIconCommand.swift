@@ -278,7 +278,7 @@ struct DownloadIconCommand: Command {
                 // clearsky index is hermite interpolated and then back to actual radiation
                 
                 /// Which range of hours solar radiation data is required
-                let solarHours = forecastStepsToInterpolate.min()! - 4 ..< forecastStepsToInterpolate.max()! + 6
+                let solarHours = forecastStepsToInterpolate.minAndMax().map { $0.min - 4 ..< $0.max + 6 } ?? 0..<0
                 let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * 3600), nTime: solarHours.count, dtSeconds: 3600)
                 
                 /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
