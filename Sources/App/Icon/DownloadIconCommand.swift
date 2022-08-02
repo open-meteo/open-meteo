@@ -84,8 +84,8 @@ struct DownloadIconCommand: Command {
         @Argument(name: "domain")
         var domain: String
 
-        @Argument(name: "run")
-        var run: String
+        @Option(name: "run")
+        var run: String?
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
@@ -429,9 +429,14 @@ struct DownloadIconCommand: Command {
         guard let domain = IconDomains.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
-        guard let run = Int(signature.run) else {
-            fatalError("Invalid run '\(signature.run)'")
-        }
+        
+        let run = signature.run.map {
+            guard let run = Int($0) else {
+                fatalError("Invalid run '\($0)'")
+            }
+            return run
+        } ?? domain.lastRun
+        
         let onlyVariables: [IconVariable]? = signature.onlyVariables.map {
             $0.split(separator: ",").map {
                 guard let variable = IconVariable(rawValue: String($0)) else {
@@ -449,5 +454,22 @@ struct DownloadIconCommand: Command {
 
         try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convertIcon(logger: logger, domain: domain, run: date, variables: variables)
+    }
+}
+
+
+extension IconDomains {
+    /// Based on the current time , guess the current run that should be available soon on the open-data server
+    fileprivate var lastRun: Int {
+        let t = Timestamp.now()
+        switch self {
+        case .icon: fallthrough
+        case .iconEu:
+            // Icon has a delay of 2-3 hours after initialisation
+            return ((t.hour - 2 + 24) % 24) / 6 * 6
+        case .iconD2:
+            // Icon d2 has a delay of 1 hour and runs every 3 hours
+            return ((t.hour - 1 + 24) % 24) / 3 * 3
+        }
     }
 }

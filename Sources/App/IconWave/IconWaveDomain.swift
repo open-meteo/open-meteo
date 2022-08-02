@@ -4,7 +4,7 @@ import SwiftPFor2D
 /**
  Domain definition for ICON wave models
  */
-enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnum, GenericDomain {
+enum IconWaveDomain: String, Codable, CaseIterable, GenericDomain {
     case gwam
     case ewam
     
@@ -64,7 +64,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, LosslessStringConvertibleEnu
     }
 }
 
-enum IconWaveVariable: String, CaseIterable, Codable, LosslessStringConvertibleEnum, GenericVariableMixing {
+enum IconWaveVariable: String, CaseIterable, Codable, GenericVariableMixing {
     //case windspeed_10m // Disabled, because already available in better quality in regular domains
     //case winddirection_10m
     case wave_height

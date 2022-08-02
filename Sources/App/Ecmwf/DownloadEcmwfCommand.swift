@@ -482,8 +482,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
  */
 struct DownloadEcmwfCommand: Command {
     struct Signature: CommandSignature {
-        @Argument(name: "run")
-        var run: String
+        @Option(name: "run")
+        var run: String?
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
@@ -494,9 +494,12 @@ struct DownloadEcmwfCommand: Command {
     }
     
     func run(using context: CommandContext, signature: Signature) throws {
-        guard let run = Int(signature.run) else {
-            fatalError("Invalid run")
-        }
+        let run = signature.run.map {
+            guard let run = Int($0) else {
+                fatalError("Invalid run '\($0)'")
+            }
+            return run
+        } ?? EcmwfDomain.ifs04.lastRun
         let logger = context.application.logger
 
         // 18z run starts downloading on the next day
@@ -648,5 +651,17 @@ struct DownloadEcmwfCommand: Command {
             }
         }
         return d
+    }
+}
+
+extension EcmwfDomain {
+    /// Based on the current time , guess the current run that should be available soon on the open-data server
+    fileprivate var lastRun: Int {
+        let t = Timestamp.now()
+        switch self {
+        case .ifs04:
+            // ECMWF has a delay of 7-8 hours after initialisation
+            return ((t.hour - 7 + 24) % 24) / 6 * 6
+        }
     }
 }
