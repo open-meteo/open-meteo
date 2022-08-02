@@ -69,9 +69,10 @@ struct Zensun {
     }
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    public static func calculateRadiationBackwardsAveraged(grid: RegularGrid, timerange: TimerangeDt) -> [Float] {
+    public static func calculateRadiationBackwardsAveraged(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
         var out = [Float]()
-        out.reserveCapacity(grid.count * timerange.count)
+        let yrange = yrange ?? 0..<grid.ny
+        out.reserveCapacity(yrange.count * grid.nx * timerange.count)
                 
         for timestamp in timerange {
             /// fractional day number with 12am 1jan = 1
@@ -99,7 +100,7 @@ struct Zensun {
             
             let p10 = lonsun0.degreesToRadians
             
-            for indexY in 0..<grid.ny {
+            for indexY in yrange {
                 let lat = grid.latMin + grid.dy * Float(indexY)
                 for indexX in 0..<grid.nx {
                     let lon = grid.lonMin + grid.dx * Float(indexX)

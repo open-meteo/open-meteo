@@ -194,50 +194,48 @@ struct DownloadIconCommand: Command {
         // Afterwards merge into temporal data files
         
         try cdo.convertSurfaceElevation()
-        
-        logger.info("Calculating solar radiation field")
-        // We only caculate a 24 hour radiation field. For ICON global, this already requires 400 MB memory
-        let solar_backwards = domain == .iconD2 ? [] : Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: TimerangeDt(start: run, nTime: 24, dtSeconds: 3600))
-        //let solar_instant = domain == .iconD2 ? [] : Meteorology.calculateRadiationInstant(grid: grid, startTime: initTimeUnix, nTime: 24, dtSeconds: 3600)
-        logger.info("Solar radiation field calculated")
-        //let sol2d = Array2DFastSpace(data: solar_instant, nLocations: grid.count, nTime: 24)
-        //try! sol2d.writeNetcdf(filename: "\(domain.omfileDirectory)solfac.nc", nx: grid.nx, ny: grid.ny)
-        //return
 
         for variable in variables {
+            let startConvert = DispatchTime.now()
             logger.info("Converting \(variable)")
             
             let v = variable.omFileName.uppercased()
 
-            /// space oriented, but after 72 hours only 3 hour values are filled.
-            /// 2.86GB high water for this array
-            var data2d = Array2DFastSpace(
-                data: [Float](repeating: .nan, count: nLocation * nForecastHours),
-                nLocations: nLocation,
-                nTime: nForecastHours
-            )
+            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
+            var data2d: Array2DFastTime = try {
+                /// space oriented, but after 72 hours only 3 hour values are filled.
+                /// 2.86GB high water for this array
+                var data2dFastSpace = Array2DFastSpace(
+                    data: [Float](repeating: .nan, count: nLocation * nForecastHours),
+                    nLocations: nLocation,
+                    nTime: nForecastHours
+                )
 
-            for hour in forecastSteps {
-                if hour == 0 && variable.skipHour0 {
-                    continue
+                for hour in forecastSteps {
+                    if hour == 0 && variable.skipHour0 {
+                        continue
+                    }
+                    let h3 = hour.zeroPadded(len: 3)
+                    let d = try FloatArrayCompressor.read(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg", nElements: nLocation)
+                    data2dFastSpace.data[hour * nLocation ..< (hour+1) * nLocation] = ArraySlice(d)
                 }
-                let h3 = hour.zeroPadded(len: 3)
-                let d = try FloatArrayCompressor.read(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg", nElements: nLocation)
-                data2d.data[hour * nLocation ..< (hour+1) * nLocation] = ArraySlice(d)
-            }
+                
+                // Fast time from now on
+                return data2dFastSpace.transpose()
+            }()
             
             // Deaverage radiation. Not really correct for 3h data after 81 hours.
             if variable.isAveragedOverForecastTime {
                 for l in 0..<nLocation {
-                    var prev = data2d.data[l].isNaN ? 0 : data2d.data[l]
+                    var prev = data2d[l, 0].isNaN ? 0 : data2d[l, 0]
                     var skipped = 0
                     for hour in 1 ..< nForecastHours {
-                        let d = data2d.data[hour * nLocation + l] * Float(hour)
+                        let d = data2d[l, hour] * Float(hour)
                         if d.isNaN {
                             skipped += 1
                             continue
                         }
-                        data2d.data[hour * nLocation + l] = (d - prev) / Float(skipped+1)
+                        data2d[l, hour] = (d - prev) / Float(skipped+1)
                         prev = d
                         skipped = 0
                     }
@@ -246,89 +244,117 @@ struct DownloadIconCommand: Command {
             
             // interpolate missing timesteps. We always fill 2 timesteps at once
             // data looks like: DDDDDDDDDD--D--D--D--D--D
-            for hour in 0..<nForecastHours {
-                if forecastSteps.contains(hour) {
-                    continue
-                }
-                guard hour % 3 == 1 else {
+            let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
+                if forecastSteps.contains(hour) || hour % 3 != 1 {
                     // process 2 timesteps at once
-                    continue
+                    return nil
                 }
-                switch variable.interpolationType {
-                case .linear:
-                    for l in 0..<nLocation {
-                        let prev = data2d.data[(hour-1) * nLocation + l]
-                        let next = data2d.data[(hour+2) * nLocation + l]
-                        data2d.data[hour * nLocation + l] = prev * 2/3 + next * 1/3
-                        data2d.data[(hour+1) * nLocation + l] = prev * 1/3 + next * 2/3
+                return hour
+            }
+            
+
+            switch variable.interpolationType {
+            case .linear:
+                for l in 0..<nLocation {
+                    for hour in forecastStepsToInterpolate {
+                        let prev = data2d[l, hour-1]
+                        let next = data2d[l, hour+2]
+                        data2d[l, hour] = prev * 2/3 + next * 1/3
+                        data2d[l, hour+1] = prev * 1/3 + next * 2/3
                     }
-                case .nearest:
-                    // fill with next hour. For weather code, we fill with the next hour, because this represents precipitation
-                    for l in 0..<nLocation {
-                        let next = data2d.data[(hour+2) * nLocation + l]
-                        data2d.data[hour * nLocation + l] = next
-                        data2d.data[(hour+1) * nLocation + l] = next
+                }
+            case .nearest:
+                // fill with next hour. For weather code, we fill with the next hour, because this represents precipitation
+                for l in 0..<nLocation {
+                    for hour in forecastStepsToInterpolate {
+                        let next = data2d[l, hour+2]
+                        data2d[l, hour] = next
+                        data2d[l, hour+1] = next
                     }
-                case .solar_backwards_averaged:
-                    // Solar backwards averages data. Data needs to be deaveraged before
-                    // First the clear sky index KT is calaculated (KT based on extraterrestrial radiation)
-                    // clearsky index is hermite interpolated and then back to actual radiation
-                    for l in 0..<nLocation {
-                        // point C and D are still 3 h averages
-                        let solC1 = (solar_backwards[(hour % 24) * nLocation + l])
-                        let solC2 = (solar_backwards[((hour+1) % 24) * nLocation + l])
-                        let solC3 = (solar_backwards[((hour+2) % 24) * nLocation + l])
-                        let solC = (solC1 + solC2 + solC3) / 3
-                        let C = solC <= 0.0001 ? 0 : data2d.data[(hour+2) * nLocation + l] / solC
-                        
-                        let solB = (solar_backwards[((hour-1) % 24) * nLocation + l])
-                        let B = solB <= 0.0001 ? C : data2d.data[(hour-1) * nLocation + l] / solB
-                        
-                        let solA = (solar_backwards[((hour-4) % 24) * nLocation + l])
-                        let A = solA <= 0.0001 || hour-4 < 0 ? B : data2d.data[(hour-4) * nLocation + l] / solA
-                        
-                        let solD1 = (solar_backwards[((hour+3) % 24) * nLocation + l])
-                        let solD2 = (solar_backwards[((hour+4) % 24) * nLocation + l])
-                        let solD3 = (solar_backwards[((hour+5) % 24) * nLocation + l])
-                        let solD = (solD1 + solD2 + solD3) / 3
-                        let D = solD <= 0.0001 || hour+4 >= nForecastHours ? C : data2d.data[(hour+5) * nLocation + l] / solD
-                        
+                }
+            case .solar_backwards_averaged:
+                // Solar backwards averages data. Data needs to be deaveraged before
+                // First the clear sky index KT is calaculated (KT based on extraterrestrial radiation)
+                // clearsky index is hermite interpolated and then back to actual radiation
+                
+                /// Which range of hours solar radiation data is required
+                let solarHours = forecastStepsToInterpolate.min()! - 4 ..< forecastStepsToInterpolate.max()! + 6
+                let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * 3600), nTime: solarHours.count, dtSeconds: 3600)
+                
+                /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
+                let nx = grid.nx
+                let byY = 10
+                for cy in 0..<grid.ny/byY {
+                    let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
+                    let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
+                    /// solar array is fast space oriented
+                    let solar_backwards = Zensun.calculateRadiationBackwardsAveraged(grid: domain.grid, timerange: solarTime, yrange: yrange)
+                    let solar2d = Array2DFastSpace(data: solar_backwards, nLocations: locationRange.count, nTime: solarHours.count)
+                    
+                    for l in locationRange {
+                        for hour in forecastStepsToInterpolate {
+                            let sHour = hour - solarHours.lowerBound
+                            let sLocation = l - locationRange.lowerBound
+                            // point C and D are still 3 h averages
+                            let solC1 = solar2d[sHour + 0, sLocation]
+                            let solC2 = solar2d[sHour + 1, sLocation]
+                            let solC3 = solar2d[sHour + 2, sLocation]
+                            let solC = (solC1 + solC2 + solC3) / 3
+                            let C = solC <= 0.0001 ? 0 : data2d[l, hour+2] / solC
+                            
+                            let solB = solar2d[sHour - 1, sLocation]
+                            let B = solB <= 0.0001 ? C : data2d[l, hour-1] / solB
+                            
+                            let solA = solar2d[sHour - 4, sLocation]
+                            let A = solA <= 0.0001 || hour-4 < 0 ? B : data2d[l, hour-4] / solA
+                            
+                            let solD1 = solar2d[sHour + 3, sLocation]
+                            let solD2 = solar2d[sHour + 4, sLocation]
+                            let solD3 = solar2d[sHour + 5, sLocation]
+                            let solD = (solD1 + solD2 + solD3) / 3
+                            let D = solD <= 0.0001 || hour+4 >= nForecastHours ? C : data2d[l, hour+5] / solD
+                            
+                            let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+                            let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+                            let c = -A/2.0 + C/2.0
+                            let d = B
+                            
+                            data2d[l, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
+                            data2d[l, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
+                            data2d[l, hour+2] = C * solC3
+                        }
+                    }
+                }
+            case .hermite:
+                for l in 0..<nLocation {
+                    for hour in forecastStepsToInterpolate {
+                        let A = data2d[l, hour-4 < 0 ? hour-1 : hour-4]
+                        let B = data2d[l, hour-1]
+                        let C = data2d[l, hour+2]
+                        let D = data2d[l, hour+4 >= nForecastHours ? hour+2 : hour+5]
                         let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                         let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                         let c = -A/2.0 + C/2.0
                         let d = B
-                        
-                        data2d.data[hour * nLocation + l] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
-                        data2d.data[(hour+1) * nLocation + l] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
-                        data2d.data[(hour+2) * nLocation + l] = C * solC3
+                        data2d[l, hour] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
+                        data2d[l, hour+1] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
                     }
-                case .hermite:
-                    for l in 0..<nLocation {
-                        let A = data2d.data[(hour-4 < 0 ? hour-1 : hour-4) * nLocation + l]
-                        let B = data2d.data[(hour-1) * nLocation + l]
-                        let C = data2d.data[(hour+2) * nLocation + l]
-                        let D = data2d.data[(hour+4 >= nForecastHours ? hour+2 : hour+5) * nLocation + l]
+                }
+            case .hermite_backwards_averaged:
+                /// basically shift the backwards averaged to the center and then do hermite
+                for l in 0..<nLocation {
+                    for hour in forecastStepsToInterpolate {
+                        let A = data2d[l, hour-5 < 0 ? hour-2 : hour-5]
+                        let B = data2d[l, hour-2]
+                        let C = data2d[l, hour+2]
+                        let D = data2d[l, hour+4 >= nForecastHours ? hour+2 : hour+5]
                         let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                         let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                         let c = -A/2.0 + C/2.0
                         let d = B
-                        data2d.data[hour * nLocation + l] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
-                        data2d.data[(hour+1) * nLocation + l] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
-                    }
-                case .hermite_backwards_averaged:
-                    /// basically shift the backwards averaged to the center and then do hermite
-                    for l in 0..<nLocation {
-                        let A = data2d.data[(hour-5 < 0 ? hour-2 : hour-5) * nLocation + l]
-                        let B = data2d.data[(hour-2) * nLocation + l]
-                        let C = data2d.data[(hour+2) * nLocation + l]
-                        let D = data2d.data[(hour+4 >= nForecastHours ? hour+2 : hour+5) * nLocation + l]
-                        let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                        let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                        let c = -A/2.0 + C/2.0
-                        let d = B
-                        data2d.data[(hour-1) * nLocation + l] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
-                        data2d.data[(hour) * nLocation + l] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
-                        data2d.data[(hour+1) * nLocation + l] = C
+                        data2d[l, hour-1] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
+                        data2d[l, hour] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
+                        data2d[l, hour+1] = C
                     }
                 }
             }
@@ -377,29 +403,14 @@ struct DownloadIconCommand: Command {
                 }
             }
             
-            // scale upper level wind
-            // In icon global and eu the level actually are 98 and 174 meter
-            /*if variable == .u_80m || variable == .v_80m {
-                let scale = Meteorology.scaleWindFactor(from: domain == .iconEu ? 78 : 98, to: 80)
-                for i in data2d.data.indices {
-                    data2d.data[i] *= scale
-                }
-            }
-            if variable == .u_120m || variable == .v_120m {
-                let scale = Meteorology.scaleWindFactor(from: domain == .iconEu ? 126 : 174, to: 120)
-                for i in data2d.data.indices {
-                    data2d.data[i] *= scale
-                }
-            }*/
-            
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
-                for hour in stride(from: nForecastHours - 1, through: 2, by: -1) {
-                    for l in 0..<nLocation {
-                        let current = data2d.data[hour * nLocation + l]
-                        let previous = data2d.data[(hour-1) * nLocation + l]
+                for l in 0..<nLocation {
+                    for hour in stride(from: nForecastHours - 1, through: 2, by: -1) {
+                        let current = data2d[l, hour]
+                        let previous = data2d[l, hour-1]
                         // due to floating point precision, it can become negative
-                        data2d.data[hour * nLocation + l] = max(current - previous, 0)
+                        data2d[l, hour] = max(current - previous, 0)
                     }
                 }
             }
@@ -415,9 +426,9 @@ struct DownloadIconCommand: Command {
             //let skipLast = (variable == .ashfl_s || variable == .alhfl_s) && domain == .iconD2 ? 1 : 0
             let skipLast = 0
             
-            logger.info("Create om file")
+            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
             let startOm = DispatchTime.now()
-            try om.updateFromSpaceOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: skipLast, scalefactor: variable.scalefactor)
+            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: skipLast, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
         logger.info("write init.txt")
