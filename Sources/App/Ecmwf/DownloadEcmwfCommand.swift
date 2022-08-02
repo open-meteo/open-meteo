@@ -92,44 +92,54 @@ struct DownloadEcmwfCommand: Command {
         
         for variable in EcmwfVariable.allCases {
             logger.debug("Converting \(variable)")
-            var data2d = Array2DFastSpace(
-                data: [Float](repeating: .nan, count: nLocation * nForecastHours),
-                nLocations: nLocation,
-                nTime: nForecastHours
-            )
-            for hour in forecastSteps {
-                /*if hour == 0 && variable.skipHour0 {
-                    continue
-                }*/
-                let d = try Self.readNetcdf(file: "\(downloadDirectory)\(hour)h.nc", variable: variable.gribName, levelOffset: variable.level, nx: domain.grid.nx, ny: domain.grid.ny)
-                data2d.data[(hour/domain.dtHours) * nLocation ..< (hour/domain.dtHours + 1) * nLocation] = ArraySlice(d)
+            
+            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
+            var data2d: Array2DFastTime = try {
+                var data2dSpace = Array2DFastSpace(
+                    data: [Float](repeating: .nan, count: nLocation * nForecastHours),
+                    nLocations: nLocation,
+                    nTime: nForecastHours
+                )
+                for hour in forecastSteps {
+                    /*if hour == 0 && variable.skipHour0 {
+                        continue
+                    }*/
+                    let d = try Self.readNetcdf(file: "\(downloadDirectory)\(hour)h.nc", variable: variable.gribName, levelOffset: variable.level, nx: domain.grid.nx, ny: domain.grid.ny)
+                    data2dSpace.data[(hour/domain.dtHours) * nLocation ..< (hour/domain.dtHours + 1) * nLocation] = ArraySlice(d)
+                }
+                return data2dSpace.transpose()
+            }()
+            
+            let interpolationHours = (0..<nForecastHours).compactMap { hour -> Int? in
+                if forecastSteps.contains(hour * domain.dtHours) {
+                    return nil
+                }
+                return hour
             }
             
-            for hour in 0..<nForecastHours {
-                if forecastSteps.contains(hour * domain.dtHours) {
-                    continue
-                }
-                switch variable.interpolation {
-                case .linear:
-                    for l in 0..<nLocation {
-                        let prev = data2d.data[(hour-1) * nLocation + l]
-                        let next = data2d.data[(hour+1) * nLocation + l]
-                        data2d.data[hour * nLocation + l] = prev * 1/2 + next * 1/2
+            switch variable.interpolation {
+            case .linear:
+                for l in 0..<nLocation {
+                    for hour in interpolationHours {
+                        let prev = data2d[l, hour-1]
+                        let next = data2d[l, hour+1]
+                        data2d[l, hour] = prev * 1/2 + next * 1/2
                     }
-                case .hermite:
-                    for l in 0..<nLocation {
-                        let A = data2d.data[(hour-3 < 0 ? hour-1 : hour-3) * nLocation + l]
-                        let B = data2d.data[(hour-1) * nLocation + l]
-                        let C = data2d.data[(hour+1) * nLocation + l]
-                        let D = data2d.data[(hour+2 >= nForecastHours ? hour+1 : hour+3) * nLocation + l]
+                }
+            case .hermite:
+                for l in 0..<nLocation {
+                    for hour in interpolationHours {
+                        let A = data2d[l, hour-3 < 0 ? hour-1 : hour-3]
+                        let B = data2d[l, hour-1]
+                        let C = data2d[l, hour+1]
+                        let D = data2d[l, hour+2 >= nForecastHours ? hour+1 : hour+3]
                         let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                         let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                         let c = -A/2.0 + C/2.0
                         let d = B
-                        data2d.data[hour * nLocation + l] = a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d
+                        data2d[l, hour] = a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d
                     }
                 }
-                
             }
             
             /// Temperature is stored in kelvin. Convert to celsius
@@ -146,7 +156,7 @@ struct DownloadEcmwfCommand: Command {
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
-            try om.updateFromSpaceOriented(variable: variable.nameInFiles, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            try om.updateFromTimeOriented(variable: variable.nameInFiles, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
         

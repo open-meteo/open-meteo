@@ -127,24 +127,30 @@ struct DownloadIconWaveCommand: Command {
         for variable in variables {
             logger.info("Converting \(variable)")
             
-            var data2d = Array2DFastSpace(
-                data: [Float](repeating: .nan, count: domain.grid.count * domain.countForecastHours),
-                nLocations: domain.grid.count,
-                nTime: domain.countForecastHours
-            )
-            
-            for forecastStep in 0..<domain.countForecastHours {
-                let forecastHour = forecastStep * domain.dtSeconds / 3600
-                let d = try OmFileReader(file: "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
-                data2d[forecastStep, 0..<data2d.nLocations] = ArraySlice(d)
-            }
+            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
+            let data2d: Array2DFastTime = try {
+                var data2dSpace = Array2DFastSpace(
+                    data: [Float](repeating: .nan, count: domain.grid.count * domain.countForecastHours),
+                    nLocations: domain.grid.count,
+                    nTime: domain.countForecastHours
+                )
+                
+                for forecastStep in 0..<domain.countForecastHours {
+                    let forecastHour = forecastStep * domain.dtSeconds / 3600
+                    let d = try OmFileReader(file: "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
+                    data2dSpace[forecastStep, 0..<data2dSpace.nLocations] = ArraySlice(d)
+                }
+                
+                return data2dSpace.transpose()
+            }()
+
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
             let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
             let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
             //try data2d.writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try om.updateFromSpaceOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
     }
