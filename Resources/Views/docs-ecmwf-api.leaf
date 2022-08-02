@@ -154,8 +154,8 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="soil_temperature_0_7cm" id="soil_temperature_0_7cm" name="hourly">
-            <label class="form-check-label" for="soil_temperature_0_7cm">
+            <input class="form-check-input" type="checkbox" value="soil_temperature_0_to_7cm" id="soil_temperature_0_to_7cm" name="hourly">
+            <label class="form-check-label" for="soil_temperature_0_to_7cm">
               Soil Temperature (0-7 cm)
             </label>
           </div>

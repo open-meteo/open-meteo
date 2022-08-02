@@ -27,7 +27,7 @@ cd open-meteo
 docker-compose up
 
 # Download ECMWF
-docker-compose run open-meteo download-ecmwf 00
+docker-compose run open-meteo download-ecmwf --run 00
 ```
 
 To stop running containers: `docker-compose down (add -v to wipe data)`
@@ -47,7 +47,7 @@ docker build -f Dockerfile.development -t open-meteo-development .
 docker run -it --security-opt seccomp=unconfined -p 8080:8080 -v ${PWD}:/app -t open-meteo-development /bin/bash
 # Run commands inside docker container:
 swift run
-swift run openmeteo-api download-ecmwf 00
+swift run openmeteo-api download-ecmwf --run 00
 ```
 
 Develop on macOS:
@@ -73,7 +73,7 @@ cd open-meteo
 apt install libnetcdf-dev cdo python3-pip curl
 pip3 install cdsapi
 swift run
-swift run openmeteo-api download-ecmwf 00
+swift run openmeteo-api download-ecmwf --run 00
 ```
 
 Notes: 
@@ -93,7 +93,7 @@ sudo apt install openmeteo-api
 # Download ECMWF
 sudo chown -R $(id -u):$(id -g) /var/lib/openmeteo-api
 cd /var/lib/openmeteo-api
-openmeteo-api download-ecmwf 00
+openmeteo-api download-ecmwf --run 00
 ```
 
 This will automatically install and run an empty API instance at `http://your-ip:8080`. It can be checked with:
@@ -138,7 +138,7 @@ The DWD ICON models are the most important source for the 7 days weather API. Th
 - ICON EU with 7 km, runs `00,06,12,18`
 - ICON D2 Central Europe with 2 km resolution, runs `00,03,06,09,12,15,18,21`
 
-As a minimum requirement, ICON global should be downloaded. To download the 00 run: `<exe> download icon 00 --only-variables temperature_2m,weathercode`. If `onlyVariables` is omitted, all ICON weather variables are downloaded, which could take a couple of hours.
+As a minimum requirement, ICON global should be downloaded. To download the 00 run: `<exe> download icon --run 00 --only-variables temperature_2m,weathercode`. If `onlyVariables` is omitted, all ICON weather variables are downloaded, which could take a couple of hours.
 
 For the first run, the ICON downloader will download additional domain geometry information and prepare reproduction weights. It might take a while.
 
@@ -162,7 +162,7 @@ Flags:
 ### ECMWF IFS
 For the ECMWF API, only one domain is available with runs at `00,06,12,18`. Currently it is not supported to only download a subset of weather variables, but all variables need to be downloaded.
 
-To download ECMWF forecasts, run the binary with arguments `<exe> download-ecmwf 00`.
+To download ECMWF forecasts, run the binary with arguments `<exe> download-ecmwf --run 00`.
 
 
 ### ERA5

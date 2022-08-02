@@ -13,16 +13,16 @@ import SwiftPFor2D
 struct DownloadIconWaveCommand: Command {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
-        var domain: IconWaveDomain
+        var domain: String
 
-        @Argument(name: "run")
-        var run: String
+        @Option(name: "run")
+        var run: String?
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
         
         @Option(name: "only-variables")
-        var onlyVariables: [IconWaveVariable]?
+        var onlyVariables: String?
     }
 
     var help: String {
@@ -30,15 +30,31 @@ struct DownloadIconWaveCommand: Command {
     }
     
     func run(using context: CommandContext, signature: Signature) throws {
-        guard let run = Int(signature.run) else {
-            fatalError("Invalid run")
+        guard let domain = IconWaveDomain.init(rawValue: signature.domain) else {
+            fatalError("Invalid domain '\(signature.domain)'")
         }
+        
+        let run = signature.run.map {
+            guard let run = Int($0) else {
+                fatalError("Invalid run '\($0)'")
+            }
+            return run
+        } ?? domain.lastRun
+        
+        let onlyVariables: [IconWaveVariable]? = signature.onlyVariables.map {
+            $0.split(separator: ",").map {
+                guard let variable = IconWaveVariable(rawValue: String($0)) else {
+                    fatalError("Invalid variable '\($0)'")
+                }
+                return variable
+            }
+        }
+        
         let logger = context.application.logger
-        let domain = signature.domain
         let date = Timestamp.now().with(hour: run)
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        let variables = signature.onlyVariables ?? IconWaveVariable.allCases
+        let variables = onlyVariables ?? IconWaveVariable.allCases
         try download(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convert(logger: logger, domain: domain, run: date, variables: variables)
     }
@@ -111,25 +127,44 @@ struct DownloadIconWaveCommand: Command {
         for variable in variables {
             logger.info("Converting \(variable)")
             
-            var data2d = Array2DFastSpace(
-                data: [Float](repeating: .nan, count: domain.grid.count * domain.countForecastHours),
-                nLocations: domain.grid.count,
-                nTime: domain.countForecastHours
-            )
-            
-            for forecastStep in 0..<domain.countForecastHours {
-                let forecastHour = forecastStep * domain.dtSeconds / 3600
-                let d = try OmFileReader(file: "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
-                data2d[forecastStep, 0..<data2d.nLocations] = ArraySlice(d)
-            }
+            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
+            let data2d: Array2DFastTime = try {
+                var data2dSpace = Array2DFastSpace(
+                    data: [Float](repeating: .nan, count: domain.grid.count * domain.countForecastHours),
+                    nLocations: domain.grid.count,
+                    nTime: domain.countForecastHours
+                )
+                
+                for forecastStep in 0..<domain.countForecastHours {
+                    let forecastHour = forecastStep * domain.dtSeconds / 3600
+                    let d = try OmFileReader(file: "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
+                    data2dSpace[forecastStep, 0..<data2dSpace.nLocations] = ArraySlice(d)
+                }
+                
+                return data2dSpace.transpose()
+            }()
+
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
             let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
             let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
             //try data2d.writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try om.updateFromSpaceOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+        }
+    }
+}
+
+extension IconWaveDomain {
+    /// Based on the current time , guess the current run that should be available soon on the open-data server
+    fileprivate var lastRun: Int {
+        let t = Timestamp.now()
+        switch self {
+        case .ewam: fallthrough
+        case .gwam:
+            // Wave models have a delay of 3-4 hours after initialisation
+            return ((t.hour - 3 + 24) % 24) / 12 * 12
         }
     }
 }
