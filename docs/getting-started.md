@@ -6,12 +6,14 @@ Open-Meteo has 3 components:
 - Download commands for weather datasets
 - File-based database to store all downloaded datasets
 
-The HTTP server and download commands are developed using the Vapor Swift framework and compile to a single binary `openmeteo-api`. Once the binary is available, you can start an HTTP server and download weather data from open-data sources. The file based database is automatically created as soon as the first data is downloaded.
+The HTTP server and download commands are developed using the Vapor Swift framework and compile to a single binary `openmeteo-api`. 
+
+Once the binary is available, you can start an HTTP server and download weather data from open-data sources. The file based database is automatically created as soon aa first data are downloaded.
 
 Hardware requirements:
-- A relatively modern CPU with SIMD instructions. x86_64 and arm are supported
-- At least 8 GB memory. 16 GB recommended. To download and process data, many steps require temporary memory.
-- For all forecast data, 150 GB disk space are recommended. If only a smaller selection for weather variables is used, just a couple of GB are fine.
+- A relatively modern CPU with SIMD instructions. `x86_64` and `arm` are supported
+- At least 8 GB memory. 16 GB recommended.
+- For all forecast data, 150 GB disk space are recommended. If only a small selection for weather variables is used, just a couple of GB are fine.
 
 ## Running the API
 There are different option to run Open-Meteo: Docker, native and with prebuilt ubuntu focal packages.
@@ -20,13 +22,17 @@ There are different option to run Open-Meteo: Docker, native and with prebuilt u
 To quickly compile and run Open-Meteo, docker can be used. It will run an container which exposes the open-meteo API to http://127.0.0.1:8080. Afterwards weather datasets can be downloaded.
 
 ```bash
-mkdir data
-docker build -t open-meteo .
-docker run -v "${PWD}/data":/app/data -dp 8080:8080 --name open-meteo open-meteo
+git clone https://github.com/open-meteo/open-meteo.git
+cd open-meteo
+docker-compose up
 
 # Download ECMWF
-docker exec -it open-meteo /app/openmeteo-api download-ecmwf 00
+docker-compose run open-meteo download-ecmwf 00
 ```
+
+To stop running containers: `docker-compose down (add -v to wipe data)`
+
+Compile and build new images: `docker-compose build`
 
 ### Development
 Using docker helps to run Open-Meteo, but all changes require a new image build, which slows down development. The Vapor development guide for [macOS](https://docs.vapor.codes/install/macos/) and [linux](https://docs.vapor.codes/install/linux/) help to get started.
