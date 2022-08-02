@@ -41,7 +41,7 @@ jobs:
     - name: Build
       run: |
         ${{ env.swift_build }}
-        mv .build/release/Run openmeteo-api
+        mv .build/release/openmeteo-api openmeteo-api
     - name: Package
       uses: gravitl/github-action-fpm@master
       with:

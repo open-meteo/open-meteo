@@ -27,7 +27,7 @@ final class OmFileManager: LifecycleHandler {
     
     func didBoot(_ application: Application) throws {
         let logger = application.logger
-        logger.info("Starting OmFileManager")
+        logger.debug("Starting OmFileManager")
         backgroundWatcher = application.eventLoopGroup.next().scheduleRepeatedTask(initialDelay: .seconds(2), delay: .seconds(2), {
             task in
             

@@ -42,7 +42,7 @@ let package = Package(
     ),
     .systemLibrary(name: "CZlib", pkgConfig: "z", providers: [.brew(["zlib"]), .apt(["libz-dev"])]),
     .target(name: "CHelper", cSettings: [.unsafeFlags(flagsHelper)]),
-    .executableTarget(name: "Run", dependencies: [.target(name: "App")]),
+    .executableTarget(name: "openmeteo-api", dependencies: [.target(name: "App")]),
     .testTarget(name: "AppTests", dependencies: [.target(name: "App")]),
     .target(name: "SwiftPFor2D", dependencies: ["CTurboPFor"]),
     .target(name: "CTurboPFor", cSettings: [.unsafeFlags(flagsCTurbo)]), // disable all warnings, generated from macros

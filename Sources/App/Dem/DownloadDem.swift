@@ -73,10 +73,12 @@ struct Dem90 {
  */
 struct DownloadDemCommand: Command {
     var help: String {
-        return "Download digital elevation model"
+        return "Convert digital elevation model"
     }
     
     struct Signature: CommandSignature {
+        @Argument(name: "path", help: "Local path with DEM90 data")
+        var path: String
     }
     
     func run(using context: CommandContext, signature: Signature) throws {
@@ -100,7 +102,7 @@ struct DownloadDemCommand: Command {
                 let east = lon >= 0 ? "E" : "W"
                 let coords = "\(north)\(abs(lat).zeroPadded(len: 2))_00_\(east)\(abs(lon).zeroPadded(len: 3))_00"
                 
-                let tifLocal = "/Volumes/1TB_USB3/dem/dem90/Copernicus_DSM_COG_30_\(coords)_DEM/Copernicus_DSM_COG_30_\(coords)_DEM.tif"
+                let tifLocal = "\(signature.path)/Copernicus_DSM_COG_30_\(coords)_DEM/Copernicus_DSM_COG_30_\(coords)_DEM.tif"
                 if !FileManager.default.fileExists(atPath: tifLocal) {
                     continue
                 }
