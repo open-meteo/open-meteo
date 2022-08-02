@@ -47,30 +47,6 @@ enum EcmwfDomain: GenericDomain {
 }
 
 
-enum EcmwfVariableDerived: String, Codable {
-    case windspeed_10m
-    case windspeed_1000hPa
-    case windspeed_925hPa
-    case windspeed_850hPa
-    case windspeed_700hPa
-    case windspeed_500hPa
-    case windspeed_300hPa
-    case windspeed_250hPa
-    case windspeed_200hPa
-    case windspeed_50hPa
-    case winddirection_10m
-    case winddirection_1000hPa
-    case winddirection_925hPa
-    case winddirection_850hPa
-    case winddirection_700hPa
-    case winddirection_500hPa
-    case winddirection_300hPa
-    case winddirection_250hPa
-    case winddirection_200hPa
-    case winddirection_50hPa
-}
-
-
 typealias EcmwfReader = GenericReader<EcmwfDomain, EcmwfVariable>
 
 extension EcmwfReader {
@@ -147,6 +123,8 @@ extension EcmwfReader {
         case .winddirection_50hPa:
             try prefetchData(variable: .northward_wind_50hPa)
             try prefetchData(variable: .eastward_wind_50hPa)
+        case .soil_temperature_0_7cm:
+            try prefetchData(variable: .soil_temperature_0_to_7cm)
         }
     }
     
@@ -262,6 +240,8 @@ extension EcmwfReader {
             let v = try get(variable: .eastward_wind_50hPa)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
+        case .soil_temperature_0_7cm:
+            return try get(variable: .soil_temperature_0_to_7cm)
         }
     }
 }
