@@ -263,8 +263,8 @@ struct ForecastapiResult {
                 b.buffer.writeString("""
                 {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds)
                 """)
-                if let elevation = elevation {
-                    b.buffer.writeString(",\"elevation\":\(elevation.isNaN ? "null" : "\(elevation)")")
+                if let elevation = elevation, !elevation.isNaN {
+                    b.buffer.writeString(",\"elevation\":\(elevation)")
                 }
                 if let current_weather = current_weather {
                     b.buffer.writeString("""
