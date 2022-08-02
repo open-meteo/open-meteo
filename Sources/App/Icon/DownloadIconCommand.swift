@@ -90,8 +90,8 @@ struct DownloadIconCommand: Command {
         @Flag(name: "skip-existing")
         var skipExisting: Bool
         
-        @Option(name: "only-variable")
-        var onlyVariable: String?
+        @Option(name: "only-variables")
+        var onlyVariables: String?
     }
 
     var help: String {
@@ -99,13 +99,14 @@ struct DownloadIconCommand: Command {
     }
     
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, onlyVariable: IconVariable?) throws {
+    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariable]) throws {
         let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
+        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+        
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try CdoHelper(domain: domain, logger: logger)
-        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-
+        
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "https://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
@@ -144,10 +145,7 @@ struct DownloadIconCommand: Command {
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             let h3 = hour.zeroPadded(len: 3)
-            for variable in domain.variables {
-                if let onlyVariable = onlyVariable, variable != onlyVariable {
-                    continue
-                }
+            for variable in variables {
                 if hour == 0 && variable.skipHour0 {
                     continue
                 }
@@ -178,7 +176,7 @@ struct DownloadIconCommand: Command {
 
     /// unompress and remap
     /// Process variable after variable
-    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, onlyVariable: IconVariable?) throws {
+    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariable]) throws {
         let downloadDirectory = domain.downloadDirectory
         let cdo = try CdoHelper(domain: domain, logger: logger)
         let grid = domain.grid
@@ -206,10 +204,7 @@ struct DownloadIconCommand: Command {
         //try! sol2d.writeNetcdf(filename: "\(domain.omfileDirectory)solfac.nc", nx: grid.nx, ny: grid.ny)
         //return
 
-        for variable in IconVariable.allCases {
-            if let onlyVariable = onlyVariable, variable != onlyVariable {
-                continue
-            }
+        for variable in variables {
             logger.info("Converting \(variable)")
             
             let v = variable.omFileName.uppercased()
@@ -432,23 +427,27 @@ struct DownloadIconCommand: Command {
 
     func run(using context: CommandContext, signature: Signature) throws {
         guard let domain = IconDomains.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain")
+            fatalError("Invalid domain '\(signature.domain)'")
         }
         guard let run = Int(signature.run) else {
-            fatalError("Invalid run")
+            fatalError("Invalid run '\(signature.run)'")
         }
-        let onlyVariable: IconVariable? = signature.onlyVariable.map {
-            guard let variable = IconVariable(rawValue: $0) else {
-                fatalError("Invalid variable")
+        let onlyVariables: [IconVariable]? = signature.onlyVariables.map {
+            $0.split(separator: ",").map {
+                guard let variable = IconVariable(rawValue: String($0)) else {
+                    fatalError("Invalid variable '\($0)'")
+                }
+                return variable
             }
-            return variable
         }
+        
+        let variables = onlyVariables ?? IconVariable.allCases
         let logger = context.application.logger
 
         let date = Timestamp.now().with(hour: run)
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, onlyVariable: onlyVariable)
-        try convertIcon(logger: logger, domain: domain, run: date, onlyVariable: onlyVariable)
+        try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
+        try convertIcon(logger: logger, domain: domain, run: date, variables: variables)
     }
 }

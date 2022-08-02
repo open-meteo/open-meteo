@@ -111,7 +111,7 @@ struct ForecastapiResult {
     /// e.g. `52.52N13.42E38m`
     var formatedCoordinatesFilename: String {
         let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
-        let ele = elevation.map { String(format: "%.0fm", $0) } ?? ""
+        let ele = elevation.map { $0.isNaN ? "" : String(format: "%.0fm", $0) } ?? ""
         return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
     }
     
@@ -122,7 +122,7 @@ struct ForecastapiResult {
                 var b = BufferAndWriter(writer: writer)
                 
                 b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds\n")
-                let ele = elevation.map({ "\($0)" }) ?? "NaN"
+                let ele = elevation.map({ $0.isNaN ? "NaN" : "\($0)" }) ?? "NaN"
                 b.buffer.writeString("\(latitude),\(longitude),\(ele),\(utc_offset_seconds)\n")
                 
                 if let current_weather = current_weather {
@@ -263,7 +263,7 @@ struct ForecastapiResult {
                 b.buffer.writeString("""
                 {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds)
                 """)
-                if let elevation = elevation {
+                if let elevation = elevation, !elevation.isNaN {
                     b.buffer.writeString(",\"elevation\":\(elevation)")
                 }
                 if let current_weather = current_weather {

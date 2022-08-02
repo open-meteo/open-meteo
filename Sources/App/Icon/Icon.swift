@@ -146,10 +146,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
     
-    var variables: [IconVariable] {
-        return IconVariable.allCases
-    }
-    
     var initFileNameOm: String {
         return "\(omfileDirectory)init.txt"
     }

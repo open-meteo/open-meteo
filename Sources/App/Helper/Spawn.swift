@@ -25,7 +25,7 @@ public extension Process {
             }
         }
         guard FileManager.default.fileExists(atPath: command) else {
-            throw SpawnError.executableDoesNotExist(cmd: command)
+            throw SpawnError.executableDoesNotExist(cmd: cmd)
         }
         return command
     }
