@@ -128,21 +128,13 @@ struct DownloadIconWaveCommand: Command {
             logger.info("Converting \(variable)")
             
             /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
-            let data2d: Array2DFastTime = try {
-                var data2dSpace = Array2DFastSpace(
-                    data: [Float](repeating: .nan, count: domain.grid.count * domain.countForecastHours),
-                    nLocations: domain.grid.count,
-                    nTime: domain.countForecastHours
-                )
+            var data2d = Array2DFastTime(nLocations: domain.grid.count, nTime: domain.countForecastHours)
                 
-                for forecastStep in 0..<domain.countForecastHours {
-                    let forecastHour = forecastStep * domain.dtSeconds / 3600
-                    let d = try OmFileReader(file: "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
-                    data2dSpace[forecastStep, 0..<data2dSpace.nLocations] = ArraySlice(d)
-                }
-                
-                return data2dSpace.transpose()
-            }()
+            for forecastStep in 0..<domain.countForecastHours {
+                let forecastHour = forecastStep * domain.dtSeconds / 3600
+                let d = try OmFileReader(file: "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
+                data2d[0..<data2d.nLocations, forecastStep] = d
+            }
 
             
             logger.info("Create om file")

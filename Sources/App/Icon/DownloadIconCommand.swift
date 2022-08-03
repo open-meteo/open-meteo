@@ -201,28 +201,18 @@ struct DownloadIconCommand: Command {
             
             let v = variable.omFileName.uppercased()
 
-            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
-            var data2d: Array2DFastTime = try {
-                /// space oriented, but after 72 hours only 3 hour values are filled.
-                /// 2.86GB high water for this array
-                var data2dFastSpace = Array2DFastSpace(
-                    data: [Float](repeating: .nan, count: nLocation * nForecastHours),
-                    nLocations: nLocation,
-                    nTime: nForecastHours
-                )
+            /// time oriented, but after 72 hours only 3 hour values are filled.
+            /// 2.86GB high water for this array
+            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
 
-                for hour in forecastSteps {
-                    if hour == 0 && variable.skipHour0 {
-                        continue
-                    }
-                    let h3 = hour.zeroPadded(len: 3)
-                    let d = try FloatArrayCompressor.read(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg", nElements: nLocation)
-                    data2dFastSpace.data[hour * nLocation ..< (hour+1) * nLocation] = ArraySlice(d)
+            for hour in forecastSteps {
+                if hour == 0 && variable.skipHour0 {
+                    continue
                 }
-                
-                // Fast time from now on
-                return data2dFastSpace.transpose()
-            }()
+                let h3 = hour.zeroPadded(len: 3)
+                data2d[0..<nLocation, hour] = try FloatArrayCompressor.read(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg", nElements: nLocation)
+            }
+            
             
             // Deaverage radiation. Not really correct for 3h data after 81 hours.
             if variable.isAveragedOverForecastTime {

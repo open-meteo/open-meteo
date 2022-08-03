@@ -93,22 +93,16 @@ struct DownloadEcmwfCommand: Command {
         for variable in EcmwfVariable.allCases {
             logger.debug("Converting \(variable)")
             
-            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
-            var data2d: Array2DFastTime = try {
-                var data2dSpace = Array2DFastSpace(
-                    data: [Float](repeating: .nan, count: nLocation * nForecastHours),
-                    nLocations: nLocation,
-                    nTime: nForecastHours
-                )
-                for hour in forecastSteps {
-                    /*if hour == 0 && variable.skipHour0 {
-                        continue
-                    }*/
-                    let d = try Self.readNetcdf(file: "\(downloadDirectory)\(hour)h.nc", variable: variable.gribName, levelOffset: variable.level, nx: domain.grid.nx, ny: domain.grid.ny)
-                    data2dSpace.data[(hour/domain.dtHours) * nLocation ..< (hour/domain.dtHours + 1) * nLocation] = ArraySlice(d)
-                }
-                return data2dSpace.transpose()
-            }()
+            /// Prepare data as time series optimisied array
+            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
+            
+            for hour in forecastSteps {
+                /*if hour == 0 && variable.skipHour0 {
+                    continue
+                }*/
+                let d = try Self.readNetcdf(file: "\(downloadDirectory)\(hour)h.nc", variable: variable.gribName, levelOffset: variable.level, nx: domain.grid.nx, ny: domain.grid.ny)
+                data2d[0..<nLocation, hour/domain.dtHours] = d
+            }
             
             let interpolationHours = (0..<nForecastHours).compactMap { hour -> Int? in
                 if forecastSteps.contains(hour * domain.dtHours) {

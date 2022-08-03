@@ -14,6 +14,12 @@ struct Array2DFastSpace {
         self.nLocations = nLocations
         self.nTime = nTime
     }
+    
+    public init(nLocations: Int, nTime: Int) {
+        self.data = .init(repeating: .nan, count: nLocations * nTime)
+        self.nLocations = nLocations
+        self.nTime = nTime
+    }
 
     func writeNetcdf(filename: String, nx: Int, ny: Int) throws {
         let file = try NetCDF.create(path: filename, overwriteExisting: true)
@@ -85,6 +91,12 @@ struct Array2DFastTime {
         self.nTime = nTime
     }
     
+    public init(nLocations: Int, nTime: Int) {
+        self.data = .init(repeating: .nan, count: nLocations * nTime)
+        self.nLocations = nLocations
+        self.nTime = nTime
+    }
+    
     @inlinable subscript(location: Int, time: Int) -> Float {
         get {
             precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
@@ -108,6 +120,28 @@ struct Array2DFastTime {
             precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
             precondition(time.upperBound < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
             data[time.add(location * nTime)] = newValue
+        }
+    }
+    
+    /// One spatial field into time-series array
+    @inlinable subscript(location: Range<Int>, time: Int) -> [Float] {
+        get {
+            precondition(location.upperBound < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            var out = [Float]()
+            out.reserveCapacity(location.count)
+            for loc in location {
+                out.append(self[loc, time])
+            }
+            return out
+        }
+        set {
+            precondition(location.upperBound < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            precondition(newValue.count == location.count, "Array and location count do not match")
+            for (loc, value) in zip(location, newValue) {
+                data[loc * nTime + time] = value
+            }
         }
     }
     
