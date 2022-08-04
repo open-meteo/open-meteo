@@ -9,7 +9,7 @@
 #export("content"):
 
 <div class="px-4 py-5 mb-5 text-center text-white" style="
-            background-image: url('https://assets.open-meteo.com/images/beach.jpeg');
+            background-image: url('https://assets.open-meteo.com/images/kuala_lumpur.jpeg');
             background-size: cover;
             background-position: center;
             height: 500px;
@@ -198,44 +198,45 @@
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="alder_pollen" id="alder_pollen" name="hourly">
             <label class="form-check-label" for="alder_pollen">
-              Alder Pollen
+              Alder Pollen <small class="text-muted">(*)</small>
             </label>
           </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="birch_pollen" id="birch_pollen" name="hourly">
             <label class="form-check-label" for="birch_pollen">
-              Birch Pollen
+              Birch Pollen <small class="text-muted">(*)</small>
             </label>
           </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="grass_pollen" id="grass_pollen" name="hourly">
             <label class="form-check-label" for="grass_pollen">
-              Grass Pollen
+              Grass Pollen <small class="text-muted">(*)</small>
             </label>
           </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="mugwort_pollen" id="mugwort_pollen" name="hourly">
             <label class="form-check-label" for="mugwort_pollen">
-              Mugwort Pollen
+              Mugwort Pollen <small class="text-muted">(*)</small>
             </label>
           </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="olive_pollen" id="olive_pollen" name="hourly">
             <label class="form-check-label" for="olive_pollen">
-              Olive Pollen
+              Olive Pollen <small class="text-muted">(*)</small>
             </label>
           </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="ragweed_pollen" id="ragweed_pollen" name="hourly">
             <label class="form-check-label" for="ragweed_pollen">
-              Ragweed Pollen
+              Ragweed Pollen <small class="text-muted">(*)</small>
             </label>
           </div>
         </div>
+        <small class="text-muted">* Only available in Europe</small>
         </div>
 
         <div class="row py-3 px-0">
-          <h3>Daily Marine Variables <small class="text-muted">(*)</small></h3>
+          <h3>Daily Air Quality Variables <small class="text-muted">(*)</small></h3>
           <div class="col-md-4">
             <div class="form-check">
               <input class="form-check-input" type="checkbox" value="uv_index" id="uv_index_daily" name="daily">
