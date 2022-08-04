@@ -1,7 +1,8 @@
 import Foundation
 
-enum CamsVariableDaily: String, Codable {
+/*enum CamsVariableDaily: String, Codable {
     case uv_index
+    case uv_index_clear_sky
     
 }
 
@@ -22,4 +23,4 @@ extension CamsMixer {
             }
         }
     }
-}
+}*/

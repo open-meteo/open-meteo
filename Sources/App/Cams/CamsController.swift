@@ -44,13 +44,13 @@ struct CamsController {
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
             }
             
-            let daily: ApiSection? = try params.daily.map { dailyVariables in
+            /*let daily: ApiSection? = try params.daily.map { dailyVariables in
                 return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.map { variable in
                     let d = try reader.getDaily(variable: variable).toApi(name: variable.rawValue)
                     assert(dailyTime.count == d.data.count)
                     return d
                 })
-            }
+            }*/
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
@@ -60,7 +60,7 @@ struct CamsController {
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 current_weather: nil,
-                sections: [hourly, daily].compactMap({$0}),
+                sections: [hourly /*, daily*/].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
             )
             return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
@@ -76,7 +76,7 @@ struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
     let hourly: [CamsVariable]?
-    let daily: [CamsVariableDaily]?
+    //let daily: [CamsVariableDaily]?
     //let temperature_unit: TemperatureUnit?
     //let windspeed_unit: WindspeedUnit?
     //let precipitation_unit: PrecipitationUnit?
@@ -97,9 +97,9 @@ struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
         if longitude > 180 || longitude < -180 || longitude.isNaN {
             throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
         }
-        if daily?.count ?? 0 > 0 && timezone == nil {
+        /*if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
-        }
+        }*/
     }
     
     var timeformatOrDefault: Timeformat {

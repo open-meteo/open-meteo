@@ -232,84 +232,7 @@
             </label>
           </div>
         </div>
-        <small class="text-muted">* Only available in Europe</small>
-        </div>
-
-        <div class="row py-3 px-0">
-          <h3>Daily Air Quality Variables <small class="text-muted">(*)</small></h3>
-          <div class="col-md-4">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="uv_index" id="uv_index_daily" name="daily">
-              <label class="form-check-label" for="uv_index_daily">
-                UV Index
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="wave_direction_dominant" id="wave_direction_dominant" name="daily">
-              <label class="form-check-label" for="wave_direction_dominant">
-                Wave Direction Dominant
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="wave_period_max" id="wave_period_max" name="daily">
-              <label class="form-check-label" for="wave_period_max">
-                Wave Period Max
-              </label>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="wind_wave_height_max" id="wind_wave_height_max" name="daily">
-              <label class="form-check-label" for="wind_wave_height_max">
-                Wind Wave Height Max
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="wind_wave_direction_dominant" id="wind_wave_direction_dominant" name="daily">
-              <label class="form-check-label" for="wind_wave_direction_dominant">
-                Wind Wave Direction Dominant
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="wind_wave_period_max" id="wind_wave_period_max" name="daily">
-              <label class="form-check-label" for="wind_wave_period_max">
-                Wind Wave Period Max
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="wind_wave_peak_period_max" id="wind_wave_peak_period_max" name="daily">
-              <label class="form-check-label" for="wind_wave_peak_period_max">
-                Wind Wave Peak Period Max
-              </label>
-            </div>
-          </div>
-          <div class="col-md-4">
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="swell_wave_height_max" id="swell_wave_height_max" name="daily">
-              <label class="form-check-label" for="swell_wave_height_max">
-                Swell Wave Height Max
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="swell_wave_direction_dominant" id="swell_wave_direction_dominant" name="daily">
-              <label class="form-check-label" for="swell_wave_direction_dominant">
-                Swell Wave Direction Dominant
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="swell_wave_period_max" id="swell_wave_period_max" name="daily">
-              <label class="form-check-label" for="swell_wave_period_max">
-                Swell Wave Period Max
-              </label>
-            </div>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="swell_wave_peak_period_max" id="swell_wave_peak_period_max" name="daily">
-              <label class="form-check-label" for="swell_wave_peak_period_max">
-                Swell Wave Peak Period Max
-              </label>
-            </div>
-          </div>
-          <small class="text-muted">* Parameter <mark>timezone</mark> is mandatory</small>
+        <small class="text-muted">* Only available in Europe with 4 days forecast</small>
         </div>
 
         <div class="row py-3 px-0">
@@ -321,29 +244,6 @@
                 <option value="unixtime">Unix timestamp</option>
               </select>
               <label for="timeformat">Timeformat</label>
-            </div>
-          </div>
-          <div class="col-3">
-            <div class="form-floating mb-3">
-              <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="UTC">
-                <option value="America/Anchorage">America/Anchorage</option>
-                <option value="America/Los_Angeles">America/Los_Angeles</option>
-                <option value="America/Denver">America/Denver</option>
-                <option value="America/Chicago">America/Chicago</option>
-                <option value="America/New_York">America/New_York</option>
-                <option value="America/Sao_Paulo">America/Sao_Paulo</option>
-                <option selected value="UTC">UTC</option>
-                <option value="Europe/London">Europe/London</option>
-                <option value="Europe/Berlin">Europe/Berlin</option>
-                <option value="Europe/Moscow">Europe/Moscow</option>
-                <option value="Africa/Cairo">Africa/Cairo</option>
-                <option value="Asia/Bangkok">Asia/Bangkok</option>
-                <option value="Asia/Singapore">Asia/Singapore</option>
-                <option value="Asia/Tokyo">Asia/Tokyo</option>
-                <option value="Australia/Sydney">Australia/Sydney</option>
-                <option value="Pacific/Auckland">Pacific/Auckland</option>
-              </select>
-              <label for="timezone">Timezone</label>
             </div>
           </div>
           <div class="col-3">
