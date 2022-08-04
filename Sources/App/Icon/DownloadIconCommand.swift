@@ -245,108 +245,15 @@ struct DownloadIconCommand: Command {
 
             switch variable.interpolationType {
             case .linear:
-                for l in 0..<nLocation {
-                    for hour in forecastStepsToInterpolate {
-                        let prev = data2d[l, hour-1]
-                        let next = data2d[l, hour+2]
-                        data2d[l, hour] = prev * 2/3 + next * 1/3
-                        data2d[l, hour+1] = prev * 1/3 + next * 2/3
-                    }
-                }
+                data2d.interpolate2StepsLinear(positions: forecastStepsToInterpolate)
             case .nearest:
-                // fill with next hour. For weather code, we fill with the next hour, because this represents precipitation
-                for l in 0..<nLocation {
-                    for hour in forecastStepsToInterpolate {
-                        let next = data2d[l, hour+2]
-                        data2d[l, hour] = next
-                        data2d[l, hour+1] = next
-                    }
-                }
+                data2d.interpolate2StepsNearest(positions: forecastStepsToInterpolate)
             case .solar_backwards_averaged:
-                // Solar backwards averages data. Data needs to be deaveraged before
-                // First the clear sky index KT is calaculated (KT based on extraterrestrial radiation)
-                // clearsky index is hermite interpolated and then back to actual radiation
-                
-                /// Which range of hours solar radiation data is required
-                let solarHours = forecastStepsToInterpolate.minAndMax().map { $0.min - 4 ..< $0.max + 6 } ?? 0..<0
-                let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * 3600), nTime: solarHours.count, dtSeconds: 3600)
-                
-                /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
-                let nx = grid.nx
-                let byY = 10
-                for cy in 0..<grid.ny/byY {
-                    let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
-                    let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
-                    /// solar array is fast space oriented
-                    let solar_backwards = Zensun.calculateRadiationBackwardsAveraged(grid: domain.grid, timerange: solarTime, yrange: yrange)
-                    let solar2d = Array2DFastSpace(data: solar_backwards, nLocations: locationRange.count, nTime: solarHours.count)
-                    
-                    for l in locationRange {
-                        for hour in forecastStepsToInterpolate {
-                            let sHour = hour - solarHours.lowerBound
-                            let sLocation = l - locationRange.lowerBound
-                            // point C and D are still 3 h averages
-                            let solC1 = solar2d[sHour + 0, sLocation]
-                            let solC2 = solar2d[sHour + 1, sLocation]
-                            let solC3 = solar2d[sHour + 2, sLocation]
-                            let solC = (solC1 + solC2 + solC3) / 3
-                            let C = solC <= 0.0001 ? 0 : data2d[l, hour+2] / solC
-                            
-                            let solB = solar2d[sHour - 1, sLocation]
-                            let B = solB <= 0.0001 ? C : data2d[l, hour-1] / solB
-                            
-                            let solA = solar2d[sHour - 4, sLocation]
-                            let A = solA <= 0.0001 || hour-4 < 0 ? B : data2d[l, hour-4] / solA
-                            
-                            let solD1 = solar2d[sHour + 3, sLocation]
-                            let solD2 = solar2d[sHour + 4, sLocation]
-                            let solD3 = solar2d[sHour + 5, sLocation]
-                            let solD = (solD1 + solD2 + solD3) / 3
-                            let D = solD <= 0.0001 || hour+4 >= nForecastHours ? C : data2d[l, hour+5] / solD
-                            
-                            let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                            let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                            let c = -A/2.0 + C/2.0
-                            let d = B
-                            
-                            data2d[l, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
-                            data2d[l, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
-                            data2d[l, hour+2] = C * solC3
-                        }
-                    }
-                }
+                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             case .hermite:
-                for l in 0..<nLocation {
-                    for hour in forecastStepsToInterpolate {
-                        let A = data2d[l, hour-4 < 0 ? hour-1 : hour-4]
-                        let B = data2d[l, hour-1]
-                        let C = data2d[l, hour+2]
-                        let D = data2d[l, hour+4 >= nForecastHours ? hour+2 : hour+5]
-                        let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                        let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                        let c = -A/2.0 + C/2.0
-                        let d = B
-                        data2d[l, hour] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
-                        data2d[l, hour+1] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
-                    }
-                }
+                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
             case .hermite_backwards_averaged:
-                /// basically shift the backwards averaged to the center and then do hermite
-                for l in 0..<nLocation {
-                    for hour in forecastStepsToInterpolate {
-                        let A = data2d[l, hour-5 < 0 ? hour-2 : hour-5]
-                        let B = data2d[l, hour-2]
-                        let C = data2d[l, hour+2]
-                        let D = data2d[l, hour+4 >= nForecastHours ? hour+2 : hour+5]
-                        let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                        let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                        let c = -A/2.0 + C/2.0
-                        let d = B
-                        data2d[l, hour-1] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
-                        data2d[l, hour] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
-                        data2d[l, hour+1] = C
-                    }
-                }
+                data2d.interpolate2StepsHermiteBackwardsAveraged(positions: forecastStepsToInterpolate)
             }
             
             /// Temperature is stored in kelvin. Convert to celsius
@@ -455,6 +362,126 @@ struct DownloadIconCommand: Command {
 
         try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convertIcon(logger: logger, domain: domain, run: date, variables: variables)
+    }
+}
+
+extension Array2DFastTime {
+    /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
+    mutating func interpolate2StepsLinear(positions: [Int]) {
+        for l in 0..<nLocations {
+            for hour in positions {
+                let prev = self[l, hour-1]
+                let next = self[l, hour+2]
+                self[l, hour] = prev * 2/3 + next * 1/3
+                self[l, hour+1] = prev * 1/3 + next * 2/3
+            }
+        }
+    }
+    
+    /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
+    mutating func interpolate2StepsHermite(positions: [Int]) {
+        for l in 0..<nLocations {
+            for hour in positions {
+                let A = self[l, hour-4 < 0 ? hour-1 : hour-4]
+                let B = self[l, hour-1]
+                let C = self[l, hour+2]
+                let D = self[l, hour+4 >= nTime ? hour+2 : hour+5]
+                let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+                let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+                let c = -A/2.0 + C/2.0
+                let d = B
+                self[l, hour] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
+                self[l, hour+1] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
+            }
+        }
+    }
+    
+    /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
+    mutating func interpolate2StepsHermiteBackwardsAveraged(positions: [Int]) {
+        /// basically shift the backwards averaged to the center and then do hermite
+        for l in 0..<nLocations {
+            for hour in positions {
+                let A = self[l, hour-5 < 0 ? hour-2 : hour-5]
+                let B = self[l, hour-2]
+                let C = self[l, hour+2]
+                let D = self[l, hour+4 >= nTime ? hour+2 : hour+5]
+                let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+                let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+                let c = -A/2.0 + C/2.0
+                let d = B
+                self[l, hour-1] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
+                self[l, hour] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
+                self[l, hour+1] = C
+            }
+        }
+    }
+    
+    /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
+    mutating func interpolate2StepsNearest(positions: [Int]) {
+        // fill with next hour. For weather code, we fill with the next hour, because this represents precipitation
+        for l in 0..<nLocations {
+            for hour in positions {
+                let next = self[l, hour+2]
+                self[l, hour] = next
+                self[l, hour+1] = next
+            }
+        }
+    }
+    
+    /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
+    mutating func interpolate2StepsSolarBackwards(positions: [Int], grid: RegularGrid, run: Timestamp, dtSeconds: Int) {
+        // Solar backwards averages data. Data needs to be deaveraged before
+        // First the clear sky index KT is calaculated (KT based on extraterrestrial radiation)
+        // clearsky index is hermite interpolated and then back to actual radiation
+        
+        /// Which range of hours solar radiation data is required
+        let solarHours = positions.minAndMax().map { $0.min - 4 ..< $0.max + 6 } ?? 0..<0
+        let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * dtSeconds), nTime: solarHours.count, dtSeconds: dtSeconds)
+        
+        /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
+        let nx = grid.nx
+        let byY = 10
+        for cy in 0..<grid.ny/byY {
+            let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
+            let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
+            /// solar array is fast space oriented
+            let solar_backwards = Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange)
+            let solar2d = Array2DFastSpace(data: solar_backwards, nLocations: locationRange.count, nTime: solarHours.count)
+            
+            for l in locationRange {
+                for hour in positions {
+                    let sHour = hour - solarHours.lowerBound
+                    let sLocation = l - locationRange.lowerBound
+                    // point C and D are still 3 h averages
+                    let solC1 = solar2d[sHour + 0, sLocation]
+                    let solC2 = solar2d[sHour + 1, sLocation]
+                    let solC3 = solar2d[sHour + 2, sLocation]
+                    let solC = (solC1 + solC2 + solC3) / 3
+                    let C = solC <= 0.0001 ? 0 : self[l, hour+2] / solC
+                    
+                    let solB = solar2d[sHour - 1, sLocation]
+                    let B = solB <= 0.0001 ? C : self[l, hour-1] / solB
+                    
+                    let solA = solar2d[sHour - 4, sLocation]
+                    let A = solA <= 0.0001 || hour-4 < 0 ? B : self[l, hour-4] / solA
+                    
+                    let solD1 = solar2d[sHour + 3, sLocation]
+                    let solD2 = solar2d[sHour + 4, sLocation]
+                    let solD3 = solar2d[sHour + 5, sLocation]
+                    let solD = (solD1 + solD2 + solD3) / 3
+                    let D = solD <= 0.0001 || hour+4 >= nTime ? C : self[l, hour+5] / solD
+                    
+                    let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+                    let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+                    let c = -A/2.0 + C/2.0
+                    let d = B
+                    
+                    self[l, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
+                    self[l, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
+                    self[l, hour+2] = C * solC3
+                }
+            }
+        }
     }
 }
 

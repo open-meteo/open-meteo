@@ -4,7 +4,7 @@ import SwiftNetCDF
 import SwiftPFor2D
 
 
-enum CamsDomain: String {
+enum CamsDomain: String, GenericDomain {
     case cams_global
     case cams_european
     
@@ -27,6 +27,18 @@ enum CamsDomain: String {
     }
     var downloadDirectory: String {
         return "./data/\(rawValue)/"
+    }
+    
+    var dtSeconds: Int {
+        return 3600
+    }
+    
+    var elevationFile: OmFileReader? {
+        return nil
+    }
+    
+    var omFileLength: Int {
+        return forecastHours + 4*24
     }
     
     var grid: RegularGrid {
@@ -316,6 +328,7 @@ struct DownloadCamsCommand: Command {
                 fatalError("ftppassword is required")
             }
             try downloadCamsGlobal(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
+            try convertCamsGlobal(logger: logger, domain: domain, run: date, variables: variables)
         case .cams_european:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
@@ -374,21 +387,54 @@ struct DownloadCamsCommand: Command {
                     data[i] *= meta.scalefactor
                 }
                 
-                let data2d = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: 1)
-                try data2d.writeNetcdf(filename: "\(domain.downloadDirectory)/\(variable).nc", nx: nx, ny: ny)
+                //let data2d = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: 1)
+                //try data2d.writeNetcdf(filename: "\(domain.downloadDirectory)/\(variable).nc", nx: nx, ny: ny)
                 try FileManager.default.removeItemIfExists(at: filenameDest)
                 // Store as compressed float array
                 try OmFileWriter.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, dim0: nx, dim1: ny, chunk0: nx, chunk1: ny, all: data)
-                
             }
-            fatalError("OK")
         }
         
     }
     
-    func convertCamsGlobal(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], user: String, password: String) throws {
-                
+    /// Assemble a time-series and update operational files
+    func convertCamsGlobal(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
+        for variable in variables {
+            guard let meta = variable.getCamsGlobalMeta()else {
+                continue
+            }
+            logger.info("Converting \(variable)")
+            
+            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
+            var data2d = Array2DFastTime(nLocations: domain.grid.count, nTime: domain.forecastHours)
+                
+            for hour in 0..<domain.forecastHours {
+                if meta.isMultiLevel && hour % 3 != 0 {
+                    continue // multi level variables are only 3 hour
+                }
+                let d = try OmFileReader(file: "\(domain.downloadDirectory)\(variable)_\(hour).om").readAll()
+                data2d[0..<data2d.nLocations, hour] = d
+            }
+            
+            // Multi level has only 3h data, interpolate to 1h using hermite interpolation
+            if meta.isMultiLevel {
+                let forecastStepsToInterpolate = (0..<domain.forecastHours).compactMap { hour in
+                    hour % 3 == 1 ? hour : nil
+                }
+                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
+            }
+            
+            logger.info("Create om file")
+            let startOm = DispatchTime.now()
+            let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
+            let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
+            try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
+            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+        }
         
     }
     
