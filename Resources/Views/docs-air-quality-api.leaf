@@ -140,7 +140,7 @@
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="pm2_5" id="pm2_5" name="hourly" checked>
             <label class="form-check-label" for="pm2_5">
-              Particulate Matter PM 2.5
+              Particulate Matter PM2.5
             </label>
           </div>
           <div class="form-check">

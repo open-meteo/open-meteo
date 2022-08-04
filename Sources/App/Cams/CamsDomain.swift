@@ -47,7 +47,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         case .cams_global:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
         case .cams_europe:
-            return RegularGrid(nx: 700, ny: 400, latMin: 30.05, lonMin: -24.95, dx: 0.1, dy: 0.1)
+            return RegularGrid(nx: 700, ny: 420, latMin: 30.05, lonMin: -24.95, dx: 0.1, dy: 0.1)
         }
     }
 }
@@ -129,9 +129,9 @@ enum CamsVariable: String, CaseIterable, GenericVariableMixing, Codable {
     var scalefactor: Float {
         switch self {
         case .pm10:
-            return 1
+            return 10
         case .pm2_5:
-            return 1
+            return 10
         case .dust:
             return 1
         case .aerosol_optical_depth:
