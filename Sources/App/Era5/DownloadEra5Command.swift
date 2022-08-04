@@ -348,8 +348,8 @@ struct DownloadEra5Command: Command {
         guard var landmask = try ncfile.getVariable(name: "lsm")?.readWithScalefactorAndOffset(scalefactor: 1, offset: 0) else {
             fatalError("No variable named lsm available")
         }
-        elevation.mirrorAndRotate(nt: 1)
-        landmask.mirrorAndRotate(nt: 1)
+        elevation.shift180LongitudeAndFlipLatitude(nt: 24, ny: 721, nx: 1440)
+        landmask.shift180LongitudeAndFlipLatitude(nt: 24, ny: 721, nx: 1440)
         
         /*let a1 = Array2DFastSpace(data: elevation, nLocations: 1440*721, nTime: 1)
         try a1.writeNetcdf(filename: "\(downloadDir)/elevation_converted.nc", nx: 1440, ny: 721)
@@ -523,7 +523,7 @@ struct DownloadEra5Command: Command {
                 let scaling = variable.netCdfScaling
                 var data = try ncVariable.readWithScalefactorAndOffset(scalefactor: scaling.scalefactor, offset: scaling.offest)
                 
-                data.mirrorAndRotate(nt: 24)
+                data.shift180LongitudeAndFlipLatitude(nt: 24, ny: 721, nx: 1440)
                 
                 let fastTime = Array2DFastSpace(data: data, nLocations: 721*1440, nTime: 24).transpose()
                 
@@ -698,31 +698,5 @@ extension Variable {
             // merge experiments
         }
         return data
-    }
-}
-
-fileprivate extension Array where Element == Float {
-    mutating func mirrorAndRotate(nt: Int) {
-        self.withUnsafeMutableBufferPointer { data in
-            for t in 0..<nt {
-                /// Era5 starts eastwards at 0°E... rotate to start at -180°E
-                for y in 0..<721 {
-                    for x in 0..<1440/2 {
-                        let offset = t*1440*721 + y*1440
-                        let val = data[offset + x]
-                        data[offset + x] = data[offset + x + 1440/2]
-                        data[offset + x + 1440/2] = val
-                    }
-                }
-                /// Also flip south / north
-                for y in 0..<721/2 {
-                    for x in 0..<1440 {
-                        let val = data[t*1440*721 + y*1440 + x]
-                        data[t*1440*721 + y*1440 + x] = data[t*1440*721 + (721-1-y)*1440 + x]
-                        data[t*1440*721 + (721-1-y)*1440 + x] = val
-                    }
-                }
-            }
-        }
     }
 }

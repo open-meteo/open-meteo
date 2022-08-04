@@ -98,7 +98,14 @@ struct Curl {
     let retryDelaySeconds = 5
 
     func download(url: String, to: String) throws {
-        logger.info("Downloading file \(url)")
+        // URL might contain password, strip them from logging
+        if url.contains("@") && url.contains(":") {
+            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
+            logger.info("Downloading file \(urlSafe)")
+        } else {
+            logger.info("Downloading file \(url)")
+        }
+        
         let startTime = Date()
         let args = [
             "-s",
