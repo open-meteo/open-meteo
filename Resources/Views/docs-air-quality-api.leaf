@@ -1,0 +1,520 @@
+#extend("base"):
+#export("header"):
+<link rel="stylesheet"
+  href="https://assets.open-meteo.com/libs/bootstrap-datepicker-1.9.0/bootstrap-datepicker3.min.css"
+  integrity="sha512-rxThY3LYIfYsVCWPCW9dB0k+e3RZB39f23ylUYTEuZMDrN/vRqLdaCBo/FbvVT6uC2r0ObfPzotsfKF9Qc5W5g=="
+  crossorigin="anonymous" referrerpolicy="no-referrer" />
+#endexport
+
+#export("content"):
+
+<div class="px-4 py-5 mb-5 text-center text-white" style="
+            background-image: url('https://assets.open-meteo.com/images/kuala_lumpur.jpeg');
+            background-size: cover;
+            background-position: center;
+            height: 500px;
+          ">
+  <svg style="filter: drop-shadow( 3px 3px 2px rgba(0, 0, 0, .7));" xmlns="http://www.w3.org/2000/svg" width="96" height="96" fill="currentColor" class="bi bi-lungs mb-4" viewBox="0 0 16 16">
+  <path d="M8.5 1.5a.5.5 0 1 0-1 0v5.243L7 7.1V4.72C7 3.77 6.23 3 5.28 3c-.524 0-1.023.27-1.443.592-.431.332-.847.773-1.216 1.229-.736.908-1.347 1.946-1.58 2.48-.176.405-.393 1.16-.556 2.011-.165.857-.283 1.857-.241 2.759.04.867.233 1.79.838 2.33.67.6 1.622.556 2.741-.004l1.795-.897A2.5 2.5 0 0 0 7 11.264V10.5a.5.5 0 0 0-1 0v.764a1.5 1.5 0 0 1-.83 1.342l-1.794.897c-.978.489-1.415.343-1.628.152-.28-.25-.467-.801-.505-1.63-.037-.795.068-1.71.224-2.525.157-.82.357-1.491.491-1.8.19-.438.75-1.4 1.44-2.25.342-.422.703-.799 1.049-1.065.358-.276.639-.385.833-.385a.72.72 0 0 1 .72.72v3.094l-1.79 1.28a.5.5 0 0 0 .58.813L8 7.614l3.21 2.293a.5.5 0 1 0 .58-.814L10 7.814V4.72a.72.72 0 0 1 .72-.72c.194 0 .475.11.833.385.346.266.706.643 1.05 1.066.688.85 1.248 1.811 1.439 2.249.134.309.334.98.491 1.8.156.814.26 1.73.224 2.525-.038.829-.224 1.38-.505 1.63-.213.19-.65.337-1.628-.152l-1.795-.897A1.5 1.5 0 0 1 10 11.264V10.5a.5.5 0 0 0-1 0v.764a2.5 2.5 0 0 0 1.382 2.236l1.795.897c1.12.56 2.07.603 2.741.004.605-.54.798-1.463.838-2.33.042-.902-.076-1.902-.24-2.759-.164-.852-.38-1.606-.558-2.012-.232-.533-.843-1.571-1.579-2.479-.37-.456-.785-.897-1.216-1.229C11.743 3.27 11.244 3 10.72 3 9.77 3 9 3.77 9 4.72V7.1l-.5-.357V1.5Z"/>
+</svg>
+  <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Air Quality API</h1>
+  <div class="col-lg-6 mx-auto">
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Pollutants and pollen forecast in 11 km resolution</p>
+    <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+      <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
+      <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
+    </div>
+  </div>
+</div>
+
+<!-- http://127.0.0.1:8080/v1/forecast -->
+<div class="container px-4 py-0" id="featured-3">
+    <form id="api_form" method="get" action="https://api.open-meteo.com/v1/air-quality">
+      <div class="row py-3 px-0">
+        <h3>Select Coordinates or City</h3>
+        <div class="col-md-3">
+          <div class="form-floating">
+            <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="54.3213">
+            <label for="latitude">Latitude</label>
+          </div>
+        </div>
+        <div class="col-md-3">
+          <div class="form-floating">
+            <input type="number" step="0.0001" class="form-control" name="longitude" id="longitude" value="10.1348">
+            <label for="longitude">Longitude</label>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="input-group form-floating mb-3">
+            <select class="form-select" id="select_city" aria-label="Select city">
+              <optgroup label="Europe">
+                <option selected data-latitude="52.5235" data-longitude="13.4115" data-asl="34">Berlin</option>
+                <option data-latitude="48.8567" data-longitude="2.3510" data-asl="34">Paris</option>
+                <option data-latitude="51.5002" data-longitude="-0.1262" data-asl="14">London</option>
+                <option data-latitude="40.4167" data-longitude="-3.7033" data-asl="588">Madrid</option>
+                <option data-latitude="48.2092" data-longitude="16.3728" data-asl="170">Vienna</option>
+                <option data-latitude="50.8371" data-longitude="4.3676" data-asl="577">Brussels</option>
+                <option data-latitude="55.7558" data-longitude="37.6176" data-asl="125">Moscow</option>
+                <option data-latitude="42.7105" data-longitude="23.3238" data-asl="591">Sofia</option>
+                <option data-latitude="55.6763" data-longitude="12.5681" data-asl="0">Copenhagen</option>
+                <option data-latitude="37.9792" data-longitude="23.7166" data-asl="153">Athens</option>
+                <option data-latitude="47.4984" data-longitude="19.0408" data-asl="102">Budapest</option>
+                <option data-latitude="64.1353" data-longitude="-21.8952" data-asl="15">Reykjavik</option>
+                <option data-latitude="53.3441" data-longitude="-6.2675" data-asl="8">Dublin</option>
+                <option data-latitude="41.8955" data-longitude="12.4823" data-asl="14">Rome</option>
+                <option data-latitude="52.3738" data-longitude="4.8910" data-asl="-1">Amsterdam</option>
+                <option data-latitude="59.9138" data-longitude="10.7387" data-asl="12">Oslo</option>
+                <option data-latitude="52.2297" data-longitude="21.0122" data-asl="93">Warsaw</option>
+                <option data-latitude="38.7072" data-longitude="-9.1355" data-asl="15">Lisabon</option>
+                <option data-latitude="46.9480" data-longitude="7.4481" data-asl="513">Bern</option>
+                <option data-latitude="50.4422" data-longitude="30.5367" data-asl="168">Kiev</option>
+                <option data-latitude="59.3328" data-longitude="18.0645" data-asl="15">Stockholm</option>
+              </optgroup>
+              <optgroup label="America">
+                <option data-latitude="38.8921" data-longitude="-77.0241" data-asl="2">Washington</option>
+                <option data-latitude="40.71" data-longitude="-74.01" data-asl="10">New York</option>
+                <option data-latitude="38.5737" data-longitude="-121.4871" data-asl="4">Sacramento</option>
+                <option data-latitude="34.05" data-longitude="-118.24" data-asl="89">Los Angeles</option>
+                <option data-latitude="41.85" data-longitude="-87.65" data-asl="179">Chicago</option>
+                <option data-latitude="29.76" data-longitude="-95.36" data-asl="12">Houston</option>
+                <option data-latitude="33.45" data-longitude="-112.07" data-asl="331">Phoenix</option>
+                <option data-latitude="39.95" data-longitude="-75.16" data-asl="12">Philadelphia</option>
+                <option data-latitude="49.25" data-longitude="-123.12" data-asl="70">Vancouver</option>
+                <option data-latitude="45.4235" data-longitude="-75.6979" data-asl="74">Ottawa</option>
+                <option data-latitude="-34.6118" data-longitude="-58.4173" data-asl="10">Buenos Aires</option>
+                <option data-latitude="-15.7801" data-longitude="-47.9292" data-asl="1079">Brasilia</option>
+                <option data-latitude="-33.4691" data-longitude="-70.6420" data-asl="521">Santiago</option>
+                <option data-latitude="4.6473" data-longitude="-74.0962" data-asl="2619">Bogota</option>
+                <option data-latitude="19.4271" data-longitude="-99.1276" data-asl="2216">Ciudad de Mexico</option>
+                <option data-latitude="-25.3005" data-longitude="-57.6362" data-asl="54">Asuncion</option>
+                <option data-latitude="-12.0931" data-longitude="-77.0465" data-asl="107">Lima</option>
+                <option data-latitude="-34.8941" data-longitude="-56.0675" data-asl="43">Montevideo</option>
+              </optgroup>
+              <optgroup label="Asia">
+                <option data-latitude="34.5155" data-longitude="69.1952" data-asl="1807">Kabul</option>
+                <option data-latitude="23.7106" data-longitude="90.3978" data-asl="3">Dhaka</option>
+                <option data-latitude="39.9056" data-longitude="116.3958" data-asl="63">Peking</option>
+                <option data-latitude="41.7010" data-longitude="44.7930" data-asl="451">Tiflis</option>
+                <option data-latitude="28.6353" data-longitude="77.2250" data-asl="201">New Delhi</option>
+                <option data-latitude="-6.1862" data-longitude="106.8063" data-asl="3">Jakarta</option>
+                <option data-latitude="35.7061" data-longitude="51.4358" data-asl="1138">Teheran</option>
+                <option data-latitude="33.3157" data-longitude="44.3922" data-asl="40">Baghdad</option>
+                <option data-latitude="31.7857" data-longitude="35.2007" data-asl="580">Jerusalem</option>
+                <option data-latitude="35.6785" data-longitude="139.6823" data-asl="17">Tokyo</option>
+                <option data-latitude="3.1502" data-longitude="101.7077" data-asl="60">Kuala Lumpur</option>
+                <option data-latitude="47.9138" data-longitude="106.9220" data-asl="1284">Ulan Bator</option>
+                <option data-latitude="27.7058" data-longitude="85.3157" data-asl="1298">Kathmandu</option>
+                <option data-latitude="1.2894" data-longitude="103.8500" data-asl="0">Singapore</option>
+                <option data-latitude="37.5139" data-longitude="126.9828" data-asl="33">Seoul</option>
+                <option data-latitude="39.9439" data-longitude="32.8560" data-asl="938">Ankara</option>
+                <option data-latitude="24.4764" data-longitude="54.3705" data-asl="13">Abu Dhabi</option>
+              </optgroup>
+              <optgroup label="Africa">
+                <option data-latitude="36.7755" data-longitude="3.0597" data-asl="0">Algiers</option>
+                <option data-latitude="-8.8159" data-longitude="13.2306" data-asl="6">Luanda</option>
+                <option data-latitude="30.0571" data-longitude="31.2272" data-asl="22">Cairo</option>
+                <option data-latitude="-1.2762" data-longitude="36.7965" data-asl="1728">Nairobi</option>
+                <option data-latitude="32.8830" data-longitude="13.1897" data-asl="6">Tripoli</option>
+                <option data-latitude="-22.5749" data-longitude="17.0805" data-asl="1721">Windhoek</option>
+                <option data-latitude="-25.7463" data-longitude="28.1876" data-asl="1271">Pretoria</option>
+              </optgroup>
+              <optgroup label="Oceanic">
+                <option data-latitude="-35.2820" data-longitude="149.1286" data-asl="605">Canberra</option>
+                <option data-latitude="-41.2865" data-longitude="174.7762" data-asl="20">Wellington</option>
+              </optgroup>
+            </select>
+            <label for="select_city">Select city</label>
+            <button class="btn btn-outline-secondary" type="button" id="detect_gps">Detect GPS Position</button>
+          </div>
+        </div>
+      </div>
+       <div class="row py-3 px-0">
+        <h3>Hourly Air Quality Variables</h3>
+        <div class="col-md-4">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="pm10" id="pm10" name="hourly" checked>
+            <label class="form-check-label" for="pm10">
+              Particulate Matter PM10
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="pm2_5" id="pm2_5" name="hourly" checked>
+            <label class="form-check-label" for="pm2_5">
+              Particulate Matter PM2.5
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="carbon_monoxide" id="carbon_monoxide" name="hourly">
+            <label class="form-check-label" for="carbon_monoxide">
+              Carbon Monoxide
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="nitrogen_dioxide" id="nitrogen_dioxide" name="hourly">
+            <label class="form-check-label" for="nitrogen_dioxide">
+              Nitrogen Dioxide
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="sulphur_dioxide" id="sulphur_dioxide" name="hourly">
+            <label class="form-check-label" for="sulphur_dioxide">
+              Sulphur Dioxide
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="ozone" id="ozone" name="hourly">
+            <label class="form-check-label" for="ozone">
+              Ozone
+            </label>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="aerosol_optical_depth" id="aerosol_optical_depth" name="hourly">
+            <label class="form-check-label" for="aerosol_optical_depth">
+              Aerosol Optical Depth
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="dust" id="dust" name="hourly">
+            <label class="form-check-label" for="dust">
+              Dust
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="uv_index" id="uv_index" name="hourly">
+            <label class="form-check-label" for="uv_index">
+              UV Index
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="uv_index_clear_sky" id="uv_index_clear_sky" name="hourly">
+            <label class="form-check-label" for="uv_index_clear_sky">
+              UV Index Clear Sky
+            </label>
+          </div>
+        </div>
+        <div class="col-md-4">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="alder_pollen" id="alder_pollen" name="hourly">
+            <label class="form-check-label" for="alder_pollen">
+              Alder Pollen <small class="text-muted">(*)</small>
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="birch_pollen" id="birch_pollen" name="hourly">
+            <label class="form-check-label" for="birch_pollen">
+              Birch Pollen <small class="text-muted">(*)</small>
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="grass_pollen" id="grass_pollen" name="hourly">
+            <label class="form-check-label" for="grass_pollen">
+              Grass Pollen <small class="text-muted">(*)</small>
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="mugwort_pollen" id="mugwort_pollen" name="hourly">
+            <label class="form-check-label" for="mugwort_pollen">
+              Mugwort Pollen <small class="text-muted">(*)</small>
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="olive_pollen" id="olive_pollen" name="hourly">
+            <label class="form-check-label" for="olive_pollen">
+              Olive Pollen <small class="text-muted">(*)</small>
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="ragweed_pollen" id="ragweed_pollen" name="hourly">
+            <label class="form-check-label" for="ragweed_pollen">
+              Ragweed Pollen <small class="text-muted">(*)</small>
+            </label>
+          </div>
+        </div>
+        <small class="text-muted">* Only available in Europe with 4 days forecast</small>
+        </div>
+
+        <div class="row py-3 px-0">
+          <h3>Settings</h3>
+          <div class="col-3">
+            <div class="form-floating mb-3">
+              <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="UTC">
+                <option value="America/Anchorage">America/Anchorage</option>
+                <option value="America/Los_Angeles">America/Los_Angeles</option>
+                <option value="America/Denver">America/Denver</option>
+                <option value="America/Chicago">America/Chicago</option>
+                <option value="America/New_York">America/New_York</option>
+                <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+                <option selected value="UTC">UTC</option>
+                <option value="Europe/London">Europe/London</option>
+                <option value="Europe/Berlin">Europe/Berlin</option>
+                <option value="Europe/Moscow">Europe/Moscow</option>
+                <option value="Africa/Cairo">Africa/Cairo</option>
+                <option value="Asia/Bangkok">Asia/Bangkok</option>
+                <option value="Asia/Singapore">Asia/Singapore</option>
+                <option value="Asia/Tokyo">Asia/Tokyo</option>
+                <option value="Australia/Sydney">Australia/Sydney</option>
+                <option value="Pacific/Auckland">Pacific/Auckland</option>
+              </select>
+              <label for="timezone">Timezone</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating mb-3">
+              <select class="form-select" name="timeformat" id="timeformat" aria-label="Timeformat" data-default="iso8601">
+                <option selected value="iso8601">ISO 8601 (e.g. 2022-12-31)</option>
+                <option value="unixtime">Unix timestamp</option>
+              </select>
+              <label for="timeformat">Timeformat</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating mb-3">
+              <select class="form-select" name="past_days" id="past_days" aria-label="Past days" data-default="0">
+                <option selected value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="7">1 week</option>
+                <option value="14">2 weeks</option>
+                <option value="31">1 month</option>
+                <option value="61">2 months</option>
+                <option value="92">3 months</option>
+              </select>
+              <label for="past_days">Past days</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating">
+              <input type="text" class="form-control"  data-provide="datepicker" data-date-format="yyyy-mm-dd" data-date-start-date="2022-06-08" value="" data-default="" name="start_date"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+              <label for="start_date">Start date</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating">
+              <input type="text" class="form-control"  data-provide="datepicker" data-date-format="yyyy-mm-dd" data-date-start-date="2022-06-08" value="" data-default="" name="end_date"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+              <label for="end_date">End date</label>
+            </div>
+          </div>
+          <div class="col-12 pb-3 debug-hidden">
+            <div class="form-check form-switch">
+              <input class="form-check-input" type="checkbox" id="localhost" name="localhost" value="true">
+              <label class="form-check-label" for="localhost">Use localhost server</label>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-12">
+          <button type="submit" class="btn btn-primary">Preview Chart</button>
+          <button type="submit" class="btn btn-outline-primary debug-hidden" name="format" value="xlsx">Download XLSX</button>
+          <button type="submit" class="btn btn-outline-primary debug-hidden" name="format" value="csv">Download CSV</button>
+        </div>
+      </form>
+
+  
+
+    <div class="col-12">
+      <div id="container" style="height: 400px; width: 100%"></div>
+    </div>
+
+    <div class="col-12">
+      <label for="api_url" class="form-label">API URL (<a id="api_url_link" target="_blank" href="#">Open in new tab</a>)</label>
+      <input type="text" class="form-control" id="api_url" readonly>
+      <div id="emailHelp" class="form-text">You can copy this API URL into your application</div>
+    </div>
+
+    <div class="col-12 py-5">
+      <h2 id="api-documentation">API Documentation</h2>
+      <p>The API endpoint <mark>/v1/air-quality</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly air quality forecast for 5 days. Time always starts at 0:00 today. Forecast is based on the 11 kilometer <a href="https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-europe-air-quality-forecasts?tab=overview" target="_blank">CAMS European air quality forecast</a> and the 40 kilometer <a href="https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-global-atmospheric-composition-forecasts?tab=overview" target="_blank">CAMS global atmospheric composition forecasts</a>. All URL parameters are listed below:</p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Parameter</th>
+            <th scope="col">Format</th>
+            <th scope="col">Required</th>
+            <th scope="col">Default</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">latitude, longitude</th>
+            <td>Floating point</td>
+            <td>Yes</td>
+            <td></td>
+            <td>Geographical WGS84 coordinate of the location</td>
+          </tr>
+          <tr>
+            <th scope="row">hourly</th>
+            <td>String array</td>
+            <td>No</td>
+            <td></td>
+            <td>A list of weather variables which should be returned. Values can be comma separated, or multiple <mark>&hourly=</mark> parameter in the URL can be used.</td>
+          </tr>
+          <tr>
+            <th scope="row">timeformat</th>
+            <td>String</td>
+            <td>No</td>
+            <td><mark>iso8601</mark></td>
+            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please note that all timestamp are in UTC! For daily values with unix timestamps, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
+          </tr>
+          <tr>
+            <th scope="row">timezone</th>
+            <td>String</td>
+            <td>No</td>
+            <td><mark>UTC</mark></td>
+            <td>If <mark>timezone</mark> is set, all timestamps are returned as local-time and data is returned starting at 00:00 local-time. Any time zone name from the <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> is supported.</td>
+          </tr>
+          <tr>
+            <th scope="row">past_days</th>
+            <td>Integer (0-2)</td>
+            <td>No</td>
+            <td><mark>0</mark></td>
+            <td>If <mark>past_days</mark> is set, yesterday or the day before yesterday data are also returned.</td>
+          </tr>
+          <tr>
+            <th scope="row">start_date<br/>end_date</th>
+            <td>String (yyyy-mm-dd)</td>
+            <td>No</td>
+            <td></td>
+            <td>The time interval to get weather data. A day must be specified as an ISO8601 date (e.g. <mark>2022-06-30</mark>).</td>
+          </tr>
+        </tbody>
+      </table>
+      <p>Additional optional URL parameters will be added. For API stability, no required parameters will be added in the future!</p>
+      
+
+      <h3 class="mt-5">Hourly Parameter Definition</h3>
+      <p>The parameter <mark>&hourly=</mark> accepts the following values. Most weather variables are given as an instantaneous value for the indicated hour. Some variables like precipitation are calculated from the preceding hour as an average or sum.</p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Variable</th>
+            <th scope="col">Valid time</th>
+            <th scope="col">Unit</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">pm10<br/>pm2_5</th>
+            <td>Instant</td>
+            <td>μg/m³</td>
+            <td>Particulate matter with diameter smaller than 10 µm (PM10) and smaller than 2.5 µm (PM2.5) close to surface (10 meter above ground)</td>
+          </tr>
+          <tr>
+            <th scope="row">carbon_monoxide<br/>nitrogen_dioxide<br/>sulphur_dioxide<br/>ozone</th>
+            <td>Instant</td>
+            <td>μg/m³</td>
+            <td>Atmospheric gases close to surface (10 meter above ground)</td>
+          </tr>
+          <tr>
+            <th scope="row">aerosol_optical_depth</th>
+            <td>Instant</td>
+            <td>Dimensionless</td>
+            <td>Aerosol optical depth at 550 nm of the entire atmosphere to indicate haze.</td>
+          </tr>
+          <tr>
+            <th scope="row">dust</th>
+            <td>Instant</td>
+            <td>μg/m³</td>
+            <td>Saharan dust particles close to surface level (10 meter above ground).</td>
+          </tr>
+          <tr>
+            <th scope="row">uv_index<br/>uv_index_clear_sky</th>
+            <td>Instant</td>
+            <td>Index</td>
+            <td>UV index considering clouds and clear sky. See <a href="https://confluence.ecmwf.int/display/CUSF/CAMS+global+UV+index" target="_blank">ECMWF UV Index recommendation</a> for more information</td>
+          </tr>
+          <tr>
+            <th scope="row">alder_pollen<br/>birch_pollen<br/>grass_pollen<br/>mugwort_pollen<br/>olive_pollen<br/>ragweed_pollen</th>
+            <td>Instant</td>
+            <td>Grains/m³</td>
+            <td>Pollen for various plants. Only available in Europe as provided by CAMS European Air Quality forecast.</td>
+          </tr>
+        </tbody>
+      </table>
+      
+      <h3 class="mt-5">JSON Return Object</h3>
+      <p>On success a JSON object will be returned.</p>
+      <pre><code>
+{
+  "latitude": 52.52,
+  "longitude": 13.419,
+  "elevation": 44.812,
+  "generationtime_ms": 2.2119,
+  "utc_offset_seconds": 0,
+  "hourly": {
+    "time": ["2022-07-01T00:00", "2022-07-01T01:00", "2022-07-01T02:00", ...],
+    "pm10": [1, 1.7, 1.7, 1.5, 1.5, 1.8, 2.0, 1.9, 1.3, ...]
+  },
+  "hourly_units": {
+    "pm10": "μg/m³"
+  },
+}
+      </code></pre>
+      <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Parameter</th>
+          <th scope="col">Format</th>
+          <th scope="col">Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">latitude, longitude</th>
+          <td>Floating point</td>
+          <td>WGS84 of the center of the weather grid-cell which was used to generate this forecast. This coordinate might be up to 5 km away.</td>
+        </tr>
+        <tr>
+          <th scope="row">generationtime_ms</th>
+          <td>Floating point</td>
+          <td>Generation time of the weather forecast in milliseconds. This is mainly used for performance monitoring and improvements.</td>
+        </tr>
+        <tr>
+          <th scope="row">utc_offset_seconds</th>
+          <td>Integer</td>
+          <td>Applied timezone offset from the <mark>&timezone=</mark> parameter.</td>
+        </tr>
+        <tr>
+          <th scope="row">hourly</th>
+          <td>Object</td>
+          <td>For each selected weather variable, data will be returned as a floating point array. Additionally a <mark>time</mark> array will be returned with ISO8601 timestamps.</td>
+        </tr>
+        <tr>
+          <th scope="row">hourly_units</th>
+          <td>Object</td>
+          <td>For each selected weather variable, the unit will be listed here.</td>
+        </tr>
+      </tbody>
+    </table>
+    <h3 class="mt-5">Errors</h3>
+    <p>In case an error occurs, for example a URL parameter is not correctly specified, a JSON error object is returned with a HTTP 400 status code.</p>
+          <pre><code>
+{
+  "error": true,
+  "reason": "Cannot initialize WeatherVariable from invalid String value tempeture_2m for key hourly"
+}
+      </code></pre>
+    </div>
+
+    <h2 id="citation">Citation & Acknowledgement</h2>
+    <p>METEO FRANCE, Institut national de l'environnement industriel et des risques (Ineris), Aarhus University, Norwegian Meteorological Institute (MET Norway), Jülich Institut für Energie- und Klimaforschung (IEK), Institute of Environmental Protection – National Research Institute (IEP-NRI), Koninklijk Nederlands Meteorologisch Instituut (KNMI), Nederlandse Organisatie voor toegepast-natuurwetenschappelijk onderzoek (TNO), Swedish Meteorological and Hydrological Institute (SMHI), Finnish Meteorological Institute (FMI), Italian National Agency for New Technologies, Energy and Sustainable Economic Development (ENEA) and Barcelona Supercomputing Center (BSC) (2022): CAMS European air quality forecasts, ENSEMBLE data. Copernicus Atmosphere Monitoring Service (CAMS) Atmosphere Data Store (ADS).  (Updated twice daily).</p>
+    <p>All users of Open-Meteo data must provide a clear attribution to <a href="https://confluence.ecmwf.int/display/CKB/CAMS+Regional%3A+European+air+quality+analysis+and+forecast+data+documentation\#CAMSRegional:Europeanairqualityanalysisandforecastdatadocumentation-Howtoacknowledge,citeandrefertothedata" target="_blank">CAMS ENSEMBLE data provider</a> as well as a reference to Open-Meteo.</p>
+
+  </div>
+#endexport
+
+#export("footer"):
+<script src="https://assets.open-meteo.com/libs/highstock-6.0.3/highstock.js" integrity="sha512-xStuxZIFeepdcpLwBhqIuU761mDfYUDbV8C8lUiTX96W+kyL+AYmY9l3o/Ku30gEek9l+hUJGQpmT4pcVm6LeA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="/scripts/weather.js"></script>
+<script src="https://assets.open-meteo.com/libs/bootstrap-datepicker-1.9.0/bootstrap-datepicker.min.js"
+  integrity="sha512-T/tUfKSV1bihCnd+MxKD0Hm1uBBroVYBOYSk1knyvQ9VyZJpc/ALb4P0r6ubwVPSGB2GvjeoMAJJImBG12TiaQ=="
+  crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+#endexport
+
+#endextend
+

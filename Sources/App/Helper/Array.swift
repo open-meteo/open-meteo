@@ -198,3 +198,31 @@ extension Array where Element == Float {
         }
     }
 }
+
+extension Array where Element == Float {
+    /// Shift longitudes by 180° and flip south.north
+    mutating func shift180LongitudeAndFlipLatitude(nt: Int, ny: Int, nx: Int) {
+        precondition(nt * ny * nx == count)
+        self.withUnsafeMutableBufferPointer { data in
+            /// Data starts eastwards at 0°E... rotate to start at -180°E
+            for t in 0..<nt {
+                for y in 0..<ny {
+                    for x in 0..<nx/2 {
+                        let offset = t*nx*ny + y*nx
+                        let val = data[offset + x]
+                        data[offset + x] = data[offset + x + nx/2]
+                        data[offset + x + nx/2] = val
+                    }
+                    /// Also flip south / north
+                    for y in 0..<ny/2 {
+                        for x in 0..<nx {
+                            let val = data[t*nx*ny + y*nx + x]
+                            data[t*nx*ny + y*nx + x] = data[t*nx*ny + (ny-1-y)*nx + x]
+                            data[t*nx*ny + (ny-1-y)*nx + x] = val
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

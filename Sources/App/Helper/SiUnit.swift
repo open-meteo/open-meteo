@@ -29,6 +29,9 @@ enum SiUnit: String, Codable {
     case hours = "h"
     case iso8601
     case unixtime
+    case microgramsPerQuibicMeter = "μg/m³"
+    case grainsPerQuibicMeter = "grains/m³"
+    case dimensionless = ""
     
     var significantDigits: Int {
         switch self {
@@ -59,6 +62,9 @@ enum SiUnit: String, Codable {
         case .pascal: return 0
         case .centimeter: return 2
         case .second: return 2
+        case .microgramsPerQuibicMeter: return 0
+        case .grainsPerQuibicMeter: return 1
+        case .dimensionless: return 2
         }
     }
 }
