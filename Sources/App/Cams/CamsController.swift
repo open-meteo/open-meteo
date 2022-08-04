@@ -18,8 +18,8 @@ struct CamsController {
             try params.validate()
             let currentTime = Timestamp.now()
             
-            let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 7)
-            let time = try params.getTimerange(current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+            let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 6)
+            let time = try params.getTimerange(current: currentTime, forecastDays: 5, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             

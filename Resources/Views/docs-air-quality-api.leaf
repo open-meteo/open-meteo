@@ -138,7 +138,7 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="pm2_5" id="pm2_5" name="hourly">
+            <input class="form-check-input" type="checkbox" value="pm2_5" id="pm2_5" name="hourly" checked>
             <label class="form-check-label" for="pm2_5">
               Particulate Matter PM 2.5
             </label>
@@ -149,8 +149,6 @@
               Carbon Monoxide
             </label>
           </div>
-        </div>
-        <div class="col-md-4">
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="nitrogen_dioxide" id="nitrogen_dioxide" name="hourly">
             <label class="form-check-label" for="nitrogen_dioxide">
@@ -163,6 +161,14 @@
               Sulphur Dioxide
             </label>
           </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="ozone" id="ozone" name="hourly">
+            <label class="form-check-label" for="ozone">
+              Ozone
+            </label>
+          </div>
+        </div>
+        <div class="col-md-4">
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="aerosol_optical_depth" id="aerosol_optical_depth" name="hourly">
             <label class="form-check-label" for="aerosol_optical_depth">
@@ -179,6 +185,12 @@
             <input class="form-check-input" type="checkbox" value="uv_index" id="uv_index" name="hourly">
             <label class="form-check-label" for="uv_index">
               UV Index
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="uv_index_clear_sky" id="uv_index_clear_sky" name="hourly">
+            <label class="form-check-label" for="uv_index_clear_sky">
+              UV Index Clear Sky
             </label>
           </div>
         </div>
@@ -226,9 +238,9 @@
           <h3>Daily Marine Variables <small class="text-muted">(*)</small></h3>
           <div class="col-md-4">
             <div class="form-check">
-              <input class="form-check-input" type="checkbox" value="wave_height_max" id="wave_height_max" name="daily">
-              <label class="form-check-label" for="wave_height_max">
-                Wave Height Max
+              <input class="form-check-input" type="checkbox" value="uv_index" id="uv_index_daily" name="daily">
+              <label class="form-check-label" for="uv_index_daily">
+                UV Index
               </label>
             </div>
             <div class="form-check">

@@ -45,7 +45,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     var grid: RegularGrid {
         switch self {
         case .cams_global:
-            return RegularGrid(nx: 900, ny: 451, latMin: -180, lonMin: -90, dx: 0.4, dy: 0.4)
+            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
         case .cams_europe:
             return RegularGrid(nx: 700, ny: 400, latMin: 30.05, lonMin: -24.95, dx: 0.1, dy: 0.1)
         }
@@ -63,6 +63,7 @@ enum CamsVariable: String, CaseIterable, GenericVariableMixing, Codable {
     case ozone
     case sulphur_dioxide
     case uv_index
+    case uv_index_clear_sky
     case alder_pollen
     case birch_pollen
     case grass_pollen
@@ -106,7 +107,9 @@ enum CamsVariable: String, CaseIterable, GenericVariableMixing, Codable {
         case .sulphur_dioxide:
             return .microgramsPerQuibicMeter
         case .uv_index:
-            return .wattPerSquareMeter
+            return .dimensionless
+        case .uv_index_clear_sky:
+            return .dimensionless
         case .alder_pollen:
             return .grainsPerQuibicMeter
         case .birch_pollen:
@@ -143,6 +146,8 @@ enum CamsVariable: String, CaseIterable, GenericVariableMixing, Codable {
             return 20
         case .uv_index:
             return 20
+        case .uv_index_clear_sky:
+            return 20
         case .alder_pollen:
             return 10
         case .birch_pollen:
@@ -176,6 +181,8 @@ enum CamsVariable: String, CaseIterable, GenericVariableMixing, Codable {
         case .sulphur_dioxide:
             return ("sulphur_dioxide", "so2_conc")
         case .uv_index:
+            return nil
+        case .uv_index_clear_sky:
             return nil
         case .alder_pollen:
             return ("alder_pollen", "apg_conc")
@@ -217,6 +224,8 @@ enum CamsVariable: String, CaseIterable, GenericVariableMixing, Codable {
             return ("so2", true, massMixingToUgm3)
         case .uv_index:
             return ("uvbed", false, 40)
+        case .uv_index_clear_sky:
+            return ("uvbedcs", false, 40)
         case .alder_pollen:
             return nil
         case .birch_pollen:
