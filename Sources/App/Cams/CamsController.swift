@@ -21,7 +21,7 @@ struct CamsController {
             let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 6)
             let time = try params.getTimerange(current: currentTime, forecastDays: 5, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
+            //let dailyTime = time.range.range(dtSeconds: 3600*24)
             
             guard let reader = try CamsMixer(domains: CamsDomain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest, time: hourlyTime) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
@@ -30,9 +30,9 @@ struct CamsController {
             if let hourlyVariables = params.hourly {
                 try reader.prefetchData(variables: hourlyVariables)
             }
-            if let dailyVariables = params.daily {
+            /*if let dailyVariables = params.daily {
                 try reader.prefetchData(variables: dailyVariables)
-            }
+            }*/
             
             let hourly: ApiSection? = try params.hourly.map { variables in
                 var res = [ApiColumn]()
