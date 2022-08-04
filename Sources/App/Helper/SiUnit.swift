@@ -30,6 +30,7 @@ enum SiUnit: String, Codable {
     case iso8601
     case unixtime
     case microgramsPerQuibicMeter = "μg/m³"
+    case grainsPerQuibicMeter = "grains/m³"
     case dimensionless = ""
     
     var significantDigits: Int {
@@ -62,6 +63,7 @@ enum SiUnit: String, Codable {
         case .centimeter: return 2
         case .second: return 2
         case .microgramsPerQuibicMeter: return 0
+        case .grainsPerQuibicMeter: return 1
         case .dimensionless: return 2
         }
     }

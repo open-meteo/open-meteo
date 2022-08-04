@@ -3,23 +3,25 @@ import Vapor
 import SwiftNetCDF
 import SwiftPFor2D
 
-
+/// CAMS Air quality domain definitions for Europe and global domains
 enum CamsDomain: String, GenericDomain {
     case cams_global
-    case cams_european
+    case cams_europe
     
     /// count of forecast hours
     var forecastHours: Int {
         switch self {
         case .cams_global:
             return 121
-        case .cams_european:
+        case .cams_europe:
             return 97
         }
     }
     
+    /// Cams has delay of 8 hours
     var lastRun: Int {
-        return 0
+        let t = Timestamp.now()
+        return t.hour > 14 ? 12 : 0
     }
     
     var omfileDirectory: String {
@@ -45,16 +47,16 @@ enum CamsDomain: String, GenericDomain {
         switch self {
         case .cams_global:
             return RegularGrid(nx: 900, ny: 451, latMin: -180, lonMin: -90, dx: 0.4, dy: 0.4)
-        case .cams_european:
+        case .cams_europe:
             return RegularGrid(nx: 700, ny: 400, latMin: 30.05, lonMin: -24.95, dx: 0.1, dy: 0.1)
         }
     }
 }
 
-enum CamsVariable: String, CaseIterable {
+/// Variables for CAMS. Some variables are not available in
+enum CamsVariable: String, CaseIterable, GenericVariable {
     case pm10
     case pm2_5
-    case pm1
     case dust
     case aerosol_optical_depth
     case carbon_monoxide
@@ -69,13 +71,23 @@ enum CamsVariable: String, CaseIterable {
     case olive_pollen
     case ragweed_pollen
     
+    var omFileName: String {
+        return rawValue
+    }
+    
+    var interpolation: ReaderInterpolation {
+        fatalError("No interpolation required")
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
     var unit: SiUnit {
         switch self {
         case .pm10:
             return .microgramsPerQuibicMeter
         case .pm2_5:
-            return .microgramsPerQuibicMeter
-        case .pm1:
             return .microgramsPerQuibicMeter
         case .dust:
             return .microgramsPerQuibicMeter
@@ -92,103 +104,26 @@ enum CamsVariable: String, CaseIterable {
         case .uv_index:
             return .wattPerSquareMeter
         case .alder_pollen:
-            return .microgramsPerQuibicMeter
+            return .grainsPerQuibicMeter
         case .birch_pollen:
-            return .microgramsPerQuibicMeter
+            return .grainsPerQuibicMeter
         case .grass_pollen:
-            return .microgramsPerQuibicMeter
+            return .grainsPerQuibicMeter
         case .mugwort_pollen:
-            return .microgramsPerQuibicMeter
+            return .grainsPerQuibicMeter
         case .olive_pollen:
-            return .microgramsPerQuibicMeter
+            return .grainsPerQuibicMeter
         case .ragweed_pollen:
-            return .microgramsPerQuibicMeter
+            return .grainsPerQuibicMeter
         }
     }
     
-    /// Name of the variable in the CDS API, if available
-    func getApiName(domain: CamsDomain) -> String? {
-        switch domain {
-        case .cams_global:
-            switch self {
-            case .pm10:
-                return "particulate_matter_10um"
-            case .pm2_5:
-                return "particulate_matter_2.5um"
-            case .pm1:
-                return "particulate_matter_1um"
-            case .dust:
-                return "dust_aerosol_optical_depth_550nm"
-            case .carbon_monoxide:
-                return "total_column_carbon_monoxide"
-            case .nitrogen_dioxide:
-                return "total_column_nitrogen_dioxide"
-            case .ozone:
-                return "total_column_ozone"
-            case .sulphur_dioxide:
-                return "total_column_sulphur_dioxide"
-            case .uv_index:
-                return "uv_biologically_effective_dose"
-            case .alder_pollen:
-                return nil
-            case .birch_pollen:
-                return nil
-            case .grass_pollen:
-                return nil
-            case .mugwort_pollen:
-                return nil
-            case .olive_pollen:
-                return nil
-            case .ragweed_pollen:
-                return nil
-            case .aerosol_optical_depth:
-                return nil
-            }
-        case .cams_european:
-            switch self {
-            case .pm10:
-                return "particulate_matter_10um"
-            case .pm2_5:
-                return "particulate_matter_2.5um"
-            case .pm1:
-                return "particulate_matter_1um"
-            case .dust:
-                return rawValue
-            case .carbon_monoxide:
-                return rawValue
-            case .nitrogen_dioxide:
-                return rawValue
-            case .ozone:
-                return rawValue
-            case .sulphur_dioxide:
-                return rawValue
-            case .uv_index:
-                return nil
-            case .alder_pollen:
-                return rawValue
-            case .birch_pollen:
-                return rawValue
-            case .grass_pollen:
-                return rawValue
-            case .mugwort_pollen:
-                return rawValue
-            case .olive_pollen:
-                return rawValue
-            case .aerosol_optical_depth:
-                return nil
-            case .ragweed_pollen:
-                return rawValue
-            }
-        }
-    }
-    
+    /// Scalefator for time-series files
     var scalefactor: Float {
         switch self {
         case .pm10:
             return 1
         case .pm2_5:
-            return 1
-        case .pm1:
             return 1
         case .dust:
             return 1
@@ -205,17 +140,53 @@ enum CamsVariable: String, CaseIterable {
         case .uv_index:
             return 20
         case .alder_pollen:
-            fatalError()
+            return 10
         case .birch_pollen:
-            fatalError()
+            return 10
         case .grass_pollen:
-            fatalError()
+            return 10
         case .mugwort_pollen:
-            fatalError()
+            return 10
         case .olive_pollen:
-            fatalError()
+            return 10
         case .ragweed_pollen:
-            fatalError()
+            return 10
+        }
+    }
+    
+    /// Name of the variable in the CDS API, if available
+    func getCamsEuMeta() -> (apiName: String, gribName: String)? {
+        switch self {
+        case .pm10:
+            return ("particulate_matter_10um", "pm10_conc")
+        case .pm2_5:
+            return ("particulate_matter_2.5um", "pm2p5_conc")
+        case .dust:
+            return ("dust", "dust")
+        case .carbon_monoxide:
+            return ("carbon_monoxide", "co_conc")
+        case .nitrogen_dioxide:
+            return ("nitrogen_dioxide", "no2_conc")
+        case .ozone:
+            return ("ozone", "o3_conc")
+        case .sulphur_dioxide:
+            return ("sulphur_dioxide", "so2_conc")
+        case .uv_index:
+            return nil
+        case .alder_pollen:
+            return ("alder_pollen", "apg_conc")
+        case .birch_pollen:
+            return ("birch_pollen", "bpg_conc")
+        case .grass_pollen:
+            return ("grass_pollen", "gpg_conc")
+        case .mugwort_pollen:
+            return ("mugwort_pollen", "mpg_conc")
+        case .olive_pollen:
+            return ("olive_pollen", "opg_conc")
+        case .ragweed_pollen:
+            return ("ragweed_pollen", "rwpg_conc")
+        case .aerosol_optical_depth:
+            return nil
         }
     }
     
@@ -230,8 +201,6 @@ enum CamsVariable: String, CaseIterable {
             return ("pm10", false, 1e9)
         case .pm2_5:
             return ("pm2p5", false, 1e9)
-        case .pm1:
-            return ("pm1", false, 1e9)
         case .dust:
             return ("aermr06", true, massMixingToUgm3)
         case .carbon_monoxide:
@@ -329,13 +298,13 @@ struct DownloadCamsCommand: Command {
             }
             try downloadCamsGlobal(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
             try convertCamsGlobal(logger: logger, domain: domain, run: date, variables: variables)
-        case .cams_european:
+        case .cams_europe:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            fatalError()
+            try downloadCamsEurope(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
+            try convertCamsEurope(logger: logger, domain: domain, run: date, variables: variables)
         }
-        try convert(logger: logger, domain: domain, run: date, variables: variables)
     }
     
     /// Download from the ECMWF CAMS ftp server
@@ -431,7 +400,7 @@ struct DownloadCamsCommand: Command {
             let startOm = DispatchTime.now()
             let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
             let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
-            try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
+            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
             try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
@@ -443,34 +412,34 @@ struct DownloadCamsCommand: Command {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
-        /// loop over each day, download data and convert it
         let tempPythonFile = "\(domain.downloadDirectory)download.py"
+        let downloadFile = "\(domain.downloadDirectory)download.nc"
+        
+        if skipFilesIfExisting && FileManager.default.fileExists(atPath: downloadFile) {
+            return
+        }
         
         let date = run.iso8601_YYYY_MM_dd
-        
-        let apiRequest = """
-            'cams-global-atmospheric-composition-forecasts',
-                {
-                    'date': '\(date)/\(date)',
-                    'type': 'forecast',
-                    'format': 'grib',
-                    'variable': [
-                        'dust_aerosol_optical_depth_550nm', 'particulate_matter_10um', 'particulate_matter_1um',
-                        'particulate_matter_2.5um', 'total_column_carbon_monoxide', 'total_column_nitrogen_dioxide',
-                        'total_column_ozone', 'total_column_sulphur_dioxide', 'uv_biologically_effective_dose',
-                    ],
-                    'time': '\(run.hour.zeroPadded(len: 2)):00',
-                    'leadtime_hour': [\((0..<domain.forecastHours).map{"'\($0)',"})],
-                },
-                '\(domain.downloadDirectory)download.grib'
-            """
+        let variableNames = variables.compactMap { $0.getCamsEuMeta()?.apiName }.map{"'\($0)'"}.joined(separator: ",")
+        let leadtimeHours = (0..<domain.forecastHours).map{"'\($0)'"}.joined(separator: ",")
         
         let pyCode = """
             import cdsapi
 
             c = cdsapi.Client(url="https://ads.atmosphere.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
             try:
-                c.retrieve(\(apiRequest))
+                c.retrieve('cams-europe-air-quality-forecasts',
+                {
+                    'model': 'ensemble',
+                    'date': '\(date)/\(date)',
+                    'type': 'forecast',
+                    'format': 'netcdf',
+                    'variable': [\(variableNames)],
+                    'level': '0',
+                    'time': '\(run.hour.zeroPadded(len: 2)):00',
+                    'leadtime_hour': [\(leadtimeHours)],
+                },
+                '\(downloadFile)')
             except Exception as e:
                 if "Please, check that your date selection is valid" in str(e):
                     exit(70)
@@ -491,8 +460,33 @@ struct DownloadCamsCommand: Command {
     }
     
     /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
+    func convertCamsEurope(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
+        guard let ncFile = try NetCDF.open(path: "\(domain.downloadDirectory)download.nc", allowUpdate: false) else {
+            fatalError("Could not open '\(domain.downloadDirectory)download.nc'")
+        }
+        
+        for variable in variables {
+            guard let meta = variable.getCamsEuMeta() else {
+                continue
+            }
+            logger.info("Converting \(variable)")
+            guard let ncVar = ncFile.getVariable(name: meta.gribName) else {
+                fatalError("Could not open variable \(meta.gribName)")
+            }
+            guard let ncFloat = ncVar.asType(Float.self) else {
+                fatalError("Could not open float variable \(meta.gribName)")
+            }
+            let data2d = Array2DFastSpace(data: try ncFloat.read(), nLocations: domain.grid.count, nTime: domain.forecastHours).transpose()
+            logger.info("Create om file")
+            let startOm = DispatchTime.now()
+            let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
+            let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
+            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+        }
     }
 }
 
