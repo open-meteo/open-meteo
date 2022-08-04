@@ -251,7 +251,13 @@ struct DownloadCamsCommand: Command {
             guard let ncFloat = ncVar.asType(Float.self) else {
                 fatalError("Could not open float variable \(meta.gribName)")
             }
-            let data2d = Array2DFastSpace(data: try ncFloat.read(), nLocations: domain.grid.count, nTime: domain.forecastHours).transpose()
+            var data2d = Array2DFastSpace(data: try ncFloat.read(), nLocations: domain.grid.count, nTime: domain.forecastHours).transpose()
+            for i in data2d.data.indices {
+                if data2d.data[i] <= -999 {
+                    data2d.data[i] = .nan
+                }
+            }
+            
             logger.info("Create om file")
             let startOm = DispatchTime.now()
             let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds

@@ -13,6 +13,7 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "historical-weather-api", use: historicalWeatherApiHandler)
         routes.get("en", "docs", "elevation-api", use: elevationApiHandler)
         routes.get("en", "docs", "marine-weather-api", use: marineApiHandler)
+        routes.get("en", "docs", "air-quality-api", use: airQualityApiHandler)
         routes.get("en", "features", use: featuresHandler)
         routes.get("demo-api", use: apiDemoHandler)
     }
@@ -60,6 +61,13 @@ struct WebsiteController: RouteCollection {
         }
         let context = IndexContext(title: "Marine Weather API")
         return req.view.render("docs-marine-api", context)
+    }
+    func airQualityApiHandler(_ req: Request) -> EventLoopFuture<View> {
+        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
+            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
+        }
+        let context = IndexContext(title: "Air Quality API")
+        return req.view.render("docs-air-quality-api", context)
     }
     func historicalWeatherApiHandler(_ req: Request) -> EventLoopFuture<View> {
         if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
