@@ -402,37 +402,37 @@
             <th scope="row">pm10<br/>pm2_5</th>
             <td>Instant</td>
             <td>μg/m³</td>
-            <td></td>
+            <td>Particulate matter with diameter smaller than 10 µm (PM10) and smaller than 2.5 µm (PM2.5) close to surface (10 meter above ground)</td>
           </tr>
           <tr>
             <th scope="row">carbon_monoxide<br/>nitrogen_dioxide<br/>sulphur_dioxide<br/>ozone</th>
             <td>Instant</td>
             <td>μg/m³</td>
-            <td></td>
+            <td>Atmospheric gases close to surface (10 meter above ground)</td>
           </tr>
           <tr>
             <th scope="row">aerosol_optical_depth</th>
             <td>Instant</td>
             <td>Dimensionless</td>
-            <td></td>
+            <td>Aerosol optical depth at 550 nm of the entire atmosphere to indicate haze.</td>
           </tr>
           <tr>
             <th scope="row">dust</th>
             <td>Instant</td>
             <td>μg/m³</td>
-            <td></td>
+            <td>Saharan dust particles close to surface level (10 meter above ground).</td>
           </tr>
           <tr>
             <th scope="row">uv_index<br/>uv_index_clear_sky</th>
             <td>Instant</td>
             <td>Index</td>
-            <td></td>
+            <td>UV index considering clouds and clear sky. See <a href="https://confluence.ecmwf.int/display/CUSF/CAMS+global+UV+index" target="_blank">ECMWF UV Index recommendation</a> for more information</td>
           </tr>
           <tr>
             <th scope="row">alder_pollen<br/>birch_pollen<br/>grass_pollen<br/>mugwort_pollen<br/>olive_pollen<br/>ragweed_pollen</th>
             <td>Instant</td>
             <td>Grains/m³</td>
-            <td></td>
+            <td>Pollen for various plants. Only available in Europe as provided by CAMS European Air Quality forecast.</td>
           </tr>
         </tbody>
       </table>
