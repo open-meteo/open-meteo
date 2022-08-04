@@ -19,7 +19,7 @@
 </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Air Quality API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Pollutants and pollen forecast in 10 km resolution</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Pollutants and pollen forecast in 11 km resolution</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -239,6 +239,29 @@
           <h3>Settings</h3>
           <div class="col-3">
             <div class="form-floating mb-3">
+              <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="UTC">
+                <option value="America/Anchorage">America/Anchorage</option>
+                <option value="America/Los_Angeles">America/Los_Angeles</option>
+                <option value="America/Denver">America/Denver</option>
+                <option value="America/Chicago">America/Chicago</option>
+                <option value="America/New_York">America/New_York</option>
+                <option value="America/Sao_Paulo">America/Sao_Paulo</option>
+                <option selected value="UTC">UTC</option>
+                <option value="Europe/London">Europe/London</option>
+                <option value="Europe/Berlin">Europe/Berlin</option>
+                <option value="Europe/Moscow">Europe/Moscow</option>
+                <option value="Africa/Cairo">Africa/Cairo</option>
+                <option value="Asia/Bangkok">Asia/Bangkok</option>
+                <option value="Asia/Singapore">Asia/Singapore</option>
+                <option value="Asia/Tokyo">Asia/Tokyo</option>
+                <option value="Australia/Sydney">Australia/Sydney</option>
+                <option value="Pacific/Auckland">Pacific/Auckland</option>
+              </select>
+              <label for="timezone">Timezone</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating mb-3">
               <select class="form-select" name="timeformat" id="timeformat" aria-label="Timeformat" data-default="iso8601">
                 <option selected value="iso8601">ISO 8601 (e.g. 2022-12-31)</option>
                 <option value="unixtime">Unix timestamp</option>
@@ -304,7 +327,7 @@
 
     <div class="col-12 py-5">
       <h2 id="api-documentation">API Documentation</h2>
-      <p>The API endpoint <mark>/v1/marine</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly marine weather forecast for 7 days. Time always starts at 0:00 today. All URL parameters are listed below:</p>
+      <p>The API endpoint <mark>/v1/air-quality</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly air quality forecast for 5 days. Time always starts at 0:00 today. Forecast is based on the 11 kilometer <a href="https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-europe-air-quality-forecasts?tab=overview" target="_blank">CAMS European air quality forecast</a> and the 40 kilometer <a href="https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-global-atmospheric-composition-forecasts?tab=overview" target="_blank">CAMS global atmospheric composition forecasts</a>. All URL parameters are listed below:</p>
       <table class="table">
         <thead>
           <tr>
@@ -329,13 +352,6 @@
             <td>No</td>
             <td></td>
             <td>A list of weather variables which should be returned. Values can be comma separated, or multiple <mark>&hourly=</mark> parameter in the URL can be used.</td>
-          </tr>
-          <tr>
-            <th scope="row">daily</th>
-            <td>String array</td>
-            <td>No</td>
-            <td></td>
-            <td>A list of daily weather variable aggregations which should be returned. Values can be comma separated, or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are specified, parameter <mark>timezone</mark> is required.</td>
           </tr>
           <tr>
             <th scope="row">timeformat</th>
@@ -383,62 +399,40 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row">wave_height<br/>wind_wave_height<br/>swell_wave_height</th>
+            <th scope="row">pm10<br/>pm2_5</th>
             <td>Instant</td>
-            <td>Meter</td>
-            <td>Wave height of significant mean, wind and swell waves</td>
+            <td>μg/m³</td>
+            <td></td>
           </tr>
           <tr>
-            <th scope="row">wave_direction<br/>wind_wave_direction<br/>swell_wave_direction</th>
+            <th scope="row">carbon_monoxide<br/>nitrogen_dioxide<br/>sulphur_dioxide<br/>ozone</th>
             <td>Instant</td>
-            <td>°</td>
-            <td>Mean direction of mean, wind and swell waves</td>
+            <td>μg/m³</td>
+            <td></td>
           </tr>
           <tr>
-            <th scope="row">wave_period<br/>wind_wave_period<br/>swell_wave_period</th>
+            <th scope="row">aerosol_optical_depth</th>
             <td>Instant</td>
-            <td>Seconds</td>
-            <td>Period between mean, wind and swell waves.</td>
+            <td>Dimensionless</td>
+            <td></td>
           </tr>
           <tr>
-            <th scope="row">wind_wave_peak_period<br/>swell_wave_peak_period</th>
+            <th scope="row">dust</th>
             <td>Instant</td>
-            <td>Seconds</td>
-            <td>Peak period between wind and swell waves.</td>
-          </tr>
-        </tbody>
-      </table>
-
-      <h3 class="mt-5">Daily Parameter Definition</h3>
-      <p>Aggregations are a simple 24 hour aggregation from hourly values. The parameter <mark>&daily=</mark> accepts the following values:</p>
-      <table class="table">
-        <thead>
-          <tr>
-            <th scope="col">Variable</th>
-            <th scope="col">Unit</th>
-            <th scope="col">Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row">wave_height_max<br/>wind_wave_height_max<br/>swell_wave_height_max</th>
-            <td>Meter</td>
-            <td>Maximum wave height on a given day for mean, wind and swell waves</td>
+            <td>μg/m³</td>
+            <td></td>
           </tr>
           <tr>
-            <th scope="row">wave_direction_dominant<br/>wind_wave_direction_dominant<br/>swell_wave_direction_dominant</th>
-            <td>°</td>
-            <td>Dominant wave direction of mean, wind and swell waves</td>
+            <th scope="row">uv_index<br/>uv_index_clear_sky</th>
+            <td>Instant</td>
+            <td>Index</td>
+            <td></td>
           </tr>
           <tr>
-            <th scope="row">wave_period_max<br/>wind_wave_period_max<br/>swell_wave_period_max</th>
-            <td>Seconds</td>
-            <td>Maximum wave period of mean, wind and swell</td>
-          </tr>
-          <tr>
-            <th scope="row">wind_wave_peak_period_max<br/>swell_wave_peak_period_max</th>
-            <td>Seconds</td>
-            <td>Maximum peak period between wind and swell waves.</td>
+            <th scope="row">alder_pollen<br/>birch_pollen<br/>grass_pollen<br/>mugwort_pollen<br/>olive_pollen<br/>ragweed_pollen</th>
+            <td>Instant</td>
+            <td>Grains/m³</td>
+            <td></td>
           </tr>
         </tbody>
       </table>
@@ -454,10 +448,10 @@
   "utc_offset_seconds": 0,
   "hourly": {
     "time": ["2022-07-01T00:00", "2022-07-01T01:00", "2022-07-01T02:00", ...],
-    "wave_height": [1, 1.7, 1.7, 1.5, 1.5, 1.8, 2.0, 1.9, 1.3, ...]
+    "pm10": [1, 1.7, 1.7, 1.5, 1.5, 1.8, 2.0, 1.9, 1.3, ...]
   },
   "hourly_units": {
-    "wave_height": "m"
+    "pm10": "μg/m³"
   },
 }
       </code></pre>
@@ -495,16 +489,6 @@
           <td>Object</td>
           <td>For each selected weather variable, the unit will be listed here.</td>
         </tr>
-        <tr>
-          <th scope="row">daily</th>
-          <td>Object</td>
-          <td>For each selected daily weather variable, data will be returned as a floating point array. Additionally a <mark>time</mark> array will be returned with ISO8601 timestamps.</td>
-        </tr>
-        <tr>
-          <th scope="row">daily_units</th>
-          <td>Object</td>
-          <td>For each selected daily weather variable, the unit will be listed here.</td>
-        </tr>
       </tbody>
     </table>
     <h3 class="mt-5">Errors</h3>
@@ -518,8 +502,8 @@
     </div>
 
     <h2 id="citation">Citation & Acknowledgement</h2>
-    <p>Generated using ICON Wave forecast from the <a href="https://www.dwd.de/EN/service/copyright/copyright_node.html" target="_blank">German Weather Service DWD</a>.</p>
-    <p>All users of Open-Meteo data must provide a clear attribution to DWD as well as a reference to Open-Meteo.</p>
+    <p>METEO FRANCE, Institut national de l'environnement industriel et des risques (Ineris), Aarhus University, Norwegian Meteorological Institute (MET Norway), Jülich Institut für Energie- und Klimaforschung (IEK), Institute of Environmental Protection – National Research Institute (IEP-NRI), Koninklijk Nederlands Meteorologisch Instituut (KNMI), Nederlandse Organisatie voor toegepast-natuurwetenschappelijk onderzoek (TNO), Swedish Meteorological and Hydrological Institute (SMHI), Finnish Meteorological Institute (FMI), Italian National Agency for New Technologies, Energy and Sustainable Economic Development (ENEA) and Barcelona Supercomputing Center (BSC) (2022): CAMS European air quality forecasts, ENSEMBLE data. Copernicus Atmosphere Monitoring Service (CAMS) Atmosphere Data Store (ADS).  (Updated twice daily).</p>
+    <p>All users of Open-Meteo data must provide a clear attribution to <a href="https://confluence.ecmwf.int/display/CKB/CAMS+Regional%3A+European+air+quality+analysis+and+forecast+data+documentation\#CAMSRegional:Europeanairqualityanalysisandforecastdatadocumentation-Howtoacknowledge,citeandrefertothedata" target="_blank">CAMS ENSEMBLE data provider</a> as well as a reference to Open-Meteo.</p>
 
   </div>
 #endexport
