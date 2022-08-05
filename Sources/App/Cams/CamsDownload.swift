@@ -79,7 +79,7 @@ struct DownloadCamsCommand: Command {
         }
     }
     
-    /// Download from the ECMWF CAMS ftp server
+    /// Download from the ECMWF CAMS ftp/http server
     /// This data is also available via the ADC API, but queue times are 4 hours!
     func downloadCamsGlobal(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], user: String, password: String) throws {
         
@@ -90,7 +90,7 @@ struct DownloadCamsCommand: Command {
         
         let curl = Curl(logger: logger)
         let dateRun = run.format_YYYYMMddHH
-        let ftpDir = "ftp://\(user):\(password)@dissemination.ecmwf.int/DATA/CAMS_NREALTIME/\(dateRun)/"
+        let remoteDir = "https://\(user):\(password)@dissemination.ecmwf.int/ecpds/data/file/CAMS_NREALTIME/\(dateRun)/"
         
         for hour in 0..<domain.forecastHours {
             logger.info("Downloading hour \(hour)")
@@ -110,9 +110,9 @@ struct DownloadCamsCommand: Command {
                 /// Multi level name `z_cams_c_ecmf_20220803000000_prod_fc_pl_000_co.nc`
                 /// Surface level name `z_cams_c_ecmf_20220803000000_prod_fc_sfc_012_uvbed.nc`
                 let levelType = meta.isMultiLevel ? "pl" : "sfc"
-                let ftpFile = "\(ftpDir)z_cams_c_ecmf_\(dateRun)0000_prod_fc_\(levelType)_\(hour.zeroPadded(len: 3))_\(meta.gribname).nc"
+                let remoteFile = "\(remoteDir)z_cams_c_ecmf_\(dateRun)0000_prod_fc_\(levelType)_\(hour.zeroPadded(len: 3))_\(meta.gribname).nc"
                 let tempNc = "\(domain.downloadDirectory)/temp.nc"
-                try curl.download(url: ftpFile, to: tempNc)
+                try curl.download(url: remoteFile, to: tempNc)
                 
                 guard let ncFile = try NetCDF.open(path: tempNc, allowUpdate: false) else {
                     fatalError("Could not open nc file for \(variable)")
