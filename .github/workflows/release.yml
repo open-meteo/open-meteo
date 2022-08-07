@@ -42,7 +42,7 @@ jobs:
       run: |
         ${{ env.swift_build }}
         mv .build/release/openmeteo-api openmeteo-api
-        my .build/release/*.resources Resources/
+        mv .build/release/*.resources Resources/
     - name: Package
       uses: gravitl/github-action-fpm@master
       with:
@@ -75,3 +75,5 @@ jobs:
         password: ${{ secrets.ftp_password }}
         local-dir: './repo'
         server-dir: './repo'
+        protocol: ftps
+        port: 990
