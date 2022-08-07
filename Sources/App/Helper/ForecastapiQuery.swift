@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import SwiftTimeZoneLookup
 
 enum ForecastapiError: Error {
     case latitudeMustBeInRangeOfMinus90to90(given: Float)
@@ -79,8 +80,6 @@ protocol QueryWithStartEndDateTimeZone: QueryWithTimezone {
     
     /// included end date `2022-06-01`
     var end_date: IsoDate? { get }
-    
-
 }
 
 extension QueryWithStartEndDateTimeZone {
@@ -135,12 +134,23 @@ extension QueryWithStartEndDateTimeZone {
 
 protocol QueryWithTimezone {
     var timezone: String? { get }
+    
+    var latitude: Float { get }
+    
+    var longitude: Float { get }
 }
+
+fileprivate let timezoneDatabase = try! SwiftTimeZoneLookup(databasePath: "./Resources/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources/")
 
 extension QueryWithTimezone {
     func getUtcOffsetSeconds() throws -> Int {
-        guard let timezone = timezone else {
+        guard var timezone = timezone else {
             return 0
+        }
+        if timezone == "auto" {
+            if let res = timezoneDatabase.simple(latitude: latitude, longitude: longitude) {
+                timezone = res
+            }
         }
         guard let tz = TimeZone(identifier: timezone) else {
             throw ForecastapiError.invalidTimezone
