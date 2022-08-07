@@ -72,4 +72,4 @@ jobs:
         username: open-meteo-assets
         password: ${{ secrets.ftp_password }}
         local-dir: './repo/'
-        server-dir: '/open-meteo-assets/repo/repo/'
+        server-dir: './open-meteo-assets/repo/'
