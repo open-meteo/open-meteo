@@ -18,7 +18,8 @@ struct Era5Controller {
             let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
             
             let allowedRange = Timestamp(1959, 1, 1) ..< Timestamp.now()
-            let time = try params.getTimerange(allowedRange: allowedRange)
+            let timezone = try params.resolveTimezone()
+            let time = try params.getTimerange(timezone: timezone, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
@@ -73,6 +74,7 @@ struct Era5Controller {
                 elevation: reader.modelElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
+                timezone: timezone,
                 current_weather: nil,
                 sections: [hourly, daily].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
@@ -168,7 +170,7 @@ struct Era5Query: Content, QueryWithTimezone {
         }
     }
     
-    func getTimerange(allowedRange: Range<Timestamp>) throws -> TimerangeLocal {
+    func getTimerange(timezone: TimeZone, allowedRange: Range<Timestamp>) throws -> TimerangeLocal {
         let start = start_date.toTimestamp()
         let includedEnd = end_date.toTimestamp()
         guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
@@ -180,7 +182,7 @@ struct Era5Query: Content, QueryWithTimezone {
         guard allowedRange.contains(includedEnd) else {
             throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
         }
-        let utcOffsetSeconds = try getUtcOffsetSeconds()
+        let utcOffsetSeconds = (timezone.secondsFromGMT() / 3600) * 3600
         
         return TimerangeLocal(range: start.add(-1 * utcOffsetSeconds) ..< includedEnd.add(86400 - utcOffsetSeconds), utcOffsetSeconds: utcOffsetSeconds)
     }

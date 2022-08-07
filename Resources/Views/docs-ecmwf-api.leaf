@@ -791,7 +791,7 @@
             <td>String</td>
             <td>No</td>
             <td><mark>iso8601</mark></td>
-            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please note that all time is then in UTC! For daily values with unix timestamp, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
+            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please note that all time is then in GMT+0! For daily values with unix timestamp, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
           </tr>
           <tr>
             <th scope="row">past_days</th>

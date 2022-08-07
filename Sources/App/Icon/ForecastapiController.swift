@@ -32,7 +32,8 @@ public struct ForecastapiController: RouteCollection {
             let currentTime = Timestamp.now()
             
             let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 8)
-            let time = try params.getTimerange(current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+            let timezone = try params.resolveTimezone()
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
             
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
@@ -118,6 +119,7 @@ public struct ForecastapiController: RouteCollection {
                 elevation: reader.mixer.targetElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
+                timezone: timezone,
                 current_weather: currentWeather,
                 sections: [hourly, daily].compactMap({$0}),
                 timeformat: params.timeformatOrDefault

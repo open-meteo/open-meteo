@@ -15,7 +15,8 @@ struct EcmwfController {
             let currentTime = Timestamp.now()
             
             let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 11)
-            let time = try params.getTimerange(current: currentTime, forecastDays: 10, allowedRange: allowedRange)
+            let timezone = try params.resolveTimezone()
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 10, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
             
             guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest, time: hourlyTime) else {
@@ -43,6 +44,7 @@ struct EcmwfController {
                 elevation: nil,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
+                timezone: timezone,
                 current_weather: nil,
                 sections: [hourly].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
