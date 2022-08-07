@@ -69,7 +69,7 @@ jobs:
       uses: SamKirkland/FTP-Deploy-Action@4.3.0
       with:
         server: storage.bunnycdn.com
-        username: open-meteo-assets
+        username: apt-repo
         password: ${{ secrets.ftp_password }}
         local-dir: './repo/'
-        server-dir: './open-meteo-assets/repo/'
+        server-dir: '/apt-repo/'
