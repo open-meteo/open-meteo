@@ -1003,6 +1003,8 @@
   "elevation": 44.812,
   "generationtime_ms": 2.2119,
   "utc_offset_seconds": 0,
+  "timezone": "Europe/Berlin",
+  "timezone_abbreviation": "CEST",
   "hourly": {
     "time": ["2022-07-01T00:00", "2022-07-01T01:00", "2022-07-01T02:00", ...],
     "temperature_2m": [13, 12.7, 12.7, 12.5, 12.5, 12.8, 13, 12.9, 13.3, ...]
@@ -1047,6 +1049,11 @@
           <th scope="row">utc_offset_seconds</th>
           <td>Integer</td>
           <td>Applied timezone offset from the <mark>&timezone=</mark> parameter.</td>
+        </tr>
+        <tr>
+          <th scope="row">timezone<br/>timezone_abbreviation</th>
+          <td>String</td>
+          <td>Timezone identifier (e.g. <mark>Europe/Berlin</mark>) and abbreviation (e.g. <mark>CEST</mark>)</td>
         </tr>
         <tr>
           <th scope="row">hourly</th>
