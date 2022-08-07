@@ -42,7 +42,7 @@ jobs:
       run: |
         ${{ env.swift_build }}
         mv .build/release/openmeteo-api openmeteo-api
-        cp -r .build/release/*.resources Resources/SwiftTimeZoneLookup
+        my .build/release/*.resources Resources/
     - name: Package
       uses: gravitl/github-action-fpm@master
       with:
@@ -55,10 +55,9 @@ jobs:
       with:
         files: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
         draft: true
-    - name: Publish to APT
-      uses: jrandiny/apt-repo-action@v2.0.1
+    - name: Create APT repository
+      uses: patrick-zippenfenig/apt-repo-action@master
       with:
-        github_token: ${{ secrets.PAT }}
         repo_supported_arch: amd64
         repo_supported_version: focal
         file: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
@@ -66,3 +65,13 @@ jobs:
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}
         key_passphrase: ${{ secrets.GPG_SECRET }}
+    - name: Move key
+      run: mv public.key repo/
+    - name: Upload to FTP
+      uses: SamKirkland/FTP-Deploy-Action@4.3.0
+      with:
+        server: storage.bunnycdn.com
+        username: open-meteo-assets
+        password: ${{ secrets.ftp_password }}
+        local-dir: './repo'
+        server-dir: './repo'
