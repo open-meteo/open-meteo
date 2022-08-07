@@ -3,7 +3,7 @@
 [![Test](https://github.com/open-meteo/open-meteo/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/open-meteo/open-meteo/actions/workflows/test.yml) [![codebeat badge](https://codebeat.co/badges/af28fed6-9cbf-41df-96a1-9bba03ae3c53)](https://codebeat.co/projects/github-com-open-meteo-open-meteo-main) [![GitHub license](https://img.shields.io/github/license/open-meteo/open-meteo)](https://github.com/open-meteo/open-meteo/blob/main/LICENSE) [![license: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/) [![Twitter](https://img.shields.io/twitter/url/https/twitter.com/open_meteo.svg?style=social&label=Follow%20%40Open-Meteo)](https://twitter.com/open_meteo)
 
 
-Open-Meteo is an open-source weather API and offers free access for non-commercial use. No API key is required. You can use it inmediately!
+Open-Meteo is an open-source weather API and offers free access for non-commercial use. No API key is required. You can use it immediately!
 
 Head over to https://open-meteo.com! Stay up to date with our blog at https://openmeteo.substack.com.
 
@@ -73,7 +73,7 @@ If your application exceeds 10'000 requests per day, please contact us. We reser
 
 For commercial use of Open-Meteo APIs, please contact us.
 
-All data is provided as is without any warrenty.
+All data is provided as is without any warranty.
 
 We do not collect any personal data. We do not share any personal information. We do not integrate any third party analytics, ads, beacons or plugins.
 
@@ -92,4 +92,4 @@ NonCommercial: You may not use the material for commercial purposes.
 
 
 ## Source Code License
-Open-Meteo is open-source under the GNU Affero General Public License Version 3 (AGPLv3) or any later version. You can [find the license here](LICENSE). Exceptions are third party source-code with individual licencing in each file.
+Open-Meteo is open-source under the GNU Affero General Public License Version 3 (AGPLv3) or any later version. You can [find the license here](LICENSE). Exceptions are third party source-code with individual licensing in each file.

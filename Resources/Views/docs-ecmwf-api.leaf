@@ -791,7 +791,7 @@
             <td>String</td>
             <td>No</td>
             <td><mark>iso8601</mark></td>
-            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please note that all time is then in UTC! For daily values with unix timestamp, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
+            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please note that all time is then in GMT+0! For daily values with unix timestamp, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
           </tr>
           <tr>
             <th scope="row">past_days</th>
@@ -912,6 +912,8 @@
   "latitude": 52.52,
   "longitude": 13.419,
   "generationtime_ms": 2.2119,
+  "timezone": "Europe/Berlin",
+  "timezone_abbreviation": "CEST",
   "hourly": {
     "time": ["2022-07-01T00:00", "2022-07-01T01:00", "2022-07-01T02:00", ...],
     "temperature_2m": [13, 12.7, 12.7, 12.5, 12.5, 12.8, 13, 12.9, 13.3, ...]
@@ -939,6 +941,16 @@
           <th scope="row">generationtime_ms</th>
           <td>Floating point</td>
           <td>Generation time of the weather forecast in milliseconds. This is mainly used for performance monitoring and improvements.</td>
+        </tr>
+        <tr>
+          <th scope="row">utc_offset_seconds</th>
+          <td>Integer</td>
+          <td>Applied timezone offset from the <mark>&timezone=</mark> parameter.</td>
+        </tr>
+        <tr>
+          <th scope="row">timezone<br/>timezone_abbreviation</th>
+          <td>String</td>
+          <td>Timezone identifier (e.g. <mark>Europe/Berlin</mark>) and abbreviation (e.g. <mark>CEST</mark>)</td>
         </tr>
         <tr>
           <th scope="row">hourly</th>

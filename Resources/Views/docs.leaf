@@ -564,14 +564,15 @@
           </div>
           <div class="col-3">
             <div class="form-floating mb-3">
-              <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="UTC">
+              <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="GMT">
                 <option value="America/Anchorage">America/Anchorage</option>
                 <option value="America/Los_Angeles">America/Los_Angeles</option>
                 <option value="America/Denver">America/Denver</option>
                 <option value="America/Chicago">America/Chicago</option>
                 <option value="America/New_York">America/New_York</option>
                 <option value="America/Sao_Paulo">America/Sao_Paulo</option>
-                <option selected value="UTC">UTC</option>
+                <option selected value="GMT">GMT+0</option>
+                <option value="auto">Automatically detect time zone</option>
                 <option value="Europe/London">Europe/London</option>
                 <option value="Europe/Berlin">Europe/Berlin</option>
                 <option value="Europe/Moscow">Europe/Moscow</option>
@@ -709,14 +710,14 @@
             <td>String</td>
             <td>No</td>
             <td><mark>iso8601</mark></td>
-            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please note that all timestamp are in UTC! For daily values with unix timestamps, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
+            <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds. Please note that all timestamp are in GMT+0! For daily values with unix timestamps, please apply <mark>utc_offset_seconds</mark> again to get the correct date.</td>
           </tr>
           <tr>
             <th scope="row">timezone</th>
             <td>String</td>
             <td>No</td>
-            <td><mark>UTC</mark></td>
-            <td>If <mark>timezone</mark> is set, all timestamps are returned as local-time and data is returned starting at 00:00 local-time. Any time zone name from the <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> is supported.</td>
+            <td><mark>GMT</mark></td>
+            <td>If <mark>timezone</mark> is set, all timestamps are returned as local-time and data is returned starting at 00:00 local-time. Any time zone name from the <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> is supported. If <mark>auto</mark> is set as a time zone, the coordinates will be automatically resolved to the local time zone.</td>
           </tr>
           <tr>
             <th scope="row">past_days</th>
@@ -1002,6 +1003,8 @@
   "elevation": 44.812,
   "generationtime_ms": 2.2119,
   "utc_offset_seconds": 0,
+  "timezone": "Europe/Berlin",
+  "timezone_abbreviation": "CEST",
   "hourly": {
     "time": ["2022-07-01T00:00", "2022-07-01T01:00", "2022-07-01T02:00", ...],
     "temperature_2m": [13, 12.7, 12.7, 12.5, 12.5, 12.8, 13, 12.9, 13.3, ...]
@@ -1046,6 +1049,11 @@
           <th scope="row">utc_offset_seconds</th>
           <td>Integer</td>
           <td>Applied timezone offset from the <mark>&timezone=</mark> parameter.</td>
+        </tr>
+        <tr>
+          <th scope="row">timezone<br/>timezone_abbreviation</th>
+          <td>String</td>
+          <td>Timezone identifier (e.g. <mark>Europe/Berlin</mark>) and abbreviation (e.g. <mark>CEST</mark>)</td>
         </tr>
         <tr>
           <th scope="row">hourly</th>

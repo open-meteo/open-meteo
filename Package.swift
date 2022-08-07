@@ -19,6 +19,7 @@ let package = Package(
     .package(url: "https://github.com/vapor/vapor.git", from: "4.0.0"),
     .package(url: "https://github.com/vapor/leaf.git", from: "4.0.0"),
     .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.0.0"),
+    .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.0"),
     .package(url: "https://github.com/orlandos-nl/IkigaJSON.git", from: "2.0.0"),
     //.package(name: "SwiftPFor2D", path: "/Users/om/Documents/SwiftPFor2D"),
     // NOTE: taged releases do not work, because of unsafe flags....
@@ -31,6 +32,7 @@ let package = Package(
         .product(name: "Vapor", package: "vapor"),
         .product(name: "Leaf", package: "leaf"),
         .product(name: "SwiftNetCDF", package: "SwiftNetCDF"),
+        .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),
         "CHelper",
         "SwiftPFor2D",
         "IkigaJSON",

@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import SwiftTimeZoneLookup
 
 enum ForecastapiError: Error {
     case latitudeMustBeInRangeOfMinus90to90(given: Float)
@@ -79,13 +80,11 @@ protocol QueryWithStartEndDateTimeZone: QueryWithTimezone {
     
     /// included end date `2022-06-01`
     var end_date: IsoDate? { get }
-    
-
 }
 
 extension QueryWithStartEndDateTimeZone {
-    func getTimerange(current: Timestamp, forecastDays: Int, allowedRange: Range<Timestamp>) throws -> TimerangeLocal {
-        let utcOffset = try getUtcOffsetSeconds()
+    func getTimerange(timezone: TimeZone, current: Timestamp, forecastDays: Int, allowedRange: Range<Timestamp>) throws -> TimerangeLocal {
+        let utcOffset = (timezone.secondsFromGMT() / 3600) * 3600
         if let startEnd = try getStartEndDateLocal(allowedRange: allowedRange, utcOffsetSeconds: utcOffset) {
             return startEnd
         }
@@ -135,16 +134,28 @@ extension QueryWithStartEndDateTimeZone {
 
 protocol QueryWithTimezone {
     var timezone: String? { get }
+    
+    var latitude: Float { get }
+    
+    var longitude: Float { get }
 }
 
+fileprivate let timezoneDatabase = try! SwiftTimeZoneLookup(databasePath: "./Resources/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources/")
+
 extension QueryWithTimezone {
-    func getUtcOffsetSeconds() throws -> Int {
-        guard let timezone = timezone else {
-            return 0
+    /// Get user specified timezone. It `auto` is specified, resolve via coordinates
+    func resolveTimezone() throws -> TimeZone {
+        guard var timezone = timezone else {
+            return TimeZone(identifier: "GMT")!
+        }
+        if timezone == "auto" {
+            if let res = timezoneDatabase.simple(latitude: latitude, longitude: longitude) {
+                timezone = res
+            }
         }
         guard let tz = TimeZone(identifier: timezone) else {
             throw ForecastapiError.invalidTimezone
         }
-        return (tz.secondsFromGMT() / 3600) * 3600
+        return tz
     }
 }

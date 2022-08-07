@@ -124,7 +124,7 @@ paths:
           - kn
       - name: timeformat
         in: query
-        description: If format `unixtime` is selected, all time values are returned in UNIX epoch time in seconds. Please not that all time is then in UTC! For daily values with unix timestamp, please apply `utc_offset_seconds` again to get the correct date.
+        description: If format `unixtime` is selected, all time values are returned in UNIX epoch time in seconds. Please not that all time is then in GMT+0! For daily values with unix timestamp, please apply `utc_offset_seconds` again to get the correct date.
         schema:
           type: string
           default: iso8601
