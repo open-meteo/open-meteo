@@ -65,8 +65,6 @@ jobs:
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}
         key_passphrase: ${{ secrets.GPG_SECRET }}
-    - name: Move key
-      run: mv public.key repo/
     - name: Upload to FTP
       uses: SamKirkland/FTP-Deploy-Action@4.3.0
       with:
