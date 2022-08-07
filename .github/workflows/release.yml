@@ -42,7 +42,7 @@ jobs:
       run: |
         ${{ env.swift_build }}
         mv .build/release/openmeteo-api openmeteo-api
-        cp .build/release/*.resources Resources/SwiftTimeZoneLookup
+        cp -r .build/release/*.resources Resources/SwiftTimeZoneLookup
     - name: Package
       uses: gravitl/github-action-fpm@master
       with:
