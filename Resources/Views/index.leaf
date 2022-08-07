@@ -14,7 +14,7 @@
 </svg>
 <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Free Weather API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Open-Meteo offers free weather forecast APIs for open-source developers and non-commercial use. No API key is required. You can start using it immediately!</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Open-Meteo is an open-source weather API and offers free access for non-commercial use. No API key is required. You can use it immediately!</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="/en/features" class="btn btn-primary btn-lg px-4 me-sm-3 mr-2">Features</a>
       <a href="/en/docs" class="btn btn-outline-light btn-lg px-4">Documentation</a>
@@ -41,7 +41,7 @@
 </div>
       <div class="col-lg-6">
         <h1 class="display-5 lh-1 mb-3">Hourly 7-day forecast worldwide</h1>
-        <p class="lead">Open-Meteo collaborates with National Weather Services providing Open Data with 11 to 2 km resolution. Our high performance APIs select the best weather model for your location and provide data as a simple JSON API.</p>
+        <p class="lead">Open-Meteo collaborates with National Weather Services providing Open Data with 2 to 11 km resolution. Our high performance APIs select the best weather model for your location and provide data as a simple JSON API.</p>
         <p>APIs are free without any API key for open-source developers and non-commercial use. You can embed them directly into your app.</p>
         <div class="d-grid gap-2 d-md-flex justify-content-md-start">
           <a href="/en/features" class="btn button btn-primary btn-lg px-4 me-md-2">See features</a>
