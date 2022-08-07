@@ -74,4 +74,3 @@ jobs:
         local-dir: './repo/'
         server-dir: './repo/'
         protocol: ftps
-        port: 990
