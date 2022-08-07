@@ -71,7 +71,7 @@ jobs:
         server: storage.bunnycdn.com
         username: open-meteo-assets
         password: ${{ secrets.ftp_password }}
-        local-dir: './repo'
-        server-dir: './repo'
+        local-dir: './repo/'
+        server-dir: './repo/'
         protocol: ftps
         port: 990
