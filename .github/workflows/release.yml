@@ -72,5 +72,5 @@ jobs:
         username: open-meteo-assets
         password: ${{ secrets.ftp_password }}
         local-dir: './repo/'
-        server-dir: './repo/'
+        server-dir: '/open-meteo-assets/repo/'
         protocol: ftps
