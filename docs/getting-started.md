@@ -85,8 +85,8 @@ If you are running Ubuntu 20.04 focal, you can use prebuilt binaries.
 
 They can be installed via APT:
 ```bash
-curl -L https://open-meteo.github.io/open-meteo/public.key | sudo apt-key add -
-echo "deb [arch=amd64] https://open-meteo.github.io/open-meteo/repo $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/openmeteo-api.list
+curl -L https://apt.open-meteo.com/public.key | sudo apt-key add -
+echo "deb [arch=amd64] https://apt.open-meteo.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/openmeteo-api.list
 sudo apt update
 sudo apt install openmeteo-api
 
