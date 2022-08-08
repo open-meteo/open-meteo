@@ -26,7 +26,7 @@ struct Curl {
         }
         
         let startTime = Date()
-        let args = range.map{["-r",$0]} ?? [] + [
+        let args = (range.map{["-r",$0]} ?? []) + [
             "-s",
             "--show-error",
             "--fail", // also retry 404
@@ -52,11 +52,10 @@ struct Curl {
     }
     
     /// Download an indexed grib file, but select only required grib messages
-    func downloadIndexedGrib(url: String, to: String, include: (String) -> Bool) throws {
+    func downloadIndexedGrib(url: String, to: String, include: (Substring) -> Bool) throws {
         try download(url: "\(url).idx", to: "\(to).idx")
         
-        let idx = try FileHandle.openFileReading(file: "\(to).idx")
-        guard let range = idx.forEachLine().indexToRange(include: include) else {
+        guard let range = try String(contentsOfFile: "\(to).idx").split(separator: "\n").indexToRange(include: include) else {
             throw CurlError.noGribMessagesMatch
         }
         try download(url: url, to: to, range: range)
@@ -64,9 +63,9 @@ struct Curl {
 }
 
 
-extension Sequence where Element == String {
+extension Sequence where Element == Substring {
     /// Parse a GRID index to curl read ranges
-    func indexToRange(include: (String) -> Bool) -> String? {
+    func indexToRange(include: (Substring) -> Bool) -> String? {
         var range = ""
         var start: Int? = nil
         for line in self {
@@ -92,28 +91,5 @@ extension Sequence where Element == String {
             return nil
         }
         return range
-    }
-}
-
-extension FileHandle {
-    func forEachLine() -> AnyIterator<String> {
-        var lineByteArrayPointer: UnsafeMutablePointer<CChar>? = nil
-        var lineCap: Int = 0
-        let fd = fdopen(fileDescriptor, "r")
-        
-        defer {
-            lineByteArrayPointer?.deallocate()
-            fclose(fd)
-        }
-        
-        var bytesRead = 0
-        
-        return AnyIterator<String>({
-            bytesRead = getline(&lineByteArrayPointer, &lineCap, fd)
-            guard bytesRead > 0, let lineByteArrayPointer = lineByteArrayPointer else {
-                return nil
-            }
-            return String(cString: lineByteArrayPointer)
-        })
     }
 }
