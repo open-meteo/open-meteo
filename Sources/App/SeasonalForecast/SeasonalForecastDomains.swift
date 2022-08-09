@@ -108,60 +108,57 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
     case total_precipitation
     case convective_precipitation
     
-    func matchesIndex(_ index: Substring) -> Bool {
-        index.contains("\(grib.name):\(grib.level)")
-    }
     
-    var grib: (name: String, level: String) {
+    var gribIndexName: String {
         switch self {
         case .temperature_2m:
-            return ("TMP", "2 m above ground")
+            return "TMP:2 m above ground"
         case .soil_moisture_0_to_10_cm:
-            return ("SOILW", "0-0.1 m below ground")
+            return "SOILW:0-0.1 m below ground"
         case .soil_moisture_10_to_40_cm:
-            return ("SOILW", "0.1-0.4 m below ground")
+            return "SOILW:0.1-0.4 m below ground"
         case .soil_moisture_40_to_100_cm:
-            return ("SOILW", "0.4-1 m below ground")
+            return "SOILW:0.4-1 m below ground"
         case .soil_moisture_100_to_200_cm:
-            return ("SOILW", "1-2 m below ground")
+            return "SOILW:1-2 m below ground"
         case .soil_temperature_0_to_10_cm:
-            return ("TMP", "0-0.1 m below ground")
+            return "TMP:0-0.1 m below ground"
         case .soil_temperature_10_to_40_cm:
-            return ("TMP", "0.1-0.4 m below ground")
+            return "TMP:0.1-0.4 m below ground"
         case .soil_temperature_40_to_100_cm:
-            return ("TMP", "0.4-1 m below ground")
+            return "TMP:0.4-1 m below ground"
         case .soil_temperature_100_to_200_cm:
-            return ("TMP", "1-2 m below ground")
+            return "TMP:1-2 m below ground"
         case .snow_depth:
-            return ("SNOD", "surface")
+            return "SNOD:surface"
         case .shortwave_radiation:
-            return ("DSWRF", "surface")
+            return "DSWRF:surface"
         case .uv_index:
-            return ("DUVB", "surface")
+            return "DUVB:surface"
         case .uv_index_clear_sky:
-            return ("CDUVB", "surface")
+            return "CDUVB:surface"
         case .low_cloud_cover:
-            return ("TCDC", "high cloud layer")
+            return "TCDC:high cloud layer"
         case .medium_cloud_cover:
-            return ("TCDC", "middle cloud layer")
+            return "TCDC:middle cloud layer"
         case .high_cloud_cover:
-            return ("TCDC", "low cloud layer")
+            return "TCDC:low cloud layer"
         case .convective_cloud_cover:
-            return ("TCDC", "convective cloud layer")
+            return "TCDC:convective cloud layer"
         case .wind_u_component_10m:
-            return ("UGRD", "10 m above ground")
+            return "UGRD:10 m above ground"
         case .wind_v_component_10m:
-            return ("VGRD", "10 m above ground")
+            return "VGRD:10 m above ground"
         case .temperature_2m_max:
-            return ("TMAX", "2 m above ground")
+            return "TMAX:2 m above ground"
         case .temperature_2m_min:
-            return ("TMIN", "2 m above ground")
+            return "TMIN:2 m above ground"
         case .potential_evapotranspiration:
-            return ("PEVPR", "surface")
+            return "PEVPR:surface"
         case .total_precipitation:
-            return ("PRATE", "surface")
+            return "PRATE:surface"
         case .convective_precipitation:
-            return ("CPRAT", "surface")
+            return "CPRAT:surface"
         }
     }
 }

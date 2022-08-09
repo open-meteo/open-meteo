@@ -5,6 +5,7 @@ import SwiftEccodes
 
 enum CurlError: Error {
     case noGribMessagesMatch
+    case didNotFindAllVariablesInGribIndex
 }
 
 struct Curl {
@@ -87,7 +88,8 @@ struct Curl {
         }
     }
     
-    /// Download an indexed grib file, but select only required grib messages
+    /// Download an indexed grib file, but selects only required grib messages
+    /// Data is downloaded directly into memory and GRIB decoded while iterating
     func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, data: [Float])> {
         
         guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
@@ -97,7 +99,7 @@ struct Curl {
         var matches = [Variable]()
         matches.reserveCapacity(variables.count)
         guard let range = index.split(separator: "\n").indexToRange(include: { idx in
-            guard let match = variables.first(where: { $0.matchesIndex(idx) }) else {
+            guard let match = variables.first(where: { idx.contains($0.gribIndexName) }) else {
                 return false
             }
             matches.append(match)
@@ -106,6 +108,10 @@ struct Curl {
             throw CurlError.noGribMessagesMatch
         }
         logger.debug("Ranged download \(range)")
+        
+        if variables.allSatisfy({ matches.contains($0) }) {
+            throw CurlError.didNotFindAllVariablesInGribIndex
+        }
         
         let data = try downloadInMemory(url: url, range: range)
         return data.withUnsafeBytes { data in
@@ -124,9 +130,9 @@ struct Curl {
     }
 }
 
-protocol CurlIndexedVariable {
+protocol CurlIndexedVariable: Equatable {
     /// Return true, if this index string is matching. Index string looks like `13:520719:d=2022080900:ULWRF:top of atmosphere:anl:`
-    func matchesIndex(_ index: Substring) -> Bool
+    var gribIndexName: String { get }
 }
 
 
