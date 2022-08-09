@@ -36,19 +36,28 @@ struct SeasonalForecastDownload: Command {
     
     func downloadCFS(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
         // loop timesteps
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let curl = Curl(logger: logger)
         let timeinterval = TimerangeDt(start: run, nTime: domain.nForecastHours, dtSeconds: domain.dtSeconds)
-        let variables = Array(CfsVariable.allCases[0..<2])
+        let variables = CfsVariable.allCases
         for (step,time) in timeinterval.enumerated() {
+            if step <= 4 {
+                continue
+            }
             // https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/06/6hrly_grib_01/flxf2022080818.01.2022080806.grb2.idx
             let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(time.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
             
-            for (variable, data) in try curl.downloadIndexedGrib(url: url, variables: variables) {
+            for (variable, data2) in try curl.downloadIndexedGrib(url: url, variables: variables) {
                 print(variable)
-                print(data[0..<10])
+                
+                var data = data2
+                data.shift180LongitudeAndFlipLatitude()
+                data.data.multiplyAdd(multiply: variable.gribMultiplyAdd.multiply, add: variable.gribMultiplyAdd.add)
+                print(data.data[0..<20])
+                try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(step).nc")
             }
             
-            
+            return
         }
         // loop variables
     }

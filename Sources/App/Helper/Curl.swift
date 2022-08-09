@@ -6,6 +6,7 @@ import SwiftEccodes
 enum CurlError: Error {
     case noGribMessagesMatch
     case didNotFindAllVariablesInGribIndex
+    case gribIndexMatchedTwice
 }
 
 struct Curl {
@@ -90,7 +91,7 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, data: [Float])> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, data: Array2D)> {
         
         guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
             fatalError("Could not decode index to string")
@@ -98,10 +99,15 @@ struct Curl {
         
         var matches = [Variable]()
         matches.reserveCapacity(variables.count)
-        guard let range = index.split(separator: "\n").indexToRange(include: { idx in
+        guard let range = try index.split(separator: "\n").indexToRange(include: { idx in
             guard let match = variables.first(where: { idx.contains($0.gribIndexName) }) else {
                 return false
             }
+            guard !matches.contains(match) else {
+                logger.error("Grib variable \(match) matched twice for \(idx)")
+                throw CurlError.gribIndexMatchedTwice
+            }
+            logger.debug("Matched \(match) with \(idx)")
             matches.append(match)
             return true
         }) else {
@@ -109,11 +115,20 @@ struct Curl {
         }
         logger.debug("Ranged download \(range)")
         
-        if variables.allSatisfy({ matches.contains($0) }) {
+        
+        var missing = false
+        for variable in variables {
+            if !matches.contains(variable) {
+                logger.error("Variable \(variable) '\(variable.gribIndexName)' missing")
+                missing = true
+            }
+        }
+        if missing {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
         let data = try downloadInMemory(url: url, range: range)
+        try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
         return data.withUnsafeBytes { data in
             let grib = GribMemory(ptr: data)
             var itr = zip(matches, grib.messages).makeIterator()
@@ -121,10 +136,23 @@ struct Curl {
                 guard let (variable, message) = itr.next() else {
                     return nil
                 }
+                
+                message.iterate(namespace: .ls).forEach({
+                    print($0)
+                })
+                message.iterate(namespace: .parameter).forEach({
+                    print($0)
+                })
                 guard let data = try? message.getDouble().map(Float.init) else {
                     fatalError("Could not read GRIB data for variable \(variable)")
                 }
-                return (variable, data)
+                guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
+                    fatalError("Could not get Nx")
+                }
+                guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
+                    fatalError("Could not get Ny")
+                }
+                return (variable, Array2D(data: data, nx: nx, ny: ny))
             }
         }
     }
@@ -138,7 +166,7 @@ protocol CurlIndexedVariable: Equatable {
 
 extension Sequence where Element == Substring {
     /// Parse a GRID index to curl read ranges
-    func indexToRange(include: (Substring) -> Bool) -> String? {
+    func indexToRange(include: (Substring) throws -> Bool) rethrows -> String? {
         var range = ""
         var start: Int? = nil
         for line in self {
@@ -146,7 +174,7 @@ extension Sequence where Element == Substring {
             guard parts.count > 2, let messageStart = Int(parts[1]) else {
                 continue
             }
-            guard include(line) else {
+            guard try include(line) else {
                 if let startUnwrapped = start {
                     range += "\(range.isEmpty ? "" : ",")\(startUnwrapped)-\(messageStart-1)"
                     start = nil

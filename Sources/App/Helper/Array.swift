@@ -3,6 +3,27 @@ import SwiftNetCDF
 import CHelper
 
 
+struct Array2D {
+    var data: [Float]
+    let nx: Int
+    let ny: Int
+    
+    func writeNetcdf(filename: String) throws {
+        let file = try NetCDF.create(path: filename, overwriteExisting: true)
+        try file.setAttribute("TITLE", "My data set")
+        let dimensions = [
+            try file.createDimension(name: "LAT", length: ny),
+            try file.createDimension(name: "LON", length: nx)
+        ]
+        var variable = try file.createVariable(name: "data", type: Float.self, dimensions: dimensions)
+        try variable.write(data)
+    }
+    
+    mutating func shift180LongitudeAndFlipLatitude() {
+        data.shift180LongitudeAndFlipLatitude(nt: 1, ny: ny, nx: nx)
+    }
+}
+
 struct Array2DFastSpace {
     var data: [Float]
     let nLocations: Int
@@ -213,15 +234,23 @@ extension Array where Element == Float {
                         data[offset + x] = data[offset + x + nx/2]
                         data[offset + x + nx/2] = val
                     }
-                    /// Also flip south / north
-                    for y in 0..<ny/2 {
-                        for x in 0..<nx {
-                            let val = data[t*nx*ny + y*nx + x]
-                            data[t*nx*ny + y*nx + x] = data[t*nx*ny + (ny-1-y)*nx + x]
-                            data[t*nx*ny + (ny-1-y)*nx + x] = val
-                        }
+                }
+                /// Also flip south / north
+                for y in 0..<ny/2 {
+                    for x in 0..<nx {
+                        let val = data[t*nx*ny + y*nx + x]
+                        data[t*nx*ny + y*nx + x] = data[t*nx*ny + (ny-1-y)*nx + x]
+                        data[t*nx*ny + (ny-1-y)*nx + x] = val
                     }
                 }
+            }
+        }
+    }
+    
+    mutating func multiplyAdd(multiply: Float, add: Float) {
+        self.withUnsafeMutableBufferPointer { data in
+            for i in 0..<data.count {
+                data[i] = fma(data[i], multiply, add)
             }
         }
     }
