@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import SwiftEccodes
 
 
 enum CurlError: Error {
@@ -51,15 +52,81 @@ struct Curl {
         }
     }
     
-    /// Download an indexed grib file, but select only required grib messages
-    func downloadIndexedGrib(url: String, to: String, include: (Substring) -> Bool) throws {
-        try download(url: "\(url).idx", to: "\(to).idx")
+    func downloadInMemory(url: String, range: String? = nil) throws -> Data {
+        // URL might contain password, strip them from logging
+        if url.contains("@") && url.contains(":") {
+            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
+            logger.info("Downloading file \(urlSafe)")
+        } else {
+            logger.info("Downloading file \(url)")
+        }
         
-        guard let range = try String(contentsOfFile: "\(to).idx").split(separator: "\n").indexToRange(include: include) else {
+        let startTime = Date()
+        let args = (range.map{["-r",$0]} ?? []) + [
+            "-s",
+            "--show-error",
+            "--fail", // also retry 404
+            "--insecure", // ignore expired or invalid SSL certs
+            "--retry-connrefused",
+            "--limit-rate", "10M", // Limit to 10 MB/s -> 80 Mbps
+            "--connect-timeout", "\(connectTimeout)",
+            "--max-time", "\(maxTimeSeconds)",
+            url
+        ]
+        //logger.debug("Curl command: \(args.joined(separator: " "))")
+        
+        while true {
+            do {
+                return try Process.spawnWithOutputData(cmd: "curl", args: args)
+            } catch {
+                if Int(Date().timeIntervalSince(startTime)) > maxTimeSeconds {
+                    throw error
+                }
+                sleep(UInt32(retryDelaySeconds))
+            }
+        }
+    }
+    
+    /// Download an indexed grib file, but select only required grib messages
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, data: [Float])> {
+        
+        guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
+            fatalError("Could not decode index to string")
+        }
+        
+        var matches = [Variable]()
+        matches.reserveCapacity(variables.count)
+        guard let range = index.split(separator: "\n").indexToRange(include: { idx in
+            guard let match = variables.first(where: { $0.matchesIndex(idx) }) else {
+                return false
+            }
+            matches.append(match)
+            return true
+        }) else {
             throw CurlError.noGribMessagesMatch
         }
-        try download(url: url, to: to, range: range)
+        logger.debug("Ranged download \(range)")
+        
+        let data = try downloadInMemory(url: url, range: range)
+        return data.withUnsafeBytes { data in
+            let grib = GribMemory(ptr: data)
+            var itr = zip(matches, grib.messages).makeIterator()
+            return AnyIterator {
+                guard let (variable, message) = itr.next() else {
+                    return nil
+                }
+                guard let data = try? message.getDouble().map(Float.init) else {
+                    fatalError("Could not read GRIB data for variable \(variable)")
+                }
+                return (variable, data)
+            }
+        }
     }
+}
+
+protocol CurlIndexedVariable {
+    /// Return true, if this index string is matching. Index string looks like `13:520719:d=2022080900:ULWRF:top of atmosphere:anl:`
+    func matchesIndex(_ index: Substring) -> Bool
 }
 
 

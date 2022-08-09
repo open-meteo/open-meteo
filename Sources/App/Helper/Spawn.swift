@@ -61,16 +61,31 @@ public extension Process {
             throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args)
         }
     }
-
-    static func spawnWithOutput(cmd: String, args: [String]?) throws -> String {
+    
+    static func spawnWithOutputData(cmd: String, args: [String]?) throws -> Data {
         let pipe = Pipe()
-        let eerror = Pipe()
-        let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
+        
+        var data = Data()
+        
+        /*let eerror = Pipe()
+        var errorData = Data()
+        eerror.fileHandleForReading.readabilityHandler = { handle in
+            errorData.append(handle.availableData)
+        }*/
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            data.append(handle.availableData)
+        }
+        
+        
+        let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe/*, stderr: eerror*/)
         task.waitUntilExit()
         guard task.terminationStatus == 0 else {
             throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args)
         }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: String.Encoding.utf8)!
+        return data
+    }
+
+    static func spawnWithOutput(cmd: String, args: [String]?) throws -> String {
+        return String(data: try spawnWithOutputData(cmd: cmd, args: args), encoding: String.Encoding.utf8)!
     }
 }
