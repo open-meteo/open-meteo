@@ -17,6 +17,9 @@ protocol GenericDomain {
     /// Where compressed time series files are stroed
     var omfileDirectory: String { get }
     
+    /// If present, the directory to a long term archive
+    var omfileArchive: String? { get }
+    
     /// The time length of each compressed time series file
     var omFileLength: Int { get }
 }
@@ -104,7 +107,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         self.modelElevation = gridpoint.gridElevation
         self.targetElevation = elevation
         
-        omFileSplitter = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        omFileSplitter = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: domain.omfileArchive)
         
         (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
     }

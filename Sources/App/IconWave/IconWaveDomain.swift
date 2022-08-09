@@ -14,6 +14,9 @@ enum IconWaveDomain: String, Codable, CaseIterable, GenericDomain {
     var omfileDirectory: String {
         return "./data/omfile-\(rawValue)/"
     }
+    var omfileArchive: String? {
+        return nil
+    }
     
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {

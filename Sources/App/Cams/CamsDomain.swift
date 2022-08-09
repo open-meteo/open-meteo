@@ -29,6 +29,9 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     var downloadDirectory: String {
         return "./data/\(rawValue)/"
     }
+    var omfileArchive: String? {
+        return nil
+    }
     
     var dtSeconds: Int {
         return 3600

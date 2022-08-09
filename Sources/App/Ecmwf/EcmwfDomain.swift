@@ -31,6 +31,9 @@ enum EcmwfDomain: GenericDomain {
     var omfileDirectory: String {
         return "./data/omfile-ecmwf/"
     }
+    var omfileArchive: String? {
+        return nil
+    }
     
     var omFileLength: Int {
         // 104
