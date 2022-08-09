@@ -84,6 +84,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     var downloadDirectory: String {
         return "./data/\(rawValue)/"
     }
+    var omfileArchive: String? {
+        return nil
+    }
     
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
