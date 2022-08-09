@@ -109,6 +109,7 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
     case potential_evapotranspiration
     case total_precipitation
     case convective_precipitation
+    case latent_heatflux
     
     var skipHour0: Bool {
         switch self {
@@ -168,10 +169,12 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
         case .wind_v_component_10m:
             return (1,0)
         case .potential_evapotranspiration:
-            return (1,0)
+            return (3600*6/2.5e6,0)
         case .total_precipitation:
-            return (1,0)
+            return (3600*6,0)
         case .convective_precipitation:
+            return (3600*6,0)
+        case .latent_heatflux:
             return (1,0)
         }
     }
@@ -222,6 +225,8 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
             return ":PRATE:surface:"
         case .convective_precipitation:
             return ":CPRAT:surface:"
+        case .latent_heatflux:
+            return ":LHTFL:surface:"
         }
     }
 }

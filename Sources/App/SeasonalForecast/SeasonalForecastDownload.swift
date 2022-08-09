@@ -52,7 +52,13 @@ struct SeasonalForecastDownload: Command {
                 
                 var data = data2
                 data.shift180LongitudeAndFlipLatitude()
+                for i in data.data.indices {
+                    if data.data[i] >= 9999 {
+                        data.data[i] = .nan
+                    }
+                }
                 data.data.multiplyAdd(multiply: variable.gribMultiplyAdd.multiply, add: variable.gribMultiplyAdd.add)
+
                 print(data.data[0..<20])
                 try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(step).nc")
             }

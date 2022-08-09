@@ -136,13 +136,6 @@ struct Curl {
                 guard let (variable, message) = itr.next() else {
                     return nil
                 }
-                
-                message.iterate(namespace: .ls).forEach({
-                    print($0)
-                })
-                message.iterate(namespace: .parameter).forEach({
-                    print($0)
-                })
                 guard let data = try? message.getDouble().map(Float.init) else {
                     fatalError("Could not read GRIB data for variable \(variable)")
                 }
