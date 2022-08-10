@@ -80,7 +80,9 @@ public extension Process {
         let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
         task.waitUntilExit()
         
-        /// Somehow pipes do not seem to close automatically
+        // Somehow pipes do not seem to close automatically
+        pipe.fileHandleForReading.readabilityHandler?(pipe.fileHandleForReading)
+        eerror.fileHandleForReading.readabilityHandler?(eerror.fileHandleForReading)
         try pipe.fileHandleForReading.close()
         try pipe.fileHandleForWriting.close()
         try eerror.fileHandleForReading.close()

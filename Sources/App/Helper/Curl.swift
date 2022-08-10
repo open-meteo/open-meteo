@@ -152,6 +152,7 @@ struct Curl {
         }
         
         let data = try downloadInMemory(url: url, range: range)
+        logger.debug("Converting GRIB")
         //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
         return data.withUnsafeBytes { data in
             let grib = GribMemory(ptr: data)
