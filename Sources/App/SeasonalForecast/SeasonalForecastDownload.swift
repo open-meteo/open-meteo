@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import SwiftPFor2D
+import SwiftEccodes
 
 
 /**
@@ -66,12 +67,11 @@ struct SeasonalForecastDownload: Command {
             } ?? Timestamp.now().hour - 6
             
             /// 18z run is available the day after starting 00:56
-            let date = Timestamp.now().add(-12*3600).with(hour: run) // TODO
+            let date = Timestamp.now().add(-24*3600).with(hour: run) // TODO
+            try downloadCfsElevation(logger: logger, domain: domain, run: date)
             
-            if !signature.skipExisting {
-                try downloadCfs(logger: logger, domain: domain, run: date, variables: variables)
-            }
-            //try convertCfs(logger: logger, domain: domain, run: run, variables: variables)
+            try downloadCfs(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
+            try convertCfs(logger: logger, domain: domain, run: date, variables: variables)
         case .jma:
             fatalError()
         case .eccc:
@@ -79,80 +79,74 @@ struct SeasonalForecastDownload: Command {
         }
     }
     
-    func downloadCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, variables: [CfsVariable]) throws {
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        
-        let curl = Curl(logger: logger)
-        let nx = domain.grid.nx
-        let ny = domain.grid.ny
-        
+    /// download cfs domain
+    func downloadCfsElevation(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
         /// download seamask and height
-        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
-            logger.info("Downloading height and elevation data")
-            let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
-            
-            enum ElevationVariable: String, CurlIndexedVariable, CaseIterable {
-                case height
-                case landmask
-                
-                var gribIndexName: String {
-                    switch self {
-                    case .height:
-                        return ":HGT:surface:"
-                    case .landmask:
-                        return ":LAND:surface:"
-                    }
-                }
-            }
-            
-            var height: Array2D? = nil
-            var landmask: Array2D? = nil
-            for (variable, data2) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
-                var data = data2
-                data.shift180LongitudeAndFlipLatitude()
-                switch variable {
-                case .height:
-                    height = data
-                case .landmask:
-                    landmask = data
-                }
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
-            }
-            guard var height = height, let landmask = landmask else {
-                fatalError("Could not download land and sea mask")
-            }
-            for i in height.data.indices {
-                // landmask: 0=sea, 1=land
-                height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
-            }
-            try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: height.data)
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+            return
         }
         
-        let timeinterval = TimerangeDt(start: run, nTime: domain.nForecastHours, dtSeconds: domain.dtSeconds)
-        for (forecastStep,time) in timeinterval.enumerated() {
-            /// Since model start
-            let forecastHour = forecastStep * domain.dtHours
-            logger.info("Downloading hour \(forecastHour)")
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        
+        logger.info("Downloading height and elevation data")
+        let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
+        
+        enum ElevationVariable: String, CurlIndexedVariable, CaseIterable {
+            case height
+            case landmask
+            
+            var gribIndexName: String {
+                switch self {
+                case .height:
+                    return ":HGT:surface:"
+                case .landmask:
+                    return ":LAND:surface:"
+                }
+            }
+        }
+        
+        var height: Array2D? = nil
+        var landmask: Array2D? = nil
+        let curl = Curl(logger: logger)
+        for (variable, data2) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
+            var data = data2
+            data.shift180LongitudeAndFlipLatitude()
+            switch variable {
+            case .height:
+                height = data
+            case .landmask:
+                landmask = data
+            }
+            //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
+        }
+        guard var height = height, let landmask = landmask else {
+            fatalError("Could not download land and sea mask")
+        }
+        for i in height.data.indices {
+            // landmask: 0=sea, 1=land
+            height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
+        }
+        try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: height.data)
+    }
+    
+    func downloadCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CfsVariable]) throws {
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        
+        let curl = Curl(logger: logger)
+        let gribVariables = Array(Set(variables.map{$0.timeGribName}))
+        
+        for gribVariable in gribVariables {
+            logger.info("Downloading varibale \(gribVariable)")
             for member in 1..<domain.nMembers+1 {
-                /// Forecast member 2-4 have only 45 days forecast, only member 1 has 6 months
-                if member > 1 && forecastHour > 1080 {
+                // https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/18/time_grib_01/tmin.01.2022080818.daily.grb2.idx
+                let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/18/time_grib_\(member.zeroPadded(len: 2))/\(gribVariable).\(member.zeroPadded(len: 2)).\(run.format_YYYYMMddHH).daily.grb2"
+                
+                let fileDest = "\(domain.downloadDirectory)\(gribVariable)_\(member).grb2"
+                if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
                     continue
                 }
-                // https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/06/6hrly_grib_01/flxf2022080818.01.2022080806.grb2.idx
-                let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_\(member.zeroPadded(len: 2))/flxf\(time.format_YYYYMMddHH).\(member.zeroPadded(len: 2)).\(run.format_YYYYMMddHH).grb2"
                 
-                for (variable, data2) in try curl.downloadIndexedGrib(url: url, variables: variables) {
-                    var data = data2
-                    data.shift180LongitudeAndFlipLatitude()
-                    data.data.multiplyAdd(multiply: variable.gribMultiplyAdd.multiply, add: variable.gribMultiplyAdd.add)
-
-                    //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(member)_\(forecastHour).nc")
-                    
-                    let fileDest = "\(domain.downloadDirectory)\(variable.rawValue)_\(member)_\(forecastHour).om"
-                    try FileManager.default.removeItemIfExists(at: fileDest)
-                    try OmFileWriter.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, dim0: nx, dim1: ny, chunk0: nx, chunk1: ny, all: data.data)
-                }
+                try curl.download(url: url, to: fileDest)
             }
         }
     }
@@ -164,29 +158,66 @@ struct SeasonalForecastDownload: Command {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
-        for variable in variables {
-            logger.info("Converting \(variable)")
+        let gribVariables = Array(Set(variables.map{$0.timeGribName}))
+        
+        for gribVariable in gribVariables {
             for member in 1..<domain.nMembers+1 {
-                /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
-                var data2d = Array2DFastTime(nLocations: domain.grid.count, nTime: domain.nForecastHours)
-                    
-                for forecastStep in 0..<domain.nForecastHours {
-                    let forecastHour = forecastStep * domain.dtSeconds / 3600
-                    let d = try OmFileReader(file: "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
-                    data2d[0..<data2d.nLocations, forecastStep] = d
-                }
-
+                logger.info("Converting \(gribVariable), member \(member)")
+                let grib = try GribFile(file: "\(domain.downloadDirectory)\(gribVariable)_\(member).grb2")
                 
-                logger.info("Create om file")
-                let startOm = DispatchTime.now()
-                let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
-                let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
-                //try data2d.writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-                try om.updateFromTimeOriented(variable: "\(variable.rawValue)_\(member)", array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-                logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+                /// Note, first forecast hour is always missing
+                let nForecastHours = Int(grib.messages.last!.get(attribute: "stepRange")!)! / domain.dtHours
+                
+                /// wind grib contains u and v components
+                var vars = [CfsVariable: Array2DFastTime]()
+                let startReadGrib = DispatchTime.now()
+                
+                for message in grib.messages {
+                    let shortName = message.get(attribute: "shortName")!
+                    let level = message.get(attribute: "level")!
+                    let forecastStep = Int(message.get(attribute: "step")!)! / domain.dtHours
+                    var data = try message.read2D()
+                    data.shift180LongitudeAndFlipLatitude()
+                    
+                    guard let variable = variables.first(where: {$0.timeGribKey == "\(shortName)\(level)"}) ?? variables.first(where: {$0.timeGribName == gribVariable}) else {
+                        fatalError("Could not resolve grib variable to cfs variable")
+                    }
+                    guard data.nx == domain.grid.nx, data.ny == domain.grid.ny else {
+                        fatalError("Wrong dimensions. Got \(data.nx)x\(data.ny). Expected \(domain.grid.nx)x\(domain.grid.ny)")
+                    }
+                    data.data.multiplyAdd(multiply: variable.gribMultiplyAdd.multiply, add: variable.gribMultiplyAdd.add)
+                    
+                    if vars[variable] == nil {
+                        vars[variable] = Array2DFastTime(nLocations: data.nx*data.ny, nTime: nForecastHours)
+                    }
+                    vars[variable]![0..<data.ny*data.nx, forecastStep] = data.data
+                }
+                
+                logger.info("Grib read finished in \(startReadGrib.timeElapsedPretty())")
+                
+                for (variable, data) in vars {
+                    let startOm = DispatchTime.now()
+                    let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
+                    let timeIndices = timeIndexStart ..< timeIndexStart + data.nTime
+                    try data.transpose().writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue)_\(member).nc", nx: domain.grid.nx, ny: domain.grid.ny)
+                    try om.updateFromTimeOriented(variable: "\(variable.rawValue)_\(member)", array2d: data, ringtime: timeIndices, skipFirst: 1, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+                    logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+                }
             }
         }
     }
 }
 
 
+extension GribMessage {
+    func read2D() throws -> Array2D {
+        let data = try getDouble().map(Float.init)
+        guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
+            fatalError("Could not get Nx")
+        }
+        guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
+            fatalError("Could not get Ny")
+        }
+        return Array2D(data: data, nx: nx, ny: ny)
+    }
+}
