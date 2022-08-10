@@ -1,4 +1,5 @@
 import Foundation
+import SwiftPFor2D
 
 enum SeasonalForecastDomain: String {
     case ecmwf
@@ -19,6 +20,33 @@ enum SeasonalForecastDomain: String {
     }
     var omfileArchive: String? {
         return nil
+    }
+    /// Filename of the surface elevation file
+    var surfaceElevationFileOm: String {
+        "\(omfileDirectory)HSURF.om"
+    }
+    
+    static var ncepElevation = try? OmFileReader(file: Self.ncep.surfaceElevationFileOm)
+    
+    var elevationFile: OmFileReader? {
+        switch self {
+        case .ecmwf:
+            fatalError()
+        case .ukMetOffice:
+            fatalError()
+        case .meteoFrance:
+            fatalError()
+        case .dwd:
+            fatalError()
+        case .cmcc:
+            fatalError()
+        case .ncep:
+            return Self.ncepElevation
+        case .jma:
+            fatalError()
+        case .eccc:
+            fatalError()
+        }
     }
     
     /// 14 days longer than actual one update

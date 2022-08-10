@@ -81,9 +81,53 @@ struct SeasonalForecastDownload: Command {
     
     func downloadCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, variables: [CfsVariable]) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        
         let curl = Curl(logger: logger)
         let nx = domain.grid.nx
         let ny = domain.grid.ny
+        
+        /// download seamask and height
+        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+            logger.info("Downloading height and elevation data")
+            let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
+            
+            enum ElevationVariable: String, CurlIndexedVariable, CaseIterable {
+                case height
+                case landmask
+                
+                var gribIndexName: String {
+                    switch self {
+                    case .height:
+                        return ":HGT:surface:"
+                    case .landmask:
+                        return ":LAND:surface:"
+                    }
+                }
+            }
+            
+            var height: Array2D? = nil
+            var landmask: Array2D? = nil
+            for (variable, data2) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
+                var data = data2
+                data.shift180LongitudeAndFlipLatitude()
+                switch variable {
+                case .height:
+                    height = data
+                case .landmask:
+                    landmask = data
+                }
+                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
+            }
+            guard var height = height, let landmask = landmask else {
+                fatalError("Could not download land and sea mask")
+            }
+            for i in height.data.indices {
+                // landmask: 0=sea, 1=land
+                height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
+            }
+            try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: height.data)
+        }
         
         let timeinterval = TimerangeDt(start: run, nTime: domain.nForecastHours, dtSeconds: domain.dtSeconds)
         for (forecastStep,time) in timeinterval.enumerated() {

@@ -79,6 +79,13 @@ public extension Process {
         
         let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
         task.waitUntilExit()
+        
+        /// Somehow pipes do not seem to close automatically
+        try pipe.fileHandleForReading.close()
+        try pipe.fileHandleForWriting.close()
+        try eerror.fileHandleForReading.close()
+        try eerror.fileHandleForWriting.close()
+        
         guard task.terminationStatus == 0 else {
             let error = String(data: errorData, encoding: .utf8)
             throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: error)
