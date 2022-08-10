@@ -64,10 +64,10 @@ struct SeasonalForecastDownload: Command {
                     fatalError("Invalid run '\($0)'")
                 }
                 return run
-            } ?? Timestamp.now().hour - 6
+            } ?? Timestamp.now().hour - 8
             
-            /// 18z run is available the day after starting 00:56
-            let date = Timestamp.now().add(-24*3600).with(hour: run) // TODO
+            /// 18z run is available the day after starting 05:26
+            let date = Timestamp.now().add(-8*3600).with(hour: run)
             try downloadCfsElevation(logger: logger, domain: domain, run: date)
             
             try downloadCfs(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
@@ -199,7 +199,7 @@ struct SeasonalForecastDownload: Command {
                     let startOm = DispatchTime.now()
                     let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
                     let timeIndices = timeIndexStart ..< timeIndexStart + data.nTime
-                    try data.transpose().writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue)_\(member).nc", nx: domain.grid.nx, ny: domain.grid.ny)
+                    //try data.transpose().writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue)_\(member).nc", nx: domain.grid.nx, ny: domain.grid.ny)
                     try om.updateFromTimeOriented(variable: "\(variable.rawValue)_\(member)", array2d: data, ringtime: timeIndices, skipFirst: 1, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
                     logger.info("Update om finished in \(startOm.timeElapsedPretty())")
                 }
