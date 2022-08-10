@@ -166,7 +166,7 @@ struct SeasonalForecastDownload: Command {
                 let grib = try GribFile(file: "\(domain.downloadDirectory)\(gribVariable)_\(member).grb2")
                 
                 /// Note, first forecast hour is always missing
-                let nForecastHours = Int(grib.messages.last!.get(attribute: "stepRange")!)! / domain.dtHours
+                let nForecastHours = Int(grib.messages.last!.get(attribute: "stepRange")!)! / domain.dtHours + 1
                 
                 /// wind grib contains u and v components
                 var vars = [CfsVariable: Array2DFastTime]()

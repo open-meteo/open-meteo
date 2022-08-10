@@ -164,7 +164,7 @@ enum CfsVariable: String, CaseIterable {
     case total_precipitation
     case convective_precipitation
     case specific_humidity
-    case pressure_msl
+    case surface_pressure
     
     /// Note: wind u/v components are in the same grib file
     var timeGribName: String {
@@ -199,8 +199,8 @@ enum CfsVariable: String, CaseIterable {
             return "cprat"
         case .specific_humidity:
             return "q2m"
-        case .pressure_msl:
-            return "prmsl"
+        case .surface_pressure:
+            return "pressfc"
         }
     }
     
@@ -249,7 +249,7 @@ enum CfsVariable: String, CaseIterable {
         case .specific_humidity:
             // grams of water (moisture) per kilogram of air (ranges 0-21)
             return 100
-        case .pressure_msl:
+        case .surface_pressure:
             return 10
         }
     }
@@ -286,7 +286,7 @@ enum CfsVariable: String, CaseIterable {
             return .millimeter
         case .specific_humidity:
             return .gramPerKilogram
-        case .pressure_msl:
+        case .surface_pressure:
             return .hectoPascal
         }
     }
@@ -321,7 +321,7 @@ enum CfsVariable: String, CaseIterable {
             return (3600*6,0)
         case .convective_precipitation:
             return (3600*6,0)
-        case .pressure_msl:
+        case .surface_pressure:
             // convert Pa to hPa
             return (1/100,0)
         case .specific_humidity:
