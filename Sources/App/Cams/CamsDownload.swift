@@ -221,12 +221,12 @@ struct DownloadCamsCommand: Command {
         try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
         do {
             try Process.spawnOrDie(cmd: "python3", args: [tempPythonFile])
-        } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
+        } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args, let stderr) {
             if code == 70 {
                 logger.info("Timestep \(run.iso8601_YYYY_MM_dd) seems to be unavailable")
                 fatalError()
             } else {
-                throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args)
+                throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args, stderr: stderr)
             }
         }
     }

@@ -41,12 +41,18 @@ struct Curl {
             "-o", to,
             url
         ]
+        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
         while true {
             do {
                 try Process.spawnOrDie(cmd: "curl", args: args)
                 return
             } catch {
-                if Int(Date().timeIntervalSince(startTime)) > maxTimeSeconds {
+                let timeElapsed = Date().timeIntervalSince(startTime)
+                if Date().timeIntervalSince(lastPrint) > 60 {
+                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed))/\(maxTimeSeconds) minutes, curl error '\(error)'")
+                    lastPrint = Date()
+                }
+                if Int(timeElapsed) > maxTimeSeconds {
                     throw error
                 }
                 sleep(UInt32(retryDelaySeconds))
@@ -77,11 +83,17 @@ struct Curl {
         ]
         //logger.debug("Curl command: \(args.joined(separator: " "))")
         
+        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
         while true {
             do {
                 return try Process.spawnWithOutputData(cmd: "curl", args: args)
             } catch {
-                if Int(Date().timeIntervalSince(startTime)) > maxTimeSeconds {
+                let timeElapsed = Date().timeIntervalSince(startTime)
+                if Date().timeIntervalSince(lastPrint) > 60 {
+                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed))/\(maxTimeSeconds) minutes, curl error '\(error)'")
+                    lastPrint = Date()
+                }
+                if Int(timeElapsed) > maxTimeSeconds {
                     throw error
                 }
                 sleep(UInt32(retryDelaySeconds))

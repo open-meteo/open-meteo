@@ -2,7 +2,7 @@ import Foundation
 
 
 enum SpawnError: Error {
-    case commandFailed(cmd: String, returnCode: Int32, args: [String]?)
+    case commandFailed(cmd: String, returnCode: Int32, args: [String]?, stderr: String?)
     case executableDoesNotExist(cmd: String)
 }
 
@@ -58,7 +58,7 @@ public extension Process {
         let task = try Process.spawn(cmd: cmd, args: args)
         task.waitUntilExit()
         guard task.terminationStatus == 0 else {
-            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args)
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: nil)
         }
     }
     
@@ -67,20 +67,21 @@ public extension Process {
         
         var data = Data()
         
-        /*let eerror = Pipe()
+        let eerror = Pipe()
         var errorData = Data()
         eerror.fileHandleForReading.readabilityHandler = { handle in
             errorData.append(handle.availableData)
-        }*/
+        }
         pipe.fileHandleForReading.readabilityHandler = { handle in
             data.append(handle.availableData)
         }
         
         
-        let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe/*, stderr: eerror*/)
+        let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
         task.waitUntilExit()
         guard task.terminationStatus == 0 else {
-            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args)
+            let error = String(data: errorData, encoding: .utf8)
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: error)
         }
         return data
     }

@@ -14,6 +14,39 @@ enum SeasonalForecastDomain: String {
         return "./data/\(rawValue)/"
     }
     
+    var omfileDirectory: String {
+        return "./data/omfile-\(rawValue)/"
+    }
+    var omfileArchive: String? {
+        return nil
+    }
+    
+    /// 14 days longer than actual one update
+    var omFileLength: Int {
+        return nForecastHours + 14*24/dtHours
+    }
+    
+    var grid: RegularGrid {
+        switch self {
+        case .ecmwf:
+            fatalError()
+        case .ukMetOffice:
+            fatalError()
+        case .meteoFrance:
+            fatalError()
+        case .dwd:
+            fatalError()
+        case .cmcc:
+            fatalError()
+        case .ncep:
+            return RegularGrid(nx: 384, ny: 190, latMin: -89.2767, lonMin: -179.531, dx: (89.2767*2)/190, dy: (2*179.531)/384)
+        case .jma:
+            fatalError()
+        case .eccc:
+            fatalError()
+        }
+    }
+    
     var nForecastHours: Int {
         switch self {
         case .ecmwf:
@@ -56,7 +89,7 @@ enum SeasonalForecastDomain: String {
         case .cmcc:
             return 35
         case .ncep:
-            return 1
+            return 4
         case .jma:
             return 3
         case .eccc:
@@ -111,16 +144,59 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
     case convective_precipitation
     case latent_heatflux
     
+    var scalefactor: Float {
+        switch self {
+        case .temperature_2m:
+            return 20
+        case .temperature_2m_max:
+            return 20
+        case .temperature_2m_min:
+            return 20
+        case .soil_moisture_0_to_10_cm:
+            return 1000
+        case .soil_moisture_10_to_40_cm:
+            return 1000
+        case .soil_moisture_40_to_100_cm:
+            return 1000
+        case .soil_moisture_100_to_200_cm:
+            return 1000
+        case .soil_temperature_0_to_10_cm:
+            return 20
+        case .soil_temperature_10_to_40_cm:
+            return 20
+        case .soil_temperature_40_to_100_cm:
+            return 20
+        case .soil_temperature_100_to_200_cm:
+            return 20
+        case .snow_depth:
+            return 100
+        case .shortwave_radiation:
+            return 1
+        case .low_cloud_cover:
+            return 1
+        case .medium_cloud_cover:
+            return 1
+        case .high_cloud_cover:
+            return 1
+        case .convective_cloud_cover:
+            return 1
+        case .wind_u_component_10m:
+            return 10
+        case .wind_v_component_10m:
+            return 10
+        case .potential_evapotranspiration:
+            return 10
+        case .total_precipitation:
+            return 10
+        case .convective_precipitation:
+            return 10
+        case .latent_heatflux:
+            return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
+        }
+    }
+    
     var skipHour0: Bool {
         switch self {
-        case .soil_moisture_0_to_10_cm:
-            fallthrough
-        case .soil_moisture_10_to_40_cm:
-            fallthrough
-        case .soil_moisture_40_to_100_cm:
-            fallthrough
-        case .soil_moisture_100_to_200_cm:
-            fallthrough
         case.convective_cloud_cover:
             return true
         default:
