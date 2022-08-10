@@ -80,9 +80,14 @@ public extension Process {
         let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
         task.waitUntilExit()
         
+        if let end = try pipe.fileHandleForReading.readToEnd() {
+            data.append(end)
+        }
+        if let end = try eerror.fileHandleForReading.readToEnd() {
+            errorData.append(end)
+        }
+        
         // Somehow pipes do not seem to close automatically
-        pipe.fileHandleForReading.readabilityHandler?(pipe.fileHandleForReading)
-        eerror.fileHandleForReading.readabilityHandler?(eerror.fileHandleForReading)
         try pipe.fileHandleForReading.close()
         try pipe.fileHandleForWriting.close()
         try eerror.fileHandleForReading.close()
