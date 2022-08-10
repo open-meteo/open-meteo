@@ -66,7 +66,7 @@ struct SeasonalForecastDownload: Command {
             } ?? Timestamp.now().hour - 6
             
             /// 18z run is available the day after starting 00:56
-            let date = Timestamp.now().add(-6*3600).with(hour: run)
+            let date = Timestamp.now().add(-12*3600).with(hour: run) // TODO
             
             if !signature.skipExisting {
                 try downloadCfs(logger: logger, domain: domain, run: date, variables: variables)
@@ -90,9 +90,9 @@ struct SeasonalForecastDownload: Command {
             /// Since model start
             let forecastHour = forecastStep * domain.dtHours
             logger.info("Downloading hour \(forecastHour)")
-            for member in 0..<domain.nMembers {
-                /// Forecast member 2-4 have only 45 days forecast
-                if member > 0 && forecastHour > 1080 {
+            for member in 1..<domain.nMembers+1 {
+                /// Forecast member 2-4 have only 45 days forecast, only member 1 has 6 months
+                if member > 1 && forecastHour > 1080 {
                     continue
                 }
                 // https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/06/6hrly_grib_01/flxf2022080818.01.2022080806.grb2.idx
@@ -127,8 +127,7 @@ struct SeasonalForecastDownload: Command {
         
         for variable in variables {
             logger.info("Converting \(variable)")
-            for member in 0..<domain.nMembers {
-                
+            for member in 1..<domain.nMembers+1 {
                 /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
                 var data2d = Array2DFastTime(nLocations: domain.grid.count, nTime: domain.nForecastHours)
                     

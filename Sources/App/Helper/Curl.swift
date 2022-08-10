@@ -12,12 +12,22 @@ enum CurlError: Error {
 struct Curl {
     let logger: Logger
 
+    /// Curl connect timeout parameter
     let connectTimeout = 30
+    
+    /// Give up downloading after the time, default 3 hours
+    let deadline: Date
 
-    /// Total time it will retry and then give up. Default 2 hourss
-    let maxTimeSeconds = 2*3600
+    /// Curl max-time paramter to download a single file. Default 5 minutes
+    let maxTimeSeconds = 5*60
 
+    /// Wait time after each download
     let retryDelaySeconds = 5
+    
+    public init(logger: Logger, deadLineHours: Int = 3) {
+        self.logger = logger
+        self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
+    }
 
     func download(url: String, to: String, range: String? = nil) throws {
         // URL might contain password, strip them from logging
@@ -49,10 +59,11 @@ struct Curl {
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed))/\(maxTimeSeconds) minutes, curl error '\(error)'")
+                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
                     lastPrint = Date()
                 }
-                if Int(timeElapsed) > maxTimeSeconds {
+                if Date() > deadline {
+                    logger.error("Deadline reached")
                     throw error
                 }
                 sleep(UInt32(retryDelaySeconds))
@@ -90,10 +101,11 @@ struct Curl {
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed))/\(maxTimeSeconds) minutes, curl error '\(error)'")
+                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
                     lastPrint = Date()
                 }
-                if Int(timeElapsed) > maxTimeSeconds {
+                if Date() > deadline {
+                    logger.error("Deadline reached")
                     throw error
                 }
                 sleep(UInt32(retryDelaySeconds))
