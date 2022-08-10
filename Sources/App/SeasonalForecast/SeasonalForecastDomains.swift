@@ -143,6 +143,8 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
     case total_precipitation
     case convective_precipitation
     case latent_heatflux
+    case specific_humidity
+    case surface_pressure
     
     var scalefactor: Float {
         switch self {
@@ -192,6 +194,11 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
             return 10
         case .latent_heatflux:
             return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
+        case .specific_humidity:
+            // grams of water (moisture) per kilogram of air (ranges 0-21)
+            return 100
+        case .surface_pressure:
+            return 10
         }
     }
     
@@ -201,6 +208,61 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
             return true
         default:
             return false
+        }
+    }
+    
+    var unit: SiUnit {
+        switch self {
+        case .temperature_2m:
+            return .celsius
+        case .temperature_2m_max:
+            return .celsius
+        case .temperature_2m_min:
+            return .celsius
+        case .soil_moisture_0_to_10_cm:
+            return .qubicMeterPerQubicMeter
+        case .soil_moisture_10_to_40_cm:
+            return .qubicMeterPerQubicMeter
+        case .soil_moisture_40_to_100_cm:
+            return .qubicMeterPerQubicMeter
+        case .soil_moisture_100_to_200_cm:
+            return .qubicMeterPerQubicMeter
+        case .soil_temperature_0_to_10_cm:
+            return .celsius
+        case .soil_temperature_10_to_40_cm:
+            return .celsius
+        case .soil_temperature_40_to_100_cm:
+            return .celsius
+        case .soil_temperature_100_to_200_cm:
+            return .celsius
+        case .snow_depth:
+            return .meter
+        case .shortwave_radiation:
+            return .wattPerSquareMeter
+        case .low_cloud_cover:
+            return .percent
+        case .medium_cloud_cover:
+            return .percent
+        case .high_cloud_cover:
+            return .percent
+        case .convective_cloud_cover:
+            return .percent
+        case .wind_u_component_10m:
+            return .ms
+        case .wind_v_component_10m:
+            return .ms
+        case .potential_evapotranspiration:
+            return .millimeter
+        case .total_precipitation:
+            return .millimeter
+        case .convective_precipitation:
+            return .millimeter
+        case .latent_heatflux:
+            return .wattPerSquareMeter
+        case .specific_humidity:
+            return .gramPerKilogram
+        case .surface_pressure:
+            return .hectoPascal
         }
     }
     
@@ -252,6 +314,12 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
             return (3600*6,0)
         case .latent_heatflux:
             return (1,0)
+        case .surface_pressure:
+            // convert Pa to hPa
+            return (1/100,0)
+        case .specific_humidity:
+            // convert kg/kg to g/kg
+            return (1000,0)
         }
     }
     
@@ -303,6 +371,10 @@ enum CfsVariable: String, CaseIterable, CurlIndexedVariable {
             return ":CPRAT:surface:"
         case .latent_heatflux:
             return ":LHTFL:surface:"
+        case .specific_humidity:
+            return ":SPFH:2 m above ground:"
+        case .surface_pressure:
+            return ":PRES:surface:"
         }
     }
 }

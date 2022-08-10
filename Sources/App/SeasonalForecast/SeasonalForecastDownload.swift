@@ -101,14 +101,9 @@ struct SeasonalForecastDownload: Command {
                 for (variable, data2) in try curl.downloadIndexedGrib(url: url, variables: variables) {
                     var data = data2
                     data.shift180LongitudeAndFlipLatitude()
-                    for i in data.data.indices {
-                        if data.data[i] >= 9999 {
-                            data.data[i] = .nan
-                        }
-                    }
                     data.data.multiplyAdd(multiply: variable.gribMultiplyAdd.multiply, add: variable.gribMultiplyAdd.add)
 
-                    //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
+                    //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(member)_\(forecastHour).nc")
                     
                     let fileDest = "\(domain.downloadDirectory)\(variable.rawValue)_\(member)_\(forecastHour).om"
                     try FileManager.default.removeItemIfExists(at: fileDest)
