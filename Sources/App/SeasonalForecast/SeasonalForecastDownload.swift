@@ -131,7 +131,7 @@ struct SeasonalForecastDownload: Command {
             logger.info("Downloading varibale \(gribVariable)")
             for member in 1..<domain.nMembers+1 {
                 // https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/18/time_grib_01/tmin.01.2022080818.daily.grb2.idx
-                let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/18/time_grib_\(member.zeroPadded(len: 2))/\(gribVariable).\(member.zeroPadded(len: 2)).\(run.format_YYYYMMddHH).daily.grb2"
+                let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/time_grib_\(member.zeroPadded(len: 2))/\(gribVariable).\(member.zeroPadded(len: 2)).\(run.format_YYYYMMddHH).daily.grb2"
                 
                 let fileDest = "\(domain.downloadDirectory)\(gribVariable)_\(member).grb2"
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
