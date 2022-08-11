@@ -8,6 +8,10 @@ struct Array2D {
     let nx: Int
     let ny: Int
     
+    var count: Int {
+        return nx * ny
+    }
+    
     func writeNetcdf(filename: String) throws {
         let file = try NetCDF.create(path: filename, overwriteExisting: true)
         try file.setAttribute("TITLE", "My data set")

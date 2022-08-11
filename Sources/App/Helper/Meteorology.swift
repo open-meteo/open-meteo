@@ -41,18 +41,22 @@ struct Meteorology {
         }
     }
     
-    /// Calculate meansea level pressure, corrected by temperature.
+    /// Calculate mea nsea level pressure, corrected by temperature.
     static func sealevelPressure(temperature: [Float], pressure: [Float], elevation: Float) -> [Float] {
         precondition(temperature.count == pressure.count)
         
         return zip(temperature, pressure).map { (t, p) -> Float in
-            /// Sea level temperature in kelvin
-            let t0 = (t + 273.15 + 0.0065 * elevation)
-            // https://physics.stackexchange.com/questions/14678/pressure-at-a-given-altitude
-            // exponent = (g*M/r*L) = (9.80665 * 0.0289644) / (8.31447 * 0.0065)
-            let factor = powf(1 - (0.0065 * elevation) / t0, -5.25578129287)
-            return p * factor
+            return p * Meteorology.sealevelPressureFactor(temperature: t, elevation: elevation)
         }
+    }
+    
+    /// Calculate mean sea level pressure, corrected by temperature.
+    @inlinable static func sealevelPressureFactor(temperature: Float, elevation: Float) -> Float {
+        let t0 = (temperature + 273.15 + 0.0065 * elevation)
+        // https://physics.stackexchange.com/questions/14678/pressure-at-a-given-altitude
+        // exponent = (g*M/r*L) = (9.80665 * 0.0289644) / (8.31447 * 0.0065)
+        let factor = powf(1 - (0.0065 * elevation) / t0, -5.25578129287)
+        return factor
     }
     
     /// Estimate total cloudcover from low, mid and high cloud cover

@@ -40,8 +40,6 @@ typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, Variabl
 enum CfsVariableDerived: String, Codable {
     case windspeed_10m
     case winddirection_10m
-    case relative_humidity_2m
-    case pressure_msl
 }
 
 extension SeasonalForecastReader {
@@ -56,13 +54,6 @@ extension SeasonalForecastReader {
             case .winddirection_10m:
                 try prefetchData(variable: VariableAndMember(.wind_u_component_10m, member))
                 try prefetchData(variable: VariableAndMember(.wind_v_component_10m, member))
-            case .relative_humidity_2m:
-                try prefetchData(variable: VariableAndMember(.temperature_2m, member))
-                try prefetchData(variable: VariableAndMember(.specific_humidity_2m, member))
-                try prefetchData(variable: VariableAndMember(.surface_pressure, member))
-            case .pressure_msl:
-                try prefetchData(variable: VariableAndMember(.temperature_2m, member))
-                try prefetchData(variable: VariableAndMember(.surface_pressure, member))
             }
         }
     }
@@ -83,17 +74,6 @@ extension SeasonalForecastReader {
                 let v = try get(variable: VariableAndMember(.wind_v_component_10m, member))
                 let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
                 return DataAndUnit(direction, .degreeDirection)
-            case .relative_humidity_2m:
-                let temperature = try get(variable: VariableAndMember(.temperature_2m, member), raw: true)
-                let specific_humidity = try get(variable: VariableAndMember(.specific_humidity_2m, member))
-                let pressure = try get(variable: VariableAndMember(.surface_pressure, member), raw: true)
-                let rh = Meteorology.specificToRelativeHumidity(specificHumidity: specific_humidity.data, temperature: temperature.data, pressure: pressure.data)
-                return DataAndUnit(rh, .percent)
-            case .pressure_msl:
-                let temperature = try get(variable: VariableAndMember(.temperature_2m, member), raw: true)
-                let pressure = try get(variable: VariableAndMember(.surface_pressure, member), raw: true)
-                let msl = Meteorology.sealevelPressure(temperature: temperature.data, pressure: pressure.data, elevation: modelElevation)
-                return DataAndUnit(msl, pressure.unit)
             }
         }
     }

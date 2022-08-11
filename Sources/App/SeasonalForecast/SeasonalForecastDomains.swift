@@ -169,8 +169,8 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     case wind_v_component_10m
     case total_precipitation
     case convective_precipitation
-    case specific_humidity_2m
-    case surface_pressure
+    case relativehumidity_2m
+    case pressure_msl
     
     var omFileName: String {
         return rawValue
@@ -181,58 +181,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .temperature_2m_max || self == .temperature_2m_min || self == .surface_pressure
-    }
-    
-    
-    /// Note: wind u/v components are in the same grib file
-    var timeGribName: String {
-        switch self {
-        case .temperature_2m:
-            return "tmp2m"
-        case .temperature_2m_max:
-            return "tmax"
-        case .temperature_2m_min:
-            return "tmin"
-        case .soil_moisture_0_to_10_cm:
-            return "soilm1"
-        case .soil_moisture_10_to_40_cm:
-            return "soilm2"
-        case .soil_moisture_40_to_100_cm:
-            return "soilm3"
-        case .soil_moisture_100_to_200_cm:
-            return "soilm4"
-        case .soil_temperature_0_to_10_cm:
-            return "soilt1"
-        case .shortwave_radiation:
-            return "dswsfc"
-        case .total_cloud_cover:
-            return "tcdcclm"
-        case .wind_u_component_10m:
-            return "wnd10m" // mixed in wnd10m
-        case .wind_v_component_10m:
-            return "wnd10m"
-        case .total_precipitation:
-            return "prate"
-        case .convective_precipitation:
-            return "cprat"
-        case .specific_humidity_2m:
-            return "q2m"
-        case .surface_pressure:
-            return "pressfc"
-        }
-    }
-    
-    /// Grib shortname and level
-    var timeGribKey: String? {
-        switch self {
-        case .wind_u_component_10m:
-            return "10u10"
-        case .wind_v_component_10m:
-            return "10v10"
-        default:
-            return nil
-        }
+        return self == .temperature_2m || self == .temperature_2m_max || self == .temperature_2m_min
     }
     
     var scalefactor: Float {
@@ -265,10 +214,9 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return 10
         case .convective_precipitation:
             return 10
-        case .specific_humidity_2m:
-            // grams of water (moisture) per kilogram of air (ranges 0-21)
-            return 100
-        case .surface_pressure:
+        case .relativehumidity_2m:
+            return 1
+        case .pressure_msl:
             return 10
         }
     }
@@ -303,49 +251,10 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return .millimeter
         case .convective_precipitation:
             return .millimeter
-        case .specific_humidity_2m:
-            return .gramPerKilogram
-        case .surface_pressure:
+        case .relativehumidity_2m:
+            return .percent
+        case .pressure_msl:
             return .hectoPascal
-        }
-    }
-    
-    var gribMultiplyAdd: (multiply: Float, add: Float) {
-        switch self {
-        case .temperature_2m:
-            return (1, -273.15)
-        case .temperature_2m_max:
-            return (1, -273.15)
-        case .temperature_2m_min:
-            return (1, -273.15)
-        case .soil_moisture_0_to_10_cm:
-            return (1,0)
-        case .soil_moisture_10_to_40_cm:
-            return (1,0)
-        case .soil_moisture_40_to_100_cm:
-            return (1,0)
-        case .soil_moisture_100_to_200_cm:
-            return (1,0)
-        case .soil_temperature_0_to_10_cm:
-            return (1, -273.15)
-        case .shortwave_radiation:
-            return (1,0)
-        case .total_cloud_cover:
-            return (1,0)
-        case .wind_u_component_10m:
-            return (1,0)
-        case .wind_v_component_10m:
-            return (1,0)
-        case .total_precipitation:
-            return (3600*6,0)
-        case .convective_precipitation:
-            return (3600*6,0)
-        case .surface_pressure:
-            // convert Pa to hPa
-            return (1/100,0)
-        case .specific_humidity_2m:
-            // convert kg/kg to g/kg
-            return (1000,0)
         }
     }
 }

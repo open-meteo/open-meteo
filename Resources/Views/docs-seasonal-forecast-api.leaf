@@ -269,8 +269,8 @@
         </div>
         <div class="col-md-3">
            <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_2m" id="relative_humidity_2m" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_2m">
+            <input class="form-check-input" type="checkbox" value="relativehumidity_2m" id="relativehumidity_2m" name="six_hourly">
+            <label class="form-check-label" for="relativehumidity_2m">
               Relative Humidity (2 m)
             </label>
           </div>

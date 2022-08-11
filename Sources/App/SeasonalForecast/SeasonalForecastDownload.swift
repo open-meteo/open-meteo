@@ -50,15 +50,6 @@ struct SeasonalForecastDownload: Command {
         case .cmcc:
             fatalError()
         case .ncep:
-            let variables: [CfsVariable] = signature.onlyVariables.map {
-                $0.split(separator: ",").map {
-                    guard let variable = CfsVariable(rawValue: String($0)) else {
-                        fatalError("Invalid variable '\($0)'")
-                    }
-                    return variable
-                }
-            } ?? CfsVariable.allCases
-            
             let run = signature.run.map {
                 guard let run = Int($0) else {
                     fatalError("Invalid run '\($0)'")
@@ -67,11 +58,11 @@ struct SeasonalForecastDownload: Command {
             } ?? Timestamp.now().hour - 8
             
             /// 18z run is available the day after starting 05:26
-            let date = Timestamp.now().add(-8*3600).with(hour: run)
+            let date = Timestamp.now().add(-18*3600).with(hour: run)
             try downloadCfsElevation(logger: logger, domain: domain, run: date)
             
-            try downloadCfs(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
-            try convertCfs(logger: logger, domain: domain, run: date, variables: variables)
+            try downloadCfs(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
+            try convertCfs(logger: logger, domain: domain, run: date)
         case .jma:
             fatalError()
         case .eccc:
@@ -129,11 +120,12 @@ struct SeasonalForecastDownload: Command {
         try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: height.data)
     }
     
-    func downloadCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CfsVariable]) throws {
+    func downloadCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger)
-        let gribVariables = Array(Set(variables.map{$0.timeGribName}))
+        
+        let gribVariables = ["tmp2m", "tmin", "soilt1", "dswsfc", "cprat", "q2m", "wnd10m", "tcdcclm", "prate", "soilm3", "pressfc", "soilm2", "soilm1", "soilm4", "tmax"]
         
         for gribVariable in gribVariables {
             logger.info("Downloading varibale \(gribVariable)")
@@ -152,64 +144,126 @@ struct SeasonalForecastDownload: Command {
     }
     
     /// Process each variable and update time-series optimised files
-    func convertCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, variables: [CfsVariable]) throws {
-        let downloadDirectory = domain.downloadDirectory
-        
+    func convertCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
-        let gribVariables = Array(Set(variables.map{$0.timeGribName}))
-        
-        for gribVariable in gribVariables {
-            for member in 1..<domain.nMembers+1 {
-                logger.info("Converting \(gribVariable), member \(member)")
-                let grib = try GribFile(file: "\(domain.downloadDirectory)\(gribVariable)_\(member).grb2")
+        for member in 1..<domain.nMembers+1 {
+            try GribFile.readAndConvert(logger: logger, gribName: "tmin", member: member, domain: domain, add: -273.15).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .temperature_2m_min, member: member, run: run, dtSeconds: domain.dtSeconds)
+            try GribFile.readAndConvert(logger: logger, gribName: "tmax", member: member, domain: domain, add: -273.15).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .temperature_2m_max, member: member, run: run, dtSeconds: domain.dtSeconds)
+            try GribFile.readAndConvert(logger: logger, gribName: "soilt1", member: member, domain: domain, add: -273.15).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .soil_temperature_0_to_10_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+            
+            try GribFile.readAndConvert(logger: logger, gribName: "dswsfc", member: member, domain: domain).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .shortwave_radiation, member: member, run: run, dtSeconds: domain.dtSeconds)
+            
+            try GribFile.readAndConvert(logger: logger, gribName: "cprat", member: member, domain: domain, multiply: Float(domain.dtSeconds)).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .convective_precipitation, member: member, run: run, dtSeconds: domain.dtSeconds)
+            
+            try GribFile.readAndConvert(logger: logger, gribName: "prate", member: member, domain: domain, multiply: Float(domain.dtSeconds)).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .total_precipitation, member: member, run: run, dtSeconds: domain.dtSeconds)
+            
+            try GribFile.readAndConvert(logger: logger, gribName: "tcdcclm", member: member, domain: domain).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .total_cloud_cover, member: member, run: run, dtSeconds: domain.dtSeconds)
+
+            try GribFile.readAndConvert(logger: logger, gribName: "soilm1", member: member, domain: domain).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_0_to_10_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+            try GribFile.readAndConvert(logger: logger, gribName: "soilm2", member: member, domain: domain).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_10_to_40_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+            try GribFile.readAndConvert(logger: logger, gribName: "soilm3", member: member, domain: domain).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_40_to_100_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+            try GribFile.readAndConvert(logger: logger, gribName: "soilm4", member: member, domain: domain).first!.value
+                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_100_to_200_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+
+            // in a closure to release memory
+            try {
+                let wind = try GribFile.readAndConvert(logger: logger, gribName: "wnd10m", member: member, domain: domain)
+                let uwind = wind["ugrd"]!
+                let vwind = wind["vgrd"]!
+                try uwind.writeCfs(om: om, logger: logger, variable: .wind_u_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
+                try vwind.writeCfs(om: om, logger: logger, variable: .wind_v_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
+            }()
+            
+            let tmp2m = try GribFile.readAndConvert(logger: logger, gribName: "tmp2m", member: member, domain: domain, add: -273.15).first!.value
+            try tmp2m.writeCfs(om: om, logger: logger, variable: .temperature_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
+            
+            /// hPa
+            var surfacePressure = try GribFile.readAndConvert(logger: logger, gribName: "pressfc", member: member, domain: domain, multiply: 1/100).first!.value
+            
+            try {
+                /// g/kg water/air mixing ratio
+                let specificHumidity = try GribFile.readAndConvert(logger: logger, gribName: "q2m", member: member, domain: domain, multiply: 1000).first!.value
                 
-                /// Note, first forecast hour is always missing
-                let nForecastHours = Int(grib.messages.last!.get(attribute: "stepRange")!)! / domain.dtHours + 1
-                
-                /// wind grib contains u and v components
-                var vars = [CfsVariable: Array2DFastTime]()
-                let startReadGrib = DispatchTime.now()
-                
-                for message in grib.messages {
-                    let shortName = message.get(attribute: "shortName")!
-                    let level = message.get(attribute: "level")!
-                    let forecastStep = Int(message.get(attribute: "step")!)! / domain.dtHours
-                    var data = try message.read2D()
-                    data.shift180LongitudeAndFlipLatitude()
-                    
-                    guard let variable = variables.first(where: {$0.timeGribKey == "\(shortName)\(level)"}) ?? variables.first(where: {$0.timeGribName == gribVariable}) else {
-                        fatalError("Could not resolve grib variable to cfs variable")
-                    }
-                    guard data.nx == domain.grid.nx, data.ny == domain.grid.ny else {
-                        fatalError("Wrong dimensions. Got \(data.nx)x\(data.ny). Expected \(domain.grid.nx)x\(domain.grid.ny)")
-                    }
-                    data.data.multiplyAdd(multiply: variable.gribMultiplyAdd.multiply, add: variable.gribMultiplyAdd.add)
-                    
-                    if vars[variable] == nil {
-                        vars[variable] = Array2DFastTime(nLocations: data.nx*data.ny, nTime: nForecastHours)
-                    }
-                    vars[variable]![0..<data.ny*data.nx, forecastStep] = data.data
+                let relativeHumidity = Array2DFastTime(data: Meteorology.specificToRelativeHumidity(specificHumidity: specificHumidity.data, temperature: tmp2m.data, pressure: surfacePressure.data), nLocations: tmp2m.nLocations, nTime: tmp2m.nTime)
+                try relativeHumidity.writeCfs(om: om, logger: logger, variable: .relativehumidity_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
+            }()
+            
+            
+            /// -999 for sea
+            let elevations = try domain.elevationFile!.readAll()
+            
+            /// convert surface pressure to mean sea level pressure
+            for l in 0..<tmp2m.nLocations {
+                let elevation = elevations[l]
+                if elevation.isNaN || elevation <= -999 {
+                    continue
                 }
-                
-                logger.info("Grib read finished in \(startReadGrib.timeElapsedPretty())")
-                
-                for (variable, data) in vars {
-                    let startOm = DispatchTime.now()
-                    let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
-                    let timeIndices = timeIndexStart ..< timeIndexStart + data.nTime
-                    //try data.transpose().writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue)_\(member).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-                    try om.updateFromTimeOriented(variable: "\(variable.rawValue)_\(member)", array2d: data, ringtime: timeIndices, skipFirst: 1, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-                    logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+                for t in 0..<tmp2m.nTime {
+                    surfacePressure[l,t] *= Meteorology.sealevelPressureFactor(temperature: tmp2m[l,t], elevation: elevation)
                 }
             }
+            try surfacePressure.writeCfs(om: om, logger: logger, variable: .pressure_msl, member: member, run: run, dtSeconds: domain.dtSeconds)
         }
     }
 }
 
+fileprivate extension Array2DFastTime {
+    func writeCfs(om: OmFileSplitter, logger: Logger, variable: CfsVariable, member: Int, run: Timestamp, dtSeconds: Int) throws {
+        let startOm = DispatchTime.now()
+        let timeIndexStart = run.timeIntervalSince1970 / dtSeconds
+        let timeIndices = timeIndexStart ..< timeIndexStart + nTime
+        
+        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_\(member)", array2d: self, ringtime: timeIndices, skipFirst: 1, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+        logger.info("Update om \(variable) finished in \(startOm.timeElapsedPretty())")
+    }
+}
 
-extension GribMessage {
+
+fileprivate extension GribFile {
+    static func readAndConvert(logger: Logger, gribName: String, member: Int, domain: SeasonalForecastDomain, multiply: Float = 1, add: Float = 0) throws -> [String: Array2DFastTime] {
+        logger.info("Reading grib '\(gribName)' for member \(member)")
+        let startReadGrib = DispatchTime.now()
+        var vars = [String: Array2DFastTime]()
+        
+        let grib = try GribFile(file: "\(domain.downloadDirectory)\(gribName)_\(member).grb2")
+        
+        /// Note, first forecast hour is always missing
+        let nForecastHours = Int(grib.messages.last!.get(attribute: "step")!)! / domain.dtHours + 1
+        
+        for message in grib.messages {
+            let shortName = message.get(attribute: "shortName")!
+            let forecastStep = Int(message.get(attribute: "step")!)! / domain.dtHours
+            var data = try message.read2D()
+            data.shift180LongitudeAndFlipLatitude()
+            data.data.multiplyAdd(multiply: multiply, add: add)
+            
+            guard data.nx == domain.grid.nx, data.ny == domain.grid.ny else {
+                fatalError("Wrong dimensions. Got \(data.nx)x\(data.ny). Expected \(domain.grid.nx)x\(domain.grid.ny)")
+            }
+            if vars[shortName] == nil {
+                vars[shortName] = Array2DFastTime(nLocations: data.nx*data.ny, nTime: nForecastHours)
+            }
+            vars[shortName]![0..<data.ny*data.nx, forecastStep] = data.data
+        }
+        logger.info("Grib read finished in \(startReadGrib.timeElapsedPretty())")
+        
+        return vars
+    }
+}
+
+fileprivate extension GribMessage {
     func read2D() throws -> Array2D {
         let data = try getDouble().map(Float.init)
         guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
