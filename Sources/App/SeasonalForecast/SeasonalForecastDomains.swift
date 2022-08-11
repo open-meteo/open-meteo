@@ -1,7 +1,7 @@
 import Foundation
 import SwiftPFor2D
 
-enum SeasonalForecastDomain: String {
+enum SeasonalForecastDomain: String, GenericDomain {
     case ecmwf
     case ukMetOffice
     case meteoFrance
@@ -51,7 +51,13 @@ enum SeasonalForecastDomain: String {
     
     /// 14 days longer than actual one update
     var omFileLength: Int {
-        return nForecastHours + 14*24/dtHours
+        switch self {
+        case .ncep:
+            return (6 * 31 + 14) * 24 / dtHours
+        default:
+            return nForecastHours + 14*24 / dtHours
+        }
+        
     }
     
     var grid: RegularGrid {
@@ -88,8 +94,8 @@ enum SeasonalForecastDomain: String {
         case .cmcc:
             fatalError()
         case .ncep:
-            // 6 month. There are some more steps available, but they differ from run to run
-            return 6 * 31 * 24 / dtHours
+            // Member 1 up to 9 months, but length differs from run to run. Member 2-4 45 days.
+            return 7128 / dtHours
         case .jma:
             fatalError()
         case .eccc:
@@ -148,7 +154,7 @@ enum SeasonalForecastDomain: String {
     }
 }
 
-enum CfsVariable: String, CaseIterable {
+enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     case temperature_2m
     case temperature_2m_max
     case temperature_2m_min
@@ -165,6 +171,19 @@ enum CfsVariable: String, CaseIterable {
     case convective_precipitation
     case specific_humidity
     case surface_pressure
+    
+    var omFileName: String {
+        return rawValue
+    }
+    
+    var interpolation: ReaderInterpolation {
+        fatalError("Interpolation from 6h data to 1h not supported")
+    }
+    
+    var isElevationCorrectable: Bool {
+        return self == .temperature_2m || self == .temperature_2m_max || self == .temperature_2m_min
+    }
+    
     
     /// Note: wind u/v components are in the same grib file
     var timeGribName: String {
