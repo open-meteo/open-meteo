@@ -180,8 +180,12 @@ struct SeasonalForecastDownload: Command {
             // in a closure to release memory
             try {
                 let wind = try GribFile.readAndConvert(logger: logger, gribName: "wnd10m", member: member, domain: domain)
-                let uwind = wind["ugrd"]!
-                let vwind = wind["vgrd"]!
+                guard let uwind = wind["10u"] else {
+                    fatalError()
+                }
+                guard let vwind = wind["10v"] else {
+                    fatalError()
+                }
                 try uwind.writeCfs(om: om, logger: logger, variable: .wind_u_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
                 try vwind.writeCfs(om: om, logger: logger, variable: .wind_v_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
             }()
@@ -241,6 +245,9 @@ fileprivate extension GribFile {
         
         /// Note, first forecast hour is always missing
         let nForecastHours = Int(grib.messages.last!.get(attribute: "step")!)! / domain.dtHours + 1
+        guard nForecastHours > 10 else {
+            fatalError("nForecastHours is \(nForecastHours)")
+        }
         
         for message in grib.messages {
             let shortName = message.get(attribute: "shortName")!

@@ -34,7 +34,9 @@ struct Array2DFastSpace {
     let nTime: Int
     
     public init(data: [Float], nLocations: Int, nTime: Int) {
-        precondition(data.count == nLocations * nTime)
+        if (data.count != nLocations * nTime) {
+            fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nTime=\(nTime) count=\(data.count)")
+        }
         self.data = data
         self.nLocations = nLocations
         self.nTime = nTime
@@ -110,7 +112,9 @@ struct Array2DFastTime {
     let nTime: Int
     
     public init(data: [Float], nLocations: Int, nTime: Int) {
-        precondition(data.count == nLocations * nTime)
+        if (data.count != nLocations * nTime) {
+            fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nTime=\(nTime) count=\(data.count)")
+        }
         self.data = data
         self.nLocations = nLocations
         self.nTime = nTime
