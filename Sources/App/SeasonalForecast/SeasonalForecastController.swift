@@ -170,7 +170,7 @@ struct SeasonalForecastController {
             
             let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
             let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 45, allowedRange: allowedRange)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: domain.dtSeconds)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             

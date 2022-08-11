@@ -58,7 +58,7 @@ struct SeasonalForecastDownload: Command {
             } ?? Timestamp.now().hour - 8
             
             /// 18z run is available the day after starting 05:26
-            let date = Timestamp.now().add(-18*3600).with(hour: run)
+            let date = Timestamp.now().add(-8*3600).with(hour: run)
             try downloadCfsElevation(logger: logger, domain: domain, run: date)
             
             try downloadCfs(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
