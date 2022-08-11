@@ -55,7 +55,7 @@ struct SeasonalForecastDownload: Command {
                     fatalError("Invalid run '\($0)'")
                 }
                 return run
-            } ?? Timestamp.now().hour - 8
+            } ?? ((Timestamp.now().hour - 8 + 24) % 24 ).floor(to: 6)
             
             /// 18z run is available the day after starting 05:26
             let date = Timestamp.now().add(-8*3600).with(hour: run)
