@@ -90,7 +90,7 @@ struct DownloadCamsCommand: Command {
         
         let curl = Curl(logger: logger)
         let dateRun = run.format_YYYYMMddHH
-        let remoteDir = "https://\(user):\(password)@dissemination.ecmwf.int/ecpds/data/file/CAMS_NREALTIME/\(dateRun)/"
+        let remoteDir = "https://\(user):\(password)@dissemination.ecmwf.int/ecpds/data/file/CAMS_GLOBAL/\(dateRun)/"
         
         for hour in 0..<domain.forecastHours {
             logger.info("Downloading hour \(hour)")
