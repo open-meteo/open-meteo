@@ -136,7 +136,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         return DataAndUnit(data, variable.unit)
     }
     
-    /// Read data and interpolate if required
+    /// Read data and interpolate if required. If `raw` is set, no temperature correction is applied
     func get(variable: Variable) throws -> DataAndUnit {
         if time.dtSeconds == domain.dtSeconds {
             return try readAndScale(variable: variable, time: time)

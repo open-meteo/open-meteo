@@ -73,7 +73,7 @@ struct DownloadIconWaveCommand: Command {
         
         for forecastStep in 0..<domain.countForecastHours {
             /// E.g. 0,3,6...174 for gwam
-            let forecastHour = forecastStep * domain.dtSeconds / 3600
+            let forecastHour = forecastStep * domain.dtHours
             logger.info("Downloading hour \(forecastHour)")
             
             for variable in variables {

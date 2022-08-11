@@ -3,13 +3,40 @@ import SwiftNetCDF
 import CHelper
 
 
+struct Array2D {
+    var data: [Float]
+    let nx: Int
+    let ny: Int
+    
+    var count: Int {
+        return nx * ny
+    }
+    
+    func writeNetcdf(filename: String) throws {
+        let file = try NetCDF.create(path: filename, overwriteExisting: true)
+        try file.setAttribute("TITLE", "My data set")
+        let dimensions = [
+            try file.createDimension(name: "LAT", length: ny),
+            try file.createDimension(name: "LON", length: nx)
+        ]
+        var variable = try file.createVariable(name: "data", type: Float.self, dimensions: dimensions)
+        try variable.write(data)
+    }
+    
+    mutating func shift180LongitudeAndFlipLatitude() {
+        data.shift180LongitudeAndFlipLatitude(nt: 1, ny: ny, nx: nx)
+    }
+}
+
 struct Array2DFastSpace {
     var data: [Float]
     let nLocations: Int
     let nTime: Int
     
     public init(data: [Float], nLocations: Int, nTime: Int) {
-        precondition(data.count == nLocations * nTime)
+        if (data.count != nLocations * nTime) {
+            fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nTime=\(nTime) count=\(data.count)")
+        }
         self.data = data
         self.nLocations = nLocations
         self.nTime = nTime
@@ -85,7 +112,9 @@ struct Array2DFastTime {
     let nTime: Int
     
     public init(data: [Float], nLocations: Int, nTime: Int) {
-        precondition(data.count == nLocations * nTime)
+        if (data.count != nLocations * nTime) {
+            fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nTime=\(nTime) count=\(data.count)")
+        }
         self.data = data
         self.nLocations = nLocations
         self.nTime = nTime
@@ -164,23 +193,23 @@ struct Array2DFastTime {
 
 extension Array where Element == Float {
     func max(by: Int) -> [Float] {
-        return stride(from: 0, through: count-24, by: 24).map { i in
-            return self[i..<i+24].max()!
+        return stride(from: 0, through: count-by, by: by).map { i in
+            return self[i..<i+by].max()!
         }
     }
     func min(by: Int) -> [Float] {
-        return stride(from: 0, through: count-24, by: 24).map { i in
-            return self[i..<i+24].min()!
+        return stride(from: 0, through: count-by, by: by).map { i in
+            return self[i..<i+by].min()!
         }
     }
     func sum(by: Int) -> [Float] {
-        return stride(from: 0, through: count-24, by: 24).map { i in
-            return self[i..<i+24].reduce(0, +)
+        return stride(from: 0, through: count-by, by: by).map { i in
+            return self[i..<i+by].reduce(0, +)
         }
     }
     func mean(by: Int) -> [Float] {
-        return stride(from: 0, through: count-24, by: 24).map { i in
-            return self[i..<i+24].reduce(0, +) / Float(by)
+        return stride(from: 0, through: count-by, by: by).map { i in
+            return self[i..<i+by].reduce(0, +) / Float(by)
         }
     }
     
@@ -213,15 +242,23 @@ extension Array where Element == Float {
                         data[offset + x] = data[offset + x + nx/2]
                         data[offset + x + nx/2] = val
                     }
-                    /// Also flip south / north
-                    for y in 0..<ny/2 {
-                        for x in 0..<nx {
-                            let val = data[t*nx*ny + y*nx + x]
-                            data[t*nx*ny + y*nx + x] = data[t*nx*ny + (ny-1-y)*nx + x]
-                            data[t*nx*ny + (ny-1-y)*nx + x] = val
-                        }
+                }
+                /// Also flip south / north
+                for y in 0..<ny/2 {
+                    for x in 0..<nx {
+                        let val = data[t*nx*ny + y*nx + x]
+                        data[t*nx*ny + y*nx + x] = data[t*nx*ny + (ny-1-y)*nx + x]
+                        data[t*nx*ny + (ny-1-y)*nx + x] = val
                     }
                 }
+            }
+        }
+    }
+    
+    mutating func multiplyAdd(multiply: Float, add: Float) {
+        self.withUnsafeMutableBufferPointer { data in
+            for i in 0..<data.count {
+                data[i] = fma(data[i], multiply, add)
             }
         }
     }

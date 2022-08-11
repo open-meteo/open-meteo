@@ -17,6 +17,7 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.get("era5", use: Era5Controller().query)
         categoriesRoute.get("elevation", use: DemController().query)
         categoriesRoute.get("air-quality", use: CamsController().query)
+        categoriesRoute.get("seasonal", use: SeasonalForecastController().query)
     }
     
     func query(_ req: Request) -> EventLoopFuture<Response> {
@@ -39,7 +40,7 @@ public struct ForecastapiController: RouteCollection {
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
             guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: hourlyTime) else {
-                fatalError("Not possible, as ICON is global")
+                throw ForecastapiError.noDataAvilableForThisLocation
             }
             
             

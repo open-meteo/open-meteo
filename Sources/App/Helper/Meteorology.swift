@@ -41,6 +41,24 @@ struct Meteorology {
         }
     }
     
+    /// Calculate mea nsea level pressure, corrected by temperature.
+    static func sealevelPressure(temperature: [Float], pressure: [Float], elevation: Float) -> [Float] {
+        precondition(temperature.count == pressure.count)
+        
+        return zip(temperature, pressure).map { (t, p) -> Float in
+            return p * Meteorology.sealevelPressureFactor(temperature: t, elevation: elevation)
+        }
+    }
+    
+    /// Calculate mean sea level pressure, corrected by temperature.
+    @inlinable static func sealevelPressureFactor(temperature: Float, elevation: Float) -> Float {
+        let t0 = (temperature + 273.15 + 0.0065 * elevation)
+        // https://physics.stackexchange.com/questions/14678/pressure-at-a-given-altitude
+        // exponent = (g*M/r*L) = (9.80665 * 0.0289644) / (8.31447 * 0.0065)
+        let factor = powf(1 - (0.0065 * elevation) / t0, -5.25578129287)
+        return factor
+    }
+    
     /// Estimate total cloudcover from low, mid and high cloud cover
     static func cloudCoverTotal(low: [Float], mid: [Float], high: [Float]) -> [Float] {
         precondition(low.count == mid.count)
@@ -108,5 +126,23 @@ struct Meteorology {
         let β = Float(17.625)
         let λ = Float(243.04)
         return 100 * exp((β * dewpoint) / (λ + dewpoint)) / exp((β * temperature) / (λ + temperature))
+    }
+    
+    /// Calculate relative humidity. All variables should be on the same level
+    /// https://cran.r-project.org/web/packages/humidity/vignettes/humidity-measures.html
+    /// humudity in g/kg, temperature in celsius, pressure in hPa
+    public static func specificToRelativeHumidity(specificHumidity: [Float], temperature: [Float], pressure: [Float]) -> [Float] {
+        return zip(temperature, zip(specificHumidity, pressure)).map {
+            let (temp, (qair, press)) = $0
+            
+            let β = Float(17.625)
+            let λ = Float(243.04)
+            
+            /// saturation vapor pressure at air temperature Thr. (kPa)
+            let es = 6.112 * exp((β * temp)/(temp + λ))
+            let e = qair / 1000 * press * 100 / (0.378 * qair / 1000 + 0.622)
+            let rh = e / es
+            return max(min(rh,100),0)
+        }
     }
 }

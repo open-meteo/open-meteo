@@ -15,7 +15,7 @@ RUN swift package resolve
 COPY . .
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y libnetcdf-dev && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y libnetcdf-dev libeccodes-dev && rm -rf /var/lib/apt/lists/*
 
 # Compile with optimizations
 RUN swift build --enable-test-discovery -c release
@@ -30,7 +30,7 @@ RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app
 
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y libnetcdf15 cdo curl python3-pip && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y libnetcdf15 libeccodes0 cdo curl python3-pip && rm -rf /var/lib/apt/lists/*
 RUN pip3 install cdsapi
 
 # Switch to the new home directory

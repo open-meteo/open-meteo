@@ -16,78 +16,49 @@ function previewData(data, downloadTime) {
         95: "slight to moderate thunderstorm", 96: "thunderstorm with slight hail", 99: "thunderstorm with heavy hail"
     };
 
-    let series = Object.entries(data.hourly||[]).filter(function(k){
-        return k[0] != "time"
-    }).map(function(k){
-        let hourly_starttime = (data.hourly.time[0] + data.utc_offset_seconds) * 1000;
-        let pointInterval = (data.hourly.time[1] - data.hourly.time[0]) * 1000;
-        let unit = data.hourly_units[k[0]];
-        var axisId = null;
-        for (let i = 0; i < yAxis.length; i++) {
-            if (yAxis[i].title.text == unit) {
-                axisId = i;
-            }
+    var series = [];
+    ["hourly", "six_hourly", "three_hourly", "daily"].forEach(function (section, index) {
+        if (!(section in data)) {
+            return
         }
-        if (axisId == null) {
-            yAxis.push({title: {text: unit}});
-            axisId = yAxis.length-1;
-        }
-        var ser = {
-            name: k[0],
-            data: k[1],
-            yAxis: axisId,
-            pointStart:hourly_starttime,
-            pointInterval: pointInterval,
-            tooltip: {
-                valueSuffix: " " + unit,
+        Object.entries(data[section]||[]).forEach(function(k){
+            if (k[0] == "time" || k[0] == "sunrise" && k[0] == "sunset") {
+                return
             }
-        };
+            let hourly_starttime = (data[section].time[0] + data.utc_offset_seconds) * 1000;
+            let pointInterval = (data[section].time[1] - data[section].time[0]) * 1000;
+            let unit = data[`${section}_units`][k[0]];
+            var axisId = null;
+            for (let i = 0; i < yAxis.length; i++) {
+                if (yAxis[i].title.text == unit) {
+                    axisId = i;
+                }
+            }
+            if (axisId == null) {
+                yAxis.push({title: {text: unit}});
+                axisId = yAxis.length-1;
+            }
+            var ser = {
+                name: k[0],
+                data: k[1],
+                yAxis: axisId,
+                pointStart:hourly_starttime,
+                pointInterval: pointInterval,
+                tooltip: {
+                    valueSuffix: " " + unit,
+                }
+            };
+    
+            if (k[0] == "weathercode") {
+                ser.tooltip.pointFormatter = function () {
+                    let condition = codes[this.y];
+                    return "<span style=\"color:"+this.series.color+"\">\u25CF</span> "+this.series.name+": <b>"+condition+"</b> ("+this.y+" wmo)<br/>"
+                }
+            }
 
-        if (k[0] == "weathercode") {
-            ser.tooltip.pointFormatter = function () {
-                let condition = codes[this.y];
-                return "<span style=\"color:"+this.series.color+"\">\u25CF</span> "+this.series.name+": <b>"+condition+"</b> ("+this.y+" wmo)<br/>"
-            }
-        }
-
-        return ser
-    })
-
-    let series_daily = Object.entries(data.daily||[]).filter(function(k){
-        return k[0] != "time" && k[0] != "sunrise" && k[0] != "sunset"
-    }).map(function(k){
-        let unit = data.daily_units[k[0]];
-        let daily_starttime = (data.daily.time[0] + data.utc_offset_seconds) * 1000;
-        var axisId = null;
-        for (let i = 0; i < yAxis.length; i++) {
-            if (yAxis[i].title.text == unit) {
-                axisId = i;
-            }
-        }
-        if (axisId == null) {
-            yAxis.push({title: {text: unit}});
-            axisId = yAxis.length-1;
-        }
-        var ser = {
-            name: k[0],
-            data: k[1],
-            yAxis: axisId,
-            pointStart:daily_starttime,
-            pointInterval: 3600 * 1000 * 24, // one day
-            tooltip: {
-                valueSuffix: " " + unit,
-            }
-        };
-
-        if (k[0] == "weathercode") {
-            ser.tooltip.pointFormatter = function () {
-                let condition = codes[this.y];
-                return "<span style=\"color:"+this.series.color+"\">\u25CF</span> "+this.series.name+": <b>"+condition+"</b> ("+this.y+" wmo)<br/>"
-            }
-        }
-
-        return ser
-    })
+            series.push(ser);
+        });
+    });
 
     var plotBands = []
     if ('daily' in data && 'sunrise' in data.daily && 'sunset' in data.daily) {
@@ -154,7 +125,7 @@ function previewData(data, downloadTime) {
             }
         },
     
-        series: [...series||[], ...series_daily||[]],
+        series: series,
     
         responsive: {
             rules: [{
@@ -271,16 +242,23 @@ frm.submit(function(e){
   });
 
   // restore form state from url
-  for (const element of window.location.hash.substring(1).split("&")) {
-    let parts = element.split("=");
-    let key = parts[0];
-    let value = decodeURIComponent(parts[1]);
-    frm.find("select[name='" + key + "']").val(value);
-    frm.find("input[name='" + key + "'][type=text]").val(value);
-    frm.find("input[name='" + key + "'][type=number]").val(value);
-    frm.find("input[name='" + key + "'][type=checkbox]").each(function() {
-        this.checked = value.includes(this.value);
+  let urlparams = window.location.hash.substring(1).split("&");
+  if (urlparams.length > 2) {
+    // uncheck all checkboxes
+    frm.find("input[type=checkbox]").each(function() {
+        this.checked = false;
     });
+    for (const element of urlparams) {
+        let parts = element.split("=");
+        let key = parts[0];
+        let value = decodeURIComponent(parts[1]);
+        frm.find("select[name='" + key + "']").val(value);
+        frm.find("input[name='" + key + "'][type=text]").val(value);
+        frm.find("input[name='" + key + "'][type=number]").val(value);
+        frm.find("input[name='" + key + "'][type=checkbox]").each(function() {
+            this.checked = value.split(",").includes(this.value);
+        });
+    }
   }
 
   frm.submit();

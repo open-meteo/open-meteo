@@ -2,7 +2,7 @@ import Foundation
 
 
 enum SpawnError: Error {
-    case commandFailed(cmd: String, returnCode: Int32, args: [String]?)
+    case commandFailed(cmd: String, returnCode: Int32, args: [String]?, stderr: String?)
     case executableDoesNotExist(cmd: String)
 }
 
@@ -58,19 +58,49 @@ public extension Process {
         let task = try Process.spawn(cmd: cmd, args: args)
         task.waitUntilExit()
         guard task.terminationStatus == 0 else {
-            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args)
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: nil)
         }
+    }
+    
+    static func spawnWithOutputData(cmd: String, args: [String]?) throws -> Data {
+        let pipe = Pipe()
+        
+        var data = Data()
+        
+        let eerror = Pipe()
+        var errorData = Data()
+        eerror.fileHandleForReading.readabilityHandler = { handle in
+            errorData.append(handle.availableData)
+        }
+        pipe.fileHandleForReading.readabilityHandler = { handle in
+            data.append(handle.availableData)
+        }
+        
+        
+        let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
+        task.waitUntilExit()
+        
+        if let end = try pipe.fileHandleForReading.readToEnd() {
+            data.append(end)
+        }
+        if let end = try eerror.fileHandleForReading.readToEnd() {
+            errorData.append(end)
+        }
+        
+        // Somehow pipes do not seem to close automatically
+        try pipe.fileHandleForReading.close()
+        try pipe.fileHandleForWriting.close()
+        try eerror.fileHandleForReading.close()
+        try eerror.fileHandleForWriting.close()
+        
+        guard task.terminationStatus == 0 else {
+            let error = String(data: errorData, encoding: .utf8)
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: error)
+        }
+        return data
     }
 
     static func spawnWithOutput(cmd: String, args: [String]?) throws -> String {
-        let pipe = Pipe()
-        let eerror = Pipe()
-        let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
-        task.waitUntilExit()
-        guard task.terminationStatus == 0 else {
-            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args)
-        }
-        let data = pipe.fileHandleForReading.readDataToEndOfFile()
-        return String(data: data, encoding: String.Encoding.utf8)!
+        return String(data: try spawnWithOutputData(cmd: cmd, args: args), encoding: String.Encoding.utf8)!
     }
 }
