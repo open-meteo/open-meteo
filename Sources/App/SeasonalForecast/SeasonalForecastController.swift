@@ -25,13 +25,55 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
     var isElevationCorrectable: Bool {
         variable.isElevationCorrectable
     }
+}
+
+typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableDerived>
+
+typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, VariableAndMember<CfsVariable>>
+
+
+enum CfsVariableDerived: String, Codable {
+    case windspeed_10m
+    case winddirection_10m
+}
+
+extension SeasonalForecastReader {
+    func prefetchData(variable: SeasonalForecastVariable, member: Int) throws {
+        switch variable {
+        case .raw(let variable):
+            try prefetchData(variable: VariableAndMember(variable: variable, member: member))
+        case .derived(let variable):
+            switch variable {
+            case .windspeed_10m:
+                fallthrough
+            case .winddirection_10m:
+                try prefetchData(variable: VariableAndMember(variable: .wind_u_component_10m, member: member))
+                try prefetchData(variable: VariableAndMember(variable: .wind_v_component_10m, member: member))
+            }
+        }
+    }
     
-    var name: String {
-        return "\(variable.omFileName)_member\(member.zeroPadded(len: 2))"
+    func get(variable: SeasonalForecastVariable, member: Int) throws -> DataAndUnit {
+        switch variable {
+        case .raw(let variable):
+            return try get(variable: VariableAndMember(variable: variable, member: member))
+        case .derived(let variable):
+            switch variable {
+            case .windspeed_10m:
+                let u = try get(variable: VariableAndMember(variable: .wind_u_component_10m, member: member))
+                let v = try get(variable: VariableAndMember(variable: .wind_v_component_10m, member: member))
+                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+                return DataAndUnit(speed, u.unit)
+            case .winddirection_10m:
+                let u = try get(variable: VariableAndMember(variable: .wind_u_component_10m, member: member))
+                let v = try get(variable: VariableAndMember(variable: .wind_v_component_10m, member: member))
+                let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+                return DataAndUnit(direction, .degreeDirection)
+            }
+        }
     }
 }
 
-typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, VariableAndMember<CfsVariable>>
 
 /**
  TODO:
@@ -65,25 +107,20 @@ struct SeasonalForecastController {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
-            /// Combine variables with members
-            let hourlyVariables = params.six_hourly.map {
-                $0.flatMap { variable in
-                    members.map {
-                        VariableAndMember(variable: variable, member: $0)
+            // Start data prefetch to boooooooost API speed :D
+            if let hourlyVariables = params.six_hourly {
+                for varible in hourlyVariables {
+                    for member in members {
+                        try reader.prefetchData(variable: varible, member: member)
                     }
                 }
             }
             
-            // Start data prefetch to boooooooost API speed :D
-            if let hourlyVariables = hourlyVariables {
-                for varible in hourlyVariables {
-                    try reader.prefetchData(variable: varible)
-                }
-            }
-            
-            let hourly: ApiSection? = try hourlyVariables.map { variables in
-                let res = try variables.map { variable in
-                    try reader.get(variable: variable).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: variable.name)
+            let hourly: ApiSection? = try params.six_hourly.map { variables in
+                let res = try variables.flatMap { variable in
+                    try members.map { member in
+                        try reader.get(variable: variable, member: member).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
+                    }
                 }
                 return ApiSection(name: "six_hourly", time: hourlyTime, columns: res)
             }
@@ -110,7 +147,7 @@ struct SeasonalForecastController {
 struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let six_hourly: [CfsVariable]?
+    let six_hourly: [SeasonalForecastVariable]?
     //let current_weather: Bool?
     let elevation: Float?
     //let timezone: String?
