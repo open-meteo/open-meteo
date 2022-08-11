@@ -193,23 +193,23 @@ struct Array2DFastTime {
 
 extension Array where Element == Float {
     func max(by: Int) -> [Float] {
-        return stride(from: 0, through: count-24, by: 24).map { i in
-            return self[i..<i+24].max()!
+        return stride(from: 0, through: count-by, by: by).map { i in
+            return self[i..<i+by].max()!
         }
     }
     func min(by: Int) -> [Float] {
-        return stride(from: 0, through: count-24, by: 24).map { i in
-            return self[i..<i+24].min()!
+        return stride(from: 0, through: count-by, by: by).map { i in
+            return self[i..<i+by].min()!
         }
     }
     func sum(by: Int) -> [Float] {
-        return stride(from: 0, through: count-24, by: 24).map { i in
-            return self[i..<i+24].reduce(0, +)
+        return stride(from: 0, through: count-by, by: by).map { i in
+            return self[i..<i+by].reduce(0, +)
         }
     }
     func mean(by: Int) -> [Float] {
-        return stride(from: 0, through: count-24, by: 24).map { i in
-            return self[i..<i+24].reduce(0, +) / Float(by)
+        return stride(from: 0, through: count-by, by: by).map { i in
+            return self[i..<i+by].reduce(0, +) / Float(by)
         }
     }
     

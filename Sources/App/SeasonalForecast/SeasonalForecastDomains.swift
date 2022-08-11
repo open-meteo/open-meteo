@@ -168,7 +168,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     case wind_u_component_10m
     case wind_v_component_10m
     case total_precipitation
-    case convective_precipitation
+    case showers
     case relativehumidity_2m
     case pressure_msl
     
@@ -212,7 +212,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return 10
         case .total_precipitation:
             return 10
-        case .convective_precipitation:
+        case .showers:
             return 10
         case .relativehumidity_2m:
             return 1
@@ -249,7 +249,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return .ms
         case .total_precipitation:
             return .millimeter
-        case .convective_precipitation:
+        case .showers:
             return .millimeter
         case .relativehumidity_2m:
             return .percent

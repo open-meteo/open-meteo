@@ -392,6 +392,105 @@
         </div>
       </div>
 
+      <div class="row py-3 px-0">
+        <h3>Daily Weather Variables <small class="text-muted">(*)</small></h3>
+        <div class="col-md-6">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max" name="daily">
+            <label class="form-check-label" for="temperature_2m_max">
+              Maximum Temperature (2 m)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min" name="daily">
+            <label class="form-check-label" for="temperature_2m_min">
+              Minimum Temperature (2 m)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="apparent_temperature_max" id="apparent_temperature_max" name="daily">
+            <label class="form-check-label" for="apparent_temperature_max">
+              Maximum Apparent Temperature (2 m)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="apparent_temperature_min" id="apparent_temperature_min" name="daily">
+            <label class="form-check-label" for="apparent_temperature_min">
+              Minimum Apparent Temperature (2 m)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="sunrise" id="sunrise" name="daily">
+            <label class="form-check-label" for="sunrise">
+              Sunrise
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="sunset" id="sunset" name="daily">
+            <label class="form-check-label" for="sunset">
+              Sunset
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="shortwave_radiation_sum" id="shortwave_radiation_sum" name="daily">
+            <label class="form-check-label" for="shortwave_radiation_sum">
+              Shortwave Radiation Sum
+            </label>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="precipitation_sum" id="precipitation_sum" name="daily">
+            <label class="form-check-label" for="precipitation_sum">
+              Precipitation Sum
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="rain_sum" id="rain_sum" name="daily">
+            <label class="form-check-label" for="rain_sum">
+              Rain Sum
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="snowfall_sum" id="snowfall_sum" name="daily">
+            <label class="form-check-label" for="snowfall_sum">
+              Snowfall Sum
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="precipitation_hours" id="precipitation_hours" name="daily">
+            <label class="form-check-label" for="precipitation_hours">
+              Precipitation Hours
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="windspeed_10m_max" id="windspeed_10m_max" name="daily">
+            <label class="form-check-label" for="windspeed_10m_max">
+              Maximum Wind Speed (10 m)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="windgusts_10m_max" id="windgusts_10m_max" name="daily">
+            <label class="form-check-label" for="windgusts_10m_max">
+              Maximum Wind Gusts (10 m)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="winddirection_10m_dominant" id="winddirection_10m_dominant" name="daily">
+            <label class="form-check-label" for="winddirection_10m_dominant">
+              Dominant Wind Direction (10 m)
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="et0_fao_evapotranspiration" id="et0_fao_evapotranspiration_daily" name="daily">
+            <label class="form-check-label" for="et0_fao_evapotranspiration_daily">
+              Reference Evapotranspiration (ET₀)
+            </label>
+          </div>
+        </div>
+        <small class="text-muted">* Parameter <mark>timezone</mark> is mandatory</small>
+      </div>
+     
 
       <div class="row py-3 px-0">
         <h3>Settings</h3>
