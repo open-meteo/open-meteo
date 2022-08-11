@@ -242,16 +242,23 @@ frm.submit(function(e){
   });
 
   // restore form state from url
-  for (const element of window.location.hash.substring(1).split("&")) {
-    let parts = element.split("=");
-    let key = parts[0];
-    let value = decodeURIComponent(parts[1]);
-    frm.find("select[name='" + key + "']").val(value);
-    frm.find("input[name='" + key + "'][type=text]").val(value);
-    frm.find("input[name='" + key + "'][type=number]").val(value);
-    frm.find("input[name='" + key + "'][type=checkbox]").each(function() {
-        this.checked = value.includes(this.value);
+  let urlparams = window.location.hash.substring(1).split("&");
+  if (urlparams.length > 2) {
+    // uncheck all checkboxes
+    frm.find("input[type=checkbox]").each(function() {
+        this.checked = false;
     });
+    for (const element of urlparams) {
+        let parts = element.split("=");
+        let key = parts[0];
+        let value = decodeURIComponent(parts[1]);
+        frm.find("select[name='" + key + "']").val(value);
+        frm.find("input[name='" + key + "'][type=text]").val(value);
+        frm.find("input[name='" + key + "'][type=number]").val(value);
+        frm.find("input[name='" + key + "'][type=checkbox]").each(function() {
+            this.checked = value.split(",").includes(this.value);
+        });
+    }
   }
 
   frm.submit();

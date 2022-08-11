@@ -170,7 +170,7 @@ struct SeasonalForecastController {
             
             let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
             let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 45, allowedRange: allowedRange)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 45, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: domain.dtSeconds)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
@@ -248,6 +248,7 @@ struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone {
     let precipitation_unit: PrecipitationUnit?
     let timeformat: Timeformat?
     let past_days: Int?
+    let forecast_days: Int?
     let format: ForecastResultFormat?
     let timezone: String?
     
@@ -266,6 +267,9 @@ struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone {
         }
         if let timezone = timezone, !timezone.isEmpty {
             throw ForecastapiError.timezoneNotSupported
+        }
+        if let forecast_days = forecast_days, forecast_days <= 0 || forecast_days >= 367 {
+            throw ForecastapiError.pastDaysInvalid(given: forecast_days, allowed: 0...366)
         }
         /*if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired

@@ -167,13 +167,13 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max" name="six_hourly" checked>
+            <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max" name="six_hourly">
             <label class="form-check-label" for="temperature_2m_max">
               Temperature (2 m) max
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min" name="six_hourly" checked>
+            <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min" name="six_hourly">
             <label class="form-check-label" for="temperature_2m_min">
               Temperature (2 m) min
             </label>
@@ -396,14 +396,14 @@
         <h3>Daily Weather Variables <small class="text-muted">(*)</small></h3>
         <div class="col-md-6">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max" name="daily">
-            <label class="form-check-label" for="temperature_2m_max">
+            <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max_daily" name="daily">
+            <label class="form-check-label" for="temperature_2m_max_daily">
               Maximum Temperature (2 m)
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min" name="daily">
-            <label class="form-check-label" for="temperature_2m_min">
+            <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min_daily" name="daily">
+            <label class="form-check-label" for="temperature_2m_min_daily">
               Minimum Temperature (2 m)
             </label>
           </div>
@@ -547,6 +547,17 @@
               <option value="92">3 months</option>
             </select>
             <label for="past_days">Past days</label>
+          </div>
+        </div>
+        <div class="col-3">
+          <div class="form-floating mb-3">
+            <select class="form-select" name="forecast_days" id="forecast_days" aria-label="Forecast days" data-default="45">
+              <option selected value="45">45 days</option>
+              <option value="92">3 months</option>
+              <option value="183">6 months</option>
+              <option value="274">9 months</option>
+            </select>
+            <label for="forecast_days">Forecast days</label>
           </div>
         </div>
         <div class="col-3">

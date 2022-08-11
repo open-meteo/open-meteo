@@ -6,6 +6,7 @@ enum ForecastapiError: Error {
     case latitudeMustBeInRangeOfMinus90to90(given: Float)
     case longitudeMustBeInRangeOfMinus180to180(given: Float)
     case pastDaysInvalid(given: Int, allowed: ClosedRange<Int>)
+    case forecastDaysInvalid(given: Int, allowed: ClosedRange<Int>)
     case enddateMustBeLargerEqualsThanStartdate
     case dateOutOfRange(parameter: String, allowed: Range<Timestamp>)
     case startAndEnddataMustBeSpecified
@@ -32,6 +33,8 @@ extension ForecastapiError: AbortError {
             return "Longitude must be in range of -180 to 180°. Given: \(given)."
         case .pastDaysInvalid(given: let given, allowed: let allowed):
             return "Past days is invalid. Allowed range \(allowed.lowerBound) to \(allowed.upperBound). Given \(given)."
+        case .forecastDaysInvalid(given: let given, allowed: let allowed):
+            return "Forecast days is invalid. Allowed range \(allowed.lowerBound) to \(allowed.upperBound). Given \(given)."
         case .invalidTimezone:
             return "Invalid timezone"
         case .timezoneRequired:
