@@ -118,7 +118,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     }
     
     /// Read and scale if required
-    private func readAndScale(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
+    private func readAndScale(variable: Variable, time: TimerangeDt, raw: Bool) throws -> DataAndUnit {
         var data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
         
         /// Scale pascal to hecto pasal. Case in era5
@@ -126,20 +126,32 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
             return DataAndUnit(data.map({$0 / 100}), .hectoPascal)
         }
         
-        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN {
+        if !raw && variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN {
             for i in data.indices {
                 // correct temperature by 0.65° per 100 m elevation
                 data[i] += (modelElevation - targetElevation) * 0.0065
+            }
+        }
+        if !raw && variable.isElevationCorrectable && variable.unit == .hectoPascal && !modelElevation.isNaN && !targetElevation.isNaN {
+            let t: Float = 20
+            let t0 = (t + 273.15 + 0.0065 * modelElevation)
+            let factor0 = powf(1 - (0.0065 * modelElevation) / t0, -5.25578129287)
+            
+            let t1 = (t + 273.15 + 0.0065 * targetElevation)
+            let factor1 = powf(1 - (0.0065 * targetElevation) / t1, -5.25578129287)
+            
+            for i in data.indices {
+                data[i] *= factor0 / factor1
             }
         }
         
         return DataAndUnit(data, variable.unit)
     }
     
-    /// Read data and interpolate if required
-    func get(variable: Variable) throws -> DataAndUnit {
+    /// Read data and interpolate if required. If `raw` is set, no temperature correction is applied
+    func get(variable: Variable, raw: Bool = false) throws -> DataAndUnit {
         if time.dtSeconds == domain.dtSeconds {
-            return try readAndScale(variable: variable, time: time)
+            return try readAndScale(variable: variable, time: time, raw: raw)
         }
         if time.dtSeconds > domain.dtSeconds {
             fatalError()
@@ -148,7 +160,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         let interpolationType = variable.interpolation
         
         let timeLow = time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
-        let read = try readAndScale(variable: variable, time: timeLow)
+        let read = try readAndScale(variable: variable, time: timeLow, raw: raw)
         let dataLow = read.data
         
         var data = [Float]()

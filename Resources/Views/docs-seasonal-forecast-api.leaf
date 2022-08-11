@@ -246,16 +246,14 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity" id="specific_humidity" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity">
-              specific_humidity
+            <input class="form-check-input" type="checkbox" value="specific_humidity_2m" id="specific_humidity_2m" name="six_hourly">
+            <label class="form-check-label" for="specific_humidity_2m">
+              specific_humidity_2m
             </label>
           </div>
 
         </div>
         <div class="col-md-3">
-
-
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="windspeed_10m" id="windspeed_10m" name="six_hourly">
             <label class="form-check-label" for="windspeed_10m">
@@ -263,234 +261,19 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_1000hPa" id="windspeed_1000hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_1000hPa">
-              Wind Speed (1000 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_925hPa" id="windspeed_925hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_925hPa">
-              Wind Speed (925 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_850hPa" id="windspeed_850hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_850hPa">
-              Wind Speed (850 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_700hPa" id="windspeed_700hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_700hPa">
-              Wind Speed (700 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_500hPa" id="windspeed_500hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_500hPa">
-              Wind Speed (500 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_300hPa" id="windspeed_300hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_300hPa">
-              Wind Speed (300 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_250hPa" id="windspeed_250hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_250hPa">
-              Wind Speed (250 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_200hPa" id="windspeed_200hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_200hPa">
-              Wind Speed (200 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="windspeed_50hPa" id="windspeed_50hPa" name="six_hourly">
-            <label class="form-check-label" for="windspeed_50hPa">
-              Wind Speed (50 hPa)
-            </label>
-          </div>
-
-          <div class="form-check">
             <input class="form-check-input" type="checkbox" value="winddirection_10m" id="winddirection_10m" name="six_hourly">
             <label class="form-check-label" for="winddirection_10m">
               Wind Direction (10 m)
             </label>
           </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_1000hPa" id="winddirection_1000hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_1000hPa">
-              Wind Direction (1000 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_925hPa" id="winddirection_925hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_925hPa">
-              Wind Direction (925 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_850hPa" id="winddirection_850hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_850hPa">
-              Wind Direction (850 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_700hPa" id="winddirection_700hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_700hPa">
-              Wind Direction (700 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_500hPa" id="winddirection_500hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_500hPa">
-              Wind Direction (500 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_300hPa" id="winddirection_300hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_300hPa">
-              Wind Direction (300 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_250hPa" id="winddirection_250hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_250hPa">
-              Wind Direction (250 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_200hPa" id="winddirection_200hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_200hPa">
-              Wind Direction (200 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="winddirection_50hPa" id="winddirection_50hPa" name="six_hourly">
-            <label class="form-check-label" for="winddirection_50hPa">
-              Wind Direction (50 hPa)
-            </label>
-          </div>
-
         </div>
         <div class="col-md-3">
-
            <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_1000hPa" id="relative_humidity_1000hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_1000hPa">
-              Relative Humidity (1000 hPa)
+            <input class="form-check-input" type="checkbox" value="relative_humidity_2m" id="relative_humidity_2m" name="six_hourly">
+            <label class="form-check-label" for="relative_humidity_2m">
+              Relative Humidity (2 m)
             </label>
           </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_925hPa" id="relative_humidity_925hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_925hPa">
-              Relative Humidity (925 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_850hPa" id="relative_humidity_850hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_850hPa">
-              Relative Humidity (850 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_700hPa" id="relative_humidity_700hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_700hPa">
-              Relative Humidity (700 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_500hPa" id="relative_humidity_500hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_500hPa">
-              Relative Humidity (500 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_300hPa" id="relative_humidity_300hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_300hPa">
-              Relative Humidity (300 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_250hPa" id="relative_humidity_250hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_250hPa">
-              Relative Humidity (250 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_200hPa" id="relative_humidity_200hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_200hPa">
-              Relative Humidity (200 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="relative_humidity_50hPa" id="relative_humidity_50hPa" name="six_hourly">
-            <label class="form-check-label" for="relative_humidity_50hPa">
-              Relative Humidity (50 hPa)
-            </label>
-          </div>
-
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_1000hPa" id="specific_humidity_1000hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_1000hPa">
-              Specific Humidity (1000 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_925hPa" id="specific_humidity_925hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_925hPa">
-              Specific Humidity (925 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_850hPa" id="specific_humidity_850hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_850hPa">
-              Specific Humidity (850 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_700hPa" id="specific_humidity_700hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_700hPa">
-              Specific Humidity (700 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_500hPa" id="specific_humidity_500hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_500hPa">
-              Specific Humidity (500 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_300hPa" id="specific_humidity_300hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_300hPa">
-              Specific Humidity (300 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_250hPa" id="specific_humidity_250hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_250hPa">
-              Specific Humidity (250 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_200hPa" id="specific_humidity_200hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_200hPa">
-              Specific Humidity (200 hPa)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="specific_humidity_50hPa" id="specific_humidity_50hPa" name="six_hourly">
-            <label class="form-check-label" for="specific_humidity_50hPa">
-              Specific Humidity (50 hPa)
-            </label>
-          </div>
-
         </div>
         <div class="col-md-3">
 

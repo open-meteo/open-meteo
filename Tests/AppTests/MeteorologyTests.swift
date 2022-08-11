@@ -47,4 +47,16 @@ final class MeteorologyTests: XCTestCase {
         XCTAssertEqual(Meteorology.vaporPressureDeficit(temperature2mCelsius: 25, dewpointCelsius: 26), 0)
         XCTAssertEqual(Meteorology.vaporPressureDeficit(temperature2mCelsius: 20, dewpointCelsius: -10), 2.0525706)
     }
+    
+    func testPressure() {
+        XCTAssertEqual(Meteorology.sealevelPressure(temperature: [15], pressure: [980], elevation: 1000), [1101.9026])
+        XCTAssertEqual(Meteorology.surfacePressure(temperature: [15], pressure: [1101.9026], elevation: 1000), [980])
+    }
+    
+    func testspecificHumidity() {
+        XCTAssertEqual(Meteorology.specificToRelativeHumidity(specificHumidity: [6.06], temperature: [23.00], pressure: [1013.25]), [35.06456])
+        XCTAssertEqual(Meteorology.specificToRelativeHumidity(specificHumidity: [0.06], temperature: [23.00], pressure: [1013.25]), [0.3484397])
+        // not really possible
+        XCTAssertEqual(Meteorology.specificToRelativeHumidity(specificHumidity: [24.06], temperature: [23.00], pressure: [1013.25]), [100])
+    }
 }

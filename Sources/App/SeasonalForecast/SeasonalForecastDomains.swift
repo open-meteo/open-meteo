@@ -169,7 +169,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     case wind_v_component_10m
     case total_precipitation
     case convective_precipitation
-    case specific_humidity
+    case specific_humidity_2m
     case surface_pressure
     
     var omFileName: String {
@@ -181,7 +181,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .temperature_2m_max || self == .temperature_2m_min
+        return self == .temperature_2m || self == .temperature_2m_max || self == .temperature_2m_min || self == .surface_pressure
     }
     
     
@@ -216,7 +216,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return "prate"
         case .convective_precipitation:
             return "cprat"
-        case .specific_humidity:
+        case .specific_humidity_2m:
             return "q2m"
         case .surface_pressure:
             return "pressfc"
@@ -265,7 +265,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return 10
         case .convective_precipitation:
             return 10
-        case .specific_humidity:
+        case .specific_humidity_2m:
             // grams of water (moisture) per kilogram of air (ranges 0-21)
             return 100
         case .surface_pressure:
@@ -303,7 +303,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return .millimeter
         case .convective_precipitation:
             return .millimeter
-        case .specific_humidity:
+        case .specific_humidity_2m:
             return .gramPerKilogram
         case .surface_pressure:
             return .hectoPascal
@@ -343,7 +343,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
         case .surface_pressure:
             // convert Pa to hPa
             return (1/100,0)
-        case .specific_humidity:
+        case .specific_humidity_2m:
             // convert kg/kg to g/kg
             return (1000,0)
         }
