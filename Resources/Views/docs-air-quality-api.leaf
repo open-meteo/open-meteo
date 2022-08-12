@@ -27,9 +27,8 @@
   </div>
 </div>
 
-<!-- http://127.0.0.1:8080/v1/forecast -->
 <div class="container px-4 py-0" id="featured-3">
-    <form id="api_form" method="get" action="https://api.open-meteo.com/v1/air-quality">
+    <form id="api_form" method="get" action="https://air-quality-api.open-meteo.com/v1/air-quality">
       <div class="row py-3 px-0">
         <h3>Select Coordinates or City</h3>
         <div class="col-md-3">

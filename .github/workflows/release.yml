@@ -55,7 +55,7 @@ jobs:
       with:
         generateReleaseNotes: true
         artifacts: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
-        prerelease: true
+        draft: true
     - name: Create APT repository
       uses: patrick-zippenfenig/apt-repo-action@master
       with:
