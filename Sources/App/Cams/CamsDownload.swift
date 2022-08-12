@@ -91,6 +91,8 @@ struct DownloadCamsCommand: Command {
         let curl = Curl(logger: logger)
         let dateRun = run.format_YYYYMMddHH
         let remoteDir = "https://\(user):\(password)@dissemination.ecmwf.int/ecpds/data/file/CAMS_GLOBAL/\(dateRun)/"
+        /// The surface level of multi-level files is available in the `CAMS_GLOBAL_ADDITIONAL` directory
+        let remoteDirAdditional = "https://\(user):\(password)@dissemination.ecmwf.int/ecpds/data/file/CAMS_GLOBAL_ADDITIONAL/\(dateRun)/"
         
         for hour in 0..<domain.forecastHours {
             logger.info("Downloading hour \(hour)")
@@ -107,10 +109,11 @@ struct DownloadCamsCommand: Command {
                     continue
                 }
                 
-                /// Multi level name `z_cams_c_ecmf_20220803000000_prod_fc_pl_000_co.nc`
+                /// Multi level name `z_cams_c_ecmf_20220811120000_prod_fc_ml137_000_aermr03.nc`
                 /// Surface level name `z_cams_c_ecmf_20220803000000_prod_fc_sfc_012_uvbed.nc`
-                let levelType = meta.isMultiLevel ? "pl" : "sfc"
-                let remoteFile = "\(remoteDir)z_cams_c_ecmf_\(dateRun)0000_prod_fc_\(levelType)_\(hour.zeroPadded(len: 3))_\(meta.gribname).nc"
+                let levelType = meta.isMultiLevel ? "ml137" : "sfc"
+                let dir = meta.isMultiLevel ? remoteDirAdditional : remoteDir
+                let remoteFile = "\(dir)z_cams_c_ecmf_\(dateRun)0000_prod_fc_\(levelType)_\(hour.zeroPadded(len: 3))_\(meta.gribname).nc"
                 let tempNc = "\(domain.downloadDirectory)/temp.nc"
                 try curl.download(url: remoteFile, to: tempNc)
                 
@@ -270,23 +273,40 @@ struct DownloadCamsCommand: Command {
 
 fileprivate extension Variable {
     func readLevel() throws -> [Float] {
+        /// m137 files are double... for whatever reason
+        if let ncDouble = self.asType(Double.self) {
+            guard dimensions.count == 3,
+                    dimensions[0].length == 1,
+                    dimensions[1].length == 451,
+                    dimensions[2].length == 900 else {
+                fatalError("Wrong dimensions. Got \(dimensions)")
+            }
+            return try ncDouble.read().map(Float.init)
+        }
+        
         guard let ncFloat = self.asType(Float.self) else {
             fatalError("Not a float nc variable")
         }
         if dimensions.count == 2 {
             // surface file
-            precondition(dimensions[0].length > 200)
-            precondition(dimensions[1].length > 200)
-            return try ncFloat.read(offset: [0,0], count: [dimensions[0].length, dimensions[1].length])
+            guard dimensions.count == 2,
+                    dimensions[0].length == 451,
+                    dimensions[1].length == 900 else {
+                fatalError("Wrong dimensions. Got \(dimensions)")
+            }
+            return try ncFloat.read()
         }
         if dimensions.count == 3 {
             // surface file, but with time inside...
-            precondition(dimensions[0].length == 0)
-            precondition(dimensions[1].length > 200)
-            precondition(dimensions[2].length > 200)
+            guard dimensions.count == 3,
+                    dimensions[0].length == 1,
+                    dimensions[1].length == 451,
+                    dimensions[2].length == 900 else {
+                fatalError("Wrong dimensions. Got \(dimensions)")
+            }
             return try ncFloat.read(offset: [0,0,0], count: [1, dimensions[1].length, dimensions[2].length])
         }
-        if dimensions.count == 4 {
+        /*if dimensions.count == 4 {
             // pressure level file -> read `last` level e.g. 10 meter above ground
             // dimensions time, level, lat, lon
             precondition(dimensions[0].length == 0)
@@ -294,7 +314,7 @@ fileprivate extension Variable {
             precondition(dimensions[2].length > 200)
             precondition(dimensions[3].length > 200)
             return try ncFloat.read(offset: [0, dimensions[1].length-1,0,0], count: [1, 1, dimensions[2].length, dimensions[3].length])
-        }
+        }*/
         fatalError("Wrong dimensions \(dimensionsFlat)")
     }
 }
