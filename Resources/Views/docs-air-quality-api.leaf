@@ -34,13 +34,13 @@
         <h3>Select Coordinates or City</h3>
         <div class="col-md-3">
           <div class="form-floating">
-            <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="54.3213">
+            <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="52.5235">
             <label for="latitude">Latitude</label>
           </div>
         </div>
         <div class="col-md-3">
           <div class="form-floating">
-            <input type="number" step="0.0001" class="form-control" name="longitude" id="longitude" value="10.1348">
+            <input type="number" step="0.0001" class="form-control" name="longitude" id="longitude" value="13.4115">
             <label for="longitude">Longitude</label>
           </div>
         </div>
@@ -232,11 +232,21 @@
             </label>
           </div>
         </div>
-        <small class="text-muted">* Only available in Europe with 4 days forecast</small>
+        <small class="text-muted">* Only available in Europe during pollen season with 4 days forecast</small>
         </div>
 
         <div class="row py-3 px-0">
           <h3>Settings</h3>
+          <div class="col-3">
+            <div class="form-floating mb-3">
+              <select class="form-select" name="domains" id="domains" aria-label="Domains" data-default="auto">
+                <option selected value="auto">Global + European</option>
+                <option value="cams_global">Global (40 km)</option>
+                <option value="cams_europe">European (11 km)</option>
+              </select>
+              <label for="domains">Domain</label>
+            </div>
+          </div>
           <div class="col-3">
             <div class="form-floating mb-3">
               <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="GMT">
@@ -328,7 +338,9 @@
 
     <div class="col-12 py-5">
       <h2 id="api-documentation">API Documentation</h2>
-      <p>The API endpoint <mark>/v1/air-quality</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly air quality forecast for 5 days. Time always starts at 0:00 today. Forecast is based on the 11 kilometer <a href="https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-europe-air-quality-forecasts?tab=overview" target="_blank">CAMS European air quality forecast</a> and the 40 kilometer <a href="https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-global-atmospheric-composition-forecasts?tab=overview" target="_blank">CAMS global atmospheric composition forecasts</a>. All URL parameters are listed below:</p>
+      <p>The API endpoint <mark>/v1/air-quality</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly air quality forecast for 5 days. Time always starts at 0:00 today.</p>
+      <p>Forecast is based on the 11 kilometer <a href="https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-europe-air-quality-forecasts?tab=overview" target="_blank">CAMS European air quality forecast</a> and the 40 kilometer <a href="https://ads.atmosphere.copernicus.eu/cdsapp#!/dataset/cams-global-atmospheric-composition-forecasts?tab=overview" target="_blank">CAMS global atmospheric composition forecasts</a>. The European and global domain are not coupled and may show different forecasts.</p>
+      <p>All URL parameters are listed below:</p>
       <table class="table">
         <thead>
           <tr>
@@ -353,6 +365,13 @@
             <td>No</td>
             <td></td>
             <td>A list of weather variables which should be returned. Values can be comma separated, or multiple <mark>&hourly=</mark> parameter in the URL can be used.</td>
+          </tr>
+          <tr>
+            <th scope="row">domains</th>
+            <td>String</td>
+            <td>No</td>
+            <td><mark>auto</mark></td>
+            <td>Automatically combine both domains <mark>auto</mark> or specifically select the European <mark>cams_europe</mark> or global domain <mark>cams_global</mark>.</td>
           </tr>
           <tr>
             <th scope="row">timeformat</th>

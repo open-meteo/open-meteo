@@ -3,7 +3,6 @@ import Vapor
 
 /**
  TODO:
- - docs
  - air quality index (european)
  */
 struct CamsController {
@@ -24,7 +23,9 @@ struct CamsController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             //let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try CamsMixer(domains: CamsDomain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest, time: hourlyTime) else {
+            let domains = (params.domains ?? .auto).camsDomains
+            
+            guard let reader = try CamsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest, time: hourlyTime) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
@@ -86,6 +87,7 @@ struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
     let past_days: Int?
     let format: ForecastResultFormat?
     let timezone: String?
+    let domains: Domain?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?
@@ -106,5 +108,24 @@ struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
     
     var timeformatOrDefault: Timeformat {
         return timeformat ?? .iso8601
+    }
+}
+
+extension CamsQuery {
+    enum Domain: String, Codable {
+        case auto
+        case cams_global
+        case cams_europe
+        
+        var camsDomains: [CamsDomain] {
+            switch self {
+            case .auto:
+                return CamsDomain.allCases
+            case .cams_global:
+                return [.cams_global]
+            case .cams_europe:
+                return [.cams_europe]
+            }
+        }
     }
 }
