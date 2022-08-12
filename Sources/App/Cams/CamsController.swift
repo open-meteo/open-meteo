@@ -9,7 +9,7 @@ struct CamsController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
         do {
             // API should only be used on the subdomain
-            if req.headers[.host].contains(where: { $0 == "open-meteo.com"}) {
+            if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.contains("air-quality-api.") }) {
                 throw Abort.init(.notFound)
             }
             let generationTimeStart = Date()
