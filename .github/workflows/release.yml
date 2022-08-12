@@ -25,7 +25,7 @@ jobs:
     - uses: actions/checkout@v2
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           .build
@@ -41,8 +41,8 @@ jobs:
     - name: Build
       run: |
         ${{ env.swift_build }}
-        mv .build/release/openmeteo-api openmeteo-api
-        mv .build/release/*.resources Resources/
+        cp .build/release/openmeteo-api openmeteo-api
+        cp -r .build/release/*.resources Resources/
     - name: Package
       uses: gravitl/github-action-fpm@master
       with:
@@ -51,10 +51,11 @@ jobs:
     - name: Rename deb file
       run: mv openmeteo-api_${{github.ref_name}}_amd64.deb openmeteo-api_${{github.ref_name}}_focal_amd64.deb
     - name: Release
-      uses: softprops/action-gh-release@v1
+      uses: ncipollo/release-action@v1
       with:
-        files: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
-        draft: true
+        generateReleaseNotes: true
+        artifacts: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
+        prerelease: true
     - name: Create APT repository
       uses: patrick-zippenfenig/apt-repo-action@master
       with:
