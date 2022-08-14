@@ -36,6 +36,7 @@ Apps:
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
+- [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
 
 Other:
 - Contributions welcome!
