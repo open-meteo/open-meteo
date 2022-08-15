@@ -25,10 +25,24 @@ enum NcepDomain: String {
         return nil
     }
     
+    var forecastHours: [Int] {
+        switch self {
+        case .gfs025:
+            return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
+        }
+    }
+    
     var omFileLength: Int {
         switch self {
         case .gfs025:
             return 384 + 1 + 4*24
+        }
+    }
+    
+    var grid: RegularGrid {
+        switch self {
+        case .gfs025:
+            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         }
     }
 }
@@ -79,6 +93,10 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
     //case diffuse_radiation
     //case direct_radiation
     
+    var omFileName: String {
+        return rawValue
+    }
+    
     var skipHour0: Bool {
         switch self {
         case .precipitation: return true
@@ -86,6 +104,132 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .latent_heatflux: return true
         case .showers: return true
         case .shortwave_radiation: return true
+        default: return false
+        }
+    }
+    
+    var scalefactor: Float {
+        switch self {
+        case .temperature_2m: return 20
+        case .cloudcover: return 1
+        case .cloudcover_low: return 1
+        case .cloudcover_mid: return 1
+        case .cloudcover_high: return 1
+        case .relativehumidity_2m: return 1
+        case .precipitation: return 10
+        case .v_10m: return 10
+        case .u_10m: return 10
+        case .v_80m: return 10
+        case .u_80m: return 10
+        case .soil_temperature_0_to_10cm: return 20
+        case .soil_temperature_10_to_40cm: return 20
+        case .soil_temperature_40_to_100cm: return 20
+        case .soil_temperature_100_to_200cm: return 20
+        case .soil_moisture_0_to_10cm: return 1000
+        case .soil_moisture_10_to_40cm: return 1000
+        case .soil_moisture_40_to_100cm: return 1000
+        case .soil_moisture_100_to_200cm: return 1000
+        case .snow_depth: return 100 // 1cm res
+        case .sensible_heatflux: return 0.144
+        case .latent_heatflux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
+        case .windgusts_10m: return 10
+        case .freezinglevel_height:  return 0.1 // zero height 10 meter resolution
+        case .showers: return 10
+        case .pressure_msl: return 10
+        case .shortwave_radiation: return 1
+        }
+    }
+    
+    /// unit stored on disk... or directly read by low level reads
+    var unit: SiUnit {
+        switch self {
+        case .temperature_2m: return .celsius
+        case .cloudcover: return .percent
+        case .cloudcover_low: return .percent
+        case .cloudcover_mid: return .percent
+        case .cloudcover_high: return .percent
+        case .relativehumidity_2m: return .percent
+        case .precipitation: return .millimeter
+        case .v_10m: return .ms
+        case .u_10m: return .ms
+        case .v_80m: return .ms
+        case .u_80m: return .ms
+        case .soil_temperature_0_to_10cm: return .celsius
+        case .soil_temperature_10_to_40cm: return .celsius
+        case .soil_temperature_40_to_100cm: return .celsius
+        case .soil_temperature_100_to_200cm: return .celsius
+        case .soil_moisture_0_to_10cm: return .qubicMeterPerQubicMeter
+        case .soil_moisture_10_to_40cm: return .qubicMeterPerQubicMeter
+        case .soil_moisture_40_to_100cm: return .qubicMeterPerQubicMeter
+        case .soil_moisture_100_to_200cm: return .qubicMeterPerQubicMeter
+        case .snow_depth: return .meter
+        case .sensible_heatflux: return .wattPerSquareMeter
+        case .latent_heatflux: return .wattPerSquareMeter
+        case .showers: return .millimeter
+        case .windgusts_10m: return .ms
+        case .freezinglevel_height: return .meter
+        case .pressure_msl: return .hectoPascal
+        case .shortwave_radiation: return .wattPerSquareMeter
+        }
+    }
+    
+    var isAveragedOverForecastTime: Bool {
+        switch self {
+        case .shortwave_radiation: return true
+        case .sensible_heatflux: return true
+        case .latent_heatflux: return true
+        default: return false
+        }
+    }
+    
+    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
+    var requiresOffsetCorrectionForMixing: Bool {
+        switch self {
+        case .soil_moisture_0_to_10cm: return true
+        case .soil_moisture_10_to_40cm: return true
+        case .soil_moisture_40_to_100cm: return true
+        case .soil_moisture_100_to_200cm: return true
+        case .snow_depth: return true
+        default: return false
+        }
+    }
+    
+    var interpolationType: InterpolationType {
+        switch self {
+        case .temperature_2m: return .hermite
+        case .cloudcover: return .hermite
+        case .cloudcover_low: return .hermite
+        case .cloudcover_mid: return .hermite
+        case .cloudcover_high: return .hermite
+        case .relativehumidity_2m: return .hermite
+        case .precipitation: return .linear
+        case .v_10m: return .hermite
+        case .u_10m: return .hermite
+        case .snow_depth: return .linear
+        case .sensible_heatflux: return .hermite_backwards_averaged
+        case .latent_heatflux: return .hermite_backwards_averaged
+        case .windgusts_10m: return .linear
+        case .freezinglevel_height: return .hermite
+        case .shortwave_radiation: return .solar_backwards_averaged
+        case .soil_temperature_0_to_10cm: return .hermite
+        case .soil_temperature_10_to_40cm: return .hermite
+        case .soil_temperature_40_to_100cm: return .hermite
+        case .soil_temperature_100_to_200cm: return .hermite
+        case .soil_moisture_0_to_10cm: return .hermite
+        case .soil_moisture_10_to_40cm: return .hermite
+        case .soil_moisture_40_to_100cm: return .hermite
+        case .soil_moisture_100_to_200cm: return .hermite
+        case .v_80m: return .hermite
+        case .u_80m: return .hermite
+        case .showers: return .linear
+        case .pressure_msl: return .hermite
+        }
+    }
+    
+    var isAccumulatedSinceModelStart: Bool {
+        switch self {
+        case .precipitation: fallthrough
+        case .showers: return true
         default: return false
         }
     }
@@ -107,7 +251,7 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .relativehumidity_2m:
             return ":RH:2 m above ground:"
         case .precipitation:
-            return ":APCP:surface:"
+            return ":APCP:surface:0-"
         case .v_10m:
             return ":VGRD:10 m above ground:"
         case .u_10m:
@@ -139,13 +283,32 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .latent_heatflux:
             return ":LHTFL:surface:"
         case .showers:
-            return ":ACPCP:surface:"
+            return ":ACPCP:surface:0-"
         case .windgusts_10m:
             return ":GUST:surface:"
         case .freezinglevel_height:
             return ":HGT:0C isotherm:"
         case .shortwave_radiation:
             return ":DSWRF:surface:"
+        }
+    }
+    
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m:
+            return (1, -273.15)
+        case .pressure_msl:
+            return (1, 1/100)
+        case .soil_temperature_0_to_10cm:
+            return (1, -273.15)
+        case .soil_temperature_10_to_40cm:
+            return (1, -273.15)
+        case .soil_temperature_40_to_100cm:
+            return (1, -273.15)
+        case .soil_temperature_100_to_200cm:
+            return (1, -273.15)
+        default:
+            return nil
         }
     }
 }
@@ -200,7 +363,7 @@ struct NcepDownload: Command {
             let date = Timestamp.now().with(hour: run)
             
             try downloadGfs(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
-            //try convertGfs(logger: logger, domain: domain, run: date)
+            try convertGfs(logger: logger, domain: domain, variables: variables, run: date)
         }
     }
     
@@ -258,7 +421,7 @@ struct NcepDownload: Command {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger)
-        let forecastHours = Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
+        let forecastHours = domain.forecastHours
         let variablesHour0 = variables.filter({!$0.skipHour0})
         
         for forecastHour in forecastHours {
@@ -284,141 +447,78 @@ struct NcepDownload: Command {
     }
     
     /// Process each variable and update time-series optimised files
-    /*func convertGfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
+    func convertGfs(logger: Logger, domain: NcepDomain, variables: [GfsVariable], run: Timestamp) throws {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let forecastHours = domain.forecastHours
+        let nForecastHours = forecastHours.max()!+1
         
-        for member in 1..<domain.nMembers+1 {
-            try GribFile.readAndConvert(logger: logger, gribName: "tmin", member: member, domain: domain, add: -273.15).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .temperature_2m_min, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "tmax", member: member, domain: domain, add: -273.15).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .temperature_2m_max, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "soilt1", member: member, domain: domain, add: -273.15).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_temperature_0_to_10_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+        let grid = domain.grid
+        let nLocation = grid.count
+        
+        
+        for variable in variables {
+            let startConvert = DispatchTime.now()
+            logger.info("Converting \(variable)")
             
-            try GribFile.readAndConvert(logger: logger, gribName: "dswsfc", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .shortwave_radiation, member: member, run: run, dtSeconds: domain.dtSeconds)
-            
-            try GribFile.readAndConvert(logger: logger, gribName: "cprat", member: member, domain: domain, multiply: Float(domain.dtSeconds)).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .showers, member: member, run: run, dtSeconds: domain.dtSeconds)
-            
-            try GribFile.readAndConvert(logger: logger, gribName: "prate", member: member, domain: domain, multiply: Float(domain.dtSeconds)).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .total_precipitation, member: member, run: run, dtSeconds: domain.dtSeconds)
-            
-            try GribFile.readAndConvert(logger: logger, gribName: "tcdcclm", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .total_cloud_cover, member: member, run: run, dtSeconds: domain.dtSeconds)
+            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
 
-            try GribFile.readAndConvert(logger: logger, gribName: "soilm1", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_0_to_10_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "soilm2", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_10_to_40_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "soilm3", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_40_to_100_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "soilm4", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_100_to_200_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
-
-            // in a closure to release memory
-            try {
-                let wind = try GribFile.readAndConvert(logger: logger, gribName: "wnd10m", member: member, domain: domain)
-                guard let uwind = wind["10u"] else {
-                    fatalError()
-                }
-                guard let vwind = wind["10v"] else {
-                    fatalError()
-                }
-                try uwind.writeCfs(om: om, logger: logger, variable: .wind_u_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
-                try vwind.writeCfs(om: om, logger: logger, variable: .wind_v_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
-            }()
-            
-            let tmp2m = try GribFile.readAndConvert(logger: logger, gribName: "tmp2m", member: member, domain: domain, add: -273.15).first!.value
-            try tmp2m.writeCfs(om: om, logger: logger, variable: .temperature_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
-            
-            /// hPa
-            var surfacePressure = try GribFile.readAndConvert(logger: logger, gribName: "pressfc", member: member, domain: domain, multiply: 1/100).first!.value
-            
-            try {
-                /// g/kg water/air mixing ratio
-                let specificHumidity = try GribFile.readAndConvert(logger: logger, gribName: "q2m", member: member, domain: domain, multiply: 1000).first!.value
-                
-                let relativeHumidity = Array2DFastTime(data: Meteorology.specificToRelativeHumidity(specificHumidity: specificHumidity.data, temperature: tmp2m.data, pressure: surfacePressure.data), nLocations: tmp2m.nLocations, nTime: tmp2m.nTime)
-                try relativeHumidity.writeCfs(om: om, logger: logger, variable: .relativehumidity_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
-            }()
-            
-            
-            /// -999 for sea
-            let elevations = try domain.elevationFile!.readAll()
-            
-            /// convert surface pressure to mean sea level pressure
-            for l in 0..<tmp2m.nLocations {
-                let elevation = elevations[l]
-                if elevation.isNaN || elevation <= -999 {
+            for forecastHour in forecastHours {
+                if forecastHour == 0 && variable.skipHour0 {
                     continue
                 }
-                for t in 0..<tmp2m.nTime {
-                    surfacePressure[l,t] *= Meteorology.sealevelPressureFactor(temperature: tmp2m[l,t], elevation: elevation)
-                }
+                let file = "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg"
+                data2d[0..<nLocation, forecastHour] = try FloatArrayCompressor.read(file: file, nElements: nLocation)
             }
-            try surfacePressure.writeCfs(om: om, logger: logger, variable: .pressure_msl, member: member, run: run, dtSeconds: domain.dtSeconds)
-        }
-    }*/
-}
-
-fileprivate extension Array2DFastTime {
-    func writeCfs(om: OmFileSplitter, logger: Logger, variable: CfsVariable, member: Int, run: Timestamp, dtSeconds: Int) throws {
-        let startOm = DispatchTime.now()
-        let timeIndexStart = run.timeIntervalSince1970 / dtSeconds
-        let timeIndices = timeIndexStart ..< timeIndexStart + nTime
-        
-        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_\(member)", array2d: self, ringtime: timeIndices, skipFirst: 1, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-        logger.info("Update om \(variable) finished in \(startOm.timeElapsedPretty())")
-    }
-}
-
-
-fileprivate extension GribFile {
-    static func readAndConvert(logger: Logger, gribName: String, member: Int, domain: SeasonalForecastDomain, multiply: Float = 1, add: Float = 0) throws -> [String: Array2DFastTime] {
-        logger.info("Reading grib '\(gribName)' for member \(member)")
-        let startReadGrib = DispatchTime.now()
-        var vars = [String: Array2DFastTime]()
-        
-        let grib = try GribFile(file: "\(domain.downloadDirectory)\(gribName)_\(member).grb2")
-        
-        /// Note, first forecast hour is always missing
-        let nForecastHours = Int(grib.messages.last!.get(attribute: "step")!)! / domain.dtHours + 1
-        guard nForecastHours > 10 else {
-            fatalError("nForecastHours is \(nForecastHours)")
-        }
-        
-        for message in grib.messages {
-            let shortName = message.get(attribute: "shortName")!
-            let forecastStep = Int(message.get(attribute: "step")!)! / domain.dtHours
-            var data = try message.read2D()
-            data.shift180LongitudeAndFlipLatitude()
-            data.data.multiplyAdd(multiply: multiply, add: add)
             
-            guard data.nx == domain.grid.nx, data.ny == domain.grid.ny else {
-                fatalError("Wrong dimensions. Got \(data.nx)x\(data.ny). Expected \(domain.grid.nx)x\(domain.grid.ny)")
+            let skip = variable.skipHour0 ? 1 : 0
+            
+            // Deaverage radiation. Not really correct for 3h data after 120 hours.
+            if variable.isAveragedOverForecastTime {
+                data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
             }
-            if vars[shortName] == nil {
-                vars[shortName] = Array2DFastTime(nLocations: data.nx*data.ny, nTime: nForecastHours)
+            
+            // interpolate missing timesteps. We always fill 2 timesteps at once
+            // data looks like: DDDDDDDDDD--D--D--D--D--D
+            let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
+                if forecastHours.contains(hour) || hour % 3 != 1 {
+                    // process 2 timesteps at once
+                    return nil
+                }
+                return hour
             }
-            vars[shortName]![0..<data.ny*data.nx, forecastStep] = data.data
+            
+            switch variable.interpolationType {
+            case .linear:
+                data2d.interpolate2StepsLinear(positions: forecastStepsToInterpolate)
+            case .nearest:
+                data2d.interpolate2StepsNearest(positions: forecastStepsToInterpolate)
+            case .solar_backwards_averaged:
+                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
+            case .hermite:
+                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
+            case .hermite_backwards_averaged:
+                data2d.interpolate2StepsHermiteBackwardsAveraged(positions: forecastStepsToInterpolate)
+            }
+            
+            if let fma = variable.multiplyAdd {
+                data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+            }
+            
+            // De-accumulate precipitation
+            if variable.isAccumulatedSinceModelStart {
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+            }
+            
+            let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
+            
+            
+            try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
+            
+            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
+            let startOm = DispatchTime.now()
+            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
-        logger.info("Grib read finished in \(startReadGrib.timeElapsedPretty())")
-        
-        return vars
-    }
-}
-
-fileprivate extension GribMessage {
-    func read2D() throws -> Array2D {
-        let data = try getDouble().map(Float.init)
-        guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
-            fatalError("Could not get Nx")
-        }
-        guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
-            fatalError("Could not get Ny")
-        }
-        return Array2D(data: data, nx: nx, ny: ny)
     }
 }

@@ -216,20 +216,7 @@ struct DownloadIconCommand: Command {
             
             // Deaverage radiation. Not really correct for 3h data after 81 hours.
             if variable.isAveragedOverForecastTime {
-                for l in 0..<nLocation {
-                    var prev = data2d[l, 0].isNaN ? 0 : data2d[l, 0]
-                    var skipped = 0
-                    for hour in 1 ..< nForecastHours {
-                        let d = data2d[l, hour] * Float(hour)
-                        if d.isNaN {
-                            skipped += 1
-                            continue
-                        }
-                        data2d[l, hour] = (d - prev) / Float(skipped+1)
-                        prev = d
-                        skipped = 0
-                    }
-                }
+                data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
             }
             
             // interpolate missing timesteps. We always fill 2 timesteps at once
@@ -302,14 +289,7 @@ struct DownloadIconCommand: Command {
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
-                for l in 0..<nLocation {
-                    for hour in stride(from: nForecastHours - 1, through: 2, by: -1) {
-                        let current = data2d[l, hour]
-                        let previous = data2d[l, hour-1]
-                        // due to floating point precision, it can become negative
-                        data2d[l, hour] = max(current - previous, 0)
-                    }
-                }
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
             }
             
             /*#if Xcode
@@ -366,6 +346,39 @@ struct DownloadIconCommand: Command {
 }
 
 extension Array2DFastTime {
+    mutating func deavergeOverTime(slidingWidth: Int, slidingOffset: Int) {
+        for l in 0..<nLocations {
+            for start in stride(from: slidingOffset, to: nTime, by: slidingWidth) {
+                var prev = self[l, 0].isNaN ? 0 : self[l, 0]
+                var skipped = 0
+                for hour in start+1 ..< start+slidingWidth {
+                    let d = self[l, hour] * Float(hour)
+                    if d.isNaN {
+                        skipped += 1
+                        continue
+                    }
+                    self[l, hour] = (d - prev) / Float(skipped+1)
+                    prev = d
+                    skipped = 0
+                }
+            }
+        }
+    }
+    
+    /// Note: Enforces >0
+    mutating func deaccumulateOverTime(slidingWidth: Int, slidingOffset: Int) {
+        for l in 0..<nLocations {
+            for start in stride(from: slidingOffset, to: nTime, by: slidingWidth) {
+                for hour in stride(from: start + slidingWidth - 1, through: start + 1, by: -1) {
+                    let current = self[l, hour]
+                    let previous = self[l, hour-1]
+                    // due to floating point precision, it can become negative
+                    self[l, hour] = previous.isNaN ? current : max(current - previous, 0)
+                }
+            }
+        }
+    }
+    
     /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
     mutating func interpolate2StepsLinear(positions: [Int]) {
         for l in 0..<nLocations {
