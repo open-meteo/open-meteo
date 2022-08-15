@@ -105,6 +105,11 @@ public struct Timestamp {
         return "\(year)\(month.zeroPadded(len: 2))\(day.zeroPadded(len: 2))\(hour.zeroPadded(len: 2))"
     }
     
+    // Return hour string as 2 character
+    var hh: String {
+        hour.zeroPadded(len: 2)
+    }
+    
     /// Return a new timestamp with setting the hour
     func with(hour: Int) -> Timestamp {
         return Timestamp(timeIntervalSince1970 / 86400 * 86400 + hour * 3600)

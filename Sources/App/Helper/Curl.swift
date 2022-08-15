@@ -123,13 +123,13 @@ struct Curl {
         
         var matches = [Variable]()
         matches.reserveCapacity(variables.count)
-        guard let range = try index.split(separator: "\n").indexToRange(include: { idx in
+        guard let range = index.split(separator: "\n").indexToRange(include: { idx in
             guard let match = variables.first(where: { idx.contains($0.gribIndexName) }) else {
                 return false
             }
             guard !matches.contains(match) else {
-                logger.error("Grib variable \(match) matched twice for \(idx)")
-                throw CurlError.gribIndexMatchedTwice
+                logger.info("Grib variable \(match) matched twice for \(idx)")
+                return false
             }
             logger.debug("Matched \(match) with \(idx)")
             matches.append(match)
@@ -143,7 +143,7 @@ struct Curl {
         var missing = false
         for variable in variables {
             if !matches.contains(variable) {
-                logger.error("Variable \(variable) '\(variable.gribIndexName)' missing")
+                logger.error("Variable \(variable) '\(variable)' missing")
                 missing = true
             }
         }
