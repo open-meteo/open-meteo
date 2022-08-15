@@ -262,11 +262,12 @@ struct NcepDownload: Command {
         let variablesHour0 = variables.filter({!$0.skipHour0})
         
         for forecastHour in forecastHours {
-            logger.info("Downloading forecastStep \(forecastHour)")
-            let variables = forecastHour == 0 ? variablesHour0 : variables
-            
-            let fileDest = "\(domain.downloadDirectory)\(variables[0].rawValue)_\(forecastHour).fpg"
-            if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
+            logger.info("Downloading forecastHour \(forecastHour)")
+            let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
+                let fileDest = "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg"
+                return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
+            }
+            if variables.isEmpty {
                 continue
             }
             
