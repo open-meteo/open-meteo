@@ -79,6 +79,17 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
     //case diffuse_radiation
     //case direct_radiation
     
+    var skipHour0: Bool {
+        switch self {
+        case .precipitation: return true
+        case .sensible_heatflux: return true
+        case .latent_heatflux: return true
+        case .showers: return true
+        case .shortwave_radiation: return true
+        default: return false
+        }
+    }
+    
     var gribIndexName: String {
         switch self {
         case .temperature_2m:
@@ -247,25 +258,27 @@ struct NcepDownload: Command {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger)
-        
         let forecastHours = Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
+        let variablesHour0 = variables.filter({!$0.skipHour0})
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastStep \(forecastHour)")
+            let variables = forecastHour == 0 ? variablesHour0 : variables
+            
+            let fileDest = "\(domain.downloadDirectory)\(variables[0].rawValue)_\(forecastHour).fpg"
+            if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
+                continue
+            }
+            
             //https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20220813/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
             let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f\(forecastHour.zeroPadded(len: 3))"
             
             for (variable, data) in try curl.downloadIndexedGrib(url: url, variables: variables) {
                 var data = data
                 data.shift180LongitudeAndFlipLatitude()
-                try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
-                //try FloatArrayCompressor.write(file: "\(domain.downloadDirectory)\(variable.rawValue).fpg", data: data.data)
+                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
+                try FloatArrayCompressor.write(file: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg", data: data.data)
             }
-            fatalError("OK")
-            //let fileDest = "\(domain.downloadDirectory)\(gribVariable)_\(member).grb2"
-            //if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
-            //    continue
-            //}
         }
     }
     
