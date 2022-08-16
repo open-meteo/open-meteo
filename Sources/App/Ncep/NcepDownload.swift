@@ -494,7 +494,8 @@ struct NcepDownload: Command {
             case .nearest:
                 data2d.interpolate2StepsNearest(positions: forecastStepsToInterpolate)
             case .solar_backwards_averaged:
-                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
+                // GFS radiation is center averaged
+                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run.add(1800), dtSeconds: domain.dtSeconds)
             case .hermite:
                 data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
             case .hermite_backwards_averaged:

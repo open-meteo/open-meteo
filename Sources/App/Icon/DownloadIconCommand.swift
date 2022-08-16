@@ -214,9 +214,9 @@ struct DownloadIconCommand: Command {
             }
             
             
-            // Deaverage radiation. Not really correct for 3h data after 81 hours.
+            // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
             if variable.isAveragedOverForecastTime {
-                data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
+                data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
             }
             
             // interpolate missing timesteps. We always fill 2 timesteps at once
@@ -236,7 +236,8 @@ struct DownloadIconCommand: Command {
             case .nearest:
                 data2d.interpolate2StepsNearest(positions: forecastStepsToInterpolate)
             case .solar_backwards_averaged:
-                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
+                /// Radiation data is center averaged. E.g. 8 hour data is the average of 7:30 to 8:30
+                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run.add(1800), dtSeconds: domain.dtSeconds)
             case .hermite:
                 data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
             case .hermite_backwards_averaged:
@@ -289,13 +290,10 @@ struct DownloadIconCommand: Command {
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
             }
             
-            /*#if Xcode
-            try! data2d.writeNetcdf(filename: "\(domain.omfileDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
-            return
-            #endif*/
+            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
             
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             let skip = variable.skipHour0 ? 1 : 0
@@ -349,16 +347,19 @@ extension Array2DFastTime {
     mutating func deavergeOverTime(slidingWidth: Int, slidingOffset: Int) {
         for l in 0..<nLocations {
             for start in stride(from: slidingOffset, to: nTime, by: slidingWidth) {
-                var prev = self[l, 0].isNaN ? 0 : self[l, 0]
+                var prev = self[l, start].isNaN ? 0 : self[l, start]
+                var prevH = 1
                 var skipped = 0
                 for hour in start+1 ..< start+slidingWidth {
-                    let d = self[l, hour] * Float(hour)
+                    let d = self[l, hour]
+                    let h = hour-start+1
                     if d.isNaN {
                         skipped += 1
                         continue
                     }
-                    self[l, hour] = (d - prev) / Float(skipped+1)
+                    self[l, hour] = (d * Float(h / (skipped+1)) - prev * Float(prevH / (skipped+1)))
                     prev = d
+                    prevH = h
                     skipped = 0
                 }
             }
@@ -470,24 +471,31 @@ extension Array2DFastTime {
                     let solC2 = solar2d[sHour + 1, sLocation]
                     let solC3 = solar2d[sHour + 2, sLocation]
                     let solC = (solC1 + solC2 + solC3) / 3
-                    let C = solC <= 0.0001 ? 0 : self[l, hour+2] / solC
+                    let C = solC <= 0.001 ? 0 : min(self[l, hour+2] / solC, 1100)
                     
                     let solB = solar2d[sHour - 1, sLocation]
-                    let B = solB <= 0.0001 ? C : self[l, hour-1] / solB
+                    let B = solB <= 0.001 ? 0 : min(self[l, hour-1] / solB, 1100)
                     
                     let solA = solar2d[sHour - 4, sLocation]
-                    let A = solA <= 0.0001 || hour-4 < 0 ? B : self[l, hour-4] / solA
+                    let A = solA <= 0.001 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
                     
                     let solD1 = solar2d[sHour + 3, sLocation]
                     let solD2 = solar2d[sHour + 4, sLocation]
                     let solD3 = solar2d[sHour + 5, sLocation]
                     let solD = (solD1 + solD2 + solD3) / 3
-                    let D = solD <= 0.0001 || hour+4 >= nTime ? C : self[l, hour+5] / solD
+                    let D = solD <= 0.001 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
                     
                     let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                     let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                     let c = -A/2.0 + C/2.0
                     let d = B
+                    
+                    /*if l == 477 * 1440 + 1087 {
+                        print(hour)
+                        print(self[l, hour-4 < 0 ? hour-1 : hour-4], self[l, hour-1], self[l, hour+2], self[l, hour+4 >= nTime ? hour+2 : hour+5])
+                        print(solA, solB, solC, solD)
+                        print(A,B,C,D)
+                    }*/
                     
                     self[l, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
                     self[l, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
