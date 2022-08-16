@@ -448,7 +448,7 @@ extension Array2DFastTime {
         // clearsky index is hermite interpolated and then back to actual radiation
         
         /// Which range of hours solar radiation data is required
-        let solarHours = positions.minAndMax().map { $0.min - 4 ..< $0.max + 6 } ?? 0..<0
+        let solarHours = positions.minAndMax().map { $0.min - 3 ..< $0.max + 7 } ?? 0..<0
         let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * dtSeconds), nTime: solarHours.count, dtSeconds: dtSeconds)
         
         /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
@@ -463,38 +463,31 @@ extension Array2DFastTime {
             
             for l in locationRange {
                 for hour in positions {
-                    let sHour = hour - solarHours.lowerBound
+                    let sHour = hour - solarHours.lowerBound + 1
                     let sLocation = l - locationRange.lowerBound
                     // point C and D are still 3 h averages
                     let solC1 = solar2d[sHour + 0, sLocation]
                     let solC2 = solar2d[sHour + 1, sLocation]
                     let solC3 = solar2d[sHour + 2, sLocation]
                     let solC = (solC1 + solC2 + solC3) / 3
-                    let C = solC <= 0.005 ? 0 : min(self[l, hour+2] / solC, 1100)
+                    let C = solC <= 0.0001 ? 0 : min(self[l, hour+2] / solC, 1100)
                     
                     let solB = solar2d[sHour - 1, sLocation]
-                    let B = solB <= 0.005 ? 0 : min(self[l, hour-1] / solB, 1100)
+                    let B = solB <= 0.0001 ? 0 : min(self[l, hour-1] / solB, 1100)
                     
                     let solA = solar2d[sHour - 4, sLocation]
-                    let A = solA <= 0.005 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
+                    let A = solA <= 0.0001 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
                     
                     let solD1 = solar2d[sHour + 3, sLocation]
                     let solD2 = solar2d[sHour + 4, sLocation]
                     let solD3 = solar2d[sHour + 5, sLocation]
                     let solD = (solD1 + solD2 + solD3) / 3
-                    let D = solD <= 0.005 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
+                    let D = solD <= 0.0001 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
                     
                     let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                     let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                     let c = -A/2.0 + C/2.0
                     let d = B
-                    
-                    /*if l == 477 * 1440 + 1087 {
-                        print(hour)
-                        print(self[l, hour-4 < 0 ? hour-1 : hour-4], self[l, hour-1], self[l, hour+2], self[l, hour+4 >= nTime ? hour+2 : hour+5])
-                        print(solA, solB, solC, solD)
-                        print(A,B,C,D)
-                    }*/
                     
                     self[l, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
                     self[l, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
