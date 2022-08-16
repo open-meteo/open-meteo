@@ -253,6 +253,24 @@
               Diffuse Solar Radiation
             </label>
           </div>
+          <div class="form-check debug-hidden">
+            <input class="form-check-input" type="checkbox" value="terrestrial_radiation_centered" id="terrestrial_radiation_centered" name="hourly">
+            <label class="form-check-label" for="terrestrial_radiation_centered">
+              Terrestrial Solar Radiation Center Averaged (debug only)
+            </label>
+          </div>
+          <div class="form-check debug-hidden">
+            <input class="form-check-input" type="checkbox" value="terrestrial_radiation_backwards" id="terrestrial_radiation_backwards" name="hourly">
+            <label class="form-check-label" for="terrestrial_radiation_backwards">
+              Terrestrial Solar Radiation Backwards Averaged (debug only)
+            </label>
+          </div>
+          <div class="form-check debug-hidden">
+            <input class="form-check-input" type="checkbox" value="terrestrial_radiation_instant" id="terrestrial_radiation_instant" name="hourly">
+            <label class="form-check-label" for="terrestrial_radiation_instant">
+              Terrestrial Solar Radiation Instant (debug only)
+            </label>
+          </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="direct_normal_irradiance" id="direct_normal_irradiance" name="hourly">
             <label class="form-check-label" for="direct_normal_irradiance">

@@ -494,8 +494,7 @@ struct NcepDownload: Command {
             case .nearest:
                 data2d.interpolate2StepsNearest(positions: forecastStepsToInterpolate)
             case .solar_backwards_averaged:
-                // GFS radiation is center averaged
-                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run.add(1800), dtSeconds: domain.dtSeconds)
+                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             case .hermite:
                 data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
             case .hermite_backwards_averaged:
@@ -514,7 +513,7 @@ struct NcepDownload: Command {
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             
             
-            try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
+            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
             
             logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
             let startOm = DispatchTime.now()

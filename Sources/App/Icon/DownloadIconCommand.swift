@@ -236,8 +236,7 @@ struct DownloadIconCommand: Command {
             case .nearest:
                 data2d.interpolate2StepsNearest(positions: forecastStepsToInterpolate)
             case .solar_backwards_averaged:
-                /// Radiation data is center averaged. E.g. 8 hour data is the average of 7:30 to 8:30
-                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run.add(1800), dtSeconds: domain.dtSeconds)
+                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             case .hermite:
                 data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
             case .hermite_backwards_averaged:
@@ -471,19 +470,19 @@ extension Array2DFastTime {
                     let solC2 = solar2d[sHour + 1, sLocation]
                     let solC3 = solar2d[sHour + 2, sLocation]
                     let solC = (solC1 + solC2 + solC3) / 3
-                    let C = solC <= 0.001 ? 0 : min(self[l, hour+2] / solC, 1100)
+                    let C = solC <= 0.005 ? 0 : min(self[l, hour+2] / solC, 1100)
                     
                     let solB = solar2d[sHour - 1, sLocation]
-                    let B = solB <= 0.001 ? 0 : min(self[l, hour-1] / solB, 1100)
+                    let B = solB <= 0.005 ? 0 : min(self[l, hour-1] / solB, 1100)
                     
                     let solA = solar2d[sHour - 4, sLocation]
-                    let A = solA <= 0.001 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
+                    let A = solA <= 0.005 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
                     
                     let solD1 = solar2d[sHour + 3, sLocation]
                     let solD2 = solar2d[sHour + 4, sLocation]
                     let solD3 = solar2d[sHour + 5, sLocation]
                     let solD = (solD1 + solD2 + solD3) / 3
-                    let D = solD <= 0.001 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
+                    let D = solD <= 0.005 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
                     
                     let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                     let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
