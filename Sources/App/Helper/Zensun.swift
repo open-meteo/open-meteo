@@ -53,25 +53,27 @@ struct ZensunFastTime {
 
         for indexY in yrange {
             let lat = grid.latMin + grid.dy * Float(indexY)
+            let t0=(90-lat).degreesToRadians
+            
             for indexX in 0..<grid.nx {
-                for t0 in stride(from: 0, to: t1.count, by: steps) {
-                    var sum = Float(0)
-                    for t in t0..<t0+steps {
-                        let t1 = t1[t]
-                        let p1 = p1[t]
-                        let rsun_square = rsun_square[t]
-                        
-                        let lon = grid.lonMin + grid.dx * Float(indexX)
-                        
-                        let t0=(90-lat).degreesToRadians
-                        let p0=lon.degreesToRadians
-                        let zz=cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
-                        let solfac=zz/rsun_square
-                        sum += max(solfac,0)
-                    }
-                    out.append(sum / Float(steps))
-                }
+                let lon = grid.lonMin + grid.dx * Float(indexX)
+                let p0=lon.degreesToRadians
                 
+                var sum = Float(0)
+                for t in t1.indices {
+                    let t1 = t1[t]
+                    let p1 = p1[t]
+                    let rsun_square = rsun_square[t]
+                    
+                    let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
+                    let solfac = zz/rsun_square
+                    sum += max(solfac,0)
+                    
+                    if t % steps == steps - 1 {
+                        out.append(sum / Float(steps))
+                        sum = 0
+                    }
+                }
             }
         }
         
