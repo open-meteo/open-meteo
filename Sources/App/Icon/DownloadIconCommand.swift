@@ -292,7 +292,7 @@ struct DownloadIconCommand: Command {
                 data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
             }
             
-            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
+            try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
             
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             let skip = variable.skipHour0 ? 1 : 0
@@ -334,7 +334,7 @@ struct DownloadIconCommand: Command {
         let variables = onlyVariables ?? IconVariable.allCases
         let logger = context.application.logger
 
-        let date = Timestamp.now().with(hour: run)
+        let date = Timestamp.now().add(-24*3600).with(hour: run)
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
 
         try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
@@ -450,39 +450,40 @@ extension Array2DFastTime {
         /// Which range of hours solar radiation data is required
         let solarHours = positions.minAndMax().map { $0.min - 3 ..< $0.max + 7 } ?? 0..<0
         let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * dtSeconds), nTime: solarHours.count, dtSeconds: dtSeconds)
+        let zensun = ZensunFastTime(timerange: solarTime, subsampleSteps: 60)
         
         /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
         let nx = grid.nx
-        let byY = 10
-        for cy in 0..<grid.ny/byY {
+        let byY = 2
+        for cy in 0..<grid.ny/byY+1 {
             let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
             let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
             /// solar array is fast space oriented
-            let solar_backwards = Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange)
-            let solar2d = Array2DFastSpace(data: solar_backwards, nLocations: locationRange.count, nTime: solarHours.count)
+            let solar2d = zensun.solfac(grid: grid, yrange: yrange) // Zensun.calculateRadiationBackwardsSubsampled(grid: grid, timerange: solarTime, yrange: yrange)
             
             for l in locationRange {
                 for hour in positions {
                     let sHour = hour - solarHours.lowerBound + 1
                     let sLocation = l - locationRange.lowerBound
                     // point C and D are still 3 h averages
-                    let solC1 = solar2d[sHour + 0, sLocation]
-                    let solC2 = solar2d[sHour + 1, sLocation]
-                    let solC3 = solar2d[sHour + 2, sLocation]
+                    let solC1 = solar2d[sLocation, sHour + 0]
+                    let solC2 = solar2d[sLocation, sHour + 1]
+                    let solC3 = solar2d[sLocation, sHour + 2]
                     let solC = (solC1 + solC2 + solC3) / 3
-                    let C = solC <= 0.0001 ? 0 : min(self[l, hour+2] / solC, 1100)
+                    // At low radiaiton levels it is impossible to estimate KT indices
+                    let C = solC <= 0.005 ? 0 : min(self[l, hour+2] / solC, 1100)
                     
-                    let solB = solar2d[sHour - 1, sLocation]
-                    let B = solB <= 0.0001 ? 0 : min(self[l, hour-1] / solB, 1100)
+                    let solB = solar2d[sLocation, sHour - 1]
+                    let B = solB <= 0.005 ? 0 : min(self[l, hour-1] / solB, 1100)
                     
-                    let solA = solar2d[sHour - 4, sLocation]
-                    let A = solA <= 0.0001 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
+                    let solA = solar2d[sLocation, sHour - 4]
+                    let A = solA <= 0.005 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
                     
-                    let solD1 = solar2d[sHour + 3, sLocation]
-                    let solD2 = solar2d[sHour + 4, sLocation]
-                    let solD3 = solar2d[sHour + 5, sLocation]
+                    let solD1 = solar2d[sLocation, sHour + 3]
+                    let solD2 = solar2d[sLocation, sHour + 4]
+                    let solD3 = solar2d[sLocation, sHour + 5]
                     let solD = (solD1 + solD2 + solD3) / 3
-                    let D = solD <= 0.0001 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
+                    let D = solD <= 0.005 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
                     
                     let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                     let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
