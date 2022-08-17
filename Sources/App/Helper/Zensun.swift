@@ -69,7 +69,7 @@ struct Zensun {
     }
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    /*public static func calculateRadiationBackwardsAveraged(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
+    public static func calculateRadiationBackwardsAveraged(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
         var out = [Float]()
         let yrange = yrange ?? 0..<grid.ny
         out.reserveCapacity(yrange.count * grid.nx * timerange.count)
@@ -84,6 +84,9 @@ struct Zensun {
             
             /// earth-sun distance in AU
             let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            
+            /// solar disk half-angle
+            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
             
             let latsun=decang
             /// universal time
@@ -114,34 +117,35 @@ struct Zensun {
                     if p0 > p1 + .pi {
                         p0 -= 2 * .pi
                     }
-
-                    let arg = acos(-(cos(t0)*cos(t1)))/(sin(t0)*sin(t1))
-
-                    let cos_p1_p0: Float
-                    if arg.isFinite {
-                        let p10_arg = min(p0 + arg, p10)
-                        let p1_arg = max(p0 - arg, p1)
-                        cos_p1_p0 = (sin(p10_arg-p0) - sin(p1_arg-p0)) / (p10_arg - p1_arg)
-                    } else {
-                        cos_p1_p0 = (sin(p10-p0) - sin(p1-p0)) / (p10-p1)
-                    }
-
+                    
+                    // limit p1 and p10 to sunrise/set
+                    let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+                    let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                    let sunrise = p0 + carg
+                    let sunset = p0 - carg
+                    let p1_l = min(sunrise, p10)
+                    let p10_l = max(sunset, p1)
+                    
+                    // solve integral to get sun elevation dt
+                    // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+                    let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+                    let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
                     /// sun elevation
-                    let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos_p1_p0
+                    let zz = (left-right) / (p1_l - p10_l)
                     if zz <= 0 {
                         out.append(0)
                     } else {
-                        let solfac=zz/(rsun*rsun)
+                        let solfac = zz / (rsun*rsun)
                         out.append(solfac)
                     }
                 }
             }
         }
         return out
-    }*/
+    }
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    public static func calculateRadiationBackwardsSubsampled(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil, steps: Int = 60) -> Array2DFastTime {
+    /*public static func calculateRadiationBackwardsSubsampled(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil, steps: Int = 60) -> Array2DFastTime {
         let yrange = yrange ?? 0..<grid.ny
         var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
         var temp = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: steps)
@@ -186,10 +190,10 @@ struct Zensun {
             }
         }
         return out
-    }
+    }*/
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    public static func calculateRadiationInstant(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {        
+    public static func calculateRadiationInstant(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
         var out = [Float]()
         let yrange = yrange ?? 0..<grid.ny
         out.reserveCapacity(yrange.count * grid.nx * timerange.count)
@@ -249,6 +253,12 @@ struct Zensun {
             
             let timestamp = startTime.timeIntervalSince1970 + dtSeconds * i
             let tt = Float(((timestamp % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            
+            /// earth-sun distance in AU
+            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            
+            /// solar disk half-angle
+            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
 
             let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
             let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
@@ -274,18 +284,20 @@ struct Zensun {
             let lonsun0 = -15.0*(ut0-12.0+eqtime)
             let p10 = lonsun0.degreesToRadians
 
-            let arg = acos(-(cos(t0)*cos(t1))/(sin(t0)*sin(t1)))
-
-            let cos_p1_p0: Float
-            if arg.isFinite {
-                let p10_arg = min(p0 + arg, p10)
-                let p1_arg = max(p0 - arg, p1)
-                cos_p1_p0 = (sin(p10_arg-p0) - sin(p1_arg-p0)) / (p10_arg - p1_arg)
-            } else {
-                cos_p1_p0 = (sin(p10-p0) - sin(p1-p0)) / (p10-p1)
-            }
-
-            let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos_p1_p0
+            // limit p1 and p10 to sunrise/set
+            let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+            let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+            let sunrise = p0 + carg
+            let sunset = p0 - carg
+            let p1_l = min(sunrise, p10)
+            let p10_l = max(sunset, p1)
+            
+            // solve integral to get sun elevation dt
+            // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+            let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+            let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+            /// sun elevation
+            let zz = (left-right) / (p1_l - p10_l)
             if zz <= 0 {
                 out.append(0)
                 continue

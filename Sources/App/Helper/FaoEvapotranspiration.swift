@@ -10,7 +10,7 @@ extension Meteorology {
     /// Watt per square meter
     public static func extraTerrestrialRadiationBackwards(latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
         // compute hourly mean radiation flux
-        return Zensun.calculateRadiationBackwardsSubsampled(grid: RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1), timerange: timerange).data.map {
+        return Zensun.calculateRadiationBackwardsAveraged(grid: RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1), timerange: timerange).map {
             $0 * solarConstant
         }
     }

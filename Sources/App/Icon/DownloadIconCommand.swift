@@ -457,8 +457,9 @@ extension Array2DFastTime {
         for cy in 0..<grid.ny/byY+1 {
             let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
             let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
-            /// solar array is fast space oriented
-            let solar2d = Zensun.calculateRadiationBackwardsSubsampled(grid: grid, timerange: solarTime, yrange: yrange)
+            /// solar factor, backwards averaged over dt
+            let solar2d = Array2DFastSpace(data: Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange), nLocations: locationRange.count, nTime: solarTime.count).transpose()
+            // Zensun.calculateRadiationBackwardsSubsampled(grid: grid, timerange: solarTime, yrange: yrange)
             
             for l in locationRange {
                 for hour in positions {
