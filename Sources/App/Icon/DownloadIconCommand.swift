@@ -292,7 +292,7 @@ struct DownloadIconCommand: Command {
                 data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
             }
             
-            try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
+            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
             
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             let skip = variable.skipHour0 ? 1 : 0
@@ -334,7 +334,7 @@ struct DownloadIconCommand: Command {
         let variables = onlyVariables ?? IconVariable.allCases
         let logger = context.application.logger
 
-        let date = Timestamp.now().add(-24*3600).with(hour: run)
+        let date = Timestamp.now().with(hour: run)
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
 
         try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
@@ -458,8 +458,7 @@ extension Array2DFastTime {
             let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
             let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
             /// solar factor, backwards averaged over dt
-            let solar2d = Array2DFastSpace(data: Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange), nLocations: locationRange.count, nTime: solarTime.count).transpose()
-            // Zensun.calculateRadiationBackwardsSubsampled(grid: grid, timerange: solarTime, yrange: yrange)
+            let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange)
             
             for l in locationRange {
                 for hour in positions {
