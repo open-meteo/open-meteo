@@ -448,22 +448,21 @@ extension Array2DFastTime {
         // clearsky index is hermite interpolated and then back to actual radiation
         
         /// Which range of hours solar radiation data is required
-        let solarHours = positions.minAndMax().map { $0.min - 3 ..< $0.max + 7 } ?? 0..<0
+        let solarHours = positions.minAndMax().map { $0.min - 4 ..< $0.max + 7 } ?? 0..<0
         let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * dtSeconds), nTime: solarHours.count, dtSeconds: dtSeconds)
-        let zensun = ZensunFastTime(timerange: solarTime, subsampleSteps: 60)
         
         /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
         let nx = grid.nx
-        let byY = 2
+        let byY = 1
         for cy in 0..<grid.ny/byY+1 {
             let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
             let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
             /// solar array is fast space oriented
-            let solar2d = zensun.solfac(grid: grid, yrange: yrange) // Zensun.calculateRadiationBackwardsSubsampled(grid: grid, timerange: solarTime, yrange: yrange)
+            let solar2d = Zensun.calculateRadiationBackwardsSubsampled(grid: grid, timerange: solarTime, yrange: yrange)
             
             for l in locationRange {
                 for hour in positions {
-                    let sHour = hour - solarHours.lowerBound + 1
+                    let sHour = hour - solarHours.lowerBound
                     let sLocation = l - locationRange.lowerBound
                     // point C and D are still 3 h averages
                     let solC1 = solar2d[sLocation, sHour + 0]

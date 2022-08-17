@@ -1,86 +1,6 @@
 import Foundation
 
 
-struct ZensunFastTime {
-    let t1: [Float]
-    let p1: [Float]
-    let rsun_square: [Float]
-    let steps: Int
-    
-    /// Caclulate backwards averaged solar factor
-    /// if timerange is 1, instant values are returned
-    public init(timerange: TimerangeDt, subsampleSteps: Int) {
-        let subsampledTime = subsampleSteps == 1 ? timerange : TimerangeDt(start: timerange.range.lowerBound.add(-1 * timerange.dtSeconds), to: timerange.range.upperBound.add(-1 * timerange.dtSeconds), dtSeconds: timerange.dtSeconds/subsampleSteps)
-        
-        var array_t1 = [Float]()
-        var array_p1 = [Float]()
-        var array_rsun_square = [Float]()
-        array_t1.reserveCapacity(subsampledTime.count)
-        array_p1.reserveCapacity(subsampledTime.count)
-        array_rsun_square.reserveCapacity(subsampledTime.count)
-        
-        for subTimestamp in subsampledTime {
-            /// fractional day number with 12am 1jan = 1
-            let tt = Float(((subTimestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
-            let rsun=1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
-            let rsun_square = rsun*rsun
-
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = Zensun.eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = Zensun.dec.interpolateLinear(Int(tt - 1)/5, fraction)
-
-            let latsun=decang
-            let ut = Float(((subTimestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
-            let t1 = (90-latsun).degreesToRadians
-            
-            let lonsun = -15.0*(ut-12.0+eqtime)
-            let p1 = lonsun.degreesToRadians
-            array_t1.append(t1)
-            array_p1.append(p1)
-            array_rsun_square.append(rsun_square)
-        }
-        
-        t1 = array_t1
-        p1 = array_p1
-        rsun_square = array_rsun_square
-        steps = subsampleSteps
-    }
-    
-    public func solfac(grid: RegularGrid, yrange: Range<Int>? = nil) -> Array2DFastTime {
-        let yrange = yrange ?? 0..<grid.ny
-        var out = [Float]()
-        out.reserveCapacity(yrange.count * grid.nx * p1.count / steps)
-
-        for indexY in yrange {
-            let lat = grid.latMin + grid.dy * Float(indexY)
-            let t0=(90-lat).degreesToRadians
-            
-            for indexX in 0..<grid.nx {
-                let lon = grid.lonMin + grid.dx * Float(indexX)
-                let p0=lon.degreesToRadians
-                
-                var sum = Float(0)
-                for t in t1.indices {
-                    let t1 = t1[t]
-                    let p1 = p1[t]
-                    let rsun_square = rsun_square[t]
-                    
-                    let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
-                    let solfac = zz/rsun_square
-                    sum += max(solfac,0)
-                    
-                    if t % steps == steps - 1 {
-                        out.append(sum / Float(steps))
-                        sum = 0
-                    }
-                }
-            }
-        }
-        
-        return Array2DFastTime(data: out, nLocations: yrange.count * grid.nx, nTime: p1.count / steps)
-    }
-}
-
 /// Solar position calculations based on zensun
 /// See https://gist.github.com/sangholee1990/eb3d997a9b28ace2dbcab6a45fd7c178#file-visualization_using_sun_position-pro-L306
 struct Zensun {
@@ -221,53 +141,55 @@ struct Zensun {
     }*/
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    /*public static func calculateRadiationBackwardsSubsampled(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil, steps: Int = 60) -> Array2DFastTime {
+    public static func calculateRadiationBackwardsSubsampled(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil, steps: Int = 60) -> Array2DFastTime {
         let yrange = yrange ?? 0..<grid.ny
         var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
         var temp = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: steps)
         
-        for (t1, timestamp) in timerange.enumerated() {
-            for (t, timestamp) in TimerangeDt(start: timestamp.add(-1 * timerange.dtSeconds), to: timestamp, dtSeconds: timerange.dtSeconds/steps).enumerated() {
-                /// fractional day number with 12am 1jan = 1
-                let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
-                let rsun=1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
-                let rsun_square = rsun*rsun
+        let subsampledTime = steps == 1 ? timerange : TimerangeDt(start: timerange.range.lowerBound.add(-1 * timerange.dtSeconds), to: timerange.range.upperBound.add(-1 * timerange.dtSeconds), dtSeconds: timerange.dtSeconds/steps)
+        
+        for (t, timestamp) in subsampledTime.enumerated() {
+            /// fractional day number with 12am 1jan = 1
+            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            let rsun=1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            let rsun_square = rsun*rsun
 
-                let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-                let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-                let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
+            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
+            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
 
-                let latsun=decang
-                let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
-                let t1 = (90-latsun).degreesToRadians
-                
-                let lonsun = -15.0*(ut-12.0+eqtime)
-                let p1 = lonsun.degreesToRadians
-                
-                var l = 0
-                for indexY in yrange {
-                    let lat = grid.latMin + grid.dy * Float(indexY)
-                    for indexX in 0..<grid.nx {
-                        let lon = grid.lonMin + grid.dx * Float(indexX)
-                        
-                        let t0=(90-lat).degreesToRadians
-                        let p0=lon.degreesToRadians
-                        let zz=cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
-                        let solfac=zz/rsun_square
-                        temp[l, t] = max(solfac,0)
-                        l += 1
-                    }
+            let latsun=decang
+            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let t1 = (90-latsun).degreesToRadians
+            
+            let lonsun = -15.0*(ut-12.0+eqtime)
+            let p1 = lonsun.degreesToRadians
+            
+            var l = 0
+            for indexY in yrange {
+                let lat = grid.latMin + grid.dy * Float(indexY)
+                for indexX in 0..<grid.nx {
+                    let lon = grid.lonMin + grid.dx * Float(indexX)
+                    
+                    let t0=(90-lat).degreesToRadians
+                    let p0=lon.degreesToRadians
+                    let zz=cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
+                    let solfac=zz/rsun_square
+                    temp[l, t % steps] = max(solfac,0)
+                    l += 1
                 }
             }
-            for l in 0..<temp.nLocations {
-                out[l, t1] = temp[l, 0..<steps].reduce(Float(0), +) / Float(steps)
+            if t % steps == steps - 1 {
+                for l in 0..<temp.nLocations {
+                    out[l, t/steps] = temp[l, 0..<steps].reduce(Float(0), +) / Float(steps)
+                }
             }
         }
         return out
-    }*/
+    }
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    /*public static func calculateRadiationInstant(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
+    public static func calculateRadiationInstant(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {        
         var out = [Float]()
         let yrange = yrange ?? 0..<grid.ny
         out.reserveCapacity(yrange.count * grid.nx * timerange.count)
@@ -303,7 +225,7 @@ struct Zensun {
             }
         }
         return out
-    }*/
+    }
     
     /// Calculate DNI based on zenith angle
     public static func caluclateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, startTime: Timestamp, dtSeconds: Int) -> [Float] {
