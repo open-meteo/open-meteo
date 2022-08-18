@@ -26,6 +26,12 @@ struct Array2D {
     mutating func shift180LongitudeAndFlipLatitude() {
         data.shift180LongitudeAndFlipLatitude(nt: 1, ny: ny, nx: nx)
     }
+    
+    func ensureDimensions(of grid: RegularGrid) {
+        guard nx == grid.nx && ny == grid.ny else {
+            fatalError("GRIB dimensions (nx=\(nx), ny=\(ny)) do not match domain grid dimensions (nx=\(grid.nx), ny=\(grid.ny))")
+        }
+    }
 }
 
 struct Array2DFastSpace {

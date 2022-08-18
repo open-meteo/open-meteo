@@ -474,7 +474,7 @@ extension GfsMixer {
             let frozen_precipitation_percent = try get(variable: .frozen_precipitation_percent).data
             let precipitation = try get(variable: .precipitation).data
             let snowfall = zip(frozen_precipitation_percent, precipitation).map({
-                $0/100 * $1 * 0.7
+                max($0/100 * $1 * 0.7, 0)
             })
             return DataAndUnit(snowfall, SiUnit.centimeter)
         case .relativehumitidy_2m:

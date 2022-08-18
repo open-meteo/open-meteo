@@ -22,7 +22,17 @@ enum NcepDomain: String, GenericDomain {
     }
     
     var elevationFile: OmFileReader? {
-        return nil
+        switch self {
+        case .gfs025:
+            return Self.gfs025ElevationFile
+        }
+    }
+    
+    private static var gfs025ElevationFile = try? OmFileReader(file: Self.gfs025.surfaceElevationFileOm)
+    
+    /// Filename of the surface elevation file
+    var surfaceElevationFileOm: String {
+        "\(omfileDirectory)HSURF.om"
     }
     
     var forecastHours: [Int] {
@@ -334,7 +344,7 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable, Codable, GenericVar
         case .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
-            return (1, 1/100)
+            return (1/100, 1)
         case .soil_temperature_0_to_10cm:
             return (1, -273.15)
         case .soil_temperature_10_to_40cm:
@@ -403,17 +413,13 @@ struct NcepDownload: Command {
         }
     }
     
-    /// download cfs domain
-    /*func downloadCfsElevation(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
+    func downloadNcepElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: RegularGrid) throws {
         /// download seamask and height
-        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
         
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        
         logger.info("Downloading height and elevation data")
-        let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
         
         enum ElevationVariable: String, CurlIndexedVariable, CaseIterable {
             case height
@@ -435,6 +441,7 @@ struct NcepDownload: Command {
         for (variable, data2) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
             var data = data2
             data.shift180LongitudeAndFlipLatitude()
+            data.ensureDimensions(of: grid)
             switch variable {
             case .height:
                 height = data
@@ -450,11 +457,15 @@ struct NcepDownload: Command {
             // landmask: 0=sea, 1=land
             height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
         }
-        try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: height.data)
-    }*/
+        try OmFileWriter.write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20, all: height.data)
+    }
     
     func downloadGfs(logger: Logger, domain: NcepDomain, run: Timestamp, variables: [GfsVariable], skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        
+        let elevationUrl = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f000"
+        try downloadNcepElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid)
         
         let curl = Curl(logger: logger)
         let forecastHours = domain.forecastHours
@@ -476,6 +487,7 @@ struct NcepDownload: Command {
             for (variable, data) in try curl.downloadIndexedGrib(url: url, variables: variables) {
                 var data = data
                 data.shift180LongitudeAndFlipLatitude()
+                data.ensureDimensions(of: domain.grid)
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
@@ -486,7 +498,6 @@ struct NcepDownload: Command {
     
     /// Process each variable and update time-series optimised files
     func convertGfs(logger: Logger, domain: NcepDomain, variables: [GfsVariable], run: Timestamp) throws {
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours
         let nForecastHours = forecastHours.max()!+1
