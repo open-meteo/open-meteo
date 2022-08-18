@@ -82,6 +82,9 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
     case latent_heatflux
     
     case showers
+    
+    /// CPOFP Percent frozen precipitation
+    case frozen_precipitation_percent
     //case rain
     //case snowfall_convective_water_equivalent
     //case snowfall_water_equivalent
@@ -92,6 +95,11 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
     // diff could be estimated with https://arxiv.org/pdf/2007.01639.pdf 3) method
     //case diffuse_radiation
     //case direct_radiation
+    
+    case cape
+    case lifted_index
+    
+    case visibility
     
     var omFileName: String {
         return rawValue
@@ -137,6 +145,10 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .showers: return 10
         case .pressure_msl: return 10
         case .shortwave_radiation: return 1
+        case .frozen_precipitation_percent: return 1
+        case .cape: return 0.1
+        case .lifted_index: return 50
+        case .visibility: return 0.1
         }
     }
     
@@ -170,6 +182,10 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .freezinglevel_height: return .meter
         case .pressure_msl: return .hectoPascal
         case .shortwave_radiation: return .wattPerSquareMeter
+        case .frozen_precipitation_percent: return .percent
+        case .cape: return .joulesPerKilogram
+        case .lifted_index: return .dimensionless
+        case .visibility: return .meter
         }
     }
     
@@ -178,6 +194,7 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .shortwave_radiation: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
+        case .frozen_precipitation_percent: return true
         default: return false
         }
     }
@@ -223,6 +240,10 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .u_80m: return .hermite
         case .showers: return .linear
         case .pressure_msl: return .hermite
+        case .frozen_precipitation_percent: return .linear
+        case .cape: return .hermite
+        case .lifted_index: return .hermite
+        case .visibility: return .hermite
         }
     }
     
@@ -290,6 +311,14 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
             return ":HGT:0C isotherm:"
         case .shortwave_radiation:
             return ":DSWRF:surface:"
+        case .frozen_precipitation_percent:
+            return ":CPOFP:surface:0-"
+        case .cape:
+            return ":CAPE:surface:"
+        case .lifted_index:
+            return ":LFTX:surface:"
+        case .visibility:
+            return ":VIS:surface:"
         }
     }
     
