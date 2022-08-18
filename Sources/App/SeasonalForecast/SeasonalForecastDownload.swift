@@ -154,7 +154,7 @@ struct SeasonalForecastDownload: Command {
             try GribFile.readAndConvert(logger: logger, gribName: "tmax", member: member, domain: domain, add: -273.15).first!.value
                     .writeCfs(om: om, logger: logger, variable: .temperature_2m_max, member: member, run: run, dtSeconds: domain.dtSeconds)
             try GribFile.readAndConvert(logger: logger, gribName: "soilt1", member: member, domain: domain, add: -273.15).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_temperature_0_to_10_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+                    .writeCfs(om: om, logger: logger, variable: .soil_temperature_0_to_10cm, member: member, run: run, dtSeconds: domain.dtSeconds)
             
             try GribFile.readAndConvert(logger: logger, gribName: "dswsfc", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .shortwave_radiation, member: member, run: run, dtSeconds: domain.dtSeconds)
@@ -166,16 +166,16 @@ struct SeasonalForecastDownload: Command {
                     .writeCfs(om: om, logger: logger, variable: .total_precipitation, member: member, run: run, dtSeconds: domain.dtSeconds)
             
             try GribFile.readAndConvert(logger: logger, gribName: "tcdcclm", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .total_cloud_cover, member: member, run: run, dtSeconds: domain.dtSeconds)
+                    .writeCfs(om: om, logger: logger, variable: .cloudcover, member: member, run: run, dtSeconds: domain.dtSeconds)
 
             try GribFile.readAndConvert(logger: logger, gribName: "soilm1", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_0_to_10_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_0_to_10cm, member: member, run: run, dtSeconds: domain.dtSeconds)
             try GribFile.readAndConvert(logger: logger, gribName: "soilm2", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_10_to_40_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_10_to_40cm, member: member, run: run, dtSeconds: domain.dtSeconds)
             try GribFile.readAndConvert(logger: logger, gribName: "soilm3", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_40_to_100_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_40_to_100cm, member: member, run: run, dtSeconds: domain.dtSeconds)
             try GribFile.readAndConvert(logger: logger, gribName: "soilm4", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_100_to_200_cm, member: member, run: run, dtSeconds: domain.dtSeconds)
+                    .writeCfs(om: om, logger: logger, variable: .soil_moisture_100_to_200cm, member: member, run: run, dtSeconds: domain.dtSeconds)
 
             // in a closure to release memory
             try {

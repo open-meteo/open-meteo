@@ -158,13 +158,13 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     case temperature_2m
     case temperature_2m_max
     case temperature_2m_min
-    case soil_moisture_0_to_10_cm
-    case soil_moisture_10_to_40_cm
-    case soil_moisture_40_to_100_cm
-    case soil_moisture_100_to_200_cm
-    case soil_temperature_0_to_10_cm
+    case soil_moisture_0_to_10cm
+    case soil_moisture_10_to_40cm
+    case soil_moisture_40_to_100cm
+    case soil_moisture_100_to_200cm
+    case soil_temperature_0_to_10cm
     case shortwave_radiation
-    case total_cloud_cover
+    case cloudcover
     case wind_u_component_10m
     case wind_v_component_10m
     case total_precipitation
@@ -192,19 +192,19 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return 20
         case .temperature_2m_min:
             return 20
-        case .soil_moisture_0_to_10_cm:
+        case .soil_moisture_0_to_10cm:
             return 1000
-        case .soil_moisture_10_to_40_cm:
+        case .soil_moisture_10_to_40cm:
             return 1000
-        case .soil_moisture_40_to_100_cm:
+        case .soil_moisture_40_to_100cm:
             return 1000
-        case .soil_moisture_100_to_200_cm:
+        case .soil_moisture_100_to_200cm:
             return 1000
-        case .soil_temperature_0_to_10_cm:
+        case .soil_temperature_0_to_10cm:
             return 20
         case .shortwave_radiation:
             return 1
-        case .total_cloud_cover:
+        case .cloudcover:
             return 1
         case .wind_u_component_10m:
             return 10
@@ -229,19 +229,19 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return .celsius
         case .temperature_2m_min:
             return .celsius
-        case .soil_moisture_0_to_10_cm:
+        case .soil_moisture_0_to_10cm:
             return .qubicMeterPerQubicMeter
-        case .soil_moisture_10_to_40_cm:
+        case .soil_moisture_10_to_40cm:
             return .qubicMeterPerQubicMeter
-        case .soil_moisture_40_to_100_cm:
+        case .soil_moisture_40_to_100cm:
             return .qubicMeterPerQubicMeter
-        case .soil_moisture_100_to_200_cm:
+        case .soil_moisture_100_to_200cm:
             return .qubicMeterPerQubicMeter
-        case .soil_temperature_0_to_10_cm:
+        case .soil_temperature_0_to_10cm:
             return .celsius
         case .shortwave_radiation:
             return .wattPerSquareMeter
-        case .total_cloud_cover:
+        case .cloudcover:
             return .percent
         case .wind_u_component_10m:
             return .ms

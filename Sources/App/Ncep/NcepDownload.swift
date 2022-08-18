@@ -147,8 +147,8 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .shortwave_radiation: return 1
         case .frozen_precipitation_percent: return 1
         case .cape: return 0.1
-        case .lifted_index: return 50
-        case .visibility: return 0.1
+        case .lifted_index: return 10
+        case .visibility: return 0.05 // 50 meter
         }
     }
     
@@ -194,7 +194,6 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .shortwave_radiation: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
-        case .frozen_precipitation_percent: return true
         default: return false
         }
     }
@@ -240,7 +239,7 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .u_80m: return .hermite
         case .showers: return .linear
         case .pressure_msl: return .hermite
-        case .frozen_precipitation_percent: return .linear
+        case .frozen_precipitation_percent: return .nearest
         case .cape: return .hermite
         case .lifted_index: return .hermite
         case .visibility: return .hermite
@@ -312,7 +311,7 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
         case .shortwave_radiation:
             return ":DSWRF:surface:"
         case .frozen_precipitation_percent:
-            return ":CPOFP:surface:0-"
+            return ":CPOFP:surface:"
         case .cape:
             return ":CAPE:surface:"
         case .lifted_index:
@@ -470,7 +469,9 @@ struct NcepDownload: Command {
                 var data = data
                 data.shift180LongitudeAndFlipLatitude()
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
-                try FloatArrayCompressor.write(file: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg", data: data.data)
+                let file = "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg"
+                try FileManager.default.removeItemIfExists(at: file)
+                try FloatArrayCompressor.write(file: file, data: data.data)
             }
         }
     }
@@ -542,7 +543,7 @@ struct NcepDownload: Command {
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             
             
-            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
+            try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
             
             logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
             let startOm = DispatchTime.now()
