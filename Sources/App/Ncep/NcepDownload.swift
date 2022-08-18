@@ -4,7 +4,7 @@ import SwiftPFor2D
 import SwiftEccodes
 
 
-enum NcepDomain: String {
+enum NcepDomain: String, GenericDomain {
     case gfs025
     
     var omfileDirectory: String {
@@ -48,7 +48,7 @@ enum NcepDomain: String {
 }
 
 
-enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
+enum GfsVariable: String, CurlIndexedVariable, CaseIterable, Codable, GenericVariableMixing {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -100,6 +100,14 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable {
     case lifted_index
     
     case visibility
+    
+    var interpolation: ReaderInterpolation {
+        fatalError("Gfs interpolation not required for reader. Already 1h")
+    }
+    
+    var isElevationCorrectable: Bool {
+        return self == .temperature_2m
+    }
     
     var omFileName: String {
         return rawValue
@@ -543,7 +551,7 @@ struct NcepDownload: Command {
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             
             
-            try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
+            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
             
             logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
             let startOm = DispatchTime.now()
