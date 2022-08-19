@@ -115,7 +115,7 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, data: Array2D)> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, message: GribMessage)> {
         
         guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
             fatalError("Could not decode index to string")
@@ -164,7 +164,7 @@ struct Curl {
                 guard let (variable, message) = itr.next() else {
                     return nil
                 }
-                return (variable, message.toArray2d())
+                return (variable, message)
             }
         }
     }

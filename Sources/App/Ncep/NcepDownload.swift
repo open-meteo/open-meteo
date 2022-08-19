@@ -539,8 +539,8 @@ struct NcepDownload: Command {
         var height: Array2D? = nil
         var landmask: Array2D? = nil
         let curl = Curl(logger: logger)
-        for (variable, data2) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
-            var data = data2
+        for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
+            var data = message.toArray2d()
             data.shift180LongitudeAndFlipLatitude()
             data.ensureDimensions(of: grid)
             switch variable {
@@ -590,8 +590,14 @@ struct NcepDownload: Command {
             }
 
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            for (variable, data) in try curl.downloadIndexedGrib(url: url, variables: variables) {
-                var data = data
+            for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: variables) {
+                var data = message.toArray2d()
+                /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
+                    if i % 10_000 == 0 {
+                        print("grid \(i) lat \(latitude) lon \(longitude)")
+                    }
+                }
+                fatalError("OK")*/
                 data.shift180LongitudeAndFlipLatitude()
                 data.ensureDimensions(of: domain.grid)
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")

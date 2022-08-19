@@ -57,5 +57,49 @@ final class DataTests: XCTestCase {
         let coords2 = nam.getCoordinates(gridpoint: pos2!)
         XCTAssertEqual(coords2.latitude, 34, accuracy: 0.01)
         XCTAssertEqual(coords2.longitude, -118, accuracy: 0.1)
+        
+        /**
+         Reference coordinates directly from grib files
+         grid 0 lat 21.137999999999987 lon 237.28
+         grid 10000 lat 24.449714395051082 lon 265.54789437771944
+         grid 20000 lat 22.73382904757237 lon 242.93190409785294
+         grid 30000 lat 24.37172305316154 lon 271.6307003393202
+         grid 40000 lat 24.007414634071907 lon 248.77817290935954
+         grid 50000 lat 23.92956253690586 lon 277.6758828800758
+         grid 60000 lat 24.937347048060033 lon 254.77970943979457
+         grid 70000 lat 23.130905651993345 lon 283.6325521390893
+         grid 80000 lat 25.507667211833265 lon 260.89010896163796
+         grid 90000 lat 22.73233463791032 lon 238.2565604901472
+         grid 100000 lat 25.70845087988845 lon 267.05749210570485
+         grid 110000 lat 24.27971890479045 lon 244.03343538654653
+         grid 120000 lat 25.536179388163767 lon 273.2269959284081
+         grid 130000 lat 25.49286327123711 lon 250.00358615972618
+         grid 140000 lat 24.993872521998018 lon 279.34364486922533
+         grid 150000 lat 26.351142186999365 lon 256.1244717049604
+         grid 160000 lat 24.090974440586336 lon 285.35523633547
+         grid 170000 lat 26.83968158648545 lon 262.34612554931914
+         grid 180000 lat 24.32811370921869 lon 239.2705262869787
+         */
+        
+        XCTAssertEqual(nam.findPoint(lat: 21.137999999999987, lon: 237.28), 0)
+        XCTAssertEqual(nam.findPoint(lat: 24.449714395051082, lon: 265.54789437771944), 10000)
+        XCTAssertEqual(nam.findPoint(lat: 22.73382904757237 , lon: 242.93190409785294), 20000)
+        XCTAssertEqual(nam.findPoint(lat: 24.37172305316154, lon: 271.6307003393202), 30000)
+        XCTAssertEqual(nam.findPoint(lat: 24.007414634071907, lon: 248.77817290935954), 40000)
+        
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 0).latitude, 21.137999999999987, accuracy: 0.001)
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 0).longitude, 237.28 - 360, accuracy: 0.001)
+        
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 10000).latitude, 24.449714395051082, accuracy: 0.001)
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 10000).longitude, 265.54789437771944 - 360, accuracy: 0.001)
+        
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 20000).latitude, 22.73382904757237, accuracy: 0.001)
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 20000).longitude, 242.93190409785294 - 360, accuracy: 0.001)
+        
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 30000).latitude, 24.37172305316154, accuracy: 0.001)
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 30000).longitude, 271.6307003393202 - 360, accuracy: 0.001)
+        
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).latitude, 24.007414634071907, accuracy: 0.001)
+        XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).longitude, 248.77817290935954 - 360, accuracy: 0.001)
     }
 }
