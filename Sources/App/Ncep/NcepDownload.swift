@@ -23,6 +23,10 @@ enum NcepDomain: String, GenericDomain {
         return 3600
     }
     
+    var isGlobal: Bool {
+        return self == .gfs025
+    }
+    
     var elevationFile: OmFileReader? {
         switch self {
         case .gfs025:
@@ -514,7 +518,7 @@ struct NcepDownload: Command {
         }
     }
     
-    func downloadNcepElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: Gridable) throws {
+    func downloadNcepElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) throws {
         /// download seamask and height
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
@@ -541,7 +545,9 @@ struct NcepDownload: Command {
         let curl = Curl(logger: logger)
         for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
             var data = message.toArray2d()
-            data.shift180LongitudeAndFlipLatitude()
+            if isGlobal {
+                data.shift180LongitudeAndFlipLatitude()
+            }
             data.ensureDimensions(of: grid)
             switch variable {
             case .height:
@@ -567,7 +573,7 @@ struct NcepDownload: Command {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0)
-        try downloadNcepElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid)
+        try downloadNcepElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         
         let curl = Curl(logger: logger)
         let forecastHours = domain.forecastHours
@@ -598,7 +604,9 @@ struct NcepDownload: Command {
                     }
                 }
                 fatalError("OK")*/
-                data.shift180LongitudeAndFlipLatitude()
+                if domain.isGlobal {
+                    data.shift180LongitudeAndFlipLatitude()
+                }
                 data.ensureDimensions(of: domain.grid)
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"

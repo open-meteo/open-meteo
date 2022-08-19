@@ -80,7 +80,7 @@ struct SeasonalForecastDownload: Command {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
-        try NcepDownload().downloadNcepElevation(logger: logger, url: url, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid)
+        try NcepDownload().downloadNcepElevation(logger: logger, url: url, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
     }
     
     func downloadCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool) throws {
