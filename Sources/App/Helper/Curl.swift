@@ -156,23 +156,32 @@ struct Curl {
         //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
         return try data.withUnsafeBytes { data in
             let grib = try GribMemory(ptr: data)
+            if grib.messages.count != matches.count {
+                fatalError("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(grib.messages.count)")
+            }
             var itr = zip(matches, grib.messages).makeIterator()
             return AnyIterator {
                 guard let (variable, message) = itr.next() else {
                     return nil
                 }
-                guard let data = try? message.getDouble().map(Float.init) else {
-                    fatalError("Could not read GRIB data for variable \(variable)")
-                }
-                guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
-                    fatalError("Could not get Nx")
-                }
-                guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
-                    fatalError("Could not get Ny")
-                }
-                return (variable, Array2D(data: data, nx: nx, ny: ny))
+                return (variable, message.toArray2d())
             }
         }
+    }
+}
+
+extension GribMessage {
+    func toArray2d() -> Array2D {
+        guard let data = try? getDouble().map(Float.init) else {
+            fatalError("Could not read GRIB data")
+        }
+        guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
+            fatalError("Could not get Nx")
+        }
+        guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
+            fatalError("Could not get Ny")
+        }
+        return Array2D(data: data, nx: nx, ny: ny)
     }
 }
 

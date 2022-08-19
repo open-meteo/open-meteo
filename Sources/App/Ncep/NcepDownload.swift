@@ -6,6 +6,8 @@ import SwiftEccodes
 
 enum NcepDomain: String, GenericDomain {
     case gfs025
+    case nam_conus
+    case hrrr_conus
     
     var omfileDirectory: String {
         return "./data/omfile-\(rawValue)/"
@@ -25,10 +27,16 @@ enum NcepDomain: String, GenericDomain {
         switch self {
         case .gfs025:
             return Self.gfs025ElevationFile
+        case .nam_conus:
+            return Self.namConusElevationFile
+        case .hrrr_conus:
+            return Self.hrrrConusElevationFile
         }
     }
     
     private static var gfs025ElevationFile = try? OmFileReader(file: Self.gfs025.surfaceElevationFileOm)
+    private static var namConusElevationFile = try? OmFileReader(file: Self.nam_conus.surfaceElevationFileOm)
+    private static var hrrrConusElevationFile = try? OmFileReader(file: Self.hrrr_conus.surfaceElevationFileOm)
     
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
@@ -39,13 +47,21 @@ enum NcepDomain: String, GenericDomain {
         switch self {
         case .gfs025:
             return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
+        case .nam_conus:
+            return Array(0...60)
+        case .hrrr_conus:
+            return Array(0...48)
         }
     }
     
     var omFileLength: Int {
         switch self {
+        case .nam_conus:
+            return 60 + 4*24
         case .gfs025:
             return 384 + 1 + 4*24
+        case .hrrr_conus:
+            return 48 + 1 + 4*24
         }
     }
     
@@ -53,12 +69,33 @@ enum NcepDomain: String, GenericDomain {
         switch self {
         case .gfs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+        case .nam_conus:
+            /// TODO labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
+            return RegularGrid(nx: 1799, ny: 1059, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+        case .hrrr_conus:
+            return RegularGrid(nx: 1799, ny: 1059, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+        }
+    }
+    
+    func getGribUrl(run: Timestamp, forecastHour: Int) -> String {
+        //https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20220813/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
+        //https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.20220818/nam.t00z.conusnest.hiresf00.tm00.grib2.idx
+        //https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.20220818/conus/hrrr.t00z.wrfnatf00.grib2
+        let fHH = forecastHour.zeroPadded(len: 2)
+        let fHHH = forecastHour.zeroPadded(len: 3)
+        switch self {
+        case .gfs025:
+            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f\(fHHH)"
+        case .nam_conus:
+            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
+        case .hrrr_conus:
+            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfnatf\(fHH).grib2"
         }
     }
 }
 
 
-enum GfsVariable: String, CurlIndexedVariable, CaseIterable, Codable, GenericVariableMixing {
+enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -272,8 +309,83 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable, Codable, GenericVar
         }
     }
     
-    var gribIndexName: String {
+    var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
+        case .temperature_2m:
+            return (1, -273.15)
+        case .pressure_msl:
+            return (1/100, 1)
+        case .soil_temperature_0_to_10cm:
+            return (1, -273.15)
+        case .soil_temperature_10_to_40cm:
+            return (1, -273.15)
+        case .soil_temperature_40_to_100cm:
+            return (1, -273.15)
+        case .soil_temperature_100_to_200cm:
+            return (1, -273.15)
+        default:
+            return nil
+        }
+    }
+}
+
+struct GfsVariableAndDomain: CurlIndexedVariable {
+    let variable: GfsVariable
+    let domain: NcepDomain
+    
+    var isAvailable: Bool {
+        if domain == .nam_conus && variable == .showers {
+            return false
+        }
+        if domain == .hrrr_conus {
+            switch variable {
+            case .showers:
+                fallthrough
+            case .soil_moisture_0_to_10cm:
+                fallthrough
+            case .soil_moisture_10_to_40cm:
+                fallthrough
+            case .soil_moisture_40_to_100cm:
+                fallthrough
+            case .soil_moisture_100_to_200cm:
+                fallthrough
+            case .soil_temperature_0_to_10cm:
+                fallthrough
+            case .soil_temperature_10_to_40cm:
+                fallthrough
+            case .soil_temperature_40_to_100cm:
+                fallthrough
+            case .soil_temperature_100_to_200cm:
+                return false
+            case .pressure_msl:
+                return false
+            default: break
+            }
+        }
+        return true
+    }
+    
+    var gribIndexName: String {
+        // NAM has eoms different definitons
+        if domain == .nam_conus {
+            switch variable {
+            case .lifted_index:
+                return ":LFTX:500-1000 mb:"
+            case .cloudcover:
+                return ":TCDC:entire atmosphere (considered as a single layer):"
+            default: break
+            }
+        }
+        
+        if domain == .hrrr_conus {
+            switch variable {
+            case .lifted_index:
+                return ":LFTX:500-1000 mb:"
+            default: break
+            }
+        }
+        
+        switch variable {
         case .temperature_2m:
             return ":TMP:2 m above ground:"
         case .cloudcover:
@@ -289,7 +401,7 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable, Codable, GenericVar
         case .relativehumidity_2m:
             return ":RH:2 m above ground:"
         case .precipitation:
-            return ":APCP:surface:0-"
+            return ":APCP:surface:"
         case .v_10m:
             return ":VGRD:10 m above ground:"
         case .u_10m:
@@ -321,7 +433,7 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable, Codable, GenericVar
         case .latent_heatflux:
             return ":LHTFL:surface:"
         case .showers:
-            return ":ACPCP:surface:0-"
+            return ":ACPCP:surface:"
         case .windgusts_10m:
             return ":GUST:surface:"
         case .freezinglevel_height:
@@ -336,25 +448,6 @@ enum GfsVariable: String, CurlIndexedVariable, CaseIterable, Codable, GenericVar
             return ":LFTX:surface:"
         case .visibility:
             return ":VIS:surface:"
-        }
-    }
-    
-    var multiplyAdd: (multiply: Float, add: Float)? {
-        switch self {
-        case .temperature_2m:
-            return (1, -273.15)
-        case .pressure_msl:
-            return (1/100, 1)
-        case .soil_temperature_0_to_10cm:
-            return (1, -273.15)
-        case .soil_temperature_10_to_40cm:
-            return (1, -273.15)
-        case .soil_temperature_40_to_100cm:
-            return (1, -273.15)
-        case .soil_temperature_100_to_200cm:
-            return (1, -273.15)
-        default:
-            return nil
         }
     }
 }
@@ -388,6 +481,10 @@ struct NcepDownload: Command {
             fatalError("Invalid domain '\(signature.domain)'")
         }
         switch domain {
+        case .hrrr_conus:
+            fallthrough
+        case .nam_conus:
+            fallthrough
         case .gfs025:
             let run = signature.run.map {
                 guard let run = Int($0) else {
@@ -460,36 +557,41 @@ struct NcepDownload: Command {
         try OmFileWriter.write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20, all: height.data)
     }
     
+    /// download GFS025 and NAM CONUS
     func downloadGfs(logger: Logger, domain: NcepDomain, run: Timestamp, variables: [GfsVariable], skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
-        let elevationUrl = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f000"
+        let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0)
         try downloadNcepElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid)
         
         let curl = Curl(logger: logger)
         let forecastHours = domain.forecastHours
-        let variablesHour0 = variables.filter({!$0.skipHour0})
+        
+        let variables: [GfsVariableAndDomain] = variables.compactMap {
+            let v = GfsVariableAndDomain(variable: $0, domain: domain)
+            return v.isAvailable ? v : nil
+        }
+        
+        let variablesHour0 = variables.filter({!$0.variable.skipHour0})
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
             let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
-                let fileDest = "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg"
+                let fileDest = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
             if variables.isEmpty {
                 continue
             }
-            
-            //https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20220813/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
-            let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f\(forecastHour.zeroPadded(len: 3))"
-            
+
+            let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
             for (variable, data) in try curl.downloadIndexedGrib(url: url, variables: variables) {
                 var data = data
                 data.shift180LongitudeAndFlipLatitude()
                 data.ensureDimensions(of: domain.grid)
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg"
+                let file = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
                 try FloatArrayCompressor.write(file: file, data: data.data)
             }
@@ -508,6 +610,11 @@ struct NcepDownload: Command {
         
         for variable in variables {
             let startConvert = DispatchTime.now()
+            
+            if !GfsVariableAndDomain(variable: variable, domain: domain).isAvailable {
+                continue
+            }
+            
             logger.info("Converting \(variable)")
             
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
@@ -556,7 +663,7 @@ struct NcepDownload: Command {
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                data2d.deaccumulateOverTime(slidingWidth: 3, slidingOffset: skip)
             }
             
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
