@@ -6,7 +6,7 @@ import SwiftPFor2D
  */
 protocol GenericDomain {
     /// The grid definition. Could later be replaced with a more generic implementation
-    var grid: RegularGrid { get }
+    var grid: Gridable { get }
     
     /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
     var dtSeconds: Int { get }

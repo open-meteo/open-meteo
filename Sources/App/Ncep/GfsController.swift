@@ -22,7 +22,7 @@ public struct GfsController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try GfsMixer(domains: [.gfs025], lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: hourlyTime) else {
+            guard let reader = try GfsMixer(domains: [.gfs025, .nam_conus, .hrrr_conus], lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: hourlyTime) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             

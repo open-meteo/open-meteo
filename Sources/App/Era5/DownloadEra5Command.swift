@@ -43,7 +43,7 @@ enum Era5: GenericDomain {
         return 24 * 21
     }
     
-    var grid: RegularGrid {
+    var grid: Gridable {
         RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
     }
 }

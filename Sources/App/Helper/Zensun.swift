@@ -69,7 +69,7 @@ struct Zensun {
     }
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
-    public static func calculateRadiationBackwardsAveraged(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> Array2DFastTime {
+    public static func calculateRadiationBackwardsAveraged(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> Array2DFastTime {
         let yrange = yrange ?? 0..<grid.ny
         var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
                 
@@ -104,9 +104,8 @@ struct Zensun {
             
             var l = 0
             for indexY in yrange {
-                let lat = grid.latMin + grid.dy * Float(indexY)
                 for indexX in 0..<grid.nx {
-                    let lon = grid.lonMin + grid.dx * Float(indexX)
+                    let (lat,lon) = grid.getCoordinates(gridpoint: indexY * grid.nx + indexX)
                     let t0=(90-lat).degreesToRadians                     // colatitude of point
 
                     /// longitude of point
@@ -142,7 +141,7 @@ struct Zensun {
     }
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    public static func calculateRadiationInstant(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
+    public static func calculateRadiationInstant(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
         var out = [Float]()
         let yrange = yrange ?? 0..<grid.ny
         out.reserveCapacity(yrange.count * grid.nx * timerange.count)
@@ -165,9 +164,8 @@ struct Zensun {
             let p1 = lonsun.degreesToRadians
             
             for indexY in yrange {
-                let lat = grid.latMin + grid.dy * Float(indexY)
                 for indexX in 0..<grid.nx {
-                    let lon = grid.lonMin + grid.dx * Float(indexX)
+                    let (lat,lon) = grid.getCoordinates(gridpoint: indexY * grid.nx + indexX)
                     
                     let t0=(90-lat).degreesToRadians
                     let p0=lon.degreesToRadians

@@ -60,7 +60,7 @@ enum SeasonalForecastDomain: String, GenericDomain {
         
     }
     
-    var grid: RegularGrid {
+    var grid: Gridable {
         switch self {
         case .ecmwf:
             fatalError()

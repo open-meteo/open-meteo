@@ -41,4 +41,21 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(nearest.gridpoint, 225406)
         XCTAssertEqual(nearest.gridElevation, 1006.0)
     }
+    
+    func testLambertConformal() {
+        let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
+        let pos = proj.forward(latitude: 47, longitude: -8)
+        XCTAssertEqual(pos.x, 5833.868)
+        XCTAssertEqual(pos.y, 8632.734)
+        let coords = proj.inverse(x: pos.x, y: pos.y)
+        XCTAssertEqual(coords.latitude, 47, accuracy: 0.0001)
+        XCTAssertEqual(coords.longitude, -8, accuracy: 0.0001)
+        
+        let nam = LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
+        let pos2 = nam.findPoint(lat: 34, lon: -118)
+        XCTAssertEqual(pos2, 777441)
+        let coords2 = nam.getCoordinates(gridpoint: pos2!)
+        XCTAssertEqual(coords2.latitude, 34, accuracy: 0.01)
+        XCTAssertEqual(coords2.longitude, -118, accuracy: 0.1)
+    }
 }

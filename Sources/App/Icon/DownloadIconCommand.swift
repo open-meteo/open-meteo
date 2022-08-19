@@ -6,7 +6,7 @@ import SwiftPFor2D
 
 struct CdoHelper {
     let cdo: CdoIconGlobal?
-    let grid: RegularGrid
+    let grid: Gridable
     let domain: IconDomains
     
     init(domain: IconDomains, logger: Logger) throws {
@@ -442,7 +442,7 @@ extension Array2DFastTime {
     }
     
     /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
-    mutating func interpolate2StepsSolarBackwards(positions: [Int], grid: RegularGrid, run: Timestamp, dtSeconds: Int) {
+    mutating func interpolate2StepsSolarBackwards(positions: [Int], grid: Gridable, run: Timestamp, dtSeconds: Int) {
         // Solar backwards averages data. Data needs to be deaveraged before
         // First the clear sky index KT is calaculated (KT based on extraterrestrial radiation)
         // clearsky index is hermite interpolated and then back to actual radiation

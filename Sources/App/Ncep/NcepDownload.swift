@@ -65,15 +65,17 @@ enum NcepDomain: String, GenericDomain {
         }
     }
     
-    var grid: RegularGrid {
+    var grid: Gridable {
         switch self {
         case .gfs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .nam_conus:
-            /// TODO labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
-            return RegularGrid(nx: 1799, ny: 1059, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+            /// labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
+            let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
+            return LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
         case .hrrr_conus:
-            return RegularGrid(nx: 1799, ny: 1059, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+            let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
+            return LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
         }
     }
     
@@ -334,6 +336,8 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
     let domain: NcepDomain
     
     var isAvailable: Bool {
+        // there is no parameterised convective precipitation field
+        // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
         if domain == .nam_conus && variable == .showers {
             return false
         }
@@ -510,7 +514,7 @@ struct NcepDownload: Command {
         }
     }
     
-    func downloadNcepElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: RegularGrid) throws {
+    func downloadNcepElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: Gridable) throws {
         /// download seamask and height
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
