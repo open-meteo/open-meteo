@@ -102,6 +102,15 @@ enum NcepDomain: String, GenericDomain {
             return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfnatf\(fHH).grib2"
         }
     }
+    
+    func getLeastCommonGribUrl(run: Timestamp, forecastHour: Int) -> String {
+        guard self == .gfs025 else {
+            fatalError("onyl for gfs")
+        }
+        let fHHH = forecastHour.zeroPadded(len: 3)
+        /// `pgrb2b` instead of `pgrb2`
+        return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2b.0p25.f\(fHHH)"
+    }
 }
 
 
@@ -156,6 +165,11 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
     /// Only available in NAM, but at least it can be used to get diffuse radiation
     case clear_sky_radiation
     
+    /// only GFS
+    case uv_index
+    /// only GFS
+    case uv_index_clear_sky
+    
     case cape
     case lifted_index
     
@@ -182,6 +196,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .shortwave_radiation: return true
         case .diffuse_radiation: return true
         case .clear_sky_radiation: return true
+        case .uv_index: return true
+        case .uv_index_clear_sky: return true
         default: return false
         }
     }
@@ -221,6 +237,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .visibility: return 0.05 // 50 meter
         case .diffuse_radiation: return 1
         case .clear_sky_radiation: return 1
+        case .uv_index_clear_sky: return 20
+        case .uv_index: return 20
         }
     }
     
@@ -260,6 +278,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .visibility: return .meter
         case .diffuse_radiation: return .wattPerSquareMeter
         case .clear_sky_radiation: return .wattPerSquareMeter
+        case .uv_index: return .dimensionless
+        case .uv_index_clear_sky: return .dimensionless
         }
     }
     
@@ -268,6 +288,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .shortwave_radiation: return true
         case .diffuse_radiation: return true
         case .clear_sky_radiation: return false // NOTE: only in NAM
+        case .uv_index: return true
+        case .uv_index_clear_sky: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
         default: return false
@@ -321,6 +343,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .cape: return .hermite
         case .lifted_index: return .hermite
         case .visibility: return .hermite
+        case .uv_index: return .solar_backwards_averaged
+        case .uv_index_clear_sky: return .solar_backwards_averaged
         }
     }
     
@@ -330,6 +354,11 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .showers: return true
         default: return false
         }
+    }
+    
+    /// GFS has a second file with least commonly used paramerters
+    var isLeastCommonlyUsedParameter: Bool {
+        return self == .uv_index || self == .uv_index_clear_sky
     }
     
     var multiplyAdd: (multiply: Float, add: Float)? {
@@ -367,6 +396,9 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
         }
         if variable == .clear_sky_radiation {
             return domain == .nam_conus
+        }
+        if variable == .uv_index || variable == .uv_index_clear_sky {
+            return domain == .gfs025
         }
         if domain == .hrrr_conus {
             switch variable {
@@ -487,6 +519,10 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
             return ":VDDSF:surface:"
         case .clear_sky_radiation:
             return ":CSDSF:surface:"
+        case .uv_index_clear_sky:
+            return ":CDUVB:surface:"
+        case .uv_index:
+            return ":DUVB:surface:"
         }
     }
 }
@@ -621,13 +657,11 @@ struct NcepDownload: Command {
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
-            let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
+            let variablesAll = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
                 let fileDest = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
-            if variables.isEmpty {
-                continue
-            }
+            let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
 
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
             for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: variables) {
@@ -638,6 +672,21 @@ struct NcepDownload: Command {
                     }
                 }
                 fatalError("OK")*/
+                if domain.isGlobal {
+                    data.shift180LongitudeAndFlipLatitude()
+                }
+                data.ensureDimensions(of: domain.grid)
+                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
+                let file = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"
+                try FileManager.default.removeItemIfExists(at: file)
+                try FloatArrayCompressor.write(file: file, data: data.data)
+            }
+            
+            // Get least common variables
+            let variablesLeastCommon = variablesAll.filter({ $0.variable.isLeastCommonlyUsedParameter })
+            let urlLeastCommon = domain.getLeastCommonGribUrl(run: run, forecastHour: forecastHour)
+            for (variable, message) in try curl.downloadIndexedGrib(url: urlLeastCommon, variables: variablesLeastCommon) {
+                var data = message.toArray2d()
                 if domain.isGlobal {
                     data.shift180LongitudeAndFlipLatitude()
                 }
