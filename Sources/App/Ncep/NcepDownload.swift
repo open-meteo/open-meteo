@@ -3,7 +3,11 @@ import Vapor
 import SwiftPFor2D
 import SwiftEccodes
 
-
+/**
+ GFS inventory: https://www.nco.ncep.noaa.gov/pmb/products/gfs/gfs.t00z.pgrb2.0p25.f003.shtml
+ NAM inventory: https://www.nco.ncep.noaa.gov/pmb/products/nam/nam.t00z.conusnest.hiresf06.tm00.grib2.shtml
+ HRR inventory: https://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfsfcf02.grib2.shtml
+ */
 enum NcepDomain: String, GenericDomain {
     case gfs025
     case nam_conus
@@ -145,9 +149,12 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
     case windgusts_10m
     case freezinglevel_height
     case shortwave_radiation
-    // diff could be estimated with https://arxiv.org/pdf/2007.01639.pdf 3) method
-    //case diffuse_radiation
+    /// Only for HRRR domain. Otherwise diff could be estimated with https://arxiv.org/pdf/2007.01639.pdf 3) method
+    case diffuse_radiation
     //case direct_radiation
+    
+    /// Only available in NAM, but at least it can be used to get diffuse radiation
+    case clear_sky_radiation
     
     case cape
     case lifted_index
@@ -173,6 +180,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .latent_heatflux: return true
         case .showers: return true
         case .shortwave_radiation: return true
+        case .diffuse_radiation: return true
+        case .clear_sky_radiation: return true
         default: return false
         }
     }
@@ -210,6 +219,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .cape: return 0.1
         case .lifted_index: return 10
         case .visibility: return 0.05 // 50 meter
+        case .diffuse_radiation: return 1
+        case .clear_sky_radiation: return 1
         }
     }
     
@@ -247,12 +258,16 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .cape: return .joulesPerKilogram
         case .lifted_index: return .dimensionless
         case .visibility: return .meter
+        case .diffuse_radiation: return .wattPerSquareMeter
+        case .clear_sky_radiation: return .wattPerSquareMeter
         }
     }
     
     var isAveragedOverForecastTime: Bool {
         switch self {
         case .shortwave_radiation: return true
+        case .diffuse_radiation: return true
+        case .clear_sky_radiation: return false // NOTE: only in NAM
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
         default: return false
@@ -301,6 +316,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .showers: return .linear
         case .pressure_msl: return .hermite
         case .frozen_precipitation_percent: return .nearest
+        case .diffuse_radiation: return .solar_backwards_averaged
+        case .clear_sky_radiation: return .solar_backwards_averaged
         case .cape: return .hermite
         case .lifted_index: return .hermite
         case .visibility: return .hermite
@@ -345,6 +362,12 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
         if domain == .nam_conus && variable == .showers {
             return false
         }
+        if variable == .shortwave_radiation {
+            return domain == .hrrr_conus
+        }
+        if variable == .clear_sky_radiation {
+            return domain == .nam_conus
+        }
         if domain == .hrrr_conus {
             switch variable {
             case .showers:
@@ -381,6 +404,9 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
                 return ":LFTX:500-1000 mb:"
             case .cloudcover:
                 return ":TCDC:entire atmosphere (considered as a single layer):"
+            case .precipitation:
+                // only 3h accumulation is availble
+                return ":APCP:surface:"
             default: break
             }
         }
@@ -409,7 +435,7 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
         case .relativehumidity_2m:
             return ":RH:2 m above ground:"
         case .precipitation:
-            return ":APCP:surface:"
+            return ":APCP:surface:0-"
         case .v_10m:
             return ":VGRD:10 m above ground:"
         case .u_10m:
@@ -441,7 +467,7 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
         case .latent_heatflux:
             return ":LHTFL:surface:"
         case .showers:
-            return ":ACPCP:surface:"
+            return ":ACPCP:surface:0-"
         case .windgusts_10m:
             return ":GUST:surface:"
         case .freezinglevel_height:
@@ -456,6 +482,11 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
             return ":LFTX:surface:"
         case .visibility:
             return ":VIS:surface:"
+        case .diffuse_radiation:
+            // only for local domains
+            return ":VDDSF:surface:"
+        case .clear_sky_radiation:
+            return ":CSDSF:surface:"
         }
     }
 }
@@ -474,6 +505,9 @@ struct NcepDownload: Command {
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
+        
+        @Flag(name: "create-netcdf")
+        var createNetcdf: Bool
         
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -514,7 +548,7 @@ struct NcepDownload: Command {
             let date = Timestamp.now().with(hour: run)
             
             try downloadGfs(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, variables: variables, run: date)
+            try convertGfs(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         }
     }
     
@@ -617,7 +651,7 @@ struct NcepDownload: Command {
     }
     
     /// Process each variable and update time-series optimised files
-    func convertGfs(logger: Logger, domain: NcepDomain, variables: [GfsVariable], run: Timestamp) throws {
+    func convertGfs(logger: Logger, domain: NcepDomain, variables: [GfsVariable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours
         let nForecastHours = forecastHours.max()!+1
@@ -647,9 +681,16 @@ struct NcepDownload: Command {
             
             let skip = variable.skipHour0 ? 1 : 0
             
-            // Deaverage radiation. Not really correct for 3h data after 120 hours.
+            // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
             if variable.isAveragedOverForecastTime {
-                data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
+                switch domain {
+                case .gfs025:
+                    data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
+                case .nam_conus:
+                    data2d.deavergeOverTime(slidingWidth: 3, slidingOffset: skip)
+                case .hrrr_conus:
+                    break
+                }
             }
             
             // interpolate missing timesteps. We always fill 2 timesteps at once
@@ -681,13 +722,14 @@ struct NcepDownload: Command {
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: 3, slidingOffset: skip)
+                data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
             }
             
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             
-            
-            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
+            if createNetcdf {
+                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
+            }
             
             logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
             let startOm = DispatchTime.now()
