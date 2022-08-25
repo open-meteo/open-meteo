@@ -152,8 +152,11 @@ struct Curl {
         
         var missing = false
         for variable in variables {
-            if !matches.contains(where: {$0.gribIndexName == variable.gribIndexName}) {
-                logger.error("Variable \(variable) '\(variable)' missing")
+            guard let gribIndexName = variable.gribIndexName else {
+                continue
+            }
+            if !matches.contains(where: {$0.gribIndexName == gribIndexName}) {
+                logger.error("Variable \(variable) '\(gribIndexName)' missing")
                 missing = true
             }
         }

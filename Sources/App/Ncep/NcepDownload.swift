@@ -68,9 +68,10 @@ enum NcepDomain: String, GenericDomain {
     /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     var levels: [Int] {
         switch self {
-        case .gfs025: fallthrough
+        case .gfs025: return [10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
         case .nam_conus:
-            return [10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+            // nam uses level 75 instead of 70. Level 15 and 40 missing. Only use the same levels as HRRR.
+            return [/*10, 20, 30,*/ 50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
         case .hrrr_conus:
             return [50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
             // all available
@@ -116,7 +117,7 @@ enum NcepDomain: String, GenericDomain {
         case .nam_conus:
             return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
         case .hrrr_conus:
-            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfnatf\(fHH).grib2"
+            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfprsf\(fHH).grib2"
         }
     }
     
@@ -521,6 +522,9 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .visibility:
             return ":VIS:surface:"
         case .diffuse_radiation:
+            if domain == .gfs025 {
+                return nil
+            }
             // only for local domains
             return ":VDDSF:surface:"
         case .clear_sky_radiation:
@@ -627,7 +631,11 @@ struct GfsPressureVariable: GfsVariablify {
         case .geopotential_height:
             return ":HGT:\(level) mb:"
         case .cloud_cover:
-            if domain == .hrrr_conus && level < 50 {
+            if domain != .gfs025 {
+                // no cloud cover in HRRR and NAM
+                return nil
+            }
+            if level < 50 || level == 70 {
                 return nil
             }
             return ":TCDC:\(level) mb:"
@@ -1024,7 +1032,7 @@ struct NcepDownload: Command {
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             
             if createNetcdf {
-                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable).nc", nx: grid.nx, ny: grid.ny)
+                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
             }
             
             logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
