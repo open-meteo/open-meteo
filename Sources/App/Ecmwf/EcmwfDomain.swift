@@ -44,7 +44,7 @@ enum EcmwfDomain: GenericDomain {
         return 3*3600
     }
     
-    var grid: RegularGrid {
+    var grid: Gridable {
         return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360/900, dy: 180/450)
     }
 }

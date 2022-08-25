@@ -224,6 +224,12 @@ extension IconMixer {
                 case .surface_pressure:
                     try prefetchData(variable: .pressure_msl)
                     try prefetchData(variable: .temperature_2m)
+                case .terrestrial_radiation_centered:
+                    break
+                case .terrestrial_radiation_backwards:
+                    break
+                case .terrestrial_radiation_instant:
+                    break
                 }
             }
         }
@@ -323,6 +329,18 @@ extension IconMixer {
             let temperature = try get(variable: .temperature_2m).data
             let pressure = try get(variable: .pressure_msl)
             return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: mixer.targetElevation), pressure.unit)
+        case .terrestrial_radiation_centered:
+            /// Use center averaged
+            let solar = Meteorology.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time.add(1800))
+            return DataAndUnit(solar, .wattPerSquareMeter)
+        case .terrestrial_radiation_backwards:
+            /// Use center averaged
+            let solar = Meteorology.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+            return DataAndUnit(solar, .wattPerSquareMeter)
+        case .terrestrial_radiation_instant:
+            /// Use center averaged
+            let solar = Meteorology.extraTerrestrialRadiationInstant(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+            return DataAndUnit(solar, .wattPerSquareMeter)
         }
     }
 }

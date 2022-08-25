@@ -26,6 +26,12 @@ struct Array2D {
     mutating func shift180LongitudeAndFlipLatitude() {
         data.shift180LongitudeAndFlipLatitude(nt: 1, ny: ny, nx: nx)
     }
+    
+    func ensureDimensions(of grid: Gridable) {
+        guard nx == grid.nx && ny == grid.ny else {
+            fatalError("GRIB dimensions (nx=\(nx), ny=\(ny)) do not match domain grid dimensions (nx=\(grid.nx), ny=\(grid.ny))")
+        }
+    }
 }
 
 struct Array2DFastSpace {
@@ -78,12 +84,12 @@ struct Array2DFastSpace {
     
     @inlinable subscript(time: Int, location: Range<Int>) -> ArraySlice<Float> {
         get {
-            precondition(location.upperBound < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
             precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
             return data[location.add(time * nLocations)]
         }
         set {
-            precondition(location.upperBound < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
             precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
             data[location.add(time * nLocations)] = newValue
         }
@@ -142,12 +148,12 @@ struct Array2DFastTime {
     @inlinable subscript(location: Int, time: Range<Int>) -> ArraySlice<Float> {
         get {
             precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(time.upperBound < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            precondition(time.upperBound <= nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
             return data[time.add(location * nTime)]
         }
         set {
             precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(time.upperBound < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            precondition(time.upperBound <= nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
             data[time.add(location * nTime)] = newValue
         }
     }
@@ -155,7 +161,7 @@ struct Array2DFastTime {
     /// One spatial field into time-series array
     @inlinable subscript(location: Range<Int>, time: Int) -> [Float] {
         get {
-            precondition(location.upperBound < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
             precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
             var out = [Float]()
             out.reserveCapacity(location.count)
@@ -165,7 +171,7 @@ struct Array2DFastTime {
             return out
         }
         set {
-            precondition(location.upperBound < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
             precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
             precondition(newValue.count == location.count, "Array and location count do not match")
             for (loc, value) in zip(location, newValue) {

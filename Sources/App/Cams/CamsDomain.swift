@@ -45,7 +45,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         return forecastHours + 4*24
     }
     
-    var grid: RegularGrid {
+    var grid: Gridable {
         switch self {
         case .cams_global:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)

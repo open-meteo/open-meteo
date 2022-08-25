@@ -166,14 +166,14 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="total_cloud_cover" id="total_cloud_cover" name="six_hourly">
-            <label class="form-check-label" for="total_cloud_cover">
+            <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover" name="six_hourly">
+            <label class="form-check-label" for="cloudcover">
               Total Cloud Cover
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="total_precipitation" id="total_precipitation" name="six_hourly">
-            <label class="form-check-label" for="total_precipitation">
+            <input class="form-check-input" type="checkbox" value="precipitation" id="precipitation" name="six_hourly">
+            <label class="form-check-label" for="precipitation">
               Total Precipitation
             </label>
           </div>
@@ -208,32 +208,32 @@
         </div>
         <div class="col-md-3">
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="soil_temperature_0_to_10_cm" id="soil_temperature_0_to_10_cm" name="six_hourly">
-            <label class="form-check-label" for="soil_temperature_0_to_10_cm">
+            <input class="form-check-input" type="checkbox" value="soil_temperature_0_to_10cm" id="soil_temperature_0_to_10cm" name="six_hourly">
+            <label class="form-check-label" for="soil_temperature_0_to_10cm">
               Soil Temperature (0-10 cm)
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10_cm" id="soil_moisture_0_to_10_cm" name="six_hourly">
-            <label class="form-check-label" for="soil_moisture_0_to_10_cm">
+            <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm" id="soil_moisture_0_to_10cm" name="six_hourly">
+            <label class="form-check-label" for="soil_moisture_0_to_10cm">
               Soil Moisture (0-10 cm)
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="soil_moisture_10_to_40_cm" id="soil_moisture_10_to_40_cm" name="six_hourly">
-            <label class="form-check-label" for="soil_moisture_10_to_40_cm">
+            <input class="form-check-input" type="checkbox" value="soil_moisture_10_to_40cm" id="soil_moisture_10_to_40cm" name="six_hourly">
+            <label class="form-check-label" for="soil_moisture_10_to_40cm">
               Soil Moisture (10-40 cm)
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="soil_moisture_40_to_100_cm" id="soil_moisture_40_to_100_cm" name="six_hourly">
-            <label class="form-check-label" for="soil_moisture_40_to_100_cm">
+            <input class="form-check-input" type="checkbox" value="soil_moisture_40_to_100cm" id="soil_moisture_40_to_100cm" name="six_hourly">
+            <label class="form-check-label" for="soil_moisture_40_to_100cm">
               Soil Moisture (40-100 cm)
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="soil_moisture_100_to_200_cm" id="soil_moisture_100_to_200_cm" name="six_hourly">
-            <label class="form-check-label" for="soil_moisture_100_to_200_cm">
+            <input class="form-check-input" type="checkbox" value="soil_moisture_100_to_200cm" id="soil_moisture_100_to_200cm" name="six_hourly">
+            <label class="form-check-label" for="soil_moisture_100_to_200cm">
               Soil Moisture (100-200 cm)
             </label>
           </div>

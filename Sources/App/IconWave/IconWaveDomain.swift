@@ -47,7 +47,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, GenericDomain {
         }
     }
     
-    var grid: RegularGrid {
+    var grid: Gridable {
         switch self {
         case .gwam:
             return RegularGrid(nx: 1440, ny: 699, latMin: -85.25, lonMin: -180, dx: 0.25, dy: 0.25)

@@ -6,7 +6,7 @@ import SwiftPFor2D
 
 struct CdoHelper {
     let cdo: CdoIconGlobal?
-    let grid: RegularGrid
+    let grid: Gridable
     let domain: IconDomains
     
     init(domain: IconDomains, logger: Logger) throws {
@@ -214,22 +214,9 @@ struct DownloadIconCommand: Command {
             }
             
             
-            // Deaverage radiation. Not really correct for 3h data after 81 hours.
+            // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
             if variable.isAveragedOverForecastTime {
-                for l in 0..<nLocation {
-                    var prev = data2d[l, 0].isNaN ? 0 : data2d[l, 0]
-                    var skipped = 0
-                    for hour in 1 ..< nForecastHours {
-                        let d = data2d[l, hour] * Float(hour)
-                        if d.isNaN {
-                            skipped += 1
-                            continue
-                        }
-                        data2d[l, hour] = (d - prev) / Float(skipped+1)
-                        prev = d
-                        skipped = 0
-                    }
-                }
+                data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
             }
             
             // interpolate missing timesteps. We always fill 2 timesteps at once
@@ -302,20 +289,10 @@ struct DownloadIconCommand: Command {
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
-                for l in 0..<nLocation {
-                    for hour in stride(from: nForecastHours - 1, through: 2, by: -1) {
-                        let current = data2d[l, hour]
-                        let previous = data2d[l, hour-1]
-                        // due to floating point precision, it can become negative
-                        data2d[l, hour] = max(current - previous, 0)
-                    }
-                }
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
             }
             
-            /*#if Xcode
-            try! data2d.writeNetcdf(filename: "\(domain.omfileDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
-            return
-            #endif*/
+            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
             
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             let skip = variable.skipHour0 ? 1 : 0
@@ -366,6 +343,42 @@ struct DownloadIconCommand: Command {
 }
 
 extension Array2DFastTime {
+    mutating func deavergeOverTime(slidingWidth: Int, slidingOffset: Int) {
+        for l in 0..<nLocations {
+            for start in stride(from: slidingOffset, to: nTime, by: slidingWidth) {
+                var prev = self[l, start].isNaN ? 0 : self[l, start]
+                var prevH = 1
+                var skipped = 0
+                for hour in start+1 ..< start+slidingWidth {
+                    let d = self[l, hour]
+                    let h = hour-start+1
+                    if d.isNaN {
+                        skipped += 1
+                        continue
+                    }
+                    self[l, hour] = (d * Float(h / (skipped+1)) - prev * Float(prevH / (skipped+1)))
+                    prev = d
+                    prevH = h
+                    skipped = 0
+                }
+            }
+        }
+    }
+    
+    /// Note: Enforces >0
+    mutating func deaccumulateOverTime(slidingWidth: Int, slidingOffset: Int) {
+        for l in 0..<nLocations {
+            for start in stride(from: slidingOffset, to: nTime, by: slidingWidth) {
+                for hour in stride(from: start + slidingWidth - 1, through: start + 1, by: -1) {
+                    let current = self[l, hour]
+                    let previous = self[l, hour-1]
+                    // due to floating point precision, it can become negative
+                    self[l, hour] = previous.isNaN ? current : max(current - previous, 0)
+                }
+            }
+        }
+    }
+    
     /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
     mutating func interpolate2StepsLinear(positions: [Int]) {
         for l in 0..<nLocations {
@@ -429,47 +442,47 @@ extension Array2DFastTime {
     }
     
     /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
-    mutating func interpolate2StepsSolarBackwards(positions: [Int], grid: RegularGrid, run: Timestamp, dtSeconds: Int) {
+    mutating func interpolate2StepsSolarBackwards(positions: [Int], grid: Gridable, run: Timestamp, dtSeconds: Int) {
         // Solar backwards averages data. Data needs to be deaveraged before
         // First the clear sky index KT is calaculated (KT based on extraterrestrial radiation)
         // clearsky index is hermite interpolated and then back to actual radiation
         
         /// Which range of hours solar radiation data is required
-        let solarHours = positions.minAndMax().map { $0.min - 4 ..< $0.max + 6 } ?? 0..<0
+        let solarHours = positions.minAndMax().map { $0.min - 4 ..< $0.max + 7 } ?? 0..<0
         let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * dtSeconds), nTime: solarHours.count, dtSeconds: dtSeconds)
         
         /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
         let nx = grid.nx
-        let byY = 10
-        for cy in 0..<grid.ny/byY {
+        let byY = 1
+        for cy in 0..<grid.ny/byY+1 {
             let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
             let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
-            /// solar array is fast space oriented
-            let solar_backwards = Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange)
-            let solar2d = Array2DFastSpace(data: solar_backwards, nLocations: locationRange.count, nTime: solarHours.count)
+            /// solar factor, backwards averaged over dt
+            let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange)
             
             for l in locationRange {
                 for hour in positions {
                     let sHour = hour - solarHours.lowerBound
                     let sLocation = l - locationRange.lowerBound
                     // point C and D are still 3 h averages
-                    let solC1 = solar2d[sHour + 0, sLocation]
-                    let solC2 = solar2d[sHour + 1, sLocation]
-                    let solC3 = solar2d[sHour + 2, sLocation]
+                    let solC1 = solar2d[sLocation, sHour + 0]
+                    let solC2 = solar2d[sLocation, sHour + 1]
+                    let solC3 = solar2d[sLocation, sHour + 2]
                     let solC = (solC1 + solC2 + solC3) / 3
-                    let C = solC <= 0.0001 ? 0 : self[l, hour+2] / solC
+                    // At low radiaiton levels it is impossible to estimate KT indices
+                    let C = solC <= 0.005 ? 0 : min(self[l, hour+2] / solC, 1100)
                     
-                    let solB = solar2d[sHour - 1, sLocation]
-                    let B = solB <= 0.0001 ? C : self[l, hour-1] / solB
+                    let solB = solar2d[sLocation, sHour - 1]
+                    let B = solB <= 0.005 ? 0 : min(self[l, hour-1] / solB, 1100)
                     
-                    let solA = solar2d[sHour - 4, sLocation]
-                    let A = solA <= 0.0001 || hour-4 < 0 ? B : self[l, hour-4] / solA
+                    let solA = solar2d[sLocation, sHour - 4]
+                    let A = solA <= 0.005 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
                     
-                    let solD1 = solar2d[sHour + 3, sLocation]
-                    let solD2 = solar2d[sHour + 4, sLocation]
-                    let solD3 = solar2d[sHour + 5, sLocation]
+                    let solD1 = solar2d[sLocation, sHour + 3]
+                    let solD2 = solar2d[sLocation, sHour + 4]
+                    let solD3 = solar2d[sLocation, sHour + 5]
                     let solD = (solD1 + solD2 + solD3) / 3
-                    let D = solD <= 0.0001 || hour+4 >= nTime ? C : self[l, hour+5] / solD
+                    let D = solD <= 0.005 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
                     
                     let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                     let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0

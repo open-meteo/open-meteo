@@ -97,7 +97,7 @@ extension SeasonalForecastReader {
         case .temperature_2m_min:
             try prefetchData(variable: VariableAndMember(.temperature_2m_min, member))
         case .precipitation_sum:
-            try prefetchData(variable: VariableAndMember(.total_precipitation, member))
+            try prefetchData(variable: VariableAndMember(.precipitation, member))
         case .showers_sum:
             try prefetchData(variable: VariableAndMember(.showers, member))
         case .shortwave_radiation_sum:
@@ -108,7 +108,7 @@ extension SeasonalForecastReader {
             try prefetchData(variable: VariableAndMember(.wind_u_component_10m, member))
             try prefetchData(variable: VariableAndMember(.wind_v_component_10m, member))
         case .precipitation_hours:
-            try prefetchData(variable: VariableAndMember(.total_precipitation, member))
+            try prefetchData(variable: VariableAndMember(.precipitation, member))
         }
     }
     
@@ -121,7 +121,7 @@ extension SeasonalForecastReader {
             let data = try get(variable: VariableAndMember(.temperature_2m_min, member)).conertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 4), data.unit)
         case .precipitation_sum:
-            let data = try get(variable: VariableAndMember(.total_precipitation, member)).conertAndRound(params: params)
+            let data = try get(variable: VariableAndMember(.precipitation, member)).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 4), data.unit)
         case .showers_sum:
             let data = try get(variable: VariableAndMember(.showers, member)).conertAndRound(params: params)
@@ -139,7 +139,7 @@ extension SeasonalForecastReader {
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .precipitation_hours:
-            let data = try get(variable: VariableAndMember(.total_precipitation, member)).conertAndRound(params: params)
+            let data = try get(variable: VariableAndMember(.precipitation, member)).conertAndRound(params: params)
             return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 4), .hours)
         }
     }

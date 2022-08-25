@@ -29,7 +29,7 @@ final class MeteorologyTests: XCTestCase {
     func testEvapotranspiration() {
         let time = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
         let exrad = Meteorology.extraTerrestrialRadiationBackwards(latitude: 47, longitude: 9, timerange: TimerangeDt(start: time, nTime: 1, dtSeconds: 3600))
-        XCTAssertEqual(exrad[0], 626.5638)
+        XCTAssertEqual(exrad[0], 626.56384)
         
         let et0 = Meteorology.et0Evapotranspiration(temperature2mCelsius: 25, windspeed10mMeterPerSecond: 2, dewpointCelsius: 13.8, shortwaveRadiationWatts: 300, elevation: 250, extraTerrestrialRadiation: exrad[0], dtSeconds: 3600)
         XCTAssertEqual(et0, 0.23536535)

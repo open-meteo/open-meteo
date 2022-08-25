@@ -68,13 +68,12 @@ struct Zensun {
         return (rise, set)
     }
 
-    /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    public static func calculateRadiationBackwardsAveraged(grid: RegularGrid, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
-        var out = [Float]()
+    /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
+    public static func calculateRadiationBackwardsAveraged(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> Array2DFastTime {
         let yrange = yrange ?? 0..<grid.ny
-        out.reserveCapacity(yrange.count * grid.nx * timerange.count)
+        var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
                 
-        for timestamp in timerange {
+        for (t, timestamp) in timerange.enumerated() {
             /// fractional day number with 12am 1jan = 1
             let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
 
@@ -84,6 +83,9 @@ struct Zensun {
             
             /// earth-sun distance in AU
             let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            
+            /// solar disk half-angle
+            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
             
             let latsun=decang
             /// universal time
@@ -100,10 +102,10 @@ struct Zensun {
             
             let p10 = lonsun0.degreesToRadians
             
+            var l = 0
             for indexY in yrange {
-                let lat = grid.latMin + grid.dy * Float(indexY)
                 for indexX in 0..<grid.nx {
-                    let lon = grid.lonMin + grid.dx * Float(indexX)
+                    let (lat,lon) = grid.getCoordinates(gridpoint: indexY * grid.nx + indexX)
                     let t0=(90-lat).degreesToRadians                     // colatitude of point
 
                     /// longitude of point
@@ -114,26 +116,24 @@ struct Zensun {
                     if p0 > p1 + .pi {
                         p0 -= 2 * .pi
                     }
-
-                    let arg = acos(-(cos(t0)*cos(t1)))/(sin(t0)*sin(t1))
-
-                    let cos_p1_p0: Float
-                    if arg.isFinite {
-                        let p10_arg = min(p0 + arg, p10)
-                        let p1_arg = max(p0 - arg, p1)
-                        cos_p1_p0 = (sin(p10_arg-p0) - sin(p1_arg-p0)) / (p10_arg - p1_arg)
-                    } else {
-                        cos_p1_p0 = (sin(p10-p0) - sin(p1-p0)) / (p10-p1)
-                    }
-
+                    
+                    // limit p1 and p10 to sunrise/set
+                    let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+                    let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                    let sunrise = p0 + carg
+                    let sunset = p0 - carg
+                    let p1_l = min(sunrise, p10)
+                    let p10_l = max(sunset, p1)
+                    
+                    // solve integral to get sun elevation dt
+                    // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+                    let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+                    let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
                     /// sun elevation
-                    let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos_p1_p0
-                    if zz <= 0 {
-                        out.append(0)
-                    } else {
-                        let solfac=zz/(rsun*rsun)
-                        out.append(solfac)
-                    }
+                    let zz = (left-right) / (p1_l - p10_l)
+                    
+                    out[l, t] = zz <= 0 ? 0 : zz / (rsun*rsun)
+                    l += 1
                 }
             }
         }
@@ -141,9 +141,10 @@ struct Zensun {
     }
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    public static func calculateRadiationInstant(grid: RegularGrid, timerange: TimerangeDt) -> [Float] {
+    public static func calculateRadiationInstant(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
         var out = [Float]()
-        out.reserveCapacity(grid.count * timerange.count)
+        let yrange = yrange ?? 0..<grid.ny
+        out.reserveCapacity(yrange.count * grid.nx * timerange.count)
                 
         for timestamp in timerange {
             /// fractional day number with 12am 1jan = 1
@@ -162,10 +163,9 @@ struct Zensun {
             let lonsun = -15.0*(ut-12.0+eqtime)
             let p1 = lonsun.degreesToRadians
             
-            for indexY in 0..<grid.ny {
-                let lat = grid.latMin + grid.dy * Float(indexY)
+            for indexY in yrange {
                 for indexX in 0..<grid.nx {
-                    let lon = grid.lonMin + grid.dx * Float(indexX)
+                    let (lat,lon) = grid.getCoordinates(gridpoint: indexY * grid.nx + indexX)
                     
                     let t0=(90-lat).degreesToRadians
                     let p0=lon.degreesToRadians
@@ -180,7 +180,6 @@ struct Zensun {
     
     /// Calculate DNI based on zenith angle
     public static func caluclateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, startTime: Timestamp, dtSeconds: Int) -> [Float] {
-        
         var out = [Float]()
         out.reserveCapacity(directRadiation.count)
         
@@ -200,6 +199,12 @@ struct Zensun {
             
             let timestamp = startTime.timeIntervalSince1970 + dtSeconds * i
             let tt = Float(((timestamp % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            
+            /// earth-sun distance in AU
+            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            
+            /// solar disk half-angle
+            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
 
             let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
             let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
@@ -225,18 +230,20 @@ struct Zensun {
             let lonsun0 = -15.0*(ut0-12.0+eqtime)
             let p10 = lonsun0.degreesToRadians
 
-            let arg = acos(-(cos(t0)*cos(t1))/(sin(t0)*sin(t1)))
-
-            let cos_p1_p0: Float
-            if arg.isFinite {
-                let p10_arg = min(p0 + arg, p10)
-                let p1_arg = max(p0 - arg, p1)
-                cos_p1_p0 = (sin(p10_arg-p0) - sin(p1_arg-p0)) / (p10_arg - p1_arg)
-            } else {
-                cos_p1_p0 = (sin(p10-p0) - sin(p1-p0)) / (p10-p1)
-            }
-
-            let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos_p1_p0
+            // limit p1 and p10 to sunrise/set
+            let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+            let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+            let sunrise = p0 + carg
+            let sunset = p0 - carg
+            let p1_l = min(sunrise, p10)
+            let p10_l = max(sunset, p1)
+            
+            // solve integral to get sun elevation dt
+            // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+            let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+            let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+            /// sun elevation
+            let zz = (left-right) / (p1_l - p10_l)
             if zz <= 0 {
                 out.append(0)
                 continue

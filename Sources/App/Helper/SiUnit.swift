@@ -26,6 +26,7 @@ enum SiUnit: String, Codable {
     case qubicMeterPerQubicMeter = "m³/m³"
     case kiloPascal = "kPa"
     case megaJoulesPerSquareMeter = "MJ/m²"
+    case joulesPerKilogram = "J/kg"
     case hours = "h"
     case iso8601
     case unixtime
@@ -65,6 +66,7 @@ enum SiUnit: String, Codable {
         case .microgramsPerQuibicMeter: return 0
         case .grainsPerQuibicMeter: return 1
         case .dimensionless: return 2
+        case .joulesPerKilogram: return 0
         }
     }
 }
@@ -97,6 +99,10 @@ struct DataAndUnit {
     }
     
     func conertAndRound(params: ForecastapiQuery) -> DataAndUnit {
+        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
+    }
+    
+    func conertAndRound(params: GfsQuery) -> DataAndUnit {
         return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
     }
     

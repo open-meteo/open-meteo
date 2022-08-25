@@ -60,7 +60,7 @@ enum SeasonalForecastDomain: String, GenericDomain {
         
     }
     
-    var grid: RegularGrid {
+    var grid: Gridable {
         switch self {
         case .ecmwf:
             fatalError()
@@ -158,16 +158,16 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     case temperature_2m
     case temperature_2m_max
     case temperature_2m_min
-    case soil_moisture_0_to_10_cm
-    case soil_moisture_10_to_40_cm
-    case soil_moisture_40_to_100_cm
-    case soil_moisture_100_to_200_cm
-    case soil_temperature_0_to_10_cm
+    case soil_moisture_0_to_10cm
+    case soil_moisture_10_to_40cm
+    case soil_moisture_40_to_100cm
+    case soil_moisture_100_to_200cm
+    case soil_temperature_0_to_10cm
     case shortwave_radiation
-    case total_cloud_cover
+    case cloudcover
     case wind_u_component_10m
     case wind_v_component_10m
-    case total_precipitation
+    case precipitation
     case showers
     case relativehumidity_2m
     case pressure_msl
@@ -192,25 +192,25 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return 20
         case .temperature_2m_min:
             return 20
-        case .soil_moisture_0_to_10_cm:
+        case .soil_moisture_0_to_10cm:
             return 1000
-        case .soil_moisture_10_to_40_cm:
+        case .soil_moisture_10_to_40cm:
             return 1000
-        case .soil_moisture_40_to_100_cm:
+        case .soil_moisture_40_to_100cm:
             return 1000
-        case .soil_moisture_100_to_200_cm:
+        case .soil_moisture_100_to_200cm:
             return 1000
-        case .soil_temperature_0_to_10_cm:
+        case .soil_temperature_0_to_10cm:
             return 20
         case .shortwave_radiation:
             return 1
-        case .total_cloud_cover:
+        case .cloudcover:
             return 1
         case .wind_u_component_10m:
             return 10
         case .wind_v_component_10m:
             return 10
-        case .total_precipitation:
+        case .precipitation:
             return 10
         case .showers:
             return 10
@@ -229,25 +229,25 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
             return .celsius
         case .temperature_2m_min:
             return .celsius
-        case .soil_moisture_0_to_10_cm:
+        case .soil_moisture_0_to_10cm:
             return .qubicMeterPerQubicMeter
-        case .soil_moisture_10_to_40_cm:
+        case .soil_moisture_10_to_40cm:
             return .qubicMeterPerQubicMeter
-        case .soil_moisture_40_to_100_cm:
+        case .soil_moisture_40_to_100cm:
             return .qubicMeterPerQubicMeter
-        case .soil_moisture_100_to_200_cm:
+        case .soil_moisture_100_to_200cm:
             return .qubicMeterPerQubicMeter
-        case .soil_temperature_0_to_10_cm:
+        case .soil_temperature_0_to_10cm:
             return .celsius
         case .shortwave_radiation:
             return .wattPerSquareMeter
-        case .total_cloud_cover:
+        case .cloudcover:
             return .percent
         case .wind_u_component_10m:
             return .ms
         case .wind_v_component_10m:
             return .ms
-        case .total_precipitation:
+        case .precipitation:
             return .millimeter
         case .showers:
             return .millimeter
@@ -259,7 +259,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     }
 }
 
-enum SeasonalForecastVariable6Hourly {
+/*enum SeasonalForecastVariable6Hourly {
     case temperature_2m
     case dewpoint_2m
     case wind_u_10m
@@ -268,7 +268,7 @@ enum SeasonalForecastVariable6Hourly {
     case total_precipitation
     case snowfall
     case soil_temperature
-    case total_cloud_cover
+    case total_cloudcover
 }
 
 enum SeasonalForecastVariableDaily {
@@ -277,4 +277,4 @@ enum SeasonalForecastVariableDaily {
     case wind_gusts_max
     case surface_solar_radiation_downwards
     case snow_depth
-}
+}*/

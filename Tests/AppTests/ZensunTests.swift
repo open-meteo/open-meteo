@@ -23,6 +23,6 @@ final class ZensunTests: XCTestCase {
         // jaunary 3rd sun is closest to earth
         XCTAssertEqual(Meteorology.extraTerrestrialRadiationBackwards(latitude: -23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 12, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1400.2303)
         // on jyuly 4rd the sun is the farthest away from earth
-        XCTAssertEqual(Meteorology.extraTerrestrialRadiationBackwards(latitude: 23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 6, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1308.6617)
+        XCTAssertEqual(Meteorology.extraTerrestrialRadiationBackwards(latitude: 23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 6, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1308.6616)
     }
 }

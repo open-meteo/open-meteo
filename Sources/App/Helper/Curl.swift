@@ -115,21 +115,31 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, data: Array2D)> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, message: GribMessage)> {
+        
+        let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
+        if count == 0 {
+            return AnyIterator { return nil }
+        }
         
         guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
             fatalError("Could not decode index to string")
         }
-        
+
         var matches = [Variable]()
-        matches.reserveCapacity(variables.count)
-        guard let range = try index.split(separator: "\n").indexToRange(include: { idx in
-            guard let match = variables.first(where: { idx.contains($0.gribIndexName) }) else {
+        matches.reserveCapacity(count)
+        guard let range = index.split(separator: "\n").indexToRange(include: { idx in
+            guard let match = variables.first(where: {
+                guard let gribIndexName = $0.gribIndexName else {
+                    return false
+                }
+                return idx.contains(gribIndexName)
+            }) else {
                 return false
             }
-            guard !matches.contains(match) else {
-                logger.error("Grib variable \(match) matched twice for \(idx)")
-                throw CurlError.gribIndexMatchedTwice
+            guard !matches.contains(where: {$0.gribIndexName == match.gribIndexName}) else {
+                logger.info("Grib variable \(match) matched twice for \(idx)")
+                return false
             }
             logger.debug("Matched \(match) with \(idx)")
             matches.append(match)
@@ -142,8 +152,11 @@ struct Curl {
         
         var missing = false
         for variable in variables {
-            if !matches.contains(variable) {
-                logger.error("Variable \(variable) '\(variable.gribIndexName)' missing")
+            guard let gribIndexName = variable.gribIndexName else {
+                continue
+            }
+            if !matches.contains(where: {$0.gribIndexName == gribIndexName}) {
+                logger.error("Variable \(variable) '\(gribIndexName)' missing")
                 missing = true
             }
         }
@@ -156,29 +169,39 @@ struct Curl {
         //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
         return try data.withUnsafeBytes { data in
             let grib = try GribMemory(ptr: data)
+            if grib.messages.count != matches.count {
+                fatalError("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(grib.messages.count)")
+            }
             var itr = zip(matches, grib.messages).makeIterator()
             return AnyIterator {
                 guard let (variable, message) = itr.next() else {
                     return nil
                 }
-                guard let data = try? message.getDouble().map(Float.init) else {
-                    fatalError("Could not read GRIB data for variable \(variable)")
-                }
-                guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
-                    fatalError("Could not get Nx")
-                }
-                guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
-                    fatalError("Could not get Ny")
-                }
-                return (variable, Array2D(data: data, nx: nx, ny: ny))
+                return (variable, message)
             }
         }
     }
 }
 
-protocol CurlIndexedVariable: Equatable {
+extension GribMessage {
+    func toArray2d() -> Array2D {
+        guard let data = try? getDouble().map(Float.init) else {
+            fatalError("Could not read GRIB data")
+        }
+        guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
+            fatalError("Could not get Nx")
+        }
+        guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
+            fatalError("Could not get Ny")
+        }
+        return Array2D(data: data, nx: nx, ny: ny)
+    }
+}
+
+protocol CurlIndexedVariable {
     /// Return true, if this index string is matching. Index string looks like `13:520719:d=2022080900:ULWRF:top of atmosphere:anl:`
-    var gribIndexName: String { get }
+    /// If nil, this record is ignored
+    var gribIndexName: String? { get }
 }
 
 

@@ -128,6 +128,16 @@ struct Meteorology {
         return 100 * exp((β * dewpoint) / (λ + dewpoint)) / exp((β * temperature) / (λ + temperature))
     }
     
+    /// Calculate relative dewpoint from humidity and temperature
+    /// See https://www.omnicalculator.com/physics/relative-humidity
+    @inlinable public static func dewpoint(temperature: Float, relativeHumidity: Float) -> Float {
+        let β = Float(17.625)
+        let λ = Float(243.04)
+        return λ*(log(relativeHumidity/100)+((β*temperature)/(λ+temperature)))/(β-log(relativeHumidity/100)-((β*temperature)/(λ+temperature)))
+    }
+    
+    
+    
     /// Calculate relative humidity. All variables should be on the same level
     /// https://cran.r-project.org/web/packages/humidity/vignettes/humidity-measures.html
     /// humudity in g/kg, temperature in celsius, pressure in hPa
