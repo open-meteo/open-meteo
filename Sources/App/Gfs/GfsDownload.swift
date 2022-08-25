@@ -8,7 +8,7 @@ import SwiftEccodes
  NAM inventory: https://www.nco.ncep.noaa.gov/pmb/products/nam/nam.t00z.conusnest.hiresf06.tm00.grib2.shtml
  HRR inventory: https://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfprsf02.grib2.shtml
  */
-enum NcepDomain: String, GenericDomain {
+enum GfsDomain: String, GenericDomain {
     case gfs025
     case nam_conus
     case hrrr_conus
@@ -124,7 +124,7 @@ enum NcepDomain: String, GenericDomain {
 
 
 protocol GfsVariablify: GenericVariableMixing {
-    func gribIndexName(for domain: NcepDomain) -> String?
+    func gribIndexName(for domain: GfsDomain) -> String?
     
     var skipHour0: Bool { get }
     var interpolationType: InterpolationType { get }
@@ -385,7 +385,7 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         }
     }
     
-    func gribIndexName(for domain: NcepDomain) -> String? {
+    func gribIndexName(for domain: GfsDomain) -> String? {
         // NAM has eoms different definitons
         if domain == .nam_conus {
             switch self {
@@ -597,7 +597,7 @@ struct GfsPressureVariable: GfsVariablify {
         return false
     }
     
-    func gribIndexName(for domain: NcepDomain) -> String? {
+    func gribIndexName(for domain: GfsDomain) -> String? {
         switch variable {
         case .temperature:
             return ":TMP:\(level) mb:"
@@ -677,9 +677,12 @@ enum GfsVariable: Codable, Equatable, GenericVariableMixing, RawRepresentable, H
         return omFileName
     }
     
-    static func allCases(for domain: NcepDomain) -> [GfsVariable] {
-        let pressure = GfsPressureVariableType.allCases.flatMap { variable in
-            domain.levels.map { GfsVariable.pressure(GfsPressureVariable(variable: variable, level: $0)) }
+    static func allCases(for domain: GfsDomain) -> [GfsVariable] {
+        /// process level by level to reduce the time while U/V components are updated
+        let pressure = domain.levels.flatMap { level in
+            GfsPressureVariableType.allCases.map { variable in
+                GfsVariable.pressure(GfsPressureVariable(variable: variable, level: level))
+            }
         }
         let surface = GfsSurfaceVariable.allCases.map {GfsVariable.surface($0)}
         return surface + pressure
@@ -750,10 +753,10 @@ enum GfsVariable: Codable, Equatable, GenericVariableMixing, RawRepresentable, H
 }
 
 
-
+/// Small helper structure to fuse domain and variable for more control in the  gribindex selection
 struct GfsVariableAndDomain: CurlIndexedVariable {
     let variable: GfsVariable
-    let domain: NcepDomain
+    let domain: GfsDomain
     
     var gribIndexName: String? {
         return variable.v.gribIndexName(for: domain)
@@ -764,7 +767,7 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
 /**
 NCEP GFS downloader
  */
-struct NcepDownload: Command {
+struct GfsDownload: Command {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -788,7 +791,7 @@ struct NcepDownload: Command {
     
     func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
-        guard let domain = NcepDomain.init(rawValue: signature.domain) else {
+        guard let domain = GfsDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
         switch domain {
@@ -871,7 +874,7 @@ struct NcepDownload: Command {
     }
     
     /// download GFS025 and NAM CONUS
-    func downloadGfs(logger: Logger, domain: NcepDomain, run: Timestamp, variables: [GfsVariable], skipFilesIfExisting: Bool) throws {
+    func downloadGfs(logger: Logger, domain: GfsDomain, run: Timestamp, variables: [GfsVariable], skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
@@ -916,7 +919,7 @@ struct NcepDownload: Command {
     }
     
     /// Process each variable and update time-series optimised files
-    func convertGfs(logger: Logger, domain: NcepDomain, variables: [GfsVariable], run: Timestamp, createNetcdf: Bool) throws {
+    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours
         let nForecastHours = forecastHours.max()!+1

@@ -204,9 +204,9 @@ enum GfsVariableDerived: String, Codable, CaseIterable {
 
 typealias GfsVariableCombined = VariableOrDerived<GfsVariable, GfsVariableDerived>
 
-typealias GfsReader = GenericReader<NcepDomain, GfsVariable>
+typealias GfsReader = GenericReader<GfsDomain, GfsVariable>
 
-typealias GfsMixer = GenericReaderMixerCached<NcepDomain, GfsVariable>
+typealias GfsMixer = GenericReaderMixerCached<GfsDomain, GfsVariable>
 
 extension GfsMixer {
     func getDaily(variable: GfsDailyWeatherVariable, params: GfsQuery) throws -> DataAndUnit {

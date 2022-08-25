@@ -27,7 +27,7 @@ public func configure(_ app: Application) throws {
     app.commands.use(DownloadCamsCommand(), as: "download-cams")
     app.commands.use(CronjobCommand(), as: "cronjob")
     app.commands.use(SeasonalForecastDownload(), as: "download-seasonal-forecast")
-    app.commands.use(NcepDownload(), as: "download-ncep")
+    app.commands.use(GfsDownload(), as: "download-gfs")
 
     app.http.server.configuration.hostname = "0.0.0.0"
     

@@ -111,7 +111,7 @@ struct WebsiteController: RouteCollection {
             }
             
             let title: String
-            let levels: [Int] = NcepDomain.gfs025.levels
+            let levels: [Int] = GfsDomain.gfs025.levels
             let pressureVariables = [
                 PressureVariable(label: "Temperature", name: "temperature"),
                 PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
