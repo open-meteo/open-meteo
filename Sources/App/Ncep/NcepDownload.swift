@@ -155,10 +155,10 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
     /// accumulated since forecast start
     case precipitation
     
-    case v_10m
-    case u_10m
-    case v_80m
-    case u_80m
+    case wind_v_component_10m
+    case wind_u_component_10m
+    case wind_v_component_80m
+    case wind_u_component_80m
     
     case soil_temperature_0_to_10cm
     case soil_temperature_10_to_40cm
@@ -240,10 +240,10 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .cloudcover_high: return 1
         case .relativehumidity_2m: return 1
         case .precipitation: return 10
-        case .v_10m: return 10
-        case .u_10m: return 10
-        case .v_80m: return 10
-        case .u_80m: return 10
+        case .wind_v_component_10m: return 10
+        case .wind_u_component_10m: return 10
+        case .wind_v_component_80m: return 10
+        case .wind_u_component_80m: return 10
         case .soil_temperature_0_to_10cm: return 20
         case .soil_temperature_10_to_40cm: return 20
         case .soil_temperature_40_to_100cm: return 20
@@ -281,10 +281,10 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .cloudcover_high: return .percent
         case .relativehumidity_2m: return .percent
         case .precipitation: return .millimeter
-        case .v_10m: return .ms
-        case .u_10m: return .ms
-        case .v_80m: return .ms
-        case .u_80m: return .ms
+        case .wind_v_component_10m: return .ms
+        case .wind_u_component_10m: return .ms
+        case .wind_v_component_80m: return .ms
+        case .wind_u_component_80m: return .ms
         case .soil_temperature_0_to_10cm: return .celsius
         case .soil_temperature_10_to_40cm: return .celsius
         case .soil_temperature_40_to_100cm: return .celsius
@@ -346,8 +346,8 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .cloudcover_high: return .hermite
         case .relativehumidity_2m: return .hermite
         case .precipitation: return .linear
-        case .v_10m: return .hermite
-        case .u_10m: return .hermite
+        case .wind_v_component_10m: return .hermite
+        case .wind_u_component_10m: return .hermite
         case .snow_depth: return .linear
         case .sensible_heatflux: return .hermite_backwards_averaged
         case .latent_heatflux: return .hermite_backwards_averaged
@@ -362,8 +362,8 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .soil_moisture_10_to_40cm: return .hermite
         case .soil_moisture_40_to_100cm: return .hermite
         case .soil_moisture_100_to_200cm: return .hermite
-        case .v_80m: return .hermite
-        case .u_80m: return .hermite
+        case .wind_v_component_80m: return .hermite
+        case .wind_u_component_80m: return .hermite
         case .showers: return .linear
         case .pressure_msl: return .hermite
         case .frozen_precipitation_percent: return .nearest
@@ -475,13 +475,13 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
             return ":RH:2 m above ground:"
         case .precipitation:
             return ":APCP:surface:0-"
-        case .v_10m:
+        case .wind_v_component_10m:
             return ":VGRD:10 m above ground:"
-        case .u_10m:
+        case .wind_u_component_10m:
             return ":UGRD:10 m above ground:"
-        case .v_80m:
+        case .wind_v_component_80m:
             return ":VGRD:80 m above ground:"
-        case .u_80m:
+        case .wind_u_component_80m:
             return ":UGRD:80 m above ground:"
         case .soil_temperature_0_to_10cm:
             return ":TSOIL:0-0.1 m below ground:"
