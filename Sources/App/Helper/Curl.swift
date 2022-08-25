@@ -120,11 +120,11 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, message: GribMessage)> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], callback: (_ variable: Variable, _ message: GribMessage) throws -> ()) throws {
         
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
-            return AnyIterator { return nil }
+            return
         }
         
         guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
@@ -169,22 +169,25 @@ struct Curl {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
-        let data = try downloadInMemory(url: url, range: range.range, minSize: range.minSize)
-        logger.debug("Converting GRIB, size \(data.count) bytes (expected minSize \(range.minSize))")
-        //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
-        return try data.withUnsafeBytes { data in
-            let grib = try GribMemory(ptr: data)
-            if grib.messages.count != matches.count {
-                fatalError("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(grib.messages.count)")
-            }
-            var itr = zip(matches, grib.messages).makeIterator()
-            return AnyIterator {
-                guard let (variable, message) = itr.next() else {
-                    return nil
+        for t in 1...3 {
+            let data = try downloadInMemory(url: url, range: range.range, minSize: range.minSize)
+            logger.debug("Converting GRIB, size \(data.count) bytes (expected minSize \(range.minSize))")
+            //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
+            if (try data.withUnsafeBytes { data -> Bool in
+                let grib = try GribMemory(ptr: data)
+                if grib.messages.count != matches.count {
+                    logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(grib.messages.count). Try \(t)")
+                    return false
                 }
-                return (variable, message)
+                for (variable, message) in zip(matches, grib.messages) {
+                    try callback(variable, message)
+                }
+                return true
+            }) {
+                return
             }
         }
+        fatalError("Download failed")
     }
 }
 
