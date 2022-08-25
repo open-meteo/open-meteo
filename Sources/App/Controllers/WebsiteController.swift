@@ -15,6 +15,7 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "marine-weather-api", use: marineApiHandler)
         routes.get("en", "docs", "air-quality-api", use: airQualityApiHandler)
         routes.get("en", "docs", "seasonal-forecast-api", use: seasonalForecastApiHandler)
+        routes.get("en", "docs", "gfs-api", use: gfsApiHandler)
         routes.get("en", "features", use: featuresHandler)
         routes.get("demo-api", use: apiDemoHandler)
     }
@@ -98,6 +99,13 @@ struct WebsiteController: RouteCollection {
         }
         let context = IndexContext(title: "Seasonal Forecast API")
         return req.view.render("docs-seasonal-forecast-api", context)
+    }
+    func gfsApiHandler(_ req: Request) -> EventLoopFuture<View> {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
+            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
+        }
+        let context = IndexContext(title: "GFS & HRRR Forecast API")
+        return req.view.render("docs-gfs-api", context)
     }
 }
 

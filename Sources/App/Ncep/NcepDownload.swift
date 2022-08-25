@@ -6,7 +6,7 @@ import SwiftEccodes
 /**
  GFS inventory: https://www.nco.ncep.noaa.gov/pmb/products/gfs/gfs.t00z.pgrb2.0p25.f003.shtml
  NAM inventory: https://www.nco.ncep.noaa.gov/pmb/products/nam/nam.t00z.conusnest.hiresf06.tm00.grib2.shtml
- HRR inventory: https://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfsfcf02.grib2.shtml
+ HRR inventory: https://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfprsf02.grib2.shtml
  */
 enum NcepDomain: String, GenericDomain {
     case gfs025
@@ -526,7 +526,6 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
             if domain != .hrrr_conus {
                 return nil
             }
-            
             return ":VDDSF:surface:"
         case .clear_sky_radiation:
             // only NAM
