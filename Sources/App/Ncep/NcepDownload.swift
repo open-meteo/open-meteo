@@ -905,7 +905,7 @@ struct NcepDownload: Command {
         let curl = Curl(logger: logger)
         let forecastHours = domain.forecastHours
         
-        let variables: [GfsVariableAndDomain] = variables.compactMap {
+        let variables: [GfsVariableAndDomain] = variables.map {
             GfsVariableAndDomain(variable: $0, domain: domain)
         }
         
@@ -918,7 +918,6 @@ struct NcepDownload: Command {
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
             //let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
-
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
             for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: variables) {
                 var data = message.toArray2d()
@@ -932,8 +931,8 @@ struct NcepDownload: Command {
                     data.shift180LongitudeAndFlipLatitude()
                 }
                 data.ensureDimensions(of: domain.grid)
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"
+                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
+                let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
                 try FloatArrayCompressor.write(file: file, data: data.data)
             }
