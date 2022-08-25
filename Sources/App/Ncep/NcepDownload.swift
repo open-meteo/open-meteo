@@ -120,15 +120,6 @@ enum NcepDomain: String, GenericDomain {
             return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfprsf\(fHH).grib2"
         }
     }
-    
-    func getLeastCommonGribUrl(run: Timestamp, forecastHour: Int) -> String {
-        guard self == .gfs025 else {
-            fatalError("onyl for gfs")
-        }
-        let fHHH = forecastHour.zeroPadded(len: 3)
-        /// `pgrb2b` instead of `pgrb2`
-        return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2b.0p25.f\(fHHH)"
-    }
 }
 
 
@@ -191,7 +182,7 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
     case diffuse_radiation
     //case direct_radiation
     
-    /// Only available in NAM, but at least it can be used to get diffuse radiation
+    /// Only available in NAM, but at least it can be used to get a better kt index
     case clear_sky_radiation
     
     /// only GFS
@@ -225,8 +216,6 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .shortwave_radiation: return true
         case .diffuse_radiation: return true
         case .clear_sky_radiation: return true
-        //case .uv_index: return true
-        //case .uv_index_clear_sky: return true
         default: return false
         }
     }
@@ -266,8 +255,6 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .visibility: return 0.05 // 50 meter
         case .diffuse_radiation: return 1
         case .clear_sky_radiation: return 1
-        //case .uv_index_clear_sky: return 20
-        //case .uv_index: return 20
         }
     }
     
@@ -307,8 +294,6 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .visibility: return .meter
         case .diffuse_radiation: return .wattPerSquareMeter
         case .clear_sky_radiation: return .wattPerSquareMeter
-        //case .uv_index: return .dimensionless
-        //case .uv_index_clear_sky: return .dimensionless
         }
     }
     
@@ -317,8 +302,6 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .shortwave_radiation: return true
         case .diffuse_radiation: return true
         case .clear_sky_radiation: return false // NOTE: only in NAM
-        //case .uv_index: return true
-        //case .uv_index_clear_sky: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
         default: return false
@@ -372,8 +355,6 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .cape: return .hermite
         case .lifted_index: return .hermite
         case .visibility: return .hermite
-        //case .uv_index: return .solar_backwards_averaged
-        //case .uv_index_clear_sky: return .solar_backwards_averaged
         }
     }
     
@@ -384,11 +365,6 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         default: return false
         }
     }
-    
-    /// GFS has a second file with least commonly used paramerters
-    //var isLeastCommonlyUsedParameter: Bool {
-    //    return self == .uv_index || self == .uv_index_clear_sky
-    //}
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
@@ -936,21 +912,6 @@ struct NcepDownload: Command {
                 try FileManager.default.removeItemIfExists(at: file)
                 try FloatArrayCompressor.write(file: file, data: data.data)
             }
-            
-            // Get least common variables
-            /*let variablesLeastCommon = variablesAll.filter({ $0.variable.isLeastCommonlyUsedParameter })
-            let urlLeastCommon = domain.getLeastCommonGribUrl(run: run, forecastHour: forecastHour)
-            for (variable, message) in try curl.downloadIndexedGrib(url: urlLeastCommon, variables: variablesLeastCommon) {
-                var data = message.toArray2d()
-                if domain.isGlobal {
-                    data.shift180LongitudeAndFlipLatitude()
-                }
-                data.ensureDimensions(of: domain.grid)
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"
-                try FileManager.default.removeItemIfExists(at: file)
-                try FloatArrayCompressor.write(file: file, data: data.data)
-            }*/
         }
     }
     
