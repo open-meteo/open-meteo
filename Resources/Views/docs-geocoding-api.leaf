@@ -199,7 +199,7 @@
         </tr>
         <tr>
           <th scope="row">elevation</th>
-          <td>Floating ppint</td>
+          <td>Floating point</td>
           <td>Elevation above mean sea level of this location</td>
         </tr>
         <tr>
