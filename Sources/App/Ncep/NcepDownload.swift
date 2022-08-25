@@ -546,8 +546,8 @@ enum GfsPressureVariableType: String, CaseIterable {
     case u_wind
     case v_wind
     case geopotential_height
-    case cloud_cover
-    case relative_humidity
+    case cloudcover
+    case relativehumidity
 }
 
 struct GfsPressureVariable: GfsVariablify {
@@ -572,9 +572,9 @@ struct GfsPressureVariable: GfsVariablify {
             return 10
         case .geopotential_height:
             return 1
-        case .cloud_cover:
+        case .cloudcover:
             return 1
-        case .relative_humidity:
+        case .relativehumidity:
             return 1
         }
     }
@@ -589,9 +589,9 @@ struct GfsPressureVariable: GfsVariablify {
             return .hermite
         case .geopotential_height:
             return .hermite
-        case .cloud_cover:
+        case .cloudcover:
             return .hermite
-        case .relative_humidity:
+        case .relativehumidity:
             return .hermite
         }
     }
@@ -606,9 +606,9 @@ struct GfsPressureVariable: GfsVariablify {
             return .ms
         case .geopotential_height:
             return .meter
-        case .cloud_cover:
+        case .cloudcover:
             return .percent
-        case .relative_humidity:
+        case .relativehumidity:
             return .percent
         }
     }
@@ -631,7 +631,7 @@ struct GfsPressureVariable: GfsVariablify {
             return ":VGRD:\(level) mb:"
         case .geopotential_height:
             return ":HGT:\(level) mb:"
-        case .cloud_cover:
+        case .cloudcover:
             if domain != .gfs025 {
                 // no cloud cover in HRRR and NAM
                 return nil
@@ -640,7 +640,7 @@ struct GfsPressureVariable: GfsVariablify {
                 return nil
             }
             return ":TCDC:\(level) mb:"
-        case .relative_humidity:
+        case .relativehumidity:
             return ":RH:\(level) mb:"
         }
     }

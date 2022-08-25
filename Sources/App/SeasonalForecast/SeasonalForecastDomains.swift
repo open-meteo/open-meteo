@@ -268,7 +268,7 @@ enum SeasonalForecastVariable6Hourly {
     case total_precipitation
     case snowfall
     case soil_temperature
-    case total_cloud_cover
+    case total_cloudcover
 }
 
 enum SeasonalForecastVariableDaily {
