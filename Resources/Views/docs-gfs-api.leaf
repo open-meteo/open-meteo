@@ -424,6 +424,34 @@
         </div>
 
         <div class="row py-3 px-0">
+          <div class="accordion" id="accordionExample">
+            #for(variable in pressureVariables):
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="heading-#(variable.name)">
+                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-#(variable.name)" aria-expanded="false" aria-controls="collapse-#(variable.name)">
+                  #(variable.label) on Pressure Levels
+                </button>
+              </h2>
+              <div id="collapse-#(variable.name)" class="accordion-collapse collapse" aria-labelledby="heading-#(variable.name)" data-bs-parent="#accordionExample">
+                <div class="accordion-body row">
+                  #for(level in levels):
+                  <div class="col-md-2">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level)hPa" id="#(variable.name)_#(level)hPa" name="hourly">
+                      <label class="form-check-label" for="#(variable.name)_#(level)hPa">
+                        #(level) hPa
+                      </label>
+                    </div>
+                  </div>
+                  #endfor
+                </div>
+              </div>
+            </div>
+            #endfor
+        </div>
+      </div>
+
+        <div class="row py-3 px-0">
           <h3>Daily Weather Variables <small class="text-muted">(*)</small></h3>
           <div class="col-md-6">
             <div class="form-check">

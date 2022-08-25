@@ -104,7 +104,24 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = IndexContext(title: "GFS & HRRR Forecast API")
+        struct GfsContext: Encodable {
+            struct PressureVariable: Encodable {
+                let label: String
+                let name: String
+            }
+            
+            let title: String
+            let levels: [Int] = NcepDomain.gfs025.levels
+            let pressureVariables = [
+                PressureVariable(label: "Temperature", name: "temperature"),
+                PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
+                PressureVariable(label: "Cloudcover", name: "cloudcover"),
+                PressureVariable(label: "Wind Speed", name: "windspeed"),
+                PressureVariable(label: "Wind Direction", name: "winddirection"),
+                PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
+            ]
+        }
+        let context = GfsContext(title: "GFS & HRRR Forecast API")
         return req.view.render("docs-gfs-api", context)
     }
 }
