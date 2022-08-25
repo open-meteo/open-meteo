@@ -67,14 +67,14 @@ enum GfsDomain: String, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
-    var forecastHours: [Int] {
+    func forecastHours(run: Int) -> [Int] {
         switch self {
         case .gfs025:
             return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
         case .nam_conus:
             return Array(0...60)
         case .hrrr_conus:
-            return Array(0...48)
+            return (run % 6 == 0) ? Array(0...48) : Array(0...18)
         }
     }
     
@@ -898,7 +898,7 @@ struct GfsDownload: Command {
         try downloadNcepElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         
         let curl = Curl(logger: logger)
-        let forecastHours = domain.forecastHours
+        let forecastHours = domain.forecastHours(run: run.hour)
         
         let variables: [GfsVariableAndDomain] = variables.map {
             GfsVariableAndDomain(variable: $0, domain: domain)
@@ -937,7 +937,7 @@ struct GfsDownload: Command {
     /// Process each variable and update time-series optimised files
     func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        let forecastHours = domain.forecastHours
+        let forecastHours = domain.forecastHours(run: run.hour)
         let nForecastHours = forecastHours.max()!+1
         
         let grid = domain.grid
