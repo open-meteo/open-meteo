@@ -7,6 +7,7 @@ enum CurlError: Error {
     case noGribMessagesMatch
     case didNotFindAllVariablesInGribIndex
     case gribIndexMatchedTwice
+    case sizeTooSmall
 }
 
 struct Curl {
@@ -71,7 +72,7 @@ struct Curl {
         }
     }
     
-    func downloadInMemory(url: String, range: String? = nil) throws -> Data {
+    func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> Data {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
             let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
@@ -97,7 +98,11 @@ struct Curl {
         var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
         while true {
             do {
-                return try Process.spawnWithOutputData(cmd: "curl", args: args)
+                let data = try Process.spawnWithOutputData(cmd: "curl", args: args)
+                if let minSize = minSize, data.count < minSize {
+                    throw CurlError.sizeTooSmall
+                }
+                return data
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
@@ -164,8 +169,8 @@ struct Curl {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
-        let data = try downloadInMemory(url: url, range: range)
-        logger.debug("Converting GRIB, size \(data.count) bytes")
+        let data = try downloadInMemory(url: url, range: range.range, minSize: range.minSize)
+        logger.debug("Converting GRIB, size \(data.count) bytes (expected minSize \(range.minSize))")
         //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
         return try data.withUnsafeBytes { data in
             let grib = try GribMemory(ptr: data)
@@ -207,24 +212,31 @@ protocol CurlIndexedVariable {
 
 extension Sequence where Element == Substring {
     /// Parse a GRID index to curl read ranges
-    func indexToRange(include: (Substring) throws -> Bool) rethrows -> String? {
+    func indexToRange(include: (Substring) throws -> Bool) rethrows -> (range: String, minSize: Int)? {
         var range = ""
         var start: Int? = nil
+        var minSize = 0
+        var previousMatched: Int? = nil
         for line in self {
             let parts = line.split(separator: ":")
             guard parts.count > 2, let messageStart = Int(parts[1]) else {
                 continue
             }
+            if let previousMatched = previousMatched {
+                minSize += messageStart - previousMatched
+            }
+            previousMatched = nil
             guard try include(line) else {
-                if let startUnwrapped = start {
-                    range += "\(range.isEmpty ? "" : ",")\(startUnwrapped)-\(messageStart-1)"
-                    start = nil
+                if let start = start {
+                    range += "\(range.isEmpty ? "" : ",")\(start)-\(messageStart-1)"
                 }
+                start = nil
                 continue
             }
             if start == nil {
                 start = messageStart
             }
+            previousMatched = messageStart
         }
         if let start = start {
             range += "\(range.isEmpty ? "" : ",")\(start)-"
@@ -232,6 +244,6 @@ extension Sequence where Element == Substring {
         if range.isEmpty {
             return nil
         }
-        return range
+        return (range, minSize)
     }
 }
