@@ -259,7 +259,7 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
     }
 }
 
-enum SeasonalForecastVariable6Hourly {
+/*enum SeasonalForecastVariable6Hourly {
     case temperature_2m
     case dewpoint_2m
     case wind_u_10m
@@ -277,4 +277,4 @@ enum SeasonalForecastVariableDaily {
     case wind_gusts_max
     case surface_solar_radiation_downwards
     case snow_depth
-}
+}*/
