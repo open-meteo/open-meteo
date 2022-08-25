@@ -522,12 +522,14 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
         case .visibility:
             return ":VIS:surface:"
         case .diffuse_radiation:
-            if domain == .gfs025 {
+            // only HRRR
+            if domain != .hrrr_conus {
                 return nil
             }
-            // only for local domains
+            
             return ":VDDSF:surface:"
         case .clear_sky_radiation:
+            // only NAM
             if domain != .nam_conus {
                 return nil
             }
