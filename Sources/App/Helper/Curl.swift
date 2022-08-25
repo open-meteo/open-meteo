@@ -124,14 +124,20 @@ struct Curl {
         guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
             fatalError("Could not decode index to string")
         }
-        
+
+        let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         var matches = [Variable]()
-        matches.reserveCapacity(variables.count)
+        matches.reserveCapacity(count)
         guard let range = index.split(separator: "\n").indexToRange(include: { idx in
-            guard let match = variables.first(where: { idx.contains($0.gribIndexName) }) else {
+            guard let match = variables.first(where: {
+                guard let gribIndexName = $0.gribIndexName else {
+                    return false
+                }
+                return idx.contains(gribIndexName)
+            }) else {
                 return false
             }
-            guard !matches.contains(match) else {
+            guard !matches.contains(where: {$0.gribIndexName == match.gribIndexName}) else {
                 logger.info("Grib variable \(match) matched twice for \(idx)")
                 return false
             }
@@ -146,7 +152,7 @@ struct Curl {
         
         var missing = false
         for variable in variables {
-            if !matches.contains(variable) {
+            if !matches.contains(where: {$0.gribIndexName == variable.gribIndexName}) {
                 logger.error("Variable \(variable) '\(variable)' missing")
                 missing = true
             }
@@ -189,9 +195,10 @@ extension GribMessage {
     }
 }
 
-protocol CurlIndexedVariable: Equatable {
+protocol CurlIndexedVariable {
     /// Return true, if this index string is matching. Index string looks like `13:520719:d=2022080900:ULWRF:top of atmosphere:anl:`
-    var gribIndexName: String { get }
+    /// If nil, this record is ignored
+    var gribIndexName: String? { get }
 }
 
 

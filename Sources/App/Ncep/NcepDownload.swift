@@ -62,6 +62,23 @@ enum NcepDomain: String, GenericDomain {
         }
     }
     
+    /// Pressure levels. Variables HGT, TMP, RH/SPFH , UGRD, VGRD... TCDC starts at 50mb for GFS, HRR has only RH and Cloud Mixing Ratio
+    /// https://earthscience.stackexchange.com/questions/12204/what-is-the-mixing-ratio-of-a-cloud
+    /// http://funnel.sfsu.edu/courses/metr302/f96/handouts/moist_sum.html
+    /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
+    var levels: [Int] {
+        switch self {
+        case .gfs025: fallthrough
+        case .nam_conus:
+            return [10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+        case .hrrr_conus:
+            return [50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+            // all available
+            //return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
+        }
+        
+    }
+    
     var omFileLength: Int {
         switch self {
         case .nam_conus:
@@ -114,7 +131,18 @@ enum NcepDomain: String, GenericDomain {
 }
 
 
-enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
+protocol GfsVariablify: GenericVariableMixing {
+    func gribIndexName(for domain: NcepDomain) -> String?
+    
+    var skipHour0: Bool { get }
+    var interpolationType: InterpolationType { get }
+    var isAveragedOverForecastTime: Bool { get }
+    var multiplyAdd: (multiply: Float, add: Float)? { get }
+    var isAccumulatedSinceModelStart: Bool { get }
+}
+
+
+enum GfsSurfaceVariable: String, CaseIterable, Codable, GfsVariablify {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -166,9 +194,9 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
     case clear_sky_radiation
     
     /// only GFS
-    case uv_index
+    //case uv_index
     /// only GFS
-    case uv_index_clear_sky
+    //case uv_index_clear_sky
     
     case cape
     case lifted_index
@@ -196,8 +224,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .shortwave_radiation: return true
         case .diffuse_radiation: return true
         case .clear_sky_radiation: return true
-        case .uv_index: return true
-        case .uv_index_clear_sky: return true
+        //case .uv_index: return true
+        //case .uv_index_clear_sky: return true
         default: return false
         }
     }
@@ -237,8 +265,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .visibility: return 0.05 // 50 meter
         case .diffuse_radiation: return 1
         case .clear_sky_radiation: return 1
-        case .uv_index_clear_sky: return 20
-        case .uv_index: return 20
+        //case .uv_index_clear_sky: return 20
+        //case .uv_index: return 20
         }
     }
     
@@ -278,8 +306,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .visibility: return .meter
         case .diffuse_radiation: return .wattPerSquareMeter
         case .clear_sky_radiation: return .wattPerSquareMeter
-        case .uv_index: return .dimensionless
-        case .uv_index_clear_sky: return .dimensionless
+        //case .uv_index: return .dimensionless
+        //case .uv_index_clear_sky: return .dimensionless
         }
     }
     
@@ -288,8 +316,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .shortwave_radiation: return true
         case .diffuse_radiation: return true
         case .clear_sky_radiation: return false // NOTE: only in NAM
-        case .uv_index: return true
-        case .uv_index_clear_sky: return true
+        //case .uv_index: return true
+        //case .uv_index_clear_sky: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
         default: return false
@@ -343,8 +371,8 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .cape: return .hermite
         case .lifted_index: return .hermite
         case .visibility: return .hermite
-        case .uv_index: return .solar_backwards_averaged
-        case .uv_index_clear_sky: return .solar_backwards_averaged
+        //case .uv_index: return .solar_backwards_averaged
+        //case .uv_index_clear_sky: return .solar_backwards_averaged
         }
     }
     
@@ -357,9 +385,9 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
     }
     
     /// GFS has a second file with least commonly used paramerters
-    var isLeastCommonlyUsedParameter: Bool {
-        return self == .uv_index || self == .uv_index_clear_sky
-    }
+    //var isLeastCommonlyUsedParameter: Bool {
+    //    return self == .uv_index || self == .uv_index_clear_sky
+    //}
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
@@ -379,31 +407,34 @@ enum GfsVariable: String, CaseIterable, Codable, GenericVariableMixing {
             return nil
         }
     }
-}
-
-struct GfsVariableAndDomain: CurlIndexedVariable {
-    let variable: GfsVariable
-    let domain: NcepDomain
     
-    var isAvailable: Bool {
-        // there is no parameterised convective precipitation field
-        // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
-        if domain == .nam_conus && variable == .showers {
-            return false
-        }
-        if variable == .shortwave_radiation {
-            return domain == .hrrr_conus
-        }
-        if variable == .clear_sky_radiation {
-            return domain == .nam_conus
-        }
-        if variable == .uv_index || variable == .uv_index_clear_sky {
-            return domain == .gfs025
-        }
-        if domain == .hrrr_conus {
-            switch variable {
+    func gribIndexName(for domain: NcepDomain) -> String? {
+        // NAM has eoms different definitons
+        if domain == .nam_conus {
+            switch self {
+            case .lifted_index:
+                return ":LFTX:500-1000 mb:"
+            case .cloudcover:
+                return ":TCDC:entire atmosphere (considered as a single layer):"
+            case .precipitation:
+                // only 3h accumulation is availble
+                return ":APCP:surface:"
             case .showers:
-                fallthrough
+                // there is no parameterised convective precipitation field
+                // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
+                return nil
+            default: break
+            }
+        }
+        
+        if domain == .hrrr_conus {
+            switch self {
+            case .lifted_index:
+                return ":LFTX:500-1000 mb:"
+            case .showers:
+                // there is no parameterised convective precipitation field
+                // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
+                return nil
             case .soil_moisture_0_to_10cm:
                 fallthrough
             case .soil_moisture_10_to_40cm:
@@ -419,39 +450,14 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
             case .soil_temperature_40_to_100cm:
                 fallthrough
             case .soil_temperature_100_to_200cm:
-                return false
+                return nil
             case .pressure_msl:
-                return false
-            default: break
-            }
-        }
-        return true
-    }
-    
-    var gribIndexName: String {
-        // NAM has eoms different definitons
-        if domain == .nam_conus {
-            switch variable {
-            case .lifted_index:
-                return ":LFTX:500-1000 mb:"
-            case .cloudcover:
-                return ":TCDC:entire atmosphere (considered as a single layer):"
-            case .precipitation:
-                // only 3h accumulation is availble
-                return ":APCP:surface:"
+                return nil
             default: break
             }
         }
         
-        if domain == .hrrr_conus {
-            switch variable {
-            case .lifted_index:
-                return ":LFTX:500-1000 mb:"
-            default: break
-            }
-        }
-        
-        switch variable {
+        switch self {
         case .temperature_2m:
             return ":TMP:2 m above ground:"
         case .cloudcover:
@@ -518,12 +524,254 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
             // only for local domains
             return ":VDDSF:surface:"
         case .clear_sky_radiation:
+            if domain != .nam_conus {
+                return nil
+            }
             return ":CSDSF:surface:"
-        case .uv_index_clear_sky:
+        /*case .uv_index_clear_sky:
             return ":CDUVB:surface:"
         case .uv_index:
-            return ":DUVB:surface:"
+            return ":DUVB:surface:"*/
         }
+    }
+}
+
+enum GfsPressureVariableType: String, CaseIterable {
+    case temperature
+    case u_wind
+    case v_wind
+    case geopotential_height
+    case cloud_cover
+    case relative_humidity
+}
+
+struct GfsPressureVariable: GfsVariablify {
+    let variable: GfsPressureVariableType
+    let level: Int
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    var omFileName: String {
+        return "\(variable.rawValue)_\(level)hPa"
+    }
+    
+    var scalefactor: Float {
+        switch variable {
+        case .temperature:
+            return 20
+        case .u_wind:
+            return 10
+        case .v_wind:
+            return 10
+        case .geopotential_height:
+            return 1
+        case .cloud_cover:
+            return 1
+        case .relative_humidity:
+            return 1
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        switch variable {
+        case .temperature:
+            return .hermite
+        case .u_wind:
+            return .hermite
+        case .v_wind:
+            return .hermite
+        case .geopotential_height:
+            return .hermite
+        case .cloud_cover:
+            return .hermite
+        case .relative_humidity:
+            return .hermite
+        }
+    }
+    
+    var unit: SiUnit {
+        switch variable {
+        case .temperature:
+            return .celsius
+        case .u_wind:
+            return .ms
+        case .v_wind:
+            return .ms
+        case .geopotential_height:
+            return .meter
+        case .cloud_cover:
+            return .percent
+        case .relative_humidity:
+            return .percent
+        }
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var skipHour0: Bool {
+        return false
+    }
+    
+    func gribIndexName(for domain: NcepDomain) -> String? {
+        switch variable {
+        case .temperature:
+            return ":TMP:\(level) mb:"
+        case .u_wind:
+            return ":UGRD:\(level) mb:"
+        case .v_wind:
+            return ":VGRD:\(level) mb:"
+        case .geopotential_height:
+            return ":HGT:\(level) mb:"
+        case .cloud_cover:
+            if domain == .hrrr_conus && level < 50 {
+                return nil
+            }
+            return ":TCDC:\(level) mb:"
+        case .relative_humidity:
+            return ":RH:\(level) mb:"
+        }
+    }
+    
+    var interpolationType: InterpolationType {
+        return .hermite
+    }
+    
+    var isAveragedOverForecastTime: Bool {
+        return false
+    }
+    
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch variable {
+        case .temperature:
+            return (1, -273.15)
+        default:
+            return nil
+        }
+    }
+    
+    var isAccumulatedSinceModelStart: Bool {
+        return false
+    }
+}
+
+
+
+/// Ugly glue code to make `Codable` working. It requires a different wy of decoding URL strings to enums to get rid of the code below
+enum GfsVariable: Codable, Equatable, GenericVariableMixing, RawRepresentable, Hashable {
+    typealias RawValue = String
+    
+    case surface(GfsSurfaceVariable)
+    case pressure(GfsPressureVariable)
+    
+    init?(rawValue: String) {
+        if let pos = rawValue.lastIndex(of: "_"), let posEnd = rawValue[pos..<rawValue.endIndex].range(of: "hPa") {
+            let variableString = rawValue[rawValue.startIndex ..< pos]
+            guard let variable = GfsPressureVariableType(rawValue: String(variableString)) else {
+                return nil
+            }
+            
+            let start = rawValue.index(after: pos)
+            let levelString = rawValue[start..<posEnd.lowerBound]
+            guard let level = Int(levelString) else {
+                return nil
+            }
+            self = .pressure(GfsPressureVariable(variable: variable, level: level))
+            return
+        }
+        guard let variable = GfsSurfaceVariable(rawValue: rawValue) else {
+            return nil
+        }
+        self = .surface(variable)
+    }
+    
+    var rawValue: String {
+        return omFileName
+    }
+    
+    static func allCases(for domain: NcepDomain) -> [GfsVariable] {
+        let pressure = GfsPressureVariableType.allCases.flatMap { variable in
+            domain.levels.map { GfsVariable.pressure(GfsPressureVariable(variable: variable, level: $0)) }
+        }
+        let surface = GfsSurfaceVariable.allCases.map {GfsVariable.surface($0)}
+        return surface + pressure
+    }
+    
+    var v: GfsVariablify {
+        switch self {
+        case .surface(let gfsSurfaceVariable):
+            return gfsSurfaceVariable
+        case .pressure(let gfsPressureVariable):
+            return gfsPressureVariable
+        }
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        switch self {
+        case .surface(let gfsSurfaceVariable):
+            return gfsSurfaceVariable.requiresOffsetCorrectionForMixing
+        case .pressure(let gfsPressureVariable):
+            return gfsPressureVariable.requiresOffsetCorrectionForMixing
+        }
+    }
+    
+    var omFileName: String {
+        switch self {
+        case .surface(let gfsSurfaceVariable):
+            return gfsSurfaceVariable.omFileName
+        case .pressure(let gfsPressureVariable):
+            return gfsPressureVariable.omFileName
+        }
+    }
+    
+    var scalefactor: Float {
+        switch self {
+        case .surface(let gfsSurfaceVariable):
+            return gfsSurfaceVariable.scalefactor
+        case .pressure(let gfsPressureVariable):
+            return gfsPressureVariable.scalefactor
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .surface(let gfsSurfaceVariable):
+            return gfsSurfaceVariable.interpolation
+        case .pressure(let gfsPressureVariable):
+            return gfsPressureVariable.interpolation
+        }
+    }
+    
+    var unit: SiUnit {
+        switch self {
+        case .surface(let gfsSurfaceVariable):
+            return gfsSurfaceVariable.unit
+        case .pressure(let gfsPressureVariable):
+            return gfsPressureVariable.unit
+        }
+    }
+    
+    var isElevationCorrectable: Bool {
+        switch self {
+        case .surface(let gfsSurfaceVariable):
+            return gfsSurfaceVariable.isElevationCorrectable
+        case .pressure(let gfsPressureVariable):
+            return gfsPressureVariable.isElevationCorrectable
+        }
+    }
+}
+
+
+
+struct GfsVariableAndDomain: CurlIndexedVariable {
+    let variable: GfsVariable
+    let domain: NcepDomain
+    
+    var gribIndexName: String? {
+        return variable.v.gribIndexName(for: domain)
     }
 }
 
@@ -578,7 +826,7 @@ struct NcepDownload: Command {
                     }
                     return variable
                 }
-            } ?? GfsVariable.allCases
+            } ?? GfsVariable.allCases(for: domain)
             
             /// 18z run is available the day after starting 05:26
             let date = Timestamp.now().with(hour: run)
@@ -600,7 +848,7 @@ struct NcepDownload: Command {
             case height
             case landmask
             
-            var gribIndexName: String {
+            var gribIndexName: String? {
                 switch self {
                 case .height:
                     return ":HGT:surface:"
@@ -649,19 +897,18 @@ struct NcepDownload: Command {
         let forecastHours = domain.forecastHours
         
         let variables: [GfsVariableAndDomain] = variables.compactMap {
-            let v = GfsVariableAndDomain(variable: $0, domain: domain)
-            return v.isAvailable ? v : nil
+            GfsVariableAndDomain(variable: $0, domain: domain)
         }
         
-        let variablesHour0 = variables.filter({!$0.variable.skipHour0})
+        let variablesHour0 = variables.filter({!$0.variable.v.skipHour0})
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
-            let variablesAll = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
-                let fileDest = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"
+            let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
+                let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour).fpg"
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
-            let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
+            //let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
 
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
             for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: variables) {
@@ -683,7 +930,7 @@ struct NcepDownload: Command {
             }
             
             // Get least common variables
-            let variablesLeastCommon = variablesAll.filter({ $0.variable.isLeastCommonlyUsedParameter })
+            /*let variablesLeastCommon = variablesAll.filter({ $0.variable.isLeastCommonlyUsedParameter })
             let urlLeastCommon = domain.getLeastCommonGribUrl(run: run, forecastHour: forecastHour)
             for (variable, message) in try curl.downloadIndexedGrib(url: urlLeastCommon, variables: variablesLeastCommon) {
                 var data = message.toArray2d()
@@ -695,7 +942,7 @@ struct NcepDownload: Command {
                 let file = "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
                 try FloatArrayCompressor.write(file: file, data: data.data)
-            }
+            }*/
         }
     }
     
@@ -712,7 +959,7 @@ struct NcepDownload: Command {
         for variable in variables {
             let startConvert = DispatchTime.now()
             
-            if !GfsVariableAndDomain(variable: variable, domain: domain).isAvailable {
+            if GfsVariableAndDomain(variable: variable, domain: domain).gribIndexName == nil {
                 continue
             }
             
@@ -721,17 +968,17 @@ struct NcepDownload: Command {
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
 
             for forecastHour in forecastHours {
-                if forecastHour == 0 && variable.skipHour0 {
+                if forecastHour == 0 && variable.v.skipHour0 {
                     continue
                 }
-                let file = "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).fpg"
+                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).fpg"
                 data2d[0..<nLocation, forecastHour] = try FloatArrayCompressor.read(file: file, nElements: nLocation)
             }
             
-            let skip = variable.skipHour0 ? 1 : 0
+            let skip = variable.v.skipHour0 ? 1 : 0
             
             // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
-            if variable.isAveragedOverForecastTime {
+            if variable.v.isAveragedOverForecastTime {
                 switch domain {
                 case .gfs025:
                     data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
@@ -752,7 +999,7 @@ struct NcepDownload: Command {
                 return hour
             }
             
-            switch variable.interpolationType {
+            switch variable.v.interpolationType {
             case .linear:
                 data2d.interpolate2StepsLinear(positions: forecastStepsToInterpolate)
             case .nearest:
@@ -765,12 +1012,12 @@ struct NcepDownload: Command {
                 data2d.interpolate2StepsHermiteBackwardsAveraged(positions: forecastStepsToInterpolate)
             }
             
-            if let fma = variable.multiplyAdd {
+            if let fma = variable.v.multiplyAdd {
                 data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
             }
             
             // De-accumulate precipitation
-            if variable.isAccumulatedSinceModelStart {
+            if variable.v.isAccumulatedSinceModelStart {
                 data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
             }
             

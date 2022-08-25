@@ -210,7 +210,7 @@ typealias GfsMixer = GenericReaderMixerCached<NcepDomain, GfsVariable>
 
 extension GfsMixer {
     func getDaily(variable: GfsDailyWeatherVariable, params: GfsQuery) throws -> DataAndUnit {
-        fatalError()
+        throw ForecastapiError.noDataAvilableForThisLocation
         /*switch variable {
         case .temperature_2m_max:
             let data = try get(variable: .temperature_2m).conertAndRound(params: params)
@@ -343,6 +343,10 @@ extension GfsMixer {
         }*/
     }
     
+    func prefetchData(variable: GfsSurfaceVariable) throws {
+        try prefetchData(variable: .surface(variable))
+    }
+    
     func prefetchData(variables: [GfsVariableCombined]) throws {
         for variable in variables {
             switch variable {
@@ -383,7 +387,8 @@ extension GfsMixer {
                     try prefetchData(variable: .u_180m)
                     try prefetchData(variable: .v_180m)*/
                 case .direct_normal_irradiance:
-                    fatalError()
+                    // TODO
+                    throw ForecastapiError.noDataAvilableForThisLocation
                     //try prefetchData(variable: .direct_radiation)
                 case .evapotranspiration:
                     try prefetchData(variable: .latent_heatflux)
@@ -411,6 +416,10 @@ extension GfsMixer {
                 }
             }
         }
+    }
+    
+    func get(variable: GfsSurfaceVariable) throws -> DataAndUnit {
+        return try get(variable: .surface(variable))
     }
     
     
@@ -454,7 +463,8 @@ extension GfsMixer {
             let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
         case .direct_normal_irradiance:
-            fatalError()
+            // TODO
+            throw ForecastapiError.noDataAvilableForThisLocation
             /*let dhi = try get(variable: .direct_radiation).data
             let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, startTime: mixer.time.range.lowerBound, dtSeconds: mixer.time.dtSeconds)
             return DataAndUnit(dni, .wattPerSquareMeter)*/
