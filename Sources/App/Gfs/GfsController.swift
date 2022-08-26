@@ -303,7 +303,7 @@ extension GfsMixer {
     }
     
     func prefetchData(variables: [GfsDailyWeatherVariable]) throws {
-        fatalError()
+        throw ForecastapiError.noDataAvilableForThisLocation
         /*for variable in variables {
             switch variable {
             case .temperature_2m_max:
@@ -432,8 +432,14 @@ extension GfsMixer {
                     case .terrestrial_radiation_instant:
                         break
                     }
-                case .pressure(_):
-                    fatalError()
+                case .pressure(let v):
+                    switch v.variable {
+                    case .windspeed:
+                        fallthrough
+                    case .winddirection:
+                        try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .u_wind, level: v.level)))
+                        try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .v_wind, level: v.level)))
+                    }
                 }
             }
         }
@@ -450,8 +456,6 @@ extension GfsMixer {
     
     
     func get(variable: GfsVariableDerived) throws -> DataAndUnit {
-        // NOTE caching U/V or temp/rh variables might be required
-        
         switch variable {
         case .surface(let gfsVariableDerivedSurface):
             switch gfsVariableDerivedSurface {
@@ -534,8 +538,19 @@ extension GfsMixer {
                 let solar = Meteorology.extraTerrestrialRadiationInstant(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
             }
-        case .pressure(let gfsPressureVariableDerived):
-            fatalError()
+        case .pressure(let v):
+            switch v.variable {
+            case .windspeed:
+                let u = try get(variable: .pressure(GfsPressureVariable(variable: .u_wind, level: v.level)))
+                let v = try get(variable: .pressure(GfsPressureVariable(variable: .v_wind, level: v.level)))
+                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+                return DataAndUnit(speed, u.unit)
+            case .winddirection:
+                let u = try get(variable: .pressure(GfsPressureVariable(variable: .u_wind, level: v.level))).data
+                let v = try get(variable: .pressure(GfsPressureVariable(variable: .v_wind, level: v.level))).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            }
         }
     }
 }
