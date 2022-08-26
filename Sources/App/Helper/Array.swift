@@ -268,4 +268,25 @@ extension Array where Element == Float {
             }
         }
     }
+
+    /// Perform a simple delta encoding. Leave the first value as seed.
+    mutating func deltaEncode() {
+        if count <= 1 {
+            return
+        }
+        for x in (1..<count).reversed() {
+            self[x] = self[x-1] - self[x]
+        }
+    }
+    
+    /// Undo delta coding
+    mutating func deltaDecode() {
+        if count <= 1 {
+            return
+        }
+        for x in 1..<count {
+            self[x] = self[x-1] - self[x]
+        }
+    }
 }
+
