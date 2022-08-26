@@ -140,7 +140,7 @@ enum GfsDomain: String, GenericDomain {
 /**
  List of all surface GFS variables
  */
-enum GfsSurfaceVariable: String, CaseIterable {
+enum GfsSurfaceVariable: String, CaseIterable, Codable {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -218,47 +218,17 @@ enum GfsPressureVariableType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct GfsPressureVariable {
+struct GfsPressureVariable: PressureVariableRespresentable {
     let variable: GfsPressureVariableType
     let level: Int
 }
 
-
 /**
  Combined surface and pressure level variables with all definitions for downloading and API
  */
-enum GfsVariable: Codable, Equatable, GenericVariableMixing, RawRepresentable, Hashable {
-    typealias RawValue = String
-    
-    case surface(GfsSurfaceVariable)
-    case pressure(GfsPressureVariable)
-    
-    
-    init?(rawValue: String) {
-        if let pos = rawValue.lastIndex(of: "_"), let posEnd = rawValue[pos..<rawValue.endIndex].range(of: "hPa") {
-            let variableString = rawValue[rawValue.startIndex ..< pos]
-            guard let variable = GfsPressureVariableType(rawValue: String(variableString)) else {
-                return nil
-            }
-            
-            let start = rawValue.index(after: pos)
-            let levelString = rawValue[start..<posEnd.lowerBound]
-            guard let level = Int(levelString) else {
-                return nil
-            }
-            self = .pressure(GfsPressureVariable(variable: variable, level: level))
-            return
-        }
-        guard let variable = GfsSurfaceVariable(rawValue: rawValue) else {
-            return nil
-        }
-        self = .surface(variable)
-    }
-    
-    var rawValue: String {
-        return omFileName
-    }
-    
+typealias GfsVariable = SurfaceAndPressureVariable<GfsSurfaceVariable, GfsPressureVariable>
+
+extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatable {
     static func allCases(for domain: GfsDomain) -> [GfsVariable] {
         /// process level by level to reduce the time while U/V components are updated
         let pressure = domain.levels.flatMap { level in
@@ -464,12 +434,7 @@ enum GfsVariable: Codable, Equatable, GenericVariableMixing, RawRepresentable, H
     
     
     var omFileName: String {
-        switch self {
-        case .surface(let variable):
-            return variable.rawValue
-        case .pressure(let v):
-            return "\(v.variable.rawValue)_\(v.level)hPa"
-        }
+        return rawValue
     }
     
     var scalefactor: Float {

@@ -120,7 +120,8 @@ struct GfsDownload: Command {
         let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0)
         try downloadNcepElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         
-        let curl = Curl(logger: logger)
+        let deadLineHours = domain == .gfs025 ? 4 : 2
+        let curl = Curl(logger: logger, deadLineHours: deadLineHours)
         let forecastHours = domain.forecastHours(run: run.hour)
         
         let variables: [GfsVariableAndDomain] = variables.map {

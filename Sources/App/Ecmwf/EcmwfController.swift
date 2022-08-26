@@ -56,39 +56,6 @@ struct EcmwfController {
     }
 }
 
-enum VariableOrDerived<Raw, Derived>: Codable where Raw: Codable, Raw: RawRepresentable, Derived: Codable, Derived: RawRepresentable, Raw.RawValue == Derived.RawValue {
-    case raw(Raw)
-    case derived(Derived)
-    
-    init(from decoder: Decoder) throws {
-        do {
-            let variable = try Derived(from: decoder)
-            self = .derived(variable)
-            return
-        } catch {
-            let variable = try Raw(from: decoder)
-            self = .raw(variable)
-            return
-        }
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        switch self {
-        case .raw(let value):
-            try value.encode(to: encoder)
-        case .derived(let value):
-            try value.encode(to: encoder)
-        }
-    }
-    
-    var name: Raw.RawValue {
-        switch self {
-        case .raw(let variable): return variable.rawValue
-        case .derived(let variable): return variable.rawValue
-        }
-    }
-}
-
 typealias EcmwfHourlyVariable = VariableOrDerived<EcmwfVariable, EcmwfVariableDerived>
 
 struct EcmwfQuery: Content, QueryWithStartEndDateTimeZone {
