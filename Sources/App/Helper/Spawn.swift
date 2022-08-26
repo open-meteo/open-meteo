@@ -76,12 +76,8 @@ public extension Process {
             data.append(handle.availableData)
         }
         
-        
         let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
         task.waitUntilExit()
-        
-        eerror.fileHandleForReading.readabilityHandler = nil
-        pipe.fileHandleForReading.readabilityHandler = nil
         
         if let end = try pipe.fileHandleForReading.readToEnd() {
             data.append(end)
