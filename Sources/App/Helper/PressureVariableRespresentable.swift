@@ -1,5 +1,4 @@
 import Foundation
-import Network
 
 
 /// Represent a variable combined with a pressure level and helps decoding it
