@@ -9,7 +9,7 @@
 #export("content"):
 
 <div class="px-4 py-5 mb-5 text-center text-white" style="
-            background-image: url('https://assets.open-meteo.com/images/index_background2.jpeg');
+            background-image: url('https://assets.open-meteo.com/images/sunset.jpeg');
             background-size: cover;
             background-position: center;
             height: 500px;
@@ -19,7 +19,7 @@
   </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">GFS & HRRR Forecast API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Global NOAA GFS model combined with hourly HRRR updates at 3-km resolution</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Global GFS model combined with hourly HRRR updates at 3-km resolution</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -29,6 +29,10 @@
 
 <!-- http://127.0.0.1:8080/v1/forecast -->
 <div class="container px-4 py-0" id="featured-3">
+  <div class="alert alert-primary" role="alert">
+    This API is work in progress! Data sources: GFS (0.25°, updates every 6h), NAM (3 km US conus, updates every 3h), HRRR (3km US conus, updates every hour)
+  </div>
+
     <form id="api_form" method="get" action="https://api.open-meteo.com/v1/gfs">
       <div class="row py-3 px-0">
         <h3>Select Coordinates or City</h3>
