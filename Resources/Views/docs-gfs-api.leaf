@@ -426,7 +426,7 @@
             #for(variable in pressureVariables):
             <div class="accordion-item">
               <h2 class="accordion-header" id="heading-#(variable.name)">
-                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-#(variable.name)" aria-expanded="false" aria-controls="collapse-#(variable.name)">
+                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-#(variable.name)" aria-expanded="false" aria-controls="collapse-#(variable.name)">
                   #(variable.label) on Pressure Levels
                 </button>
               </h2>
