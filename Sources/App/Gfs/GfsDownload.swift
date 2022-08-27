@@ -132,8 +132,10 @@ struct GfsDownload: Command {
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
+            /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
+            let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
             let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
-                let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour).fpg"
+                let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
             //let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
@@ -151,7 +153,7 @@ struct GfsDownload: Command {
                 }
                 data.ensureDimensions(of: domain.grid)
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour).fpg"
+                let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
                 try FloatArrayCompressor.write(file: file, data: data.data)
             }
@@ -183,7 +185,9 @@ struct GfsDownload: Command {
                 if forecastHour == 0 && variable.skipHour0 {
                     continue
                 }
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).fpg"
+                /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
+                let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
+                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 data2d[0..<nLocation, forecastHour] = try FloatArrayCompressor.read(file: file, nElements: nLocation)
             }
             
