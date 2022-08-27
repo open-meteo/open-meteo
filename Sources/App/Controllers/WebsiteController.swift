@@ -114,6 +114,7 @@ struct WebsiteController: RouteCollection {
             let levels: [Int] = GfsDomain.gfs025.levels
             let pressureVariables = [
                 PressureVariable(label: "Temperature", name: "temperature"),
+                PressureVariable(label: "Dewpoint", name: "dewpoint"),
                 PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
                 PressureVariable(label: "Cloudcover", name: "cloudcover"),
                 PressureVariable(label: "Wind Speed", name: "windspeed"),

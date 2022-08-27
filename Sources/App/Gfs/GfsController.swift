@@ -206,6 +206,7 @@ enum GfsVariableDerivedSurface: String, Codable, CaseIterable {
 enum GfsPressureVariableDerivedType: String, CaseIterable {
     case windspeed
     case winddirection
+    case dewpoint
 }
 
 /**
@@ -439,6 +440,9 @@ extension GfsMixer {
                     case .winddirection:
                         try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .u_wind, level: v.level)))
                         try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .v_wind, level: v.level)))
+                    case .dewpoint:
+                        try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .temperature, level: v.level)))
+                        try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)))
                     }
                 }
             }
@@ -550,6 +554,10 @@ extension GfsMixer {
                 let v = try get(variable: .pressure(GfsPressureVariable(variable: .v_wind, level: v.level))).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
+            case .dewpoint:
+                let temperature = try get(variable: .pressure(GfsPressureVariable(variable: .temperature, level: v.level)))
+                let rh = try get(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)))
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             }
         }
     }
