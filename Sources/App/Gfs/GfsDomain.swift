@@ -232,7 +232,7 @@ typealias GfsVariable = SurfaceAndPressureVariable<GfsSurfaceVariable, GfsPressu
 extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatable {
     static func allCases(for domain: GfsDomain) -> [GfsVariable] {
         /// process level by level to reduce the time while U/V components are updated
-        let pressure = domain.levels.flatMap { level in
+        let pressure = domain.levels.reversed().flatMap { level in
             GfsPressureVariableType.allCases.map { variable in
                 GfsVariable.pressure(GfsPressureVariable(variable: variable, level: level))
             }
@@ -485,8 +485,8 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             case .wind_u_component:
                 fallthrough
             case .wind_v_component:
-                // Use scalefactor 1 for levels higher than 300 hPa.
-                return (1..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(v.level)))
+                // Use scalefactor 3 for levels higher than 500 hPa.
+                return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(v.level)))
             case .geopotential_height:
                 return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(v.level)))
             case .cloudcover:
