@@ -208,8 +208,8 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable {
  */
 enum GfsPressureVariableType: String, CaseIterable {
     case temperature
-    case u_wind
-    case v_wind
+    case wind_u_component
+    case wind_v_component
     case geopotential_height
     case cloudcover
     case relativehumidity
@@ -377,9 +377,9 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             switch v.variable {
             case .temperature:
                 return ":TMP:\(level) mb:"
-            case .u_wind:
+            case .wind_u_component:
                 return ":UGRD:\(level) mb:"
-            case .v_wind:
+            case .wind_v_component:
                 return ":VGRD:\(level) mb:"
             case .geopotential_height:
                 return ":HGT:\(level) mb:"
@@ -482,9 +482,9 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             case .temperature:
                 // Use scalefactor of 2 for everything higher than 300 hPa
                 return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(v.level)))
-            case .u_wind:
+            case .wind_u_component:
                 fallthrough
-            case .v_wind:
+            case .wind_v_component:
                 // Use scalefactor 1 for levels higher than 300 hPa.
                 return (1..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(v.level)))
             case .geopotential_height:
@@ -587,9 +587,9 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             switch v.variable {
             case .temperature:
                 return .celsius
-            case .u_wind:
+            case .wind_u_component:
                 return .ms
-            case .v_wind:
+            case .wind_v_component:
                 return .ms
             case .geopotential_height:
                 return .meter
