@@ -323,8 +323,8 @@
 
         <div class="col-12">
           <button type="submit" class="btn btn-primary">Preview Chart</button>
-          <button type="submit" class="btn btn-outline-primary debug-hidden" name="format" value="xlsx">Download XLSX</button>
-          <button type="submit" class="btn btn-outline-primary debug-hidden" name="format" value="csv">Download CSV</button>
+          <button type="submit" class="btn btn-outline-primary" name="format" value="xlsx">Download XLSX</button>
+          <button type="submit" class="btn btn-outline-primaryn" name="format" value="csv">Download CSV</button>
         </div>
       </form>
 
