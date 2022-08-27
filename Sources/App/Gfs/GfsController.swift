@@ -180,6 +180,7 @@ enum GfsDailyWeatherVariable: String, Codable {
 enum GfsVariableDerivedSurface: String, Codable, CaseIterable {
     case apparent_temperature
     case relativehumitidy_2m
+    case dewpoint_2m
     case windspeed_10m
     case winddirection_10m
     case windspeed_80m
@@ -432,6 +433,9 @@ extension GfsMixer {
                         break
                     case .terrestrial_radiation_instant:
                         break
+                    case .dewpoint_2m:
+                        try prefetchData(variable: .temperature_2m)
+                        try prefetchData(variable: .relativehumidity_2m)
                     }
                 case .pressure(let v):
                     switch v.variable {
@@ -541,6 +545,10 @@ extension GfsMixer {
                 /// Use center averaged
                 let solar = Meteorology.extraTerrestrialRadiationInstant(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
+            case .dewpoint_2m:
+                let temperature = try get(variable: .temperature_2m)
+                let rh = try get(variable: .relativehumidity_2m)
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             }
         case .pressure(let v):
             switch v.variable {
