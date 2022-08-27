@@ -22,7 +22,7 @@ function previewData(data, downloadTime) {
             return
         }
         Object.entries(data[section]||[]).forEach(function(k){
-            if (k[0] == "time" || k[0] == "sunrise" && k[0] == "sunset") {
+            if (k[0] == "time" || k[0] == "sunrise" || k[0] == "sunset") {
                 return
             }
             let hourly_starttime = (data[section].time[0] + data.utc_offset_seconds) * 1000;

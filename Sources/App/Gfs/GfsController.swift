@@ -1,7 +1,15 @@
 import Foundation
 import Vapor
 
-
+/**
+ TODO:
+ - No convective precip in NAM/HRRR
+ - weather code
+ - No diffuse/direct radiation in GFS
+ - No 120/180m wind
+ - No cloudcover in NAM/HRRR on pressure levels
+ - Soil temp/moisture on different levels
+ */
 public struct GfsController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
         do {
@@ -15,7 +23,7 @@ public struct GfsController {
             let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
             let currentTime = Timestamp.now()
             
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 8)
+            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 17)
             let timezone = try params.resolveTimezone()
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
             
@@ -161,9 +169,9 @@ enum GfsDailyWeatherVariable: String, Codable {
     case apparent_temperature_min
     case precipitation_sum
     case snowfall_sum
-    case rain_sum
-    case showers_sum
-    case weathercode
+    //case rain_sum
+    //case showers_sum
+    //case weathercode
     case shortwave_radiation_sum
     // cloudcover_total_max?
     case windspeed_10m_max
@@ -189,7 +197,7 @@ enum GfsVariableDerivedSurface: String, Codable, CaseIterable {
     case winddirection_120m
     case windspeed_180m
     case winddirection_180m*/
-    case direct_normal_irradiance
+    //case direct_normal_irradiance
     case evapotranspiration
     case et0_fao_evapotranspiration
     case vapor_pressure_deficit
@@ -228,8 +236,7 @@ typealias GfsMixer = GenericReaderMixerCached<GfsDomain, GfsVariable>
 
 extension GfsMixer {
     func getDaily(variable: GfsDailyWeatherVariable, params: GfsQuery) throws -> DataAndUnit {
-        throw ForecastapiError.noDataAvilableForThisLocation
-        /*switch variable {
+        switch variable {
         case .temperature_2m_max:
             let data = try get(variable: .temperature_2m).conertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
@@ -246,10 +253,10 @@ extension GfsMixer {
             // rounding is required, becuse floating point addition results in uneven numbers
             let data = try get(variable: .precipitation).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .weathercode:
+        /*case .weathercode:
             // not 100% corrct
             let data = try get(variable: .weathercode).conertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 24), data.unit)
+            return DataAndUnit(data.data.max(by: 24), data.unit)*/
         case .shortwave_radiation_sum:
             let data = try get(variable: .shortwave_radiation).conertAndRound(params: params)
             // 3600s only for hourly data of source
@@ -282,13 +289,13 @@ extension GfsMixer {
         case .snowfall_sum:
             let data = try get(variable: .snowfall).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .rain_sum:
+        /*case .rain_sum:
             let data = try get(variable: .rain).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .showers_sum:
             let data = try get(variable: .showers).conertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        }*/
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)*/
+        }
     }
     
     func get(variable: GfsVariableCombined) throws -> DataAndUnit {
@@ -305,8 +312,7 @@ extension GfsMixer {
     }
     
     func prefetchData(variables: [GfsDailyWeatherVariable]) throws {
-        throw ForecastapiError.noDataAvilableForThisLocation
-        /*for variable in variables {
+        for variable in variables {
             switch variable {
             case .temperature_2m_max:
                 fallthrough
@@ -319,15 +325,13 @@ extension GfsMixer {
                 try prefetchData(variable: .wind_u_component_10m)
                 try prefetchData(variable: .wind_v_component_10m)
                 try prefetchData(variable: .relativehumidity_2m)
-                try prefetchData(variable: .direct_radiation)
-                try prefetchData(variable: .diffuse_radiation)
+                try prefetchData(variable: .shortwave_radiation)
             case .precipitation_sum:
                 try prefetchData(variable: .precipitation)
-            case .weathercode:
-                try prefetchData(variable: .weathercode)
+            //case .weathercode:
+            //    try prefetchData(variable: .weathercode)
             case .shortwave_radiation_sum:
-                try prefetchData(variable: .direct_radiation)
-                try prefetchData(variable: .diffuse_radiation)
+                try prefetchData(variable: .shortwave_radiation)
             case .windspeed_10m_max:
                 try prefetchData(variable: .wind_u_component_10m)
                 try prefetchData(variable: .wind_v_component_10m)
@@ -343,22 +347,20 @@ extension GfsMixer {
             case .sunset:
                 break
             case .et0_fao_evapotranspiration:
-                try prefetchData(variable: .direct_radiation)
-                try prefetchData(variable: .diffuse_radiation)
+                try prefetchData(variable: .shortwave_radiation)
                 try prefetchData(variable: .temperature_2m)
                 try prefetchData(variable: .relativehumidity_2m)
                 try prefetchData(variable: .wind_u_component_10m)
                 try prefetchData(variable: .wind_v_component_10m)
             case .snowfall_sum:
                 try prefetchData(variable: .precipitation)
-                try prefetchData(variable: .showers)
-                try prefetchData(variable: .rain)
-            case .rain_sum:
+                try prefetchData(variable: .frozen_precipitation_percent)
+            /*case .rain_sum:
                 try prefetchData(variable: .rain)
             case .showers_sum:
-                try prefetchData(variable: .showers)
+                try prefetchData(variable: .showers)*/
             }
-        }*/
+        }
     }
     
     func prefetchData(variable: GfsSurfaceVariable) throws {
@@ -406,10 +408,8 @@ extension GfsMixer {
                     case .winddirection_180m:
                         try prefetchData(variable: .u_180m)
                         try prefetchData(variable: .v_180m)*/
-                    case .direct_normal_irradiance:
-                        // TODO
-                        throw ForecastapiError.noDataAvilableForThisLocation
-                        //try prefetchData(variable: .direct_radiation)
+                    /*case .direct_normal_irradiance:
+                        try prefetchData(variable: .direct_radiation)*/
                     case .evapotranspiration:
                         try prefetchData(variable: .latent_heatflux)
                     case .vapor_pressure_deficit:
@@ -502,10 +502,8 @@ extension GfsMixer {
                 let rh = try get(variable: .relativehumidity_2m).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
-            case .direct_normal_irradiance:
-                // TODO
-                throw ForecastapiError.noDataAvilableForThisLocation
-                /*let dhi = try get(variable: .direct_radiation).data
+            /*case .direct_normal_irradiance:
+                let dhi = try get(variable: .direct_radiation).data
                 let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, startTime: mixer.time.range.lowerBound, dtSeconds: mixer.time.dtSeconds)
                 return DataAndUnit(dni, .wattPerSquareMeter)*/
             case .et0_fao_evapotranspiration:
