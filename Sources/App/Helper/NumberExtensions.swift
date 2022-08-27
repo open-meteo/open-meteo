@@ -63,6 +63,21 @@ extension Range where Element == Int {
     }
 }
 
+extension Range where Bound == Float {
+    /// Interpolate between lower and upper bound
+    func interpolated(atFraction at: Float) -> Float {
+        let value = lowerBound + (upperBound - lowerBound) * at
+        return Swift.min(Swift.max(value, lowerBound), upperBound)
+    }
+    
+    /// Return the fraction of wheever the value is. limited to to 0...1
+    func fraction(of value: Float) -> Float {
+        let limited = Swift.min(Swift.max(value, lowerBound), upperBound)
+        return (limited - lowerBound) / (upperBound - lowerBound)
+    }
+}
+
+
 public extension RandomAccessCollection where Element == Float, Index == Int {
     /// Calculate linear interpolation. Index and fraction are kept apart, because of floating point inprecisions
     @inlinable func interpolateLinear(_ i: Int, _ fraction: Float) -> Float {

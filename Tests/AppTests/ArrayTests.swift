@@ -12,6 +12,20 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqual(spatial2.data, spatial.data)
     }
     
+    func testRangeFraction() {
+        XCTAssertEqual((100..<1000).interpolated(atFraction: 0.5), 550)
+        XCTAssertEqual((100..<1000).interpolated(atFraction: 0), 100)
+        XCTAssertEqual((100..<1000).interpolated(atFraction: 1), 1000)
+        XCTAssertEqual((100..<1000).interpolated(atFraction: -0.1), 100)
+        XCTAssertEqual((100..<1000).interpolated(atFraction: 1.1), 1000)
+        
+        XCTAssertEqual((100..<1000).fraction(of: 550), 0.5)
+        XCTAssertEqual((100..<1000).fraction(of: 100), 0)
+        XCTAssertEqual((100..<1000).fraction(of: 1000), 1)
+        XCTAssertEqual((100..<1000).fraction(of: 90), 0)
+        XCTAssertEqual((100..<1000).fraction(of: 1010), 1)
+    }
+    
     func testDeaccumulate() {
         var data = Array2DFastTime(data: [1,2,3,1,2,3], nLocations: 1, nTime: 6)
         data.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 0)

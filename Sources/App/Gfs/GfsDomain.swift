@@ -1,5 +1,6 @@
 import Foundation
 import SwiftPFor2D
+import CloudKit
 
 
 /**
@@ -476,19 +477,22 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             case .clear_sky_radiation: return 1
             }
         case .pressure(let v):
+            // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
             switch v.variable {
             case .temperature:
-                return 20
+                // Use scalefactor of 2 for everything higher than 300 hPa
+                return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(v.level)))
             case .u_wind:
-                return 10
+                fallthrough
             case .v_wind:
-                return 10
+                // Use scalefactor 1 for levels higher than 300 hPa.
+                return (1..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(v.level)))
             case .geopotential_height:
-                return 1
+                return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(v.level)))
             case .cloudcover:
-                return 1
+                return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(v.level)))
             case .relativehumidity:
-                return 1
+                return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(v.level)))
             }
         }
     }
