@@ -269,7 +269,7 @@ struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone {
             throw ForecastapiError.timezoneNotSupported
         }
         if let forecast_days = forecast_days, forecast_days <= 0 || forecast_days >= 367 {
-            throw ForecastapiError.pastDaysInvalid(given: forecast_days, allowed: 0...366)
+            throw ForecastapiError.forecastDaysInvalid(given: forecast_days, allowed: 0...366)
         }
         /*if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired

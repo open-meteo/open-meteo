@@ -25,12 +25,14 @@ public struct GfsController {
             
             let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 17)
             let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, allowedRange: allowedRange)
             
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try GfsMixer(domains: [.gfs025, .nam_conus, .hrrr_conus], lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: hourlyTime) else {
+            let domains = [GfsDomain.gfs025, .nam_conus, .hrrr_conus]
+            
+            guard let reader = try GfsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: hourlyTime) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
@@ -58,22 +60,22 @@ public struct GfsController {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: time) else {
+                guard let reader = try GfsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: time) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
                 let temperature = try reader.get(variable: .temperature_2m).conertAndRound(params: params)
                 let winddirection = try reader.get(variable: .winddirection_10m).conertAndRound(params: params)
                 let windspeed = try reader.get(variable: .windspeed_10m).conertAndRound(params: params)
-                let weathercode = try reader.get(variable: .weathercode).conertAndRound(params: params)
+                //let weathercode = try reader.get(variable: .weathercode).conertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],
                     winddirection: winddirection.data[0],
-                    weathercode: weathercode.data[0],
+                    weathercode: .nan, //weathercode.data[0],
                     temperature_unit: temperature.unit,
                     windspeed_unit: windspeed.unit,
                     winddirection_unit: winddirection.unit,
-                    weathercode_unit: weathercode.unit,
+                    weathercode_unit: .dimensionless, //weathercode.unit,
                     time: starttime
                 )
             } else {
@@ -137,6 +139,7 @@ struct GfsQuery: Content, QueryWithStartEndDateTimeZone {
     let precipitation_unit: PrecipitationUnit?
     let timeformat: Timeformat?
     let past_days: Int?
+    let forecast_days: Int?
     let format: ForecastResultFormat?
     
     /// iso starting date `2022-02-01`
@@ -150,6 +153,9 @@ struct GfsQuery: Content, QueryWithStartEndDateTimeZone {
         }
         if longitude > 180 || longitude < -180 || longitude.isNaN {
             throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
+        }
+        if let forecast_days = forecast_days, forecast_days <= 0 || forecast_days > 16 {
+            throw ForecastapiError.forecastDaysInvalid(given: forecast_days, allowed: 0...16)
         }
         if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired

@@ -30,7 +30,7 @@
 <!-- http://127.0.0.1:8080/v1/forecast -->
 <div class="container px-4 py-0" id="featured-3">
   <div class="alert alert-primary" role="alert">
-    This API is work in progress! Data sources: GFS (0.25°, updates every 6h), NAM (3 km US conus, updates every 3h), HRRR (3km US conus, updates every hour)
+    This API is using NOAA GFS data with high resolution data for the U.S. For Europe, please use the generic <a href="/en/docs">Weather Forecast API</a>. Weather models are listed <a href="#data-sources">below</a>.
   </div>
 
     <form id="api_form" method="get" action="https://api.open-meteo.com/v1/gfs">
@@ -213,6 +213,12 @@
               Freezinglevel Height
             </label>
           </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="visibility" id="visibility" name="hourly">
+            <label class="form-check-label" for="visibility">
+              Visibility
+            </label>
+          </div>
         </div>
         <div class="col-md-3">
           <div class="form-check">
@@ -311,7 +317,18 @@
               Sensible heat flux
             </label>
           </div>-->
-          
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="cape" id="cape" name="hourly">
+            <label class="form-check-label" for="cape">
+              CAPE
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="lifted_index" id="lifted_index" name="hourly">
+            <label class="form-check-label" for="lifted_index">
+              Lifted Index
+            </label>
+          </div>
         </div>
         <div class="col-md-3">
           <div class="form-check">
@@ -608,6 +625,46 @@
           </div>
           <div class="col-3">
             <div class="form-floating mb-3">
+              <select class="form-select" name="past_days" id="past_days" aria-label="Past days" data-default="0">
+                <option selected value="0">0</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="5">5</option>
+                <option value="7">1 week</option>
+                <option value="14">2 weeks</option>
+                <option value="31">1 month</option>
+                <option value="61">2 months</option>
+                <option value="92">3 months</option>
+              </select>
+              <label for="past_days">Past days</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating mb-3">
+              <select class="form-select" name="forecast_days" id="forecast_days" aria-label="Forecast days" data-default="7">
+                <option value="1">1 day</option>
+                <option value="3">3 days</option>
+                <option selected value="7">7 days</option>
+                <option value="16">16 days</option>
+              </select>
+              <label for="forecast_days">Forecast days</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating">
+              <input type="text" class="form-control"  data-provide="datepicker" data-date-format="yyyy-mm-dd" data-date-start-date="2022-06-08" value="" data-default="" name="start_date"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+              <label for="start_date">Start date</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating">
+              <input type="text" class="form-control"  data-provide="datepicker" data-date-format="yyyy-mm-dd" data-date-start-date="2022-06-08" value="" data-default="" name="end_date"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+              <label for="end_date">End date</label>
+            </div>
+          </div>
+          <div class="col-3">
+            <div class="form-floating mb-3">
               <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="GMT">
                 <option value="America/Anchorage">America/Anchorage</option>
                 <option value="America/Los_Angeles">America/Los_Angeles</option>
@@ -628,35 +685,6 @@
                 <option value="Pacific/Auckland">Pacific/Auckland</option>
               </select>
               <label for="timezone">Timezone</label>
-            </div>
-          </div>
-          <div class="col-3">
-            <div class="form-floating mb-3">
-              <select class="form-select" name="past_days" id="past_days" aria-label="Past days" data-default="0">
-                <option selected value="0">0</option>
-                <option value="1">1</option>
-                <option value="2">2</option>
-                <option value="3">3</option>
-                <option value="5">5</option>
-                <option value="7">1 week</option>
-                <option value="14">2 weeks</option>
-                <option value="31">1 month</option>
-                <option value="61">2 months</option>
-                <option value="92">3 months</option>
-              </select>
-              <label for="past_days">Past days</label>
-            </div>
-          </div>
-          <div class="col-3">
-            <div class="form-floating">
-              <input type="text" class="form-control"  data-provide="datepicker" data-date-format="yyyy-mm-dd" data-date-start-date="2022-06-08" value="" data-default="" name="start_date"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
-              <label for="start_date">Start date</label>
-            </div>
-          </div>
-          <div class="col-3">
-            <div class="form-floating">
-              <input type="text" class="form-control"  data-provide="datepicker" data-date-format="yyyy-mm-dd" data-date-start-date="2022-06-08" value="" data-default="" name="end_date"><span class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
-              <label for="end_date">End date</label>
             </div>
           </div>
           <div class="col-12 pb-3 debug-hidden">
@@ -687,8 +715,49 @@
     </div>
 
     <div class="col-12 py-5">
-      <h2 id="api-documentation">API Documentation</h2>
-      <p>The API endpoint <mark>/v1/forecast</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours. All URL parameters are listed below:</p>
+      <h2 id="data-sources">Data Source</h2>
+      <p>This API uses global NOAA GFS weather forecast and combines them with high-resolution NAM and HRRR forecasts. HRRR is a rapid-refresh model and updates every hour. High-resolution data are only available for the United States. For other locations, only GFS is used.</p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Weather Model</th>
+            <th scope="col">Region</th>
+            <th scope="col">Spatial Resolution</th>
+            <th scope="col">Temporal Resolution</th>
+            <th scope="col">Forecast Length</th>
+            <th scope="col">Update frequency</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row"><a href="https://www.nco.ncep.noaa.gov/pmb/products/gfs/" target="_blank">GFS</a></th>
+            <td>Global</td>
+            <td>0.25° (~25 km)</td>
+            <td>Hourly, 3-hourly after 120 hours</td>
+            <td>16 days</td>
+            <td>Every 6 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://www.nco.ncep.noaa.gov/pmb/products/nam/" target="_blank">NAM Conus</a></th>
+            <td>U.S. Conus</td>
+            <td>3 km</td>
+            <td>Hourly</td>
+            <td>2.5 days</td>
+            <td>Every 6 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://rapidrefresh.noaa.gov/hrrr/" target="_blank">HRRR Conus</a></th>
+            <td>U.S. Conus</td>
+            <td>3 km</td>
+            <td>Hourly</td>
+            <td>18 hours (48 hours for 0, 6, 12, 18z)</td>
+            <td>Every hour</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="api-documentation" class="mt-5">API Documentation</h2>
+      <p>The API endpoint <mark>/v1/gfs</mark> accepts a geographical coordinate, a list of weather variables and responds with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours. If <mark>&forecast_days=16</mark> is set, up to 16 days of forecast can be returned. All URL parameters are listed below:</p>
       <table class="table">
         <thead>
           <tr>
@@ -765,10 +834,17 @@
           </tr>
           <tr>
             <th scope="row">past_days</th>
-            <td>Integer (0-2)</td>
+            <td>Integer</td>
             <td>No</td>
             <td><mark>0</mark></td>
-            <td>If <mark>past_days</mark> is set, yesterday or the day before yesterday data are also returned.</td>
+            <td>If <mark>past_days</mark> is set, past weather data can be returned.</td>
+          </tr>
+          <tr>
+            <th scope="row">forecast_days</th>
+            <td>Integer (0-16)</td>
+            <td>No</td>
+            <td><mark>7</mark></td>
+            <td>Per default, only 7 days are returned. Up to 16 days of forecast are possible.</td>
           </tr>
           <tr>
             <th scope="row">start_date<br/>end_date</th>
@@ -849,16 +925,16 @@
             <td>High level clouds from 8 km altitude</td>
           </tr>
           <tr>
-            <th scope="row">windspeed_10m<br/>windspeed_80m<br>windspeed_120m<br>windspeed_180m</th>
+            <th scope="row">windspeed_10m<br/>windspeed_80m</th>
             <td>Instant</td>
             <td>km/h (mph, m/s, knots)</td>
-            <td>Wind speed at 10, 80, 120 or 180 meters above ground. Wind speed on 10 meters is the standard level.</td>
+            <td>Wind speed at 10 or 80 meters above ground. Wind speed on 10 meters is the standard level.</td>
           </tr>
           <tr>
-            <th scope="row">winddirection_10m<br>winddirection_80m<br/>winddirection_120m<br/>winddirection_180m</th>
+            <th scope="row">winddirection_10m<br>winddirection_80m</th>
             <td>Instant</td>
             <td>°</td>
-            <td>Wind direction at 10, 80, 120 or 180 meters above ground</td>
+            <td>Wind direction at 10 or 80 meters above ground</td>
           </tr>
           <tr>
             <th scope="row">windgusts_10m</th>
@@ -872,7 +948,7 @@
             <td>W/m²</td>
             <td>Shortwave solar radiation as average of the preceding hour. This is equal to the total global horizontal irradiation </td>
           </tr>
-          <tr>
+          <!--<tr>
             <th scope="row">direct_radiation<br/>direct_normal_irradiance</th>
             <td>Preceding hour mean</td>
             <td>W/m²</td>
@@ -883,7 +959,7 @@
             <td>Preceding hour mean</td>
             <td>W/m²</td>
             <td>Diffuse solar radiation as average of the preceding hour</td>
-          </tr>
+          </tr>-->
           <tr>
             <th scope="row">vapor_pressure_deficit</th>
             <td>Instant</td>
@@ -914,7 +990,7 @@
             <td>cm (inch)</td>
             <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by 7. E.g. 7 cm snow = 10 mm precipitation water equivalent</td>
           </tr>
-          <tr>
+          <!--<tr>
             <th scope="row">rain</th>
             <td>Preceding hour sum</td>
             <td>mm (inch)</td>
@@ -931,7 +1007,7 @@
             <td>Instant</td>
             <td>WMO code</td>
             <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for details.</td>
-          </tr>
+          </tr>-->
           <tr>
             <th scope="row">snow_depth</th>
             <td>Instant</td>
@@ -945,16 +1021,16 @@
             <td>Altitude above sea level of the 0°C level</td>
           </tr>
           <tr>
-            <th scope="row">soil_temperature_0cm<br/>soil_temperature_6cm<br/>soil_temperature_18cm<br/>soil_temperature_54cm</th>
+            <th scope="row">soil_temperature_0_to_10cm<br/>soil_temperature_10_to_40cm<br/>soil_temperature_40_to_100cm<br/>soil_temperature_100_to_200cm</th>
             <td>Instant</td>
             <td>°C (°F)</td>
-            <td>Temperature in the soil at 0, 6, 18 and 54 cm depths. 0 cm is the surface temperature on land or water surface temperature on water.</td>
+            <td>Temperature in the soil as an average on 0-10, 10-40, 40-100 and 100-200 cm depths.</td>
           </tr>
           <tr>
-            <th scope="row">soil_moisture_0_1cm<br/>soil_moisture_1_3cm<br/>soil_moisture_3_9cm<br/>soil_moisture_9_27cm<br/>soil_moisture_27_81cm</th>
+            <th scope="row">soil_moisture_0_to_10cm<br/>soil_moisture_10_to_40cm<br/>soil_moisture_40_to_100cm<br/>soil_moisture_100_to_200cm</th>
             <td>Instant</td>
             <td>m³/m³</td>
-            <td>Average soil water content as volumetric mixing ratio at 0-1, 1-3, 3-9, 9-27 and 27-81 cm depths.</td>
+            <td>Average soil water content as volumetric mixing ratio at 0-10, 10-40, 40-100 and 100-200 cm depths.</td>
           </tr>
         </tbody>
       </table>
@@ -985,7 +1061,7 @@
             <td>mm</td>
             <td>Sum of daily precipitation (including rain, showers and snowfall)</td>
           </tr>
-          <tr>
+          <!--<tr>
             <th scope="row">rain_sum</th>
             <td>mm</td>
             <td>Sum of daily rain</td>
@@ -994,7 +1070,7 @@
             <th scope="row">showers_sum</th>
             <td>mm</td>
             <td>Sum of daily showers</td>
-          </tr>
+          </tr>-->
           <tr>
             <th scope="row">snowfall_sum</th>
             <td>cm</td>
@@ -1005,11 +1081,11 @@
             <td>hours</td>
             <td>The number of hours with rain</td>
           </tr>
-          <tr>
+          <!--<tr>
             <th scope="row">weathercode</th>
             <td>WMO code</td>
             <td>The most severe weather condition on a given day</td>
-          </tr>
+          </tr>-->
           <tr>
             <th scope="row">sunrise<br>sunset</th>
             <td>iso8601</td>
@@ -1141,7 +1217,7 @@
       <h2 id="weathervariables">Weather variable documentation</h2>
     </div>
 
-    <div class="col-6">
+    <!--<div class="col-6">
     <h3>WMO Weather interpretation codes (WW)</h3>
     <table class="table">
       <thead>
@@ -1206,7 +1282,7 @@
       </tbody>
     </table>
     <p>(*) Thunderstorm forecast with hail is only available in Central Europe</p>
-    </div>
+    </div>-->
 
     <!--<div class=col-12>
       <h1>Docs</h1>
