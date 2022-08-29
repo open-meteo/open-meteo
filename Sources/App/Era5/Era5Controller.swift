@@ -395,7 +395,7 @@ extension Era5Reader {
             return DataAndUnit(snowfall, .centimeter)
         case .direct_normal_irradiance:
             let dhi = try get(variable: .direct_radiation).data
-            let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, timerange: time)
+            let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, timerange: time)
             return DataAndUnit(dni, .wattPerSquareMeter)
         case .rain:
             let snowwater = try get(variable: .snowfall_water_equivalent)

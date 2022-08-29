@@ -310,7 +310,7 @@ extension IconMixer {
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
         case .direct_normal_irradiance:
             let dhi = try get(variable: .direct_radiation).data
-            let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+            let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
             return DataAndUnit(dni, .wattPerSquareMeter)
         case .et0_fao_evapotranspiration:
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
@@ -358,7 +358,7 @@ extension IconMixer {
             return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
         case .direct_normal_irradiance_instant:
             let direct = try get(variable: .direct_radiation_instant)
-            let dni = Zensun.caluclateInstantDNI(directRadiation: direct.data, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+            let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
             return DataAndUnit(dni, direct.unit)
             
             // because DNI is divided by cos(zenith), the approach below was not work

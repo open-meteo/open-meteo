@@ -182,14 +182,14 @@ struct Zensun {
     }
     
     /// Calculate DNI using super sampling
-    public static func caluclateBackwardsDNISupersampled(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt, samples: Int = 60) -> [Float] {
+    public static func calculateBackwardsDNISupersampled(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt, samples: Int = 60) -> [Float] {
         let averagedToInstant = backwardsAveragedToInstantFactor(time: timerange, latitude: latitude, longitude: longitude)
         let dhiInstant = zip(directRadiation, averagedToInstant).map(*)
         
         let timeSuperSampled = timerange.range.range(dtSeconds: timerange.dtSeconds / samples)
         let dhiSuperSamled = dhiInstant.interpolateHermite(timeOld: timerange, timeNew: timeSuperSampled, scalefactor: 1)
         
-        let dniSuperSampled = caluclateInstantDNI(directRadiation: dhiSuperSamled, latitude: latitude, longitude: longitude, timerange: timeSuperSampled)
+        let dniSuperSampled = calculateInstantDNI(directRadiation: dhiSuperSamled, latitude: latitude, longitude: longitude, timerange: timeSuperSampled)
         
         /// return instant values
         //return (0..<timerange.count).map { dniSuperSampled[$0 * samples] }
@@ -198,10 +198,11 @@ struct Zensun {
     }
     
     /// Calculate DNI based on zenith angle
-    public static func caluclateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
-        //return caluclateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
+    public static func calculateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+        return calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
         
         // For some reason, the code below deaverages data!
+        // Same issue with taylor series expansion
         
         var out = [Float]()
         out.reserveCapacity(directRadiation.count)
@@ -265,27 +266,45 @@ struct Zensun {
             let p10_l = max(sunset, p1)
             
             // solve integral to get sun elevation dt
-            // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
-            let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
-            let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+            // integral 1/(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = (2 sqrt(2) tan^(-1)((sqrt(2) tan((p - p0)/2) cos(t0 + t1))/sqrt(cos(2 t0) + cos(2 t1))))/sqrt(cos(2 t0) + cos(2 t1)) + constant
+            //let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+            //let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+            let s = cos(2 * t0) + cos(2 * t1)
+            
+            
+            let leftTan = (sqrt(2) * tan((p1_l - p0)/2) * cos(t0 + t1))
+            let rightTan = (sqrt(2) * tan((p10_l - p0)/2) * cos(t0 + t1))
+            
+            //let sqrt_t10_t1 = sqrt(s)
+            //let left = (2 * sqrt(2) * atan(leftTan/sqrt(s)))/sqrt(s)
+            //let right = (2 * sqrt(2) * atan(rightTan/sqrt(s)))/sqrt(s)
+            
+            // Taylor series approximation
+            var left: Float = (2 * sqrtf(2) * leftTan)/s
+            var right: Float = (2 * sqrtf(2) * rightTan)/s
+            for i in (2..<10) {
+                let sign: Float = (i%2 == 0) ? -1 : 1
+                let l = Float(i*2-1)
+                left += sign * (2 * sqrtf(2) * powf(leftTan,l))/(l * powf(s,Float(i)))
+                right += sign * (2 * sqrtf(2) * powf(rightTan,l))/(l * powf(s,Float(i)))
+            }
             /// sun elevation
-            let zz = (left-right) / (p1_l - p10_l)
-            if zz <= 0 {
+            let b = (left - right) / (p1_l - p10_l)
+            /*if b <= 0 {
                 out.append(0)
                 continue
                 
-            }
-            let zenithRadians=acos(zz)
+            }*/
             // The 85° limit should be applied before the integral is calculated, but there seems not to be an easy mathematical solution
-            let b = max(cos(zenithRadians), cos(Float(85).degreesToRadians))
-            let dni = dhi / b
+            //let b = max(zz), cos(Float(85).degreesToRadians))
+            let dni = dhi * b
             out.append(dni)
         }
         return out
     }
     
     /// Calculate DNI based on zenith angle
-    public static func caluclateInstantDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+    public static func calculateInstantDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
         var out = [Float]()
         out.reserveCapacity(directRadiation.count)
         
@@ -326,8 +345,7 @@ struct Zensun {
                 out.append(0)
                 continue
             }
-            let zenithRadians=acos(zz)
-            let b = max(cos(zenithRadians), cos(Float(85).degreesToRadians))
+            let b = max(zz, cos(Float(85).degreesToRadians))
             let dni = dhi / b
             out.append(dni)
         }

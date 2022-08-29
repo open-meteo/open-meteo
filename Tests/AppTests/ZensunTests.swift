@@ -30,7 +30,10 @@ final class ZensunTests: XCTestCase {
     func testDNI() {
         let directRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 116.0, 305.0, 485.0, 615.0, 680.0, 681.0, 579.0, 428.0, 272.0, 87.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         let time = TimerangeDt(start: Timestamp(2022,7,31), nTime: 24, dtSeconds: 3600)
-        let dni = Zensun.caluclateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time, samples: 600)
-        XCTAssertEqual(dni[1...], [0.0, 0.0, 0.0, 0.0, 0.0, 23.298891, 358.03854, 635.08167, 788.98944, 866.9147, 900.1934, 912.40094, 880.8849, 797.1055, 708.6093, 551.5555, 126.22124, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        let dni = Zensun.calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time, samples: 600)
+        XCTAssertEqual(dni[1...], [0.0, 0.0, 0.0, 0.0, 0.0, 23.298893, 358.03854, 635.08167, 788.98944, 866.9147, 900.1934, 912.40094, 880.8849, 797.1055, 708.6094, 551.5554, 126.22124, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        
+        //let dni2 = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time)
+        //XCTAssertEqual(dni2[1...], [0.0, 0.0, 0.0, 0.0, 0.0, 23.298893, 358.03854, 635.08167, 788.98944, 866.9147, 900.1934, 912.40094, 880.8849, 797.1055, 708.6094, 551.5554, 126.22124, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
     }
 }
