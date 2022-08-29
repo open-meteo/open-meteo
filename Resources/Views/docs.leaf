@@ -416,8 +416,8 @@
                       </label>
                     </div>
                     <div class="form-check">
-                      <input class="form-check-input" type="checkbox" value="terrestrial_radiation_backwards" id="terrestrial_radiation_backwards" name="hourly">
-                      <label class="form-check-label" for="terrestrial_radiation_backwards">
+                      <input class="form-check-input" type="checkbox" value="terrestrial_radiation" id="terrestrial_radiation" name="hourly">
+                      <label class="form-check-label" for="terrestrial_radiation">
                         Terrestrial Solar Radiation
                       </label>
                     </div>

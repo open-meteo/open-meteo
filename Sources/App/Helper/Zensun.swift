@@ -256,7 +256,58 @@ struct Zensun {
                 
             }
             let zenithRadians=acos(zz)
-            let b = cos(zenithRadians)// max(cos(zenithRadians), cos(Float(85).degreesToRadians))
+            // The 85° limit should be applied before the integral is calculated, but there seems not to be an easy mathematical solution
+            let b = max(cos(zenithRadians), cos(Float(85).degreesToRadians))
+            let dni = dhi / b
+            out.append(dni)
+        }
+        return out
+    }
+    
+    /// Calculate DNI based on zenith angle
+    public static func caluclateInstantDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+        var out = [Float]()
+        out.reserveCapacity(directRadiation.count)
+        
+        for (dhi, timestamp) in zip(directRadiation, timerange) {
+            // direct horizontal irradiation
+            if dhi.isNaN {
+                out.append(.nan)
+                continue
+            }
+            if dhi <= 0 {
+                out.append(0)
+                continue
+            }
+            
+            /// fractional day number with 12am 1jan = 1
+            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+
+            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
+            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
+            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            
+            let latsun=decang
+            /// universal time
+            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let t1 = (90-latsun).degreesToRadians
+            
+            let lonsun = -15.0*(ut-12.0+eqtime)
+            
+            /// longitude of sun
+            let p1 = lonsun.degreesToRadians
+            
+            let t0=(90-latitude).degreesToRadians                     // colatitude of point
+
+            /// longitude of point
+            let p0 = longitude.degreesToRadians
+            let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
+            if zz <= 0 {
+                out.append(0)
+                continue
+            }
+            let zenithRadians=acos(zz)
+            let b = max(cos(zenithRadians), cos(Float(85).degreesToRadians))
             let dni = dhi / b
             out.append(dni)
         }

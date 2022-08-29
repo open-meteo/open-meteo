@@ -55,12 +55,16 @@ enum ReaderInterpolation {
     /// Hermite interpolation for more smooth interpolation for temperature
     case hermite
     
+    case solar_backwards_averaged
+    
     /// How many timesteps on the left and right side are used for interpolation
     var padding: Int {
         switch self {
         case .linear:
             return 1
         case .hermite:
+            return 2
+        case .solar_backwards_averaged:
             return 2
         }
     }
@@ -151,37 +155,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         let read = try readAndScale(variable: variable, time: timeLow)
         let dataLow = read.data
         
-        var data = [Float]()
-        data.reserveCapacity(time.count)
-        switch interpolationType {
-        case .linear:
-            for t in time {
-                let index = t.timeIntervalSince1970 / domain.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / domain.dtSeconds
-                let fraction = Float(t.timeIntervalSince1970 % domain.dtSeconds) / Float(domain.dtSeconds)
-                let A = dataLow[index]
-                let B = index+1 >= dataLow.count ? A : dataLow[index+1]
-                let h = A * (1-fraction) + B * fraction
-                /// adjust it to scalefactor, otherwise interpolated values show more level of detail
-                data.append(round(h * variable.scalefactor) / variable.scalefactor)
-            }
-        case .hermite:
-            for t in time {
-                let index = t.timeIntervalSince1970 / domain.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / domain.dtSeconds
-                let fraction = Float(t.timeIntervalSince1970 % domain.dtSeconds) / Float(domain.dtSeconds)
-                
-                let B = dataLow[index]
-                let A = index-1 < 0 ? B : dataLow[index-1].isNaN ? B : dataLow[index-1]
-                let C = index+1 >= dataLow.count ? B : dataLow[index+1].isNaN ? B : dataLow[index+1]
-                let D = index+2 >= dataLow.count ? C : dataLow[index+2].isNaN ? B : dataLow[index+2]
-                let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                let c = -A/2.0 + C/2.0
-                let d = B
-                let h = a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d
-                /// adjust it to scalefactor, otherwise interpolated values show more level of detail
-                data.append(round(h * variable.scalefactor) / variable.scalefactor)
-            }
-        }
+        let data = dataLow.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
         return DataAndUnit(data, read.unit)
     }
 }
@@ -194,5 +168,74 @@ extension TimerangeDt {
     }
     func expandLeftRight(by: Int) -> TimerangeDt {
         return TimerangeDt(start: range.lowerBound.add(-1*by), to: range.upperBound.add(by), dtSeconds: dtSeconds)
+    }
+}
+
+
+
+extension Array where Element == Float {
+    fileprivate func interpolate(type: ReaderInterpolation, timeOld: TimerangeDt, timeNew: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
+        switch type {
+        case .linear:
+            return interpolateLinear(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
+        case .hermite:
+            return interpolateHermite(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
+        case .solar_backwards_averaged:
+            return interpolateSolarBackwards(timeOld: timeOld, timeNew: timeNew, latitude: latitude, longitude: longitude, scalefactor: scalefactor)
+        }
+    }
+    
+    func interpolateSolarBackwards(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
+        /// Like regular hermite, but interpolated via clearsky index kt derived with solar factor
+        let position = RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1)
+        let solarLow = Zensun.calculateRadiationBackwardsAveraged(grid: position, timerange: timeLow).data
+        let solar = Zensun.calculateRadiationBackwardsAveraged(grid: position, timerange: time).data
+        return time.enumerated().map { (i, t) in
+            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
+            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
+            
+            let B = self[index] / solarLow[index]
+            let A = index-1 < 0 ? B : self[index-1].isNaN ? B : (self[index-1] / solarLow[index-1])
+            let C = index+1 >= self.count ? B : self[index+1].isNaN ? B : (self[index+1] / solarLow[index+1])
+            let D = index+2 >= self.count ? C : self[index+2].isNaN ? B : (self[index+2] / solarLow[index+2])
+            let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+            let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+            let c = -A/2.0 + C/2.0
+            let d = B
+            let h = (a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d) * solar[i]
+            /// adjust it to scalefactor, otherwise interpolated values show more level of detail
+            return roundf(h * scalefactor) / scalefactor
+        }
+    }
+    
+    func interpolateLinear(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
+        return time.map { t in
+            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
+            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
+            let A = self[index]
+            let B = index+1 >= self.count ? A : self[index+1]
+            let h = A * (1-fraction) + B * fraction
+            /// adjust it to scalefactor, otherwise interpolated values show more level of detail
+            return roundf(h * scalefactor) / scalefactor
+        }
+    }
+    
+    func interpolateHermite(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
+        return time.map { t in
+            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
+            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
+            
+            let B = self[index]
+            let A = index-1 < 0 ? B : self[index-1].isNaN ? B : self[index-1]
+            let C = index+1 >= self.count ? B : self[index+1].isNaN ? B : self[index+1]
+            let D = index+2 >= self.count ? C : self[index+2].isNaN ? B : self[index+2]
+            let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+            let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+            let c = -A/2.0 + C/2.0
+            let d = B
+            let h = a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d
+            /// adjust it to scalefactor, otherwise interpolated values show more level of detail
+            return roundf(h * scalefactor) / scalefactor
+        }
     }
 }

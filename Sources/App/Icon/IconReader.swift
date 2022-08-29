@@ -224,7 +224,7 @@ extension IconMixer {
                 case .surface_pressure:
                     try prefetchData(variable: .pressure_msl)
                     try prefetchData(variable: .temperature_2m)
-                case .terrestrial_radiation_backwards:
+                case .terrestrial_radiation:
                     break
                 case .terrestrial_radiation_instant:
                     break
@@ -336,7 +336,7 @@ extension IconMixer {
             let temperature = try get(variable: .temperature_2m).data
             let pressure = try get(variable: .pressure_msl)
             return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: mixer.targetElevation), pressure.unit)
-        case .terrestrial_radiation_backwards:
+        case .terrestrial_radiation:
             /// Use center averaged
             let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
             return DataAndUnit(solar, .wattPerSquareMeter)
@@ -357,9 +357,14 @@ extension IconMixer {
             let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
             return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
         case .direct_normal_irradiance_instant:
-            let dni = try get(variable: .direct_normal_irradiance)
-            let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
-            return DataAndUnit(zip(dni.data, factor).map(*), dni.unit)
+            let direct = try get(variable: .direct_radiation_instant)
+            let dni = Zensun.caluclateInstantDNI(directRadiation: direct.data, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+            return DataAndUnit(dni, direct.unit)
+            
+            // because DNI is divided by cos(zenith), the approach below was not work
+            //let dni = try get(variable: .direct_normal_irradiance)
+            //let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
+            //return DataAndUnit(zip(dni.data, factor).map(*), dni.unit)
         }
     }
 }

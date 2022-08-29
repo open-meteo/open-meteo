@@ -134,6 +134,8 @@ struct DownloadEcmwfCommand: Command {
                         data2d[l, hour] = a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d
                     }
                 }
+            case .solar_backwards_averaged:
+                fatalError("ecmwf solar not implemented")
             }
             
             /// Temperature is stored in kelvin. Convert to celsius

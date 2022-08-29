@@ -211,7 +211,7 @@ enum GfsVariableDerivedSurface: String, Codable, CaseIterable {
     //case shortwave_radiation
     case snowfall
     case surface_pressure
-    case terrestrial_radiation_backwards
+    case terrestrial_radiation
     case terrestrial_radiation_instant
 }
 
@@ -433,7 +433,7 @@ extension GfsMixer {
                     case .surface_pressure:
                         try prefetchData(variable: .pressure_msl)
                         try prefetchData(variable: .temperature_2m)
-                    case .terrestrial_radiation_backwards:
+                    case .terrestrial_radiation:
                         break
                     case .terrestrial_radiation_instant:
                         break
@@ -535,7 +535,7 @@ extension GfsMixer {
                 let temperature = try get(variable: .temperature_2m).data
                 let pressure = try get(variable: .pressure_msl)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: mixer.targetElevation), pressure.unit)
-            case .terrestrial_radiation_backwards:
+            case .terrestrial_radiation:
                 /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
