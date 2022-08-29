@@ -182,11 +182,11 @@ struct Zensun {
     }
     
     /// Calculate DNI based on zenith angle
-    public static func caluclateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, time: TimerangeDt) -> [Float] {
+    public static func caluclateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
         var out = [Float]()
         out.reserveCapacity(directRadiation.count)
         
-        for (dhi, t) in zip(directRadiation, time) {
+        for (dhi, timestamp) in zip(directRadiation, timerange) {
             // direct horizontal irradiation
             if dhi.isNaN {
                 out.append(.nan)
@@ -197,37 +197,44 @@ struct Zensun {
                 continue
             }
             
-            let tt = Float(((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            /// fractional day number with 12am 1jan = 1
+            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+
+            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
+            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
+            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
             
             /// earth-sun distance in AU
             let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
             
             /// solar disk half-angle
             let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
-
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
-
+            
             let latsun=decang
-            let ut = Float(((t.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
-
-            let lonsun = -15.0*(ut-12.0+eqtime)
-            let t0 = (90-latitude).degreesToRadians
+            /// universal time
+            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
             let t1 = (90-latsun).degreesToRadians
-            var p0 = longitude.degreesToRadians
+            
+            let lonsun = -15.0*(ut-12.0+eqtime)
+            
+            /// longitude of sun
             let p1 = lonsun.degreesToRadians
+            
+            let ut0 = ut - (Float(timerange.dtSeconds)/3600)
+            let lonsun0 = -15.0*(ut0-12.0+eqtime)
+            
+            let p10 = lonsun0.degreesToRadians
+            
+            let t0=(90-latitude).degreesToRadians                     // colatitude of point
 
+            /// longitude of point
+            var p0 = longitude.degreesToRadians
             if p0 < p1 - .pi {
                 p0 += 2 * .pi
             }
             if p0 > p1 + .pi {
                 p0 -= 2 * .pi
             }
-
-            let ut0 = ut - (Float(time.dtSeconds)/3600)
-            let lonsun0 = -15.0*(ut0-12.0+eqtime)
-            let p10 = lonsun0.degreesToRadians
 
             // limit p1 and p10 to sunrise/set
             let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
