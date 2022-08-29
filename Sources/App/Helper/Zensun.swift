@@ -181,8 +181,28 @@ struct Zensun {
         return out
     }
     
+    /// Calculate DNI using super sampling
+    public static func caluclateBackwardsDNISupersampled(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt, samples: Int = 60) -> [Float] {
+        let averagedToInstant = backwardsAveragedToInstantFactor(time: timerange, latitude: latitude, longitude: longitude)
+        let dhiInstant = zip(directRadiation, averagedToInstant).map(*)
+        
+        let timeSuperSampled = timerange.range.range(dtSeconds: timerange.dtSeconds / samples)
+        let dhiSuperSamled = dhiInstant.interpolateHermite(timeOld: timerange, timeNew: timeSuperSampled, scalefactor: 1)
+        
+        let dniSuperSampled = caluclateInstantDNI(directRadiation: dhiSuperSamled, latitude: latitude, longitude: longitude, timerange: timeSuperSampled)
+        
+        /// return instant values
+        //return (0..<timerange.count).map { dniSuperSampled[$0 * samples] }
+        
+        return dniSuperSampled.meanBackwards(by: samples)
+    }
+    
     /// Calculate DNI based on zenith angle
     public static func caluclateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+        return caluclateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
+        
+        // For some reason, the code below deaverages data!
+        
         var out = [Float]()
         out.reserveCapacity(directRadiation.count)
         

@@ -218,6 +218,14 @@ extension Array where Element == Float {
             return self[i..<i+by].reduce(0, +) / Float(by)
         }
     }
+    func meanBackwards(by: Int) -> [Float] {
+        return stride(from: 0, through: count-by, by: by).map { i in
+            if i == 0 {
+                return .nan
+            }
+            return self[i-by..<i].reduce(0, +) / Float(by)
+        }
+    }
     
     mutating func rounded(digits: Int) {
         let roundExponent = powf(10, Float(digits))
