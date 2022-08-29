@@ -224,12 +224,19 @@ extension IconMixer {
                 case .surface_pressure:
                     try prefetchData(variable: .pressure_msl)
                     try prefetchData(variable: .temperature_2m)
-                case .terrestrial_radiation_centered:
-                    break
                 case .terrestrial_radiation_backwards:
                     break
                 case .terrestrial_radiation_instant:
                     break
+                case .shortwave_radiation_instant:
+                    try prefetchData(variable: .direct_radiation)
+                    try prefetchData(variable: .diffuse_radiation)
+                case .diffuse_radiation_instant:
+                    try prefetchData(variable: .diffuse_radiation)
+                case .direct_radiation_instant:
+                    try prefetchData(variable: .direct_radiation)
+                case .direct_normal_irradiance_instant:
+                    try prefetchData(variable: .direct_radiation)
                 }
             }
         }
@@ -303,10 +310,10 @@ extension IconMixer {
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
         case .direct_normal_irradiance:
             let dhi = try get(variable: .direct_radiation).data
-            let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, startTime: mixer.time.range.lowerBound, dtSeconds: mixer.time.dtSeconds)
+            let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, time: mixer.time)
             return DataAndUnit(dni, .wattPerSquareMeter)
         case .et0_fao_evapotranspiration:
-            let exrad = Meteorology.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
             let swrad = try get(variable: .shortwave_radiation).data
             let temperature = try get(variable: .temperature_2m).data
             let windspeed = try get(variable: .windspeed_10m).data
@@ -329,18 +336,30 @@ extension IconMixer {
             let temperature = try get(variable: .temperature_2m).data
             let pressure = try get(variable: .pressure_msl)
             return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: mixer.targetElevation), pressure.unit)
-        case .terrestrial_radiation_centered:
-            /// Use center averaged
-            let solar = Meteorology.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time.add(1800))
-            return DataAndUnit(solar, .wattPerSquareMeter)
         case .terrestrial_radiation_backwards:
             /// Use center averaged
-            let solar = Meteorology.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
             return DataAndUnit(solar, .wattPerSquareMeter)
         case .terrestrial_radiation_instant:
             /// Use center averaged
-            let solar = Meteorology.extraTerrestrialRadiationInstant(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
             return DataAndUnit(solar, .wattPerSquareMeter)
+        case .shortwave_radiation_instant:
+            let sw = try get(variable: .shortwave_radiation)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
+            return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
+        case .diffuse_radiation_instant:
+            let diff = try get(variable: .diffuse_radiation)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
+            return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
+        case .direct_radiation_instant:
+            let direct = try get(variable: .direct_radiation)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
+            return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
+        case .direct_normal_irradiance_instant:
+            let dni = try get(variable: .direct_normal_irradiance)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
+            return DataAndUnit(zip(dni.data, factor).map(*), dni.unit)
         }
     }
 }

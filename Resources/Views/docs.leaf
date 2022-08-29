@@ -156,18 +156,6 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="pressure_msl" id="pressure_msl" name="hourly">
-            <label class="form-check-label" for="pressure_msl">
-              Sealevel Pressure
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="surface_pressure" id="surface_pressure" name="hourly">
-            <label class="form-check-label" for="surface_pressure">
-              Surface Pressure <!--<span class="badge bg-secondary">New</span>-->
-            </label>
-          </div>
-          <div class="form-check">
             <input class="form-check-input" type="checkbox" value="precipitation" id="precipitation" name="hourly">
             <label class="form-check-label" for="precipitation">
               Precipitation (rain + showers + snow)
@@ -192,12 +180,6 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode" name="hourly">
-            <label class="form-check-label" for="weathercode">
-              Weathercode
-            </label>
-          </div>
-          <div class="form-check">
             <input class="form-check-input" type="checkbox" value="snow_depth" id="snow_depth" name="hourly">
             <label class="form-check-label" for="snow_depth">
               Snow Depth
@@ -211,6 +193,24 @@
           </div>
         </div>
         <div class="col-md-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode" name="hourly">
+            <label class="form-check-label" for="weathercode">
+              Weathercode
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="pressure_msl" id="pressure_msl" name="hourly">
+            <label class="form-check-label" for="pressure_msl">
+              Sealevel Pressure
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="surface_pressure" id="surface_pressure" name="hourly">
+            <label class="form-check-label" for="surface_pressure">
+              Surface Pressure
+            </label>
+          </div>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover" name="hourly">
             <label class="form-check-label" for="cloudcover">
@@ -233,48 +233,6 @@
             <input class="form-check-input" type="checkbox" value="cloudcover_high" id="cloudcover_high" name="hourly">
             <label class="form-check-label" for="cloudcover_high">
               Cloudcover High
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="shortwave_radiation" id="shortwave_radiation" name="hourly">
-            <label class="form-check-label" for="shortwave_radiation">
-              Shortwave Solar Radiation
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="direct_radiation" id="direct_radiation" name="hourly">
-            <label class="form-check-label" for="direct_radiation">
-              Direct Solar Radiation
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="diffuse_radiation" id="diffuse_radiation" name="hourly">
-            <label class="form-check-label" for="diffuse_radiation">
-              Diffuse Solar Radiation
-            </label>
-          </div>
-          <div class="form-check debug-hidden">
-            <input class="form-check-input" type="checkbox" value="terrestrial_radiation_centered" id="terrestrial_radiation_centered" name="hourly">
-            <label class="form-check-label" for="terrestrial_radiation_centered">
-              Terrestrial Solar Radiation Center Averaged (debug only)
-            </label>
-          </div>
-          <div class="form-check debug-hidden">
-            <input class="form-check-input" type="checkbox" value="terrestrial_radiation_backwards" id="terrestrial_radiation_backwards" name="hourly">
-            <label class="form-check-label" for="terrestrial_radiation_backwards">
-              Terrestrial Solar Radiation Backwards Averaged (debug only)
-            </label>
-          </div>
-          <div class="form-check debug-hidden">
-            <input class="form-check-input" type="checkbox" value="terrestrial_radiation_instant" id="terrestrial_radiation_instant" name="hourly">
-            <label class="form-check-label" for="terrestrial_radiation_instant">
-              Terrestrial Solar Radiation Instant (debug only)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="direct_normal_irradiance" id="direct_normal_irradiance" name="hourly">
-            <label class="form-check-label" for="direct_normal_irradiance">
-              Direct Normal Irradiance (DNI)
             </label>
           </div>
           <div class="form-check">
@@ -421,6 +379,89 @@
             </label>
           </div>
         </div>
+
+        <div class="row py-3 px-0">
+          <div class="accordion">
+            <div class="accordion-item">
+              <h2 class="accordion-header" id="heading-solar-variables">
+                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-solar-variables" aria-expanded="false" aria-controls="collapse-solar-variables">
+                  Solar Radiation Variables&nbsp;<span class="badge bg-secondary">New</span>
+                </button>
+              </h2>
+              <div id="collapse-solar-variables" class="accordion-collapse collapse" aria-labelledby="heading-solar-variables" data-bs-parent="#accordionExample">
+                <div class="accordion-body row">
+                  <div class="col-md-6">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="shortwave_radiation" id="shortwave_radiation" name="hourly">
+                      <label class="form-check-label" for="shortwave_radiation">
+                        Shortwave Solar Radiation
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="direct_radiation" id="direct_radiation" name="hourly">
+                      <label class="form-check-label" for="direct_radiation">
+                        Direct Solar Radiation
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="diffuse_radiation" id="diffuse_radiation" name="hourly">
+                      <label class="form-check-label" for="diffuse_radiation">
+                        Diffuse Solar Radiation
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="direct_normal_irradiance" id="direct_normal_irradiance" name="hourly">
+                      <label class="form-check-label" for="direct_normal_irradiance">
+                        Direct Normal Irradiance DNI
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="terrestrial_radiation_backwards" id="terrestrial_radiation_backwards" name="hourly">
+                      <label class="form-check-label" for="terrestrial_radiation_backwards">
+                        Terrestrial Solar Radiation
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-6">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="shortwave_radiation_instant" id="shortwave_radiation_instant" name="hourly">
+                      <label class="form-check-label" for="shortwave_radiation_instant">
+                        Shortwave Solar Radiation (Instant)
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="direct_radiation_instant" id="direct_radiation_instant" name="hourly">
+                      <label class="form-check-label" for="direct_radiation_instant">
+                        Direct Solar Radiation (Instant)
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="diffuse_radiation_instant" id="diffuse_radiation_instant" name="hourly">
+                      <label class="form-check-label" for="diffuse_radiation_instant">
+                        Diffuse Solar Radiation (Instant)
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="direct_normal_irradiance_instant" id="direct_normal_irradiance_instant" name="hourly">
+                      <label class="form-check-label" for="direct_normal_irradiance_instant">
+                        Direct Normal Irradiance DNI (Instant)
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="terrestrial_radiation_instant" id="terrestrial_radiation_instant" name="hourly">
+                      <label class="form-check-label" for="terrestrial_radiation_instant">
+                        Terrestrial Solar Radiation (Instant)
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-12">
+                    <small class="text-muted">Note: Solar radiation is averaged over the past hour. Use <mark>instant</mark> for radiation at the indicated time.</small>
+                  </div>
+                </div>
+              </div>
+              
+            </div>
+          </div>
         </div>
 
         <div class="row py-3 px-0">

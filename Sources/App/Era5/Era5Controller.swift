@@ -365,7 +365,7 @@ extension Era5Reader {
             let dewpoint = try get(variable: .dewpoint_2m).data
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
         case .et0_fao_evapotranspiration:
-            let exrad = Meteorology.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time)
+            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time)
             let swrad = try get(variable: .shortwave_radiation).data
             let temperature = try get(variable: .temperature_2m).data
             let windspeed = try get(derived: .windspeed_10m).data
@@ -395,7 +395,7 @@ extension Era5Reader {
             return DataAndUnit(snowfall, .centimeter)
         case .direct_normal_irradiance:
             let dhi = try get(variable: .direct_radiation).data
-            let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, startTime: time.range.lowerBound, dtSeconds: time.dtSeconds)
+            let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, time: time)
             return DataAndUnit(dni, .wattPerSquareMeter)
         case .rain:
             let snowwater = try get(variable: .snowfall_water_equivalent)

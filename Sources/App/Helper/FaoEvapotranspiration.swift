@@ -3,24 +3,6 @@ import Foundation
 
 extension Meteorology {
     static public let boltzmanConstant = Float(0.20429166e-9)
-    
-    /// Watt per square meter
-    static public let solarConstant = Float(1367.7)
-    
-    /// Watt per square meter
-    public static func extraTerrestrialRadiationBackwards(latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
-        // compute hourly mean radiation flux
-        return Zensun.calculateRadiationBackwardsAveraged(grid: RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1), timerange: timerange).data.map {
-            $0 * solarConstant
-        }
-    }
-    
-    public static func extraTerrestrialRadiationInstant(latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
-        // compute hourly mean radiation flux
-        return Zensun.calculateRadiationInstant(grid: RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1), timerange: timerange).map {
-            max($0 * solarConstant, 0)
-        }
-    }
 
     /// FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
     public static func et0Evapotranspiration(temperature2mCelsius: Float, windspeed10mMeterPerSecond: Float, dewpointCelsius: Float, shortwaveRadiationWatts: Float, elevation: Float, extraTerrestrialRadiation: Float, dtSeconds: Int) -> Float {

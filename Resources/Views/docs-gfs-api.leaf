@@ -264,12 +264,6 @@
             </label>
           </div>-->
           <div class="form-check debug-hidden">
-            <input class="form-check-input" type="checkbox" value="terrestrial_radiation_centered" id="terrestrial_radiation_centered" name="hourly">
-            <label class="form-check-label" for="terrestrial_radiation_centered">
-              Terrestrial Solar Radiation Center Averaged (debug only)
-            </label>
-          </div>
-          <div class="form-check debug-hidden">
             <input class="form-check-input" type="checkbox" value="terrestrial_radiation_backwards" id="terrestrial_radiation_backwards" name="hourly">
             <label class="form-check-label" for="terrestrial_radiation_backwards">
               Terrestrial Solar Radiation Backwards Averaged (debug only)
@@ -439,7 +433,7 @@
         </div>
 
         <div class="row py-3 px-0">
-          <div class="accordion" id="accordionExample">
+          <div class="accordion">
             #for(variable in pressureVariables):
             <div class="accordion-item">
               <h2 class="accordion-header" id="heading-#(variable.name)">

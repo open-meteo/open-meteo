@@ -9,6 +9,7 @@ import Vapor
  - No 120/180m wind
  - No cloudcover in NAM/HRRR on pressure levels
  - Soil temp/moisture on different levels
+ - cloudcover interpolation negative values
  */
 public struct GfsController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
@@ -210,7 +211,6 @@ enum GfsVariableDerivedSurface: String, Codable, CaseIterable {
     //case shortwave_radiation
     case snowfall
     case surface_pressure
-    case terrestrial_radiation_centered
     case terrestrial_radiation_backwards
     case terrestrial_radiation_instant
 }
@@ -433,8 +433,6 @@ extension GfsMixer {
                     case .surface_pressure:
                         try prefetchData(variable: .pressure_msl)
                         try prefetchData(variable: .temperature_2m)
-                    case .terrestrial_radiation_centered:
-                        break
                     case .terrestrial_radiation_backwards:
                         break
                     case .terrestrial_radiation_instant:
@@ -513,7 +511,7 @@ extension GfsMixer {
                 let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, startTime: mixer.time.range.lowerBound, dtSeconds: mixer.time.dtSeconds)
                 return DataAndUnit(dni, .wattPerSquareMeter)*/
             case .et0_fao_evapotranspiration:
-                let exrad = Meteorology.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+                let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
                 let swrad = try get(variable: .shortwave_radiation).data
                 let temperature = try get(variable: .temperature_2m).data
                 let windspeed = try get(variable: .windspeed_10m).data
@@ -537,17 +535,13 @@ extension GfsMixer {
                 let temperature = try get(variable: .temperature_2m).data
                 let pressure = try get(variable: .pressure_msl)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: mixer.targetElevation), pressure.unit)
-            case .terrestrial_radiation_centered:
-                /// Use center averaged
-                let solar = Meteorology.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time.add(1800))
-                return DataAndUnit(solar, .wattPerSquareMeter)
             case .terrestrial_radiation_backwards:
                 /// Use center averaged
-                let solar = Meteorology.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
             case .terrestrial_radiation_instant:
                 /// Use center averaged
-                let solar = Meteorology.extraTerrestrialRadiationInstant(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
+                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: mixer.time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
             case .dewpoint_2m:
                 let temperature = try get(variable: .temperature_2m)

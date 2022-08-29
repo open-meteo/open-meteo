@@ -4,6 +4,9 @@ import Foundation
 /// Solar position calculations based on zensun
 /// See https://gist.github.com/sangholee1990/eb3d997a9b28ace2dbcab6a45fd7c178#file-visualization_using_sun_position-pro-L306
 struct Zensun {
+    /// Watt per square meter
+    static public let solarConstant = Float(1367.7)
+    
     /// eqation of time
     static let eqt: [Float] = [ -3.23, -5.49, -7.60, -9.48, -11.09, -12.39, -13.34, -13.95, -14.23, -14.19, -13.85, -13.22, -12.35, -11.26, -10.01, -8.64, -7.18, -5.67, -4.16, -2.69, -1.29, -0.02, 1.10, 2.05, 2.80, 3.33, 3.63, 3.68, 3.49, 3.09, 2.48, 1.71, 0.79, -0.24, -1.33, -2.41, -3.45, -4.39, -5.20, -5.84, -6.28, -6.49, -6.44, -6.15, -5.60, -4.82, -3.81, -2.60, -1.19, 0.36, 2.03, 3.76, 5.54, 7.31, 9.04, 10.69, 12.20, 13.53, 14.65, 15.52, 16.12, 16.41, 16.36, 15.95, 15.19, 14.09, 12.67, 10.93, 8.93, 6.70, 4.32, 1.86, -0.62, -3.23]
 
@@ -167,10 +170,10 @@ struct Zensun {
                 for indexX in 0..<grid.nx {
                     let (lat,lon) = grid.getCoordinates(gridpoint: indexY * grid.nx + indexX)
                     
-                    let t0=(90-lat).degreesToRadians
-                    let p0=lon.degreesToRadians
-                    let zz=cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
-                    let solfac=zz/rsun_square
+                    let t0 = (90-lat).degreesToRadians
+                    let p0 = lon.degreesToRadians
+                    let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
+                    let solfac = zz/rsun_square
                     out.append(solfac)
                 }
             }
@@ -179,15 +182,12 @@ struct Zensun {
     }
     
     /// Calculate DNI based on zenith angle
-    public static func caluclateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, startTime: Timestamp, dtSeconds: Int) -> [Float] {
+    public static func caluclateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, time: TimerangeDt) -> [Float] {
         var out = [Float]()
         out.reserveCapacity(directRadiation.count)
         
-        let max_sun_zenith = Float(85).degreesToRadians
-        
-        for i in 0..<directRadiation.count {
+        for (dhi, t) in zip(directRadiation, time) {
             // direct horizontal irradiation
-            let dhi = directRadiation[i]
             if dhi.isNaN {
                 out.append(.nan)
                 continue
@@ -197,8 +197,7 @@ struct Zensun {
                 continue
             }
             
-            let timestamp = startTime.timeIntervalSince1970 + dtSeconds * i
-            let tt = Float(((timestamp % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            let tt = Float(((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
             
             /// earth-sun distance in AU
             let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
@@ -211,7 +210,7 @@ struct Zensun {
             let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
 
             let latsun=decang
-            let ut = Float(((timestamp % 86400) + 86400) % 86400) / 3600
+            let ut = Float(((t.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
 
             let lonsun = -15.0*(ut-12.0+eqtime)
             let t0 = (90-latitude).degreesToRadians
@@ -226,7 +225,7 @@ struct Zensun {
                 p0 -= 2 * .pi
             }
 
-            let ut0 = ut - (Float(dtSeconds)/3600)
+            let ut0 = ut - (Float(time.dtSeconds)/3600)
             let lonsun0 = -15.0*(ut0-12.0+eqtime)
             let p10 = lonsun0.degreesToRadians
 
@@ -250,11 +249,39 @@ struct Zensun {
                 
             }
             let zenithRadians=acos(zz)
-            let b = max(cos(zenithRadians), cos(max_sun_zenith))
+            let b = cos(zenithRadians)// max(cos(zenithRadians), cos(Float(85).degreesToRadians))
             let dni = dhi / b
             out.append(dni)
         }
         return out
+    }
+    
+    /// Watt per square meter
+    public static func extraTerrestrialRadiationBackwards(latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+        // compute hourly mean radiation flux
+        return Zensun.calculateRadiationBackwardsAveraged(grid: RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1), timerange: timerange).data.map {
+            $0 * solarConstant
+        }
+    }
+    
+    public static func extraTerrestrialRadiationInstant(latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+        // compute hourly mean radiation flux
+        return Zensun.calculateRadiationInstant(grid: RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1), timerange: timerange).map {
+            max($0 * solarConstant, 0)
+        }
+    }
+    
+    /// Calculate scaling factor from backwards to instant radiation factor
+    public static func backwardsAveragedToInstantFactor(time: TimerangeDt, latitude: Float, longitude: Float) -> [Float] {
+        let position = RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1)
+        let backwards = Zensun.calculateRadiationBackwardsAveraged(grid: position, timerange: time).data
+        let instant = Zensun.calculateRadiationInstant(grid: position, timerange: time)
+        return zip(instant, backwards).map({
+            if $0 <= 0 || $1 <= 0 {
+                return 0
+            }
+            return $0 / $1
+        })
     }
 }
 

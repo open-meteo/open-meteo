@@ -244,8 +244,11 @@ enum IconVariableDerived: String, Codable, CaseIterable {
     case snow_height
     case snowfall
     case surface_pressure
-    case terrestrial_radiation_centered
     case terrestrial_radiation_backwards
     case terrestrial_radiation_instant
+    case shortwave_radiation_instant
+    case diffuse_radiation_instant
+    case direct_radiation_instant
+    case direct_normal_irradiance_instant
 }
 
