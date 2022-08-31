@@ -101,15 +101,27 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         nForecastHours(run: 0) + 3*24
     }
     
+    /// All available pressure levels for the current domain
     var levels: [Int] {
         switch self {
-        case .icon: return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000]
+        case .icon:
+            return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700,      800,      850,      900, 925, 950,      1000]
         case .iconEu:
-            return [50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 775, 800, 825, 850, 875, 900, 925, 950, 1000]
+            return [    50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 775, 800, 825, 850, 875, 900, 925, 950,      1000]
         case .iconD2:
-            return [200, 250, 300, 400, 500, 600, 700, 850, 950, 975, 1000]
+            return [                      200, 250, 300, 400, 500, 600, 700,                850,                950, 975, 1000]
         }
-        
+    }
+    
+    /// All surface and pressure variables
+    var allVariables: [IconVariableRespresentable] {
+        let surface = IconVariable.allCases
+        let pressure = levels.reversed().flatMap { level in
+            IconPressureVariableType.allCases.map { variable in
+                IconPressureVariable(variable: variable, level: level)
+            }
+        }
+        return surface + pressure
     }
     
     /// Number  of forecast hours per run

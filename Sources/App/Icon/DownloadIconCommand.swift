@@ -282,8 +282,11 @@ struct DownloadIconCommand: Command {
             return run
         } ?? domain.lastRun
         
-        let onlyVariables: [IconVariable]? = signature.onlyVariables.map {
+        let onlyVariables: [IconVariableRespresentable]? = signature.onlyVariables.map {
             $0.split(separator: ",").map {
+                if let variable = IconPressureVariable(rawValue: String($0)) {
+                    return variable
+                }
                 guard let variable = IconVariable(rawValue: String($0)) else {
                     fatalError("Invalid variable '\($0)'")
                 }
@@ -291,8 +294,7 @@ struct DownloadIconCommand: Command {
             }
         }
         
-        let variables = onlyVariables ?? IconVariable.allCases
-        //let variables = [IconPressureVariable(variable: .temperature, level: 1000), IconPressureVariable(variable: .temperature, level: 900)]
+        let variables = onlyVariables ?? domain.allVariables
         let logger = context.application.logger
 
         let date = Timestamp.now().with(hour: run)
