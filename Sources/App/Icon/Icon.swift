@@ -101,6 +101,17 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         nForecastHours(run: 0) + 3*24
     }
     
+    var levels: [Int] {
+        switch self {
+        case .icon: return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000]
+        case .iconEu:
+            return [50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 775, 800, 825, 850, 875, 900, 925, 950, 1000]
+        case .iconD2:
+            return [200, 250, 300, 400, 500, 600, 700, 850, 950, 975, 1000]
+        }
+        
+    }
+    
     /// Number  of forecast hours per run
     func nForecastHours(run: Int) -> Int {
         switch self {
@@ -169,7 +180,123 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     }
 }
 
-enum IconVariable: String, CaseIterable, Codable, GenericVariableMixing {
+enum IconPressureVariableType: String, CaseIterable {
+    case temperature
+    case wind_u_component
+    case wind_v_component
+    case geopotential_height
+    case relativehumidity
+}
+
+struct IconPressureVariable: PressureVariableRespresentable, IconVariableRespresentable {
+    let variable: IconPressureVariableType
+    let level: Int
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    var omFileName: String {
+        rawValue
+    }
+    
+    var scalefactor: Float {
+        // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
+        switch variable {
+        case .temperature:
+            // Use scalefactor of 2 for everything higher than 300 hPa
+            return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
+        case .wind_u_component:
+            fallthrough
+        case .wind_v_component:
+            // Use scalefactor 3 for levels higher than 500 hPa.
+            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+        case .geopotential_height:
+            return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
+        //case .cloudcover:
+        //    return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(v.level)))
+        case .relativehumidity:
+            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        fatalError("Icon interpolation not required for reader. Already 1h")
+    }
+    
+    var unit: SiUnit {
+        switch variable {
+        case .temperature:
+            return .celsius
+        case .wind_u_component:
+            return .ms
+        case .wind_v_component:
+            return .ms
+        case .geopotential_height:
+            return .meter
+        //case .cloudcover:
+        //    return .percent
+        case .relativehumidity:
+            return .percent
+        }
+    }
+    
+    var interpolationType: InterpolationType {
+        return .hermite
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var isAveragedOverForecastTime: Bool {
+        return false
+    }
+    
+    var isAccumulatedSinceModelStart: Bool {
+        return false
+    }
+    
+    var skipHour0: Bool {
+        return false
+    }
+    
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch variable {
+        case .temperature:
+            return (1, -273.15)
+        default:
+            return nil
+        }
+    }
+    
+    func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?) {
+        switch variable {
+        case .temperature:
+        return ("t", "pressure-level", level)
+        case .wind_u_component:
+            return ("u", "pressure-level", level)
+        case .wind_v_component:
+            return ("v", "pressure-level", level)
+        case .geopotential_height:
+            return ("fi", "pressure-level", level)
+        case .relativehumidity:
+            return ("relhum", "pressure-level", level)
+        }
+    }
+}
+
+protocol IconVariableRespresentable: GenericVariableMixing {
+    var skipHour0: Bool { get }
+    var isAveragedOverForecastTime: Bool { get }
+    var isAccumulatedSinceModelStart: Bool { get }
+    var multiplyAdd: (multiply: Float, add: Float)? { get }
+    var interpolationType: InterpolationType { get }
+    func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)
+}
+
+
+enum IconVariable: String, CaseIterable, Codable, IconVariableRespresentable {
     case temperature_2m
     case cloudcover // cloudcover total
     case cloudcover_low
@@ -465,6 +592,32 @@ enum IconVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .u_180m: return ("u", "model-level", domain.numberOfModelFullLevels-4)
         case .v_180m: return ("v", "model-level", domain.numberOfModelFullLevels-4)
         default: return (omFileName, "single-level", nil)
+        }
+    }
+    
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m: fallthrough
+        case .dewpoint_2m: fallthrough
+        case .soil_temperature_0cm: fallthrough
+        case .soil_temperature_6cm: fallthrough
+        case .soil_temperature_18cm: fallthrough
+        case .soil_temperature_54cm:
+            return (1, -273.15) // Temperature is stored in kelvin. Convert to celsius
+        case .pressure_msl:
+            return (1/100, 0) // convert to hPa
+        case .soil_moisture_0_1cm:
+            return (0.001 / 0.01, 0) // 1cm depth
+        case .soil_moisture_1_3cm:
+            return (0.001 / 0.02, 0) // 2cm depth
+        case .soil_moisture_3_9cm:
+            return (0.001 / 0.06, 0) // 6cm depth
+        case .soil_moisture_9_27cm:
+            return (0.001 / 0.18, 0) // 18cm depth
+        case .soil_moisture_27_81cm:
+            return (0.001 / 0.54, 0) // 54cm depth
+        default:
+            return nil
         }
     }
     

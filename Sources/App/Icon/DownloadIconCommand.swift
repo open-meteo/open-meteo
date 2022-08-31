@@ -99,7 +99,7 @@ struct DownloadIconCommand: Command {
     }
     
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariable]) throws {
+    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableRespresentable]) throws {
         let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -176,7 +176,7 @@ struct DownloadIconCommand: Command {
 
     /// unompress and remap
     /// Process variable after variable
-    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariable]) throws {
+    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariableRespresentable]) throws {
         let downloadDirectory = domain.downloadDirectory
         let cdo = try CdoHelper(domain: domain, logger: logger)
         let grid = domain.grid
@@ -243,48 +243,8 @@ struct DownloadIconCommand: Command {
                 data2d.interpolate2StepsHermiteBackwardsAveraged(positions: forecastStepsToInterpolate)
             }
             
-            /// Temperature is stored in kelvin. Convert to celsius
-            if variable == .temperature_2m || variable == .dewpoint_2m || variable == .soil_temperature_0cm || variable == .soil_temperature_6cm || variable == .soil_temperature_18cm || variable == .soil_temperature_54cm {
-                for i in data2d.data.indices {
-                    data2d.data[i] -= 273.15
-                }
-            }
-            // convert to hPa
-            if variable == .pressure_msl {
-                for i in data2d.data.indices {
-                    data2d.data[i] /= 100
-                }
-            }
-
-            if variable == .soil_moisture_0_1cm {
-                for i in data2d.data.indices {
-                    // 1cm depth
-                    data2d.data[i] *= (0.001 / 0.01)
-                }
-            }
-            if variable == .soil_moisture_1_3cm {
-                for i in data2d.data.indices {
-                    // 2cm depth
-                    data2d.data[i] *= (0.001 / 0.02)
-                }
-            }
-            if variable == .soil_moisture_3_9cm {
-                for i in data2d.data.indices {
-                    // 6cm depth
-                    data2d.data[i] *= (0.001 / 0.06)
-                }
-            }
-            if variable == .soil_moisture_9_27cm {
-                for i in data2d.data.indices {
-                    // 18cm depth
-                    data2d.data[i] *= (0.001 / 0.18)
-                }
-            }
-            if variable == .soil_moisture_27_81cm {
-                for i in data2d.data.indices {
-                    // 54cm depth
-                    data2d.data[i] *= (0.001 / 0.54)
-                }
+            if let fma = variable.multiplyAdd {
+                data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
             }
             
             // De-accumulate precipitation
@@ -332,6 +292,7 @@ struct DownloadIconCommand: Command {
         }
         
         let variables = onlyVariables ?? IconVariable.allCases
+        //let variables = [IconPressureVariable(variable: .temperature, level: 1000), IconPressureVariable(variable: .temperature, level: 900)]
         let logger = context.application.logger
 
         let date = Timestamp.now().with(hour: run)
