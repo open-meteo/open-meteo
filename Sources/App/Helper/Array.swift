@@ -240,6 +240,10 @@ extension Array where Element == Float {
             return Foundation.round($0 * roundExponent) / roundExponent
         }
     }
+    
+    func containsNaN() -> Bool {
+        return first(where: {$0.isNaN}) != nil
+    }
 }
 
 extension Array where Element == Float {

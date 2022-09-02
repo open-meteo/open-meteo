@@ -44,79 +44,63 @@ struct GenericReaderMixer<Domain: GenericDomain, Variable: GenericVariableMixing
     }
     
     func get(variable: Variable) throws -> DataAndUnit {
-        // Read data from available domains
-        let datas = try reader.map {
-            try $0.get(variable: variable)
+        /// Last reader return highest resolution data
+        guard let highestResolutionData = try reader.last?.get(variable: variable) else {
+            fatalError()
+        }
+        if !highestResolutionData.data.containsNaN() {
+            return highestResolutionData
         }
         
+        // Integrate now lower resolution models
+        var data = highestResolutionData.data
         if variable.requiresOffsetCorrectionForMixing {
-            return datas.mergeOffsetCorrected()!
-        } else {
-            return datas.merge()!
+            data.deltaEncode()
+            for r in reader.reversed().dropFirst() {
+                let d = try r.get(variable: variable)
+                data.integrateIfNaNDeltaCoded(d.data)
+                
+                if !data.containsNaN() {
+                    break
+                }
+            }
+            // undo delta operation
+            data.deltaDecode()
+            return DataAndUnit(data, highestResolutionData.unit)
         }
+        
+        // default case, just place new data in 1:1
+        for r in reader.reversed() {
+            let d = try r.get(variable: variable)
+            data.integrateIfNaN(d.data)
+            
+            if !data.containsNaN() {
+                break
+            }
+        }
+        return DataAndUnit(data, highestResolutionData.unit)
     }
 }
 
-
-extension Sequence where Element == DataAndUnit {
-    /// For soil moisture, we have to correct offsets at model mixing
-    /// The first value stays the start value, afterwards only deltas are used
-    /// In the end, the lower-resolution model, just gets corrected by the offset to a higher resolution domain
-    /// An alternative implementation would be to check exactly at model mixing offsets and correct it there
-    func mergeOffsetCorrected() -> DataAndUnit? {
-        var first: [Float]? = nil
-        var unit: SiUnit? = nil
-        for d in self {
-            if first == nil {
-                first = d.data
-                first?.deltaEncode()
-                unit = d.unit
+fileprivate extension Array where Element == Float {
+    mutating func integrateIfNaN(_ other: [Float]) {
+        for x in other.indices {
+            if other[x].isNaN || !self[x].isNaN {
                 continue
             }
-            
-            // integrate other models, but use convert to delta
-            for x in d.data.indices.reversed() {
-                if d.data[x].isNaN {
-                    continue
-                }
-                if x > 0 {
-                    first![x] = d.data[x-1] - d.data[x]
-                } else {
-                    first![x] = d.data[x]
-                }
-            }
+            self[x] = other[x]
         }
-        // undo delta operation
-        first?.deltaDecode()
-        guard let first = first, let unit = unit else {
-            return nil
-        }
-        return DataAndUnit(first, unit)
     }
-    
-    /// Simple merge
-    func merge() -> DataAndUnit? {
-        var data: [Float]? = nil
-        var unit: SiUnit? = nil
-        
-        // default case, just place new data in 1:1
-        for d in self {
-            if data == nil {
-                data = d.data
-                unit = d.unit
+    mutating func integrateIfNaNDeltaCoded(_ other: [Float]) {
+        for x in other.indices {
+            if other[x].isNaN || !self[x].isNaN {
                 continue
             }
-            for x in d.data.indices {
-                if d.data[x].isNaN {
-                    continue
-                }
-                data![x] = d.data[x]
+            if x > 0 {
+                self[x] = other[x-1] - other[x]
+            } else {
+                self[x] = other[x]
             }
         }
-        
-        guard let data = data, let unit = unit else {
-            return nil
-        }
-        return DataAndUnit(data, unit)
     }
 }
