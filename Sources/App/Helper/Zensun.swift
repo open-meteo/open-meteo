@@ -489,8 +489,10 @@ struct Zensun {
         }
     }
     
-    /// Approximate diffuse radiation based on Reindl-2
-    /// See http://dx.doi.org/10.1016/0038-092X(90)90060-P https://www.lmd.polytechnique.fr/~drobinski/MEC573/2021/Project_Solar_France/biblio/Reindl%20et%20al.%20-%201990%20-%20Diffuse%20fraction%20correlations.pdf
+    /// Approximate diffuse radiation based on  Razo, Müller Witwer: Ein Modellansatz zur Bestimmung von Direkt-und Diffusanteil der Einstrahlung auf die PV-Modulebene
+    /// https://www.researchgate.net/publication/333293000_Ein_Modellansatz_zur_Bestimmung_von_Direkt-und_Diffusanteil_der_Einstrahlung_auf_die_PV-Modulebene
+    /// https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf
+    /// Engerer model could also be interesting: https://github.com/JamieMBright/Engerer2-separation-model/blob/master/Engerer2Separation.py
     public static func calculateDiffuseRadiationBackwards(shortwaveRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
         let grid = RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1)
         let sunElevation = calculateSunElevationBackwards(grid: grid, timerange: timerange).data
@@ -500,8 +502,24 @@ struct Zensun {
             /// clearness index [0;1], must be relative to extraterrestrial radiation NOT cleasky
             let kt = ghi / exrad
             
+            let aoi = acos(sinAlpha)
+            
+            let c1: Float = 1.58
+            let c2: Float = 0.991
+            let c3: Float = -5.084
+            let c4: Float = -2.11
+            let c5: Float = -1.16
+            let c6: Float = 2.918
+            let c7: Float = 1.307
+            let c8: Float = 0.762
+            let c9: Float = 0.432
+            let c10: Float = 0.718
+            
+            let kd = c1*kt + c2*aoi + c3*powf(kt,2) + c4*kt*aoi + c5*powf(aoi,2) + c6*powf(kt,3) + c7*powf(kt,2)*aoi + c8*kt*powf(aoi,2) + c9*powf(aoi,3) + c10
+            
             /// diffuse fraction [0;1]
-            var kd: Float
+            /*var kd: Float
+            // Reindl-2 model
             switch kt {
             case ...0.3:
                 kd = min(1.02 - 0.254 * kt + 0.0123 * sinAlpha, 1)
@@ -509,7 +527,7 @@ struct Zensun {
                 kd = max(min(1.4 - 1.749 * kt + 0.177 * sinAlpha, 0.97), 0.1)
             default: // >= 0.78
                 kd = max(0.486 * kt - 0.182 * sinAlpha, 0.1)
-            }
+            }*/
             
             return kd * ghi
         }
