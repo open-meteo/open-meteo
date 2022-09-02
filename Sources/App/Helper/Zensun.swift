@@ -133,7 +133,7 @@ struct Zensun {
                     // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                     let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                     let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-                    /// sun elevation
+                    /// sun elevation (`zz = sin(alpha)`)
                     let zz = (left-right) / (p1_l - p10_l)
                     
                     out[l, t] = zz <= 0 ? 0 : zz / (rsun*rsun)
@@ -207,7 +207,7 @@ struct Zensun {
                     // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                     let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                     let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-                    /// sun elevation
+                    /// sun elevation (`zz = sin(alpha)`)
                     let zz = (left-right) / (p1_l - p10_l)
                     
                     out[l, t] = zz
@@ -248,6 +248,7 @@ struct Zensun {
                     
                     let t0 = (90-lat).degreesToRadians
                     let p0 = lon.degreesToRadians
+                    /// sun elevation (`zz = sin(alpha)`)
                     let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
                     let solfac = zz/rsun_square
                     out.append(solfac)
@@ -343,38 +344,16 @@ struct Zensun {
             let p10_l = max(sunset, p1)
             
             // solve integral to get sun elevation dt
-            // integral 1/(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = (2 sqrt(2) tan^(-1)((sqrt(2) tan((p - p0)/2) cos(t0 + t1))/sqrt(cos(2 t0) + cos(2 t1))))/sqrt(cos(2 t0) + cos(2 t1)) + constant
-            //let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
-            //let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-            let s = cos(2 * t0) + cos(2 * t1)
+            // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+            let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+            let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+            /// sun elevation (`zz = sin(alpha) = cos(zenith)`)
+            let zzBackwards = (left-right) / (p1_l - p10_l)
             
-            
-            let leftTan = (sqrt(2) * tan((p1_l - p0)/2) * cos(t0 + t1))
-            let rightTan = (sqrt(2) * tan((p10_l - p0)/2) * cos(t0 + t1))
-            
-            //let sqrt_t10_t1 = sqrt(s)
-            //let left = (2 * sqrt(2) * atan(leftTan/sqrt(s)))/sqrt(s)
-            //let right = (2 * sqrt(2) * atan(rightTan/sqrt(s)))/sqrt(s)
-            
-            // Taylor series approximation
-            var left: Float = (2 * sqrtf(2) * leftTan)/s
-            var right: Float = (2 * sqrtf(2) * rightTan)/s
-            for i in (2..<10) {
-                let sign: Float = (i%2 == 0) ? -1 : 1
-                let l = Float(i*2-1)
-                left += sign * (2 * sqrtf(2) * powf(leftTan,l))/(l * powf(s,Float(i)))
-                right += sign * (2 * sqrtf(2) * powf(rightTan,l))/(l * powf(s,Float(i)))
-            }
-            /// sun elevation
-            let b = (left - right) / (p1_l - p10_l)
-            /*if b <= 0 {
-                out.append(0)
-                continue
-                
-            }*/
             // The 85° limit should be applied before the integral is calculated, but there seems not to be an easy mathematical solution
             //let b = max(zz), cos(Float(85).degreesToRadians))
-            let dni = dhi * b
+            //let zenith = 90 - asin(zzBackwards).radiansToDegrees
+            let dni = dhi / zzBackwards
             out.append(dni)
         }
         return out
@@ -498,7 +477,7 @@ struct Zensun {
             // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
             let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-            /// sun elevation
+            /// sun elevation (`zz = sin(alpha)`)
             let zzBackwards = (left-right) / (p1_l - p10_l)
             
             /// Instant sun elevation
@@ -511,25 +490,25 @@ struct Zensun {
     }
     
     /// Approximate diffuse radiation based on Reindl-2
-    /// See http://dx.doi.org/10.1016/0038-092X(90)90060-P
+    /// See http://dx.doi.org/10.1016/0038-092X(90)90060-P https://www.lmd.polytechnique.fr/~drobinski/MEC573/2021/Project_Solar_France/biblio/Reindl%20et%20al.%20-%201990%20-%20Diffuse%20fraction%20correlations.pdf
     public static func calculateDiffuseRadiationBackwards(shortwaveRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
         let grid = RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1)
         let sunElevation = calculateSunElevationBackwards(grid: grid, timerange: timerange).data
-        return zip(shortwaveRadiation, sunElevation).map { ghi, sunElevation in
-            let exrad = sunElevation * Self.solarConstant
+        return zip(shortwaveRadiation, sunElevation).map { ghi, sinAlpha in
+            let exrad = sinAlpha * Self.solarConstant
             
-            /// clearness index [0;1]
+            /// clearness index [0;1], must be relative to extraterrestrial radiation NOT cleasky
             let kt = ghi / exrad
             
             /// diffuse fraction [0;1]
             var kd: Float
             switch kt {
             case ...0.3:
-                kd = 1.02 - 0.254 * kt + 0.0123 * sunElevation
+                kd = min(1.02 - 0.254 * kt + 0.0123 * sinAlpha, 1)
             case 0.3 ..< 0.78:
-                kd = 1.4 - 1.749 * kt + 0.177 * sunElevation
+                kd = max(min(1.4 - 1.749 * kt + 0.177 * sinAlpha, 0.97), 0.1)
             default: // >= 0.78
-                kd = 0.486 * kt - 0.182 * sunElevation
+                kd = max(0.486 * kt - 0.182 * sinAlpha, 0.1)
             }
             
             return kd * ghi
