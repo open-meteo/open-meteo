@@ -83,12 +83,13 @@ enum GfsDomain: String, GenericDomain {
     /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     var levels: [Int] {
         switch self {
-        case .gfs025: return [10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+        case .gfs025:
+            return [10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
         case .nam_conus:
             // nam uses level 75 instead of 70. Level 15 and 40 missing. Only use the same levels as HRRR.
-            return [/*10, 20, 30,*/ 50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+            return [                    50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
         case .hrrr_conus:
-            return [50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+            return [                    50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
             // all available
             //return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
         }
@@ -187,9 +188,6 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable {
     /// Only for HRRR domain. Otherwise diff could be estimated with https://arxiv.org/pdf/2007.01639.pdf 3) method
     case diffuse_radiation
     //case direct_radiation
-    
-    /// Only available in NAM, but at least it can be used to get a better kt index
-    case clear_sky_radiation
     
     /// only GFS
     //case uv_index
@@ -360,16 +358,6 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
                     return nil
                 }
                 return ":VDDSF:surface:"
-            case .clear_sky_radiation:
-                // only NAM
-                if domain != .nam_conus {
-                    return nil
-                }
-                return ":CSDSF:surface:"
-            /*case .uv_index_clear_sky:
-                return ":CDUVB:surface:"
-            case .uv_index:
-                return ":DUVB:surface:"*/
             }
         case .pressure(let v):
             let level = v.level
@@ -407,7 +395,6 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             case .showers: return true
             case .shortwave_radiation: return true
             case .diffuse_radiation: return true
-            case .clear_sky_radiation: return true
             default: return false
             }
         case .pressure(_):
@@ -473,7 +460,6 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             case .lifted_index: return 10
             case .visibility: return 0.05 // 50 meter
             case .diffuse_radiation: return 1
-            case .clear_sky_radiation: return 1
             }
         case .pressure(let v):
             // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
@@ -529,7 +515,6 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             case .pressure_msl: return .hermite
             case .frozen_precipitation_percent: return .nearest
             case .diffuse_radiation: return .solar_backwards_averaged
-            case .clear_sky_radiation: return .solar_backwards_averaged
             case .cape: return .hermite
             case .lifted_index: return .hermite
             case .visibility: return .hermite
@@ -580,7 +565,6 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             case .lifted_index: return .dimensionless
             case .visibility: return .meter
             case .diffuse_radiation: return .wattPerSquareMeter
-            case .clear_sky_radiation: return .wattPerSquareMeter
             }
         case .pressure(let v):
             switch v.variable {
@@ -645,7 +629,6 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
             switch gfsSurfaceVariable {
             case .shortwave_radiation: return true
             case .diffuse_radiation: return true
-            case .clear_sky_radiation: return false // NOTE: only in NAM
             case .sensible_heatflux: return true
             case .latent_heatflux: return true
             default: return false

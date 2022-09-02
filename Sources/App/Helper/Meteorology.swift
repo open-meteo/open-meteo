@@ -155,4 +155,11 @@ struct Meteorology {
             return max(min(rh,100),0)
         }
     }
+    
+    /// Calculate upper level clouds from relative humidity using Sundqvist et al. (1989):
+    /// See https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
+    @inlinable public static func relativeHumidityToCloudCover(relativeHumidity rh: Float) -> Float {
+        let rhCrit: Float = 80
+        return max(1 - sqrtf((1 - rh / 100) / (1 - rhCrit / 100)), 0) * 100
+    }
 }

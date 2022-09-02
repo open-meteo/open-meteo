@@ -251,6 +251,12 @@
               Shortwave Solar Radiation
             </label>
           </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="diffuse_radiation" id="diffuse_radiation" name="hourly">
+            <label class="form-check-label" for="diffuse_radiation">
+              Diffuse Solar Radiation
+            </label>
+          </div>
           <!--<div class="form-check">
             <input class="form-check-input" type="checkbox" value="direct_radiation" id="direct_radiation" name="hourly">
             <label class="form-check-label" for="direct_radiation">

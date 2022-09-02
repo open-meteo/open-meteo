@@ -136,8 +136,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         return DataAndUnit(data, variable.unit)
     }
     
-    /// Read data and interpolate if required. If `raw` is set, no temperature correction is applied
-    func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
+    /// Read data and interpolate if required
+    func readAndInterpolate(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
         if time.dtSeconds == domain.dtSeconds {
             return try readAndScale(variable: variable, time: time)
         }
@@ -153,6 +153,32 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         
         let data = dataLow.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
         return DataAndUnit(data, read.unit)
+    }
+    
+    func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
+        /*if let domain = domain as? IconDomains, let variable = variable as? IconVariable {
+            if domain == .iconD2 {
+                // do pressure level interpolation
+            }
+        }*/
+        
+        if let domain = domain as? GfsDomain, let variable = variable as? GfsVariable {
+            /// HRRR domain has no cloud cover for pressure levels, calculate from RH
+            if domain == .hrrr_conus || domain == .nam_conus, case let .pressure(pressure) = variable, pressure.variable == .cloudcover {
+                let rh = try get(variable: GfsVariable.pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)) as! Variable, time: time)
+                let clc = rh.data.map(Meteorology.relativeHumidityToCloudCover)
+                return DataAndUnit(clc, .percent)
+            }
+            
+            /// GFS has no diffuse radiation
+            if domain == .gfs025, case let .surface(variable) = variable, variable == .diffuse_radiation {
+                let ghi = try get(variable: GfsVariable.surface(.shortwave_radiation) as! Variable, time: time)
+                let dhi = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: ghi.data, latitude: modelLat, longitude: modelLon, timerange: time)
+                return DataAndUnit(dhi, ghi.unit)
+            }
+        }
+        
+        return try readAndInterpolate(variable: variable, time: time)
     }
 }
 

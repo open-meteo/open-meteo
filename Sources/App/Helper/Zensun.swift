@@ -72,6 +72,7 @@ struct Zensun {
     }
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
+    /// This function is performance critical for updates. This explains redundant code.
     public static func calculateRadiationBackwardsAveraged(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> Array2DFastTime {
         let yrange = yrange ?? 0..<grid.ny
         var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
@@ -142,6 +143,81 @@ struct Zensun {
         }
         return out
     }
+    
+    
+    /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
+    /// To get zenith angle, use `acos`
+    public static func calculateSunElevationBackwards(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> Array2DFastTime {
+        let yrange = yrange ?? 0..<grid.ny
+        var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
+                
+        for (t, timestamp) in timerange.enumerated() {
+            /// fractional day number with 12am 1jan = 1
+            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+
+            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
+            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
+            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            
+            /// earth-sun distance in AU
+            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            
+            /// solar disk half-angle
+            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
+            
+            let latsun=decang
+            /// universal time
+            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let t1 = (90-latsun).degreesToRadians
+            
+            let lonsun = -15.0*(ut-12.0+eqtime)
+            
+            /// longitude of sun
+            let p1 = lonsun.degreesToRadians
+            
+            let ut0 = ut - (Float(timerange.dtSeconds)/3600)
+            let lonsun0 = -15.0*(ut0-12.0+eqtime)
+            
+            let p10 = lonsun0.degreesToRadians
+            
+            var l = 0
+            for indexY in yrange {
+                for indexX in 0..<grid.nx {
+                    let (lat,lon) = grid.getCoordinates(gridpoint: indexY * grid.nx + indexX)
+                    let t0=(90-lat).degreesToRadians                     // colatitude of point
+
+                    /// longitude of point
+                    var p0 = lon.degreesToRadians
+                    if p0 < p1 - .pi {
+                        p0 += 2 * .pi
+                    }
+                    if p0 > p1 + .pi {
+                        p0 -= 2 * .pi
+                    }
+                    
+                    // limit p1 and p10 to sunrise/set
+                    let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+                    let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                    let sunrise = p0 + carg
+                    let sunset = p0 - carg
+                    let p1_l = min(sunrise, p10)
+                    let p10_l = max(sunset, p1)
+                    
+                    // solve integral to get sun elevation dt
+                    // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+                    let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+                    let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                    /// sun elevation
+                    let zz = (left-right) / (p1_l - p10_l)
+                    
+                    out[l, t] = zz
+                    l += 1
+                }
+            }
+        }
+        return out
+    }
+    
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
     public static func calculateRadiationInstant(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
@@ -431,6 +507,32 @@ struct Zensun {
                 return 0
             }
             return zzInstant / zzBackwards
+        }
+    }
+    
+    /// Approximate diffuse radiation based on Reindl-2
+    /// See http://dx.doi.org/10.1016/0038-092X(90)90060-P
+    public static func calculateDiffuseRadiationBackwards(shortwaveRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1)
+        let sunElevation = calculateSunElevationBackwards(grid: grid, timerange: timerange).data
+        return zip(shortwaveRadiation, sunElevation).map { ghi, sunElevation in
+            let exrad = sunElevation * Self.solarConstant
+            
+            /// clearness index [0;1]
+            let kt = ghi / exrad
+            
+            /// diffuse fraction [0;1]
+            var kd: Float
+            switch kt {
+            case ...0.3:
+                kd = 1.02 - 0.254 * kt + 0.0123 * sunElevation
+            case 0.3 ..< 0.78:
+                kd = 1.4 - 1.749 * kt + 0.177 * sunElevation
+            default: // >= 0.78
+                kd = 0.486 * kt - 0.182 * sunElevation
+            }
+            
+            return kd * ghi
         }
     }
 }
