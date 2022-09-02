@@ -171,6 +171,11 @@ public struct TimerangeDt {
         self.dtSeconds = dtSeconds
     }
     
+    public init(range: Range<Timestamp>, dtSeconds: Int) {
+        self.range = range
+        self.dtSeconds = dtSeconds
+    }
+    
     public init(start: Timestamp, nTime: Int, dtSeconds: Int) {
         self.range = start ..< start.add(nTime * dtSeconds)
         self.dtSeconds = dtSeconds
@@ -183,6 +188,10 @@ public struct TimerangeDt {
     
     @inlinable public func add(_ seconds: Int) -> TimerangeDt {
         return range.add(seconds).range(dtSeconds: dtSeconds)
+    }
+    
+    func with(dtSeconds: Int) -> TimerangeDt {
+        return TimerangeDt(range: range, dtSeconds: dtSeconds)
     }
     
     /// Format to a nice string like `2022-06-30 to 2022-07-13`

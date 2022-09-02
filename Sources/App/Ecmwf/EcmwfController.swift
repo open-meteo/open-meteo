@@ -19,19 +19,19 @@ struct EcmwfController {
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 10, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
             
-            guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest, time: hourlyTime) else {
+            guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
                 fatalError("Not possible, ECMWF is global")
             }
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
-                try reader.prefetchData(variables: hourlyVariables)
+                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
             
             let hourly: ApiSection? = try params.hourly.map { variables in
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: variable.name)
+                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: variable.name)
                     res.append(d)
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)

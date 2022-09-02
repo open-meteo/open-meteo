@@ -18,34 +18,31 @@ struct GenericReaderMixer<Domain: GenericDomain, Variable: GenericVariableMixing
     var targetElevation: Float {
         reader.last!.targetElevation
     }
-    var time: TimerangeDt {
-        reader.last!.time
-    }
     
-    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, time: TimerangeDt) throws {
+    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         reader = try domains.compactMap {
-            try GenericReader(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode, time: time)
+            try GenericReader(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode)
         }
         guard !reader.isEmpty else {
             return nil
         }
     }
     
-    func prefetchData(variable: Variable) throws {
+    func prefetchData(variable: Variable, time: TimerangeDt) throws {
         for reader in reader {
-            try reader.prefetchData(variable: variable)
+            try reader.prefetchData(variable: variable, time: time)
         }
     }
     
-    func prefetchData(variables: [Variable]) throws {
+    func prefetchData(variables: [Variable], time: TimerangeDt) throws {
         try variables.forEach { variable in
-            try prefetchData(variable: variable)
+            try prefetchData(variable: variable, time: time)
         }
     }
     
-    func get(variable: Variable) throws -> DataAndUnit {
+    func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
         /// Last reader return highest resolution data
-        guard let highestResolutionData = try reader.last?.get(variable: variable) else {
+        guard let highestResolutionData = try reader.last?.get(variable: variable, time: time) else {
             fatalError()
         }
         if !highestResolutionData.data.containsNaN() {
@@ -57,7 +54,7 @@ struct GenericReaderMixer<Domain: GenericDomain, Variable: GenericVariableMixing
         if variable.requiresOffsetCorrectionForMixing {
             data.deltaEncode()
             for r in reader.reversed().dropFirst() {
-                let d = try r.get(variable: variable)
+                let d = try r.get(variable: variable, time: time)
                 data.integrateIfNaNDeltaCoded(d.data)
                 
                 if !data.containsNaN() {
@@ -71,7 +68,7 @@ struct GenericReaderMixer<Domain: GenericDomain, Variable: GenericVariableMixing
         
         // default case, just place new data in 1:1
         for r in reader.reversed() {
-            let d = try r.get(variable: variable)
+            let d = try r.get(variable: variable, time: time)
             data.integrateIfNaN(d.data)
             
             if !data.containsNaN() {

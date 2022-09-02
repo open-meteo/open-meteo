@@ -40,24 +40,24 @@ public struct ForecastapiController: RouteCollection {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: hourlyTime) else {
+            guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
             
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
-                try reader.prefetchData(variables: hourlyVariables)
+                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
             if let dailyVariables = params.daily {
-                try reader.prefetchData(variables: dailyVariables)
+                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
             }
             
             let hourly: ApiSection? = try params.hourly.map { variables in
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable).conertAndRound(params: params).toApi(name: variable.name)
+                    let d = try reader.get(variable: variable, time: hourlyTime).conertAndRound(params: params).toApi(name: variable.name)
                     assert(hourlyTime.count == d.data.count)
                     res.append(d)
                 }
@@ -68,13 +68,13 @@ public struct ForecastapiController: RouteCollection {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised, time: time) else {
+                guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                let temperature = try reader.get(variable: .temperature_2m).conertAndRound(params: params)
-                let winddirection = try reader.get(variable: .winddirection_10m).conertAndRound(params: params)
-                let windspeed = try reader.get(variable: .windspeed_10m).conertAndRound(params: params)
-                let weathercode = try reader.get(variable: .weathercode).conertAndRound(params: params)
+                let temperature = try reader.get(variable: .temperature_2m, time: time).conertAndRound(params: params)
+                let winddirection = try reader.get(variable: .winddirection_10m, time: time).conertAndRound(params: params)
+                let windspeed = try reader.get(variable: .windspeed_10m, time: time).conertAndRound(params: params)
+                let weathercode = try reader.get(variable: .weathercode, time: time).conertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],
@@ -107,7 +107,7 @@ public struct ForecastapiController: RouteCollection {
                         }
                         continue
                     }
-                    let d = try reader.getDaily(variable: variable, params: params).toApi(name: variable.rawValue)
+                    let d = try reader.getDaily(variable: variable, params: params, time: dailyTime).toApi(name: variable.rawValue)
                     assert(dailyTime.count == d.data.count)
                     res.append(d)
                 }

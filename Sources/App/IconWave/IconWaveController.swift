@@ -20,22 +20,22 @@ struct IconWaveController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try IconWaveMixer(domains: IconWaveDomain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .sea, time: hourlyTime) else {
+            guard let reader = try IconWaveMixer(domains: IconWaveDomain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .sea) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
-                try reader.prefetchData(variables: hourlyVariables)
+                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
             if let dailyVariables = params.daily {
-                try reader.prefetchData(variables: dailyVariables)
+                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
             }
             
             let hourly: ApiSection? = try params.hourly.map { variables in
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable).toApi(name: variable.rawValue)
+                    let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.rawValue)
                     res.append(d)
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
@@ -43,7 +43,7 @@ struct IconWaveController {
             
             let daily: ApiSection? = try params.daily.map { dailyVariables in
                 return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.map { variable in
-                    let d = try reader.getDaily(variable: variable).toApi(name: variable.rawValue)
+                    let d = try reader.getDaily(variable: variable, time: dailyTime).toApi(name: variable.rawValue)
                     assert(dailyTime.count == d.data.count)
                     return d
                 })

@@ -81,9 +81,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     /// Grid index in data files
     let position: Int
     
-    /// The desired time and resolution to read
-    let time: TimerangeDt
-    
     /// Elevation of the grid point
     let modelElevation: Float
     
@@ -100,14 +97,13 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     let omFileSplitter: OmFileSplitter
     
     /// Return nil, if the coordinates are outside the domain grid
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, time: TimerangeDt) throws {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         // check if coordinates are in domain, otherwise return nil
         guard let gridpoint = try domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: domain.elevationFile, mode: mode) else {
             return nil
         }
         self.domain = domain
         self.position = gridpoint.gridpoint
-        self.time = time
         self.modelElevation = gridpoint.gridElevation
         self.targetElevation = elevation
         
@@ -117,7 +113,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     }
     
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
-    func prefetchData(variable: Variable) throws {
+    func prefetchData(variable: Variable, time: TimerangeDt) throws {
         try omFileSplitter.willNeed(variable: variable.omFileName, location: position, time: time)
     }
     
@@ -141,7 +137,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     }
     
     /// Read data and interpolate if required. If `raw` is set, no temperature correction is applied
-    func get(variable: Variable) throws -> DataAndUnit {
+    func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
         if time.dtSeconds == domain.dtSeconds {
             return try readAndScale(variable: variable, time: time)
         }

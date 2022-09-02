@@ -18,69 +18,71 @@ enum IconWaveVariableDaily: String, Codable {
 }
 
 extension IconWaveMixer {
-    func getDaily(variable: IconWaveVariableDaily) throws -> DataAndUnit {
+    func getDaily(variable: IconWaveVariableDaily, time timeDaily: TimerangeDt) throws -> DataAndUnit {
+        let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
         case .wave_height_max:
-            let data = try get(variable: .wave_height)
+            let data = try get(variable: .wave_height, time: time)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .wind_wave_height_max:
-            let data = try get(variable: .wind_wave_height)
+            let data = try get(variable: .wind_wave_height, time: time)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .swell_wave_height_max:
-            let data = try get(variable: .swell_wave_height)
+            let data = try get(variable: .swell_wave_height, time: time)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .wave_direction_dominant:
-            let data = try get(variable: .wave_direction)
+            let data = try get(variable: .wave_direction, time: time)
             return DataAndUnit(data.data.mean(by: 24), data.unit)
         case .wind_wave_direction_dominant:
-            let data = try get(variable: .wind_wave_direction)
+            let data = try get(variable: .wind_wave_direction, time: time)
             return DataAndUnit(data.data.mean(by: 24), data.unit)
         case .swell_wave_direction_dominant:
-            let data = try get(variable: .swell_wave_direction)
+            let data = try get(variable: .swell_wave_direction, time: time)
             return DataAndUnit(data.data.mean(by: 24), data.unit)
         case .wave_period_max:
-            let data = try get(variable: .wave_period)
+            let data = try get(variable: .wave_period, time: time)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .wind_wave_period_max:
-            let data = try get(variable: .wind_wave_period)
+            let data = try get(variable: .wind_wave_period, time: time)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .wind_wave_peak_period_max:
-            let data = try get(variable: .wind_wave_peak_period)
+            let data = try get(variable: .wind_wave_peak_period, time: time)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .swell_wave_period_max:
-            let data = try get(variable: .swell_wave_period)
+            let data = try get(variable: .swell_wave_period, time: time)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .swell_wave_peak_period_max:
-            let data = try get(variable: .swell_wave_peak_period)
+            let data = try get(variable: .swell_wave_peak_period, time: time)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         }
     }
     
-    func prefetchData(variables: [IconWaveVariableDaily]) throws {
+    func prefetchData(variables: [IconWaveVariableDaily], time timeDaily: TimerangeDt) throws {
+        let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             switch variable {
             case .wave_height_max:
-                try prefetchData(variable: .wave_height)
+                try prefetchData(variable: .wave_height, time: time)
             case .wind_wave_height_max:
-                try prefetchData(variable: .wind_wave_height)
+                try prefetchData(variable: .wind_wave_height, time: time)
             case .swell_wave_height_max:
-                try prefetchData(variable: .swell_wave_height)
+                try prefetchData(variable: .swell_wave_height, time: time)
             case .wave_direction_dominant:
-                try prefetchData(variable: .wave_direction)
+                try prefetchData(variable: .wave_direction, time: time)
             case .wind_wave_direction_dominant:
-                try prefetchData(variable: .wind_wave_direction)
+                try prefetchData(variable: .wind_wave_direction, time: time)
             case .swell_wave_direction_dominant:
-                try prefetchData(variable: .swell_wave_direction)
+                try prefetchData(variable: .swell_wave_direction, time: time)
             case .wave_period_max:
-                try prefetchData(variable: .wave_period)
+                try prefetchData(variable: .wave_period, time: time)
             case .wind_wave_period_max:
-                try prefetchData(variable: .wind_wave_period)
+                try prefetchData(variable: .wind_wave_period, time: time)
             case .wind_wave_peak_period_max:
-                try prefetchData(variable: .wind_wave_peak_period)
+                try prefetchData(variable: .wind_wave_peak_period, time: time)
             case .swell_wave_period_max:
-                try prefetchData(variable: .swell_wave_period)
+                try prefetchData(variable: .swell_wave_period, time: time)
             case .swell_wave_peak_period_max:
-                try prefetchData(variable: .swell_wave_peak_period)
+                try prefetchData(variable: .swell_wave_peak_period, time: time)
             }
         }
     }
