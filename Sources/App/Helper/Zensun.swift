@@ -183,18 +183,19 @@ struct Zensun {
     
     /// Calculate DNI using super sampling
     public static func calculateBackwardsDNISupersampled(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt, samples: Int = 60) -> [Float] {
-        let averagedToInstant = backwardsAveragedToInstantFactor(time: timerange, latitude: latitude, longitude: longitude)
-        let dhiInstant = zip(directRadiation, averagedToInstant).map(*)
+        // Shit timerange by dt and increase time resolution
+        let timeSuperSampled = timerange.range.add(-timerange.dtSeconds).range(dtSeconds: timerange.dtSeconds / samples)
+        let dhiBackwardsSuperSamled = directRadiation.interpolateSolarBackwards(timeOld: timerange, timeNew: timeSuperSampled, latitude: latitude, longitude: longitude, scalefactor: 1)
         
-        let timeSuperSampled = timerange.range.range(dtSeconds: timerange.dtSeconds / samples)
-        let dhiSuperSamled = dhiInstant.interpolateHermite(timeOld: timerange, timeNew: timeSuperSampled, scalefactor: 1)
+        let averagedToInstant = backwardsAveragedToInstantFactor(time: timeSuperSampled, latitude: latitude, longitude: longitude)
+        let dhiSuperSamled = zip(dhiBackwardsSuperSamled, averagedToInstant).map(*)
         
         let dniSuperSampled = calculateInstantDNI(directRadiation: dhiSuperSamled, latitude: latitude, longitude: longitude, timerange: timeSuperSampled)
         
         /// return instant values
-        //return (0..<timerange.count).map { dniSuperSampled[$0 * samples] }
+        //return (0..<timerange.count).map { dhiBackwardsSuperSamled[Swift.min($0 * samples + samples, dhiBackwardsSuperSamled.count-1)] }
         
-        return dniSuperSampled.meanBackwards(by: samples)
+        return dniSuperSampled.mean(by: samples)
     }
     
     /// Calculate DNI based on zenith angle

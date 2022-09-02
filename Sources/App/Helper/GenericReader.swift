@@ -194,10 +194,27 @@ extension Array where Element == Float {
             let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
             let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
             
-            let B = self[index] / solarLow[index]
-            let A = index-1 < 0 ? B : self[index-1].isNaN ? B : (self[index-1] / solarLow[index-1])
-            let C = index+1 >= self.count ? B : self[index+1].isNaN ? B : (self[index+1] / solarLow[index+1])
-            let D = index+2 >= self.count ? C : self[index+2].isNaN ? B : (self[index+2] / solarLow[index+2])
+            let indexB = Swift.max(index, 0)
+            let indexA = Swift.max(index-1, 0)
+            let indexC = Swift.min(index+1, self.count-1)
+            let indexD = Swift.min(index+2, self.count-1)
+            
+            if self[indexB].isNaN {
+                return .nan
+            }
+            // At low radiaiton levels it is impossible to estimate KT indices
+            if solarLow[indexB] < 0.005 {
+                return 0
+            }
+            
+            let B = self[indexB] / solarLow[indexB]
+            let A = self[indexA].isNaN ? B : (solarLow[indexA] <= 0.005 ? B : self[indexA] / solarLow[indexA])
+            let C = self[indexC].isNaN ? B : (solarLow[indexC] <= 0.005 ? B : self[indexC] / solarLow[indexC])
+            let D = self[indexD].isNaN ? C : (solarLow[indexD] <= 0.005 ? C : self[indexD] / solarLow[indexD])
+            
+            // linear
+            //let h = (B * (1-fraction) + C * fraction) * solar[i]
+            
             let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
             let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
             let c = -A/2.0 + C/2.0
