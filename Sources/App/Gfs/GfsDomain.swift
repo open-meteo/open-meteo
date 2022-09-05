@@ -6,10 +6,12 @@ import SwiftPFor2D
  GFS inventory: https://www.nco.ncep.noaa.gov/pmb/products/gfs/gfs.t00z.pgrb2.0p25.f003.shtml
  NAM inventory: https://www.nco.ncep.noaa.gov/pmb/products/nam/nam.t00z.conusnest.hiresf06.tm00.grib2.shtml
  HRR inventory: https://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfprsf02.grib2.shtml
+ 
+ 
  */
 enum GfsDomain: String, GenericDomain {
     case gfs025
-    case nam_conus
+    //case nam_conus // disabled because it only add 12 forecast hours
     case hrrr_conus
     
     var omfileDirectory: String {
@@ -34,8 +36,8 @@ enum GfsDomain: String, GenericDomain {
         switch self {
         case .gfs025:
             return Self.gfs025ElevationFile
-        case .nam_conus:
-            return Self.namConusElevationFile
+        //case .nam_conus:
+            //return Self.namConusElevationFile
         case .hrrr_conus:
             return Self.hrrrConusElevationFile
         }
@@ -48,9 +50,9 @@ enum GfsDomain: String, GenericDomain {
         case .gfs025:
             // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
             return ((t.hour - 3 + 24) % 24) / 6 * 6
-        case .nam_conus:
+        //case .nam_conus:
             // NAM has a delay of 1:40 hours after initialisation. Cronjob starts at 1:40
-            return ((t.hour - 1 + 24) % 24) / 6 * 6
+            //return ((t.hour - 1 + 24) % 24) / 6 * 6
         case .hrrr_conus:
             // HRRR has a delay of 55 minutes after initlisation. Cronjob starts at xx:55
             return t.hour
@@ -58,7 +60,7 @@ enum GfsDomain: String, GenericDomain {
     }
     
     private static var gfs025ElevationFile = try? OmFileReader(file: Self.gfs025.surfaceElevationFileOm)
-    private static var namConusElevationFile = try? OmFileReader(file: Self.nam_conus.surfaceElevationFileOm)
+    //private static var namConusElevationFile = try? OmFileReader(file: Self.nam_conus.surfaceElevationFileOm)
     private static var hrrrConusElevationFile = try? OmFileReader(file: Self.hrrr_conus.surfaceElevationFileOm)
     
     /// Filename of the surface elevation file
@@ -70,8 +72,8 @@ enum GfsDomain: String, GenericDomain {
         switch self {
         case .gfs025:
             return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
-        case .nam_conus:
-            return Array(0...60)
+        //case .nam_conus:
+            //return Array(0...60)
         case .hrrr_conus:
             return (run % 6 == 0) ? Array(0...48) : Array(0...18)
         }
@@ -85,11 +87,11 @@ enum GfsDomain: String, GenericDomain {
         switch self {
         case .gfs025:
             return [10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
-        case .nam_conus:
+        //case .nam_conus:
             // nam uses level 75 instead of 70. Level 15 and 40 missing. Only use the same levels as HRRR.
-            return [                    50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+            //return [                            100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000] // disabled: 50, 75,
         case .hrrr_conus:
-            return [                    50, 75, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+            return [                            100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]  // disabled: 50, 75,
             // all available
             //return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
         }
@@ -98,8 +100,8 @@ enum GfsDomain: String, GenericDomain {
     
     var omFileLength: Int {
         switch self {
-        case .nam_conus:
-            return 60 + 4*24
+        //case .nam_conus:
+            //return 60 + 4*24
         case .gfs025:
             return 384 + 1 + 4*24
         case .hrrr_conus:
@@ -111,10 +113,10 @@ enum GfsDomain: String, GenericDomain {
         switch self {
         case .gfs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .nam_conus:
+        /*case .nam_conus:
             /// labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
             let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
-            return LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
+            return LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)*/
         case .hrrr_conus:
             let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
             return LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
@@ -130,8 +132,8 @@ enum GfsDomain: String, GenericDomain {
         switch self {
         case .gfs025:
             return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f\(fHHH)"
-        case .nam_conus:
-            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
+        //case .nam_conus:
+        //    return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
         case .hrrr_conus:
             return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfprsf\(fHH).grib2"
         }
@@ -242,7 +244,7 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
         switch self {
         case .surface(let variable):
             // NAM has eoms different definitons
-            if domain == .nam_conus {
+            /*if domain == .nam_conus {
                 switch variable {
                 case .lifted_index:
                     return ":LFTX:500-1000 mb:"
@@ -257,7 +259,7 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
                     return nil
                 default: break
                 }
-            }
+            }*/
             
             if domain == .hrrr_conus {
                 switch variable {

@@ -165,7 +165,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         
         if let domain = domain as? GfsDomain, let variable = variable as? GfsVariable {
             /// HRRR domain has no cloud cover for pressure levels, calculate from RH
-            if domain == .hrrr_conus || domain == .nam_conus, case let .pressure(pressure) = variable, pressure.variable == .cloudcover {
+            if domain != .gfs025, case let .pressure(pressure) = variable, pressure.variable == .cloudcover {
                 let rh = try get(variable: GfsVariable.pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)) as! Variable, time: time)
                 let clc = rh.data.map(Meteorology.relativeHumidityToCloudCover)
                 return DataAndUnit(clc, .percent)

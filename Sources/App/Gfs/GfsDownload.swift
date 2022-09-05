@@ -36,8 +36,8 @@ struct GfsDownload: Command {
         switch domain {
         case .hrrr_conus:
             fallthrough
-        case .nam_conus:
-            fallthrough
+        //case .nam_conus:
+        //    fallthrough
         case .gfs025:
             let run = signature.run.map {
                 guard let run = Int($0) else {
@@ -198,8 +198,8 @@ struct GfsDownload: Command {
                 switch domain {
                 case .gfs025:
                     data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
-                case .nam_conus:
-                    data2d.deavergeOverTime(slidingWidth: 3, slidingOffset: skip)
+                //case .nam_conus:
+                //    data2d.deavergeOverTime(slidingWidth: 3, slidingOffset: skip)
                 case .hrrr_conus:
                     break
                 }
@@ -234,7 +234,8 @@ struct GfsDownload: Command {
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
+                //data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
             }
             
             let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours

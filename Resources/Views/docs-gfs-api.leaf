@@ -716,7 +716,7 @@
 
     <div class="col-12 py-5">
       <h2 id="data-sources">Data Source</h2>
-      <p>This API uses global NOAA GFS weather forecast and combines them with high-resolution NAM and HRRR forecasts. HRRR is a rapid-refresh model and updates every hour. High-resolution data are only available for the United States. For other locations, only GFS is used.</p>
+      <p>This API uses global NOAA GFS weather forecast and combines them with high-resolution HRRR forecasts. HRRR is a rapid-refresh model and updates every hour. High-resolution data are only available for the United States. For other locations, only GFS is used.</p>
       <table class="table">
         <thead>
           <tr>
@@ -737,14 +737,14 @@
             <td>16 days</td>
             <td>Every 6 hours</td>
           </tr>
-          <tr>
+          <!--<tr>
             <th scope="row"><a href="https://www.nco.ncep.noaa.gov/pmb/products/nam/" target="_blank">NAM Conus</a></th>
             <td>U.S. Conus</td>
             <td>3 km</td>
             <td>Hourly</td>
             <td>2.5 days</td>
             <td>Every 6 hours</td>
-          </tr>
+          </tr>-->
           <tr>
             <th scope="row"><a href="https://rapidrefresh.noaa.gov/hrrr/" target="_blank">HRRR Conus</a></th>
             <td>U.S. Conus</td>
