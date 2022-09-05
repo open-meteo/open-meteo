@@ -168,7 +168,7 @@ struct DownloadCamsCommand: Command {
                 let forecastStepsToInterpolate = (0..<domain.forecastHours).compactMap { hour in
                     hour % 3 == 1 ? hour : nil
                 }
-                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
+                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate, bounds: 0...Float.infinity)
             }
             
             logger.info("Create om file")

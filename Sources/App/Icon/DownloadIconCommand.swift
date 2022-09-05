@@ -237,10 +237,10 @@ struct DownloadIconCommand: Command {
                 data2d.interpolate2StepsNearest(positions: forecastStepsToInterpolate)
             case .solar_backwards_averaged:
                 data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
-            case .hermite:
-                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate)
-            case .hermite_backwards_averaged:
-                data2d.interpolate2StepsHermiteBackwardsAveraged(positions: forecastStepsToInterpolate)
+            case .hermite(let bounds):
+                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate, bounds: bounds)
+            case .hermite_backwards_averaged(let bounds):
+                data2d.interpolate2StepsHermiteBackwardsAveraged(positions: forecastStepsToInterpolate, bounds: bounds)
             }
             
             if let fma = variable.multiplyAdd {
@@ -355,7 +355,7 @@ extension Array2DFastTime {
     }
     
     /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
-    mutating func interpolate2StepsHermite(positions: [Int]) {
+    mutating func interpolate2StepsHermite(positions: [Int], bounds: ClosedRange<Float>?) {
         for l in 0..<nLocations {
             for hour in positions {
                 let A = self[l, hour-4 < 0 ? hour-1 : hour-4]
@@ -366,14 +366,21 @@ extension Array2DFastTime {
                 let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                 let c = -A/2.0 + C/2.0
                 let d = B
-                self[l, hour] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
-                self[l, hour+1] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
+                let x0 = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
+                let x1 = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
+                if let bounds = bounds {
+                    self[l, hour] = Swift.min(Swift.max(x0, bounds.lowerBound), bounds.upperBound)
+                    self[l, hour+1] = Swift.min(Swift.max(x1, bounds.lowerBound), bounds.upperBound)
+                } else {
+                    self[l, hour] = x0
+                    self[l, hour+1] = x1
+                }
             }
         }
     }
     
     /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
-    mutating func interpolate2StepsHermiteBackwardsAveraged(positions: [Int]) {
+    mutating func interpolate2StepsHermiteBackwardsAveraged(positions: [Int], bounds: ClosedRange<Float>?) {
         /// basically shift the backwards averaged to the center and then do hermite
         for l in 0..<nLocations {
             for hour in positions {
@@ -385,9 +392,18 @@ extension Array2DFastTime {
                 let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                 let c = -A/2.0 + C/2.0
                 let d = B
-                self[l, hour-1] = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
-                self[l, hour] = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
-                self[l, hour+1] = C
+                let xm1 = a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d
+                let x0 = a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d
+                let x1 = C
+                if let bounds = bounds {
+                    self[l, hour-1] = Swift.min(Swift.max(xm1, bounds.lowerBound), bounds.upperBound)
+                    self[l, hour] = Swift.min(Swift.max(x0, bounds.lowerBound), bounds.upperBound)
+                    self[l, hour+1] = Swift.min(Swift.max(x1, bounds.lowerBound), bounds.upperBound)
+                } else {
+                    self[l, hour-1] = xm1
+                    self[l, hour] = x0
+                    self[l, hour+1] = C
+                }
             }
         }
     }

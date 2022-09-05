@@ -2,12 +2,13 @@ import Foundation
 
 
 extension Array where Element == Float {
+    /// bounds: Apply min and max after interpolation
     func interpolate(type: ReaderInterpolation, timeOld: TimerangeDt, timeNew: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
         switch type {
         case .linear:
             return interpolateLinear(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
-        case .hermite:
-            return interpolateHermite(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
+        case .hermite(let bounds):
+            return interpolateHermite(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor, bounds: bounds)
         case .solar_backwards_averaged:
             return interpolateSolarBackwards(timeOld: timeOld, timeNew: timeNew, latitude: latitude, longitude: longitude, scalefactor: scalefactor)
         }
@@ -65,7 +66,7 @@ extension Array where Element == Float {
         }
     }
     
-    func interpolateHermite(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
+    func interpolateHermite(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float, bounds: ClosedRange<Float>?) -> [Float] {
         return time.map { t in
             let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
             let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
@@ -80,7 +81,11 @@ extension Array where Element == Float {
             let d = B
             let h = a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d
             /// adjust it to scalefactor, otherwise interpolated values show more level of detail
-            return roundf(h * scalefactor) / scalefactor
+            let hScaled = roundf(h * scalefactor) / scalefactor
+            if let bounds = bounds {
+                return Swift.min(Swift.max(hScaled, bounds.lowerBound), bounds.upperBound)
+            }
+            return hScaled
         }
     }
 }

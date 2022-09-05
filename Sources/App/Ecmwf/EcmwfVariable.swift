@@ -439,7 +439,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     }
     
     var interpolation: ReaderInterpolation {
-        return .hermite
+        switch self {
+        case .relative_humidity_1000hPa: fallthrough
+        case .relative_humidity_925hPa: fallthrough
+        case .relative_humidity_850hPa: fallthrough
+        case .relative_humidity_700hPa: fallthrough
+        case .relative_humidity_500hPa: fallthrough
+        case .relative_humidity_300hPa: fallthrough
+        case .relative_humidity_250hPa: fallthrough
+        case .relative_humidity_200hPa: fallthrough
+        case .relative_humidity_50hPa: return .hermite(bounds: 0...100)
+        default: return .hermite(bounds: nil)
+        }
     }
 }
 

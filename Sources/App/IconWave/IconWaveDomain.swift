@@ -201,23 +201,23 @@ enum IconWaveVariable: String, CaseIterable, Codable, GenericVariableMixing {
         case .wave_height:
             return .linear
         case .wave_period:
-            return .hermite
+            return .hermite(bounds: 0...Float.infinity)
         case .wave_direction:
             return .linear
         case .wind_wave_height:
             return .linear
         case .wind_wave_period:
-            return .hermite
+            return .hermite(bounds: 0...Float.infinity)
         case .wind_wave_peak_period:
-            return .hermite
+            return .hermite(bounds: 0...Float.infinity)
         case .wind_wave_direction:
             return .linear
         case .swell_wave_height:
             return .linear
         case .swell_wave_period:
-            return .hermite
+            return .hermite(bounds: 0...Float.infinity)
         case .swell_wave_peak_period:
-            return .hermite
+            return .hermite(bounds: 0...Float.infinity)
         case .swell_wave_direction:
             return .linear
         }

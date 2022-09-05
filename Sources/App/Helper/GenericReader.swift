@@ -53,7 +53,7 @@ enum ReaderInterpolation {
     case linear
     
     /// Hermite interpolation for more smooth interpolation for temperature
-    case hermite
+    case hermite(bounds: ClosedRange<Float>?)
     
     case solar_backwards_averaged
     
@@ -157,6 +157,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     
     func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
         /*if let domain = domain as? IconDomains, let variable = variable as? IconVariable {
+         // icon has no
             if domain == .iconD2 {
                 // do pressure level interpolation
             }

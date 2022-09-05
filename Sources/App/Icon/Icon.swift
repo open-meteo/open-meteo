@@ -254,7 +254,10 @@ struct IconPressureVariable: PressureVariableRespresentable, IconVariableRespres
     }
     
     var interpolationType: InterpolationType {
-        return .hermite
+        switch variable {
+        case .relativehumidity: return .hermite(bounds: 0...100)
+        default: return .hermite(bounds: nil)
+        }
     }
     
     var isElevationCorrectable: Bool {
@@ -534,43 +537,43 @@ enum IconVariable: String, CaseIterable, Codable, IconVariableRespresentable {
     
     var interpolationType: InterpolationType {
         switch self {
-        case .temperature_2m: return .hermite
+        case .temperature_2m: return .hermite(bounds: nil)
         case .cloudcover: return .linear
         case .cloudcover_low: return .linear
         case .cloudcover_mid: return .linear
         case .cloudcover_high: return .linear
-        case .relativehumidity_2m: return .hermite
+        case .relativehumidity_2m: return .hermite(bounds: 0...100)
         case .precipitation: return .linear
         case .weathercode: return .nearest
-        case .v_10m: return .hermite
-        case .u_10m: return .hermite
+        case .v_10m: return .hermite(bounds: nil)
+        case .u_10m: return .hermite(bounds: nil)
         case .snow_depth: return .linear
-        case .sensible_heatflux: return .hermite_backwards_averaged
-        case .latent_heatflux: return .hermite_backwards_averaged
+        case .sensible_heatflux: return .hermite_backwards_averaged(bounds: nil)
+        case .latent_heatflux: return .hermite_backwards_averaged(bounds: nil)
         case .windgusts_10m: return .linear
-        case .freezinglevel_height: return .hermite
-        case .dewpoint_2m: return .hermite
+        case .freezinglevel_height: return .hermite(bounds: nil)
+        case .dewpoint_2m: return .hermite(bounds: nil)
         case .diffuse_radiation: return .solar_backwards_averaged
         case .direct_radiation: return .solar_backwards_averaged
-        case .soil_temperature_0cm: return .hermite
-        case .soil_temperature_6cm: return .hermite
-        case .soil_temperature_18cm: return .hermite
-        case .soil_temperature_54cm: return .hermite
-        case .soil_moisture_0_1cm: return .hermite
-        case .soil_moisture_1_3cm: return .hermite
-        case .soil_moisture_3_9cm: return .hermite
-        case .soil_moisture_9_27cm: return .hermite
-        case .soil_moisture_27_81cm: return .hermite
-        case .v_80m: return .hermite
-        case .u_80m: return .hermite
-        case .v_120m: return .hermite
-        case .u_120m: return .hermite
-        case .v_180m: return .hermite
+        case .soil_temperature_0cm: return .hermite(bounds: nil)
+        case .soil_temperature_6cm: return .hermite(bounds: nil)
+        case .soil_temperature_18cm: return .hermite(bounds: nil)
+        case .soil_temperature_54cm: return .hermite(bounds: nil)
+        case .soil_moisture_0_1cm: return .hermite(bounds: nil)
+        case .soil_moisture_1_3cm: return .hermite(bounds: nil)
+        case .soil_moisture_3_9cm: return .hermite(bounds: nil)
+        case .soil_moisture_9_27cm: return .hermite(bounds: nil)
+        case .soil_moisture_27_81cm: return .hermite(bounds: nil)
+        case .v_80m: return .hermite(bounds: nil)
+        case .u_80m: return .hermite(bounds: nil)
+        case .v_120m: return .hermite(bounds: nil)
+        case .u_120m: return .hermite(bounds: nil)
+        case .v_180m: return .hermite(bounds: nil)
         case .snowfall_convective_water_equivalent: return .linear
         case .snowfall_water_equivalent: return .linear
-        case .u_180m: return .hermite
+        case .u_180m: return .hermite(bounds: nil)
         case .showers: return .linear
-        case .pressure_msl: return .hermite
+        case .pressure_msl: return .hermite(bounds: nil)
         case .rain: return .linear
         }
     }
@@ -695,7 +698,7 @@ enum InterpolationType {
     // Use solar radiation interpolation
     case solar_backwards_averaged
     // Use hemite interpolation
-    case hermite
+    case hermite(bounds: ClosedRange<Float>?)
     /// Hermite interpolation but for backward averaged data. Used for latent heat flux
-    case hermite_backwards_averaged
+    case hermite_backwards_averaged(bounds: ClosedRange<Float>?)
 }
