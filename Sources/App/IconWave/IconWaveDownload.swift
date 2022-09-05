@@ -64,7 +64,7 @@ struct DownloadIconWaveCommand: Command {
         // https://opendata.dwd.de/weather/maritime/wave_models/gwam/grib/00/mdww/GWAM_MDWW_2022072800_000.grib2.bz2
         // https://opendata.dwd.de/weather/maritime/wave_models/ewam/grib/00/mdww/EWAM_MDWW_2022072800_000.grib2.bz2
         let baseUrl = "https://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
-        let downloadDirectory = "./data/\(domain.rawValue)/"
+        let downloadDirectory = "\(OpenMeteo.dataDictionary)\(domain.rawValue)/"
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger)
@@ -119,7 +119,7 @@ struct DownloadIconWaveCommand: Command {
     
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable]) throws {
-        let downloadDirectory = "./data/\(domain.rawValue)/"
+        let downloadDirectory = "\(OpenMeteo.dataDictionary)\(domain.rawValue)/"
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)

@@ -137,7 +137,7 @@ public struct ForecastapiController: RouteCollection {
 struct ForecastapiQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let hourly: [WeatherVariable]?
+    let hourly: [IconApiVariable]?
     let daily: [DailyWeatherVariable]?
     let current_weather: Bool?
     let elevation: Float?
@@ -223,9 +223,29 @@ enum OvernightMorningAfternoonEveningWeatherVariable: String, Codable {
     case relative_humidity_max
 }
 
-typealias WeatherVariable = VariableOrDerived<IconVariable, IconVariableDerived>
+typealias IconApiVariable = VariableOrDerived<IconVariable, IconVariableDerived>
 
-enum IconVariableDerived: String, Codable, CaseIterable {
+/**
+ Types of pressure level variables
+ */
+enum IconPressureVariableDerivedType: String, CaseIterable {
+    case windspeed
+    case winddirection
+    case dewpoint
+    case cloudcover
+}
+
+/**
+ A pressure level variable on a given level in hPa / mb
+ */
+struct IconPressureVariableDerived: PressureVariableRespresentable {
+    let variable: IconPressureVariableDerivedType
+    let level: Int
+}
+
+typealias IconVariableDerived = SurfaceAndPressureVariable<IconSurfaceVariableDerived, IconPressureVariableDerived>
+
+enum IconSurfaceVariableDerived: String, Codable, CaseIterable {
     case apparent_temperature
     case relativehumitidy_2m
     case windspeed_10m

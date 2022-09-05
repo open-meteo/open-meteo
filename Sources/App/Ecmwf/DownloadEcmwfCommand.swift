@@ -47,7 +47,7 @@ struct DownloadEcmwfCommand: Command {
         
         let dateStr = run.format_YYYYMMdd
         let curl = Curl(logger: logger)
-        let downloadDirectory = "./data/ecmwf-forecast/"
+        let downloadDirectory = "\(OpenMeteo.dataDictionary)ecmwf-forecast/"
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         let filenameTemp = "\(downloadDirectory)temp.grib2"
         
@@ -77,7 +77,7 @@ struct DownloadEcmwfCommand: Command {
     
     func convertEcmwf(logger: Logger, run: Timestamp) throws {
         let domain = EcmwfDomain.ifs04
-        let downloadDirectory = "./data/ecmwf-forecast/"
+        let downloadDirectory = "\(OpenMeteo.dataDictionary)ecmwf-forecast/"
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         let nForecastHours = forecastSteps.max()! / domain.dtHours + 1

@@ -12,7 +12,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, GenericDomain {
     static var ewamElevation = try? OmFileReader(file: IconWaveDomain.ewam.surfaceElevationFileOm)
     
     var omfileDirectory: String {
-        return "./data/omfile-\(rawValue)/"
+        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
     var omfileArchive: String? {
         return nil

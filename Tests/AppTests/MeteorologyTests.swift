@@ -59,4 +59,32 @@ final class MeteorologyTests: XCTestCase {
         // not really possible
         XCTAssertEqual(Meteorology.specificToRelativeHumidity(specificHumidity: [24.06], temperature: [23.00], pressure: [1013.25]), [100])
     }
+    
+    func testPressureLevelAltitude() {
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 1013.25), 0, accuracy: 0.01)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 1012.04913), 100, accuracy: 0.1)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 1007.25775), 500, accuracy: 0.1)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 1001.2942), 1000, accuracy: 0.1)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 977.72565), 3000, accuracy: 0.1)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 954.6082), 5000, accuracy: 0.1)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 898.7457), 10000, accuracy: 0.1)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 794.95197), 20000, accuracy: 0.1)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 701.08527), 30000, accuracy: 0.1)
+        XCTAssertEqual(Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 657.64056), 35000, accuracy: 0.1)
+        
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 0), 1013.25, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 100), 1012.04913, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 500), 1007.25775, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 1000), 1001.2942, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 3000), 977.72565, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 5000), 954.6082, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 10000), 898.7457, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 20000), 794.95197, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 30000), 701.08527, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 35000), 657.64056, accuracy: 0.001)
+        
+        let t = Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 900)
+        XCTAssertEqual(Meteorology.scaleWindFactor(from: Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 850), to: t), 0.97187996, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.scaleWindFactor(from: Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 950), to: t), 1.0471461, accuracy: 0.001)
+    }
 }

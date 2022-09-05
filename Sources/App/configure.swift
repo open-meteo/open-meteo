@@ -2,6 +2,17 @@ import Vapor
 import Leaf
 import IkigaJSON
 
+struct OpenMeteo {
+    /// Data directory with trailing slash
+    static var dataDictionary: String {
+        if let dir = Environment.get("DATA_DIRECTORY") {
+            return dir
+        }
+        return  "./data/"
+    }
+}
+
+
 // configures your application
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone(abbreviation: "GMT")!

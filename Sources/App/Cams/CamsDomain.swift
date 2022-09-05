@@ -24,10 +24,10 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     }
     
     var omfileDirectory: String {
-        return "./data/omfile-\(rawValue)/"
+        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "./data/\(rawValue)/"
+        return "\(OpenMeteo.dataDictionary)\(rawValue)/"
     }
     var omfileArchive: String? {
         return nil

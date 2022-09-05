@@ -29,7 +29,7 @@ enum EcmwfDomain: GenericDomain {
     }
     
     var omfileDirectory: String {
-        return "./data/omfile-ecmwf/"
+        return "\(OpenMeteo.dataDictionary)omfile-ecmwf/"
     }
     var omfileArchive: String? {
         return nil

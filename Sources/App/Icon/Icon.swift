@@ -79,10 +79,10 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     }
 
     var omfileDirectory: String {
-        return "./data/omfile-\(rawValue)/"
+        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "./data/\(rawValue)/"
+        return "\(OpenMeteo.dataDictionary)\(rawValue)/"
     }
     var omfileArchive: String? {
         return nil
@@ -111,6 +111,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconD2:
             return [                      200, 250, 300, 400, 500, 600, 700,      850,           950, 975, 1000]
         }
+    }
+    
+    /// All levels available in the API
+    static var apiLevels: [Int] {
+        return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 975, 1000]
     }
     
     /// All surface and pressure variables

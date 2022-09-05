@@ -40,7 +40,25 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = IndexContext(title: "Docs")
+        struct ContextWithLevels: Encodable {
+            struct PressureVariable: Encodable {
+                let label: String
+                let name: String
+            }
+            
+            let title: String
+            let levels: [Int] = IconDomains.apiLevels
+            let pressureVariables = [
+                PressureVariable(label: "Temperature", name: "temperature"),
+                PressureVariable(label: "Dewpoint", name: "dewpoint"),
+                PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
+                PressureVariable(label: "Cloudcover", name: "cloudcover"),
+                PressureVariable(label: "Wind Speed", name: "windspeed"),
+                PressureVariable(label: "Wind Direction", name: "winddirection"),
+                PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
+            ]
+        }
+        let context = ContextWithLevels(title: "Docs")
         return req.view.render("docs", context)
     }
     func docsGeocodingHandler(_ req: Request) -> EventLoopFuture<View> {

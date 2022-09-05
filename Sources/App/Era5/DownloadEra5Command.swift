@@ -23,15 +23,15 @@ enum Era5: GenericDomain {
     }
     
     var downloadDirectory: String {
-        return "./data/era5/"
+        return "\(OpenMeteo.dataDictionary)era5/"
     }
     
     var omfileDirectory: String {
-        return "./data/omfile-era5/"
+        return "\(OpenMeteo.dataDictionary)omfile-era5/"
     }
     
     var omfileArchive: String? {
-        return "./data/yearly-era5/"
+        return "\(OpenMeteo.dataDictionary)yearly-era5/"
     }
     
     /// Use store 14 days per om file
@@ -369,14 +369,14 @@ struct DownloadEra5Command: Command {
     
     func runStripSea(logger: Logger, year: Int) throws {
         let domain = Era5.era5
-        try FileManager.default.createDirectory(atPath: "./data/era5-no-sea", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDictionary)era5-no-sea", withIntermediateDirectories: true)
         logger.info("Read elevation")
         let elevation = try OmFileReader(file: domain.surfaceElevationFileOm).readAll()
         
         for variable in Era5Variable.allCases {
             logger.info("Converting variable \(variable)")
             let fullFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
-            let strippedFile = "./data/era5-no-sea/\(variable)_\(year).om"
+            let strippedFile = "\(OpenMeteo.dataDictionary)era5-no-sea/\(variable)_\(year).om"
             try stripSea(logger: logger, readFilePath: fullFile, writeFilePath: strippedFile, elevation: elevation)
         }
     }

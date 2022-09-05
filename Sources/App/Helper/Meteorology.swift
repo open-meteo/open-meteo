@@ -112,7 +112,7 @@ struct Meteorology {
         return max(esat-ea, 0)
     }
     
-    /// Factor that need to be applied to scale wind from onee level to another
+    /// Factor that need to be applied to scale wind from onee level to another. Only valid for altitude below 100 meters.
     /// http://www.fao.org/3/x0490e/x0490e07.htm
     public static func scaleWindFactor(from: Float, to: Float) -> Float {
         let factorFrom = 4.87/(log(67.8*from-5.42))
@@ -161,5 +161,15 @@ struct Meteorology {
     @inlinable public static func relativeHumidityToCloudCover(relativeHumidity rh: Float) -> Float {
         let rhCrit: Float = 80
         return max(1 - sqrtf((1 - rh / 100) / (1 - rhCrit / 100)), 0) * 100
+    }
+    
+    /// Approximate altitude in meters from pressure level in hPa
+    @inlinable static func altitudeAboveSeaLevelMeters(pressureLevelHpA: Float) -> Float {
+        return -1/2.25577 * 10e5 * (powf(pressureLevelHpA/1013.25, 1/5.25588) - 1)
+    }
+    
+    /// Approximate pressure level from altitude
+    @inlinable static func pressureLevelHpA(altitudeAboveSeaLevelMeters: Float) -> Float {
+        return 1013.25 * powf(1 - 2.25577 * 10e-7 * altitudeAboveSeaLevelMeters, 5.25588)
     }
 }
