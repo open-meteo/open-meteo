@@ -124,7 +124,7 @@ struct DownloadIconCommand: Command {
         let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
         // surface elevation
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
-        if (skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)time-invariant_HSURF.grib2.bz2")) == false {
+        if (skipFilesIfExisting && FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm)) == false {
             let file: String
             if domain == .iconD2 {
                 file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_hsurf.grib2.bz2"
@@ -138,7 +138,7 @@ struct DownloadIconCommand: Command {
         }
         
         // land fraction
-        if (skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)time-invariant_FR_LAND.grib2.bz2")) == false {
+        if (skipFilesIfExisting && FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm)) == false {
             let file: String
             if domain == .iconD2 {
                 file = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_fr_land.grib2.bz2"
@@ -178,9 +178,9 @@ struct DownloadIconCommand: Command {
                 sema.wait()
                 group.enter()
                 queue.async {
-                    let gribFile = "\(downloadDirectory)\(v.variable).grib2.bz2"
+                    let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
                     try! curl.download(
-                        url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
+                        url: "\(serverPrefix)\(variable.omFileName)/\(filenameFrom)",
                         to: gribFile
                     )
                     // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
