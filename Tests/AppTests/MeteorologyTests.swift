@@ -82,9 +82,5 @@ final class MeteorologyTests: XCTestCase {
         XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 20000), 794.95197, accuracy: 0.001)
         XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 30000), 701.08527, accuracy: 0.001)
         XCTAssertEqual(Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: 35000), 657.64056, accuracy: 0.001)
-        
-        let t = Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 900)
-        XCTAssertEqual(Meteorology.scaleWindFactor(from: Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 850), to: t), 0.97187996, accuracy: 0.001)
-        XCTAssertEqual(Meteorology.scaleWindFactor(from: Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: 950), to: t), 1.0471461, accuracy: 0.001)
     }
 }

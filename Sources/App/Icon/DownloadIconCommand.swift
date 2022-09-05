@@ -111,7 +111,7 @@ struct DownloadIconCommand: Command {
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "https://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-        let curl = Curl(logger: logger)
+        let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
         // surface elevation
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
         if (skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)time-invariant_HSURF.grib2.bz2")) == false {

@@ -6,7 +6,7 @@ import SwiftNetCDF
 /**
  Download from
  https://confluence.ecmwf.int/display/UDOC/ECMWF+Open+Data+-+Real+Time
- https://data.ecmwf.int/forecasts/20220131/00z/0p4-beta/oper/
+ https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/
  
  model info (not everything is open data) https://www.ecmwf.int/en/forecasts/datasets/set-i
  */
@@ -59,8 +59,8 @@ struct DownloadEcmwfCommand: Command {
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             
-            //https://data.ecmwf.int/forecasts/20220131/00z/0p4-beta/oper/20220131000000-0h-oper-fc.grib2
-            //https://data.ecmwf.int/forecasts/20220131/00z/0p4-beta/oper/20220131000000-12h-oper-fc.grib2
+            //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-0h-oper-fc.grib2
+            //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-12h-oper-fc.grib2
             let filenameFrom = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
             let filenameConverted = "\(downloadDirectory)/\(hour)h.nc"
             

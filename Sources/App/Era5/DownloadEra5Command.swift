@@ -628,19 +628,6 @@ struct DownloadEra5Command: Command {
             return
         }
         
-        //for t in Timerange(start: Timestamp.now().add(-24*3600*190), nTime: 180, dtSeconds: 24*3600).itterate() {
-        //    print("\(t.iso8601_YYYY_MM_dd) \(t.timeIntervalSince1970/3600/Era5.omFileLength)")
-        //}
-        // 904: 20211223-20220112
-        // 905: 20220113-20220202
-        // 906: 20220203-20220224
-        // 907: 20220225-20220316
-        // 908: 20220317-20220406
-        // 909: 20220407-20220427
-        // 910: 20220428-20220518
-        // 911: 20220519-20220607
-        //return
-        
         /// Select the desired timerange, or use last 14 day
         var timeinterval = signature.getTimeinterval()
         timeinterval = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
