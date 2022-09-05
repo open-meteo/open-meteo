@@ -151,7 +151,7 @@ struct DownloadIconCommand: Command {
             )
         }
         
-        let queue = DispatchQueue(label: "downloadqueue", attributes: .concurrent)
+        let queue = DispatchQueue.global()
         let group = DispatchGroup()
         let sema = DispatchSemaphore(value: concurrent)
 
