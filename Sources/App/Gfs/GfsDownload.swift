@@ -218,18 +218,8 @@ struct GfsDownload: Command {
                 return hour
             }
             
-            switch variable.interpolationType {
-            case .linear:
-                data2d.interpolate2StepsLinear(positions: forecastStepsToInterpolate)
-            case .nearest:
-                data2d.interpolate2StepsNearest(positions: forecastStepsToInterpolate)
-            case .solar_backwards_averaged:
-                data2d.interpolate2StepsSolarBackwards(positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
-            case .hermite(let bounds):
-                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate, bounds: bounds)
-            case .hermite_backwards_averaged(let bounds):
-                data2d.interpolate2StepsHermiteBackwardsAveraged(positions: forecastStepsToInterpolate, bounds: bounds)
-            }
+            // Fill in missing hourly values after switching to 3h
+            data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             
             if let fma = variable.multiplyAdd {
                 data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)

@@ -5,7 +5,7 @@ protocol IconVariableDownloadable: GenericVariableMixing {
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
-    var interpolationType: InterpolationType { get }
+    var interpolationType: Interpolation2StepType { get }
     func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)
 }
 
@@ -34,7 +34,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         }
     }
     
-    var interpolationType: InterpolationType {
+    var interpolationType: Interpolation2StepType {
         switch self {
         case .temperature_2m: return .hermite(bounds: nil)
         case .cloudcover: return .linear
@@ -137,7 +137,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
 }
 
 extension IconPressureVariable: IconVariableDownloadable {
-    var interpolationType: InterpolationType {
+    var interpolationType: Interpolation2StepType {
         switch variable {
         case .relativehumidity: return .hermite(bounds: 0...100)
         default: return .hermite(bounds: nil)

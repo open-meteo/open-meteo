@@ -2,7 +2,7 @@
 protocol GfsVariableDownloadable: GenericVariableMixing {
     func gribIndexName(for domain: GfsDomain) -> String?
     var skipHour0: Bool { get }
-    var interpolationType: InterpolationType { get }
+    var interpolationType: Interpolation2StepType { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
@@ -142,7 +142,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         }
     }
     
-    var interpolationType: InterpolationType {
+    var interpolationType: Interpolation2StepType {
         switch self {
         case .temperature_2m: return .hermite(bounds: nil)
         case .cloudcover: return .hermite(bounds: 0...100)
@@ -246,7 +246,7 @@ extension GfsPressureVariable: GfsVariableDownloadable {
         return false
     }
     
-    var interpolationType: InterpolationType {
+    var interpolationType: Interpolation2StepType {
         switch variable {
         case .cloudcover: fallthrough
         case .relativehumidity: return .hermite(bounds: 0...100)

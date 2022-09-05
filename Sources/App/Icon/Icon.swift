@@ -518,16 +518,3 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
     }
 
 }
-
-enum InterpolationType {
-    // Simple linear interpolation
-    case linear
-    // Just copy the next value
-    case nearest
-    // Use solar radiation interpolation
-    case solar_backwards_averaged
-    // Use hemite interpolation
-    case hermite(bounds: ClosedRange<Float>?)
-    /// Hermite interpolation but for backward averaged data. Used for latent heat flux
-    case hermite_backwards_averaged(bounds: ClosedRange<Float>?)
-}
