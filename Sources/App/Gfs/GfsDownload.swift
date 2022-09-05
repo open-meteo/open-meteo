@@ -46,14 +46,17 @@ struct GfsDownload: Command {
                 return run
             } ?? domain.lastRun
             
-            let variables: [GfsVariable] = signature.onlyVariables.map {
+            let variables: [GfsVariableDownloadable] = signature.onlyVariables.map {
                 $0.split(separator: ",").map {
-                    guard let variable = GfsVariable(rawValue: String($0)) else {
+                    if let variable = GfsPressureVariable(rawValue: String($0)) {
+                        return variable
+                    }
+                    guard let variable = GfsSurfaceVariable(rawValue: String($0)) else {
                         fatalError("Invalid variable '\($0)'")
                     }
                     return variable
                 }
-            } ?? GfsVariable.allCases(for: domain)
+            } ?? domain.allVariables
             
             /// 18z run is available the day after starting 05:26
             let date = Timestamp.now().with(hour: run)
@@ -113,7 +116,7 @@ struct GfsDownload: Command {
     }
     
     /// download GFS025 and NAM CONUS
-    func downloadGfs(logger: Logger, domain: GfsDomain, run: Timestamp, variables: [GfsVariable], skipFilesIfExisting: Bool) throws {
+    func downloadGfs(logger: Logger, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
@@ -161,7 +164,7 @@ struct GfsDownload: Command {
     }
     
     /// Process each variable and update time-series optimised files
-    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariable], run: Timestamp, createNetcdf: Bool) throws {
+    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours(run: run.hour)
         let nForecastHours = forecastHours.max()!+1
@@ -254,7 +257,7 @@ struct GfsDownload: Command {
 
 /// Small helper structure to fuse domain and variable for more control in the gribindex selection
 struct GfsVariableAndDomain: CurlIndexedVariable {
-    let variable: GfsVariable
+    let variable: GfsVariableDownloadable
     let domain: GfsDomain
     
     var gribIndexName: String? {

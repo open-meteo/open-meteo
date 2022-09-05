@@ -94,6 +94,47 @@ enum SurfaceAndPressureVariable<Surface, Pressure>: Codable, RawRepresentable wh
     }
 }
 
+extension SurfaceAndPressureVariable: Hashable, Equatable where Pressure: Hashable, Surface: Hashable {
+    
+}
+
+extension SurfaceAndPressureVariable: GenericVariableMixing, GenericVariable where Surface: GenericVariableMixing, Pressure: GenericVariableMixing {
+    var asGenericVariable: GenericVariableMixing {
+        switch self {
+        case .surface(let surface):
+            return surface
+        case .pressure(let pressure):
+            return pressure
+        }
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        asGenericVariable.requiresOffsetCorrectionForMixing
+    }
+    
+    var omFileName: String {
+        asGenericVariable.omFileName
+    }
+    
+    var scalefactor: Float {
+        asGenericVariable.scalefactor
+    }
+    
+    var interpolation: ReaderInterpolation {
+        asGenericVariable.interpolation
+    }
+    
+    var unit: SiUnit {
+        asGenericVariable.unit
+    }
+    
+    var isElevationCorrectable: Bool {
+        asGenericVariable.isElevationCorrectable
+    }
+    
+    
+}
+
 
 enum VariableOrDerived<Raw, Derived>: Codable where Raw: Codable, Raw: RawRepresentable, Derived: Codable, Derived: RawRepresentable, Raw.RawValue == Derived.RawValue {
     case raw(Raw)

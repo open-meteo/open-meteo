@@ -99,7 +99,7 @@ struct DownloadIconCommand: Command {
     }
     
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableRespresentable]) throws {
+    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable]) throws {
         let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -176,7 +176,7 @@ struct DownloadIconCommand: Command {
 
     /// unompress and remap
     /// Process variable after variable
-    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariableRespresentable]) throws {
+    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariableDownloadable]) throws {
         let downloadDirectory = domain.downloadDirectory
         let cdo = try CdoHelper(domain: domain, logger: logger)
         let grid = domain.grid
@@ -282,12 +282,12 @@ struct DownloadIconCommand: Command {
             return run
         } ?? domain.lastRun
         
-        let onlyVariables: [IconVariableRespresentable]? = signature.onlyVariables.map {
+        let onlyVariables: [IconVariableDownloadable]? = signature.onlyVariables.map {
             $0.split(separator: ",").map {
                 if let variable = IconPressureVariable(rawValue: String($0)) {
                     return variable
                 }
-                guard let variable = IconVariable(rawValue: String($0)) else {
+                guard let variable = IconSurfaceVariable(rawValue: String($0)) else {
                     fatalError("Invalid variable '\($0)'")
                 }
                 return variable

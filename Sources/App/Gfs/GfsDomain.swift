@@ -98,6 +98,17 @@ enum GfsDomain: String, GenericDomain {
         
     }
     
+    var allVariables: [GfsVariableDownloadable] {
+        /// process level by level to reduce the time while U/V components are updated
+        let pressure = levels.reversed().flatMap { level in
+            GfsPressureVariableType.allCases.map { variable in
+                GfsPressureVariable(variable: variable, level: level)
+            }
+        }
+        let surface = GfsSurfaceVariable.allCases
+        return surface + pressure
+    }
+    
     var omFileLength: Int {
         switch self {
         //case .nam_conus:
@@ -143,7 +154,7 @@ enum GfsDomain: String, GenericDomain {
 /**
  List of all surface GFS variables
  */
-enum GfsSurfaceVariable: String, CaseIterable, Codable {
+enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixing {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -200,6 +211,103 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable {
     case lifted_index
     
     case visibility
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        switch self {
+        case .soil_moisture_0_to_10cm: return true
+        case .soil_moisture_10_to_40cm: return true
+        case .soil_moisture_40_to_100cm: return true
+        case .soil_moisture_100_to_200cm: return true
+        case .snow_depth: return true
+        default: return false
+        }
+    }
+    
+    var omFileName: String {
+        return rawValue
+    }
+    
+    var scalefactor: Float {
+        switch self {
+        case .temperature_2m: return 20
+        case .cloudcover: return 1
+        case .cloudcover_low: return 1
+        case .cloudcover_mid: return 1
+        case .cloudcover_high: return 1
+        case .relativehumidity_2m: return 1
+        case .precipitation: return 10
+        case .wind_v_component_10m: return 10
+        case .wind_u_component_10m: return 10
+        case .wind_v_component_80m: return 10
+        case .wind_u_component_80m: return 10
+        case .soil_temperature_0_to_10cm: return 20
+        case .soil_temperature_10_to_40cm: return 20
+        case .soil_temperature_40_to_100cm: return 20
+        case .soil_temperature_100_to_200cm: return 20
+        case .soil_moisture_0_to_10cm: return 1000
+        case .soil_moisture_10_to_40cm: return 1000
+        case .soil_moisture_40_to_100cm: return 1000
+        case .soil_moisture_100_to_200cm: return 1000
+        case .snow_depth: return 100 // 1cm res
+        case .sensible_heatflux: return 0.144
+        case .latent_heatflux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
+        case .windgusts_10m: return 10
+        case .freezinglevel_height:  return 0.1 // zero height 10 meter resolution
+        case .showers: return 10
+        case .pressure_msl: return 10
+        case .shortwave_radiation: return 1
+        case .frozen_precipitation_percent: return 1
+        case .cape: return 0.1
+        case .lifted_index: return 10
+        case .visibility: return 0.05 // 50 meter
+        case .diffuse_radiation: return 1
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        fatalError("Gfs interpolation not required for reader. Already 1h")
+    }
+    
+    var unit: SiUnit {
+        switch self {
+        case .temperature_2m: return .celsius
+        case .cloudcover: return .percent
+        case .cloudcover_low: return .percent
+        case .cloudcover_mid: return .percent
+        case .cloudcover_high: return .percent
+        case .relativehumidity_2m: return .percent
+        case .precipitation: return .millimeter
+        case .wind_v_component_10m: return .ms
+        case .wind_u_component_10m: return .ms
+        case .wind_v_component_80m: return .ms
+        case .wind_u_component_80m: return .ms
+        case .soil_temperature_0_to_10cm: return .celsius
+        case .soil_temperature_10_to_40cm: return .celsius
+        case .soil_temperature_40_to_100cm: return .celsius
+        case .soil_temperature_100_to_200cm: return .celsius
+        case .soil_moisture_0_to_10cm: return .qubicMeterPerQubicMeter
+        case .soil_moisture_10_to_40cm: return .qubicMeterPerQubicMeter
+        case .soil_moisture_40_to_100cm: return .qubicMeterPerQubicMeter
+        case .soil_moisture_100_to_200cm: return .qubicMeterPerQubicMeter
+        case .snow_depth: return .meter
+        case .sensible_heatflux: return .wattPerSquareMeter
+        case .latent_heatflux: return .wattPerSquareMeter
+        case .showers: return .millimeter
+        case .windgusts_10m: return .ms
+        case .freezinglevel_height: return .meter
+        case .pressure_msl: return .hectoPascal
+        case .shortwave_radiation: return .wattPerSquareMeter
+        case .frozen_precipitation_percent: return .percent
+        case .cape: return .joulesPerKilogram
+        case .lifted_index: return .dimensionless
+        case .visibility: return .meter
+        case .diffuse_radiation: return .wattPerSquareMeter
+        }
+    }
+    
+    var isElevationCorrectable: Bool {
+        return self == .temperature_2m
+    }
 }
 
 /**
@@ -218,315 +326,35 @@ enum GfsPressureVariableType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct GfsPressureVariable: PressureVariableRespresentable {
+struct GfsPressureVariable: PressureVariableRespresentable, GenericVariableMixing, Hashable {
     let variable: GfsPressureVariableType
     let level: Int
-}
-
-/**
- Combined surface and pressure level variables with all definitions for downloading and API
- */
-typealias GfsVariable = SurfaceAndPressureVariable<GfsSurfaceVariable, GfsPressureVariable>
-
-extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatable {
-    static func allCases(for domain: GfsDomain) -> [GfsVariable] {
-        /// process level by level to reduce the time while U/V components are updated
-        let pressure = domain.levels.reversed().flatMap { level in
-            GfsPressureVariableType.allCases.map { variable in
-                GfsVariable.pressure(GfsPressureVariable(variable: variable, level: level))
-            }
-        }
-        let surface = GfsSurfaceVariable.allCases.map {GfsVariable.surface($0)}
-        return surface + pressure
-    }
     
-    func gribIndexName(for domain: GfsDomain) -> String? {
-        switch self {
-        case .surface(let variable):
-            // NAM has eoms different definitons
-            /*if domain == .nam_conus {
-                switch variable {
-                case .lifted_index:
-                    return ":LFTX:500-1000 mb:"
-                case .cloudcover:
-                    return ":TCDC:entire atmosphere (considered as a single layer):"
-                case .precipitation:
-                    // only 3h accumulation is availble
-                    return ":APCP:surface:"
-                case .showers:
-                    // there is no parameterised convective precipitation field
-                    // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
-                    return nil
-                default: break
-                }
-            }*/
-            
-            if domain == .hrrr_conus {
-                switch variable {
-                case .lifted_index:
-                    return ":LFTX:500-1000 mb:"
-                case .showers:
-                    // there is no parameterised convective precipitation field
-                    // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
-                    return nil
-                case .soil_moisture_0_to_10cm:
-                    fallthrough
-                case .soil_moisture_10_to_40cm:
-                    fallthrough
-                case .soil_moisture_40_to_100cm:
-                    fallthrough
-                case .soil_moisture_100_to_200cm:
-                    fallthrough
-                case .soil_temperature_0_to_10cm:
-                    fallthrough
-                case .soil_temperature_10_to_40cm:
-                    fallthrough
-                case .soil_temperature_40_to_100cm:
-                    fallthrough
-                case .soil_temperature_100_to_200cm:
-                    return nil
-                case .pressure_msl:
-                    return nil
-                default: break
-                }
-            }
-            
-            switch variable {
-            case .temperature_2m:
-                return ":TMP:2 m above ground:"
-            case .cloudcover:
-                return ":TCDC:entire atmosphere:"
-            case .cloudcover_low:
-                return ":LCDC:low cloud layer:"
-            case .cloudcover_mid:
-                return ":MCDC:middle cloud layer:"
-            case .cloudcover_high:
-                return ":HCDC:high cloud layer:"
-            case .pressure_msl:
-                return ":PRMSL:mean sea level:"
-            case .relativehumidity_2m:
-                return ":RH:2 m above ground:"
-            case .precipitation:
-                return ":APCP:surface:0-"
-            case .wind_v_component_10m:
-                return ":VGRD:10 m above ground:"
-            case .wind_u_component_10m:
-                return ":UGRD:10 m above ground:"
-            case .wind_v_component_80m:
-                return ":VGRD:80 m above ground:"
-            case .wind_u_component_80m:
-                return ":UGRD:80 m above ground:"
-            case .soil_temperature_0_to_10cm:
-                return ":TSOIL:0-0.1 m below ground:"
-            case .soil_temperature_10_to_40cm:
-                return ":TSOIL:0.1-0.4 m below ground:"
-            case .soil_temperature_40_to_100cm:
-                return ":TSOIL:0.4-1 m below ground:"
-            case .soil_temperature_100_to_200cm:
-                return ":TSOIL:1-2 m below ground:"
-            case .soil_moisture_0_to_10cm:
-                return ":SOILW:0-0.1 m below ground:"
-            case .soil_moisture_10_to_40cm:
-                return ":SOILW:0.1-0.4 m below ground:"
-            case .soil_moisture_40_to_100cm:
-                return ":SOILW:0.4-1 m below ground:"
-            case .soil_moisture_100_to_200cm:
-                return ":SOILW:1-2 m below ground:"
-            case .snow_depth:
-                return ":SNOD:surface:"
-            case .sensible_heatflux:
-                return ":SHTFL:surface:"
-            case .latent_heatflux:
-                return ":LHTFL:surface:"
-            case .showers:
-                return ":ACPCP:surface:0-"
-            case .windgusts_10m:
-                return ":GUST:surface:"
-            case .freezinglevel_height:
-                return ":HGT:0C isotherm:"
-            case .shortwave_radiation:
-                return ":DSWRF:surface:"
-            case .frozen_precipitation_percent:
-                return ":CPOFP:surface:"
-            case .cape:
-                return ":CAPE:surface:"
-            case .lifted_index:
-                return ":LFTX:surface:"
-            case .visibility:
-                return ":VIS:surface:"
-            case .diffuse_radiation:
-                // only HRRR
-                if domain != .hrrr_conus {
-                    return nil
-                }
-                return ":VDDSF:surface:"
-            }
-        case .pressure(let v):
-            let level = v.level
-            switch v.variable {
-            case .temperature:
-                return ":TMP:\(level) mb:"
-            case .wind_u_component:
-                return ":UGRD:\(level) mb:"
-            case .wind_v_component:
-                return ":VGRD:\(level) mb:"
-            case .geopotential_height:
-                return ":HGT:\(level) mb:"
-            case .cloudcover:
-                if domain != .gfs025 {
-                    // no cloud cover in HRRR and NAM
-                    return nil
-                }
-                if level < 50 || level == 70 {
-                    return nil
-                }
-                return ":TCDC:\(level) mb:"
-            case .relativehumidity:
-                return ":RH:\(level) mb:"
-            }
-        }
-    }
-    
-    var skipHour0: Bool {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            switch gfsSurfaceVariable {
-            case .precipitation: return true
-            case .sensible_heatflux: return true
-            case .latent_heatflux: return true
-            case .showers: return true
-            case .shortwave_radiation: return true
-            case .diffuse_radiation: return true
-            default: return false
-            }
-        case .pressure(_):
-            return false
-        }
-    }
-    
-    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            switch gfsSurfaceVariable {
-            case .soil_moisture_0_to_10cm: return true
-            case .soil_moisture_10_to_40cm: return true
-            case .soil_moisture_40_to_100cm: return true
-            case .soil_moisture_100_to_200cm: return true
-            case .snow_depth: return true
-            default: return false
-            }
-        case .pressure(_):
-            return false
-        }
+        return false
     }
-    
     
     var omFileName: String {
         return rawValue
     }
     
     var scalefactor: Float {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            switch gfsSurfaceVariable {
-            case .temperature_2m: return 20
-            case .cloudcover: return 1
-            case .cloudcover_low: return 1
-            case .cloudcover_mid: return 1
-            case .cloudcover_high: return 1
-            case .relativehumidity_2m: return 1
-            case .precipitation: return 10
-            case .wind_v_component_10m: return 10
-            case .wind_u_component_10m: return 10
-            case .wind_v_component_80m: return 10
-            case .wind_u_component_80m: return 10
-            case .soil_temperature_0_to_10cm: return 20
-            case .soil_temperature_10_to_40cm: return 20
-            case .soil_temperature_40_to_100cm: return 20
-            case .soil_temperature_100_to_200cm: return 20
-            case .soil_moisture_0_to_10cm: return 1000
-            case .soil_moisture_10_to_40cm: return 1000
-            case .soil_moisture_40_to_100cm: return 1000
-            case .soil_moisture_100_to_200cm: return 1000
-            case .snow_depth: return 100 // 1cm res
-            case .sensible_heatflux: return 0.144
-            case .latent_heatflux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
-            case .windgusts_10m: return 10
-            case .freezinglevel_height:  return 0.1 // zero height 10 meter resolution
-            case .showers: return 10
-            case .pressure_msl: return 10
-            case .shortwave_radiation: return 1
-            case .frozen_precipitation_percent: return 1
-            case .cape: return 0.1
-            case .lifted_index: return 10
-            case .visibility: return 0.05 // 50 meter
-            case .diffuse_radiation: return 1
-            }
-        case .pressure(let v):
-            // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
-            switch v.variable {
-            case .temperature:
-                // Use scalefactor of 2 for everything higher than 300 hPa
-                return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(v.level)))
-            case .wind_u_component:
-                fallthrough
-            case .wind_v_component:
-                // Use scalefactor 3 for levels higher than 500 hPa.
-                return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(v.level)))
-            case .geopotential_height:
-                return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(v.level)))
-            case .cloudcover:
-                return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(v.level)))
-            case .relativehumidity:
-                return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(v.level)))
-            }
-        }
-    }
-    
-    var interpolationType: InterpolationType {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            switch gfsSurfaceVariable {
-            case .temperature_2m: return .hermite(bounds: nil)
-            case .cloudcover: return .hermite(bounds: 0...100)
-            case .cloudcover_low: return .hermite(bounds: 0...100)
-            case .cloudcover_mid: return .hermite(bounds: 0...100)
-            case .cloudcover_high: return .hermite(bounds: 0...100)
-            case .relativehumidity_2m: return .hermite(bounds: 0...100)
-            case .precipitation: return .linear
-            case .wind_v_component_10m: return .hermite(bounds: nil)
-            case .wind_u_component_10m: return .hermite(bounds: nil)
-            case .snow_depth: return .linear
-            case .sensible_heatflux: return .hermite_backwards_averaged(bounds: nil)
-            case .latent_heatflux: return .hermite_backwards_averaged(bounds: nil)
-            case .windgusts_10m: return .linear
-            case .freezinglevel_height: return .hermite(bounds: nil)
-            case .shortwave_radiation: return .solar_backwards_averaged
-            case .soil_temperature_0_to_10cm: return .hermite(bounds: nil)
-            case .soil_temperature_10_to_40cm: return .hermite(bounds: nil)
-            case .soil_temperature_40_to_100cm: return .hermite(bounds: nil)
-            case .soil_temperature_100_to_200cm: return .hermite(bounds: nil)
-            case .soil_moisture_0_to_10cm: return .hermite(bounds: nil)
-            case .soil_moisture_10_to_40cm: return .hermite(bounds: nil)
-            case .soil_moisture_40_to_100cm: return .hermite(bounds: nil)
-            case .soil_moisture_100_to_200cm: return .hermite(bounds: nil)
-            case .wind_v_component_80m: return .hermite(bounds: nil)
-            case .wind_u_component_80m: return .hermite(bounds: nil)
-            case .showers: return .linear
-            case .pressure_msl: return .hermite(bounds: nil)
-            case .frozen_precipitation_percent: return .nearest
-            case .diffuse_radiation: return .solar_backwards_averaged
-            case .cape: return .hermite(bounds: nil)
-            case .lifted_index: return .hermite(bounds: nil)
-            case .visibility: return .hermite(bounds: nil)
-            }
-        case .pressure(let v):
-            switch v.variable {
-            case .cloudcover: fallthrough
-            case .relativehumidity: return .hermite(bounds: 0...100)
-            default: return .hermite(bounds: nil)
-            }
+        // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
+        switch variable {
+        case .temperature:
+            // Use scalefactor of 2 for everything higher than 300 hPa
+            return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
+        case .wind_u_component:
+            fallthrough
+        case .wind_v_component:
+            // Use scalefactor 3 for levels higher than 500 hPa.
+            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+        case .geopotential_height:
+            return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
+        case .cloudcover:
+            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
+        case .relativehumidity:
+            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
     }
     
@@ -534,126 +362,28 @@ extension GfsVariable: GenericVariableMixing, GenericVariable, Hashable, Equatab
         fatalError("Gfs interpolation not required for reader. Already 1h")
     }
     
-    /// unit stored on disk... or directly read by low level reads
     var unit: SiUnit {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            switch gfsSurfaceVariable {
-            case .temperature_2m: return .celsius
-            case .cloudcover: return .percent
-            case .cloudcover_low: return .percent
-            case .cloudcover_mid: return .percent
-            case .cloudcover_high: return .percent
-            case .relativehumidity_2m: return .percent
-            case .precipitation: return .millimeter
-            case .wind_v_component_10m: return .ms
-            case .wind_u_component_10m: return .ms
-            case .wind_v_component_80m: return .ms
-            case .wind_u_component_80m: return .ms
-            case .soil_temperature_0_to_10cm: return .celsius
-            case .soil_temperature_10_to_40cm: return .celsius
-            case .soil_temperature_40_to_100cm: return .celsius
-            case .soil_temperature_100_to_200cm: return .celsius
-            case .soil_moisture_0_to_10cm: return .qubicMeterPerQubicMeter
-            case .soil_moisture_10_to_40cm: return .qubicMeterPerQubicMeter
-            case .soil_moisture_40_to_100cm: return .qubicMeterPerQubicMeter
-            case .soil_moisture_100_to_200cm: return .qubicMeterPerQubicMeter
-            case .snow_depth: return .meter
-            case .sensible_heatflux: return .wattPerSquareMeter
-            case .latent_heatflux: return .wattPerSquareMeter
-            case .showers: return .millimeter
-            case .windgusts_10m: return .ms
-            case .freezinglevel_height: return .meter
-            case .pressure_msl: return .hectoPascal
-            case .shortwave_radiation: return .wattPerSquareMeter
-            case .frozen_precipitation_percent: return .percent
-            case .cape: return .joulesPerKilogram
-            case .lifted_index: return .dimensionless
-            case .visibility: return .meter
-            case .diffuse_radiation: return .wattPerSquareMeter
-            }
-        case .pressure(let v):
-            switch v.variable {
-            case .temperature:
-                return .celsius
-            case .wind_u_component:
-                return .ms
-            case .wind_v_component:
-                return .ms
-            case .geopotential_height:
-                return .meter
-            case .cloudcover:
-                return .percent
-            case .relativehumidity:
-                return .percent
-            }
+        switch variable {
+        case .temperature:
+            return .celsius
+        case .wind_u_component:
+            return .ms
+        case .wind_v_component:
+            return .ms
+        case .geopotential_height:
+            return .meter
+        case .cloudcover:
+            return .percent
+        case .relativehumidity:
+            return .percent
         }
     }
     
     var isElevationCorrectable: Bool {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            return gfsSurfaceVariable == .temperature_2m
-        case .pressure(_):
-            return false
-        }
-    }
-    
-    var multiplyAdd: (multiply: Float, add: Float)? {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            switch gfsSurfaceVariable {
-            case .temperature_2m:
-                return (1, -273.15)
-            case .pressure_msl:
-                return (1/100, 1)
-            case .soil_temperature_0_to_10cm:
-                return (1, -273.15)
-            case .soil_temperature_10_to_40cm:
-                return (1, -273.15)
-            case .soil_temperature_40_to_100cm:
-                return (1, -273.15)
-            case .soil_temperature_100_to_200cm:
-                return (1, -273.15)
-            default:
-                return nil
-            }
-        case .pressure(let v):
-            switch v.variable {
-            case .temperature:
-                return (1, -273.15)
-            default:
-                return nil
-            }
-        }
-
-    }
-    
-    var isAveragedOverForecastTime: Bool {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            switch gfsSurfaceVariable {
-            case .shortwave_radiation: return true
-            case .diffuse_radiation: return true
-            case .sensible_heatflux: return true
-            case .latent_heatflux: return true
-            default: return false
-            }
-        case .pressure(_):
-            return false
-        }
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        switch self {
-        case .surface(let gfsSurfaceVariable):
-            switch gfsSurfaceVariable {
-            case .precipitation: fallthrough
-            case .showers: return true
-            default: return false
-            }
-        case .pressure(_):
-            return false
-        }
+        return false
     }
 }
+/**
+ Combined surface and pressure level variables with all definitions for downloading and API
+ */
+typealias GfsVariable = SurfaceAndPressureVariable<GfsSurfaceVariable, GfsPressureVariable>

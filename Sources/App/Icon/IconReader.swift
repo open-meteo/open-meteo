@@ -27,6 +27,10 @@ final class GenericReaderMixerCached<Domain: GenericDomain, Variable: GenericVar
 }
 
 extension IconMixer {
+    func get(variable: IconSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {
+        return try get(variable: .surface(variable), time: time)
+    }
+    
     func getDaily(variable: DailyWeatherVariable, params: ForecastapiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
         let time = timeDaily.with(dtSeconds: mixer.reader.first!.domain.dtSeconds)
         switch variable {
@@ -102,6 +106,10 @@ extension IconMixer {
     
     func prefetchData(variable: Variable, time: TimerangeDt) throws {
         try mixer.prefetchData(variable: variable, time: time)
+    }
+    
+    func prefetchData(variable: IconSurfaceVariable, time: TimerangeDt) throws {
+        try mixer.prefetchData(variable: .surface(variable), time: time)
     }
     
     func prefetchData(variables: [DailyWeatherVariable], time timeDaily: TimerangeDt) throws {

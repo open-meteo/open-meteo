@@ -156,12 +156,12 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     }
     
     func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        /*if let domain = domain as? IconDomains, let variable = variable as? IconVariable {
-         // icon has no
-            if domain == .iconD2 {
+        if let domain = domain as? IconDomains, let variable = variable as? IconVariable {
+            // icon-d2 has no
+            //if domain == .iconD2, case let .pressure(pressure) = variable, pressure.level {
                 // do pressure level interpolation
-            }
-        }*/
+            //}
+        }
         
         if let domain = domain as? GfsDomain, let variable = variable as? GfsVariable {
             /// HRRR domain has no cloud cover for pressure levels, calculate from RH
