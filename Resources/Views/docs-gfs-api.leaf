@@ -439,7 +439,7 @@
         </div>
 
         <div class="row py-3 px-0">
-          <div class="accordion">
+          <div class="accordion" id="accordionVariables">
             #for(variable in pressureVariables):
             <div class="accordion-item">
               <h2 class="accordion-header" id="heading-#(variable.name)">
@@ -447,7 +447,7 @@
                   #(variable.label) on Pressure Levels
                 </button>
               </h2>
-              <div id="collapse-#(variable.name)" class="accordion-collapse collapse" aria-labelledby="heading-#(variable.name)" data-bs-parent="#accordionExample">
+              <div id="collapse-#(variable.name)" class="accordion-collapse collapse" aria-labelledby="heading-#(variable.name)" data-bs-parent="#accordionVariables">
                 <div class="accordion-body row">
                   #for(level in levels):
                   <div class="col-md-2">
