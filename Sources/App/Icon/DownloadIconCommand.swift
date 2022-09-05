@@ -180,7 +180,7 @@ struct DownloadIconCommand: Command {
                 queue.async {
                     let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
                     try! curl.download(
-                        url: "\(serverPrefix)\(variable.omFileName)/\(filenameFrom)",
+                        url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
                         to: gribFile
                     )
                     // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
