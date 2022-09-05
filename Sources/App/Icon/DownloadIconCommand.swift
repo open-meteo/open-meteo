@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 import SwiftNetCDF
 import SwiftPFor2D
+import Dispatch
 
 
 struct CdoHelper {
@@ -17,8 +18,8 @@ struct CdoHelper {
     }
     
     func readGrib2Bz2(_ filename: String) throws -> [Float] {
-        let tempNc = "\(domain.downloadDirectory)temp.nc"
         let gribFile = String(filename.dropLast(4))
+        let tempNc = "\(gribFile).nc"
         
         try Process.bunzip2(file: filename)
         if let cdo = cdo {
@@ -29,8 +30,14 @@ struct CdoHelper {
             try Process.grib2ToNetcdf(in: gribFile, out: tempNc)
         }
         try FileManager.default.removeItem(atPath: gribFile)
-        guard let nc = try NetCDF.open(path: tempNc, allowUpdate: false) else {
-            fatalError("File test.nc does not exist")
+        let data = try readNetCdf(path: tempNc)
+        try FileManager.default.removeItem(atPath: tempNc)
+        return data
+    }
+    
+    func readNetCdf(path: String) throws -> [Float] {
+        guard let nc = try NetCDF.open(path: path, allowUpdate: false) else {
+            fatalError("File \(path) does not exist")
         }
         guard let v = nc.getVariables().first(where: {$0.dimensions.count >= 3}) else {
             fatalError("Could not find data variable with 3d/4d data")
@@ -86,6 +93,9 @@ struct DownloadIconCommand: Command {
 
         @Option(name: "run")
         var run: String?
+        
+        @Option(name: "concurrent", help: "Number of parallel downloads")
+        var concurrent: Int?
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
@@ -99,7 +109,7 @@ struct DownloadIconCommand: Command {
     }
     
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable]) throws {
+    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable], concurrent: Int) throws {
         let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -140,6 +150,10 @@ struct DownloadIconCommand: Command {
                 to: "\(downloadDirectory)time-invariant_FR_LAND.grib2.bz2"
             )
         }
+        
+        let queue = DispatchQueue(label: "downloadqueue", attributes: .concurrent)
+        let group = DispatchGroup()
+        let sema = DispatchSemaphore(value: concurrent)
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         for hour in forecastSteps {
@@ -160,18 +174,27 @@ struct DownloadIconCommand: Command {
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
                     continue
                 }
-                try curl.download(
-                    url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
-                    to: "\(downloadDirectory)temp.grib2.bz2"
-                )
-                // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
-                // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
-                let data = try cdo.readGrib2Bz2("\(downloadDirectory)temp.grib2.bz2")
-                // Write data as encoded floats to disk
-                try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
-                try FloatArrayCompressor.write(file: "\(downloadDirectory)\(filenameDest)", data: data)
+                
+                sema.wait()
+                group.enter()
+                queue.async {
+                    let gribFile = "\(downloadDirectory)\(v.variable).grib2.bz2"
+                    try! curl.download(
+                        url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
+                        to: gribFile
+                    )
+                    // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
+                    // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
+                    let data = try! cdo.readGrib2Bz2(gribFile)
+                    // Write data as encoded floats to disk
+                    try! FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
+                    try! FloatArrayCompressor.write(file: "\(downloadDirectory)\(filenameDest)", data: data)
+                    group.leave()
+                    sema.signal()
+                }
             }
         }
+        group.wait()
     }
 
     /// unompress and remap
@@ -289,7 +312,7 @@ struct DownloadIconCommand: Command {
         let date = Timestamp.now().with(hour: run)
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
+        try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, concurrent: signature.concurrent ?? 1)
         try convertIcon(logger: logger, domain: domain, run: date, variables: variables)
     }
 }
