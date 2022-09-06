@@ -1,4 +1,5 @@
 import Foundation
+import NIOConcurrencyHelpers
 
 
 enum SpawnError: Error {
@@ -7,6 +8,8 @@ enum SpawnError: Error {
 }
 
 public extension Process {
+    static var lock = Lock()
+    
     /// Get the absolute path of an executable
     static func findExecutable(cmd: String) throws -> String {
         var command: String
@@ -32,26 +35,30 @@ public extension Process {
     
     /// Spawn a Process with optional attached pipes
     static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil, stderr: Pipe? = nil) throws -> Process {
-        let proc = Process()
         let command = try findExecutable(cmd: cmd)
+        
+        // 2022-09-06: Debugging crashed from multi threaded downloads
+        // Maybe some process internals are not thread safe
+        return lock.withLock {
+            let proc = Process()
+            proc.executableURL = URL(fileURLWithPath: command)
+            proc.arguments = args
 
-        proc.executableURL = URL(fileURLWithPath: command)
-        proc.arguments = args
-
-        if let pipe = stdout {
-            proc.standardOutput = pipe
+            if let pipe = stdout {
+                proc.standardOutput = pipe
+            }
+            if let pipe = stderr {
+                proc.standardError = pipe
+            }
+            /// somehow this crashes from time to time with a bad file descriptor
+            do {
+                try proc.run()
+            } catch {
+                print("command failed, retry")
+                try! proc.run()
+            }
+            return proc
         }
-        if let pipe = stderr {
-            proc.standardError = pipe
-        }
-        /// somehow this crashes from time to time with a bad file descriptor
-        do {
-            try proc.run()
-        } catch {
-            print("command failed, retry")
-            try! proc.run()
-        }
-        return proc
     }
 
     static func spawnOrDie(cmd: String, args: [String]?) throws {
