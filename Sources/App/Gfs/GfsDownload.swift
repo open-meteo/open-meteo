@@ -158,7 +158,14 @@ struct GfsDownload: AsyncCommandFix {
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
-                try FloatArrayCompressor.write(file: file, data: data.data)
+                
+                // Scaling before compression with scalefactor
+                if let fma = variable.variable.multiplyAdd {
+                    data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
             }
         }
     }
@@ -191,7 +198,7 @@ struct GfsDownload: AsyncCommandFix {
                 /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
                 let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
                 let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour)\(prefix).fpg"
-                data2d[0..<nLocation, forecastHour] = try FloatArrayCompressor.read(file: file, nElements: nLocation)
+                data2d[0..<nLocation, forecastHour] = try OmFileReader(file: file).readAll()
             }
             
             let skip = variable.skipHour0 ? 1 : 0
@@ -220,10 +227,6 @@ struct GfsDownload: AsyncCommandFix {
             
             // Fill in missing hourly values after switching to 3h
             data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
-            
-            if let fma = variable.multiplyAdd {
-                data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-            }
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {

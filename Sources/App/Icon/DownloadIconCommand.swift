@@ -184,11 +184,18 @@ struct DownloadIconCommand: AsyncCommandFix {
                         )
                         // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
                         // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
-                        let data = try await cdo.readGrib2Bz2(gribFile)
+                        var data = try await cdo.readGrib2Bz2(gribFile)
                         try FileManager.default.removeItem(atPath: gribFile)
                         // Write data as encoded floats to disk
                         try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
-                        try OmFileWriter.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: .fpxdec32, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 10, chunk1: domain.grid.nx, all: data)
+                        
+                        // Scaling before compression with scalefactor
+                        if let fma = variable.multiplyAdd {
+                            data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                        }
+                        
+                        let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                        try OmFileWriter.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data)
                     }
                 }
             }
@@ -253,10 +260,6 @@ struct DownloadIconCommand: AsyncCommandFix {
             
             // Fill in missing hourly values after switching to 3h
             data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
-            
-            if let fma = variable.multiplyAdd {
-                data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-            }
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {

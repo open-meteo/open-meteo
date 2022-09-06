@@ -139,7 +139,7 @@ struct OmFileSplitter {
      Updates are done in chunks of 8 MB to keep memory size low. Otherwise ICON update would take 4+ GB memory for just this function.
      
      TODO: smoothing is not implemented
-     TODO: a data callback would be possible to reduce memory every further
+     TODO: a data callback would be possible to reduce memory every further -> issue with itterating over time, have to completely change OmFileWriter
      */
     func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, ringtime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float) throws {
         
