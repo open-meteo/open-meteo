@@ -37,9 +37,9 @@ public extension Process {
     static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil, stderr: Pipe? = nil) throws -> Process {
         let command = try findExecutable(cmd: cmd)
         
-        // 2022-09-06: Debugging crashed from multi threaded downloads
+        // 2022-09-06: Debugging crashes from multi threaded downloads
         // Maybe some process internals are not thread safe
-        return lock.withLock {
+        return try lock.withLock {
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: command)
             proc.arguments = args
@@ -54,8 +54,8 @@ public extension Process {
             do {
                 try proc.run()
             } catch {
-                print("command failed, retry")
-                try! proc.run()
+                //print("command failed, retry")
+                try proc.run()
             }
             return proc
         }
@@ -64,8 +64,12 @@ public extension Process {
     static func spawnOrDie(cmd: String, args: [String]?) throws {
         let task = try Process.spawn(cmd: cmd, args: args)
         task.waitUntilExit()
-        guard task.terminationStatus == 0 else {
-            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: nil)
+        // 2022-09-06: Debugging crashes from multi threaded downloads
+        // Maybe some process internals are not thread safe
+        try lock.withLock {
+            guard task.terminationStatus == 0 else {
+                throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: nil)
+            }
         }
     }
     

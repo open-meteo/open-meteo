@@ -178,17 +178,23 @@ struct DownloadIconCommand: Command {
                 sema.wait()
                 group.enter()
                 queue.async {
+                    do {
                     let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
-                    try! curl.download(
+                    try curl.download(
                         url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
                         to: gribFile
                     )
                     // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
                     // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
                     let data = try! cdo.readGrib2Bz2(gribFile)
+                    try FileManager.default.removeItem(atPath: gribFile)
                     // Write data as encoded floats to disk
-                    try! FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
-                    try! FloatArrayCompressor.write(file: "\(downloadDirectory)\(filenameDest)", data: data)
+                    try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
+                    try FloatArrayCompressor.write(file: "\(downloadDirectory)\(filenameDest)", data: data)
+                    } catch {
+                        logger.warning("Download failed \(error)")
+                        fatalError()
+                    }
                     group.leave()
                     sema.signal()
                 }
