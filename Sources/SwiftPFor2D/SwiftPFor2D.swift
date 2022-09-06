@@ -16,6 +16,16 @@ public enum SwiftPFor2DError: Error {
 
 public enum CompressionType: UInt8 {
     case p4nzdec256 = 0
+    case fpxdec32 = 1
+    
+    public var bytesPerElement: Int {
+        switch self {
+        case .p4nzdec256:
+            return 2
+        case .fpxdec32:
+            return 4
+        }
+    }
 }
 
 
@@ -81,7 +91,7 @@ public final class OmFileWriter {
         chunkOffsetBytes.reserveCapacity(nChunks)
         
         /// Read buffer needs to be a bit larger for AVX 256 bit alignment
-        let buffer = UnsafeMutableBufferPointer<Int16>.allocate(capacity: (chunk0 * chunk1).P4NENC256_BOUND())
+        let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: (chunk0 * chunk1 * compressionType.bytesPerElement).P4NENC256_BOUND(), alignment: 4)
         defer { buffer.deallocate() }
         
         /// Size a compressed chunk might
@@ -96,122 +106,151 @@ public final class OmFileWriter {
                 
         /// itterate over all chunks
         var c0 = 0
-        while c0 < nDim0Chunks {
-            // Get new data from closure
-            let uncompressedInput = try supplyChunk(c0 * chunk0)
-            
-            // Make sure that we received an even number of `c0 * chunk0` or all remaining elements at once. The last chunk might be smaller than `c0 * chunk0`
-            /// Number of elements in a row of chunks. Not just one chunk.
-            let elementsPerChunkRow = chunk0 * dim1
-            let missingElements = dim0 * dim1 - c0 * elementsPerChunkRow
-            if missingElements < elementsPerChunkRow {
-                // For the last chunk, the number must match exactly
-                guard uncompressedInput.count == missingElements else {
+        
+        switch compressionType {
+        case .p4nzdec256:
+            let buffer = buffer.baseAddress!.assumingMemoryBound(to: Int16.self)
+            while c0 < nDim0Chunks {
+                // Get new data from closure
+                let uncompressedInput = try supplyChunk(c0 * chunk0)
+                
+                // Make sure that we received an even number of `c0 * chunk0` or all remaining elements at once. The last chunk might be smaller than `c0 * chunk0`
+                /// Number of elements in a row of chunks. Not just one chunk.
+                let elementsPerChunkRow = chunk0 * dim1
+                let missingElements = dim0 * dim1 - c0 * elementsPerChunkRow
+                if missingElements < elementsPerChunkRow {
+                    // For the last chunk, the number must match exactly
+                    guard uncompressedInput.count == missingElements else {
+                        throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                    }
+                }
+                let isEvenMultipleOfChunkSize = uncompressedInput.count % elementsPerChunkRow == 0
+                guard isEvenMultipleOfChunkSize || uncompressedInput.count == missingElements else {
                     throw SwiftPFor2DError.chunkHasWrongNumberOfElements
                 }
-            }
-            let isEvenMultipleOfChunkSize = uncompressedInput.count % elementsPerChunkRow == 0
-            guard isEvenMultipleOfChunkSize || uncompressedInput.count == missingElements else {
-                throw SwiftPFor2DError.chunkHasWrongNumberOfElements
-            }
-            
-            let nReadChunks = uncompressedInput.count.divideRoundedUp(divisor: elementsPerChunkRow)
-            
-            for c00 in 0..<nReadChunks {
-                let length0 = min((c0+c00+1) * chunk0, dim0) - (c0+c00) * chunk0
                 
-                for c1 in 0..<nDim1Chunks {
-                    // load chunk into buffer
-                    // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
-                    let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
-                    for d0 in 0..<length0 {
-                        let start = c1 * chunk1 + d0 * dim1 + c00*elementsPerChunkRow + uncompressedInput.startIndex
-                        let rangeBuffer = d0*length1 ..< (d0+1)*length1
-                        let rangeInput = start ..< start + length1
-                        for (posBuffer, posInput) in zip(rangeBuffer, rangeInput) {
-                            let val = uncompressedInput[posInput]
-                            if val.isNaN {
-                                // Int16.min is not representable because of zigzag coding
-                                buffer[posBuffer] = Int16.max
-                            }
-                            buffer[posBuffer] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(val * scalefactor))))
-                        }
-                    }
+                let nReadChunks = uncompressedInput.count.divideRoundedUp(divisor: elementsPerChunkRow)
+                
+                for c00 in 0..<nReadChunks {
+                    let length0 = min((c0+c00+1) * chunk0, dim0) - (c0+c00) * chunk0
                     
-                    //let dx = 6
-                    
-                    // 2D delta encoding
-                    if length0 > 1/* && length0 != dx*dx*/ {
-                        //print("in regular 2D")
-                        for d1 in 0..<length1 {
-                            for d0 in (1..<length0).reversed() {
-                                buffer[d0*length1 + d1] &-= buffer[(d0-1)*length1 + d1]
+                    for c1 in 0..<nDim1Chunks {
+                        // load chunk into buffer
+                        // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
+                        let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
+                        for d0 in 0..<length0 {
+                            let start = c1 * chunk1 + d0 * dim1 + c00*elementsPerChunkRow + uncompressedInput.startIndex
+                            let rangeBuffer = d0*length1 ..< (d0+1)*length1
+                            let rangeInput = start ..< start + length1
+                            for (posBuffer, posInput) in zip(rangeBuffer, rangeInput) {
+                                let val = uncompressedInput[posInput]
+                                if val.isNaN {
+                                    // Int16.min is not representable because of zigzag coding
+                                    buffer[posBuffer] = Int16.max
+                                }
+                                buffer[posBuffer] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(val * scalefactor))))
                             }
                         }
-                    }
-                    
-                    /*if length0 == dx*dx {
-                        //print("in 3D")
-                        for d1 in (1..<dx).reversed() {
-                            for d2 in 0..<dx {
-                                for dt in 0..<length1 {
-                                    buffer[d1*dx*length1 + d2*length1 + dt] &-= buffer[(d1-1)*dx*length1 + d2*length1 + dt]
+                        
+                        // 2D delta encoding
+                        if length0 > 1/* && length0 != dx*dx*/ {
+                            //print("in regular 2D")
+                            for d1 in 0..<length1 {
+                                for d0 in (1..<length0).reversed() {
+                                    buffer[d0*length1 + d1] &-= buffer[(d0-1)*length1 + d1]
                                 }
                             }
                         }
-                        for d1 in 0..<dx {
-                            for d2 in (1..<dx).reversed() {
-                                for dt in 0..<length1 {
-                                    buffer[d1*dx*length1 + d2*length1 + dt] &-= buffer[d1*dx*length1 + (d2-1)*length1 + dt]
-                                }
-                            }
+                        
+                        let writeLength = p4nzenc128v16(buffer, length1 * length0, writeBuffer.advanced(by: writeBufferPos))
+                        
+                        /// If the write buffer is too full, write it to disk. Too full means, that the next compressed chunk may not fit inside
+                        writeBufferPos += writeLength
+                        if (writeBufferSize-writeBufferPos) < minBufferSize{
+                            try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer, count: writeBufferPos))
+                            // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
+                            try fn.synchronize()
+                            writeBufferPos = 0
                         }
-                    }*/
-                    
-                    // 1D delta
-                    /*for d0 in 0..<length0 {
-                        for d1 in (1..<length1).reversed() {
-                            buffer[d0*length1 + d1] &-= buffer[d0*length1 + d1 - 1]
-                        }
-                    }*/
-                    
-                    /*for i in (1..<length0*length1).reversed() {
-                        buffer[i] &-= buffer[i-1]
-                    }*/
-                    
-                    
-                    // zig zag
-                    /*for i in 0..<length0*length1 {
-                        buffer[i] = (buffer[i] << 1) ^ (buffer[i] >> 31)
-                    }*/
-                    
-                    /*print(buffer[1..<length1*length0].max())
-                    if c00 > 5 {
-                        print(buffer[0..<length1 * length0])
-                        return
-                    }*/
-                    
-                    // compress buffer
-                    //print("compress", writeBufferPos, buffer.baseAddress!, writeBuffer.advanced(by: writeBufferPos))
-                    
-                    let writeLength = p4nzenc128v16(buffer.baseAddress, length1 * length0, writeBuffer.advanced(by: writeBufferPos))
-                    
-                    /// If the write buffer is too full, write it to disk. Too full means, that the next compressed chunk may not fit inside
-                    writeBufferPos += writeLength
-                    if (writeBufferSize-writeBufferPos) < minBufferSize{
-                        try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer, count: writeBufferPos))
-                        // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
-                        try fn.synchronize()
-                        writeBufferPos = 0
+                        
+                        // Store chunk offset position in our lookup table
+                        let previous = chunkOffsetBytes.last ?? 0
+                        chunkOffsetBytes.append(previous + writeLength)
                     }
-                    
-                    // Store chunk offset position in our lookup table
-                    let previous = chunkOffsetBytes.last ?? 0
-                    chunkOffsetBytes.append(previous + writeLength)
                 }
+                c0 += nReadChunks
             }
-            c0 += nReadChunks
+        case .fpxdec32:
+            let bufferFloat = buffer.baseAddress!.assumingMemoryBound(to: Float.self)
+            let buffer = buffer.baseAddress!.assumingMemoryBound(to: UInt32.self)
+            while c0 < nDim0Chunks {
+                // Get new data from closure
+                let uncompressedInput = try supplyChunk(c0 * chunk0)
+                
+                // Make sure that we received an even number of `c0 * chunk0` or all remaining elements at once. The last chunk might be smaller than `c0 * chunk0`
+                /// Number of elements in a row of chunks. Not just one chunk.
+                let elementsPerChunkRow = chunk0 * dim1
+                let missingElements = dim0 * dim1 - c0 * elementsPerChunkRow
+                if missingElements < elementsPerChunkRow {
+                    // For the last chunk, the number must match exactly
+                    guard uncompressedInput.count == missingElements else {
+                        throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                    }
+                }
+                let isEvenMultipleOfChunkSize = uncompressedInput.count % elementsPerChunkRow == 0
+                guard isEvenMultipleOfChunkSize || uncompressedInput.count == missingElements else {
+                    throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                }
+                
+                let nReadChunks = uncompressedInput.count.divideRoundedUp(divisor: elementsPerChunkRow)
+                
+                for c00 in 0..<nReadChunks {
+                    let length0 = min((c0+c00+1) * chunk0, dim0) - (c0+c00) * chunk0
+                    
+                    for c1 in 0..<nDim1Chunks {
+                        // load chunk into buffer
+                        // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
+                        let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
+                        for d0 in 0..<length0 {
+                            let start = c1 * chunk1 + d0 * dim1 + c00*elementsPerChunkRow + uncompressedInput.startIndex
+                            let rangeBuffer = d0*length1 ..< (d0+1)*length1
+                            let rangeInput = start ..< start + length1
+                            for (posBuffer, posInput) in zip(rangeBuffer, rangeInput) {
+                                let val = uncompressedInput[posInput]
+                                bufferFloat[posBuffer] = val
+                            }
+                        }
+                        
+                        // 2D xor encoding
+                        if length0 > 1/* && length0 != dx*dx*/ {
+                            //print("in regular 2D")
+                            for d1 in 0..<length1 {
+                                for d0 in (1..<length0).reversed() {
+                                    buffer[d0*length1 + d1] ^= buffer[(d0-1)*length1 + d1]
+                                }
+                            }
+                        }
+                        
+                        let writeLength = fpxenc32(buffer, length1 * length0, writeBuffer.advanced(by: writeBufferPos), 0)
+                        
+                        /// If the write buffer is too full, write it to disk. Too full means, that the next compressed chunk may not fit inside
+                        writeBufferPos += writeLength
+                        if (writeBufferSize-writeBufferPos) < minBufferSize{
+                            try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer, count: writeBufferPos))
+                            // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
+                            try fn.synchronize()
+                            writeBufferPos = 0
+                        }
+                        
+                        // Store chunk offset position in our lookup table
+                        let previous = chunkOffsetBytes.last ?? 0
+                        chunkOffsetBytes.append(previous + writeLength)
+                    }
+                }
+                c0 += nReadChunks
+            }
         }
+        
         
         // Write remainind data from buffer
         try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer, count: writeBufferPos))
@@ -287,6 +326,9 @@ public final class OmFileReader {
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
     
+    /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
+    public let compression: CompressionType
+    
     /// Number of elements in dimension 0... The slow one
     public let dim0: Int
     
@@ -316,6 +358,7 @@ public final class OmFileReader {
         chunk0 = header.chunk0
         chunk1 = header.chunk1
         scalefactor = header.scalefactor
+        compression = header.compression
     }
     
     /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
@@ -369,7 +412,7 @@ public final class OmFileReader {
     }
     
     /// Read data into existing buffers
-    public func read(into: UnsafeMutablePointer<Float>, arrayRange: Range<Int>, chunkBuffer: UnsafeMutablePointer<Int16>, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+    public func read(into: UnsafeMutablePointer<Float>, arrayRange: Range<Int>, chunkBuffer: UnsafeMutableRawPointer, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
             throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
@@ -386,54 +429,112 @@ public final class OmFileReader {
         
         let compressedDataStartOffset = OmHeader.length + nChunks * MemoryLayout<Int>.stride
         let compressedDataStartPtr = UnsafeMutablePointer(mutating: fn.data.baseAddress!.advanced(by: compressedDataStartOffset))
-        for c0 in dim0Read.lowerBound / chunk0 ..< dim0Read.upperBound.divideRoundedUp(divisor: chunk0) {
-            for c1 in dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1) {
-                // load chunk into buffer
-                // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
-                let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
-                let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
-                
-                /// The chunk coordinates in global space... e.g. 600..<1000
-                let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
-                let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
-                
-                /// This chunk clamped to read coodinates... e.g. 650..<950
-                let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
-                let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
-                
-                // load chunk from mmap
-                let chunkNum = c0 * nDim1Chunks + c1
-                let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
-                let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
-                let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBuffer)
-                precondition(uncompressedBytes == lengthCompressedBytes)
-                
-                // 2D delta decoding
-                if length0 > 1 {
-                    for d1 in 0..<length1 {
-                        for d0 in (1..<length0) {
-                            chunkBuffer[d0*length1 + d1] &+= chunkBuffer[(d0-1)*length1 + d1]
+        
+        switch compression {
+        case .p4nzdec256:
+            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
+            for c0 in dim0Read.lowerBound / chunk0 ..< dim0Read.upperBound.divideRoundedUp(divisor: chunk0) {
+                for c1 in dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1) {
+                    // load chunk into buffer
+                    // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
+                    let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
+                    let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
+                    
+                    /// The chunk coordinates in global space... e.g. 600..<1000
+                    let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
+                    let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
+                    
+                    /// This chunk clamped to read coodinates... e.g. 650..<950
+                    let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
+                    let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
+                    
+                    // load chunk from mmap
+                    let chunkNum = c0 * nDim1Chunks + c1
+                    let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
+                    let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
+                    let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBuffer)
+                    precondition(uncompressedBytes == lengthCompressedBytes)
+                    
+                    // 2D delta decoding
+                    if length0 > 1 {
+                        for d1 in 0..<length1 {
+                            for d0 in (1..<length0) {
+                                chunkBuffer[d0*length1 + d1] &+= chunkBuffer[(d0-1)*length1 + d1]
+                            }
+                        }
+                    }
+                    
+                    /// Moved to local coordinates... e.g. 50..<350
+                    let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
+                    let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
+
+                    for d0 in clampedLocal0 {
+                        let read = clampedLocal1.add(d0 * length1)
+                        
+                        let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
+                        let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
+                        let localRange = localOut1.add(localOut0 * dim1Read.count + arrayRange.lowerBound)
+                        
+                        for (posBuffer, posOut) in zip(read, localRange) {
+                            let val = chunkBuffer[posBuffer]
+                            if val == Int16.max {
+                                into.advanced(by: posOut).pointee = .nan
+                            } else {
+                                into.advanced(by: posOut).pointee = Float(val) / scalefactor
+                            }
                         }
                     }
                 }
-                
-                /// Moved to local coordinates... e.g. 50..<350
-                let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
+            }
+        case .fpxdec32:
+            let chunkBufferUInt = chunkBuffer.assumingMemoryBound(to: UInt32.self)
+            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
+            
+            for c0 in dim0Read.lowerBound / chunk0 ..< dim0Read.upperBound.divideRoundedUp(divisor: chunk0) {
+                for c1 in dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1) {
+                    // load chunk into buffer
+                    // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
+                    let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
+                    let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
+                    
+                    /// The chunk coordinates in global space... e.g. 600..<1000
+                    let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
+                    let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
+                    
+                    /// This chunk clamped to read coodinates... e.g. 650..<950
+                    let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
+                    let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
+                    
+                    // load chunk from mmap
+                    let chunkNum = c0 * nDim1Chunks + c1
+                    let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
+                    let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
+                    let uncompressedBytes = fpxdec32(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBufferUInt, 0)
+                    precondition(uncompressedBytes == lengthCompressedBytes)
+                    
+                    // 2D xor decoding
+                    if length0 > 1 {
+                        for d1 in 0..<length1 {
+                            for d0 in (1..<length0) {
+                                chunkBufferUInt[d0*length1 + d1] ^= chunkBufferUInt[(d0-1)*length1 + d1]
+                            }
+                        }
+                    }
+                    
+                    /// Moved to local coordinates... e.g. 50..<350
+                    let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
+                    let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
 
-                for d0 in clampedLocal0 {
-                    let read = clampedLocal1.add(d0 * length1)
-                    
-                    let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                    let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
-                    let localRange = localOut1.add(localOut0 * dim1Read.count + arrayRange.lowerBound)
-                    
-                    for (posBuffer, posOut) in zip(read, localRange) {
-                        let val = chunkBuffer[posBuffer]
-                        if val == Int16.max {
-                            into.advanced(by: posOut).pointee = .nan
-                        } else {
-                            into.advanced(by: posOut).pointee = Float(val) / scalefactor
+                    for d0 in clampedLocal0 {
+                        let read = clampedLocal1.add(d0 * length1)
+                        
+                        let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
+                        let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
+                        let localRange = localOut1.add(localOut0 * dim1Read.count + arrayRange.lowerBound)
+                        
+                        for (posBuffer, posOut) in zip(read, localRange) {
+                            let val = chunkBuffer[posBuffer]
+                            into.advanced(by: posOut).pointee = val
                         }
                     }
                 }

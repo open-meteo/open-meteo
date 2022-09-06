@@ -109,31 +109,30 @@ final class OmFileManager: LifecycleHandler {
 
 extension OmFileReader {
     /// Keep one buffer per thread
-    fileprivate static var buffers = [Thread: UnsafeMutableBufferPointer<Int16>]()
+    fileprivate static var buffers = [Thread: UnsafeMutableRawBufferPointer]()
     
     /// Thread safe access to buffers
     fileprivate static let lockBuffers = Lock()
     
     /// Thread safe buffer provider that automatically reallocates buffers
-    fileprivate static func getBuffer(minBytes: Int) -> UnsafeMutableBufferPointer<Int16> {
-        let minElements = minBytes/2
+    fileprivate static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
         return lockBuffers.withLock {
             if let buffer = buffers[Thread.current] {
-                if buffer.count < minElements {
-                    let buffer = UnsafeMutableBufferPointer(start: realloc(buffer.baseAddress, minBytes).assumingMemoryBound(to: Int16.self), count: minElements)
+                if buffer.count < minBytes {
+                    let buffer = UnsafeMutableRawBufferPointer(start: realloc(buffer.baseAddress, minBytes), count: minBytes)
                     buffers[Thread.current] = buffer
                     return buffer
                 }
                 return buffer
             }
-            let buffer = UnsafeMutableBufferPointer<Int16>.allocate(capacity: minElements)
+            let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: minBytes, alignment: 4)
             buffers[Thread.current] = buffer
             return buffer
         }
     }
     /// Read data into existing output float buffer
     public func read(into: UnsafeMutablePointer<Float>, arrayRange: Range<Int>, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
-        let chunkBuffer = OmFileReader.getBuffer(minBytes: (chunk0 * chunk1 * 2).P4NENC256_BOUND()).baseAddress!
+        let chunkBuffer = OmFileReader.getBuffer(minBytes: (chunk0 * chunk1 * compression.bytesPerElement).P4NENC256_BOUND()).baseAddress!
         try read(into: into, arrayRange: arrayRange, chunkBuffer: chunkBuffer, dim0Slow: dim0Read, dim1: dim1Read)
     }
     
