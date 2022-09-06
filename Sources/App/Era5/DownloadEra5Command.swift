@@ -336,7 +336,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             let tempPythonFile = "\(downloadDir)elevation.py"
 
             try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            try await Process.spawnOrDie(cmd: "python3", args: [tempPythonFile])
+            try await Process.spawn(cmd: "python3", args: [tempPythonFile])
         }
         
         logger.info("Converting elevation and sea mask")
@@ -500,7 +500,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             
             try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
             do {
-                try await Process.spawnOrDie(cmd: "python3", args: [tempPythonFile])
+                try await Process.spawn(cmd: "python3", args: [tempPythonFile])
             } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args, let stderr) {
                 if code == 70 {
                     logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")

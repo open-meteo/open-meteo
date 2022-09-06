@@ -139,7 +139,7 @@ struct DownloadDemCommand: AsyncCommandFix {
                     continue
                 }*/
                 
-                try await Process.spawnOrDie(cmd: "gdal_translate", args: ["-of","NetCDF",tifLocal,ncTemp])
+                try await Process.spawn(cmd: "gdal_translate", args: ["-of","NetCDF",tifLocal,ncTemp])
                 //try FileManager.default.removeItem(atPath: tifTemp)
                 
                 let data = try readNc(file: ncTemp)

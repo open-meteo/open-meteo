@@ -56,7 +56,7 @@ struct Curl {
         var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
         while true {
             do {
-                try await Process.spawnOrDie(cmd: "curl", args: args)
+                try await Process.spawn(cmd: "curl", args: args)
                 return
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
@@ -173,6 +173,7 @@ struct Curl {
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
             do {
+                // TODO just return DATA+gribmessage
                 let data = try await downloadInMemory(url: url, range: range.range, minSize: range.minSize)
                 logger.debug("Converting GRIB, size \(data.count) bytes (expected minSize \(range.minSize))")
                 //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))

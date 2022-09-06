@@ -4,20 +4,20 @@ import Vapor
 
 extension Process {
     static func bunzip2(file: String) async throws {
-        try await spawnOrDie(cmd: "bunzip2", args: ["--keep", "-f", file])
+        try await spawn(cmd: "bunzip2", args: ["--keep", "-f", file])
     }
     
     static public func grib2ToNetcdf(in inn: String, out: String) async throws {
-        try await spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "copy", inn, out])
+        try await spawn(cmd: "cdo", args: ["-s","-f", "nc", "copy", inn, out])
     }
     
     /// Convert to NetCDF and shift to -180;180 longitude. Only works for global grids
     static public func grib2ToNetcdfShiftLongitudeInvertLatitude(in inn: String, out: String) async throws {
-        try await spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "-invertlat", "-sellonlatbox,-180,180,-90,90", inn, out])
+        try await spawn(cmd: "cdo", args: ["-s","-f", "nc", "-invertlat", "-sellonlatbox,-180,180,-90,90", inn, out])
     }
     
     static public func grib2ToNetCDFInvertLatitude(in inn: String, out: String) async throws {
-        try await spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "invertlat", inn, out])
+        try await spawn(cmd: "cdo", args: ["-s","-f", "nc", "invertlat", inn, out])
     }
 }
 
@@ -71,7 +71,7 @@ struct CdoIconGlobal {
         }
 
         logger.info("Generating weights file \(weightsFile)")
-        let terminationStatus = try await Process.spawn(cmd: "cdo", args: ["-s","gennn,\(gridFile)", localUncompressed, weightsFile])
+        let terminationStatus = try await Process.spawnWithPipes(cmd: "cdo", args: ["-s","gennn,\(gridFile)", localUncompressed, weightsFile])
         guard terminationStatus == 0 else {
             fatalError("Cdo gennn failed")
         }
@@ -82,6 +82,6 @@ struct CdoIconGlobal {
 
     public func remap(in inn: String, out: String) async throws {
         logger.info("Remapping file \(inn)")
-        try await Process.spawnOrDie(cmd: "cdo", args: ["-s", "-f", "nc", "remap,\(gridFile),\(weightsFile)", inn, out])
+        try await Process.spawn(cmd: "cdo", args: ["-s", "-f", "nc", "remap,\(gridFile),\(weightsFile)", inn, out])
     }
 }

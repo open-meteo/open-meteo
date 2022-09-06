@@ -10,21 +10,18 @@ enum SpawnError: Error {
 public extension Process {
     /// Get the absolute path of an executable
     static func findExecutable(cmd: String) async throws -> String {
-        var command: String
-        if !cmd.hasPrefix("/") {
-            command = (try? await spawnWithOutput(cmd: "/usr/bin/which", args: [cmd]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)) ?? ""
-        } else {
-            command = cmd
-        }
-        if cmd == "cdo" && command == "" && FileManager.default.fileExists(atPath: "/opt/homebrew/bin/cdo") {
+        if cmd == "cdo" {
             // workaround for mac because cdo is not in PATH
             if FileManager.default.fileExists(atPath: "/opt/homebrew/bin/cdo") {
-                command = "/opt/homebrew/bin/cdo"
+                return "/opt/homebrew/bin/cdo"
             }
             if FileManager.default.fileExists(atPath: "/usr/local/bin/cdo") {
-                command = "/usr/local/bin/cdo"
+                return "/usr/local/bin/cdo"
             }
         }
+        
+        let command = cmd.hasPrefix("/") ? cmd : (try? await spawnWithOutput(cmd: "/usr/bin/which", args: [cmd]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)) ?? ""
+
         guard FileManager.default.fileExists(atPath: command) else {
             throw SpawnError.executableDoesNotExist(cmd: cmd)
         }
@@ -32,7 +29,7 @@ public extension Process {
     }
     
     /// Spawn async. Returns termination status code
-    static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil, stderr: Pipe? = nil) async throws -> Int32 {
+    static func spawnWithPipes(cmd: String, args: [String]?, stdout: Pipe? = nil, stderr: Pipe? = nil) async throws -> Int32 {
         let command = try await findExecutable(cmd: cmd)
         let proc = Process()
         
@@ -67,18 +64,21 @@ public extension Process {
     }
     
     /// Always captures `stderr`. Otherwise it is just flooding logs.
-    static func spawnOrDie(cmd: String, args: [String]?, stdout: Pipe? = nil) async throws {
+    static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil) async throws {
         let eerror = Pipe()
         var errorData = Data()
         eerror.fileHandleForReading.readabilityHandler = { handle in
             errorData.append(handle.availableData)
         }
         
-        let terminationStatus = try await Process.spawn(cmd: cmd, args: args, stdout: stdout, stderr: eerror)
+        let terminationStatus = try await Process.spawnWithPipes(cmd: cmd, args: args, stdout: stdout, stderr: eerror)
         
+        eerror.fileHandleForReading.readabilityHandler = nil
         if let end = try eerror.fileHandleForReading.readToEnd() {
             errorData.append(end)
         }
+        try eerror.fileHandleForReading.close()
+        try eerror.fileHandleForWriting.close()
         
         guard terminationStatus == 0 else {
             let error = String(data: errorData, encoding: .utf8)
@@ -93,11 +93,14 @@ public extension Process {
             data.append(handle.availableData)
         }
         
-        try await Process.spawnOrDie(cmd: cmd, args: args, stdout: pipe)
+        try await Process.spawn(cmd: cmd, args: args, stdout: pipe)
         
+        pipe.fileHandleForReading.readabilityHandler = nil
         if let end = try pipe.fileHandleForReading.readToEnd() {
             data.append(end)
         }
+        try pipe.fileHandleForReading.close()
+        try pipe.fileHandleForWriting.close()
         return data
     }
     

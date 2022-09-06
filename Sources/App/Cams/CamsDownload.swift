@@ -223,7 +223,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
         
         try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
         do {
-            try await Process.spawnOrDie(cmd: "python3", args: [tempPythonFile])
+            try await Process.spawn(cmd: "python3", args: [tempPythonFile])
         } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args, let stderr) {
             if code == 70 {
                 logger.info("Timestep \(run.iso8601_YYYY_MM_dd) seems to be unavailable")
