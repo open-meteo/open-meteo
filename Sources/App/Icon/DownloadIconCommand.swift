@@ -124,7 +124,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
         // surface elevation
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
-        if (skipFilesIfExisting && FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm)) == false {
+        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             let file: String
             if domain == .iconD2 {
                 file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_hsurf.grib2.bz2"
@@ -135,10 +135,8 @@ struct DownloadIconCommand: AsyncCommandFix {
                 url: file,
                 to: "\(downloadDirectory)time-invariant_HSURF.grib2.bz2"
             )
-        }
         
-        // land fraction
-        if (skipFilesIfExisting && FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm)) == false {
+            // land fraction
             let file: String
             if domain == .iconD2 {
                 file = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_fr_land.grib2.bz2"
