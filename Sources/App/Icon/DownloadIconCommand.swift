@@ -345,8 +345,8 @@ extension IconDomains {
             // Icon has a delay of 2-3 hours after initialisation
             return ((t.hour - 2 + 24) % 24) / 6 * 6
         case .iconD2:
-            // Icon d2 has a delay of 1 hour and runs every 3 hours
-            return ((t.hour - 1 + 24) % 24) / 3 * 3
+            // Icon d2 has a delay of 44 minutes and runs every 3 hours
+            return t.hour / 3 * 3
         }
     }
 }
