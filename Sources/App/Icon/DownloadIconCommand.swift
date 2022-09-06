@@ -137,14 +137,14 @@ struct DownloadIconCommand: AsyncCommandFix {
             )
         
             // land fraction
-            let file: String
+            let file2: String
             if domain == .iconD2 {
-                file = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_fr_land.grib2.bz2"
+                file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_fr_land.grib2.bz2"
             } else {
-                file = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_FR_LAND.grib2.bz2"
+                file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_FR_LAND.grib2.bz2"
             }
             try await curl.download(
-                url: file,
+                url: file2,
                 to: "\(downloadDirectory)time-invariant_FR_LAND.grib2.bz2"
             )
         }
