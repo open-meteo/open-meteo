@@ -196,7 +196,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
                 let variable = pressure.variable
                 switch level {
                 case 800:
-                    return try self.interpolatePressureLevel(variable: variable, level: level, lowerLevel: 700, upperLevel: 800, time: time)
+                    return try self.interpolatePressureLevel(variable: variable, level: level, lowerLevel: 700, upperLevel: 850, time: time)
                 case 900:
                     return try self.interpolatePressureLevel(variable: variable, level: level, lowerLevel: 850, upperLevel: 950, time: time)
                 case 925:
