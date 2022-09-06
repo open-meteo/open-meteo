@@ -15,7 +15,10 @@ public enum SwiftPFor2DError: Error {
 
 
 public enum CompressionType: UInt8 {
+    /// Lossy compression using 2D delta coding and scalefactor
     case p4nzdec256 = 0
+    
+    /// Lossless compression using 2D xor coding
     case fpxdec32 = 1
     
     public var bytesPerElement: Int {

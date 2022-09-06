@@ -40,6 +40,11 @@ final class ArrayTests: XCTestCase {
         data3.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 1)
         XCTAssertTrue(data3.data[0].isNaN)
         XCTAssertEqual(data3.data[1..<7], [1, 1, 1, 1, 1, 1])
+        
+        var data4 = Array2DFastTime(data: [.nan,1,2,3,3.1,3.3,3.9], nLocations: 1, nTime: 7)
+        data4.deaccumulateOverTime(slidingWidth: data4.nTime, slidingOffset: 1)
+        XCTAssertTrue(data4.data[0].isNaN)
+        XCTAssertEqualArray(data4.data[1..<7], [1.0, 1.0, 1.0, 0.1, 0.2, 0.6], accuracy: 0.001)
     }
     
     func testSolfactorBackwards() {

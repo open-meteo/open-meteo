@@ -57,7 +57,7 @@ extension Array2DFastTime {
     mutating func deaccumulateOverTime(slidingWidth: Int, slidingOffset: Int) {
         for l in 0..<nLocations {
             for start in stride(from: slidingOffset, to: nTime, by: slidingWidth) {
-                for hour in stride(from: start + slidingWidth - 1, through: start + 1, by: -1) {
+                for hour in stride(from: min(start + slidingWidth, nTime) - 1, through: start + 1, by: -1) {
                     let current = self[l, hour]
                     let previous = self[l, hour-1]
                     // due to floating point precision, it can become negative

@@ -188,7 +188,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                         try FileManager.default.removeItem(atPath: gribFile)
                         // Write data as encoded floats to disk
                         try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
-                        try FloatArrayCompressor.write(file: "\(downloadDirectory)\(filenameDest)", data: data)
+                        try OmFileWriter.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: .fpxdec32, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 10, chunk1: domain.grid.nx, all: data)
                     }
                 }
             }
@@ -232,7 +232,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     continue
                 }
                 let h3 = hour.zeroPadded(len: 3)
-                data2d[0..<nLocation, hour] = try FloatArrayCompressor.read(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg", nElements: nLocation)
+                data2d[0..<nLocation, hour] = try OmFileReader(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg").readAll()
             }
             
             
