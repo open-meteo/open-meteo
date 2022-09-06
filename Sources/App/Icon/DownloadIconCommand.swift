@@ -150,52 +150,52 @@ struct DownloadIconCommand: AsyncCommandFix {
                 to: "\(downloadDirectory)time-invariant_FR_LAND.grib2.bz2"
             )
         }
-        
-        /*let queue = DispatchQueue.global()
-        let group = DispatchGroup()
-        let sema = DispatchSemaphore(value: concurrent)*/
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        for hour in forecastSteps {
-            logger.info("Downloading hour \(hour)")
-            let h3 = hour.zeroPadded(len: 3)
-            for variable in variables {
-                if hour == 0 && variable.skipHour0 {
-                    continue
+        var jobNumber = 0
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for hour in forecastSteps {
+                logger.info("Downloading hour \(hour)")
+                let h3 = hour.zeroPadded(len: 3)
+                for variable in variables {
+                    if hour == 0 && variable.skipHour0 {
+                        continue
+                    }
+                    let v = variable.getVarAndLevel(domain: domain)
+                    let level = v.level.map({"_\($0)"}) ?? ""
+                    let leveld2 = v.level.map({"_\($0)"}) ?? "_2d"
+                    let filenameFrom = domain != .iconD2 ?
+                        "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable.uppercased()).grib2.bz2" :
+                        "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(leveld2)_\(v.variable).grib2.bz2"
+                    
+                    let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
+                    if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
+                        continue
+                    }
+                    
+                    if jobNumber >= concurrent {
+                        try await group.next()
+                    }
+                    jobNumber += 1
+                    
+                    group.addTask {
+                        let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
+                        try await curl.download(
+                            url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
+                            to: gribFile
+                        )
+                        // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
+                        // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
+                        let data = try await cdo.readGrib2Bz2(gribFile)
+                        try FileManager.default.removeItem(atPath: gribFile)
+                        // Write data as encoded floats to disk
+                        try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
+                        try FloatArrayCompressor.write(file: "\(downloadDirectory)\(filenameDest)", data: data)
+                    }
                 }
-                let v = variable.getVarAndLevel(domain: domain)
-                let level = v.level.map({"_\($0)"}) ?? ""
-                var filenameFrom = "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable.uppercased()).grib2.bz2"
-                if domain == .iconD2 {
-                    let level = v.level.map({"_\($0)"}) ?? "_2d"
-                    filenameFrom = "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable).grib2.bz2"
-                }
-                let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
-                if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
-                    continue
-                }
-                
-                /*sema.wait()
-                group.enter()
-                queue.async {*/
-                    let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
-                    try await curl.download(
-                        url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
-                        to: gribFile
-                    )
-                    // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
-                    // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
-                    let data = try await cdo.readGrib2Bz2(gribFile)
-                    try FileManager.default.removeItem(atPath: gribFile)
-                    // Write data as encoded floats to disk
-                    try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
-                    try FloatArrayCompressor.write(file: "\(downloadDirectory)\(filenameDest)", data: data)
-                    //group.leave()
-                    //sema.signal()
-                //}
             }
+            try await group.waitForAll()
         }
-        //group.wait()
     }
 
     /// unompress and remap

@@ -15,6 +15,7 @@ extension AsyncCommandFix {
         promise.completeWithTask {
             try await run(using: context, signature: signature)
         }
+        try promise.futureResult.wait()
     }
 }
 

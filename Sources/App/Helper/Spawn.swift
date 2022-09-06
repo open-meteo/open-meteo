@@ -8,8 +8,6 @@ enum SpawnError: Error {
 }
 
 public extension Process {
-    static var lock = Lock()
-    
     /// Get the absolute path of an executable
     static func findExecutable(cmd: String) async throws -> String {
         var command: String
@@ -36,29 +34,33 @@ public extension Process {
     /// Spawn async. Returns termination status code
     static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil, stderr: Pipe? = nil) async throws -> Int32 {
         let command = try await findExecutable(cmd: cmd)
+        let proc = Process()
         
-        return try await withCheckedThrowingContinuation { continuation in
-            let proc = Process()
-            proc.executableURL = URL(fileURLWithPath: command)
-            proc.arguments = args
-            proc.terminationHandler = { task in
-                continuation.resume(returning: task.terminationStatus)
-            }
-            if let pipe = stdout {
-                proc.standardOutput = pipe
-            }
-            if let pipe = stderr {
-                proc.standardError = pipe
-            }
-            
-            do {
-                try proc.run()
-            } catch {
-                /// somehow this crashes from time to time with a bad file descriptor
+        return try await withTaskCancellationHandler {
+            proc.terminate()
+        } operation: {
+            return try await withCheckedThrowingContinuation { continuation in
+                proc.executableURL = URL(fileURLWithPath: command)
+                proc.arguments = args
+                proc.terminationHandler = { task in
+                    continuation.resume(returning: task.terminationStatus)
+                }
+                if let pipe = stdout {
+                    proc.standardOutput = pipe
+                }
+                if let pipe = stderr {
+                    proc.standardError = pipe
+                }
                 do {
                     try proc.run()
                 } catch {
-                    continuation.resume(throwing: error)
+                    // somehow this crashes from time to time with a bad file descriptor
+                    // retry once
+                    do {
+                        try proc.run()
+                    } catch {
+                        continuation.resume(throwing: error)
+                    }
                 }
             }
         }
