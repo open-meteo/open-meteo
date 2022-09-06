@@ -20,6 +20,12 @@ extension DispatchTime {
         if deltaMs < 20_000 {
             return "\((deltaMs/1_000).round(digits: 1))s"
         }
-        return "\((deltaMs/1_000).round(digits: 0))s"
+        if deltaMs < 180_000 {
+            return "\((deltaMs/1_000).round(digits: 0))s"
+        }
+        if deltaMs < 1000 * 60 * 90 {
+            return "\((deltaMs/1_000/60).round(digits: 0))m"
+        }
+        return "\((deltaMs/1_000/60/60).round(digits: 0))h \((deltaMs/1_000/60).round(digits: 0))m"
     }
 }

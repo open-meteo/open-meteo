@@ -58,32 +58,6 @@ struct CdoHelper {
         }
         return d
     }
-    
-    /**
-     Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
-     */
-    func convertSurfaceElevation() async throws {
-        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
-            return
-        }
-        
-        // use special numbers for SEA grid points?
-        try await Process.bunzip2(file: "\(domain.downloadDirectory)time-invariant_HSURF.grib2.bz2")
-        var hsurf = try await readGrib2Bz2("\(domain.downloadDirectory)time-invariant_HSURF.grib2.bz2")
-        
-        try await Process.bunzip2(file: "\(domain.downloadDirectory)time-invariant_FR_LAND.grib2.bz2")
-        let landFraction = try await readGrib2Bz2("\(domain.downloadDirectory)time-invariant_FR_LAND.grib2.bz2")
-        
-        // Set all sea grid points to -999
-        precondition(hsurf.count == landFraction.count)
-        for i in hsurf.indices {
-            if landFraction[i] < 0.5 {
-                hsurf[i] = -999
-            }
-        }
-        
-        try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: hsurf)
-    }
 }
 
 struct DownloadIconCommand: AsyncCommandFix {
@@ -108,11 +82,18 @@ struct DownloadIconCommand: AsyncCommandFix {
         "Download a specified icon model run"
     }
     
-    /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable], concurrent: Int) async throws {
+    /**
+     Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
+     */
+    func convertSurfaceElevation(logger: Logger, domain: IconDomains, run: Timestamp) async throws {
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+            return
+        }
+        
         let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger)
@@ -148,6 +129,40 @@ struct DownloadIconCommand: AsyncCommandFix {
                 to: "\(downloadDirectory)time-invariant_FR_LAND.grib2.bz2"
             )
         }
+        
+        // use special numbers for SEA grid points?
+        try await Process.bunzip2(file: "\(domain.downloadDirectory)time-invariant_HSURF.grib2.bz2")
+        var hsurf = try await cdo.readGrib2Bz2("\(domain.downloadDirectory)time-invariant_HSURF.grib2.bz2")
+        
+        try await Process.bunzip2(file: "\(domain.downloadDirectory)time-invariant_FR_LAND.grib2.bz2")
+        let landFraction = try await cdo.readGrib2Bz2("\(domain.downloadDirectory)time-invariant_FR_LAND.grib2.bz2")
+        
+        // Set all sea grid points to -999
+        precondition(hsurf.count == landFraction.count)
+        for i in hsurf.indices {
+            if landFraction[i] < 0.5 {
+                hsurf[i] = -999
+            }
+        }
+        
+        try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: hsurf)
+    }
+    
+    
+    /// Download ICON global, eu and d2 *.grid2.bz2 files
+    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable], concurrent: Int) async throws {
+        let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
+        let downloadDirectory = domain.downloadDirectory
+        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+        
+        let domainPrefix = "\(domain.rawValue)_\(domain.region)"
+        let cdo = try await CdoHelper(domain: domain, logger: logger)
+        
+        // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
+        // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
+        let serverPrefix = "https://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
+        let dateStr = run.format_YYYYMMddHH
+        let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         var jobNumber = 0
@@ -207,7 +222,6 @@ struct DownloadIconCommand: AsyncCommandFix {
     /// Process variable after variable
     func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariableDownloadable]) async throws {
         let downloadDirectory = domain.downloadDirectory
-        let cdo = try await CdoHelper(domain: domain, logger: logger)
         let grid = domain.grid
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
@@ -221,8 +235,6 @@ struct DownloadIconCommand: AsyncCommandFix {
         // ICON global 6z and 18z have 120 instead of 180 forecast hours
         // Stategy: Read each variable in a spatial array and interpolate missing values
         // Afterwards merge into temporal data files
-        
-        try await cdo.convertSurfaceElevation()
 
         for variable in variables {
             let startConvert = DispatchTime.now()
@@ -285,6 +297,7 @@ struct DownloadIconCommand: AsyncCommandFix {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let start = DispatchTime.now()
         guard let domain = IconDomains.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
@@ -309,12 +322,16 @@ struct DownloadIconCommand: AsyncCommandFix {
         }
         
         let variables = onlyVariables ?? domain.allVariables
+        
         let logger = context.application.logger
-
         let date = Timestamp.now().with(hour: run)
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
+        try await convertSurfaceElevation(logger: logger, domain: domain, run: date)
+        
         try await downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, concurrent: signature.concurrent ?? 1)
         try await convertIcon(logger: logger, domain: domain, run: date, variables: variables)
+        
+        logger.info("Finished in \(start.timeElapsedPretty())")
     }
 }
 

@@ -13,9 +13,9 @@ struct CronjobCommand: Command {
     func run(using context: CommandContext, signature: Signature) throws {
         print("""
         MAILTO=info@open-meteo.com
-        50 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon > ~/log/icon.log 2>&1 || cat ~/log/icon.log
-        10 3,9,15,21  * * * /usr/local/bin/openmeteo-api download icon-eu > ~/log/icon-eu.log 2>&1 || cat ~/log/icon-eu.log
-        0  1,4,7,10,13,16,19,22 * * * /usr/local/bin/openmeteo-api download icon-d2 > ~/log/icon-d2.log 2>&1 || cat ~/log/icon-d2.log
+        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon > ~/log/icon.log 2>&1 || cat ~/log/icon.log
+        36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu > ~/log/icon-eu.log 2>&1 || cat ~/log/icon-eu.log
+        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download icon-d2 > ~/log/icon-d2.log 2>&1 || cat ~/log/icon-d2.log
         
         45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
         0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log

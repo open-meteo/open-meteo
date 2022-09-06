@@ -29,6 +29,7 @@ struct GfsDownload: AsyncCommandFix {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
+        let start = DispatchTime.now()
         let logger = context.application.logger
         guard let domain = GfsDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
@@ -64,6 +65,8 @@ struct GfsDownload: AsyncCommandFix {
             try await downloadGfs(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
             try convertGfs(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         }
+        
+        logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
     func downloadNcepElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) async throws {
