@@ -73,7 +73,7 @@ public final class OmFileWriter {
         
         /// Create header and write to file
         let header = OmHeader(
-            compression: compressionType,
+            compression: compressionType.rawValue,
             scalefactor: scalefactor,
             dim0: dim0,
             dim1: dim1,
@@ -289,11 +289,11 @@ struct OmHeader {
     /// Magic number for the file header
     let magicNumber2: UInt8 = Self.magicNumber2
     
-    /// Version. Always 1 for now
+    /// Version. Version 1 was setting compression type incorrectly. Version 2 just fixes compression type.
     let version: UInt8 = Self.version
     
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
-    let compression: CompressionType
+    let compression: UInt8
     
     /// The scalefactor that is applied to all write data
     let scalefactor: Float
@@ -317,7 +317,7 @@ struct OmHeader {
     static var magicNumber2: UInt8 = 77
     
     /// Default version
-    static var version: UInt8 = 1
+    static var version: UInt8 = 2
     
     /// Size in bytes of the header
     static var length: Int { 40 }
@@ -361,7 +361,8 @@ public final class OmFileReader {
         chunk0 = header.chunk0
         chunk1 = header.chunk1
         scalefactor = header.scalefactor
-        compression = header.compression
+        // bug in version 1: compression type was random
+        compression = header.version == 1 ? .p4nzdec256 : CompressionType(rawValue: header.compression)!
     }
     
     /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
