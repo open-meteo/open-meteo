@@ -94,7 +94,8 @@ struct GfsDownload: AsyncCommandFix {
         var height: Array2D? = nil
         var landmask: Array2D? = nil
         let curl = Curl(logger: logger)
-        for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
+        let data = try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases)
+        for (variable, message) in zip(data.variables, data.messages) {
             var data = message.toArray2d()
             if isGlobal {
                 data.shift180LongitudeAndFlipLatitude()
@@ -146,7 +147,8 @@ struct GfsDownload: AsyncCommandFix {
             }
             //let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables) {
+            let data = try await curl.downloadIndexedGrib(url: url, variables: variables)
+            for (variable, message) in zip(data.variables, data.messages) {
                 var data = message.toArray2d()
                 /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
                     if i % 10_000 == 0 {
