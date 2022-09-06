@@ -4,7 +4,7 @@ import SwiftNetCDF
 import SwiftPFor2D
 
 /// Download CAMS Europe and Global air quality forecasts
-struct DownloadCamsCommand: Command {
+struct DownloadCamsCommand: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -32,7 +32,7 @@ struct DownloadCamsCommand: Command {
         "Download global and european CAMS air quality forecasts"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         guard let domain = CamsDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
@@ -68,20 +68,20 @@ struct DownloadCamsCommand: Command {
             guard let ftppassword = signature.ftppassword else {
                 fatalError("ftppassword is required")
             }
-            try downloadCamsGlobal(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
+            try await downloadCamsGlobal(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
             try convertCamsGlobal(logger: logger, domain: domain, run: date, variables: variables)
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            try downloadCamsEurope(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
+            try await downloadCamsEurope(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
             try convertCamsEurope(logger: logger, domain: domain, run: date, variables: variables)
         }
     }
     
     /// Download from the ECMWF CAMS ftp/http server
     /// This data is also available via the ADC API, but queue times are 4 hours!
-    func downloadCamsGlobal(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], user: String, password: String) throws {
+    func downloadCamsGlobal(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], user: String, password: String) async throws {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
@@ -115,7 +115,7 @@ struct DownloadCamsCommand: Command {
                 let dir = meta.isMultiLevel ? remoteDirAdditional : remoteDir
                 let remoteFile = "\(dir)z_cams_c_ecmf_\(dateRun)0000_prod_fc_\(levelType)_\(hour.zeroPadded(len: 3))_\(meta.gribname).nc"
                 let tempNc = "\(domain.downloadDirectory)/temp.nc"
-                try curl.download(url: remoteFile, to: tempNc)
+                try await curl.download(url: remoteFile, to: tempNc)
                 
                 guard let ncFile = try NetCDF.open(path: tempNc, allowUpdate: false) else {
                     fatalError("Could not open nc file for \(variable)")
@@ -183,7 +183,7 @@ struct DownloadCamsCommand: Command {
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func downloadCamsEurope(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) throws {
+    func downloadCamsEurope(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) async throws {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
@@ -223,7 +223,7 @@ struct DownloadCamsCommand: Command {
         
         try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
         do {
-            try Process.spawnOrDie(cmd: "python3", args: [tempPythonFile])
+            try await Process.spawnOrDie(cmd: "python3", args: [tempPythonFile])
         } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args, let stderr) {
             if code == 70 {
                 logger.info("Timestep \(run.iso8601_YYYY_MM_dd) seems to be unavailable")

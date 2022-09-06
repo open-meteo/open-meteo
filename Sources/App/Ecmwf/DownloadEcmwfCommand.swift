@@ -10,7 +10,7 @@ import SwiftNetCDF
  
  model info (not everything is open data) https://www.ecmwf.int/en/forecasts/datasets/set-i
  */
-struct DownloadEcmwfCommand: Command {
+struct DownloadEcmwfCommand: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Option(name: "run")
         var run: String?
@@ -23,7 +23,7 @@ struct DownloadEcmwfCommand: Command {
         "Download a specified ecmwf model run"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let run = signature.run.map {
             guard let run = Int($0) else {
                 fatalError("Invalid run '\($0)'")
@@ -37,11 +37,11 @@ struct DownloadEcmwfCommand: Command {
         let date = twoHoursAgo.with(hour: run)
         logger.info("Downloading domain ECMWF run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        try downloadEcmwf(logger: logger, run: date, skipFilesIfExisting: signature.skipExisting)
+        try await downloadEcmwf(logger: logger, run: date, skipFilesIfExisting: signature.skipExisting)
         try convertEcmwf(logger: logger, run: date)
     }
     
-    func downloadEcmwf(logger: Logger, run: Timestamp, skipFilesIfExisting: Bool) throws {
+    func downloadEcmwf(logger: Logger, run: Timestamp, skipFilesIfExisting: Bool) async throws {
         let domain = EcmwfDomain.ifs04
         let base = "https://data.ecmwf.int/forecasts/"
         
@@ -67,11 +67,11 @@ struct DownloadEcmwfCommand: Command {
             if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameConverted) {
                 continue
             }
-            try curl.download(
+            try await curl.download(
                 url: filenameFrom,
                 to: filenameTemp
             )
-            try Process.grib2ToNetCDFInvertLatitude(in: filenameTemp, out: filenameConverted)
+            try await Process.grib2ToNetCDFInvertLatitude(in: filenameTemp, out: filenameConverted)
         }
     }
     

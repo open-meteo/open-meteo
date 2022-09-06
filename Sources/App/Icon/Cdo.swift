@@ -3,21 +3,21 @@ import Vapor
 
 
 extension Process {
-    static func bunzip2(file: String) throws {
-        try spawnOrDie(cmd: "bunzip2", args: ["--keep", "-f", file])
+    static func bunzip2(file: String) async throws {
+        try await spawnOrDie(cmd: "bunzip2", args: ["--keep", "-f", file])
     }
     
-    static public func grib2ToNetcdf(in inn: String, out: String) throws {
-        try spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "copy", inn, out])
+    static public func grib2ToNetcdf(in inn: String, out: String) async throws {
+        try await spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "copy", inn, out])
     }
     
     /// Convert to NetCDF and shift to -180;180 longitude. Only works for global grids
-    static public func grib2ToNetcdfShiftLongitudeInvertLatitude(in inn: String, out: String) throws {
-        try spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "-invertlat", "-sellonlatbox,-180,180,-90,90", inn, out])
+    static public func grib2ToNetcdfShiftLongitudeInvertLatitude(in inn: String, out: String) async throws {
+        try await spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "-invertlat", "-sellonlatbox,-180,180,-90,90", inn, out])
     }
     
-    static public func grib2ToNetCDFInvertLatitude(in inn: String, out: String) throws {
-        try spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "invertlat", inn, out])
+    static public func grib2ToNetCDFInvertLatitude(in inn: String, out: String) async throws {
+        try await spawnOrDie(cmd: "cdo", args: ["-s","-f", "nc", "invertlat", inn, out])
     }
 }
 
@@ -27,7 +27,7 @@ struct CdoIconGlobal {
     let logger: Logger
 
     /// Download and prepare weights for icon global is missing
-    public init(logger: Logger, workDirectory: String) throws {
+    public init(logger: Logger, workDirectory: String) async throws {
         self.logger = logger
         let fileName = "icon_grid_0026_R03B07_G.nc"
         let remoteFile = "https://opendata.dwd.de/weather/lib/cdo/\(fileName).bz2"
@@ -62,18 +62,17 @@ struct CdoIconGlobal {
 
         if !fm.fileExists(atPath: localFile) {
             let curl = Curl(logger: logger)
-            try curl.download(url: remoteFile, to: localFile)
+            try await curl.download(url: remoteFile, to: localFile)
         }
 
         if !fm.fileExists(atPath: localUncompressed) {
             logger.info("Uncompressing \(localFile)")
-            try Process.bunzip2(file: localFile)
+            try await Process.bunzip2(file: localFile)
         }
 
         logger.info("Generating weights file \(weightsFile)")
-        let task = try Process.spawn(cmd: "cdo", args: ["-s","gennn,\(gridFile)", localUncompressed, weightsFile])
-        task.waitUntilExit()
-        guard task.terminationStatus == 0 else {
+        let terminationStatus = try await Process.spawn(cmd: "cdo", args: ["-s","gennn,\(gridFile)", localUncompressed, weightsFile])
+        guard terminationStatus == 0 else {
             fatalError("Cdo gennn failed")
         }
 
@@ -81,8 +80,8 @@ struct CdoIconGlobal {
         try FileManager.default.removeItem(atPath: localFile)
     }
 
-    public func remap(in inn: String, out: String) throws {
+    public func remap(in inn: String, out: String) async throws {
         logger.info("Remapping file \(inn)")
-        try Process.spawnOrDie(cmd: "cdo", args: ["-s", "-f", "nc", "remap,\(gridFile),\(weightsFile)", inn, out])
+        try await Process.spawnOrDie(cmd: "cdo", args: ["-s", "-f", "nc", "remap,\(gridFile),\(weightsFile)", inn, out])
     }
 }

@@ -3,6 +3,20 @@ import Vapor
 import SwiftNetCDF
 import SwiftPFor2D
 
+/// Workaround to use async in commans
+/// Wait for https://github.com/vapor/vapor/pull/2870
+protocol AsyncCommandFix: Command {
+    func run(using context: CommandContext, signature: Signature) async throws
+}
+
+extension AsyncCommandFix {
+    func run(using context: CommandContext, signature: Signature) throws {
+        let promise = context.application.eventLoopGroup.next().makePromise(of: Void.self)
+        promise.completeWithTask {
+            try await run(using: context, signature: signature)
+        }
+    }
+}
 
 /**
  Download digital elevation model from Copernicus and Sinergise https://copernicus-dem-30m.s3.amazonaws.com/readme.html
@@ -71,7 +85,7 @@ struct Dem90 {
 /**
  Download digital elevation model from Sinergise https://copernicus-dem-30m.s3.amazonaws.com/readme.html
  */
-struct DownloadDemCommand: Command {
+struct DownloadDemCommand: AsyncCommandFix {
     var help: String {
         return "Convert digital elevation model"
     }
@@ -81,7 +95,7 @@ struct DownloadDemCommand: Command {
         var path: String
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         try FileManager.default.createDirectory(atPath: Dem90.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: Dem90.omDirectory, withIntermediateDirectories: true)
         let logger = context.application.logger
@@ -124,7 +138,7 @@ struct DownloadDemCommand: Command {
                     continue
                 }*/
                 
-                try Process.spawnOrDie(cmd: "gdal_translate", args: ["-of","NetCDF",tifLocal,ncTemp])
+                try await Process.spawnOrDie(cmd: "gdal_translate", args: ["-of","NetCDF",tifLocal,ncTemp])
                 //try FileManager.default.removeItem(atPath: tifTemp)
                 
                 let data = try readNc(file: ncTemp)

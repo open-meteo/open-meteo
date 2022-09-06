@@ -11,10 +11,10 @@ public extension Process {
     static var lock = Lock()
     
     /// Get the absolute path of an executable
-    static func findExecutable(cmd: String) throws -> String {
+    static func findExecutable(cmd: String) async throws -> String {
         var command: String
         if !cmd.hasPrefix("/") {
-            command = (try? spawnWithOutput(cmd: "/usr/bin/which", args: [cmd]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)) ?? ""
+            command = (try? await spawnWithOutput(cmd: "/usr/bin/which", args: [cmd]).trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)) ?? ""
         } else {
             command = cmd
         }
@@ -33,47 +33,45 @@ public extension Process {
         return command
     }
     
-    /// Spawn a Process with optional attached pipes
-    static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil, stderr: Pipe? = nil) throws -> Process {
-        let command = try findExecutable(cmd: cmd)
+    /// Spawn async. Returns termination status code
+    static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil, stderr: Pipe? = nil) async throws -> Int32 {
+        let command = try await findExecutable(cmd: cmd)
         
-        // 2022-09-06: Debugging crashes from multi threaded downloads
-        // Maybe some process internals are not thread safe
-        return try lock.withLock {
+        return try await withCheckedThrowingContinuation { continuation in
             let proc = Process()
             proc.executableURL = URL(fileURLWithPath: command)
             proc.arguments = args
-
+            proc.terminationHandler = { task in
+                continuation.resume(returning: task.terminationStatus)
+            }
             if let pipe = stdout {
                 proc.standardOutput = pipe
             }
             if let pipe = stderr {
                 proc.standardError = pipe
             }
-            /// somehow this crashes from time to time with a bad file descriptor
+            
             do {
                 try proc.run()
             } catch {
-                //print("command failed, retry")
-                try proc.run()
-            }
-            return proc
-        }
-    }
-
-    static func spawnOrDie(cmd: String, args: [String]?) throws {
-        let task = try Process.spawn(cmd: cmd, args: args)
-        task.waitUntilExit()
-        // 2022-09-06: Debugging crashes from multi threaded downloads
-        // Maybe some process internals are not thread safe
-        try lock.withLock {
-            guard task.terminationStatus == 0 else {
-                throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: nil)
+                /// somehow this crashes from time to time with a bad file descriptor
+                do {
+                    try proc.run()
+                } catch {
+                    continuation.resume(throwing: error)
+                }
             }
         }
     }
     
-    static func spawnWithOutputData(cmd: String, args: [String]?) throws -> Data {
+    static func spawnOrDie(cmd: String, args: [String]?) async throws {
+        let terminationStatus = try await Process.spawn(cmd: cmd, args: args)
+        guard terminationStatus == 0 else {
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: nil)
+        }
+    }
+    
+    static func spawnWithOutputData(cmd: String, args: [String]?) async throws -> Data {
         let pipe = Pipe()
         
         var data = Data()
@@ -87,8 +85,7 @@ public extension Process {
             data.append(handle.availableData)
         }
         
-        let task = try Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
-        task.waitUntilExit()
+        let terminationStatus = try await Process.spawn(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
         
         if let end = try pipe.fileHandleForReading.readToEnd() {
             data.append(end)
@@ -103,14 +100,14 @@ public extension Process {
         try eerror.fileHandleForReading.close()
         try eerror.fileHandleForWriting.close()
         
-        guard task.terminationStatus == 0 else {
+        guard terminationStatus == 0 else {
             let error = String(data: errorData, encoding: .utf8)
-            throw SpawnError.commandFailed(cmd: cmd, returnCode: task.terminationStatus, args: args, stderr: error)
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: error)
         }
         return data
     }
-
-    static func spawnWithOutput(cmd: String, args: [String]?) throws -> String {
-        return String(data: try spawnWithOutputData(cmd: cmd, args: args), encoding: String.Encoding.utf8)!
+    
+    static func spawnWithOutput(cmd: String, args: [String]?) async throws -> String {
+        return String(data: try await spawnWithOutputData(cmd: cmd, args: args), encoding: String.Encoding.utf8)!
     }
 }

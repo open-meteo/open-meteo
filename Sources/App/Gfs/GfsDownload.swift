@@ -6,7 +6,7 @@ import SwiftPFor2D
 /**
 NCEP GFS downloader
  */
-struct GfsDownload: Command {
+struct GfsDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -28,7 +28,7 @@ struct GfsDownload: Command {
         "Download GFS from NOAA NCEP"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         guard let domain = GfsDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
@@ -61,12 +61,12 @@ struct GfsDownload: Command {
             /// 18z run is available the day after starting 05:26
             let date = Timestamp.now().with(hour: run)
             
-            try downloadGfs(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
+            try await downloadGfs(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
             try convertGfs(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         }
     }
     
-    func downloadNcepElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) throws {
+    func downloadNcepElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) async throws {
         /// download seamask and height
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
@@ -91,7 +91,7 @@ struct GfsDownload: Command {
         var height: Array2D? = nil
         var landmask: Array2D? = nil
         let curl = Curl(logger: logger)
-        for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
+        for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
             var data = message.toArray2d()
             if isGlobal {
                 data.shift180LongitudeAndFlipLatitude()
@@ -116,12 +116,12 @@ struct GfsDownload: Command {
     }
     
     /// download GFS025 and NAM CONUS
-    func downloadGfs(logger: Logger, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool) throws {
+    func downloadGfs(logger: Logger, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool) async throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0)
-        try downloadNcepElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
+        try await downloadNcepElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         
         let deadLineHours = domain == .gfs025 ? 4 : 2
         let curl = Curl(logger: logger, deadLineHours: deadLineHours)
@@ -143,7 +143,7 @@ struct GfsDownload: Command {
             }
             //let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: variables) {
+            for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables) {
                 var data = message.toArray2d()
                 /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
                     if i % 10_000 == 0 {

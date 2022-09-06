@@ -31,7 +31,7 @@ struct Curl {
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
     }
 
-    func download(url: String, to: String, range: String? = nil) throws {
+    func download(url: String, to: String, range: String? = nil) async throws {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
             let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
@@ -56,7 +56,7 @@ struct Curl {
         var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
         while true {
             do {
-                try Process.spawnOrDie(cmd: "curl", args: args)
+                try await Process.spawnOrDie(cmd: "curl", args: args)
                 return
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
@@ -73,7 +73,7 @@ struct Curl {
         }
     }
     
-    func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> Data {
+    func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) async throws -> Data {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
             let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
@@ -99,7 +99,7 @@ struct Curl {
         var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
         while true {
             do {
-                let data = try Process.spawnWithOutputData(cmd: "curl", args: args)
+                let data = try await Process.spawnWithOutputData(cmd: "curl", args: args)
                 if let minSize = minSize, data.count < minSize {
                     throw CurlError.sizeTooSmall
                 }
@@ -121,14 +121,14 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, message: GribMessage)> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) async throws -> AnyIterator<(variable: Variable, message: GribMessage)> {
         
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return AnyIterator { return nil }
         }
         
-        guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
+        guard let index = String(data: try await downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
             fatalError("Could not decode index to string")
         }
 
@@ -173,7 +173,7 @@ struct Curl {
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
             do {
-                let data = try downloadInMemory(url: url, range: range.range, minSize: range.minSize)
+                let data = try await downloadInMemory(url: url, range: range.range, minSize: range.minSize)
                 logger.debug("Converting GRIB, size \(data.count) bytes (expected minSize \(range.minSize))")
                 //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
                 return try data.withUnsafeBytes { data in

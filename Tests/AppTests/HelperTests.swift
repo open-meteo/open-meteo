@@ -50,4 +50,14 @@ final class HelperTests: XCTestCase {
             line.contains(":")
         })*/
     }
+    
+    func testSpawn() async throws {
+        let time = DispatchTime.now()
+        async let a: () = try Process.spawnOrDie(cmd: "sleep", args: ["1"])
+        async let b: () = try Process.spawnOrDie(cmd: "sleep", args: ["1"])
+        try await a
+        try await b
+        let elapsedMs = Double((DispatchTime.now().uptimeNanoseconds - time.uptimeNanoseconds) / 1_000_000)
+        XCTAssertLessThan(elapsedMs, 1200)
+    }
 }
