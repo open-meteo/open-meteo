@@ -42,6 +42,8 @@ public extension Process {
                 proc.arguments = args
                 proc.terminationHandler = { task in
                     continuation.resume(returning: task.terminationStatus)
+                    // unset terminationHandler to make sure `continuation` can be released
+                    task.terminationHandler = nil
                 }
                 if let pipe = stdout {
                     proc.standardOutput = pipe

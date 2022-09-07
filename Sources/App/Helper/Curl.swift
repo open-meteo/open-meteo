@@ -174,13 +174,13 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> GribWithData<Variable> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) async throws -> GribWithData<Variable> {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return GribWithData(storage: nil, messages: [], variables: [])
         }
         
-        var indexData = try downloadInMemory(url: "\(url).idx")
+        var indexData = try await downloadInMemory(url: "\(url).idx")
         guard let index = indexData.readString(length: indexData.readableBytes) else {
             fatalError("Could not decode index to string")
         }
@@ -225,7 +225,7 @@ struct Curl {
         
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
-            let data = try downloadInMemory(url: url, range: range.range, minSize: range.minSize)
+            let data = try await downloadInMemory(url: url, range: range.range, minSize: range.minSize)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes (expected minSize \(range.minSize))")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
