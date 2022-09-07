@@ -30,49 +30,6 @@ struct Curl {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
     }
-
-    /// Note: there might be some issues with memory leaks
-    func downloadAsync(url: String, to: String, range: String? = nil) async throws {
-        // URL might contain password, strip them from logging
-        if url.contains("@") && url.contains(":") {
-            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
-            logger.info("Downloading file \(urlSafe)")
-        } else {
-            logger.info("Downloading file \(url)")
-        }
-        
-        let startTime = Date()
-        let args = (range.map{["-r",$0]} ?? []) + [
-            "-s",
-            "--show-error",
-            "--fail", // also retry 404
-            "--insecure", // ignore expired or invalid SSL certs
-            "--retry-connrefused",
-            "--limit-rate", "10M", // Limit to 10 MB/s -> 80 Mbps
-            "--connect-timeout", "\(connectTimeout)",
-            "--max-time", "\(maxTimeSeconds)",
-            "-o", to,
-            url
-        ]
-        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
-        while true {
-            do {
-                try await Process.spawn(cmd: "curl", args: args)
-                return
-            } catch {
-                let timeElapsed = Date().timeIntervalSince(startTime)
-                if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
-                    lastPrint = Date()
-                }
-                if Date() > deadline {
-                    logger.error("Deadline reached")
-                    throw error
-                }
-                sleep(UInt32(retryDelaySeconds))
-            }
-        }
-    }
     
     func download(url: String, to: String, range: String? = nil) throws {
         // URL might contain password, strip them from logging

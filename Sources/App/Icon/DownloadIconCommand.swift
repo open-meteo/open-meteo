@@ -10,24 +10,24 @@ struct CdoHelper {
     let grid: Gridable
     let domain: IconDomains
     
-    init(domain: IconDomains, logger: Logger) async throws {
+    init(domain: IconDomains, logger: Logger) throws {
         // icon global needs resampling to plate carree
-        cdo = domain == .icon ? try await CdoIconGlobal(logger: logger, workDirectory: domain.downloadDirectory) : nil
+        cdo = domain == .icon ? try CdoIconGlobal(logger: logger, workDirectory: domain.downloadDirectory) : nil
         grid = domain.grid
         self.domain = domain
     }
     
-    func readGrib2Bz2(_ filename: String) async throws -> [Float] {
+    func readGrib2Bz2(_ filename: String) throws -> [Float] {
         let gribFile = String(filename.dropLast(4))
         let tempNc = "\(gribFile).nc"
         
-        try await Process.bunzip2(file: filename)
+        try Process.bunzip2(file: filename)
         if let cdo = cdo {
             // resample to regular latlon (icon global)
-            try await cdo.remap(in: gribFile, out: tempNc)
+            try cdo.remap(in: gribFile, out: tempNc)
         } else {
             // just convert grib2 to netcdf
-            try await Process.grib2ToNetcdf(in: gribFile, out: tempNc)
+            try Process.grib2ToNetcdf(in: gribFile, out: tempNc)
         }
         try FileManager.default.removeItem(atPath: gribFile)
         let data = try readNetCdf(path: tempNc)
@@ -60,16 +60,13 @@ struct CdoHelper {
     }
 }
 
-struct DownloadIconCommand: AsyncCommandFix {
+struct DownloadIconCommand: Command {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
 
         @Option(name: "run")
         var run: String?
-        
-        @Option(name: "concurrent", help: "Number of parallel downloads")
-        var concurrent: Int?
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
@@ -85,7 +82,7 @@ struct DownloadIconCommand: AsyncCommandFix {
     /**
      Convert surface elevation. Out of grid positions are NaN. Sea grid points are -999.
      */
-    func convertSurfaceElevation(logger: Logger, domain: IconDomains, run: Timestamp) async throws {
+    func convertSurfaceElevation(logger: Logger, domain: IconDomains, run: Timestamp) throws {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             return
         }
@@ -96,7 +93,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger)
+        let cdo = try CdoHelper(domain: domain, logger: logger)
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
@@ -131,11 +128,11 @@ struct DownloadIconCommand: AsyncCommandFix {
         }
         
         // use special numbers for SEA grid points?
-        try await Process.bunzip2(file: "\(domain.downloadDirectory)time-invariant_HSURF.grib2.bz2")
-        var hsurf = try await cdo.readGrib2Bz2("\(domain.downloadDirectory)time-invariant_HSURF.grib2.bz2")
+        try Process.bunzip2(file: "\(domain.downloadDirectory)time-invariant_HSURF.grib2.bz2")
+        var hsurf = try cdo.readGrib2Bz2("\(domain.downloadDirectory)time-invariant_HSURF.grib2.bz2")
         
-        try await Process.bunzip2(file: "\(domain.downloadDirectory)time-invariant_FR_LAND.grib2.bz2")
-        let landFraction = try await cdo.readGrib2Bz2("\(domain.downloadDirectory)time-invariant_FR_LAND.grib2.bz2")
+        try Process.bunzip2(file: "\(domain.downloadDirectory)time-invariant_FR_LAND.grib2.bz2")
+        let landFraction = try cdo.readGrib2Bz2("\(domain.downloadDirectory)time-invariant_FR_LAND.grib2.bz2")
         
         // Set all sea grid points to -999
         precondition(hsurf.count == landFraction.count)
@@ -150,13 +147,13 @@ struct DownloadIconCommand: AsyncCommandFix {
     
     
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable], concurrent: Int) async throws {
+    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable]) throws {
         let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger)
+        let cdo = try CdoHelper(domain: domain, logger: logger)
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
@@ -165,63 +162,52 @@ struct DownloadIconCommand: AsyncCommandFix {
         let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        var jobNumber = 0
-        try await withThrowingTaskGroup(of: Void.self) { group in
-            for hour in forecastSteps {
-                logger.info("Downloading hour \(hour)")
-                let h3 = hour.zeroPadded(len: 3)
-                for variable in variables {
-                    if hour == 0 && variable.skipHour0 {
-                        continue
-                    }
-                    let v = variable.getVarAndLevel(domain: domain)
-                    let level = v.level.map({"_\($0)"}) ?? ""
-                    let leveld2 = v.level.map({"_\($0)"}) ?? "_2d"
-                    let filenameFrom = domain != .iconD2 ?
-                        "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable.uppercased()).grib2.bz2" :
-                        "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(leveld2)_\(v.variable).grib2.bz2"
-                    
-                    let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
-                    if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
-                        continue
-                    }
-                    
-                    if jobNumber >= concurrent {
-                        try await group.next()
-                    }
-                    jobNumber += 1
-                    
-                    group.addTask {
-                        let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
-                        try await curl.downloadAsync(
-                            url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
-                            to: gribFile
-                        )
-                        // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
-                        // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
-                        var data = try await cdo.readGrib2Bz2(gribFile)
-                        try FileManager.default.removeItem(atPath: gribFile)
-                        // Write data as encoded floats to disk
-                        try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
-                        
-                        // Scaling before compression with scalefactor
-                        if let fma = variable.multiplyAdd {
-                            data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                        }
-                        
-                        logger.info("Compressing and writing data to \(filenameDest)")
-                        let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                        try OmFileWriter.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data)
-                    }
+        for hour in forecastSteps {
+            logger.info("Downloading hour \(hour)")
+            let h3 = hour.zeroPadded(len: 3)
+            for variable in variables {
+                if hour == 0 && variable.skipHour0 {
+                    continue
                 }
+                let v = variable.getVarAndLevel(domain: domain)
+                let level = v.level.map({"_\($0)"}) ?? ""
+                let leveld2 = v.level.map({"_\($0)"}) ?? "_2d"
+                let filenameFrom = domain != .iconD2 ?
+                    "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable.uppercased()).grib2.bz2" :
+                    "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(leveld2)_\(v.variable).grib2.bz2"
+                
+                let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
+                if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
+                    continue
+                }
+            
+                let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
+                try curl.download(
+                    url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
+                    to: gribFile
+                )
+                // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
+                // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
+                var data = try cdo.readGrib2Bz2(gribFile)
+                try FileManager.default.removeItem(atPath: gribFile)
+                // Write data as encoded floats to disk
+                try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
+                
+                // Scaling before compression with scalefactor
+                if let fma = variable.multiplyAdd {
+                    data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                logger.info("Compressing and writing data to \(filenameDest)")
+                let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                try OmFileWriter.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data)
             }
-            try await group.waitForAll()
         }
     }
 
     /// unompress and remap
     /// Process variable after variable
-    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariableDownloadable]) async throws {
+    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariableDownloadable]) throws {
         let downloadDirectory = domain.downloadDirectory
         let grid = domain.grid
         
@@ -297,7 +283,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)
     }
 
-    func run(using context: CommandContext, signature: Signature) async throws {
+    func run(using context: CommandContext, signature: Signature) throws {
         let start = DispatchTime.now()
         guard let domain = IconDomains.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
@@ -327,10 +313,10 @@ struct DownloadIconCommand: AsyncCommandFix {
         let logger = context.application.logger
         let date = Timestamp.now().with(hour: run)
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
-        try await convertSurfaceElevation(logger: logger, domain: domain, run: date)
+        try convertSurfaceElevation(logger: logger, domain: domain, run: date)
         
-        try await downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, concurrent: signature.concurrent ?? 1)
-        try await convertIcon(logger: logger, domain: domain, run: date, variables: variables)
+        try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
+        try convertIcon(logger: logger, domain: domain, run: date, variables: variables)
         
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -355,7 +341,7 @@ extension IconDomains {
 
 /// Workaround to use async in commans
 /// Wait for https://github.com/vapor/vapor/pull/2870
-protocol AsyncCommandFix: Command {
+/*protocol AsyncCommandFix: Command {
     func run(using context: CommandContext, signature: Signature) async throws
 }
 
@@ -367,4 +353,4 @@ extension AsyncCommandFix {
         }
         try promise.futureResult.wait()
     }
-}
+}*/
