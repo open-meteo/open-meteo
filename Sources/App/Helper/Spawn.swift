@@ -1,5 +1,6 @@
 import Foundation
 import NIOConcurrencyHelpers
+import NIOCore
 
 
 enum SpawnError: Error {
@@ -66,38 +67,38 @@ public extension Process {
     /// Always captures `stderr`. Otherwise it is just flooding logs.
     static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil) async throws {
         let eerror = Pipe()
-        var errorData = Data()
+        var errorData = ByteBuffer()
         eerror.fileHandleForReading.readabilityHandler = { handle in
-            errorData.append(handle.availableData)
+            errorData.writeData(handle.availableData)
         }
         
         let terminationStatus = try await Process.spawnWithPipes(cmd: cmd, args: args, stdout: stdout, stderr: eerror)
         
         eerror.fileHandleForReading.readabilityHandler = nil
         if let end = try eerror.fileHandleForReading.readToEnd() {
-            errorData.append(end)
+            errorData.writeData(end)
         }
         try eerror.fileHandleForReading.close()
         try eerror.fileHandleForWriting.close()
         
         guard terminationStatus == 0 else {
-            let error = String(data: errorData, encoding: .utf8)
+            let error = errorData.readString(length: errorData.readableBytes) ?? ""
             throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: error)
         }
     }
     
-    static func spawnWithOutputData(cmd: String, args: [String]?) async throws -> Data {
+    static func spawnWithOutputData(cmd: String, args: [String]?) async throws -> ByteBuffer {
         let pipe = Pipe()
-        var data = Data()
+        var data = ByteBuffer()
         pipe.fileHandleForReading.readabilityHandler = { handle in
-            data.append(handle.availableData)
+            data.writeData(handle.availableData)
         }
         
         try await Process.spawn(cmd: cmd, args: args, stdout: pipe)
         
         pipe.fileHandleForReading.readabilityHandler = nil
         if let end = try pipe.fileHandleForReading.readToEnd() {
-            data.append(end)
+            data.writeData(end)
         }
         try pipe.fileHandleForReading.close()
         try pipe.fileHandleForWriting.close()
@@ -105,6 +106,7 @@ public extension Process {
     }
     
     static func spawnWithOutput(cmd: String, args: [String]?) async throws -> String {
-        return String(data: try await spawnWithOutputData(cmd: cmd, args: args), encoding: String.Encoding.utf8)!
+        var data = try await spawnWithOutputData(cmd: cmd, args: args)
+        return data.readString(length: data.readableBytes) ?? ""
     }
 }
