@@ -74,6 +74,9 @@ struct DownloadIconCommand: Command {
         @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
         var upperLevel: Bool
         
+        @Flag(name: "model-level", help: "Download upper-level variables on model levels")
+        var modelLevel: Bool
+        
         @Option(name: "only-variables")
         var onlyVariables: String?
     }
@@ -311,14 +314,23 @@ struct DownloadIconCommand: Command {
             }
         }
         
-        let surfaceVariables = IconSurfaceVariable.allCases
+        /// 3 different variables sets to optimise download time:
+        /// - surface variables with soil
+        /// - model-level e.g. for 180m wind, they have a much larger dalay and sometimes are aborted
+        /// - pressure level which take forever to download because it is too much data
+        let surfaceVariables = IconSurfaceVariable.allCases.filter {
+            $0.getVarAndLevel(domain: domain).cat != "model-level"
+        }
+        let modelLevelVariables = IconSurfaceVariable.allCases.filter {
+            $0.getVarAndLevel(domain: domain).cat == "model-level"
+        }
         let pressureVariables = domain.levels.reversed().flatMap { level in
             IconPressureVariableType.allCases.map { variable in
                 IconPressureVariable(variable: variable, level: level)
             }
         }
         
-        let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
+        let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : (signature.modelLevel ? modelLevelVariables : surfaceVariables))
         
         let logger = context.application.logger
         let date = Timestamp.now().with(hour: run)
