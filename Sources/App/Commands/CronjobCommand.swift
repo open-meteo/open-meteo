@@ -17,6 +17,10 @@ struct CronjobCommand: Command {
         36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu > ~/log/icon-eu.log 2>&1 || cat ~/log/icon-eu.log
         44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download icon-d2 > ~/log/icon-d2.log 2>&1 || cat ~/log/icon-d2.log
         
+        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon --upper-level > ~/log/icon_upper-level.log 2>&1 || cat ~/log/icon_upper-level.log
+        36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu --upper-level > ~/log/icon-eu_upper-level.log 2>&1 || cat ~/log/icon-eu_upper-level.log
+        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download --upper-level icon-d2 > ~/log/icon-d2_upper-level.log 2>&1 || cat ~/log/icon-d2_upper-level.log
+        
         45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
         0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
         
@@ -31,8 +35,10 @@ struct CronjobCommand: Command {
         20 5,11,17,23 * * * /usr/local/bin/openmeteo-api download-seasonal-forecast ncep > ~/log/seasonal_ncep.log 2>&1 || cat ~/log/seasonal_ncep.log
         
         40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs025 > ~/log/gfs025.log 2>&1 || cat ~/log/gfs025.log
-        # 40 1,7,13,19 * * * /usr/local/bin/openmeteo-api download-gfs nam_conus > ~/log/nam_conus.log 2>&1 || cat ~/log/nam_conus.log
         55 * * * * /usr/local/bin/openmeteo-api download-gfs hrrr_conus > ~/log/hrrr_conus.log 2>&1 || cat ~/log/hrrr_conus.log
+        
+        40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs025 --upper-level > ~/log/gfs025_upper-level.log 2>&1 || cat ~/log/gfs025_upper-level.log
+        55 * * * * /usr/local/bin/openmeteo-api download-gfs hrrr_conus --upper-level > ~/log/hrrr_conus_upper-level.log 2>&1 || cat ~/log/hrrr_conus_upper-level.log
         """)
     }
 }

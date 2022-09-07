@@ -117,18 +117,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     static var apiLevels: [Int] {
         return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 975, 1000]
     }
-    
-    /// All surface and pressure variables
-    var allVariables: [IconVariableDownloadable] {
-        let surface = IconSurfaceVariable.allCases
-        let pressure = levels.reversed().flatMap { level in
-            IconPressureVariableType.allCases.map { variable in
-                IconPressureVariable(variable: variable, level: level)
-            }
-        }
-        return surface + pressure
-    }
-    
+
     /// Number  of forecast hours per run
     func nForecastHours(run: Int) -> Int {
         switch self {

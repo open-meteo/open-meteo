@@ -98,17 +98,6 @@ enum GfsDomain: String, GenericDomain {
         
     }
     
-    var allVariables: [GfsVariableDownloadable] {
-        /// process level by level to reduce the time while U/V components are updated
-        let pressure = levels.reversed().flatMap { level in
-            GfsPressureVariableType.allCases.map { variable in
-                GfsPressureVariable(variable: variable, level: level)
-            }
-        }
-        let surface = GfsSurfaceVariable.allCases
-        return surface + pressure
-    }
-    
     var omFileLength: Int {
         switch self {
         //case .nam_conus:

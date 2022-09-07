@@ -71,6 +71,9 @@ struct DownloadIconCommand: Command {
         @Flag(name: "skip-existing")
         var skipExisting: Bool
         
+        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
+        var upperLevel: Bool
+        
         @Option(name: "only-variables")
         var onlyVariables: String?
     }
@@ -308,7 +311,14 @@ struct DownloadIconCommand: Command {
             }
         }
         
-        let variables = onlyVariables ?? domain.allVariables
+        let surfaceVariables = IconSurfaceVariable.allCases
+        let pressureVariables = domain.levels.reversed().flatMap { level in
+            IconPressureVariableType.allCases.map { variable in
+                IconPressureVariable(variable: variable, level: level)
+            }
+        }
+        
+        let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
         
         let logger = context.application.logger
         let date = Timestamp.now().with(hour: run)

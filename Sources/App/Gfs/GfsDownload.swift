@@ -22,6 +22,9 @@ struct GfsDownload: Command {
         
         @Option(name: "only-variables")
         var onlyVariables: String?
+        
+        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
+        var upperLevel: Bool
     }
 
     var help: String {
@@ -47,7 +50,7 @@ struct GfsDownload: Command {
                 return run
             } ?? domain.lastRun
             
-            let variables: [GfsVariableDownloadable] = signature.onlyVariables.map {
+            let onlyVariables: [GfsVariableDownloadable]? = signature.onlyVariables.map {
                 $0.split(separator: ",").map {
                     if let variable = GfsPressureVariable(rawValue: String($0)) {
                         return variable
@@ -57,7 +60,16 @@ struct GfsDownload: Command {
                     }
                     return variable
                 }
-            } ?? domain.allVariables
+            }
+            
+            let pressureVariables = domain.levels.reversed().flatMap { level in
+                GfsPressureVariableType.allCases.map { variable in
+                    GfsPressureVariable(variable: variable, level: level)
+                }
+            }
+            let surfaceVariables = GfsSurfaceVariable.allCases
+            
+            let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
             
             /// 18z run is available the day after starting 05:26
             let date = Timestamp.now().with(hour: run)
