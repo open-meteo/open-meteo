@@ -61,6 +61,15 @@ struct CdoHelper {
 }
 
 struct DownloadIconCommand: Command {
+    enum VariableGroup: String, RawRepresentable {
+        case all
+        case surface
+        case modelLevel
+        case pressureLevel
+        case pressureLevelGt500
+        case pressureLevelLtE500
+    }
+    
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -71,11 +80,8 @@ struct DownloadIconCommand: Command {
         @Flag(name: "skip-existing")
         var skipExisting: Bool
         
-        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
-        var upperLevel: Bool
-        
-        @Flag(name: "model-level", help: "Download upper-level variables on model levels")
-        var modelLevel: Bool
+        @Option(name: "group")
+        var group: String?
         
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -302,6 +308,13 @@ struct DownloadIconCommand: Command {
             return run
         } ?? domain.lastRun
         
+        let group: VariableGroup = signature.group.map { str in
+            guard let group = VariableGroup.init(rawValue: str) else {
+                fatalError("Invalid group '\(str)'")
+            }
+            return group
+        } ?? .all
+        
         let onlyVariables: [IconVariableDownloadable]? = signature.onlyVariables.map {
             $0.split(separator: ",").map {
                 if let variable = IconPressureVariable(rawValue: String($0)) {
@@ -318,20 +331,44 @@ struct DownloadIconCommand: Command {
         /// - surface variables with soil
         /// - model-level e.g. for 180m wind, they have a much larger dalay and sometimes are aborted
         /// - pressure level which take forever to download because it is too much data
-        let surfaceVariables = IconSurfaceVariable.allCases.filter {
-            $0.getVarAndLevel(domain: domain).cat != "model-level"
-        }
-        let modelLevelVariables = IconSurfaceVariable.allCases.filter {
-            $0.getVarAndLevel(domain: domain).cat == "model-level"
-        }
-        let pressureVariables = domain.levels.reversed().flatMap { level in
-            IconPressureVariableType.allCases.map { variable in
-                IconPressureVariable(variable: variable, level: level)
+        var groupVariables: [IconVariableDownloadable]
+        switch group {
+        case .all:
+            groupVariables = IconSurfaceVariable.allCases + domain.levels.reversed().flatMap { level in
+                IconPressureVariableType.allCases.map { variable in
+                    IconPressureVariable(variable: variable, level: level)
+                }
+            }
+        case .surface:
+            groupVariables = IconSurfaceVariable.allCases.filter {
+                $0.getVarAndLevel(domain: domain).cat != "model-level"
+            }
+        case .modelLevel:
+            groupVariables = IconSurfaceVariable.allCases.filter {
+                $0.getVarAndLevel(domain: domain).cat == "model-level"
+            }
+        case .pressureLevel:
+            groupVariables = domain.levels.reversed().flatMap { level in
+                IconPressureVariableType.allCases.map { variable in
+                    IconPressureVariable(variable: variable, level: level)
+                }
+            }
+        case .pressureLevelGt500:
+            groupVariables = domain.levels.reversed().flatMap { level in
+                return level > 500 ? IconPressureVariableType.allCases.map { variable in
+                    IconPressureVariable(variable: variable, level: level)
+                } : []
+            }
+        case .pressureLevelLtE500:
+            groupVariables = domain.levels.reversed().flatMap { level in
+                return level <= 500 ? IconPressureVariableType.allCases.map { variable in
+                    IconPressureVariable(variable: variable, level: level)
+                } : []
             }
         }
         
-        let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : (signature.modelLevel ? modelLevelVariables : surfaceVariables))
-        
+        let variables = onlyVariables ?? groupVariables
+                
         let logger = context.application.logger
         let date = Timestamp.now().with(hour: run)
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")

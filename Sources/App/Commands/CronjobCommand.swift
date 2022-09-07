@@ -13,17 +13,18 @@ struct CronjobCommand: Command {
     func run(using context: CommandContext, signature: Signature) throws {
         print("""
         MAILTO=info@open-meteo.com
-        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon > ~/log/icon.log 2>&1 || cat ~/log/icon.log
-        36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu > ~/log/icon-eu.log 2>&1 || cat ~/log/icon-eu.log
-        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download icon-d2 > ~/log/icon-d2.log 2>&1 || cat ~/log/icon-d2.log
+        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download --group surface icon > ~/log/icon.log 2>&1 || cat ~/log/icon.log
+        36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download --group surface icon-eu > ~/log/icon-eu.log 2>&1 || cat ~/log/icon-eu.log
+        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download --group surface icon-d2 > ~/log/icon-d2.log 2>&1 || cat ~/log/icon-d2.log
         
-        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon --upper-level > ~/log/icon_upper-level.log 2>&1 || cat ~/log/icon_upper-level.log
-        36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu --upper-level > ~/log/icon-eu_upper-level.log 2>&1 || cat ~/log/icon-eu_upper-level.log
-        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download --upper-level icon-d2 > ~/log/icon-d2_upper-level.log 2>&1 || cat ~/log/icon-d2_upper-level.log
+        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download --group pressureLevelGt500 icon > ~/log/icon_upper-levelgt500.log 2>&1 || cat ~/log/icon_upper-levelgt500.log
+                37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download --group pressureLevelLtE500 icon > ~/log/icon_upper-levellte500.log 2>&1 || cat ~/log/icon_upper-levellte500.log
+        36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download --group pressureLevel icon-eu > ~/log/icon-eu_upper-level.log 2>&1 || cat ~/log/icon-eu_upper-level.log
+        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api --group pressureLevel download icon-d2 > ~/log/icon-d2_upper-level.log 2>&1 || cat ~/log/icon-d2_upper-level.log
         
-        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon --model-level > ~/log/icon_model-level.log 2>&1 || cat ~/log/icon_model-level.log
-        36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu --model-level > ~/log/icon-eu_model-level.log 2>&1 || cat ~/log/icon-eu_model-level.log
-        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download --model-level icon-d2 > ~/log/icon-d2_model-level.log 2>&1 || cat ~/log/icon-d2_model-level.log
+        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download --group modelLevel icon > ~/log/icon_model-level.log 2>&1 || cat ~/log/icon_model-level.log
+        36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download --group modelLevel icon-eu > ~/log/icon-eu_model-level.log 2>&1 || cat ~/log/icon-eu_model-level.log
+        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download --group modelLevel icon-d2 > ~/log/icon-d2_model-level.log 2>&1 || cat ~/log/icon-d2_model-level.log
         
         45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
         0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
