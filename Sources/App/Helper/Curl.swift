@@ -73,6 +73,53 @@ struct Curl {
         }
     }
     
+    /// Wait for a download to finish
+    func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> ByteBuffer {
+        // URL might contain password, strip them from logging
+        if url.contains("@") && url.contains(":") {
+            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
+            logger.info("Downloading file \(urlSafe)")
+        } else {
+            logger.info("Downloading file \(url)")
+        }
+        
+        let startTime = Date()
+        let args = (range.map{["-r",$0]} ?? []) + [
+            "-s",
+            "--show-error",
+            "--fail", // also retry 404
+            "--insecure", // ignore expired or invalid SSL certs
+            "--retry-connrefused",
+            "--limit-rate", "10M", // Limit to 10 MB/s -> 80 Mbps
+            "--connect-timeout", "\(connectTimeout)",
+            "--max-time", "\(maxTimeSeconds)",
+            url
+        ]
+        //logger.debug("Curl command: \(args.joined(separator: " "))")
+        
+        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
+        while true {
+            do {
+                let data = try Process.spawnWithOutputData(cmd: "curl", args: args)
+                if let minSize = minSize, data.readableBytes < minSize {
+                    throw CurlError.sizeTooSmall
+                }
+                return data
+            } catch {
+                let timeElapsed = Date().timeIntervalSince(startTime)
+                if Date().timeIntervalSince(lastPrint) > 60 {
+                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
+                    lastPrint = Date()
+                }
+                if Date() > deadline {
+                    logger.error("Deadline reached")
+                    throw error
+                }
+                sleep(UInt32(retryDelaySeconds))
+            }
+        }
+    }
+    
     func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) async throws -> ByteBuffer {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
@@ -127,13 +174,13 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) async throws -> GribWithData<Variable> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> GribWithData<Variable> {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return GribWithData(storage: nil, messages: [], variables: [])
         }
         
-        var indexData = try await downloadInMemory(url: "\(url).idx")
+        var indexData = try downloadInMemory(url: "\(url).idx")
         guard let index = indexData.readString(length: indexData.readableBytes) else {
             fatalError("Could not decode index to string")
         }
@@ -178,7 +225,7 @@ struct Curl {
         
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
-            let data = try await downloadInMemory(url: url, range: range.range, minSize: range.minSize)
+            let data = try downloadInMemory(url: url, range: range.range, minSize: range.minSize)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes (expected minSize \(range.minSize))")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {

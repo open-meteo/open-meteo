@@ -147,7 +147,10 @@ struct GfsDownload: AsyncCommandFix {
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            let data = try await curl.downloadIndexedGrib(url: url, variables: variables)
+            // NOTE: 2022-09-07: Async grib downloads are leaking in release build on linux.
+            // couldn't figure it out after 2 days, so lets stick to sync code.
+            // Either returned data is not released or something in eccodes
+            let data = try curl.downloadIndexedGrib(url: url, variables: variables)
             for (variable, message) in zip(data.variables, data.messages) {
                 var data = message.toArray2d()
                 /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
