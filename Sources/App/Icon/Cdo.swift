@@ -19,6 +19,23 @@ extension Process {
     static public func grib2ToNetCDFInvertLatitude(in inn: String, out: String) async throws {
         try await spawn(cmd: "cdo", args: ["-s","-f", "nc", "invertlat", inn, out])
     }
+    
+    static func bunzip2(file: String) throws {
+        try spawn(cmd: "bunzip2", args: ["--keep", "-f", file])
+    }
+    
+    static public func grib2ToNetcdf(in inn: String, out: String) throws {
+        try spawn(cmd: "cdo", args: ["-s","-f", "nc", "copy", inn, out])
+    }
+    
+    /// Convert to NetCDF and shift to -180;180 longitude. Only works for global grids
+    static public func grib2ToNetcdfShiftLongitudeInvertLatitude(in inn: String, out: String) throws {
+        try spawn(cmd: "cdo", args: ["-s","-f", "nc", "-invertlat", "-sellonlatbox,-180,180,-90,90", inn, out])
+    }
+    
+    static public func grib2ToNetCDFInvertLatitude(in inn: String, out: String) throws {
+        try spawn(cmd: "cdo", args: ["-s","-f", "nc", "invertlat", inn, out])
+    }
 }
 
 struct CdoIconGlobal {
@@ -62,7 +79,7 @@ struct CdoIconGlobal {
 
         if !fm.fileExists(atPath: localFile) {
             let curl = Curl(logger: logger)
-            try await curl.download(url: remoteFile, to: localFile)
+            try await curl.downloadAsync(url: remoteFile, to: localFile)
         }
 
         if !fm.fileExists(atPath: localUncompressed) {

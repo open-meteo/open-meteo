@@ -1,6 +1,4 @@
 import Foundation
-import NIOConcurrencyHelpers
-import NIOCore
 
 
 enum SpawnError: Error {
@@ -34,7 +32,7 @@ public extension Process {
         let command = try await findExecutable(cmd: cmd)
         let proc = Process()
         
-        //return try await withTaskCancellationHandler {
+        return try await withTaskCancellationHandler {
             return try await withCheckedThrowingContinuation { continuation in
                 proc.executableURL = URL(fileURLWithPath: command)
                 proc.arguments = args
@@ -63,48 +61,48 @@ public extension Process {
                     }
                 }
             }
-        /*} onCancel: {
+        } onCancel: {
             // unset terminationHandler to make sure `continuation` can be released
             proc.terminationHandler = nil
             proc.terminate()
-        }*/
+        }
     }
     
     /// Always captures `stderr`. Otherwise it is just flooding logs.
     static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil) async throws {
         let eerror = Pipe()
-        var errorData = ByteBuffer()
+        var errorData = Data()
         eerror.fileHandleForReading.readabilityHandler = { handle in
-            errorData.writeData(handle.availableData)
+            errorData.append(handle.availableData)
         }
         
         let terminationStatus = try await Process.spawnWithPipes(cmd: cmd, args: args, stdout: stdout, stderr: eerror)
         
         eerror.fileHandleForReading.readabilityHandler = nil
         if let end = try eerror.fileHandleForReading.readToEnd() {
-            errorData.writeData(end)
+            errorData.append(end)
         }
         try eerror.fileHandleForReading.close()
         try eerror.fileHandleForWriting.close()
         
         guard terminationStatus == 0 else {
-            let error = errorData.readString(length: errorData.readableBytes) ?? ""
+            let error = String(data: errorData, encoding: .utf8) ?? ""
             throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: error)
         }
     }
     
-    static func spawnWithOutputData(cmd: String, args: [String]?) async throws -> ByteBuffer {
+    static func spawnWithOutputData(cmd: String, args: [String]?) async throws -> Data {
         let pipe = Pipe()
-        var data = ByteBuffer()
+        var data = Data()
         pipe.fileHandleForReading.readabilityHandler = { handle in
-            data.writeData(handle.availableData)
+            data.append(handle.availableData)
         }
         
         try await Process.spawn(cmd: cmd, args: args, stdout: pipe)
         
         pipe.fileHandleForReading.readabilityHandler = nil
         if let end = try pipe.fileHandleForReading.readToEnd() {
-            data.writeData(end)
+            data.append(end)
         }
         try pipe.fileHandleForReading.close()
         try pipe.fileHandleForWriting.close()
@@ -112,8 +110,8 @@ public extension Process {
     }
     
     static func spawnWithOutput(cmd: String, args: [String]?) async throws -> String {
-        var data = try await spawnWithOutputData(cmd: cmd, args: args)
-        return data.readString(length: data.readableBytes) ?? ""
+        let data = try await spawnWithOutputData(cmd: cmd, args: args)
+        return String(data: data, encoding: .utf8) ?? ""
     }
     
     
@@ -122,8 +120,8 @@ public extension Process {
      */
     
     static func spawnWithOutput(cmd: String, args: [String]?) throws -> String {
-        var data = try spawnWithOutputData(cmd: cmd, args: args)
-        return data.readString(length: data.readableBytes) ?? ""
+        let data = try spawnWithOutputData(cmd: cmd, args: args)
+        return String(data: data, encoding: .utf8) ?? ""
     }
     
     static func findExecutable(cmd: String) throws -> String {
@@ -145,19 +143,18 @@ public extension Process {
         return command
     }
     
-    /// TODO back to data
-    static func spawnWithOutputData(cmd: String, args: [String]?) throws -> ByteBuffer {
+    static func spawnWithOutputData(cmd: String, args: [String]?) throws -> Data {
         let pipe = Pipe()
-        var data = ByteBuffer()
+        var data = Data()
         pipe.fileHandleForReading.readabilityHandler = { handle in
-            data.writeData(handle.availableData)
+            data.append(handle.availableData)
         }
         
         try Process.spawn(cmd: cmd, args: args, stdout: pipe)
         
         pipe.fileHandleForReading.readabilityHandler = nil
         if let end = try pipe.fileHandleForReading.readToEnd() {
-            data.writeData(end)
+            data.append(end)
         }
         try pipe.fileHandleForReading.close()
         try pipe.fileHandleForWriting.close()
@@ -167,22 +164,22 @@ public extension Process {
     /// Always captures `stderr`. Otherwise it is just flooding logs.
     static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil) throws {
         let eerror = Pipe()
-        var errorData = ByteBuffer()
+        var errorData = Data()
         eerror.fileHandleForReading.readabilityHandler = { handle in
-            errorData.writeData(handle.availableData)
+            errorData.append(handle.availableData)
         }
         
         let terminationStatus = try Process.spawnWithPipes(cmd: cmd, args: args, stdout: stdout, stderr: eerror)
         
         eerror.fileHandleForReading.readabilityHandler = nil
         if let end = try eerror.fileHandleForReading.readToEnd() {
-            errorData.writeData(end)
+            errorData.append(end)
         }
         try eerror.fileHandleForReading.close()
         try eerror.fileHandleForWriting.close()
         
         guard terminationStatus == 0 else {
-            let error = errorData.readString(length: errorData.readableBytes) ?? ""
+            let error = String(data: errorData, encoding: .utf8) ?? ""
             throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: error)
         }
     }

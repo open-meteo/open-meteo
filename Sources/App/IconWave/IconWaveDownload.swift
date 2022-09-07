@@ -10,7 +10,7 @@ import SwiftPFor2D
  
  All equations: https://library.wmo.int/doc_num.php?explnum_id=10979
  */
-struct DownloadIconWaveCommand: AsyncCommandFix {
+struct DownloadIconWaveCommand: Command {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -29,7 +29,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         "Download a specified wave model run"
     }
     
-    func run(using context: CommandContext, signature: Signature) async throws {
+    func run(using context: CommandContext, signature: Signature) throws {
         guard let domain = IconWaveDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
@@ -55,12 +55,12 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         
         let variables = onlyVariables ?? IconWaveVariable.allCases
-        try await download(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
+        try download(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convert(logger: logger, domain: domain, run: date, variables: variables)
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func download(logger: Logger, domain: IconWaveDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconWaveVariable]) async throws {
+    func download(logger: Logger, domain: IconWaveDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconWaveVariable]) throws {
         // https://opendata.dwd.de/weather/maritime/wave_models/gwam/grib/00/mdww/GWAM_MDWW_2022072800_000.grib2.bz2
         // https://opendata.dwd.de/weather/maritime/wave_models/ewam/grib/00/mdww/EWAM_MDWW_2022072800_000.grib2.bz2
         let baseUrl = "https://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
@@ -86,15 +86,15 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                 let tempNc = "\(downloadDirectory)temp.nc"
                 let tempgrib2 = "\(downloadDirectory)temp.grib2"
                 let tempBz2 = "\(tempgrib2).bz2"
-                try await curl.download(
+                try curl.download(
                     url: url,
                     to: tempBz2
                 )
-                try await Process.bunzip2(file: tempBz2)
+                try Process.bunzip2(file: tempBz2)
                 if domain == .gwam {
-                    try await Process.grib2ToNetcdfShiftLongitudeInvertLatitude(in: tempgrib2, out: tempNc)
+                    try Process.grib2ToNetcdfShiftLongitudeInvertLatitude(in: tempgrib2, out: tempNc)
                 } else {
-                    try await Process.grib2ToNetCDFInvertLatitude(in: tempgrib2, out: tempNc)
+                    try Process.grib2ToNetCDFInvertLatitude(in: tempgrib2, out: tempNc)
                 }
                 let data = try NetCDF.readIconWave(file: tempNc)
                 

@@ -112,7 +112,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             } else {
                 file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_HSURF.grib2.bz2"
             }
-            try await curl.download(
+            try curl.download(
                 url: file,
                 to: "\(downloadDirectory)time-invariant_HSURF.grib2.bz2"
             )
@@ -124,7 +124,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             } else {
                 file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_FR_LAND.grib2.bz2"
             }
-            try await curl.download(
+            try curl.download(
                 url: file2,
                 to: "\(downloadDirectory)time-invariant_FR_LAND.grib2.bz2"
             )
@@ -193,7 +193,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     
                     group.addTask {
                         let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
-                        try await curl.download(
+                        try await curl.downloadAsync(
                             url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
                             to: gribFile
                         )
@@ -349,5 +349,22 @@ extension IconDomains {
             // Icon d2 has a delay of 44 minutes and runs every 3 hours
             return t.hour / 3 * 3
         }
+    }
+}
+
+
+/// Workaround to use async in commans
+/// Wait for https://github.com/vapor/vapor/pull/2870
+protocol AsyncCommandFix: Command {
+    func run(using context: CommandContext, signature: Signature) async throws
+}
+
+extension AsyncCommandFix {
+    func run(using context: CommandContext, signature: Signature) throws {
+        let promise = context.application.eventLoopGroup.next().makePromise(of: Void.self)
+        promise.completeWithTask {
+            try await run(using: context, signature: signature)
+        }
+        try promise.futureResult.wait()
     }
 }

@@ -231,7 +231,7 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     }
 }
 
-struct DownloadEra5Command: AsyncCommandFix {
+struct DownloadEra5Command: Command {
     struct Signature: CommandSignature {
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download with format 20220101-20220131")
         var timeinterval: String?
@@ -302,7 +302,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         }
     }
     
-    func downloadElevation(logger: Logger, cdskey: String) async throws {
+    func downloadElevation(logger: Logger, cdskey: String) throws {
         let domain = Era5.era5
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             return
@@ -336,7 +336,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             let tempPythonFile = "\(downloadDir)elevation.py"
 
             try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            try await Process.spawn(cmd: "python3", args: [tempPythonFile])
+            try Process.spawn(cmd: "python3", args: [tempPythonFile])
         }
         
         logger.info("Converting elevation and sea mask")
@@ -381,10 +381,10 @@ struct DownloadEra5Command: AsyncCommandFix {
         }
     }
     
-    func runYear(logger: Logger, year: Int, cdskey: String) async throws {
+    func runYear(logger: Logger, year: Int, cdskey: String) throws {
         let domain = Era5.era5
         let timeinterval = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
-        let _ = try await downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
+        let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
         
         let nx = domain.grid.nx // 721
         let ny = domain.grid.ny // 1440
@@ -435,7 +435,7 @@ struct DownloadEra5Command: AsyncCommandFix {
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt) async throws -> TimerangeDt {
+    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt) throws -> TimerangeDt {
         let domain = Era5.era5
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -500,7 +500,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             
             try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
             do {
-                try await Process.spawn(cmd: "python3", args: [tempPythonFile])
+                try Process.spawn(cmd: "python3", args: [tempPythonFile])
             } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args, let stderr) {
                 if code == 70 {
                     logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
@@ -607,7 +607,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         }
     }
     
-    func run(using context: CommandContext, signature: Signature) async throws {
+    func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
         if let stripseaYear = signature.stripseaYear {
             try runStripSea(logger: logger, year: Int(stripseaYear)!)
@@ -617,20 +617,20 @@ struct DownloadEra5Command: AsyncCommandFix {
             fatalError("cds key is required")
         }
         /// Make sure elevation information is present. Otherwise download it
-        try await downloadElevation(logger: logger, cdskey: cdskey)
+        try downloadElevation(logger: logger, cdskey: cdskey)
         
         /// Only download one specified year
         if let yearStr = signature.year {
             guard let year = Int(yearStr) else {
                 fatalError("Could not convert year to integer")
             }
-            try await runYear(logger: logger, year: year, cdskey: cdskey)
+            try runYear(logger: logger, year: year, cdskey: cdskey)
             return
         }
         
         /// Select the desired timerange, or use last 14 day
         var timeinterval = signature.getTimeinterval()
-        timeinterval = try await downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
+        timeinterval = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
         try convertDailyFiles(logger: logger, timeinterval: timeinterval)
     }
 }

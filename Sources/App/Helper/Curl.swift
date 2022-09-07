@@ -31,7 +31,8 @@ struct Curl {
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
     }
 
-    func download(url: String, to: String, range: String? = nil) async throws {
+    /// Note: there might be some issues with memory leaks
+    func downloadAsync(url: String, to: String, range: String? = nil) async throws {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
             let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
@@ -73,8 +74,50 @@ struct Curl {
         }
     }
     
+    func download(url: String, to: String, range: String? = nil) throws {
+        // URL might contain password, strip them from logging
+        if url.contains("@") && url.contains(":") {
+            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
+            logger.info("Downloading file \(urlSafe)")
+        } else {
+            logger.info("Downloading file \(url)")
+        }
+        
+        let startTime = Date()
+        let args = (range.map{["-r",$0]} ?? []) + [
+            "-s",
+            "--show-error",
+            "--fail", // also retry 404
+            "--insecure", // ignore expired or invalid SSL certs
+            "--retry-connrefused",
+            "--limit-rate", "10M", // Limit to 10 MB/s -> 80 Mbps
+            "--connect-timeout", "\(connectTimeout)",
+            "--max-time", "\(maxTimeSeconds)",
+            "-o", to,
+            url
+        ]
+        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
+        while true {
+            do {
+                try Process.spawn(cmd: "curl", args: args)
+                return
+            } catch {
+                let timeElapsed = Date().timeIntervalSince(startTime)
+                if Date().timeIntervalSince(lastPrint) > 60 {
+                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
+                    lastPrint = Date()
+                }
+                if Date() > deadline {
+                    logger.error("Deadline reached")
+                    throw error
+                }
+                sleep(UInt32(retryDelaySeconds))
+            }
+        }
+    }
+    
     /// Wait for a download to finish
-    func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> ByteBuffer {
+    func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> Data {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
             let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
@@ -101,7 +144,7 @@ struct Curl {
         while true {
             do {
                 let data = try Process.spawnWithOutputData(cmd: "curl", args: args)
-                if let minSize = minSize, data.readableBytes < minSize {
+                if let minSize = minSize, data.count < minSize {
                     throw CurlError.sizeTooSmall
                 }
                 return data
@@ -118,70 +161,17 @@ struct Curl {
                 sleep(UInt32(retryDelaySeconds))
             }
         }
-    }
-    
-    func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) async throws -> ByteBuffer {
-        // URL might contain password, strip them from logging
-        if url.contains("@") && url.contains(":") {
-            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
-            logger.info("Downloading file \(urlSafe)")
-        } else {
-            logger.info("Downloading file \(url)")
-        }
-        
-        let startTime = Date()
-        let args = (range.map{["-r",$0]} ?? []) + [
-            "-s",
-            "--show-error",
-            "--fail", // also retry 404
-            "--insecure", // ignore expired or invalid SSL certs
-            "--retry-connrefused",
-            "--limit-rate", "10M", // Limit to 10 MB/s -> 80 Mbps
-            "--connect-timeout", "\(connectTimeout)",
-            "--max-time", "\(maxTimeSeconds)",
-            url
-        ]
-        //logger.debug("Curl command: \(args.joined(separator: " "))")
-        
-        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
-        while true {
-            do {
-                let data = try await Process.spawnWithOutputData(cmd: "curl", args: args)
-                if let minSize = minSize, data.readableBytes < minSize {
-                    throw CurlError.sizeTooSmall
-                }
-                return data
-            } catch {
-                let timeElapsed = Date().timeIntervalSince(startTime)
-                if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
-                    lastPrint = Date()
-                }
-                if Date() > deadline {
-                    logger.error("Deadline reached")
-                    throw error
-                }
-                sleep(UInt32(retryDelaySeconds))
-            }
-        }
-    }
-    
-    struct GribWithData<Variable: CurlIndexedVariable> {
-        let storage: Unmanaged<AnyObject>?
-        let messages: [GribMessage]
-        let variables: [Variable]
     }
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) async throws -> GribWithData<Variable> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) throws -> AnyIterator<(variable: Variable, message: GribMessage)> {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
-            return GribWithData(storage: nil, messages: [], variables: [])
+            return AnyIterator { return nil }
         }
         
-        var indexData = try await downloadInMemory(url: "\(url).idx")
-        guard let index = indexData.readString(length: indexData.readableBytes) else {
+        guard let index = String(data: try downloadInMemory(url: "\(url).idx"), encoding: .utf8) else {
             fatalError("Could not decode index to string")
         }
 
@@ -225,17 +215,23 @@ struct Curl {
         
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
-            let data = try await downloadInMemory(url: url, range: range.range, minSize: range.minSize)
-            logger.debug("Converting GRIB, size \(data.readableBytes) bytes (expected minSize \(range.minSize))")
+            let data = try downloadInMemory(url: url, range: range.range, minSize: range.minSize)
+            logger.debug("Converting GRIB, size \(data.count) bytes (expected minSize \(range.minSize))")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
-                return try data.withUnsafeReadableBytesWithStorageManagement { ptr, storage in
+                return try data.withUnsafeBytes { ptr in
                     let grib = try GribMemory(ptr: ptr)
                     if grib.messages.count != matches.count {
                         logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(grib.messages.count)")
                         throw CurlError.didNotGetAllGribMessages(got: grib.messages.count, expected: matches.count)
                     }
-                    return GribWithData(storage: storage, messages: grib.messages, variables: matches)
+                    var itr = zip(matches, grib.messages).makeIterator()
+                    return AnyIterator {
+                        guard let (variable, message) = itr.next() else {
+                            return nil
+                        }
+                        return (variable, message)
+                    }
                 }
             } catch {
                 if i == 3 {

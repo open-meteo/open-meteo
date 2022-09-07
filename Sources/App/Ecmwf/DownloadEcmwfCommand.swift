@@ -10,7 +10,7 @@ import SwiftNetCDF
  
  model info (not everything is open data) https://www.ecmwf.int/en/forecasts/datasets/set-i
  */
-struct DownloadEcmwfCommand: AsyncCommandFix {
+struct DownloadEcmwfCommand: Command {
     struct Signature: CommandSignature {
         @Option(name: "run")
         var run: String?
@@ -23,7 +23,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         "Download a specified ecmwf model run"
     }
     
-    func run(using context: CommandContext, signature: Signature) async throws {
+    func run(using context: CommandContext, signature: Signature) throws {
         let run = signature.run.map {
             guard let run = Int($0) else {
                 fatalError("Invalid run '\($0)'")
@@ -37,11 +37,11 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let date = twoHoursAgo.with(hour: run)
         logger.info("Downloading domain ECMWF run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        try await downloadEcmwf(logger: logger, run: date, skipFilesIfExisting: signature.skipExisting)
+        try downloadEcmwf(logger: logger, run: date, skipFilesIfExisting: signature.skipExisting)
         try convertEcmwf(logger: logger, run: date)
     }
     
-    func downloadEcmwf(logger: Logger, run: Timestamp, skipFilesIfExisting: Bool) async throws {
+    func downloadEcmwf(logger: Logger, run: Timestamp, skipFilesIfExisting: Bool) throws {
         let domain = EcmwfDomain.ifs04
         let base = "https://data.ecmwf.int/forecasts/"
         
@@ -67,11 +67,11 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameConverted) {
                 continue
             }
-            try await curl.download(
+            try curl.download(
                 url: filenameFrom,
                 to: filenameTemp
             )
-            try await Process.grib2ToNetCDFInvertLatitude(in: filenameTemp, out: filenameConverted)
+            try Process.grib2ToNetCDFInvertLatitude(in: filenameTemp, out: filenameConverted)
         }
     }
     
