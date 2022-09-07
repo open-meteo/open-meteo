@@ -35,15 +35,17 @@ public extension Process {
         let proc = Process()
         
         return try await withTaskCancellationHandler {
+            // unset terminationHandler to make sure `continuation` can be released
+            proc.terminationHandler = nil
             proc.terminate()
         } operation: {
             return try await withCheckedThrowingContinuation { continuation in
                 proc.executableURL = URL(fileURLWithPath: command)
                 proc.arguments = args
                 proc.terminationHandler = { task in
-                    continuation.resume(returning: task.terminationStatus)
                     // unset terminationHandler to make sure `continuation` can be released
                     task.terminationHandler = nil
+                    continuation.resume(returning: task.terminationStatus)
                 }
                 if let pipe = stdout {
                     proc.standardOutput = pipe
@@ -59,6 +61,8 @@ public extension Process {
                     do {
                         try proc.run()
                     } catch {
+                        // unset terminationHandler to make sure `continuation` can be released
+                        continuation.terminationHandler = nil
                         continuation.resume(throwing: error)
                     }
                 }
@@ -141,6 +145,7 @@ public extension Process {
         return command
     }
     
+    /// TODO back to data
     static func spawnWithOutputData(cmd: String, args: [String]?) throws -> ByteBuffer {
         let pipe = Pipe()
         var data = ByteBuffer()
