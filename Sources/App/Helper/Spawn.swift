@@ -62,7 +62,7 @@ public extension Process {
                         try proc.run()
                     } catch {
                         // unset terminationHandler to make sure `continuation` can be released
-                        continuation.terminationHandler = nil
+                        proc.terminationHandler = nil
                         continuation.resume(throwing: error)
                     }
                 }
