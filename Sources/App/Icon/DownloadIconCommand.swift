@@ -187,7 +187,7 @@ struct DownloadIconCommand: Command {
                     continue
                 }
             
-                let gribFile = "\(downloadDirectory)temp.grib2.bz2"
+                let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
                 try curl.download(
                     url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
                     to: gribFile

@@ -23,7 +23,7 @@ struct CronjobCommand: Command {
         
         37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon --model-level > ~/log/icon_model-level.log 2>&1 || cat ~/log/icon_model-level.log
         36 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu --model-level > ~/log/icon-eu_model-level.log 2>&1 || cat ~/log/icon-eu_model-level.log
-        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download --model-level icon-d2 > ~/log/icon-d2_model-level.log 2>&1 || cat ~/log/icon-d2_upper-level.log
+        44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download --model-level icon-d2 > ~/log/icon-d2_model-level.log 2>&1 || cat ~/log/icon-d2_model-level.log
         
         45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
         0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
