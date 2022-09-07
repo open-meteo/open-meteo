@@ -34,11 +34,7 @@ public extension Process {
         let command = try await findExecutable(cmd: cmd)
         let proc = Process()
         
-        return try await withTaskCancellationHandler {
-            // unset terminationHandler to make sure `continuation` can be released
-            proc.terminationHandler = nil
-            proc.terminate()
-        } operation: {
+        //return try await withTaskCancellationHandler {
             return try await withCheckedThrowingContinuation { continuation in
                 proc.executableURL = URL(fileURLWithPath: command)
                 proc.arguments = args
@@ -67,7 +63,11 @@ public extension Process {
                     }
                 }
             }
-        }
+        /*} onCancel: {
+            // unset terminationHandler to make sure `continuation` can be released
+            proc.terminationHandler = nil
+            proc.terminate()
+        }*/
     }
     
     /// Always captures `stderr`. Otherwise it is just flooding logs.
