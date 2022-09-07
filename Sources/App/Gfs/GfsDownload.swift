@@ -146,38 +146,33 @@ struct GfsDownload: AsyncCommandFix {
                 let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
-            try await downloadAndConvertTimestep(forecastHour: forecastHour, prefix: prefix, domain: domain, curl: curl, run: run, variables: variables)
-        }
-    }
-    
-    func downloadAndConvertTimestep(forecastHour: Int, prefix: String, domain: GfsDomain, curl: Curl, run: Timestamp, variables: [GfsVariableAndDomain]) async throws {
-        
-        let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-        let data = try await curl.downloadIndexedGrib(url: url, variables: variables)
-        for (variable, message) in zip(data.variables, data.messages) {
-            var data = message.toArray2d()
-            /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
-                if i % 10_000 == 0 {
-                    print("grid \(i) lat \(latitude) lon \(longitude)")
+            let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
+            let data = try await curl.downloadIndexedGrib(url: url, variables: variables)
+            for (variable, message) in zip(data.variables, data.messages) {
+                var data = message.toArray2d()
+                /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
+                    if i % 10_000 == 0 {
+                        print("grid \(i) lat \(latitude) lon \(longitude)")
+                    }
                 }
+                fatalError("OK")*/
+                if domain.isGlobal {
+                    data.shift180LongitudeAndFlipLatitude()
+                }
+                data.ensureDimensions(of: domain.grid)
+                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
+                let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
+                try FileManager.default.removeItemIfExists(at: file)
+                
+                // Scaling before compression with scalefactor
+                if let fma = variable.variable.multiplyAdd {
+                    data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg")
+                let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
             }
-            fatalError("OK")*/
-            if domain.isGlobal {
-                data.shift180LongitudeAndFlipLatitude()
-            }
-            data.ensureDimensions(of: domain.grid)
-            //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
-            let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
-            try FileManager.default.removeItemIfExists(at: file)
-            
-            // Scaling before compression with scalefactor
-            if let fma = variable.variable.multiplyAdd {
-                data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-            }
-            
-            curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg")
-            let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-            try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
         }
     }
     
