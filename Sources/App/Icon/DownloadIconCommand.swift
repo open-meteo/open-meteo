@@ -209,6 +209,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                             data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         
+                        logger.info("Compressing and writing data to \(filenameDest)")
                         let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                         try OmFileWriter.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data)
                     }
