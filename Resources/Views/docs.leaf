@@ -477,20 +477,24 @@
                       <div class="tab-pane fade #if(isFirst): show active#endif" id="v-pills-#(variable.name)" role="tabpanel" aria-labelledby="v-pills-#(variable.name)-tab">
                         <div class="row">
                           #for(level in levels):
-                          <div class="col-md-3">
+                          #if(index % (count(levels)/3+1) == 0 || isFirst):
+                          <div class="col-sm-4">
+                          #endif
                             <div class="form-check">
-                              <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level)hPa" id="#(variable.name)_#(level)hPa" name="hourly">
-                              <label class="form-check-label" for="#(variable.name)_#(level)hPa">
-                                #(level) hPa
+                              <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level.level)hPa" id="#(variable.name)_#(level.level)hPa" name="hourly">
+                              <label class="form-check-label" for="#(variable.name)_#(level.level)hPa">
+                                #(level.level) hPa <small class="text-muted">(#(level.altitude))</small>
                               </label>
                             </div>
+                          #if(index % (count(levels)/3+1) == count(levels)/3 || isLast):
                           </div>
+                          #endif
                           #endfor
                         </div>
                       </div>
                       #endfor
                       <div class="mt-3">
-                        <small class="text-muted">Tip: Use <mark>geopotential_height</mark> to get the precise altitude <strong>above sea level</strong> (not above ground) for each pressure level.</small>
+                        <small class="text-muted">Note: Altitude is approximate and in meters <strong> above sea level</strong> (not above ground). Use <mark>geopotential_height</mark> to get the precise altitude above sea level for each pressure level.</small>
                       </div>
                     </div>
                   </div>

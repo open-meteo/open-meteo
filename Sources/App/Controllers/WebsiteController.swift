@@ -45,9 +45,31 @@ struct WebsiteController: RouteCollection {
                 let label: String
                 let name: String
             }
+            struct PressureLevel: Encodable {
+                let level: Int
+                let altitude: String
+            }
             
             let title: String
-            let levels: [Int] = IconDomains.apiLevels
+            let levels: [PressureLevel] = IconDomains.apiLevels.reversed().map {
+                let altitude = Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: Float($0))
+                var str: String
+                switch altitude {
+                case ...100:
+                    str = "\(altitude.rounded()) m"
+                case ...1000:
+                    str = "\((Int(altitude)/10*10)) m"
+                case ...3000:
+                    // round to 0.1 km
+                    str = "\(((altitude/100).rounded()/10)) km"
+                case ...10000:
+                    // round to 0.5 km
+                    str = "\(((altitude/500).rounded()*500/1000)) km"
+                default:
+                    str = "\(Int((altitude/1000).rounded())) km"
+                }
+                return PressureLevel(level: $0, altitude: str)
+            }
             let pressureVariables = [
                 PressureVariable(label: "Temperature", name: "temperature"),
                 PressureVariable(label: "Dewpoint", name: "dewpoint"),
