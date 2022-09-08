@@ -76,7 +76,7 @@
 
   
 
-    <div class="col-12" id="container">
+    <div class="col-12 table-responsive" id="container">
     </div>
 
     <div class="col-12">
@@ -88,54 +88,56 @@
     <div class="col-12 py-5">
       <h2 id="api-documentation">API Documentation</h2>
       <p>The API endpoint <mark>https://geocoding-api.open-meteo.com/v1/search</mark> accepts a search term and returns a list of matching locations. URL parameters are listed below:</p>
-      <table class="table">
-        <thead>
-          <tr>
-            <th scope="col">Parameter</th>
-            <th scope="col">Format</th>
-            <th scope="col">Required</th>
-            <th scope="col">Default</th>
-            <th scope="col">Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row">name</th>
-            <td>String</td>
-            <td>Yes</td>
-            <td></td>
-            <td>String to search for. An empty string or only 1 character will return an empty result. 2 characters will only match exact matching locations. 3 and more characters will perform fuzzy matching. The search string can be a location name or a postal code.</td>
-          </tr>
-          <tr>
-            <th scope="row">count</th>
-            <td>Integer</td>
-            <td>No</td>
-            <td><mark>10</mark></td>
-            <td>The number of search results to return. Up to 100 results can be retrieved.</td>
-          </tr>
-          <tr>
-            <th scope="row">format</th>
-            <td>String</td>
-            <td>No</td>
-            <td><mark>json</mark></td>
-            <td>By default, results are returned as JSON. Alternatively, <mark>protobuf</mark> is supported for more efficient encoding and transfer.</td>
-          </tr>
-          <tr>
-            <th scope="row">language</th>
-            <td>String</td>
-            <td>No</td>
-            <td><mark>en</mark></td>
-            <td>Return translated results, if available, otherwise return english or the native location name. Lower-cased.</td>
-          </tr>
-          <!--<tr>
-            <th scope="row">country_codes</th>
-            <td>String array</td>
-            <td>No</td>
-            <td></td>
-            <td>Optionally a comma-separated list of country codes, filters all search results to those countries. Country code must be upper-cased. E.g. <mark>&country_codes=DE,AT,CH</mark> to limit search to Germany, Austria and Switzerland.</td>
-          </tr>-->
-        </tbody>
-      </table>
+      <div class="table-responsive">
+        <table class="table">
+          <thead>
+            <tr>
+              <th scope="col">Parameter</th>
+              <th scope="col">Format</th>
+              <th scope="col">Required</th>
+              <th scope="col">Default</th>
+              <th scope="col">Description</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row">name</th>
+              <td>String</td>
+              <td>Yes</td>
+              <td></td>
+              <td>String to search for. An empty string or only 1 character will return an empty result. 2 characters will only match exact matching locations. 3 and more characters will perform fuzzy matching. The search string can be a location name or a postal code.</td>
+            </tr>
+            <tr>
+              <th scope="row">count</th>
+              <td>Integer</td>
+              <td>No</td>
+              <td><mark>10</mark></td>
+              <td>The number of search results to return. Up to 100 results can be retrieved.</td>
+            </tr>
+            <tr>
+              <th scope="row">format</th>
+              <td>String</td>
+              <td>No</td>
+              <td><mark>json</mark></td>
+              <td>By default, results are returned as JSON. Alternatively, <mark>protobuf</mark> is supported for more efficient encoding and transfer.</td>
+            </tr>
+            <tr>
+              <th scope="row">language</th>
+              <td>String</td>
+              <td>No</td>
+              <td><mark>en</mark></td>
+              <td>Return translated results, if available, otherwise return english or the native location name. Lower-cased.</td>
+            </tr>
+            <!--<tr>
+              <th scope="row">country_codes</th>
+              <td>String array</td>
+              <td>No</td>
+              <td></td>
+              <td>Optionally a comma-separated list of country codes, filters all search results to those countries. Country code must be upper-cased. E.g. <mark>&country_codes=DE,AT,CH</mark> to limit search to Germany, Austria and Switzerland.</td>
+            </tr>-->
+          </tbody>
+        </table>
+      </div>
       <p>Additional optional URL parameters will be added. For API stability, no required parameters will be added in the future!</p>
       
       <h3 class="mt-5">JSON Return Object</h3>
@@ -173,82 +175,84 @@
     }]
 }
       </code></pre>
-      <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Parameter</th>
-          <th scope="col">Format</th>
-          <th scope="col">Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th scope="row">id</th>
-          <td>Integer</td>
-          <td>Unique ID for this location</td>
-        </tr>
-        <tr>
-          <th scope="row">name</th>
-          <td>String</td>
-          <td>Location name. Localized following the <mark>&language=</mark> parameter, if possible</td>
-        </tr>
-        <tr>
-          <th scope="row">latitude, longitude</th>
-          <td>Floating point</td>
-          <td>Geographical WGS84 coordinates of this location</td>
-        </tr>
-        <tr>
-          <th scope="row">elevation</th>
-          <td>Floating point</td>
-          <td>Elevation above mean sea level of this location</td>
-        </tr>
-        <tr>
-          <th scope="row">timezone</th>
-          <td>String</td>
-          <td>Time zone using <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> definitions</td>
-        </tr>
-        <tr>
-          <th scope="row">feature_code</th>
-          <td>String</td>
-          <td>Type of this location. Following the <a hre="https://www.geonames.org/export/codes.html" target="_new">GeoNames feature_code definition</a></td>
-        </tr>
-        <tr>
-          <th scope="row">country_code</th>
-          <td>String</td>
-          <td>2-Character FIPS <a href="https://en.wikipedia.org/wiki/List_of_FIPS_country_codes" target="_new">country code</a>. E.g. <mark>DE</mark> for Germany</td>
-        </tr>
-        <tr>
-          <th scope="row">country</th>
-          <td>String</td>
-          <td>Country name. Localized following the <mark>&language=</mark> parameter, if possible</td>
-        </tr>
-        <tr>
-          <th scope="row">country_id</th>
-          <td>Integer</td>
-          <td>Unique ID for this country</td>
-        </tr>
-        <tr>
-          <th scope="row">population</th>
-          <td>Integer</td>
-          <td>Number of inhabitants</td>
-        </tr>
-        <tr>
-          <th scope="row">postcodes</th>
-          <td>String array</td>
-          <td>List of postcodes for this location</td>
-        </tr>
-        <tr>
-          <th scope="row">admin1, admin2, admin3, admin4</th>
-          <td>String</td>
-          <td>Name of hierarchical administrative areas this location resides in. Admin1 is the first administrative level. Admin2 the second administrative level. Localized following the <mark>&language=</mark> parameter, if possible</td>
-        </tr>
-        <tr>
-          <th scope="row">admin1_id, admin2_id, admin3_id, admin4_id</th>
-          <td>Integer</td>
-          <td>Unique IDs for the administrative areas</td>
-        </tr>
-      </tbody>
-    </table>
+      <div class="table-responsive">
+        <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Parameter</th>
+            <th scope="col">Format</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">id</th>
+            <td>Integer</td>
+            <td>Unique ID for this location</td>
+          </tr>
+          <tr>
+            <th scope="row">name</th>
+            <td>String</td>
+            <td>Location name. Localized following the <mark>&language=</mark> parameter, if possible</td>
+          </tr>
+          <tr>
+            <th scope="row">latitude, longitude</th>
+            <td>Floating point</td>
+            <td>Geographical WGS84 coordinates of this location</td>
+          </tr>
+          <tr>
+            <th scope="row">elevation</th>
+            <td>Floating point</td>
+            <td>Elevation above mean sea level of this location</td>
+          </tr>
+          <tr>
+            <th scope="row">timezone</th>
+            <td>String</td>
+            <td>Time zone using <a href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone database</a> definitions</td>
+          </tr>
+          <tr>
+            <th scope="row">feature_code</th>
+            <td>String</td>
+            <td>Type of this location. Following the <a hre="https://www.geonames.org/export/codes.html" target="_new">GeoNames feature_code definition</a></td>
+          </tr>
+          <tr>
+            <th scope="row">country_code</th>
+            <td>String</td>
+            <td>2-Character FIPS <a href="https://en.wikipedia.org/wiki/List_of_FIPS_country_codes" target="_new">country code</a>. E.g. <mark>DE</mark> for Germany</td>
+          </tr>
+          <tr>
+            <th scope="row">country</th>
+            <td>String</td>
+            <td>Country name. Localized following the <mark>&language=</mark> parameter, if possible</td>
+          </tr>
+          <tr>
+            <th scope="row">country_id</th>
+            <td>Integer</td>
+            <td>Unique ID for this country</td>
+          </tr>
+          <tr>
+            <th scope="row">population</th>
+            <td>Integer</td>
+            <td>Number of inhabitants</td>
+          </tr>
+          <tr>
+            <th scope="row">postcodes</th>
+            <td>String array</td>
+            <td>List of postcodes for this location</td>
+          </tr>
+          <tr>
+            <th scope="row">admin1, admin2, admin3, admin4</th>
+            <td>String</td>
+            <td>Name of hierarchical administrative areas this location resides in. Admin1 is the first administrative level. Admin2 the second administrative level. Localized following the <mark>&language=</mark> parameter, if possible</td>
+          </tr>
+          <tr>
+            <th scope="row">admin1_id, admin2_id, admin3_id, admin4_id</th>
+            <td>Integer</td>
+            <td>Unique IDs for the administrative areas</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
 
     *Note: All IDs can be can be resolved via the API endpoint <a href="https://geocoding-api.open-meteo.com/v1/get?id=2950159" target="_new">https://geocoding-api.open-meteo.com/v1/get?id=2950159</a>
 

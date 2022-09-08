@@ -151,31 +151,33 @@
     <p>The API endpoint <mark>/v1/elevation</mark> accepts one or multiple geographical coordinate and returns the terrain elevation for those points.</p>
     <p>Data is based on the <a href="https://spacedata.copernicus.eu/web/cscda/dataset-details?articleId=394198" target="_blank">Copernicus DEM 2021 release GLO-90</a> with 90 meters resolution. The GLO-90 dataset is available worldwide with a free license.</p>
     <p>All URL parameters are listed below:</p>
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Parameter</th>
-          <th scope="col">Format</th>
-          <th scope="col">Required</th>
-          <th scope="col">Default</th>
-          <th scope="col">Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th scope="row">latitude<br/>longitude</th>
-          <td>Floating point array</td>
-          <td>Yes</td>
-          <td></td>
-          <td>
-            Geographical WGS84 coordinates of the location. 
-            Multiple coordinates can be coma <mark>,</mark> separated. 
-            Up to 100 coordinates can be requested at once. 
-            Example for <a href="https://api.open-meteo.com/v1/elevation?latitude=52.52,48.85&longitude=13.41,2.35" target="_blank">multiple coordinates</a>.
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Parameter</th>
+            <th scope="col">Format</th>
+            <th scope="col">Required</th>
+            <th scope="col">Default</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">latitude<br/>longitude</th>
+            <td>Floating point array</td>
+            <td>Yes</td>
+            <td></td>
+            <td>
+              Geographical WGS84 coordinates of the location. 
+              Multiple coordinates can be coma <mark>,</mark> separated. 
+              Up to 100 coordinates can be requested at once. 
+              Example for <a href="https://api.open-meteo.com/v1/elevation?latitude=52.52,48.85&longitude=13.41,2.35" target="_blank">multiple coordinates</a>.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
     <p>Additional optional URL parameters will be added. For API stability, no required parameters will be added in the
       future!</p>
 
