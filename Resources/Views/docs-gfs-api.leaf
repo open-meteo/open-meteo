@@ -545,7 +545,7 @@
                           <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level.level)hPa"
                             id="#(variable.name)_#(level.level)hPa" name="hourly">
                           <label class="form-check-label" for="#(variable.name)_#(level.level)hPa">
-                            #(level.level) hPa <small class="text-muted">(#(level.altitude) km)</small>
+                            #(level.level) hPa <small class="text-muted">(#(level.altitude))</small>
                           </label>
                         </div>
                         #if(index % (count(levels)/3+1) == count(levels)/3 || isLast):

@@ -532,7 +532,7 @@
                           <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level.level)hPa"
                             id="#(variable.name)_#(level.level)hPa" name="hourly">
                           <label class="form-check-label" for="#(variable.name)_#(level.level)hPa">
-                            #(level.level) hPa <small class="text-muted">(#(level.altitude) km)</small>
+                            #(level.level) hPa <small class="text-muted">(#(level.altitude))</small>
                           </label>
                         </div>
                         #if(index % (count(levels)/3+1) == count(levels)/3 || isLast):
@@ -1122,7 +1122,7 @@
 
     <h3 class="mt-5">Pressure Level Variables</h3>
     <p>Pressure level variables do not have fixed altitudes. Altitude varies with atmospheric pressure. 1000 hPa is
-      roughly between 500 and 1600 meters above sea level. Estimated altitudes are given below. Altitudes are in meters
+      roughly between 60 and 160 meters above sea level. Estimated altitudes are given below. Altitudes are in meters
       above sea level (not above ground). For precise altitudes, <mark>geopotential_height</mark> can be used.</p>
     <div class="table-responsive">
       <table class="table">
@@ -1131,7 +1131,7 @@
           #for(level in levels):<td>#(level.level)</td>#endfor
         </tr>
         <tr>
-          <th>Altitude (km asl)</th>
+          <th>Altitude</th>
           #for(level in levels):<td>#(level.altitude)</td>#endfor
         </tr>
       </table>

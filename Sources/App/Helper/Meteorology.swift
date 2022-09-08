@@ -165,11 +165,11 @@ struct Meteorology {
     
     /// Approximate altitude in meters from pressure level in hPa
     @inlinable static func altitudeAboveSeaLevelMeters(pressureLevelHpA: Float) -> Float {
-        return -1/2.25577 * 10e5 * (powf(pressureLevelHpA/1013.25, 1/5.25588) - 1)
+        return -1/2.25577 * 10e4 * (powf(pressureLevelHpA/1013.25, 1/5.25588) - 1)
     }
     
     /// Approximate pressure level from altitude
     @inlinable static func pressureLevelHpA(altitudeAboveSeaLevelMeters: Float) -> Float {
-        return 1013.25 * powf(1 - 2.25577 * 10e-7 * altitudeAboveSeaLevelMeters, 5.25588)
+        return 1013.25 * powf(1 - 2.25577 * 10e-6 * altitudeAboveSeaLevelMeters, 5.25588)
     }
 }
