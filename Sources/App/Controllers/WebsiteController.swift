@@ -24,7 +24,7 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = IndexContext(title: "Home page")
+        let context = IndexContext(title: "Free Open-Source Weather API")
         return req.view.render("index", context)
     }
     
@@ -40,7 +40,7 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = ContextWithLevels(title: "Docs", levels: IconDomains.apiLevels, variables: [
+        let context = ContextWithLevels(title: "Weather Forecast API", levels: IconDomains.apiLevels, variables: [
             ContextWithLevels.PressureVariable(label: "Temperature", name: "temperature"),
             ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
             ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
