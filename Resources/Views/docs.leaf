@@ -385,7 +385,7 @@
             <div class="accordion-item">
               <h2 class="accordion-header" id="heading-solar-variables">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-solar-variables" aria-expanded="false" aria-controls="collapse-solar-variables">
-                  Solar Radiation Variables&nbsp;<span class="badge bg-secondary">New</span>
+                  Solar Radiation Variables
                 </button>
               </h2>
               <div id="collapse-solar-variables" class="accordion-collapse collapse" aria-labelledby="heading-solar-variables" data-bs-parent="#accordionVariables">
@@ -460,29 +460,43 @@
                 </div>
               </div>
             </div>
-            #for(variable in pressureVariables):
             <div class="accordion-item debug-hidden">
-              <h2 class="accordion-header" id="heading-#(variable.name)">
-                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-#(variable.name)" aria-expanded="false" aria-controls="collapse-#(variable.name)">
-                  #(variable.label) on Pressure Levels
-                </button>
+              <h2 class="accordion-header" id="heading-pressure-levels">
+                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-pressure-levels" aria-expanded="false" aria-controls="collapse-pressure-levels">Pressure Levels&nbsp;<span class="badge bg-secondary">New</span></button>
               </h2>
-              <div id="collapse-#(variable.name)" class="accordion-collapse collapse" aria-labelledby="heading-#(variable.name)" data-bs-parent="#accordionVariables">
-                <div class="accordion-body row">
-                  #for(level in levels):
-                  <div class="col-md-2">
-                    <div class="form-check">
-                      <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level)hPa" id="#(variable.name)_#(level)hPa" name="hourly">
-                      <label class="form-check-label" for="#(variable.name)_#(level)hPa">
-                        #(level) hPa
-                      </label>
+              <div id="collapse-pressure-levels" class="accordion-collapse collapse" aria-labelledby="heading-pressure-levels" data-bs-parent="#accordionVariables">
+                <div class="accordion-body">
+                  <div class="d-flex align-items-start">
+                    <div class="nav flex-column nav-pills me-3" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                      #for(variable in pressureVariables):
+                      <button class="nav-link text-nowrap #if(isFirst): active#endif" id="v-pills-#(variable.name)-tab" data-bs-toggle="pill" data-bs-target="#v-pills-#(variable.name)" type="button" role="tab" aria-controls="v-pills-#(variable.name)" aria-selected="#(isFirst)">#(variable.label)</button>
+                      #endfor
+                    </div>
+                    <div class="tab-content" id="v-pills-tabContent">
+                      #for(variable in pressureVariables):
+                      <div class="tab-pane fade #if(isFirst): show active#endif" id="v-pills-#(variable.name)" role="tabpanel" aria-labelledby="v-pills-#(variable.name)-tab">
+                        <div class="row">
+                          #for(level in levels):
+                          <div class="col-md-3">
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level)hPa" id="#(variable.name)_#(level)hPa" name="hourly">
+                              <label class="form-check-label" for="#(variable.name)_#(level)hPa">
+                                #(level) hPa
+                              </label>
+                            </div>
+                          </div>
+                          #endfor
+                        </div>
+                      </div>
+                      #endfor
+                      <div class="mt-3">
+                        <small class="text-muted">Tip: Use <mark>geopotential_height</mark> to get the precise altitude <strong>above sea level</strong> (not above ground) for each pressure level.</small>
+                      </div>
                     </div>
                   </div>
-                  #endfor
                 </div>
               </div>
             </div>
-            #endfor
           </div>
         </div>
 
