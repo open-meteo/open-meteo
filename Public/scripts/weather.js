@@ -5,6 +5,27 @@ if (location.hostname === "127.0.0.1") {
     $(".debug-hidden").show();
 }
 
+function updateCheckboxCounter(counter, countOf) {
+    var countAll = 0;
+    var countChecked = 0;
+    countOf.querySelectorAll("input[type=checkbox]").forEach(function(element) {
+        countAll += 1;
+        countChecked += element.checked ? 1 : 0
+    });
+    counter.innerHTML = `${countChecked} / ${countAll}`;
+}
+function setupCheckboxCounter() {
+    document.querySelectorAll('.checkboxcounter').forEach(function(counter) {
+        const countOf = document.querySelector(counter.dataset.countCheckboxesOf);
+        updateCheckboxCounter(counter, countOf);
+        countOf.querySelectorAll("input[type=checkbox]").forEach(function(element) {
+            element.addEventListener('change', (event) => {
+                updateCheckboxCounter(counter, countOf);
+            })
+        });
+    })
+}
+
 function previewData(data, downloadTime) {
     var yAxis = [];
     let codes = {0: "fair", 1: "mainly clear", 2: "partly cloudy", 3: "overcast", 45: "fog", 
@@ -262,4 +283,5 @@ frm.submit(function(e){
   }
 
   frm.submit();
+  setupCheckboxCounter();
 });

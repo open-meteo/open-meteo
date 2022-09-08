@@ -246,48 +246,6 @@
             </label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="shortwave_radiation" id="shortwave_radiation" name="hourly">
-            <label class="form-check-label" for="shortwave_radiation">
-              Shortwave Solar Radiation
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="diffuse_radiation" id="diffuse_radiation" name="hourly">
-            <label class="form-check-label" for="diffuse_radiation">
-              Diffuse Solar Radiation
-            </label>
-          </div>
-          <!--<div class="form-check">
-            <input class="form-check-input" type="checkbox" value="direct_radiation" id="direct_radiation" name="hourly">
-            <label class="form-check-label" for="direct_radiation">
-              Direct Solar Radiation
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="diffuse_radiation" id="diffuse_radiation" name="hourly">
-            <label class="form-check-label" for="diffuse_radiation">
-              Diffuse Solar Radiation
-            </label>
-          </div>-->
-          <div class="form-check debug-hidden">
-            <input class="form-check-input" type="checkbox" value="terrestrial_radiation" id="terrestrial_radiation" name="hourly">
-            <label class="form-check-label" for="terrestrial_radiation">
-              Terrestrial Solar Radiation Backwards Averaged (debug only)
-            </label>
-          </div>
-          <div class="form-check debug-hidden">
-            <input class="form-check-input" type="checkbox" value="terrestrial_radiation_instant" id="terrestrial_radiation_instant" name="hourly">
-            <label class="form-check-label" for="terrestrial_radiation_instant">
-              Terrestrial Solar Radiation Instant (debug only)
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="direct_normal_irradiance" id="direct_normal_irradiance" name="hourly">
-            <label class="form-check-label" for="direct_normal_irradiance">
-              Direct Normal Irradiance (DNI)
-            </label>
-          </div>
-          <div class="form-check">
             <input class="form-check-input" type="checkbox" value="evapotranspiration" id="evapotranspiration" name="hourly">
             <label class="form-check-label" for="evapotranspiration">
               Evapotranspiration
@@ -443,7 +401,7 @@
             <div class="accordion-item">
               <h2 class="accordion-header" id="heading-solar-variables">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-solar-variables" aria-expanded="false" aria-controls="collapse-solar-variables">
-                  Solar Radiation Variables
+                  Solar Radiation Variables&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter" data-count-checkboxes-of="#collapse-solar-variables">0/x</span>
                 </button>
               </h2>
               <div id="collapse-solar-variables" class="accordion-collapse collapse" aria-labelledby="heading-solar-variables" data-bs-parent="#accordionVariables">
@@ -520,7 +478,9 @@
             </div>
             <div class="accordion-item debug-hidden">
               <h2 class="accordion-header" id="heading-pressure-levels">
-                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-pressure-levels" aria-expanded="false" aria-controls="collapse-pressure-levels">Pressure Levels&nbsp;<span class="badge bg-secondary">New</span></button>
+                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-pressure-levels" aria-expanded="false" aria-controls="collapse-pressure-levels">
+                  Pressure Levels&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter" data-count-checkboxes-of="#collapse-pressure-levels">0/x</span>&nbsp;<span class="badge bg-primary">New</span>
+                </button>
               </h2>
               <div id="collapse-pressure-levels" class="accordion-collapse collapse" aria-labelledby="heading-pressure-levels" data-bs-parent="#accordionVariables">
                 <div class="accordion-body">
@@ -536,7 +496,7 @@
                         <div class="row">
                           #for(level in levels):
                           #if(index % (count(levels)/3+1) == 0 || isFirst):
-                          <div class="col-sm-4">
+                          <div class="col-lg-4">
                           #endif
                             <div class="form-check">
                               <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level.level)hPa" id="#(variable.name)_#(level.level)hPa" name="hourly">
