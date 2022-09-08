@@ -460,7 +460,7 @@
                 </div>
               </div>
             </div>
-            <div class="accordion-item debug-hidden">
+            <div class="accordion-item">
               <h2 class="accordion-header" id="heading-pressure-levels">
                 <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-pressure-levels" aria-expanded="false" aria-controls="collapse-pressure-levels">
                   Pressure Levels&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter" data-count-checkboxes-of="#collapse-pressure-levels">0/x</span>&nbsp;<span class="badge bg-primary">New</span>
@@ -471,7 +471,7 @@
                   <div class="d-flex align-items-start">
                     <div class="nav flex-column nav-pills me-3" id="v-pills-tab" role="tablist" aria-orientation="vertical">
                       #for(variable in pressureVariables):
-                      <button class="nav-link text-nowrap #if(isFirst): active#endif" id="v-pills-#(variable.name)-tab" data-bs-toggle="pill" data-bs-target="#v-pills-#(variable.name)" type="button" role="tab" aria-controls="v-pills-#(variable.name)" aria-selected="#(isFirst)">#(variable.label)</button>
+                      <button class="nav-link text-start text-nowrap #if(isFirst): active#endif" id="v-pills-#(variable.name)-tab" data-bs-toggle="pill" data-bs-target="#v-pills-#(variable.name)" type="button" role="tab" aria-controls="v-pills-#(variable.name)" aria-selected="#(isFirst)">#(variable.label)</button>
                       #endfor
                     </div>
                     <div class="tab-content" id="v-pills-tabContent">

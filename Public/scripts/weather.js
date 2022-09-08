@@ -13,6 +13,7 @@ function updateCheckboxCounter(counter, countOf) {
         countChecked += element.checked ? 1 : 0
     });
     counter.innerHTML = `${countChecked} / ${countAll}`;
+    counter.style.display = countChecked == 0 ? "none" : "block";
 }
 function setupCheckboxCounter() {
     document.querySelectorAll('.checkboxcounter').forEach(function(counter) {
