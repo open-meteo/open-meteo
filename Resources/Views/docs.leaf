@@ -485,7 +485,7 @@
                             <div class="form-check">
                               <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level.level)hPa" id="#(variable.name)_#(level.level)hPa" name="hourly">
                               <label class="form-check-label" for="#(variable.name)_#(level.level)hPa">
-                                #(level.level) hPa <small class="text-muted">(#(level.altitude))</small>
+                                #(level.level) hPa <small class="text-muted">(#(level.altitude) km)</small>
                               </label>
                             </div>
                           #if(index % (count(levels)/3+1) == count(levels)/3 || isLast):
@@ -496,7 +496,7 @@
                       </div>
                       #endfor
                       <div class="mt-3">
-                        <small class="text-muted">Note: Altitude is approximate and in meters <strong> above sea level</strong> (not above ground). Use <mark>geopotential_height</mark> to get the precise altitude above sea level for each pressure level.</small>
+                        <small class="text-muted">Note: Altitudes are approximate and in meters <strong> above sea level</strong> (not above ground). Use <mark>geopotential_height</mark> to get precise altitudes above sea level.</small>
                       </div>
                     </div>
                   </div>
@@ -1012,6 +1012,67 @@
             <td>Instant</td>
             <td>m³/m³</td>
             <td>Average soil water content as volumetric mixing ratio at 0-1, 1-3, 3-9, 9-27 and 27-81 cm depths.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3 class="mt-5">Pressure Level Variables</h3>
+      <p>Pressure level variables do not have fixed altitudes. Altitude varies with atmospheric pressure. 1000 hPa is roughly between 500 and 1600 meters above sea level. Estimated altitudes are given below. Altitudes are in meters above sea level (not above ground). For precise altitudes, <mark>geopotential_height</mark> can be used.</p>
+      <table class="table">
+        <tr>
+          <th>Level (hPa)</th>
+          #for(level in levels):<td>#(level.level)</td>#endfor
+        </tr>
+        <tr>
+          <th>Altitude (km asl)</th>
+          #for(level in levels):<td>#(level.altitude)</td>#endfor
+        </tr>
+      </table>
+
+      <p>All pressure level have valid times of the indicated hour (instant).</p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Variable</th>
+            <th scope="col">Unit</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">temperature_1000hPa<br/>temperature_975hPa, ...</th>
+            <td>°C (°F)</td>
+            <td>Air temperature at the specified pressure level. Air temperatures decrease linearly with pressure.</td>
+          </tr>
+          <tr>
+            <th scope="row">relativehumidity_1000hPa<br/>relativehumidity_975hPa, ...</th>
+            <td>%</td>
+            <td>Relative humidity at the specified pressure level.</td>
+          </tr>
+          <tr>
+            <th scope="row">dewpoint_1000hPa<br/>dewpoint_975hPa, ...</th>
+            <td>°C (°F)</td>
+            <td>Dew point temperature at the specified pressure level.</td>
+          </tr>
+          <tr>
+            <th scope="row">cloudcover_1000hPa<br/>cloudcover_975hPa, ...</th>
+            <td>%</td>
+            <td>Cloud cover at the specified pressure level. Cloud cover is approximated based on relative humidity using <a href="https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf" target="_blank">Sundqvist et al. (1989)</a>. It may not match perfectly with low, mid and high cloud cover variables.</td>
+          </tr>
+          <tr>
+            <th scope="row">windspeed_1000hPa<br/>windspeed_975hPa, ...</th>
+            <td>km/h (mph, m/s, knots)</td>
+            <td>Wind speed at the specified pressure level.</td>
+          </tr>
+          <tr>
+            <th scope="row">winddirection_1000hPa<br/>winddirection_975hPa, ...</th>
+            <td>°</td>
+            <td>Wind direction at the specified pressure level.</td>
+          </tr>
+          <tr>
+            <th scope="row">geopotential_height_1000hPa<br/>geopotential_height_975hPa, ...</th>
+            <td>meter</td>
+            <td>Geopotential height at the specified pressure level. This can be used to get the correct altitude in meter above sea level of each pressure level. Be carefull not to mistake it with altitude above ground.</td>
           </tr>
         </tbody>
       </table>

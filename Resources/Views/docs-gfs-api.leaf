@@ -501,7 +501,7 @@
                             <div class="form-check">
                               <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level.level)hPa" id="#(variable.name)_#(level.level)hPa" name="hourly">
                               <label class="form-check-label" for="#(variable.name)_#(level.level)hPa">
-                                #(level.level) hPa <small class="text-muted">(#(level.altitude))</small>
+                                #(level.level) hPa <small class="text-muted">(#(level.altitude) km)</small>
                               </label>
                             </div>
                           #if(index % (count(levels)/3+1) == count(levels)/3 || isLast):
@@ -512,7 +512,7 @@
                       </div>
                       #endfor
                       <div class="mt-3">
-                        <small class="text-muted">Note: Altitude is approximate and in meters <strong> above sea level</strong> (not above ground). Use <mark>geopotential_height</mark> to get the precise altitude above sea level for each pressure level.</small>
+                        <small class="text-muted">Note: Altitudes are approximate and in meters <strong> above sea level</strong> (not above ground). Use <mark>geopotential_height</mark> to get precise altitudes above sea level.</small>
                       </div>
                     </div>
                   </div>

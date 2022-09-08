@@ -151,18 +151,14 @@ struct ContextWithLevels: Encodable {
             let altitude = Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: Float($0))
             var str: String
             switch altitude {
-            case ...100:
-                str = "\(altitude.rounded()) m"
-            case ...1000:
-                str = "\((Int(altitude)/10*10)) m"
             case ...3000:
                 // round to 0.1 km
-                str = "\(((altitude/100).rounded()/10)) km"
+                str = "\(((altitude/100).rounded()/10))"
             case ...10000:
                 // round to 0.5 km
-                str = "\(((altitude/500).rounded()*500/1000)) km"
+                str = "\(((altitude/500).rounded()*500/1000))"
             default:
-                str = "\(Int((altitude/1000).rounded())) km"
+                str = "\(Int((altitude/1000).rounded()))"
             }
             return PressureLevel(level: $0, altitude: str)
         }
