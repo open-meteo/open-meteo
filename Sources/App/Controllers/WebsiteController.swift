@@ -40,47 +40,15 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        struct ContextWithLevels: Encodable {
-            struct PressureVariable: Encodable {
-                let label: String
-                let name: String
-            }
-            struct PressureLevel: Encodable {
-                let level: Int
-                let altitude: String
-            }
-            
-            let title: String
-            let levels: [PressureLevel] = IconDomains.apiLevels.reversed().map {
-                let altitude = Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: Float($0))
-                var str: String
-                switch altitude {
-                case ...100:
-                    str = "\(altitude.rounded()) m"
-                case ...1000:
-                    str = "\((Int(altitude)/10*10)) m"
-                case ...3000:
-                    // round to 0.1 km
-                    str = "\(((altitude/100).rounded()/10)) km"
-                case ...10000:
-                    // round to 0.5 km
-                    str = "\(((altitude/500).rounded()*500/1000)) km"
-                default:
-                    str = "\(Int((altitude/1000).rounded())) km"
-                }
-                return PressureLevel(level: $0, altitude: str)
-            }
-            let pressureVariables = [
-                PressureVariable(label: "Temperature", name: "temperature"),
-                PressureVariable(label: "Dewpoint", name: "dewpoint"),
-                PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
-                PressureVariable(label: "Cloudcover", name: "cloudcover"),
-                PressureVariable(label: "Wind Speed", name: "windspeed"),
-                PressureVariable(label: "Wind Direction", name: "winddirection"),
-                PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
-            ]
-        }
-        let context = ContextWithLevels(title: "Docs")
+        let context = ContextWithLevels(title: "Docs", levels: IconDomains.apiLevels, variables: [
+            ContextWithLevels.PressureVariable(label: "Temperature", name: "temperature"),
+            ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
+            ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
+            ContextWithLevels.PressureVariable(label: "Cloudcover", name: "cloudcover"),
+            ContextWithLevels.PressureVariable(label: "Wind Speed", name: "windspeed"),
+            ContextWithLevels.PressureVariable(label: "Wind Direction", name: "winddirection"),
+            ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
+        ])
         return req.view.render("docs", context)
     }
     func docsGeocodingHandler(_ req: Request) -> EventLoopFuture<View> {
@@ -144,29 +112,59 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        struct GfsContext: Encodable {
-            struct PressureVariable: Encodable {
-                let label: String
-                let name: String
-            }
-            
-            let title: String
-            let levels: [Int] = GfsDomain.gfs025.levels
-            let pressureVariables = [
-                PressureVariable(label: "Temperature", name: "temperature"),
-                PressureVariable(label: "Dewpoint", name: "dewpoint"),
-                PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
-                PressureVariable(label: "Cloudcover", name: "cloudcover"),
-                PressureVariable(label: "Wind Speed", name: "windspeed"),
-                PressureVariable(label: "Wind Direction", name: "winddirection"),
-                PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
-            ]
-        }
-        let context = GfsContext(title: "GFS & HRRR Forecast API")
+        let context = ContextWithLevels(title: "GFS & HRRR Forecast API", levels: GfsDomain.gfs025.levels, variables: [
+            ContextWithLevels.PressureVariable(label: "Temperature", name: "temperature"),
+            ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
+            ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
+            ContextWithLevels.PressureVariable(label: "Cloudcover", name: "cloudcover"),
+            ContextWithLevels.PressureVariable(label: "Wind Speed", name: "windspeed"),
+            ContextWithLevels.PressureVariable(label: "Wind Direction", name: "winddirection"),
+            ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
+        ])
         return req.view.render("docs-gfs-api", context)
     }
 }
 
 struct IndexContext: Encodable {
     let title: String
+}
+
+struct ContextWithLevels: Encodable {
+    let title: String
+    let pressureVariables: [PressureVariable]
+    let levels: [PressureLevel]
+    
+    
+    struct PressureVariable: Encodable {
+        let label: String
+        let name: String
+    }
+    struct PressureLevel: Encodable {
+        let level: Int
+        let altitude: String
+    }
+    
+    public init(title: String, levels: [Int], variables: [PressureVariable]) {
+        self.title = title
+        self.pressureVariables = variables
+        self.levels = levels.reversed().map {
+            let altitude = Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: Float($0))
+            var str: String
+            switch altitude {
+            case ...100:
+                str = "\(altitude.rounded()) m"
+            case ...1000:
+                str = "\((Int(altitude)/10*10)) m"
+            case ...3000:
+                // round to 0.1 km
+                str = "\(((altitude/100).rounded()/10)) km"
+            case ...10000:
+                // round to 0.5 km
+                str = "\(((altitude/500).rounded()*500/1000)) km"
+            default:
+                str = "\(Int((altitude/1000).rounded())) km"
+            }
+            return PressureLevel(level: $0, altitude: str)
+        }
+    }
 }

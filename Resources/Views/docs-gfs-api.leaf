@@ -439,32 +439,128 @@
         </div>
 
         <div class="row py-3 px-0">
-          <div class="accordion" id="accordionVariables">
-            #for(variable in pressureVariables):
+          <div class="accordion"  id="accordionVariables">
             <div class="accordion-item">
-              <h2 class="accordion-header" id="heading-#(variable.name)">
-                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-#(variable.name)" aria-expanded="false" aria-controls="collapse-#(variable.name)">
-                  #(variable.label) on Pressure Levels
+              <h2 class="accordion-header" id="heading-solar-variables">
+                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-solar-variables" aria-expanded="false" aria-controls="collapse-solar-variables">
+                  Solar Radiation Variables
                 </button>
               </h2>
-              <div id="collapse-#(variable.name)" class="accordion-collapse collapse" aria-labelledby="heading-#(variable.name)" data-bs-parent="#accordionVariables">
+              <div id="collapse-solar-variables" class="accordion-collapse collapse" aria-labelledby="heading-solar-variables" data-bs-parent="#accordionVariables">
                 <div class="accordion-body row">
-                  #for(level in levels):
-                  <div class="col-md-2">
+                  <div class="col-md-6">
                     <div class="form-check">
-                      <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level)hPa" id="#(variable.name)_#(level)hPa" name="hourly">
-                      <label class="form-check-label" for="#(variable.name)_#(level)hPa">
-                        #(level) hPa
+                      <input class="form-check-input" type="checkbox" value="shortwave_radiation" id="shortwave_radiation" name="hourly">
+                      <label class="form-check-label" for="shortwave_radiation">
+                        Shortwave Solar Radiation
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="direct_radiation" id="direct_radiation" name="hourly">
+                      <label class="form-check-label" for="direct_radiation">
+                        Direct Solar Radiation
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="diffuse_radiation" id="diffuse_radiation" name="hourly">
+                      <label class="form-check-label" for="diffuse_radiation">
+                        Diffuse Solar Radiation
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="direct_normal_irradiance" id="direct_normal_irradiance" name="hourly">
+                      <label class="form-check-label" for="direct_normal_irradiance">
+                        Direct Normal Irradiance DNI
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="terrestrial_radiation" id="terrestrial_radiation" name="hourly">
+                      <label class="form-check-label" for="terrestrial_radiation">
+                        Terrestrial Solar Radiation
                       </label>
                     </div>
                   </div>
-                  #endfor
+                  <div class="col-md-6">
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="shortwave_radiation_instant" id="shortwave_radiation_instant" name="hourly">
+                      <label class="form-check-label" for="shortwave_radiation_instant">
+                        Shortwave Solar Radiation (Instant)
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="direct_radiation_instant" id="direct_radiation_instant" name="hourly">
+                      <label class="form-check-label" for="direct_radiation_instant">
+                        Direct Solar Radiation (Instant)
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="diffuse_radiation_instant" id="diffuse_radiation_instant" name="hourly">
+                      <label class="form-check-label" for="diffuse_radiation_instant">
+                        Diffuse Solar Radiation (Instant)
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="direct_normal_irradiance_instant" id="direct_normal_irradiance_instant" name="hourly">
+                      <label class="form-check-label" for="direct_normal_irradiance_instant">
+                        Direct Normal Irradiance DNI (Instant)
+                      </label>
+                    </div>
+                    <div class="form-check">
+                      <input class="form-check-input" type="checkbox" value="terrestrial_radiation_instant" id="terrestrial_radiation_instant" name="hourly">
+                      <label class="form-check-label" for="terrestrial_radiation_instant">
+                        Terrestrial Solar Radiation (Instant)
+                      </label>
+                    </div>
+                  </div>
+                  <div class="col-md-12">
+                    <small class="text-muted">Note: Solar radiation is averaged over the past hour. Use <mark>instant</mark> for radiation at the indicated time.</small>
+                  </div>
                 </div>
               </div>
             </div>
-            #endfor
+            <div class="accordion-item debug-hidden">
+              <h2 class="accordion-header" id="heading-pressure-levels">
+                <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-pressure-levels" aria-expanded="false" aria-controls="collapse-pressure-levels">Pressure Levels&nbsp;<span class="badge bg-secondary">New</span></button>
+              </h2>
+              <div id="collapse-pressure-levels" class="accordion-collapse collapse" aria-labelledby="heading-pressure-levels" data-bs-parent="#accordionVariables">
+                <div class="accordion-body">
+                  <div class="d-flex align-items-start">
+                    <div class="nav flex-column nav-pills me-3" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                      #for(variable in pressureVariables):
+                      <button class="nav-link text-nowrap #if(isFirst): active#endif" id="v-pills-#(variable.name)-tab" data-bs-toggle="pill" data-bs-target="#v-pills-#(variable.name)" type="button" role="tab" aria-controls="v-pills-#(variable.name)" aria-selected="#(isFirst)">#(variable.label)</button>
+                      #endfor
+                    </div>
+                    <div class="tab-content" id="v-pills-tabContent">
+                      #for(variable in pressureVariables):
+                      <div class="tab-pane fade #if(isFirst): show active#endif" id="v-pills-#(variable.name)" role="tabpanel" aria-labelledby="v-pills-#(variable.name)-tab">
+                        <div class="row">
+                          #for(level in levels):
+                          #if(index % (count(levels)/3+1) == 0 || isFirst):
+                          <div class="col-sm-4">
+                          #endif
+                            <div class="form-check">
+                              <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level.level)hPa" id="#(variable.name)_#(level.level)hPa" name="hourly">
+                              <label class="form-check-label" for="#(variable.name)_#(level.level)hPa">
+                                #(level.level) hPa <small class="text-muted">(#(level.altitude))</small>
+                              </label>
+                            </div>
+                          #if(index % (count(levels)/3+1) == count(levels)/3 || isLast):
+                          </div>
+                          #endif
+                          #endfor
+                        </div>
+                      </div>
+                      #endfor
+                      <div class="mt-3">
+                        <small class="text-muted">Note: Altitude is approximate and in meters <strong> above sea level</strong> (not above ground). Use <mark>geopotential_height</mark> to get the precise altitude above sea level for each pressure level.</small>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
         <div class="row py-3 px-0">
           <h3>Daily Weather Variables <small class="text-muted">(*)</small></h3>
