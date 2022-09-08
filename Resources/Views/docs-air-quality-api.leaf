@@ -334,7 +334,7 @@
 
 
 
-  <div class="col-12">
+  <div class="col-12 my-4">
     <div id="container" style="height: 400px; width: 100%"></div>
   </div>
 

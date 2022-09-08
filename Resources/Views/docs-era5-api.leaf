@@ -571,7 +571,7 @@
     </div>
   </form>
 
-  <div class="col-12">
+  <div class="col-12 my-4">
     <div id="containerStockcharts" style="height: 500px; width: 100%"></div>
   </div>
 
