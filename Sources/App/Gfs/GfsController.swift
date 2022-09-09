@@ -5,11 +5,10 @@ import Vapor
  TODO:
  - No convective precip in NAM/HRRR
  - weather code
- - No diffuse/direct radiation in GFS
  - No 120/180m wind
- - No cloudcover in NAM/HRRR on pressure levels
  - Soil temp/moisture on different levels
- - cloudcover interpolation negative values
+ - DONE No cloudcover in NAM/HRRR on pressure levels -> RH to clouds implemented
+ - DONE No diffuse/direct radiation in GFS -> separation model implemented
  */
 public struct GfsController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
@@ -204,11 +203,15 @@ enum GfsVariableDerivedSurface: String, Codable, CaseIterable {
     case winddirection_120m
     case windspeed_180m
     case winddirection_180m*/
-    //case direct_normal_irradiance
+    case direct_normal_irradiance
+    case direct_normal_irradiance_instant
+    case direct_radiation
+    case direct_radiation_instant
+    case diffuse_radiation_instant
+    case shortwave_radiation_instant
     case evapotranspiration
     case et0_fao_evapotranspiration
     case vapor_pressure_deficit
-    //case shortwave_radiation
     case snowfall
     case surface_pressure
     case terrestrial_radiation
@@ -442,6 +445,19 @@ extension GfsMixer {
                     case .dewpoint_2m:
                         try prefetchData(variable: .temperature_2m, time: time)
                         try prefetchData(variable: .relativehumidity_2m, time: time)
+                    case .diffuse_radiation_instant:
+                        try prefetchData(variable: .diffuse_radiation, time: time)
+                    case .direct_normal_irradiance:
+                        fallthrough
+                    case .direct_normal_irradiance_instant:
+                        fallthrough
+                    case .direct_radiation:
+                        fallthrough
+                    case .direct_radiation_instant:
+                        try prefetchData(variable: .shortwave_radiation, time: time)
+                        try prefetchData(variable: .diffuse_radiation, time: time)
+                    case .shortwave_radiation_instant:
+                        try prefetchData(variable: .shortwave_radiation, time: time)
                     }
                 case .pressure(let v):
                     switch v.variable {
@@ -508,10 +524,6 @@ extension GfsMixer {
                 let rh = try get(variable: .relativehumidity_2m, time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
-            /*case .direct_normal_irradiance:
-                let dhi = try get(variable: .direct_radiation).data
-                let dni = Zensun.caluclateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, startTime: mixer.time.range.lowerBound, dtSeconds: mixer.time.dtSeconds)
-                return DataAndUnit(dni, .wattPerSquareMeter)*/
             case .et0_fao_evapotranspiration:
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: time)
                 let swrad = try get(variable: .shortwave_radiation, time: time).data
@@ -549,6 +561,30 @@ extension GfsMixer {
                 let temperature = try get(variable: .temperature_2m, time: time)
                 let rh = try get(variable: .relativehumidity_2m, time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+            case .shortwave_radiation_instant:
+                let sw = try get(variable: .shortwave_radiation, time: time)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: mixer.modelLat, longitude: mixer.modelLon)
+                return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
+            case .direct_normal_irradiance:
+                let dhi = try get(variable: .direct_radiation, time: time).data
+                let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: time)
+                return DataAndUnit(dni, .wattPerSquareMeter)
+            case .direct_normal_irradiance_instant:
+                let direct = try get(variable: .direct_radiation_instant, time: time)
+                let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: mixer.modelLat, longitude: mixer.modelLat, timerange: time)
+                return DataAndUnit(dni, direct.unit)
+            case .direct_radiation:
+                let diffuse = try get(variable: .diffuse_radiation, time: time)
+                let swrad = try get(variable: .shortwave_radiation, time: time)
+                return DataAndUnit(zip(swrad.data, diffuse.data).map(-), diffuse.unit)
+            case .direct_radiation_instant:
+                let direct = try get(variable: .direct_radiation, time: time)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: mixer.modelLat, longitude: mixer.modelLon)
+                return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
+            case .diffuse_radiation_instant:
+                let diff = try get(variable: .diffuse_radiation, time: time)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: mixer.modelLat, longitude: mixer.modelLon)
+                return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
             }
         case .pressure(let v):
             switch v.variable {
