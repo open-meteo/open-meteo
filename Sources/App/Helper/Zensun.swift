@@ -3,15 +3,15 @@ import Foundation
 
 /// Solar position calculations based on zensun
 /// See https://gist.github.com/sangholee1990/eb3d997a9b28ace2dbcab6a45fd7c178#file-visualization_using_sun_position-pro-L306
-struct Zensun {
+public struct Zensun {
     /// Watt per square meter
     static public let solarConstant = Float(1367.7)
     
     /// eqation of time
-    static let eqt: [Float] = [ -3.23, -5.49, -7.60, -9.48, -11.09, -12.39, -13.34, -13.95, -14.23, -14.19, -13.85, -13.22, -12.35, -11.26, -10.01, -8.64, -7.18, -5.67, -4.16, -2.69, -1.29, -0.02, 1.10, 2.05, 2.80, 3.33, 3.63, 3.68, 3.49, 3.09, 2.48, 1.71, 0.79, -0.24, -1.33, -2.41, -3.45, -4.39, -5.20, -5.84, -6.28, -6.49, -6.44, -6.15, -5.60, -4.82, -3.81, -2.60, -1.19, 0.36, 2.03, 3.76, 5.54, 7.31, 9.04, 10.69, 12.20, 13.53, 14.65, 15.52, 16.12, 16.41, 16.36, 15.95, 15.19, 14.09, 12.67, 10.93, 8.93, 6.70, 4.32, 1.86, -0.62, -3.23]
+    public static let eqt: [Float] = [ -3.23, -5.49, -7.60, -9.48, -11.09, -12.39, -13.34, -13.95, -14.23, -14.19, -13.85, -13.22, -12.35, -11.26, -10.01, -8.64, -7.18, -5.67, -4.16, -2.69, -1.29, -0.02, 1.10, 2.05, 2.80, 3.33, 3.63, 3.68, 3.49, 3.09, 2.48, 1.71, 0.79, -0.24, -1.33, -2.41, -3.45, -4.39, -5.20, -5.84, -6.28, -6.49, -6.44, -6.15, -5.60, -4.82, -3.81, -2.60, -1.19, 0.36, 2.03, 3.76, 5.54, 7.31, 9.04, 10.69, 12.20, 13.53, 14.65, 15.52, 16.12, 16.41, 16.36, 15.95, 15.19, 14.09, 12.67, 10.93, 8.93, 6.70, 4.32, 1.86, -0.62, -3.23]
 
     /// declination
-    static let dec: [Float] = [-23.06, -22.57, -21.91, -21.06, -20.05, -18.88, -17.57, -16.13, -14.57, -12.91, -11.16, -9.34, -7.46, -5.54, -3.59, -1.62, 0.36, 2.33, 4.28, 6.19, 8.06, 9.88, 11.62, 13.29, 14.87, 16.34, 17.70, 18.94, 20.04, 21.00, 21.81, 22.47, 22.95, 23.28, 23.43, 23.40, 23.21, 22.85, 22.32, 21.63, 20.79, 19.80, 18.67, 17.42, 16.05, 14.57, 13.00, 11.33, 9.60, 7.80, 5.95, 4.06, 2.13, 0.19, -1.75, -3.69, -5.62, -7.51, -9.36, -11.16, -12.88, -14.53, -16.07, -17.50, -18.81, -19.98, -20.99, -21.85, -22.52, -23.02, -23.33, -23.44, -23.35, -23.06]
+    public static let dec: [Float] = [-23.06, -22.57, -21.91, -21.06, -20.05, -18.88, -17.57, -16.13, -14.57, -12.91, -11.16, -9.34, -7.46, -5.54, -3.59, -1.62, 0.36, 2.33, 4.28, 6.19, 8.06, 9.88, 11.62, 13.29, 14.87, 16.34, 17.70, 18.94, 20.04, 21.00, 21.81, 22.47, 22.95, 23.28, 23.43, 23.40, 23.21, 22.85, 22.32, 21.63, 20.79, 19.80, 18.67, 17.42, 16.05, 14.57, 13.00, 11.33, 9.60, 7.80, 5.95, 4.06, 2.13, 0.19, -1.75, -3.69, -5.62, -7.51, -9.36, -11.16, -12.88, -14.53, -16.07, -17.50, -18.81, -19.98, -20.99, -21.85, -22.52, -23.02, -23.33, -23.44, -23.35, -23.06]
     
     /// Calculate sun rise and set times
     public static func calculateSunRiseSet(timeRange: Range<Timestamp>, lat: Float, lon: Float, utcOffsetSeconds: Int) -> (rise: [Timestamp], set: [Timestamp]) {
@@ -22,11 +22,9 @@ struct Zensun {
         set.reserveCapacity(nDays)
         for time in timeRange.stride(dtSeconds: 86400) {
             /// fractional day number with 12am 1jan = 1
-            let tt = Float(((time.add(12*3600).timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            let tt = time.add(12*3600).fractionalDay
             
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            let (eqtime, decang) = time.add(12*3600).getSunDeclination()
             let latsun = decang
             
             /// colatitude of sun
@@ -79,11 +77,9 @@ struct Zensun {
                 
         for (t, timestamp) in timerange.enumerated() {
             /// fractional day number with 12am 1jan = 1
-            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            let tt = timestamp.fractionalDay
 
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            let (eqtime, decang) = timestamp.getSunDeclination()
             
             /// earth-sun distance in AU
             let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
@@ -93,7 +89,7 @@ struct Zensun {
             
             let latsun=decang
             /// universal time
-            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let ut = timestamp.hourWithFraction
             let t1 = (90-latsun).degreesToRadians
             
             let lonsun = -15.0*(ut-12.0+eqtime)
@@ -153,11 +149,9 @@ struct Zensun {
                 
         for (t, timestamp) in timerange.enumerated() {
             /// fractional day number with 12am 1jan = 1
-            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            let tt = timestamp.fractionalDay
 
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            let (eqtime, decang) = timestamp.getSunDeclination()
             
             /// earth-sun distance in AU
             let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
@@ -167,7 +161,7 @@ struct Zensun {
             
             let latsun=decang
             /// universal time
-            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let ut = timestamp.hourWithFraction
             let t1 = (90-latsun).degreesToRadians
             
             let lonsun = -15.0*(ut-12.0+eqtime)
@@ -227,16 +221,14 @@ struct Zensun {
                 
         for timestamp in timerange {
             /// fractional day number with 12am 1jan = 1
-            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            let tt = timestamp.fractionalDay
             let rsun=1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
             let rsun_square = rsun*rsun
 
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            let (eqtime, decang) = timestamp.getSunDeclination()
 
             let latsun=decang
-            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let ut = timestamp.hourWithFraction
             let t1 = (90-latsun).degreesToRadians
             
             let lonsun = -15.0*(ut-12.0+eqtime)
@@ -297,11 +289,9 @@ struct Zensun {
             }
             
             /// fractional day number with 12am 1jan = 1
-            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            let tt = timestamp.fractionalDay
 
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            let (eqtime, decang) = timestamp.getSunDeclination()
             
             /// earth-sun distance in AU
             let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
@@ -311,7 +301,7 @@ struct Zensun {
             
             let latsun=decang
             /// universal time
-            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let ut = timestamp.hourWithFraction
             let t1 = (90-latsun).degreesToRadians
             
             let lonsun = -15.0*(ut-12.0+eqtime)
@@ -374,17 +364,12 @@ struct Zensun {
                 out.append(0)
                 continue
             }
-            
-            /// fractional day number with 12am 1jan = 1
-            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
 
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            let (eqtime, decang) = timestamp.getSunDeclination()
             
             let latsun=decang
             /// universal time
-            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let ut = timestamp.hourWithFraction
             let t1 = (90-latsun).degreesToRadians
             
             let lonsun = -15.0*(ut-12.0+eqtime)
@@ -427,11 +412,9 @@ struct Zensun {
     public static func backwardsAveragedToInstantFactor(time: TimerangeDt, latitude: Float, longitude: Float) -> [Float] {
         return time.map { timestamp in
             /// fractional day number with 12am 1jan = 1
-            let tt = Float(((timestamp.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 1.0 + 0.5
+            let tt = timestamp.fractionalDay
 
-            let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-            let eqtime = eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-            let decang = dec.interpolateLinear(Int(tt - 1)/5, fraction)
+            let (eqtime, decang) = timestamp.getSunDeclination()
             
             /// earth-sun distance in AU
             let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
@@ -441,7 +424,7 @@ struct Zensun {
             
             let latsun=decang
             /// universal time
-            let ut = Float(((timestamp.timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+            let ut = timestamp.hourWithFraction
             let t1 = (90-latsun).degreesToRadians
             
             let lonsun = -15.0*(ut-12.0+eqtime)
@@ -534,3 +517,23 @@ struct Zensun {
     }
 }
 
+extension Timestamp {
+    /// fractional day number with 12am 1jan = 1.
+    public var fractionalDay: Float {
+        Float(((timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 0.5 + 1.0
+    }
+    
+    /// E.g. 2.5 for 2:30
+    public var hourWithFraction: Float {
+        Float(((timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
+    }
+    
+    @inlinable public func getSunDeclination() -> (eqtime: Float, decang: Float) {
+        let tt = fractionalDay
+        let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
+        let eqtime = Zensun.eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
+        let decang = Zensun.dec.interpolateLinear(Int(tt - 1)/5, fraction)
+        
+        return (eqtime, decang)
+    }
+}

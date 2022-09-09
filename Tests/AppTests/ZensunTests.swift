@@ -26,6 +26,28 @@ final class ZensunTests: XCTestCase {
         XCTAssertEqual(Zensun.extraTerrestrialRadiationBackwards(latitude: 23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 6, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1308.6616)
     }
     
+    func testZensunDate() {
+        // reference https://gml.noaa.gov/grad/solcalc/azel.html
+        let p = Timestamp(2022,1,1,12).getSunDeclination()
+        XCTAssertEqual(p.decang, -22.962, accuracy: 0.001) // should be -22.96
+        XCTAssertEqual(p.eqtime * 60, -3.6820002, accuracy: 0.001) // should be -3.7
+        
+        let p2 = Timestamp(2024,1,1,12).getSunDeclination()
+        XCTAssertEqual(p2.decang, -23.011, accuracy: 0.001) // should be -23
+        XCTAssertEqual(p2.eqtime * 60, -3.4559999, accuracy: 0.001) // should be -3.47
+        
+        let p3 = Timestamp(2022,7,1,12).getSunDeclination()
+        XCTAssertEqual(p3.decang, 23.066, accuracy: 0.001) // should be 23.06
+        XCTAssertEqual(p3.eqtime * 60, -3.8260005, accuracy: 0.001) // should be -3.95
+        
+        XCTAssertEqual(Timestamp(1970,1,1,12).fractionalDay, 2.0)
+        XCTAssertEqual(Timestamp(2022,1,1,12).fractionalDay, 2.0)
+        XCTAssertEqual(Timestamp(2023,1,1,12).fractionalDay, 1.75)
+        XCTAssertEqual(Timestamp(2024,1,1,12).fractionalDay, 1.5) // leap year
+        XCTAssertEqual(Timestamp(2025,1,1,12).fractionalDay, 2.25)
+        XCTAssertEqual(Timestamp(2026,1,1,12).fractionalDay, 2.0)
+    }
+    
     
     func testDNI() {
         let directRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 116.0, 305.0, 485.0, 615.0, 680.0, 681.0, 579.0, 428.0, 272.0, 87.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]

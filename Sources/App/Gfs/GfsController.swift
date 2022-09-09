@@ -571,7 +571,7 @@ extension GfsMixer {
                 return DataAndUnit(dni, .wattPerSquareMeter)
             case .direct_normal_irradiance_instant:
                 let direct = try get(variable: .direct_radiation_instant, time: time)
-                let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: mixer.modelLat, longitude: mixer.modelLat, timerange: time)
+                let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: time)
                 return DataAndUnit(dni, direct.unit)
             case .direct_radiation:
                 let diffuse = try get(variable: .diffuse_radiation, time: time)

@@ -111,10 +111,10 @@ struct Array2DFastSpace {
     }
 }
 
-struct Array2DFastTime {
-    var data: [Float]
-    let nLocations: Int
-    let nTime: Int
+public struct Array2DFastTime {
+    public var data: [Float]
+    public let nLocations: Int
+    public let nTime: Int
     
     public init(data: [Float], nLocations: Int, nTime: Int) {
         if (data.count != nLocations * nTime) {

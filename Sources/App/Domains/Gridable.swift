@@ -2,7 +2,7 @@ import Foundation
 import SwiftPFor2D
 
 
-protocol Gridable {
+public protocol Gridable {
     var nx: Int { get }
     var ny: Int { get }
     
