@@ -33,8 +33,8 @@
 <!-- http://127.0.0.1:8080/v1/forecast -->
 <div class="container px-4 py-0" id="featured-3">
   <div class="alert alert-primary" role="alert">
-    This API is using NOAA GFS data with high resolution data for the U.S. For Europe, please use the generic <a
-      href="/en/docs">Weather Forecast API</a>. Weather models are listed <a href="#data-sources">below</a>.
+    This API uses NOAA GFS combined with hourly HRRR updates and is optimised for the U.S. For Europe, the generic <a
+      href="/en/docs">Weather Forecast API</a> is recommended. Weather models are listed <a href="#data-sources">below</a>.
   </div>
 
   <form id="api_form" method="get" action="https://api.open-meteo.com/v1/gfs">
@@ -516,8 +516,7 @@
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-pressure-levels" aria-expanded="false" aria-controls="collapse-pressure-levels">
               Pressure Levels&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
-                data-count-checkboxes-of="#collapse-pressure-levels">0/x</span>&nbsp;<span
-                class="badge bg-primary">New</span>
+                data-count-checkboxes-of="#collapse-pressure-levels">0/x</span>
             </button>
           </h2>
           <div id="collapse-pressure-levels" class="accordion-collapse collapse"
@@ -1098,18 +1097,18 @@
             <td>Shortwave solar radiation as average of the preceding hour. This is equal to the total global horizontal
               irradiation </td>
           </tr>
-          <!--<tr>
-              <th scope="row">direct_radiation<br/>direct_normal_irradiance</th>
-              <td>Preceding hour mean</td>
-              <td>W/m²</td>
-              <td>Direct solar radiation as average of the preceding hour on the horizontal plane and the normal plane (perpendicular to the sun)</td>
-            </tr>
-            <tr>
-              <th scope="row">diffuse_radiation</th>
-              <td>Preceding hour mean</td>
-              <td>W/m²</td>
-              <td>Diffuse solar radiation as average of the preceding hour</td>
-            </tr>-->
+          <tr>
+            <th scope="row">direct_radiation<br/>direct_normal_irradiance</th>
+            <td>Preceding hour mean</td>
+            <td>W/m²</td>
+            <td>Direct solar radiation as average of the preceding hour on the horizontal plane and the normal plane (perpendicular to the sun). HRRR offers direct radiation directly. In GFS it is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
+          </tr>
+          <tr>
+            <th scope="row">diffuse_radiation</th>
+            <td>Preceding hour mean</td>
+            <td>W/m²</td>
+            <td>Diffuse solar radiation as average of the preceding hour. HRRR offers diffuse radiation directly. In GFS it is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
+          </tr>
           <tr>
             <th scope="row">vapor_pressure_deficit</th>
             <td>Instant</td>
@@ -1177,6 +1176,24 @@
             <td>Altitude above sea level of the 0°C level</td>
           </tr>
           <tr>
+            <th scope="row">visibility</th>
+            <td>Instant</td>
+            <td>meters</td>
+            <td>Viewing distance in meters. Influenced by low clouds, humidity and aerosols. Maximum visibility is approximately 24 km.</td>
+          </tr>
+          <tr>
+            <th scope="row">cape</th>
+            <td>Instant</td>
+            <td>J/kg</td>
+            <td>Convective available potential energy. See <a href="https://en.wikipedia.org/wiki/Convective_available_potential_energy" target="_blank">Wikipedia</a>.</td>
+          </tr>
+          <tr>
+            <th scope="row">lifted_index</th>
+            <td>Instant</td>
+            <td>dimensionless</td>
+            <td>Atmospheric stability. See <a href="https://en.wikipedia.org/wiki/Lifted_index" target="_blank">Wikipedia</a>.</td>
+          </tr>
+          <tr>
             <th scope="row">
               soil_temperature_0_to_10cm<br />soil_temperature_10_to_40cm<br />soil_temperature_40_to_100cm<br />soil_temperature_100_to_200cm
             </th>
@@ -1191,6 +1208,79 @@
             <td>Instant</td>
             <td>m³/m³</td>
             <td>Average soil water content as volumetric mixing ratio at 0-10, 10-40, 40-100 and 100-200 cm depths.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="mt-5">Pressure Level Variables</h3>
+    <p>Pressure level variables do not have fixed altitudes. Altitude varies with atmospheric pressure. 1000 hPa is
+      roughly between 60 and 160 meters above sea level. Estimated altitudes are given below. Altitudes are in meters
+      above sea level (not above ground). For precise altitudes, <mark>geopotential_height</mark> can be used.</p>
+    <div class="table-responsive">
+      <table class="table">
+        <tr>
+          <th>Level (hPa)</th>
+          #for(level in levels):<td>#(level.level)</td>#endfor
+        </tr>
+        <tr>
+          <th>Altitude</th>
+          #for(level in levels):<td>#(level.altitude)</td>#endfor
+        </tr>
+      </table>
+    </div>
+
+    <p>All pressure level have valid times of the indicated hour (instant).</p>
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Variable</th>
+            <th scope="col">Unit</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">temperature_1000hPa<br />temperature_975hPa, ...</th>
+            <td>°C (°F)</td>
+            <td>Air temperature at the specified pressure level. Air temperatures decrease linearly with pressure.</td>
+          </tr>
+          <tr>
+            <th scope="row">relativehumidity_1000hPa<br />relativehumidity_975hPa, ...</th>
+            <td>%</td>
+            <td>Relative humidity at the specified pressure level.</td>
+          </tr>
+          <tr>
+            <th scope="row">dewpoint_1000hPa<br />dewpoint_975hPa, ...</th>
+            <td>°C (°F)</td>
+            <td>Dew point temperature at the specified pressure level.</td>
+          </tr>
+          <tr>
+            <th scope="row">cloudcover_1000hPa<br />cloudcover_975hPa, ...</th>
+            <td>%</td>
+            <td>Cloud cover at the specified pressure level. GFS is including parameterised cloud cover directly. HRRR cloud cover is approximated based on relative humidity
+              using <a
+                href="https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf"
+                target="_blank">Sundqvist et al. (1989)</a>. It may not match perfectly with low, mid and high cloud
+              cover variables.</td>
+          </tr>
+          <tr>
+            <th scope="row">windspeed_1000hPa<br />windspeed_975hPa, ...</th>
+            <td>km/h (mph, m/s, knots)</td>
+            <td>Wind speed at the specified pressure level.</td>
+          </tr>
+          <tr>
+            <th scope="row">winddirection_1000hPa<br />winddirection_975hPa, ...</th>
+            <td>°</td>
+            <td>Wind direction at the specified pressure level.</td>
+          </tr>
+          <tr>
+            <th scope="row">geopotential_height_1000hPa<br />geopotential_height_975hPa, ...</th>
+            <td>meter</td>
+            <td>Geopotential height at the specified pressure level. This can be used to get the correct altitude in
+              meter above sea level of each pressure level. Be carefull not to mistake it with altitude above ground.
+            </td>
           </tr>
         </tbody>
       </table>
@@ -1390,103 +1480,8 @@
       </code>
     </pre>
   </div>
-
-
-  <!--<div class="col-12 py-5">
-      <h2 id="weathervariables">Weather variable documentation</h2>
-    </div>
-
-    <div class="col-6">
-    <h3>WMO Weather interpretation codes (WW)</h3>
-    <table class="table">
-      <thead>
-        <tr>
-          <th scope="col">Code</th>
-          <th scope="col">Description</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th scope="row">0</th>
-          <td>Clear sky</td>
-        </tr>
-        <tr>
-          <th scope="row">1, 2, 3</th>
-          <td>Mainly clear, partly cloudy, and overcast</td>
-        </tr>
-        <tr>
-          <th scope="row">45, 48</th>
-          <td>Fog and depositing rime fog</td>
-        </tr>
-        <tr>
-          <th scope="row">51, 53, 55</th>
-          <td>Drizzle: Light, moderate, and dense intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">56, 57</th>
-          <td>Freezing Drizzle: Light and dense intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">61, 63, 65</th>
-          <td>Rain: Slight, moderate and heavy intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">66, 67</th>
-          <td>Freezing Rain: Light and heavy intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">71, 73, 75</th>
-          <td>Snow fall: Slight, moderate, and heavy intensity</td>
-        </tr>
-        <tr>
-          <th scope="row">77</th>
-          <td>Snow grains</td>
-        </tr>
-        <tr>
-          <th scope="row">80, 81, 82</th>
-          <td>Rain showers: Slight, moderate, and violent</td>
-        </tr>
-        <tr>
-          <th scope="row">85, 86</th>
-          <td>Snow showers slight and heavy</td>
-        </tr>
-        <tr>
-          <th scope="row">95 *</th>
-          <td>Thunderstorm: Slight or moderate</td>
-        </tr>
-        <tr>
-          <th scope="row">96, 99 *</th>
-          <td>Thunderstorm with slight and heavy hail</td>
-        </tr>
-      </tbody>
-    </table>
-    <p>(*) Thunderstorm forecast with hail is only available in Central Europe</p>
-    </div>-->
-
-  <!--<div class=col-12>
-      <h1>Docs</h1>
-      <div id="swagger-ui">
-      </div>
-    </div>-->
 </div>
 
-<!--<link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.30.0/swagger-ui.css">
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.30.0/swagger-ui-bundle.js"></script>
-    <script>
-        const ui = SwaggerUIBundle({
-            url: '/docs/openapi.yml',
-        oauth2RedirectUrl: window.location.origin + '/docs/oauth2-redirect',
-            dom_id: '#swagger-ui',
-            presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIBundle.SwaggerUIStandalonePreset
-            ],
-            layout: "BaseLayout",
-            deepLinking: true,
-            showExtensions: true,
-            showCommonExtensions: true
-        })
-    </script>-->
 #endexport
 
 #export("footer"):
