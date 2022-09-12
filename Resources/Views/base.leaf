@@ -62,7 +62,7 @@
                   href="/en/docs/elevation-api">Elevation API</a></li>
               <li><a class="dropdown-item #if(title == "ECMWF Weather Forecast API"): active #endif"
                   href="/en/docs/ecmwf-api">ECMWF API</a></li>
-              <li class="debug-hidden"><a class="dropdown-item #if(title == "GFS & HRRR Forecast API"): active #endif"
+              <li><a class="dropdown-item #if(title == "GFS & HRRR Forecast API"): active #endif"
                     href="/en/docs/gfs-api">GFS &amp; HRRR Forecast API</a></li>
               <li class="debug-hidden"><a class="dropdown-item #if(title == "Seasonal Forecast API"): active #endif"
                       href="/en/docs/seasonal-forecast-api">Seasonal Forecast API</a></li>
