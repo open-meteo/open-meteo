@@ -54,8 +54,7 @@
               <li><a class="dropdown-item #if(title == "Marine Weather API"): active #endif"
                   href="/en/docs/marine-weather-api">Marine Weather API</a></li>
               <li><a class="dropdown-item #if(title == "Air Quality API"): active #endif"
-                  href="/en/docs/air-quality-api">Air Quality API&nbsp;&nbsp;<span
-                    class="badge bg-secondary">New</span></a></li>
+                  href="/en/docs/air-quality-api">Air Quality API</a></li>
               <li><a class="dropdown-item #if(title == "Geocoding API"): active #endif"
                   href="/en/docs/geocoding-api">Geocoding API</a></li>
               <li><a class="dropdown-item #if(title == "Elevation API"): active #endif"
@@ -63,7 +62,8 @@
               <li><a class="dropdown-item #if(title == "ECMWF Weather Forecast API"): active #endif"
                   href="/en/docs/ecmwf-api">ECMWF API</a></li>
               <li><a class="dropdown-item #if(title == "GFS & HRRR Forecast API"): active #endif"
-                    href="/en/docs/gfs-api">GFS &amp; HRRR Forecast API</a></li>
+                    href="/en/docs/gfs-api">GFS &amp; HRRR Forecast API&nbsp;&nbsp;<span
+                    class="badge bg-secondary">New</span></a></li>
               <li class="debug-hidden"><a class="dropdown-item #if(title == "Seasonal Forecast API"): active #endif"
                       href="/en/docs/seasonal-forecast-api">Seasonal Forecast API</a></li>
             </ul>
