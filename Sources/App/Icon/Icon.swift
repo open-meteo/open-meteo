@@ -289,6 +289,14 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
     case v_180m
     case u_180m
     
+    case temperature_80m
+    case temperature_120m
+    case temperature_180m
+    
+    case relativehumidity_80m
+    case relativehumidity_120m
+    case relativehumidity_180m
+    
     /// Soil temperature
     case soil_temperature_0cm
     case soil_temperature_6cm
@@ -399,6 +407,18 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
         case .pressure_msl: return 10
         case .snowfall_convective_water_equivalent: return 10
         case .snowfall_water_equivalent: return 10
+        case .temperature_80m:
+            fallthrough
+        case .temperature_120m:
+            fallthrough
+        case .temperature_180m:
+            return 10
+        case .relativehumidity_80m:
+            fallthrough
+        case .relativehumidity_120m:
+            fallthrough
+        case .relativehumidity_180m:
+            return 10
         }
     }
     
@@ -443,6 +463,18 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
         case .snowfall_water_equivalent: return .millimeter
         case .direct_radiation: return .wattPerSquareMeter
         case .pressure_msl: return .hectoPascal
+        case .temperature_80m:
+            return .celsius
+        case .temperature_120m:
+            return .celsius
+        case .temperature_180m:
+            return .celsius
+        case .relativehumidity_80m:
+            return .percent
+        case .relativehumidity_120m:
+            return .percent
+        case .relativehumidity_180m:
+            return .percent
         }
     }
     
@@ -500,6 +532,18 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
         case .direct_radiation: return "aswdir_s"
         case .snowfall_convective_water_equivalent: return "snow_con"
         case .snowfall_water_equivalent: return "snow_gsp"
+        case .temperature_80m:
+            return rawValue
+        case .temperature_120m:
+            return rawValue
+        case .temperature_180m:
+            return rawValue
+        case .relativehumidity_80m:
+            return rawValue
+        case .relativehumidity_120m:
+            return rawValue
+        case .relativehumidity_180m:
+            return rawValue
         }
     }
     
@@ -508,7 +552,7 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .dewpoint_2m
+        return self == .temperature_2m || self == .temperature_80m || self == .temperature_120m || self == .temperature_180m || self == .dewpoint_2m
     }
 
 }

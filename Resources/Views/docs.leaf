@@ -141,11 +141,47 @@
             Temperature (2 m)
           </label>
         </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="temperature_80m" id="temperature_80m" name="hourly">
+          <label class="form-check-label" for="temperature_80m">
+            Temperature (80 m)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="temperature_120m" id="temperature_120m" name="hourly">
+          <label class="form-check-label" for="temperature_120m">
+            Temperature (120 m)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="temperature_180m" id="temperature_180m" name="hourly">
+          <label class="form-check-label" for="temperature_180m">
+            Temperature (180 m)
+          </label>
+        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="relativehumidity_2m" id="relativehumidity_2m"
             name="hourly">
           <label class="form-check-label" for="relativehumidity_2m">
             Relative Humidity (2 m)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="relativehumidity_80m" id="relativehumidity_80m" name="hourly">
+          <label class="form-check-label" for="relativehumidity_80m">
+            Relative Humidity (80 m)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="relativehumidity_120m" id="relativehumidity_120m" name="hourly">
+          <label class="form-check-label" for="relativehumidity_120m">
+            Relative Humidity (120 m)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="relativehumidity_180m" id="relativehumidity_180m" name="hourly">
+          <label class="form-check-label" for="relativehumidity_180m">
+            Relative Humidity (180 m)
           </label>
         </div>
         <div class="form-check">

@@ -74,6 +74,18 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .showers: return .linear
         case .pressure_msl: return .hermite(bounds: nil)
         case .rain: return .linear
+        case .temperature_80m:
+            return .hermite(bounds: nil)
+        case .temperature_120m:
+            return .hermite(bounds: nil)
+        case .temperature_180m:
+            return .hermite(bounds: nil)
+        case .relativehumidity_80m:
+            return .hermite(bounds: 0...100)
+        case .relativehumidity_120m:
+            return .hermite(bounds: 0...100)
+        case .relativehumidity_180m:
+            return .hermite(bounds: 0...100)
         }
     }
     
@@ -105,6 +117,12 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .v_120m: return ("v", "model-level", domain.numberOfModelFullLevels-3)
         case .u_180m: return ("u", "model-level", domain.numberOfModelFullLevels-4)
         case .v_180m: return ("v", "model-level", domain.numberOfModelFullLevels-4)
+        case .temperature_80m: return ("t", "model-level", domain.numberOfModelFullLevels-2)
+        case .temperature_120m: return ("t", "model-level", domain.numberOfModelFullLevels-3)
+        case .temperature_180m: return ("t", "model-level", domain.numberOfModelFullLevels-4)
+        case .relativehumidity_80m: return ("relhum", "model-level", domain.numberOfModelFullLevels-2)
+        case .relativehumidity_120m: return ("relhum", "model-level", domain.numberOfModelFullLevels-3)
+        case .relativehumidity_180m: return ("relhum", "model-level", domain.numberOfModelFullLevels-4)
         default: return (omFileName, "single-level", nil)
         }
     }
@@ -112,6 +130,9 @@ extension IconSurfaceVariable: IconVariableDownloadable {
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m: fallthrough
+        case .temperature_80m: fallthrough
+        case .temperature_120m: fallthrough
+        case .temperature_180m: fallthrough
         case .dewpoint_2m: fallthrough
         case .soil_temperature_0cm: fallthrough
         case .soil_temperature_6cm: fallthrough
