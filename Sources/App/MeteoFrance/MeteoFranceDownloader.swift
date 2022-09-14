@@ -44,7 +44,7 @@ struct MeteoFranceDownload: Command {
             return run
         } ?? domain.lastRun
         
-        let onlyVariables: [GenericVariable]? = signature.onlyVariables.map {
+        let onlyVariables: [MeteoFranceVariableDownloadable]? = signature.onlyVariables.map {
             $0.split(separator: ",").map {
                 if let variable = MeteoFrancePressureVariable(rawValue: String($0)) {
                     return variable
@@ -57,11 +57,11 @@ struct MeteoFranceDownload: Command {
         }
         
         let pressureVariables = domain.levels.reversed().flatMap { level in
-            GfsPressureVariableType.allCases.map { variable in
-                GfsPressureVariable(variable: variable, level: level)
+            MeteoFrancePressureVariableType.allCases.map { variable in
+                MeteoFrancePressureVariable(variable: variable, level: level)
             }
         }
-        let surfaceVariables = GfsSurfaceVariable.allCases
+        let surfaceVariables = MeteoFranceSurfaceVariable.allCases
         
         let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
         
@@ -131,12 +131,12 @@ struct MeteoFranceDownload: Command {
         let gribIndexName: String? // :PRMSL:mean sea level:1 hour fcst:
         //let backwardsDtHours: Int? // 10 m above ground:0-1 hour max fcst
         //let isAccumulatedModelStart: Bool // TPRATE:surface:0-1 hour acc fcst
-        let variable: GenericVariable
+        let variable: MeteoFranceVariableDownloadable
         
     }
     
     
-    func variablesPerPackage(domain: MeteoFranceDomain, package: MfVariablePackages, steps: ArraySlice<Int>, variables: [GenericVariable]) -> [MfGribVariable] {
+    func variablesPerPackage(domain: MeteoFranceDomain, package: MfVariablePackages, steps: ArraySlice<Int>, variables: [MeteoFranceVariableDownloadable]) -> [MfGribVariable] {
         
         switch domain {
         case .arpege_europe:
@@ -144,9 +144,9 @@ struct MeteoFranceDownload: Command {
         case .arpege_world:
             switch package {
             case .SP1:
-                return steps.map { h in
+                return steps.flatMap { h in
                     let hour = h == 0 ? "anl" : "\(h) hour fcst"
-                    return MfGribVariable(hour: h, gribIndexName: ":PRMSL:mean sea level:\(hour):", variable: MeteoFranceSurfaceVariable.pressure_msl)
+                    return [MfGribVariable(hour: h, gribIndexName: ":PRMSL:mean sea level:\(hour):", variable: MeteoFranceSurfaceVariable.pressure_msl), MfGribVariable(hour: h, gribIndexName: ":TMP:2 m above ground:\(hour):", variable: MeteoFranceSurfaceVariable.temperature_2m)]
                 }
             case .SP2:
                 return []
@@ -163,7 +163,7 @@ struct MeteoFranceDownload: Command {
     }
     
     /// download MeteoFrance
-    func download(logger: Logger, domain: MeteoFranceDomain, run: Timestamp, variables: [GenericVariable], skipFilesIfExisting: Bool) throws {
+    func download(logger: Logger, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
 
@@ -199,31 +199,27 @@ struct MeteoFranceDownload: Command {
                 // Note, in ARPEGE EUROPE some variables always have hourly data
                 let vars = variablesPerPackage(domain: domain, package: package, steps: fileTime.steps, variables: variables)
                 
+                print(vars)
+                
                 //https://mf-nwp-models.s3.amazonaws.com/arpege-world/v1/2022-08-21/00/SP1/00H24H.grib2.inv
                 //https://mf-nwp-models.s3.amazonaws.com/arome-france/v1/2022-09-14/00/SP1/00H24H.grib2.inv
                 let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
                 let url = "https://mf-nwp-models.s3.amazonaws.com/\(dmn)/v1/\(run.iso8601_YYYY_MM_dd)/\(run.hour.zeroPadded(len: 2))/\(package)/\(fileTime.file).grib2"
                 
-                for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: vars, extension: ".inv") {
-                    var data = message.toArray2d()
-                    /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
-                        if i % 10_000 == 0 {
-                            print("grid \(i) lat \(latitude) lon \(longitude)")
-                        }
+                for (variable, data) in try curl.downloadIndexedGribSequential(url: url, variables: vars, extension: ".inv") {
+                    var data = data
+                    if domain.isGlobal {
+                        data.shift180LongitudeAndFlipLatitude()
                     }
-                    fatalError("OK")*/
-                    //if domain.isGlobal {
-                    //    data.shift180LongitudeAndFlipLatitude()
-                    //}
                     data.ensureDimensions(of: domain.grid)
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.variable.multiplyAdd {
+                        data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
                     try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).om"
                     try FileManager.default.removeItemIfExists(at: file)
-                    
-                    // Scaling before compression with scalefactor
-                    //if let fma = variable.variable.multiplyAdd {
-                    //    data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    //}
                     
                     curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(variable.hour).om")
                     //let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
@@ -291,7 +287,7 @@ struct MeteoFranceDownload: Command {
     }
     
     /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: MeteoFranceDomain, variables: [GenericVariable], run: Timestamp, createNetcdf: Bool) throws {
+    func convert(logger: Logger, domain: MeteoFranceDomain, variables: [MeteoFranceVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours(run: run.hour)
         let nForecastHours = forecastHours.max()!+1

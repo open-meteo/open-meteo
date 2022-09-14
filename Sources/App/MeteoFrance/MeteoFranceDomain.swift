@@ -46,6 +46,9 @@ enum MeteoFranceDomain: String, GenericDomain {
         }
         return 3600
     }
+    var isGlobal: Bool {
+        return self == .arpege_world
+    }
 
     private static var arpegeEuropeElevationFile = try? OmFileReader(file: Self.arpege_europe.surfaceElevationFileOm)
     private static var arpegeWorldElevationFile = try? OmFileReader(file: Self.arpege_world.surfaceElevationFileOm)
