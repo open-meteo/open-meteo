@@ -1,7 +1,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:5.6.2-focal as build
+FROM swift:5.7.0-focal as build
 EXPOSE 8080
 USER root
 

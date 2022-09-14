@@ -14,7 +14,7 @@ env:
 jobs:
   linux:
     runs-on: ubuntu-20.04
-    container: swift:5.6.2-focal
+    container: swift:5.7.0-focal
     name: Linux
     steps:
     - name: Get Swift Version
