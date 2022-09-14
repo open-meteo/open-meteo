@@ -38,26 +38,13 @@ public extension Process {
             data.append(handle.availableData)
         }
         
-        try Process.spawn(cmd: cmd, args: args, stdout: pipe)
-        
-        pipe.fileHandleForReading.readabilityHandler = nil
-        if let end = try pipe.fileHandleForReading.readToEnd() {
-            data.append(end)
-        }
-        try pipe.fileHandleForReading.close()
-        try pipe.fileHandleForWriting.close()
-        return data
-    }
-    
-    /// Always captures `stderr`. Otherwise it is just flooding logs.
-    static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil) throws {
         let eerror = Pipe()
         var errorData = Data()
         eerror.fileHandleForReading.readabilityHandler = { handle in
             errorData.append(handle.availableData)
         }
         
-        let terminationStatus = try Process.spawnWithPipes(cmd: cmd, args: args, stdout: stdout, stderr: eerror)
+        let terminationStatus = try Process.spawnWithPipes(cmd: cmd, args: args, stdout: pipe, stderr: eerror)
         
         eerror.fileHandleForReading.readabilityHandler = nil
         if let end = try eerror.fileHandleForReading.readToEnd() {
@@ -66,9 +53,27 @@ public extension Process {
         try eerror.fileHandleForReading.close()
         try eerror.fileHandleForWriting.close()
         
+        pipe.fileHandleForReading.readabilityHandler = nil
+        if let end = try pipe.fileHandleForReading.readToEnd() {
+            data.append(end)
+        }
+        try pipe.fileHandleForReading.close()
+        try pipe.fileHandleForWriting.close()
+        
         guard terminationStatus == 0 else {
             let error = String(data: errorData, encoding: .utf8) ?? ""
             throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: error)
+        }
+        
+        return data
+    }
+    
+    /// Does not capture stderror. As soon as pipes are used, swift tends to crash from time to time on linux
+    static func spawn(cmd: String, args: [String]?, stdout: Pipe? = nil, stderr: Pipe? = nil) throws {
+        let terminationStatus = try Process.spawnWithPipes(cmd: cmd, args: args, stdout: stdout, stderr: stderr)
+        
+        guard terminationStatus == 0 else {
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: "")
         }
     }
     
