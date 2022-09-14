@@ -5,6 +5,24 @@ import SwiftPFor2D
 /**
 Docs https://mf-models-on-aws.org/en/doc
  
+ HP1 files, model levels, temp, rh, wind, pres
+ HP2 files, model level, tke, spfh, gp, cloud cover, dewpoint
+ IP 1 pressure, temp, rh, wind, gp
+ IP 2, dew, vvel, spfh, wind dir/speed
+ IP3, cloud water, tke, cloud cover,
+ IP4, vorticity, relv, epot
+ SP1 surface, prmsl, wind, gust, tmp, rh, total clouds, precip rate, snow precip rate, swrad
+ SP2, low mid high clouds, surface pressure, lw rad,
+ 
+ arome models:
+ SP3 heat flux,
+ 
+ arome HD:
+ - HP1 rh wind, 20/50/100 m
+ - SP1 wind, temp, th
+ - SP2 surface pres,
+ - SP3, dist, brightness temperature
+ 
  */
 enum MeteoFranceDomain: String, GenericDomain {
     case arpege_europe
@@ -62,16 +80,52 @@ enum MeteoFranceDomain: String, GenericDomain {
     func forecastHours(run: Int) -> [Int] {
         switch self {
         case .arpege_europe:
-            let through = run == 0 ? 102 : run == 12 ? 114 : 72
-            return Array(stride(from: 0, to: 96, by: 3)) + Array(stride(from: 96, through: through, by: 6))
+            // Note: apparently surface variables are hourly, while pressure/model levels are 1/3/6h
+            // In SP2 some are hourly and some are switching 1/3/6h
+            if run == 18 {
+                // up to 60h, no 6h afterwards
+                return Array(stride(from: 0, through: 12, by: 1)) + Array(stride(from: 15, through: 60, by: 3))
+            }
+            let through = (run == 0 || run == 12) ? 102 : 72
+            return Array(stride(from: 0, through: 12, by: 1)) + Array(stride(from: 15, through: 72, by: 3)) + Array(stride(from: 78, through: through, by: 6))
+            
+            //return Array(stride(from: 0, through: through, by: 1))
         case .arpege_world:
-            let through = run == 0 ? 102 : run == 12 ? 114 : 72
-            return Array(stride(from: 0, to: 11, by: 1)) + Array(stride(from: 11, to: 72, by: 3)) + Array(stride(from: 72, through: through, by: 6))
+            let through = run == 0 || run == 12 ? 102 : run == 6 ? 72 : 60
+            return Array(stride(from: 0, to: 96, by: 3)) + Array(stride(from: 96, through: through, by: 6))
         case .arome_france:
             fallthrough
         case .arome_france_hd:
             let through = run == 00 || run == 12 ? 42 : 36
             return Array(stride(from: 0, through: through, by: 1))
+        }
+    }
+    
+    /// world 0-24, 27-48, 51-72, 75-102
+    func getForecastHoursPerFile(run: Int) -> [(file: String, steps: ArraySlice<Int>)] {
+        
+        let hoursPerFile: Int
+        switch self {
+        case .arpege_europe:
+            hoursPerFile = 12
+        case .arpege_world:
+            hoursPerFile = 24
+        case .arome_france:
+            hoursPerFile = 6
+        case .arome_france_hd:
+            hoursPerFile = 1
+        }
+        
+        let timesteps = forecastHours(run: run)
+        let steps = timesteps.chunked(by: { t, i in
+            return !(t >= hoursPerFile && (t % hoursPerFile) == 0)
+        })
+        
+        return steps.map {
+            let prev = $0.startIndex == 0 ? 0 : (timesteps[$0.startIndex-1] + dtHours)
+            let file = hoursPerFile == 1 ? "\(prev.zeroPadded(len: 2))H" : "\(prev.zeroPadded(len: 2))H\($0.last!.zeroPadded(len: 2))"
+            
+            return (file, $0)
         }
     }
     
