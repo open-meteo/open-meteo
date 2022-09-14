@@ -293,10 +293,6 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
     case temperature_120m
     case temperature_180m
     
-    case relativehumidity_80m
-    case relativehumidity_120m
-    case relativehumidity_180m
-    
     /// Soil temperature
     case soil_temperature_0cm
     case soil_temperature_6cm
@@ -413,12 +409,6 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
             fallthrough
         case .temperature_180m:
             return 10
-        case .relativehumidity_80m:
-            fallthrough
-        case .relativehumidity_120m:
-            fallthrough
-        case .relativehumidity_180m:
-            return 10
         }
     }
     
@@ -469,12 +459,6 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
             return .celsius
         case .temperature_180m:
             return .celsius
-        case .relativehumidity_80m:
-            return .percent
-        case .relativehumidity_120m:
-            return .percent
-        case .relativehumidity_180m:
-            return .percent
         }
     }
     
@@ -537,12 +521,6 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
         case .temperature_120m:
             return rawValue
         case .temperature_180m:
-            return rawValue
-        case .relativehumidity_80m:
-            return rawValue
-        case .relativehumidity_120m:
-            return rawValue
-        case .relativehumidity_180m:
             return rawValue
         }
     }

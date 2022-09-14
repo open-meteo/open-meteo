@@ -80,12 +80,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             return .hermite(bounds: nil)
         case .temperature_180m:
             return .hermite(bounds: nil)
-        case .relativehumidity_80m:
-            return .hermite(bounds: 0...100)
-        case .relativehumidity_120m:
-            return .hermite(bounds: 0...100)
-        case .relativehumidity_180m:
-            return .hermite(bounds: 0...100)
         }
     }
     
@@ -120,9 +114,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .temperature_80m: return ("t", "model-level", domain.numberOfModelFullLevels-2)
         case .temperature_120m: return ("t", "model-level", domain.numberOfModelFullLevels-3)
         case .temperature_180m: return ("t", "model-level", domain.numberOfModelFullLevels-4)
-        case .relativehumidity_80m: return ("relhum", "model-level", domain.numberOfModelFullLevels-2)
-        case .relativehumidity_120m: return ("relhum", "model-level", domain.numberOfModelFullLevels-3)
-        case .relativehumidity_180m: return ("relhum", "model-level", domain.numberOfModelFullLevels-4)
         default: return (omFileName, "single-level", nil)
         }
     }
