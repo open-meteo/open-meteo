@@ -37,47 +37,41 @@ struct MeteoFranceDownload: Command {
         guard let domain = MeteoFranceDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
-        switch domain {
-        case .hrrr_conus:
-            fallthrough
-        //case .nam_conus:
-        //    fallthrough
-        case .gfs025:
-            let run = signature.run.map {
-                guard let run = Int($0) else {
-                    fatalError("Invalid run '\($0)'")
-                }
-                return run
-            } ?? domain.lastRun
-            
-            let onlyVariables: [GfsVariableDownloadable]? = signature.onlyVariables.map {
-                $0.split(separator: ",").map {
-                    if let variable = GfsPressureVariable(rawValue: String($0)) {
-                        return variable
-                    }
-                    guard let variable = GfsSurfaceVariable(rawValue: String($0)) else {
-                        fatalError("Invalid variable '\($0)'")
-                    }
+        let run = signature.run.map {
+            guard let run = Int($0) else {
+                fatalError("Invalid run '\($0)'")
+            }
+            return run
+        } ?? domain.lastRun
+        
+        let onlyVariables: [GenericVariable]? = signature.onlyVariables.map {
+            $0.split(separator: ",").map {
+                if let variable = MeteoFrancePressureVariable(rawValue: String($0)) {
                     return variable
                 }
-            }
-            
-            let pressureVariables = domain.levels.reversed().flatMap { level in
-                GfsPressureVariableType.allCases.map { variable in
-                    GfsPressureVariable(variable: variable, level: level)
+                guard let variable = MeteoFranceSurfaceVariable(rawValue: String($0)) else {
+                    fatalError("Invalid variable '\($0)'")
                 }
+                return variable
             }
-            let surfaceVariables = GfsSurfaceVariable.allCases
-            
-            let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
-            
-            /// 18z run is available the day after starting 05:26
-            let date = Timestamp.now().with(hour: run)
-            
-            try download(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
-            try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         }
         
+        let pressureVariables = domain.levels.reversed().flatMap { level in
+            GfsPressureVariableType.allCases.map { variable in
+                GfsPressureVariable(variable: variable, level: level)
+            }
+        }
+        let surfaceVariables = GfsSurfaceVariable.allCases
+        
+        let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
+        
+        /// 18z run is available the day after starting 05:26
+        let date = Timestamp.now().with(hour: run)
+        
+        logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
+        
+        try download(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
+        try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
@@ -131,9 +125,61 @@ struct MeteoFranceDownload: Command {
     }
     
     /// download MeteoFrance
-    func download(logger: Logger, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) throws {
+    func download(logger: Logger, domain: MeteoFranceDomain, run: Timestamp, variables: [GenericVariable], skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        
+        
+        struct MfGribVariable: CurlIndexedVariable {
+            var gribIndexName: String?
+            
+            let hour: Int // 0 = anl
+            let gribNameLevel: String // :PRMSL:mean sea level:1 hour fcst:
+            let backwardsDtHours: Int? // 10 m above ground:0-1 hour max fcst
+            let isAccumulatedModelStart: Bool // TPRATE:surface:0-1 hour acc fcst
+            let variable: GenericVariable
+            
+        }
+        
+        enum VariablePackages: String, CaseIterable {
+            case SP1
+            case SP2
+            case IP1
+            case IP2
+        }
+        
+        //let vars = [MfGribVariable(hour: 1, gribNameLevel: <#T##String#>, backwardsDtHours: <#T##Int?#>, isAccumulatedModelStart: <#T##Bool#>, variable: MeteoFranceVariable.surface(.temperature_2m))]
+        
+        /// First file has one timestep more, because of analysis step 0
+        /// arpege europe 00H12H, 13H24H ... 97H102H
+        /// arpege world 00H24H, 27H48H, .. 75H102H (run 6/18 ends 51H72H)
+        /// arome france 00H06H, 07H12H, 13H18H
+        /// arome hh 00H.grib2
+        
+        /// loop tempstep files
+        /// loop over variable packages
+        
+        let timesteps = domain.forecastHours(run: run.hour)
+        
+
+        
+        print(timesteps)
+        
+        /// world 0-24, 27-48, 51-72, 75-102
+        let fileTimes = domain.getForecastHoursPerFile(run: run.hour)
+        
+        print(fileTimes)
+        
+        for fileTime in fileTimes {
+            //let timeString = hoursPerFile == 1 ? "\(fileTime.first!.zeroPadded(len: 2))H" : "\(fileTime.first!.zeroPadded(len: 2))H\(fileTime.last!.zeroPadded(len: 2))"
+            //print(timeString)
+            
+            
+        }
+        
+        
+        
+        /*// HG1
         
         let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0)
         try downloadElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
@@ -186,11 +232,11 @@ struct MeteoFranceDownload: Command {
                 let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                 try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
             }
-        }
+        }*/
     }
     
     /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
+    func convert(logger: Logger, domain: MeteoFranceDomain, variables: [GenericVariable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours(run: run.hour)
         let nForecastHours = forecastHours.max()!+1
@@ -199,7 +245,7 @@ struct MeteoFranceDownload: Command {
         let nLocation = grid.count
         
         
-        for variable in variables {
+        /*for variable in variables {
             let startConvert = DispatchTime.now()
             
             if GfsVariableAndDomain(variable: variable, domain: domain).gribIndexName == nil {
@@ -263,16 +309,6 @@ struct MeteoFranceDownload: Command {
             let startOm = DispatchTime.now()
             try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
-        }
-    }
-}
-
-/// Small helper structure to fuse domain and variable for more control in the gribindex selection
-struct MeteoFranceVariableAndDomain: CurlIndexedVariable {
-    let variable: GfsVariableDownloadable
-    let domain: GfsDomain
-    
-    var gribIndexName: String? {
-        return variable.gribIndexName(for: domain)
+        }*/
     }
 }
