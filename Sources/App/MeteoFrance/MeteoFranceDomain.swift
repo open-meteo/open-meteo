@@ -106,7 +106,10 @@ enum MeteoFranceDomain: String, GenericDomain {
         }
     }
     
-    /// world 0-24, 27-48, 51-72, 75-102
+    /// arpege europe 00H12H, 13H24H ... 97H102H
+    /// arpege world 00H24H, 27H48H, .. 75H102H (run 6/18 ends 51H72H)
+    /// arome france 00H06H, 07H12H, 13H18H
+    /// arome hh 00H.grib2
     func getForecastHoursPerFile(run: Int) -> [(file: String, steps: ArraySlice<Int>)] {
         
         let breakpoints: [Int]
@@ -132,7 +135,7 @@ enum MeteoFranceDomain: String, GenericDomain {
             }
             let start = i == 0 ? 0 : breakpoints[i-1] + dtHours
             let end = breakpoints[i]
-            let file = "\(start.zeroPadded(len: 2))H\(end.zeroPadded(len: 2))"
+            let file = "\(start.zeroPadded(len: 2))H\(end.zeroPadded(len: 2))H"
             
             return (file, s)
         }
@@ -170,7 +173,7 @@ enum MeteoFranceDomain: String, GenericDomain {
         case .arpege_europe:
             return RegularGrid(nx: 1, ny: 1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .arpege_world:
-            return RegularGrid(nx: 1, ny: 1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .arome_france:
             return RegularGrid(nx: 1, ny: 1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .arome_france_hd:
