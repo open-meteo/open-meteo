@@ -198,6 +198,70 @@ struct Curl {
         }
         fatalError("not reachable")
     }
+    
+    /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
+    func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") throws -> [(variable: Variable, data: Array2D)] {
+        let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
+        if count == 0 {
+            return []
+        }
+        
+        guard let index = String(data: try downloadInMemory(url: "\(url)\(`extension`)"), encoding: .utf8) else {
+            fatalError("Could not decode index to string")
+        }
+
+        var matches = [Variable]()
+        matches.reserveCapacity(count)
+        guard let range = index.split(separator: "\n").indexToRange(include: { idx in
+            guard let match = variables.first(where: {
+                guard let gribIndexName = $0.gribIndexName else {
+                    return false
+                }
+                return idx.contains(gribIndexName)
+            }) else {
+                return false
+            }
+            guard !matches.contains(where: {$0.gribIndexName == match.gribIndexName}) else {
+                logger.info("Grib variable \(match) matched twice for \(idx)")
+                return false
+            }
+            logger.debug("Matched \(match) with \(idx)")
+            matches.append(match)
+            return true
+        }) else {
+            throw CurlError.noGribMessagesMatch
+        }
+        logger.debug("Ranged download \(range)")
+        
+        
+        var missing = false
+        for variable in variables {
+            guard let gribIndexName = variable.gribIndexName else {
+                continue
+            }
+            if !matches.contains(where: {$0.gribIndexName == gribIndexName}) {
+                logger.error("Variable \(variable) '\(gribIndexName)' missing")
+                missing = true
+            }
+        }
+        if missing {
+            throw CurlError.didNotFindAllVariablesInGribIndex
+        }
+        
+        let ranges = range.range.split(separator: ",")
+        var matchesPos = 0
+        return try ranges.flatMap { range in
+            let data = try downloadInMemory(url: url, range: String(range), minSize: nil)
+            return try data.withUnsafeBytes { ptr in
+                let grib = try GribMemory(ptr: ptr)
+                return grib.messages.map {
+                    let variable = matches[matchesPos]
+                    matchesPos += 1
+                    return (variable, $0.toArray2d())
+                }
+            }
+        }
+    }
 }
 
 extension GribMessage {
