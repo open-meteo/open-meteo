@@ -91,7 +91,12 @@ enum MeteoFranceDomain: String, GenericDomain {
             
             //return Array(stride(from: 0, through: through, by: 1))
         case .arpege_world:
-            let through = run == 0 || run == 12 ? 102 : run == 6 ? 72 : 60
+            if run == 6 || run == 18 {
+                // no 6h
+                let through = run == 6 ? 72 : 60
+                return Array(stride(from: 0, through: through, by: 3))
+            }
+            let through = 102
             return Array(stride(from: 0, to: 96, by: 3)) + Array(stride(from: 96, through: through, by: 6))
         case .arome_france:
             fallthrough
@@ -104,28 +109,32 @@ enum MeteoFranceDomain: String, GenericDomain {
     /// world 0-24, 27-48, 51-72, 75-102
     func getForecastHoursPerFile(run: Int) -> [(file: String, steps: ArraySlice<Int>)] {
         
-        let hoursPerFile: Int
+        let breakpoints: [Int]
         switch self {
         case .arpege_europe:
-            hoursPerFile = 12
+            breakpoints = [12,24,36,48,60,72,84,96,102]
         case .arpege_world:
-            hoursPerFile = 24
+            breakpoints = [24,48,72,102]
         case .arome_france:
-            hoursPerFile = 6
+            breakpoints = [6,12,18,24,30,36,42]
         case .arome_france_hd:
-            hoursPerFile = 1
+            breakpoints = []
         }
         
         let timesteps = forecastHours(run: run)
         let steps = timesteps.chunked(by: { t, i in
-            return !(t >= hoursPerFile && (t % hoursPerFile) == 0)
+            return !breakpoints.isEmpty && !breakpoints.contains(t)
         })
         
-        return steps.map {
-            let prev = $0.startIndex == 0 ? 0 : (timesteps[$0.startIndex-1] + dtHours)
-            let file = hoursPerFile == 1 ? "\(prev.zeroPadded(len: 2))H" : "\(prev.zeroPadded(len: 2))H\($0.last!.zeroPadded(len: 2))"
+        return steps.enumerated().map { (i, s) in
+            if breakpoints.count == 0 {
+                return ("\(i.zeroPadded(len: 2))H", s)
+            }
+            let start = i == 0 ? 0 : breakpoints[i-1] + dtHours
+            let end = breakpoints[i]
+            let file = "\(start.zeroPadded(len: 2))H\(end.zeroPadded(len: 2))"
             
-            return (file, $0)
+            return (file, s)
         }
     }
     
