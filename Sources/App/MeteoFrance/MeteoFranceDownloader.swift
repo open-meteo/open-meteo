@@ -134,33 +134,15 @@ struct MeteoFranceDownload: Command {
     func download(logger: Logger, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-
-        
-        //let vars = [MfGribVariable(hour: 1, gribNameLevel: <#T##String#>, backwardsDtHours: <#T##Int?#>, isAccumulatedModelStart: <#T##Bool#>, variable: MeteoFranceVariable.surface(.temperature_2m))]
-        
-        /// First file has one timestep more, because of analysis step 0
-
-        
-        /// loop tempstep files
-        /// loop over variable packages
-        
-        //let timesteps = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: false)
         
         let curl = Curl(logger: logger, deadLineHours: 3)
-        
-        //print(timesteps)
-        
+                
         /// world 0-24, 27-48, 51-72, 75-102
         let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)
         let fileTimesHourly = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: true)
         
-        //print(fileTimes)
-        
+        // loop over time files... every file has 6,12 or 24 hour of data
         for (fileTime, fileTimeHourly) in zip(fileTimes, fileTimesHourly) {
-            //let timeString = hoursPerFile == 1 ? "\(fileTime.first!.zeroPadded(len: 2))H" : "\(fileTime.first!.zeroPadded(len: 2))H\(fileTime.last!.zeroPadded(len: 2))"
-            //print(timeString)
-            
-            
             // loop over packages for variables, like SP1 or IP1
             for package in MfVariablePackages.allCases {
                 logger.info("Downloading forecast hour \(fileTime.file) package \(package)")
@@ -202,68 +184,11 @@ struct MeteoFranceDownload: Command {
                     try FileManager.default.removeItemIfExists(at: file)
                     
                     curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(variable.hour).om")
-                    //let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    try OmFileWriter.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
+                    let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                    try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
                 }
             }
         }
-        
-        
-        
-        /*// HG1
-        
-        let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0)
-        try downloadElevation(logger: logger, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
-        
-        let deadLineHours = domain == .gfs025 ? 4 : 2
-        let curl = Curl(logger: logger, deadLineHours: deadLineHours)
-        let forecastHours = domain.forecastHours(run: run.hour)
-        
-        let variables: [MeteoFranceVariableAndDomain] = variables.map {
-            GfsVariableAndDomain(variable: $0, domain: domain)
-        }
-        //let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
-        
-        let variablesHour0 = variables.filter({!$0.variable.skipHour0})
-        
-        for forecastHour in forecastHours {
-            logger.info("Downloading forecastHour \(forecastHour)")
-            /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
-            let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
-            let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
-                let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
-                return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
-            }
-            let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            // NOTE: 2022-09-07: Async grib downloads are leaking in release build on linux.
-            // couldn't figure it out after 2 days, so lets stick to sync code.
-            // Either returned data is not released or something in eccodes
-            for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: variables) {
-                var data = message.toArray2d()
-                /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
-                    if i % 10_000 == 0 {
-                        print("grid \(i) lat \(latitude) lon \(longitude)")
-                    }
-                }
-                fatalError("OK")*/
-                if domain.isGlobal {
-                    data.shift180LongitudeAndFlipLatitude()
-                }
-                data.ensureDimensions(of: domain.grid)
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
-                try FileManager.default.removeItemIfExists(at: file)
-                
-                // Scaling before compression with scalefactor
-                if let fma = variable.variable.multiplyAdd {
-                    data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-                
-                curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg")
-                let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
-            }
-        }*/
     }
     
     /// Process each variable and update time-series optimised files
