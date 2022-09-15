@@ -46,6 +46,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     
     func toGribIndexName(hour: Int) -> String {
         let hourStr = hour == 0 ? "anl" : "\(hour) hour fcst"
+        let hourOrDay = hour % 24 == 0 ? "\(hour/24) day" : "\(hour) hour"
         switch self {
         case .temperature_2m:
             return ":TMP:2 m above ground:\(hourStr):"
@@ -62,9 +63,9 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         case .relativehumidity_2m:
             return ":RH:2 m above ground:\(hourStr):"
         case .precipitation:
-            return ":TPRATE:surface:0-\(hour) hour acc fcst:"
+            return ":TPRATE:surface:0-\(hourOrDay) acc fcst:"
         case .snowfall_water_equivalent:
-            return ":SPRATE:surface:0-\(hour) hour acc fcst:"
+            return ":SPRATE:surface:0-\(hourOrDay) acc fcst:"
         case .wind_v_component_10m:
             return "VGRD:10 m above ground:\(hourStr):"
         case .wind_u_component_10m:
@@ -72,7 +73,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         case .windgusts_10m:
             return ":GUST:10 m above ground:\(hour-1)-\(hour) hour max fcst:"
         case .shortwave_radiation:
-            return ":DSWRF:surface:0-\(hour) hour acc fcst:"
+            return ":DSWRF:surface:0-\(hourOrDay) acc fcst:"
         case .cape:
             return ":CAPE:surface - 3000 m above ground:\(hourStr):"
         }
@@ -83,6 +84,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         case .precipitation: return true
         case .shortwave_radiation: return true
         case .windgusts_10m: return true
+        case .snowfall_water_equivalent: return true
         default: return false
         }
     }
@@ -110,7 +112,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .cape:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...1e9)
         case .wind_v_component_10m:
             return .hermite(bounds: nil)
         case .wind_u_component_10m:

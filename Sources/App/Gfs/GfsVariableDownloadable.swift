@@ -173,8 +173,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .pressure_msl: return .hermite(bounds: nil)
         case .frozen_precipitation_percent: return .nearest
         case .diffuse_radiation: return .solar_backwards_averaged
-        case .cape: return .hermite(bounds: nil)
-        case .lifted_index: return .hermite(bounds: nil)
+        case .cape: return .hermite(bounds: 0...1e9)
+        case .lifted_index: return .hermite(bounds: 0...1e9)
         case .visibility: return .hermite(bounds: nil)
         }
     }
