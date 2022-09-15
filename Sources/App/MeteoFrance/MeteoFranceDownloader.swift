@@ -13,6 +13,9 @@ struct MeteoFranceDownload: Command {
 
         @Option(name: "run")
         var run: String?
+        
+        @Option(name: "past-days")
+        var pastDays: Int?
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
@@ -57,8 +60,11 @@ struct MeteoFranceDownload: Command {
         }
         
         let pressureVariables = domain.levels.reversed().flatMap { level in
-            MeteoFrancePressureVariableType.allCases.map { variable in
-                MeteoFrancePressureVariable(variable: variable, level: level)
+            MeteoFrancePressureVariableType.allCases.compactMap { variable -> MeteoFrancePressureVariable? in
+                if variable == .cloudcover && level < 100 {
+                    return nil
+                }
+                return MeteoFrancePressureVariable(variable: variable, level: level)
             }
         }
         let surfaceVariables = MeteoFranceSurfaceVariable.allCases
@@ -66,7 +72,7 @@ struct MeteoFranceDownload: Command {
         let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
         
         /// 18z run is available the day after starting 05:26
-        let date = Timestamp.now().with(hour: run)
+        let date = Timestamp.now().add(-24*3600 * (signature.pastDays ?? 0)).with(hour: run)
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         
@@ -163,7 +169,10 @@ struct MeteoFranceDownload: Command {
                         return []
                     }
                     // TODO some varibales are hourly although the rest is 3/6 h
-                    return fileTime.steps.map { h in
+                    return fileTime.steps.compactMap { h in
+                        if h == 0 && v.skipHour0 {
+                            return nil
+                        }
                         return MfGribVariable(hour: h, gribIndexName: v.toGribIndexName(hour: h), variable: v)
                     }
                 }

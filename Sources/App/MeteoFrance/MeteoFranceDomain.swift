@@ -150,7 +150,7 @@ enum MeteoFranceDomain: String, GenericDomain {
         case .arpege_europe:
             fallthrough
         case .arpege_world:
-            return [10, 30, 50, 70, 100, 150, 175, 200, 225, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
+            return [10, 20, 30, 50, 70, 100, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arome_france:
             fallthrough
         case .arome_france_hd:
