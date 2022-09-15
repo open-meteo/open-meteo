@@ -26,6 +26,10 @@ struct Array2D {
         data.shift180LongitudeAndFlipLatitude(nt: 1, ny: ny, nx: nx)
     }
     
+    mutating func flipLatitude() {
+        data.flipLatitude(nt: 1, ny: ny, nx: nx)
+    }
+    
     func ensureDimensions(of grid: Gridable) {
         guard nx == grid.nx && ny == grid.ny else {
             fatalError("GRIB dimensions (nx=\(nx), ny=\(ny)) do not match domain grid dimensions (nx=\(grid.nx), ny=\(grid.ny))")

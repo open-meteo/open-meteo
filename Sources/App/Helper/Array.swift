@@ -77,6 +77,23 @@ extension Array where Element == Float {
         }
     }
     
+    /// Flip south.north
+    mutating func flipLatitude(nt: Int, ny: Int, nx: Int) {
+        precondition(nt * ny * nx == count)
+        self.withUnsafeMutableBufferPointer { data in
+            for t in 0..<nt {
+                /// Also flip south / north
+                for y in 0..<ny/2 {
+                    for x in 0..<nx {
+                        let val = data[t*nx*ny + y*nx + x]
+                        data[t*nx*ny + y*nx + x] = data[t*nx*ny + (ny-1-y)*nx + x]
+                        data[t*nx*ny + (ny-1-y)*nx + x] = val
+                    }
+                }
+            }
+        }
+    }
+    
     mutating func multiplyAdd(multiply: Float, add: Float) {
         self.withUnsafeMutableBufferPointer { data in
             for i in 0..<data.count {

@@ -80,10 +80,14 @@ enum MeteoFranceDomain: String, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
-    func forecastHours(run: Int) -> [Int] {
+    func forecastHours(run: Int, hourlyForArpegeEurope: Bool) -> [Int] {
         switch self {
         case .arpege_europe:
             // Note: apparently surface variables are hourly, while pressure/model levels are 1/3/6h
+            if hourlyForArpegeEurope {
+                let through = (run == 0 || run == 12) ? 102 : run == 18 ? 60 : 72
+                return Array(stride(from: 0, through: through, by: 1))
+            }
             // In SP2 some are hourly and some are switching 1/3/6h
             if run == 18 {
                 // up to 60h, no 6h afterwards
@@ -113,7 +117,7 @@ enum MeteoFranceDomain: String, GenericDomain {
     /// arpege world 00H24H, 27H48H, .. 75H102H (run 6/18 ends 51H72H)
     /// arome france 00H06H, 07H12H, 13H18H
     /// arome hh 00H.grib2
-    func getForecastHoursPerFile(run: Int) -> [(file: String, steps: ArraySlice<Int>)] {
+    func getForecastHoursPerFile(run: Int, hourlyForArpegeEurope: Bool) -> [(file: String, steps: ArraySlice<Int>)] {
         
         let breakpoints: [Int]
         switch self {
@@ -127,7 +131,7 @@ enum MeteoFranceDomain: String, GenericDomain {
             breakpoints = []
         }
         
-        let timesteps = forecastHours(run: run)
+        let timesteps = forecastHours(run: run, hourlyForArpegeEurope: hourlyForArpegeEurope)
         let steps = timesteps.chunked(by: { t, i in
             return !breakpoints.isEmpty && !breakpoints.contains(t)
         })
@@ -174,7 +178,7 @@ enum MeteoFranceDomain: String, GenericDomain {
     var grid: Gridable {
         switch self {
         case .arpege_europe:
-            return RegularGrid(nx: 1, ny: 1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+            return RegularGrid(nx: 741, ny: 521, latMin: 20, lonMin: 42, dx: 0.1, dy: 0.1)
         case .arpege_world:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .arome_france:
