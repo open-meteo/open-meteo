@@ -255,6 +255,8 @@ struct Curl {
             return try data.withUnsafeBytes { ptr in
                 let grib = try GribMemory(ptr: ptr)
                 return grib.messages.map {
+                    //try! $0.dumpCoordinates()
+                    //fatalError("OK")
                     let variable = matches[matchesPos]
                     matchesPos += 1
                     return (variable, $0.toArray2d())
@@ -276,6 +278,20 @@ extension GribMessage {
             fatalError("Could not get Ny")
         }
         return Array2D(data: data, nx: nx, ny: ny)
+    }
+    
+    func dumpCoordinates() throws {
+        guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
+            fatalError("Could not get Nx")
+        }
+        guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
+            fatalError("Could not get Ny")
+        }
+        for (i,(latitude, longitude,value)) in try iterateCoordinatesAndValues().enumerated() {
+            if i % 10_000 == 0 || i == ny*nx-1 {
+                print("grid \(i) lat \(latitude) lon \(longitude) value \(value)")
+            }
+        }
     }
 }
 

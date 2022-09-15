@@ -8,9 +8,27 @@ protocol MeteoFranceVariableDownloadable: GenericVariableMixing {
     var isAccumulatedSinceModelStart: Bool { get }
     func toGribIndexName(hour: Int) -> String
     var inPackage: MfVariablePackages { get }
+    
+    /// In ARPEGE EUROPE some variables are hourly
+    /// Others start hourly and then switch to 3/6 hourly resolution
+    /// Obviously, if hourly data is available, it will be used
+    var isAlwaysHourlyInArgegeEurope: Bool { get }
 }
 
 extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
+    var isAlwaysHourlyInArgegeEurope: Bool {
+        switch self {
+        case .cloudcover_low:
+            fallthrough
+        case .cloudcover_mid:
+            fallthrough
+        case .cloudcover_high:
+            return true
+        default:
+            return inPackage == .SP1
+        }
+    }
+    
     var inPackage: MfVariablePackages {
         switch self {
         case .temperature_2m:
@@ -150,6 +168,10 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
 }
 
 extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
+    var isAlwaysHourlyInArgegeEurope: Bool {
+        return false
+    }
+    
     func toGribIndexName(hour: Int) -> String {
         let hourStr = hour == 0 ? "anl" : "\(hour) hour fcst"
         switch variable {

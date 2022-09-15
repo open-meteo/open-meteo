@@ -144,18 +144,19 @@ struct MeteoFranceDownload: Command {
         /// loop tempstep files
         /// loop over variable packages
         
-        let timesteps = domain.forecastHours(run: run.hour)
+        //let timesteps = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: false)
         
         let curl = Curl(logger: logger, deadLineHours: 3)
         
-        print(timesteps)
+        //print(timesteps)
         
         /// world 0-24, 27-48, 51-72, 75-102
-        let fileTimes = domain.getForecastHoursPerFile(run: run.hour)
+        let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)
+        let fileTimesHourly = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: true)
         
-        print(fileTimes)
+        //print(fileTimes)
         
-        for fileTime in fileTimes {
+        for (fileTime, fileTimeHourly) in zip(fileTimes, fileTimesHourly) {
             //let timeString = hoursPerFile == 1 ? "\(fileTime.first!.zeroPadded(len: 2))H" : "\(fileTime.first!.zeroPadded(len: 2))H\(fileTime.last!.zeroPadded(len: 2))"
             //print(timeString)
             
@@ -168,17 +169,16 @@ struct MeteoFranceDownload: Command {
                     guard v.inPackage == package else {
                         return []
                     }
-                    // TODO some varibales are hourly although the rest is 3/6 h
-                    return fileTime.steps.compactMap { h in
+                    // Some varibales are hourly although the rest is 3/6 h
+                    let time = (v.isAlwaysHourlyInArgegeEurope && domain == .arpege_europe) ? fileTimeHourly.steps : fileTime.steps
+                    return time.compactMap { h in
                         if h == 0 && v.skipHour0 {
                             return nil
                         }
                         return MfGribVariable(hour: h, gribIndexName: v.toGribIndexName(hour: h), variable: v)
                     }
                 }
-                
-                print(vars)
-                
+                                
                 //https://mf-nwp-models.s3.amazonaws.com/arpege-world/v1/2022-08-21/00/SP1/00H24H.grib2.inv
                 //https://mf-nwp-models.s3.amazonaws.com/arome-france/v1/2022-09-14/00/SP1/00H24H.grib2.inv
                 let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
@@ -188,6 +188,8 @@ struct MeteoFranceDownload: Command {
                     var data = data
                     if domain.isGlobal {
                         data.shift180LongitudeAndFlipLatitude()
+                    } else {
+                        data.flipLatitude()
                     }
                     data.ensureDimensions(of: domain.grid)
                     // Scaling before compression with scalefactor
@@ -195,7 +197,7 @@ struct MeteoFranceDownload: Command {
                         data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
+                    //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).om"
                     try FileManager.default.removeItemIfExists(at: file)
                     
@@ -267,7 +269,7 @@ struct MeteoFranceDownload: Command {
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: MeteoFranceDomain, variables: [MeteoFranceVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        let forecastHours = domain.forecastHours(run: run.hour)
+        let forecastHours = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: true)
         let nForecastHours = forecastHours.max()!+1
         
         let grid = domain.grid
