@@ -124,44 +124,6 @@ struct MeteoFranceDownload: Command {
         try OmFileWriter.write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20, all: height.data)
     }
     
-    struct MfGribVariable: CurlIndexedVariable {
-        //var gribIndexName: String?
-        
-        let hour: Int // 0 = anl
-        let gribIndexName: String? // :PRMSL:mean sea level:1 hour fcst:
-        //let backwardsDtHours: Int? // 10 m above ground:0-1 hour max fcst
-        //let isAccumulatedModelStart: Bool // TPRATE:surface:0-1 hour acc fcst
-        let variable: MeteoFranceVariableDownloadable
-        
-    }
-    
-    
-    func variablesPerPackage(domain: MeteoFranceDomain, package: MfVariablePackages, steps: ArraySlice<Int>, variables: [MeteoFranceVariableDownloadable]) -> [MfGribVariable] {
-        
-        switch domain {
-        case .arpege_europe:
-            fallthrough
-        case .arpege_world:
-            switch package {
-            case .SP1:
-                return steps.flatMap { h in
-                    let hour = h == 0 ? "anl" : "\(h) hour fcst"
-                    return [MfGribVariable(hour: h, gribIndexName: ":PRMSL:mean sea level:\(hour):", variable: MeteoFranceSurfaceVariable.pressure_msl), MfGribVariable(hour: h, gribIndexName: ":TMP:2 m above ground:\(hour):", variable: MeteoFranceSurfaceVariable.temperature_2m)]
-                }
-            case .SP2:
-                return []
-            case .IP1:
-                return []
-            case .IP2:
-                return []
-            }
-        case .arome_france:
-            fatalError()
-        case .arome_france_hd:
-            fatalError()
-        }
-    }
-    
     /// download MeteoFrance
     func download(logger: Logger, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
@@ -196,8 +158,15 @@ struct MeteoFranceDownload: Command {
             for package in MfVariablePackages.allCases {
                 logger.info("Downloading forecast hour \(fileTime.file) package \(package)")
                 
-                // Note, in ARPEGE EUROPE some variables always have hourly data
-                let vars = variablesPerPackage(domain: domain, package: package, steps: fileTime.steps, variables: variables)
+                let vars = variables.flatMap { v -> [MfGribVariable] in
+                    guard v.inPackage == package else {
+                        return []
+                    }
+                    // TODO some varibales are hourly although the rest is 3/6 h
+                    return fileTime.steps.map { h in
+                        return MfGribVariable(hour: h, gribIndexName: v.toGribIndexName(hour: h), variable: v)
+                    }
+                }
                 
                 print(vars)
                 
@@ -364,9 +333,21 @@ struct MeteoFranceDownload: Command {
     }
 }
 
+struct MfGribVariable: CurlIndexedVariable {
+    //var gribIndexName: String?
+    
+    let hour: Int // 0 = anl
+    let gribIndexName: String? // :PRMSL:mean sea level:1 hour fcst:
+    //let backwardsDtHours: Int? // 10 m above ground:0-1 hour max fcst
+    //let isAccumulatedModelStart: Bool // TPRATE:surface:0-1 hour acc fcst
+    let variable: MeteoFranceVariableDownloadable
+    
+}
+
 enum MfVariablePackages: String, CaseIterable {
     case SP1
     case SP2
     case IP1
     case IP2
+    case IP3
 }

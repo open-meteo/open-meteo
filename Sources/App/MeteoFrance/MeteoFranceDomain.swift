@@ -197,64 +197,22 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariableM
     case pressure_msl
     case relativehumidity_2m
     
-    /// accumulated since forecast start
-    case precipitation
-    
     case wind_v_component_10m
     case wind_u_component_10m
-    case wind_v_component_80m
-    case wind_u_component_80m
     
-    case soil_temperature_0_to_10cm
-    case soil_temperature_10_to_40cm
-    case soil_temperature_40_to_100cm
-    case soil_temperature_100_to_200cm
-    
-    case soil_moisture_0_to_10cm
-    case soil_moisture_10_to_40cm
-    case soil_moisture_40_to_100cm
-    case soil_moisture_100_to_200cm
-    
-    case snow_depth
-    
-    /// averaged since model start
-    case sensible_heatflux
-    case latent_heatflux
-    
-    case showers
-    
-    /// CPOFP Percent frozen precipitation
-    case frozen_precipitation_percent
-    //case rain
-    //case snowfall_convective_water_equivalent
-    //case snowfall_water_equivalent
+    /// accumulated since forecast start
+    case precipitation
+   
+    case snowfall_water_equivalent
     
     case windgusts_10m
-    case freezinglevel_height
+
     case shortwave_radiation
-    /// Only for HRRR domain. Otherwise diff could be estimated with https://arxiv.org/pdf/2007.01639.pdf 3) method
-    case diffuse_radiation
-    //case direct_radiation
-    
-    /// only GFS
-    //case uv_index
-    /// only GFS
-    //case uv_index_clear_sky
-    
+   
     case cape
-    case lifted_index
-    
-    case visibility
     
     var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_to_10cm: return true
-        case .soil_moisture_10_to_40cm: return true
-        case .soil_moisture_40_to_100cm: return true
-        case .soil_moisture_100_to_200cm: return true
-        case .snow_depth: return true
-        default: return false
-        }
+        return false
     }
     
     var omFileName: String {
@@ -263,38 +221,34 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariableM
     
     var scalefactor: Float {
         switch self {
-        case .temperature_2m: return 20
-        case .cloudcover: return 1
-        case .cloudcover_low: return 1
-        case .cloudcover_mid: return 1
-        case .cloudcover_high: return 1
-        case .relativehumidity_2m: return 1
-        case .precipitation: return 10
-        case .wind_v_component_10m: return 10
-        case .wind_u_component_10m: return 10
-        case .wind_v_component_80m: return 10
-        case .wind_u_component_80m: return 10
-        case .soil_temperature_0_to_10cm: return 20
-        case .soil_temperature_10_to_40cm: return 20
-        case .soil_temperature_40_to_100cm: return 20
-        case .soil_temperature_100_to_200cm: return 20
-        case .soil_moisture_0_to_10cm: return 1000
-        case .soil_moisture_10_to_40cm: return 1000
-        case .soil_moisture_40_to_100cm: return 1000
-        case .soil_moisture_100_to_200cm: return 1000
-        case .snow_depth: return 100 // 1cm res
-        case .sensible_heatflux: return 0.144
-        case .latent_heatflux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
-        case .windgusts_10m: return 10
-        case .freezinglevel_height:  return 0.1 // zero height 10 meter resolution
-        case .showers: return 10
-        case .pressure_msl: return 10
-        case .shortwave_radiation: return 1
-        case .frozen_precipitation_percent: return 1
-        case .cape: return 0.1
-        case .lifted_index: return 10
-        case .visibility: return 0.05 // 50 meter
-        case .diffuse_radiation: return 1
+        case .temperature_2m:
+            return 20
+        case .cloudcover:
+            return 1
+        case .cloudcover_low:
+            return 1
+        case .cloudcover_mid:
+            return 1
+        case .cloudcover_high:
+            return 1
+        case .relativehumidity_2m:
+            return 1
+        case .precipitation:
+            return 10
+        case .windgusts_10m:
+            return 10
+        case .pressure_msl:
+            return 10
+        case .shortwave_radiation:
+            return 1
+        case .cape:
+            return 0.1
+        case .snowfall_water_equivalent:
+            return 10
+        case .wind_v_component_10m:
+            return 10
+        case .wind_u_component_10m:
+            return 10
         }
     }
     
@@ -304,38 +258,34 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariableM
     
     var unit: SiUnit {
         switch self {
-        case .temperature_2m: return .celsius
-        case .cloudcover: return .percent
-        case .cloudcover_low: return .percent
-        case .cloudcover_mid: return .percent
-        case .cloudcover_high: return .percent
-        case .relativehumidity_2m: return .percent
-        case .precipitation: return .millimeter
-        case .wind_v_component_10m: return .ms
-        case .wind_u_component_10m: return .ms
-        case .wind_v_component_80m: return .ms
-        case .wind_u_component_80m: return .ms
-        case .soil_temperature_0_to_10cm: return .celsius
-        case .soil_temperature_10_to_40cm: return .celsius
-        case .soil_temperature_40_to_100cm: return .celsius
-        case .soil_temperature_100_to_200cm: return .celsius
-        case .soil_moisture_0_to_10cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_10_to_40cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_40_to_100cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_100_to_200cm: return .qubicMeterPerQubicMeter
-        case .snow_depth: return .meter
-        case .sensible_heatflux: return .wattPerSquareMeter
-        case .latent_heatflux: return .wattPerSquareMeter
-        case .showers: return .millimeter
-        case .windgusts_10m: return .ms
-        case .freezinglevel_height: return .meter
-        case .pressure_msl: return .hectoPascal
-        case .shortwave_radiation: return .wattPerSquareMeter
-        case .frozen_precipitation_percent: return .percent
-        case .cape: return .joulesPerKilogram
-        case .lifted_index: return .dimensionless
-        case .visibility: return .meter
-        case .diffuse_radiation: return .wattPerSquareMeter
+        case .temperature_2m:
+            return .celsius
+        case .cloudcover:
+            return .percent
+        case .cloudcover_low:
+            return .percent
+        case .cloudcover_mid:
+            return .percent
+        case .cloudcover_high:
+            return .percent
+        case .relativehumidity_2m:
+            return .percent
+        case .precipitation:
+            return .millimeter
+        case .windgusts_10m:
+            return .ms
+        case .pressure_msl:
+            return .hectoPascal
+        case .shortwave_radiation:
+            return .wattPerSquareMeter
+        case .cape:
+            return .joulesPerKilogram
+        case .snowfall_water_equivalent:
+            return .millimeter
+        case .wind_v_component_10m:
+            return .ms
+        case .wind_u_component_10m:
+            return .ms
         }
     }
     
