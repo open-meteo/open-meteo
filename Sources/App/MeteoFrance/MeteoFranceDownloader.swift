@@ -73,7 +73,6 @@ struct MeteoFranceDownload: Command {
         
         let variables = variablesAll.filter({ $0.availableFor(domain: domain) })
         
-        /// 18z run is available the day after starting 05:26
         let date = Timestamp.now().add(-24*3600 * (signature.pastDays ?? 0)).with(hour: run)
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
@@ -137,7 +136,7 @@ struct MeteoFranceDownload: Command {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
-        let curl = Curl(logger: logger, deadLineHours: 3)
+        let curl = Curl(logger: logger, deadLineHours: 4)
                 
         /// world 0-24, 27-48, 51-72, 75-102
         let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)

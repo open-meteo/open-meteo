@@ -44,6 +44,17 @@ struct CronjobCommand: Command {
         
         40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs025 --upper-level > ~/log/gfs025_upper-level.log 2>&1 || cat ~/log/gfs025_upper-level.log
         55 * * * * /usr/local/bin/openmeteo-api download-gfs hrrr_conus --upper-level > ~/log/hrrr_conus_upper-level.log 2>&1 || cat ~/log/hrrr_conus_upper-level.log
+        
+        0 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-meteofrance arpege_world > ~/log/arpege_world.log 2>&1 || cat ~/log/arpege_world.log
+        0 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-meteofrance arpege_world --upper-level > ~/log/arpege_world_upper-level.log 2>&1 || cat ~/log/arpege_world_upper-level.log
+        
+        0 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-meteofrance arpege_europe > ~/log/arpege_europe.log 2>&1 || cat ~/log/arpege_europe.log
+        0 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-meteofrance arpege_europe --upper-level > ~/log/arpege_europe_upper-level.log 2>&1 || cat ~/log/arpege_europe_upper-level.log
+        
+        0 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-meteofrance arome_france > ~/log/arome_france.log 2>&1 || cat ~/log/arome_france.log
+        0 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-meteofrance arome_france --upper-level > ~/log/arome_france_upper-level.log 2>&1 || cat ~/log/arome_france_upper-level.log
+        
+        0 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-meteofrance arome_france_hd > ~/log/arome_france_hd.log 2>&1 || cat ~/log/arome_france_hd.log
         """)
     }
 }
