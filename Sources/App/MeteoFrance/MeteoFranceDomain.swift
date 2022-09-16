@@ -376,7 +376,20 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Gfs interpolation not required for reader. Already 1h")
+        switch variable {
+        case .temperature:
+            return .hermite(bounds: nil)
+        case .wind_u_component:
+            return .hermite(bounds: nil)
+        case .wind_v_component:
+            return .hermite(bounds: nil)
+        case .geopotential_height:
+            return .hermite(bounds: nil)
+        case .cloudcover:
+            return .hermite(bounds: 0...100)
+        case .relativehumidity:
+            return .hermite(bounds: 0...100)
+        }
     }
     
     var unit: SiUnit {
