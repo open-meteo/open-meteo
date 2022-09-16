@@ -69,7 +69,9 @@ struct MeteoFranceDownload: Command {
         }
         let surfaceVariables = MeteoFranceSurfaceVariable.allCases
         
-        let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
+        let variablesAll = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
+        
+        let variables = variablesAll.filter({ $0.availableFor(domain: domain) })
         
         /// 18z run is available the day after starting 05:26
         let date = Timestamp.now().add(-24*3600 * (signature.pastDays ?? 0)).with(hour: run)
@@ -154,7 +156,7 @@ struct MeteoFranceDownload: Command {
                     // Some varibales are hourly although the rest is 3/6 h
                     let time = (v.isAlwaysHourlyInArgegeEurope && domain == .arpege_europe) ? fileTimeHourly.steps : fileTime.steps
                     return time.compactMap { h in
-                        if h == 0 && v.skipHour0 {
+                        if h == 0 && v.skipHour0(domain: domain) {
                             return nil
                         }
                         return MfGribVariable(hour: h, gribIndexName: v.toGribIndexName(hour: h), variable: v)
@@ -179,7 +181,7 @@ struct MeteoFranceDownload: Command {
                         data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
+                    try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).om"
                     try FileManager.default.removeItemIfExists(at: file)
                     
