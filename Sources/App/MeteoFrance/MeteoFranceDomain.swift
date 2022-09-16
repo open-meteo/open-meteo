@@ -257,7 +257,36 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariableM
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Gfs interpolation not required for reader. Already 1h")
+        switch self {
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .cloudcover:
+            return .hermite(bounds: 0...10)
+        case .cloudcover_low:
+            return .hermite(bounds: 0...10)
+        case .cloudcover_mid:
+            return .hermite(bounds: 0...10)
+        case .cloudcover_high:
+            return .hermite(bounds: 0...10)
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .relativehumidity_2m:
+            return .hermite(bounds: 0...10)
+        case .wind_v_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_10m:
+            return .hermite(bounds: nil)
+        case .precipitation:
+            return .linear
+        case .snowfall_water_equivalent:
+            return .linear
+        case .windgusts_10m:
+            return .hermite(bounds: nil)
+        case .shortwave_radiation:
+            return .hermite(bounds: nil) // solar backwards
+        case .cape:
+            return .hermite(bounds: 0...10e9)
+        }
     }
     
     var unit: SiUnit {
