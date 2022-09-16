@@ -141,24 +141,6 @@
             Temperature (2 m)
           </label>
         </div>
-        <div class="form-check debug-hidden">
-          <input class="form-check-input" type="checkbox" value="temperature_80m" id="temperature_80m" name="hourly">
-          <label class="form-check-label" for="temperature_80m">
-            Temperature (80 m)
-          </label>
-        </div>
-        <div class="form-check debug-hidden">
-          <input class="form-check-input" type="checkbox" value="temperature_120m" id="temperature_120m" name="hourly">
-          <label class="form-check-label" for="temperature_120m">
-            Temperature (120 m)
-          </label>
-        </div>
-        <div class="form-check debug-hidden">
-          <input class="form-check-input" type="checkbox" value="temperature_180m" id="temperature_180m" name="hourly">
-          <label class="form-check-label" for="temperature_180m">
-            Temperature (180 m)
-          </label>
-        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="relativehumidity_2m" id="relativehumidity_2m"
             name="hourly">
@@ -352,6 +334,24 @@
           <input class="form-check-input" type="checkbox" value="windgusts_10m" id="windgusts_10m" name="hourly">
           <label class="form-check-label" for="windgusts_10m">
             Wind Gusts (10 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_80m" id="temperature_80m" name="hourly">
+          <label class="form-check-label" for="temperature_80m">
+            Temperature (80 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_120m" id="temperature_120m" name="hourly">
+          <label class="form-check-label" for="temperature_120m">
+            Temperature (120 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_180m" id="temperature_180m" name="hourly">
+          <label class="form-check-label" for="temperature_180m">
+            Temperature (180 m)
           </label>
         </div>
       </div>
