@@ -149,17 +149,21 @@ struct MeteoFranceDownload: Command {
             for package in MfVariablePackages.allCases {
                 logger.info("Downloading forecast hour \(fileTime.file) package \(package)")
                 
-                let vars = variables.flatMap { v -> [MfGribVariable] in
-                    guard v.inPackage == package else {
+                let vars = variables.flatMap { variable -> [MfGribVariable] in
+                    guard variable.inPackage == package else {
                         return []
                     }
                     // Some varibales are hourly although the rest is 3/6 h
-                    let time = (v.isAlwaysHourlyInArgegeEurope && domain == .arpege_europe) ? fileTimeHourly.steps : fileTime.steps
+                    let time = (variable.isAlwaysHourlyInArgegeEurope && domain == .arpege_europe) ? fileTimeHourly.steps : fileTime.steps
                     return time.compactMap { h in
-                        if h == 0 && v.skipHour0(domain: domain) {
+                        if h == 0 && variable.skipHour0(domain: domain) {
                             return nil
                         }
-                        return MfGribVariable(hour: h, gribIndexName: v.toGribIndexName(hour: h), variable: v)
+                        let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(h).om"
+                        if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
+                            return nil
+                        }
+                        return MfGribVariable(hour: h, gribIndexName: variable.toGribIndexName(hour: h), variable: variable)
                     }
                 }
                                 
@@ -181,7 +185,7 @@ struct MeteoFranceDownload: Command {
                         data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
+                    //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).om"
                     try FileManager.default.removeItemIfExists(at: file)
                     
@@ -196,60 +200,56 @@ struct MeteoFranceDownload: Command {
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: MeteoFranceDomain, variables: [MeteoFranceVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        let forecastHours = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: true)
-        let nForecastHours = forecastHours.max()!+1
+        let forecastHours = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: false)
+        let forecastHoursHourly = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: true)
+        let dtHours = domain.dtHours
+        
+        let nForecastHours = forecastHours.max()! / dtHours + 1
         
         let grid = domain.grid
         let nLocation = grid.count
         
-        
-        /*for variable in variables {
+        for variable in variables {
             let startConvert = DispatchTime.now()
-            
-            if GfsVariableAndDomain(variable: variable, domain: domain).gribIndexName == nil {
-                continue
-            }
+            let forecastHours = (variable.isAlwaysHourlyInArgegeEurope && domain == .arpege_europe) ? forecastHoursHourly : forecastHours
             
             logger.info("Converting \(variable)")
             
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
+            let skipHour0 = variable.skipHour0(domain: domain)
 
             for forecastHour in forecastHours {
-                if forecastHour == 0 && variable.skipHour0 {
+                if forecastHour == 0 && skipHour0 {
                     continue
                 }
-                /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
-                let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour)\(prefix).fpg"
-                data2d[0..<nLocation, forecastHour] = try OmFileReader(file: file).readAll()
+                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).om"
+                data2d[0..<nLocation, forecastHour / dtHours] = try OmFileReader(file: file).readAll()
             }
             
-            let skip = variable.skipHour0 ? 1 : 0
+            let skip = skipHour0 ? 1 : 0
             
             // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
-            if variable.isAveragedOverForecastTime {
-                switch domain {
-                case .gfs025:
-                    data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
-                //case .nam_conus:
-                //    data2d.deavergeOverTime(slidingWidth: 3, slidingOffset: skip)
-                case .hrrr_conus:
-                    break
-                }
-            }
+            //if variable.isAveragedOverForecastTime {
+                //data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                //data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+            //}
+            // radiation in meteofrance is aggregated and not averaged!
             
-            // interpolate missing timesteps. We always fill 2 timesteps at once
-            // data looks like: DDDDDDDDDD--D--D--D--D--D
-            let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
-                if forecastHours.contains(hour) || hour % 3 != 1 {
-                    // process 2 timesteps at once
-                    return nil
+            // TODO: 6h interpolation for arpege world/europe
+            if dtHours == 1 {
+                // interpolate missing timesteps. We always fill 2 timesteps at once
+                // data looks like: DDDDDDDDDD--D--D--D--D--D
+                let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
+                    if forecastHours.contains(hour) || hour % 3 != 1 {
+                        // process 2 timesteps at once
+                        return nil
+                    }
+                    return hour
                 }
-                return hour
+                
+                // Fill in missing hourly values after switching to 3h
+                data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             }
-            
-            // Fill in missing hourly values after switching to 3h
-            data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
@@ -257,7 +257,7 @@ struct MeteoFranceDownload: Command {
                 data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
             }
             
-            let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
+            let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
             
             if createNetcdf {
                 try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
@@ -267,7 +267,7 @@ struct MeteoFranceDownload: Command {
             let startOm = DispatchTime.now()
             try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
-        }*/
+        }
     }
 }
 

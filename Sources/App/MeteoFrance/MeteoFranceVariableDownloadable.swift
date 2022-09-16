@@ -172,23 +172,23 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         case .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
-            return (1/100, 1)
+            return (1/100, 0)
+        case .shortwave_radiation:
+            return (1/10_000, 0)
         default:
             return nil
         }
     }
     
     var isAveragedOverForecastTime: Bool {
-        switch self {
-        case .shortwave_radiation: return true
-        default: return false
-        }
+        return false
     }
     
     var isAccumulatedSinceModelStart: Bool {
         switch self {
         case .precipitation: fallthrough
         case .snowfall_water_equivalent: return true
+        case .shortwave_radiation: return true
         default: return false
         }
     }
