@@ -1,13 +1,16 @@
 
 /// Required additions to a MeteoFrance variable to make it downloadable
 protocol MeteoFranceVariableDownloadable: GenericVariableMixing {
-    var skipHour0: Bool { get }
+    func skipHour0(domain: MeteoFranceDomain) -> Bool
     var interpolationType: Interpolation2StepType { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
     func toGribIndexName(hour: Int) -> String
     var inPackage: MfVariablePackages { get }
+    
+    /// AROME france HD has very few variables
+    func availableFor(domain: MeteoFranceDomain) -> Bool
     
     /// In ARPEGE EUROPE some variables are hourly
     /// Others start hourly and then switch to 3/6 hourly resolution
@@ -16,6 +19,26 @@ protocol MeteoFranceVariableDownloadable: GenericVariableMixing {
 }
 
 extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
+    func availableFor(domain: MeteoFranceDomain) -> Bool {
+        guard domain == .arome_france_hd else {
+            return true
+        }
+        switch self {
+        case .temperature_2m:
+            fallthrough
+        case .relativehumidity_2m:
+            fallthrough
+        case .wind_u_component_10m:
+            fallthrough
+        case .wind_v_component_10m:
+            return true
+        case .cape:
+            return true
+        default:
+            return false
+        }
+    }
+    
     var isAlwaysHourlyInArgegeEurope: Bool {
         switch self {
         case .cloudcover_low:
@@ -97,8 +120,12 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         }
     }
     
-    var skipHour0: Bool {
+    func skipHour0(domain: MeteoFranceDomain) -> Bool {
         switch self {
+        case .cloudcover: return domain == .arome_france
+        case .cloudcover_low: return domain == .arome_france
+        case .cloudcover_mid: return domain == .arome_france
+        case .cloudcover_high: return domain == .arome_france
         case .precipitation: return true
         case .shortwave_radiation: return true
         case .windgusts_10m: return true
@@ -168,6 +195,13 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
 }
 
 extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
+    func availableFor(domain: MeteoFranceDomain) -> Bool {
+        if variable == .cloudcover && domain == .arome_france {
+            return false
+        }
+        return true
+    }
+    
     var isAlwaysHourlyInArgegeEurope: Bool {
         return false
     }
@@ -207,7 +241,7 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
         }
     }
     
-    var skipHour0: Bool {
+    func skipHour0(domain: MeteoFranceDomain) -> Bool {
         return false
     }
     

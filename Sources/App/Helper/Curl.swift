@@ -287,6 +287,7 @@ extension GribMessage {
         guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
             fatalError("Could not get Ny")
         }
+        print("nx=\(nx) ny=\(ny)")
         for (i,(latitude, longitude,value)) in try iterateCoordinatesAndValues().enumerated() {
             if i % 10_000 == 0 || i == ny*nx-1 {
                 print("grid \(i) lat \(latitude) lon \(longitude) value \(value)")

@@ -156,9 +156,9 @@ enum MeteoFranceDomain: String, GenericDomain {
         case .arpege_world:
             return [10, 20, 30, 50, 70, 100, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arome_france:
-            fallthrough
+            return [100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arome_france_hd:
-            return [100, 125, 150, 175, 200, 225, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
+            return []
         }
     }
     
@@ -182,9 +182,9 @@ enum MeteoFranceDomain: String, GenericDomain {
         case .arpege_world:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .arome_france:
-            return RegularGrid(nx: 1, ny: 1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+            return RegularGrid(nx: 801, ny: 601, latMin: 38.0, lonMin: -8.0, dx: 0.025, dy: 0.025)
         case .arome_france_hd:
-            return RegularGrid(nx: 1, ny: 1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+            return RegularGrid(nx: 2801, ny: 1791, latMin: 37.5, lonMin: -12.0, dx: 0.01, dy: 0.01)
         }
     }
 }
