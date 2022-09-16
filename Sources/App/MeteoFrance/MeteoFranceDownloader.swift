@@ -235,8 +235,25 @@ struct MeteoFranceDownload: Command {
             //}
             // radiation in meteofrance is aggregated and not averaged!
             
-            // TODO: 6h interpolation for arpege world/europe
+            /// somehow radiation for ARPEGE EUROPE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?
+            if domain == .arpege_europe, let variable = variable as? MeteoFranceSurfaceVariable, variable == .shortwave_radiation {
+                data2d.data.multiplyAdd(multiply: 3, add: 0)
+            }
+            
+            // Fill in missing hourly values after switching to 3h
+            //data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
+            
+            // TODO: 6h interpolation for arpege world
             if dtHours == 1 {
+                // Interpolate 6h steps to 3h steps before 1h
+                let forecastStepsToInterpolate6h = (0..<nForecastHours).compactMap { hour -> Int? in
+                    if forecastHours.contains(hour) || hour % 3 != 0 {
+                        return nil
+                    }
+                    return hour
+                }
+                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, dt: 3)
+                
                 // interpolate missing timesteps. We always fill 2 timesteps at once
                 // data looks like: DDDDDDDDDD--D--D--D--D--D
                 let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
