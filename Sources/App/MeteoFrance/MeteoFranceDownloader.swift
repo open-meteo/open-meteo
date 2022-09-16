@@ -268,8 +268,8 @@ struct MeteoFranceDownload: Command {
             } else {
                 // Arpege world with dtHours=3. Interpolate 6h to 3h values
                 // TODO: shortwave radiation is not correct for the last hours
-                let forecastStepsToInterpolate6h = (0..<nForecastHours).compactMap { hour -> Int? in
-                    return forecastHours.contains(hour) ? nil : hour
+                let forecastStepsToInterpolate6h = (0 ..< nForecastHours * dtHours).compactMap { hour -> Int? in
+                    return forecastHours.contains(hour) || hour % 3 != 0 ? nil : hour / dtHours
                 }
                 data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, dt: 1)
             }
