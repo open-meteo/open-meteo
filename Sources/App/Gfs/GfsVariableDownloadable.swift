@@ -184,7 +184,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
-            return (1/100, 1)
+            return (1/100, 0)
         case .soil_temperature_0_to_10cm:
             return (1, -273.15)
         case .soil_temperature_10_to_40cm:
