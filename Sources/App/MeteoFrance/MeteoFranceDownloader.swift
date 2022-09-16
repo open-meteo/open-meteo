@@ -235,15 +235,14 @@ struct MeteoFranceDownload: Command {
             //}
             // radiation in meteofrance is aggregated and not averaged!
             
-            /// somehow radiation for ARPEGE EUROPE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?
-            if domain == .arpege_europe, let variable = variable as? MeteoFranceSurfaceVariable, variable == .shortwave_radiation {
+            /// somehow radiation for ARPEGE EUROPE and AROME FRANCE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?
+            if let variable = variable as? MeteoFranceSurfaceVariable, variable == .shortwave_radiation {
                 data2d.data.multiplyAdd(multiply: 3, add: 0)
             }
             
             // Fill in missing hourly values after switching to 3h
             //data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             
-            // TODO: 6h interpolation for arpege world
             if dtHours == 1 {
                 // Interpolate 6h steps to 3h steps before 1h
                 let forecastStepsToInterpolate6h = (0..<nForecastHours).compactMap { hour -> Int? in
@@ -266,6 +265,13 @@ struct MeteoFranceDownload: Command {
                 
                 // Fill in missing hourly values after switching to 3h
                 data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
+            } else {
+                // Arpege world with dtHours=3. Interpolate 6h to 3h values
+                // TODO: shortwave radiation is not correct for the last hours
+                let forecastStepsToInterpolate6h = (0..<nForecastHours).compactMap { hour -> Int? in
+                    return forecastHours.contains(hour) ? nil : hour
+                }
+                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, dt: 1)
             }
             
             // De-accumulate precipitation
