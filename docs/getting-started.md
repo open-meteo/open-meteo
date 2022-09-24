@@ -27,7 +27,7 @@ cd open-meteo
 docker-compose up
 
 # Download ECMWF
-docker-compose run open-meteo download-ecmwf --run 00
+docker-compose exec open-meteo ./openmeteo-api download-ecmwf --run 00
 ```
 
 To stop running containers: `docker-compose down (add -v to wipe data)`
