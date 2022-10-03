@@ -71,8 +71,8 @@ enum MeteoFranceDomain: String, GenericDomain {
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Int {
         let t = Timestamp.now()
-        // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
-        return ((t.hour - 3 + 24) % 24) / 6 * 6
+        // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00 (arpege) or 2:00 (arome)
+        return ((t.hour - 2 + 24) % 24) / 6 * 6
     }
     
     /// Filename of the surface elevation file
