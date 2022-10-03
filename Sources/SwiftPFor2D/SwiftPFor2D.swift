@@ -98,7 +98,7 @@ public final class OmFileWriter {
         defer { buffer.deallocate() }
         
         /// Size a compressed chunk might
-        let minBufferSize = (chunk0 * chunk1 * MemoryLayout<Int16>.size).P4NENC256_BOUND()
+        let minBufferSize = (chunk0 * chunk1 * compressionType.bytesPerElement).P4NENC256_BOUND()
         var writeBufferPos = 0
         
         /// 8 MB write buffer
@@ -261,7 +261,7 @@ public final class OmFileWriter {
         //print("avg chunk size bytes", (chunkOffsetBytes.last ?? 0) / (nDim0Chunks*nDim1Chunks))
         
         // write trailing byte to allow the encoder to read with 256 bit alignment
-        let trailingBytes = (chunk0 * chunk1 * MemoryLayout<UInt16>.size).P4NENC256_BOUND() - (chunk0 * chunk1 * MemoryLayout<UInt16>.size)
+        let trailingBytes = (chunk0 * chunk1 * compressionType.bytesPerElement).P4NENC256_BOUND() - (chunk0 * chunk1 * compressionType.bytesPerElement)
         try fn.write(contentsOf: Data(repeating: 0, count: trailingBytes))
         
         // write dictionary
