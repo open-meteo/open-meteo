@@ -251,6 +251,13 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
             if domain == .arpege_europe || domain == .arpege_world, case let .pressure(pressure) = variable, pressure.level == 125  {
                 return try self.interpolatePressureLevel(variable: pressure.variable, level: 125, lowerLevel: 100, upperLevel: 150, time: time)
             }
+            
+            /// AROME France domain has no cloud cover for pressure levels, calculate from RH
+            if domain == .arome_france, case let .pressure(pressure) = variable, pressure.variable == .cloudcover {
+                let rh = try get(variable: MeteoFranceVariable.pressure(MeteoFrancePressureVariable(variable: .relativehumidity, level: pressure.level)) as! Variable, time: time)
+                let clc = rh.data.map(Meteorology.relativeHumidityToCloudCover)
+                return DataAndUnit(clc, .percent)
+            }
         }
         
         if let domain = domain as? GfsDomain, let variable = variable as? GfsVariable {
