@@ -130,7 +130,8 @@ struct ForecastapiResult {
                     b.buffer.writeString("\n")
                     b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.rawValue)),windspeed (\(current_weather.windspeed_unit.rawValue)),winddirection (\(current_weather.winddirection_unit.rawValue)),weathercode (\(current_weather.weathercode_unit.rawValue))\n")
                     b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false))
-                    b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(current_weather.winddirection),\(current_weather.weathercode)\n")
+                    let ww = current_weather.weathercode.isNaN ? "NaN" : String(format: "%.0f", current_weather.weathercode)
+                    b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(current_weather.winddirection),\(ww)\n")
                 }
                 
                 for section in sections {
@@ -153,7 +154,7 @@ struct ForecastapiResult {
                                 if a[i].isNaN {
                                     b.buffer.writeString(",NaN")
                                 } else {
-                                    b.buffer.writeString(",\(a[i])")
+                                    b.buffer.writeString(",\(String(format: "%.\(e.unit.significantDigits)f", a[i]))")
                                 }
                             case .int(let a):
                                 b.buffer.writeString(",\(a[i])")
@@ -272,8 +273,9 @@ struct ForecastapiResult {
                     b.buffer.writeString(",\"elevation\":\(elevation)")
                 }
                 if let current_weather = current_weather {
+                    let ww = current_weather.weathercode.isNaN ? "null" : String(format: "%.0f", current_weather.weathercode)
                     b.buffer.writeString("""
-                        ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(current_weather.winddirection),"weathercode":\(current_weather.weathercode),"time":
+                        ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(current_weather.winddirection),"weathercode":\(ww),"time":
                         """)
                     b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
                     b.buffer.writeString("}")
@@ -336,6 +338,7 @@ struct ForecastapiResult {
                                 try await b.flushIfRequired()
                             }
                         case .float(let floats):
+                            let format = "%.\(e.unit.significantDigits)f"
                             for v in floats {
                                 if firstValue {
                                     firstValue = false
@@ -345,7 +348,7 @@ struct ForecastapiResult {
                                 if v.isNaN {
                                     b.buffer.writeString("null")
                                 } else {
-                                    b.buffer.writeString("\(v)")
+                                    b.buffer.writeString(String(format: format, v))
                                 }
                                 try await b.flushIfRequired()
                             }
