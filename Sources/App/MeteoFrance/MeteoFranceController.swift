@@ -26,7 +26,7 @@ public struct MeteoFranceController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            let domains = [MeteoFranceDomain.arpege_world, .arpege_europe, .arome_france, .arome_france_hd]
+            let domains = [MeteoFranceDomain.arpege_world, .arpege_europe, .arome_france, .arome_france_hd] //[MeteoFranceDomain.arome_france]
             
             guard let reader = try MeteoFranceMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
@@ -533,9 +533,8 @@ extension MeteoFranceMixer {
                 }
                 return DataAndUnit(et0, .millimeter)
             case .snowfall:
-                let frozen_precipitation_percent = try get(variable: .snowfall_water_equivalent, time: time).data
-                let precipitation = try get(variable: .precipitation, time: time).data
-                let snowfall = frozen_precipitation_percent.map({$0 * 0.7})
+                let snowfall_water_equivalent = try get(variable: .snowfall_water_equivalent, time: time).data
+                let snowfall = snowfall_water_equivalent.map({$0 * 0.7})
                 return DataAndUnit(snowfall, SiUnit.centimeter)
             case .relativehumitidy_2m:
                 return try get(variable: .relativehumidity_2m, time: time)

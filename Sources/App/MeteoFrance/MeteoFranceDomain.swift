@@ -183,7 +183,7 @@ enum MeteoFranceDomain: String, GenericDomain {
     var grid: Gridable {
         switch self {
         case .arpege_europe:
-            return RegularGrid(nx: 741, ny: 521, latMin: 20, lonMin: 42, dx: 0.1, dy: 0.1)
+            return RegularGrid(nx: 741, ny: 521, latMin: 20, lonMin: -32, dx: 0.1, dy: 0.1)
         case .arpege_world:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .arome_france:
