@@ -66,6 +66,8 @@
                     class="badge bg-secondary">New</span></a></li>
               <li class="debug-hidden"><a class="dropdown-item #if(title == "Seasonal Forecast API"): active #endif"
                       href="/en/docs/seasonal-forecast-api">Seasonal Forecast API</a></li>
+              <li class="debug-hidden"><a class="dropdown-item #if(title == "MeteoFrance ARPEGE & AROME API"): active #endif"
+                        href="/en/docs/meteofrance-api">MeteoFrance API</a></li>
             </ul>
           </li>
           <li class="nav-item">

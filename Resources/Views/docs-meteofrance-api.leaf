@@ -19,10 +19,9 @@
     <path
       d="M7.068.727c.243-.97 1.62-.97 1.864 0l.071.286a.96.96 0 0 0 1.622.434l.205-.211c.695-.719 1.888-.03 1.613.931l-.08.284a.96.96 0 0 0 1.187 1.187l.283-.081c.96-.275 1.65.918.931 1.613l-.211.205a.96.96 0 0 0 .434 1.622l.286.071c.97.243.97 1.62 0 1.864l-.286.071a.96.96 0 0 0-.434 1.622l.211.205c.719.695.03 1.888-.931 1.613l-.284-.08a.96.96 0 0 0-1.187 1.187l.081.283c.275.96-.918 1.65-1.613.931l-.205-.211a.96.96 0 0 0-1.622.434l-.071.286c-.243.97-1.62.97-1.864 0l-.071-.286a.96.96 0 0 0-1.622-.434l-.205.211c-.695.719-1.888.03-1.613-.931l.08-.284a.96.96 0 0 0-1.186-1.187l-.284.081c-.96.275-1.65-.918-.931-1.613l.211-.205a.96.96 0 0 0-.434-1.622l-.286-.071c-.97-.243-.97-1.62 0-1.864l.286-.071a.96.96 0 0 0 .434-1.622l-.211-.205c-.719-.695-.03-1.888.931-1.613l.284.08a.96.96 0 0 0 1.187-1.186l-.081-.284c-.275-.96.918-1.65 1.613-.931l.205.211a.96.96 0 0 0 1.622-.434l.071-.286zM12.973 8.5H8.25l-2.834 3.779A4.998 4.998 0 0 0 12.973 8.5zm0-1a4.998 4.998 0 0 0-7.557-3.779l2.834 3.78h4.723zM5.048 3.967c-.03.021-.058.043-.087.065l.087-.065zm-.431.355A4.984 4.984 0 0 0 3.002 8c0 1.455.622 2.765 1.615 3.678L7.375 8 4.617 4.322zm.344 7.646.087.065-.087-.065z" />
   </svg>
-  <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">MeteoFrance ARPEGE & AROME API</h1>
+  <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">MeteoFrance API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Global GFS model combined with hourly HRRR
-      updates at 3-km resolution</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Global ARPEGE model combined with high resolution AROME model</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -33,7 +32,7 @@
 <!-- http://127.0.0.1:8080/v1/forecast -->
 <div class="container px-4 py-0" id="featured-3">
   <div class="alert alert-primary" role="alert">
-    This API uses NOAA GFS combined with hourly HRRR updates and is optimised for the U.S. For Europe, the generic <a
+    This API uses MeteoFrance AROME and ARPEGE weather models and is optimised for Central Europe. For most use-cases the generic <a
       href="/en/docs">Weather Forecast API</a> is recommended. Weather models are listed <a href="#data-sources">below</a>.
   </div>
 
@@ -207,7 +206,7 @@
             <label class="form-check-label" for="weathercode">
               Weathercode
             </label>
-          </div> -->
+          </div> 
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="snow_depth" id="snow_depth" name="hourly">
           <label class="form-check-label" for="snow_depth">
@@ -226,7 +225,7 @@
           <label class="form-check-label" for="visibility">
             Visibility
           </label>
-        </div>
+        </div>-->
       </div>
       <div class="col-md-3">
         <div class="form-check">
@@ -253,13 +252,13 @@
             Cloudcover High
           </label>
         </div>
-        <div class="form-check">
+        <!--<div class="form-check">
           <input class="form-check-input" type="checkbox" value="evapotranspiration" id="evapotranspiration"
             name="hourly">
           <label class="form-check-label" for="evapotranspiration">
             Evapotranspiration
           </label>
-        </div>
+        </div>-->
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="et0_fao_evapotranspiration"
             id="et0_fao_evapotranspiration" name="hourly">
@@ -292,12 +291,12 @@
             CAPE
           </label>
         </div>
-        <div class="form-check">
+        <!--<div class="form-check">
           <input class="form-check-input" type="checkbox" value="lifted_index" id="lifted_index" name="hourly">
           <label class="form-check-label" for="lifted_index">
             Lifted Index
           </label>
-        </div>
+        </div>-->
       </div>
       <div class="col-md-3">
         <div class="form-check">
@@ -306,13 +305,13 @@
             Wind Speed (10 m)
           </label>
         </div>
-        <div class="form-check">
+        <!--<div class="form-check">
           <input class="form-check-input" type="checkbox" value="windspeed_80m" id="windspeed_80m" name="hourly">
           <label class="form-check-label" for="windspeed_80m">
             Wind Speed (80 m)
           </label>
         </div>
-        <!--<div class="form-check">
+        <div class="form-check">
             <input class="form-check-input" type="checkbox" value="windspeed_120m" id="windspeed_120m" name="hourly">
             <label class="form-check-label" for="windspeed_120m">
               Wind Speed (120 m)
@@ -331,14 +330,14 @@
             Wind Direction (10 m)
           </label>
         </div>
-        <div class="form-check">
+        <!--<div class="form-check">
           <input class="form-check-input" type="checkbox" value="winddirection_80m" id="winddirection_80m"
             name="hourly">
           <label class="form-check-label" for="winddirection_80m">
             Wind Direction (80 m)
           </label>
         </div>
-        <!--<div class="form-check">
+        <div class="form-check">
             <input class="form-check-input" type="checkbox" value="winddirection_120m" id="winddirection_120m" name="hourly">
             <label class="form-check-label" for="winddirection_120m">
               Wind Direction (120 m)
@@ -357,7 +356,7 @@
           </label>
         </div>
       </div>
-      <div class="col-md-3">
+      <!--<div class="col-md-3">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="soil_temperature_0_to_10cm"
             id="soil_temperature_0_to_10cm" name="hourly">
@@ -414,7 +413,7 @@
             Soil Moisture (100-400 cm)
           </label>
         </div>
-      </div>
+      </div>-->
     </div>
 
     <div class="row py-3 px-0">
@@ -754,18 +753,6 @@
         </div>
       </div>
       <div class="col-3">
-        <div class="form-floating mb-3">
-          <select class="form-select" name="forecast_days" id="forecast_days" aria-label="Forecast days"
-            data-default="7">
-            <option value="1">1 day</option>
-            <option value="3">3 days</option>
-            <option selected value="7">7 days</option>
-            <option value="16">16 days</option>
-          </select>
-          <label for="forecast_days">Forecast days</label>
-        </div>
-      </div>
-      <div class="col-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
             data-date-start-date="2022-06-08" value="" data-default="" name="start_date"><span
@@ -835,9 +822,8 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses global NOAA GFS weather forecast and combines them with high-resolution HRRR forecasts. HRRR is a
-      rapid-refresh model and updates every hour. High-resolution data are only available for the United States. For
-      other locations, only GFS is used.</p>
+    <p>This API uses global MeteoFrance ARPEGE weather forecast and combines them with high-resolution AROME forecasts. AROME is a 1.5 km high resolution model covering France and neighbouring areas. For
+      other locations, only ARPEGE is used.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -852,37 +838,44 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row"><a href="https://www.nco.ncep.noaa.gov/pmb/products/gfs/" target="_blank">GFS</a></th>
+            <th scope="row"><a href="https://mf-models-on-aws.org/en/doc/models/arpege-world/" target="_blank">Arpege World</a></th>
             <td>Global</td>
-            <td>0.25° (~25 km)</td>
-            <td>Hourly, 3-hourly after 120 hours</td>
-            <td>16 days</td>
+            <td>0.5° (~55 km)</td>
+            <td>3-Hourly, 6-hourly after 96 hours</td>
+            <td>4 days</td>
             <td>Every 6 hours</td>
           </tr>
-          <!--<tr>
-              <th scope="row"><a href="https://www.nco.ncep.noaa.gov/pmb/products/nam/" target="_blank">NAM Conus</a></th>
-              <td>U.S. Conus</td>
-              <td>3 km</td>
-              <td>Hourly</td>
-              <td>2.5 days</td>
-              <td>Every 6 hours</td>
-            </tr>-->
           <tr>
-            <th scope="row"><a href="https://rapidrefresh.noaa.gov/hrrr/" target="_blank">HRRR Conus</a></th>
-            <td>U.S. Conus</td>
-            <td>3 km</td>
+            <th scope="row"><a href="https://mf-models-on-aws.org/en/doc/models/arpege-europe/" target="_blank">Arpege Europe</a></th>
+            <td>Europe</td>
+            <td>0.1° (~11 km)</td>
+            <td>Hourly, 3-hourly after 72 hours</td>
+            <td>4 days</td>
+            <td>Every 6 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://mf-models-on-aws.org/en/doc/models/arome-france/" target="_blank">Arome France</a></th>
+            <td>France</td>
+            <td>2.5 km</td>
             <td>Hourly</td>
-            <td>18 hours (48 hours for 0, 6, 12, 18z)</td>
-            <td>Every hour</td>
+            <td>42 hours</td>
+            <td>Every 6 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://mf-models-on-aws.org/en/doc/models/arome-france-hd/" target="_blank">Arome France HD</a></th>
+            <td>France</td>
+            <td>1.5 km</td>
+            <td>Hourly</td>
+            <td>42 hours</td>
+            <td>Every 6 hours</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <h2 id="api-documentation" class="mt-5">API Documentation</h2>
-    <p>The API endpoint <mark>/v1/gfs</mark> accepts a geographical coordinate, a list of weather variables and responds
-      with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours. If
-      <mark>&forecast_days=16</mark> is set, up to 16 days of forecast can be returned. All URL parameters are listed
+    <p>The API endpoint <mark>/v1/meteofrance</mark> accepts a geographical coordinate, a list of weather variables and responds
+      with a JSON hourly weather forecast for 4 days. Time always starts at 0:00 today and contains 168 hours. All URL parameters are listed
       below:
     </p>
     <div class="table-responsive">
@@ -979,13 +972,6 @@
             <td>If <mark>past_days</mark> is set, past weather data can be returned.</td>
           </tr>
           <tr>
-            <th scope="row">forecast_days</th>
-            <td>Integer (0-16)</td>
-            <td>No</td>
-            <td><mark>7</mark></td>
-            <td>Per default, only 7 days are returned. Up to 16 days of forecast are possible.</td>
-          </tr>
-          <tr>
             <th scope="row">start_date<br />end_date</th>
             <td>String (yyyy-mm-dd)</td>
             <td>No</td>
@@ -1073,16 +1059,16 @@
             <td>High level clouds from 8 km altitude</td>
           </tr>
           <tr>
-            <th scope="row">windspeed_10m<br />windspeed_80m</th>
+            <th scope="row">windspeed_10m</th>
             <td>Instant</td>
             <td>km/h (mph, m/s, knots)</td>
-            <td>Wind speed at 10 or 80 meters above ground. Wind speed on 10 meters is the standard level.</td>
+            <td>Wind speed at 10 meters above ground. Wind speed on 10 meters is the standard level.</td>
           </tr>
           <tr>
-            <th scope="row">winddirection_10m<br>winddirection_80m</th>
+            <th scope="row">winddirection_10m</th>
             <td>Instant</td>
             <td>°</td>
-            <td>Wind direction at 10 or 80 meters above ground</td>
+            <td>Wind direction at 10 meters above ground</td>
           </tr>
           <tr>
             <th scope="row">windgusts_10m</th>
@@ -1101,13 +1087,13 @@
             <th scope="row">direct_radiation<br/>direct_normal_irradiance</th>
             <td>Preceding hour mean</td>
             <td>W/m²</td>
-            <td>Direct solar radiation as average of the preceding hour on the horizontal plane and the normal plane (perpendicular to the sun). HRRR offers direct radiation directly. In GFS it is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
+            <td>Direct solar radiation as average of the preceding hour on the horizontal plane and the normal plane (perpendicular to the sun). MeteoFrance does not offers diffuse and direct radiation directly. It is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
           </tr>
           <tr>
             <th scope="row">diffuse_radiation</th>
             <td>Preceding hour mean</td>
             <td>W/m²</td>
-            <td>Diffuse solar radiation as average of the preceding hour. HRRR offers diffuse radiation directly. In GFS it is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
+            <td>Diffuse solar radiation as average of the preceding hour. HRRR offers diffuse radiation directly. MeteoFrance does not offers diffuse and direct radiation directly. It is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
           </tr>
           <tr>
             <th scope="row">vapor_pressure_deficit</th>
@@ -1116,13 +1102,13 @@
             <td>Vapor Pressure Deificit (VPD) in kilopascal (kPa). For high VPD (&gt;1.6), water transpiration of plants
               increases. For low VPD (&lt;0.4), transpiration decreases</td>
           </tr>
-          <tr>
+          <!--<tr>
             <th scope="row">evapotranspiration</th>
             <td>Preceding hour sum</td>
             <td>mm (inch)</td>
             <td>Evapotranspration from land surface and plants that weather models assumes for this location. Available
               soil water is considered. 1 mm evapotranspiration per hour equals 1 liter of water per spare meter.</td>
-          </tr>
+          </tr>-->
           <tr>
             <th scope="row">et0_fao_evapotranspiration</th>
             <td>Preceding hour sum</td>
@@ -1162,7 +1148,7 @@
               <td>Instant</td>
               <td>WMO code</td>
               <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for details.</td>
-            </tr>-->
+            </tr>
           <tr>
             <th scope="row">snow_depth</th>
             <td>Instant</td>
@@ -1180,14 +1166,14 @@
             <td>Instant</td>
             <td>meters</td>
             <td>Viewing distance in meters. Influenced by low clouds, humidity and aerosols. Maximum visibility is approximately 24 km.</td>
-          </tr>
+          </tr>-->
           <tr>
             <th scope="row">cape</th>
             <td>Instant</td>
             <td>J/kg</td>
             <td>Convective available potential energy. See <a href="https://en.wikipedia.org/wiki/Convective_available_potential_energy" target="_blank">Wikipedia</a>.</td>
           </tr>
-          <tr>
+          <!--<tr>
             <th scope="row">lifted_index</th>
             <td>Instant</td>
             <td>dimensionless</td>
@@ -1208,7 +1194,7 @@
             <td>Instant</td>
             <td>m³/m³</td>
             <td>Average soil water content as volumetric mixing ratio at 0-10, 10-40, 40-100 and 100-200 cm depths.</td>
-          </tr>
+          </tr>-->
         </tbody>
       </table>
     </div>
@@ -1259,7 +1245,7 @@
           <tr>
             <th scope="row">cloudcover_1000hPa<br />cloudcover_975hPa, ...</th>
             <td>%</td>
-            <td>Cloud cover at the specified pressure level. GFS is including parameterised cloud cover directly. HRRR cloud cover is approximated based on relative humidity
+            <td>Cloud cover at the specified pressure level. ARPEGE Wold and Europe includes parameterised cloud cover directly. AROME cloud cover is approximated based on relative humidity
               using <a
                 href="https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf"
                 target="_blank">Sundqvist et al. (1989)</a>. It may not match perfectly with low, mid and high cloud

@@ -19,9 +19,9 @@ public struct MeteoFranceController {
             let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
             let currentTime = Timestamp.now()
             
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 17)
+            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 6)
             let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, allowedRange: allowedRange)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 4, allowedRange: allowedRange)
             
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
