@@ -110,6 +110,10 @@ struct DataAndUnit {
         return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
     }
     
+    func conertAndRound(params: MeteoFranceQuery) -> DataAndUnit {
+        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
+    }
+    
     func conertAndRound(params: Era5Query) -> DataAndUnit {
         return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
     }
