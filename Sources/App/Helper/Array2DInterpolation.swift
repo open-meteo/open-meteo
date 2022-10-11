@@ -243,6 +243,9 @@ extension Array2DFastTime {
             // First the clear sky index KT is calaculated (KT based on extraterrestrial radiation)
             // clearsky index is hermite interpolated and then back to actual radiation
             
+            if interpolationHours.isEmpty {
+                return
+            }
             guard width == 1 else {
                 fatalError("Solar interpolation for width != 1 not implemented")
             }
