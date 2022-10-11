@@ -9,9 +9,9 @@
 #export("content"):
 
 <div class="px-4 py-5 mb-5 text-center text-white" style="
-            background-image: url('https://assets.open-meteo.com/images/index_background2.jpeg');
+            background-image: url('https://assets.open-meteo.com/images/partly_cloudy.jpeg');
             background-size: cover;
-            background-position: center;
+            background-position: bottom;
             height: 500px;
           ">
   <svg style="filter: drop-shadow( 3px 3px 2px rgba(0, 0, 0, .7));" xmlns="http://www.w3.org/2000/svg" width="96"
