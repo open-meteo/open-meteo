@@ -841,7 +841,7 @@
             <th scope="row"><a href="https://mf-models-on-aws.org/en/doc/models/arpege-world/" target="_blank">Arpege World</a></th>
             <td>Global</td>
             <td>0.5° (~55 km)</td>
-            <td>3-Hourly, 6-hourly after 96 hours</td>
+            <td>3-Hourly<small class="text-muted">, 6-hourly after 96 hours</small></td>
             <td>4 days</td>
             <td>Every 6 hours</td>
           </tr>
@@ -849,7 +849,7 @@
             <th scope="row"><a href="https://mf-models-on-aws.org/en/doc/models/arpege-europe/" target="_blank">Arpege Europe</a></th>
             <td>Europe</td>
             <td>0.1° (~11 km)</td>
-            <td>Hourly, 3-hourly after 72 hours</td>
+            <td>Hourly<small class="text-muted">, 3-hourly after 72 hours</small></td>
             <td>4 days</td>
             <td>Every 6 hours</td>
           </tr>
@@ -862,7 +862,7 @@
             <td>Every 6 hours</td>
           </tr>
           <tr>
-            <th scope="row"><a href="https://mf-models-on-aws.org/en/doc/models/arome-france-hd/" target="_blank">Arome France HD</a></th>
+            <th scope="row"><a href="https://mf-models-on-aws.org/en/doc/models/arome-france-hd/" target="_blank">Arome France HD</a> <small class="text-muted">(*)</small></th>
             <td>France</td>
             <td>1.5 km</td>
             <td>Hourly</td>
@@ -871,6 +871,8 @@
           </tr>
         </tbody>
       </table>
+
+      <small class="text-muted">* Arome France HD only contains a small selection of weather variables.</small>
     </div>
 
     <h2 id="api-documentation" class="mt-5">API Documentation</h2>
