@@ -82,6 +82,8 @@ struct DownloadEcmwfCommand: Command {
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         let nForecastHours = forecastSteps.max()! / domain.dtHours + 1
         
+        let time = TimerangeDt(start: run, nTime: nForecastHours * domain.dtHours, dtSeconds: domain.dtSeconds)
+        
         let nLocation = domain.grid.nx * domain.grid.ny
         
         /// The time data is placed in the ring
@@ -111,34 +113,7 @@ struct DownloadEcmwfCommand: Command {
                 return hour
             }
             
-            switch variable.interpolation {
-            case .linear:
-                for l in 0..<nLocation {
-                    for hour in interpolationHours {
-                        let prev = data2d[l, hour-1]
-                        let next = data2d[l, hour+1]
-                        data2d[l, hour] = prev * 1/2 + next * 1/2
-                    }
-                }
-            case .hermite:
-                for l in 0..<nLocation {
-                    for hour in interpolationHours {
-                        let A = data2d[l, hour-3 < 0 ? hour-1 : hour-3]
-                        let B = data2d[l, hour-1]
-                        let C = data2d[l, hour+1]
-                        let D = data2d[l, hour+2 >= nForecastHours ? hour+1 : hour+3]
-                        let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                        let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                        let c = -A/2.0 + C/2.0
-                        let d = B
-                        data2d[l, hour] = a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d
-                    }
-                }
-            case .solar_backwards_averaged:
-                fatalError("ecmwf solar not implemented")
-            }
-            
-            data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, dt: 1)
+            data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid)
             
             /// Temperature is stored in kelvin. Convert to celsius
             if variable.rawValue.contains("temperature") {
@@ -200,39 +175,6 @@ extension EcmwfDomain {
         case .ifs04:
             // ECMWF has a delay of 7-8 hours after initialisation
             return ((t.hour - 7 + 24) % 24) / 6 * 6
-        }
-    }
-}
-
-extension Array2DFastTime {
-    /// interpolate 1 missing step.. E.g. `DDDDDD-D-D-D-D-D`
-    /// `dt` can be used to set element spacing E.g. `DxDxDxDxDxDx-xDx-xDx-xDx-xDx-xD` whith dt=1 all `x` positions will be ignored
-    mutating func interpolate1Step(interpolation: ReaderInterpolation, interpolationHours: [Int], dt: Int) {
-        switch interpolation {
-        case .linear:
-            for l in 0..<nLocations {
-                for hour in interpolationHours {
-                    let prev = self[l, hour-1*dt]
-                    let next = self[l, hour+1*dt]
-                    self[l, hour] = prev * 1/2 + next * 1/2
-                }
-            }
-        case .hermite:
-            for l in 0..<nLocations {
-                for hour in interpolationHours {
-                    let A = self[l, hour-3*dt < 0 ? hour-1*dt : hour-3*dt]
-                    let B = self[l, hour-1*dt]
-                    let C = self[l, hour+1*dt]
-                    let D = self[l, hour+2*dt >= nTime ? hour+1*dt : hour+3*dt]
-                    let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                    let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                    let c = -A/2.0 + C/2.0
-                    let d = B
-                    self[l, hour] = a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d
-                }
-            }
-        case .solar_backwards_averaged:
-            fatalError("ecmwf solar not implemented")
         }
     }
 }

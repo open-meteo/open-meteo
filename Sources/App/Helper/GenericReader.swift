@@ -68,6 +68,15 @@ enum ReaderInterpolation {
             return 2
         }
     }
+    
+    var isSolarInterpolation: Bool {
+        switch self {
+        case .solar_backwards_averaged:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 

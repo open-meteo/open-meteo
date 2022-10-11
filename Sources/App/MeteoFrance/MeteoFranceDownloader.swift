@@ -205,6 +205,8 @@ struct MeteoFranceDownload: Command {
         
         let nForecastHours = forecastHours.max()! / dtHours + 1
         
+        let time = TimerangeDt(start: run, nTime: nForecastHours * domain.dtHours, dtSeconds: domain.dtSeconds)
+        
         let grid = domain.grid
         let nLocation = grid.count
         
@@ -228,10 +230,9 @@ struct MeteoFranceDownload: Command {
             let skip = skipHour0 ? 1 : 0
             
             // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
-            //if variable.isAveragedOverForecastTime {
-                //data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-                //data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-            //}
+            if variable.interpolation.isSolarInterpolation {
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+            }
             // radiation in meteofrance is aggregated and not averaged!
             
             /// somehow radiation for ARPEGE EUROPE and AROME FRANCE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?
@@ -250,7 +251,7 @@ struct MeteoFranceDownload: Command {
                     }
                     return hour
                 }
-                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, dt: 3)
+                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid)
                 
                 // interpolate missing timesteps. We always fill 2 timesteps at once
                 // data looks like: DDDDDDDDDD--D--D--D--D--D
@@ -265,16 +266,16 @@ struct MeteoFranceDownload: Command {
                 // Fill in missing hourly values after switching to 3h
                 data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             } else {
-                // Arpege world with dtHours=3. Interpolate 6h to 3h values
-                // TODO: shortwave radiation is not correct for the last hours
+                // Arpege world with dtHours=3. Interpolate 6h to 3h values (actually only the last timestep)
                 let forecastStepsToInterpolate6h = stride(from: 0, to: nForecastHours * dtHours, by: dtHours).compactMap { hour -> Int? in
                     return forecastHours.contains(hour) ? nil : hour / dtHours
                 }
-                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, dt: 1)
+
+                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 1, time: time, grid: grid)
             }
             
             // De-accumulate precipitation
-            if variable.isAccumulatedSinceModelStart {
+            if variable.isAccumulatedSinceModelStart, !variable.interpolation.isSolarInterpolation {
                 //data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
                 data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
             }
