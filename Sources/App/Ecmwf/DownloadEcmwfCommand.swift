@@ -151,7 +151,13 @@ struct DownloadEcmwfCommand: Command {
             fatalError("File \(file) does not exist")
         }
         // For some reason total colum water integral is sometimes called "tcwv" or "tciwv"
-        guard let v = variable == "tciwv" ? (nc.getVariable(name: "tciwv") ?? nc.getVariable(name: "tcwv")) : nc.getVariable(name: variable) else {
+        // total precipitation "tp" "param193.1.0"
+        // runoff "ro" "param201.0.2"
+        guard let v = nc.getVariable(name: variable) ?? (
+            variable == "tciwv" ? nc.getVariable(name: "tcwv") :
+            variable == "tp" ? nc.getVariable(name: "param193.1.0") :
+            variable == "ro" ? nc.getVariable(name: "param201.0.2") :
+            nil) else {
             fatalError("Could not find data variable with 3d/4d data. Name: \(variable), File: \(file)")
         }
         precondition(v.dimensions[v.dimensions.count-1].length == nx)
