@@ -400,7 +400,7 @@ extension IconDomains {
 
 /// Workaround to use async in commans
 /// Wait for https://github.com/vapor/vapor/pull/2870
-/*protocol AsyncCommandFix: Command {
+protocol AsyncCommandFix: Command {
     func run(using context: CommandContext, signature: Signature) async throws
 }
 
@@ -412,4 +412,4 @@ extension AsyncCommandFix {
         }
         try promise.futureResult.wait()
     }
-}*/
+}

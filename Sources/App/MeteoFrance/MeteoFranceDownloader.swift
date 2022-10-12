@@ -6,7 +6,7 @@ import SwiftPFor2D
 /**
 Meteofrance Arome, Arpge downloader
  */
-struct MeteoFranceDownload: Command {
+struct MeteoFranceDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -34,7 +34,7 @@ struct MeteoFranceDownload: Command {
         "Download MeteoFrance models"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
         guard let domain = MeteoFranceDomain.init(rawValue: signature.domain) else {
@@ -77,14 +77,15 @@ struct MeteoFranceDownload: Command {
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        try downloadElevation(logger: logger, domain: domain)
+        try await downloadElevation(application: context.application, domain: domain)
         try download(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
     // download seamask and height
-    func downloadElevation(logger: Logger, domain: MeteoFranceDomain) throws {
+    func downloadElevation(application: Application, domain: MeteoFranceDomain) async throws {
+        let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
@@ -99,7 +100,7 @@ struct MeteoFranceDownload: Command {
         let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
         
         let terrainUrl = "https://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/terrain.grib2"
-        for message in try curl.downloadGrib(url: terrainUrl) {
+        for message in try await curl.downloadGrib(url: terrainUrl, client: application.http.client.shared) {
             var data = message.toArray2d()
             if domain.isGlobal {
                 data.shift180LongitudeAndFlipLatitude()
@@ -112,7 +113,7 @@ struct MeteoFranceDownload: Command {
         }
         
         let landmaskUrl = "https://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/landmask.grib2"
-        for message in try curl.downloadGrib(url: landmaskUrl) {
+        for message in try await curl.downloadGrib(url: landmaskUrl, client: application.http.client.shared) {
             var data = message.toArray2d()
             if domain.isGlobal {
                 data.shift180LongitudeAndFlipLatitude()

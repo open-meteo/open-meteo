@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import SwiftEccodes
+import AsyncHTTPClient
 
 
 enum CurlError: Error {
@@ -9,6 +10,7 @@ enum CurlError: Error {
     case gribIndexMatchedTwice
     case sizeTooSmall
     case didNotGetAllGribMessages(got: Int, expected: Int)
+    case downloadFailed(code: HTTPStatus)
 }
 
 struct Curl {
@@ -73,6 +75,48 @@ struct Curl {
         }
     }
     
+    /// Use http-async http client to download
+    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
+        // URL might contain password, strip them from logging
+        if url.contains("@") && url.contains(":") {
+            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
+            logger.info("Downloading file \(urlSafe)")
+        } else {
+            logger.info("Downloading file \(url)")
+        }
+        
+        let startTime = Date()
+        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
+        
+        var request = HTTPClientRequest(url: url)
+        if let range = range {
+            request.headers.add(name: "range", value: "bytes=\(range)")
+        }
+        
+        while true {
+            do {
+                let response = try await client.execute(request, timeout: .seconds(Int64(maxTimeSeconds)))
+                if response.status != .ok {
+                    throw CurlError.downloadFailed(code: response.status)
+                }
+                let data = try await response.body.collect(upTo: .max)
+                
+                return data
+            } catch {
+                let timeElapsed = Date().timeIntervalSince(startTime)
+                if Date().timeIntervalSince(lastPrint) > 60 {
+                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
+                    lastPrint = Date()
+                }
+                if Date() > deadline {
+                    logger.error("Deadline reached")
+                    throw error
+                }
+                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
+            }
+        }
+    }
+    
     /// Wait for a download to finish
     func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> Data {
         // URL might contain password, strip them from logging
@@ -122,13 +166,13 @@ struct Curl {
     
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadGrib(url: String) throws -> AnyIterator<GribMessage> {
+    func downloadGrib(url: String, client: HTTPClient) async throws -> AnyIterator<GribMessage> {
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
-            let data = try downloadInMemory(url: url)
-            logger.debug("Converting GRIB, size \(data.count) bytes")
+            let data = try await downloadInMemoryAsync(url: url, client: client)
+            logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
-                return try data.withUnsafeBytes { ptr in
+                return try data.withUnsafeReadableBytes { ptr in
                     let grib = try GribMemory(ptr: ptr)
                     var itr = grib.messages.makeIterator()
                     return AnyIterator {
