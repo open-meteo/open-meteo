@@ -47,6 +47,11 @@ enum EcmwfDomain: GenericDomain {
     var grid: Gridable {
         return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360/900, dy: 180/450)
     }
+    
+    /// All levels available in the API
+    static var apiLevels: [Int] {
+        return [50, 200, 250, 300, 500, 700, 850, 925, 1000]
+    }
 }
 
 

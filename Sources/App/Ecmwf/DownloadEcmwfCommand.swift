@@ -99,9 +99,9 @@ struct DownloadEcmwfCommand: Command {
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
             
             for hour in forecastSteps {
-                /*if hour == 0 && variable.skipHour0 {
+                if hour == 0 && variable.skipHour0 {
                     continue
-                }*/
+                }
                 let d = try Self.readNetcdf(file: "\(downloadDirectory)\(hour)h.nc", variable: variable.gribName, levelOffset: variable.level, nx: domain.grid.nx, ny: domain.grid.ny)
                 data2d[0..<nLocation, hour/domain.dtHours] = d
             }
@@ -115,6 +115,11 @@ struct DownloadEcmwfCommand: Command {
             
             data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid)
             
+            // De-accumulate precipitation
+            if variable.isAccumulatedSinceModelStart {
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+            }
+            
             // Scaling before compression with scalefactor
             if let fma = variable.multiplyAdd {
                 data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
@@ -127,7 +132,8 @@ struct DownloadEcmwfCommand: Command {
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.nameInFiles, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            let skipFirst = variable.skipHour0 ? 1 : 0
+            try om.updateFromTimeOriented(variable: variable.nameInFiles, array2d: data2d, ringtime: ringtime, skipFirst: skipFirst, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
         

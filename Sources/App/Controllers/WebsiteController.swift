@@ -63,7 +63,18 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = IndexContext(title: "ECMWF Weather Forecast API")
+        let context = ContextWithLevels(title: "ECMWF Weather Forecast API", levels: EcmwfDomain.apiLevels, variables: [
+            ContextWithLevels.PressureVariable(label: "Temperature", name: "temperature"),
+            //ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
+            ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relative_humidity"), // NOTE underscore here!
+            ContextWithLevels.PressureVariable(label: "Specific Humidity", name: "specific_humidity"),
+            //ContextWithLevels.PressureVariable(label: "Cloudcover", name: "cloudcover"),
+            ContextWithLevels.PressureVariable(label: "Wind Speed", name: "windspeed"),
+            ContextWithLevels.PressureVariable(label: "Wind Direction", name: "winddirection"),
+            ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
+            ContextWithLevels.PressureVariable(label: "Relative Vorticity", name: "atmosphere_relative_vorticity"),
+            ContextWithLevels.PressureVariable(label: "Divergence of Wind", name: "divergence_of_wind"),
+        ])
         return req.view.render("docs-ecmwf-api", context)
     }
     func marineApiHandler(_ req: Request) -> EventLoopFuture<View> {

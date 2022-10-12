@@ -140,14 +140,24 @@
       </div>
     </div>
     <div class="row py-3 px-0">
-      <h3>Hourly Weather Variables</h3>
+      <h3>3-Hourly Weather Variables</h3>
       <div class="col-md-3">
+
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_2m" id="temperature_2m" name="hourly"
+            checked>
+          <label class="form-check-label" for="temperature_2m">
+            Temperature (2 m)
+          </label>
+        </div>
+
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="pressure_msl" id="pressure_msl" name="hourly">
           <label class="form-check-label" for="pressure_msl">
             Sealevel Pressure
           </label>
         </div>
+
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="surface_air_pressure" id="surface_air_pressure"
             name="hourly">
@@ -155,6 +165,49 @@
             Surface Air Pressure
           </label>
         </div>
+      </div>
+
+      <div class="col-md-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="precipitation" id="precipitation" name="hourly">
+          <label class="form-check-label" for="precipitation">
+            Precipitation (rain + showers + snow)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="runoff" id="runoff" name="hourly">
+          <label class="form-check-label" for="runoff">
+            Surface water runoff
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="total_column_integrated_water_vapour"
+            id="total_column_integrated_water_vapour" name="hourly">
+          <label class="form-check-label" for="total_column_integrated_water_vapour">
+            Total Column Integrated Water Vapour
+          </label>
+        </div>
+
+      </div>
+
+      <div class="col-md-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="windspeed_10m" id="windspeed_10m" name="hourly">
+          <label class="form-check-label" for="windspeed_10m">
+            Wind Speed (10 m)
+          </label>
+        </div>
+        
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="winddirection_10m" id="winddirection_10m"
+            name="hourly">
+          <label class="form-check-label" for="winddirection_10m">
+            Wind Direction (10 m)
+          </label>
+        </div>
+
+      </div>
+      <div class="col-md-3">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="skin_temperature" id="skin_temperature" name="hourly">
           <label class="form-check-label" for="skin_temperature">
@@ -168,549 +221,63 @@
             Soil Temperature (0-7 cm)
           </label>
         </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="total_column_integrated_water_vapour"
-            id="total_column_integrated_water_vapour" name="hourly">
-          <label class="form-check-label" for="total_column_integrated_water_vapour">
-            Total Column Integrated Water Vapour
-          </label>
-        </div>
-
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_2m" id="temperature_2m" name="hourly"
-            checked>
-          <label class="form-check-label" for="temperature_2m">
-            Temperature (2 m)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_1000hPa" id="temperature_1000hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_1000hPa">
-            Temperature (1000 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_925hPa" id="temperature_925hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_925hPa">
-            Temperature (925 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_850hPa" id="temperature_850hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_850hPa">
-            Temperature (850 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_700hPa" id="temperature_700hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_700hPa">
-            Temperature (700 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_500hPa" id="temperature_500hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_500hPa">
-            Temperature (500 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_300hPa" id="temperature_300hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_300hPa">
-            Temperature (300 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_250hPa" id="temperature_250hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_250hPa">
-            Temperature (250 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_200hPa" id="temperature_200hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_200hPa">
-            Temperature (200 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_50hPa" id="temperature_50hPa"
-            name="hourly">
-          <label class="form-check-label" for="temperature_50hPa">
-            Temperature (50 hPa)
-          </label>
-        </div>
-
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_1000hPa"
-            id="geopotential_height_1000hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_1000hPa">
-            Geopotential Height (1000 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_925hPa"
-            id="geopotential_height_925hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_925hPa">
-            Geopotential Height (925 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_850hPa"
-            id="geopotential_height_850hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_850hPa">
-            Geopotential Height (850 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_700hPa"
-            id="geopotential_height_700hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_700hPa">
-            Geopotential Height (700 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_500hPa"
-            id="geopotential_height_500hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_500hPa">
-            Geopotential Height (500 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_300hPa"
-            id="geopotential_height_300hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_300hPa">
-            Geopotential Height (300 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_250hPa"
-            id="geopotential_height_250hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_250hPa">
-            Geopotential Height (250 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_200hPa"
-            id="geopotential_height_200hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_200hPa">
-            Geopotential Height (200 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="geopotential_height_50hPa"
-            id="geopotential_height_50hPa" name="hourly">
-          <label class="form-check-label" for="geopotential_height_50hPa">
-            Geopotential Height (50 hPa)
-          </label>
-        </div>
-
       </div>
-      <div class="col-md-3">
+    </div>
 
-
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_10m" id="windspeed_10m" name="hourly">
-          <label class="form-check-label" for="windspeed_10m">
-            Wind Speed (10 m)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_1000hPa" id="windspeed_1000hPa"
-            name="hourly">
-          <label class="form-check-label" for="windspeed_1000hPa">
-            Wind Speed (1000 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_925hPa" id="windspeed_925hPa" name="hourly">
-          <label class="form-check-label" for="windspeed_925hPa">
-            Wind Speed (925 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_850hPa" id="windspeed_850hPa" name="hourly">
-          <label class="form-check-label" for="windspeed_850hPa">
-            Wind Speed (850 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_700hPa" id="windspeed_700hPa" name="hourly">
-          <label class="form-check-label" for="windspeed_700hPa">
-            Wind Speed (700 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_500hPa" id="windspeed_500hPa" name="hourly">
-          <label class="form-check-label" for="windspeed_500hPa">
-            Wind Speed (500 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_300hPa" id="windspeed_300hPa" name="hourly">
-          <label class="form-check-label" for="windspeed_300hPa">
-            Wind Speed (300 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_250hPa" id="windspeed_250hPa" name="hourly">
-          <label class="form-check-label" for="windspeed_250hPa">
-            Wind Speed (250 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_200hPa" id="windspeed_200hPa" name="hourly">
-          <label class="form-check-label" for="windspeed_200hPa">
-            Wind Speed (200 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_50hPa" id="windspeed_50hPa" name="hourly">
-          <label class="form-check-label" for="windspeed_50hPa">
-            Wind Speed (50 hPa)
-          </label>
-        </div>
-
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_10m" id="winddirection_10m"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_10m">
-            Wind Direction (10 m)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_1000hPa" id="winddirection_1000hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_1000hPa">
-            Wind Direction (1000 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_925hPa" id="winddirection_925hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_925hPa">
-            Wind Direction (925 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_850hPa" id="winddirection_850hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_850hPa">
-            Wind Direction (850 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_700hPa" id="winddirection_700hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_700hPa">
-            Wind Direction (700 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_500hPa" id="winddirection_500hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_500hPa">
-            Wind Direction (500 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_300hPa" id="winddirection_300hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_300hPa">
-            Wind Direction (300 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_250hPa" id="winddirection_250hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_250hPa">
-            Wind Direction (250 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_200hPa" id="winddirection_200hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_200hPa">
-            Wind Direction (200 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="winddirection_50hPa" id="winddirection_50hPa"
-            name="hourly">
-          <label class="form-check-label" for="winddirection_50hPa">
-            Wind Direction (50 hPa)
-          </label>
-        </div>
-
-      </div>
-      <div class="col-md-3">
-
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_1000hPa"
-            id="relative_humidity_1000hPa" name="hourly">
-          <label class="form-check-label" for="relative_humidity_1000hPa">
-            Relative Humidity (1000 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_925hPa" id="relative_humidity_925hPa"
-            name="hourly">
-          <label class="form-check-label" for="relative_humidity_925hPa">
-            Relative Humidity (925 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_850hPa" id="relative_humidity_850hPa"
-            name="hourly">
-          <label class="form-check-label" for="relative_humidity_850hPa">
-            Relative Humidity (850 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_700hPa" id="relative_humidity_700hPa"
-            name="hourly">
-          <label class="form-check-label" for="relative_humidity_700hPa">
-            Relative Humidity (700 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_500hPa" id="relative_humidity_500hPa"
-            name="hourly">
-          <label class="form-check-label" for="relative_humidity_500hPa">
-            Relative Humidity (500 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_300hPa" id="relative_humidity_300hPa"
-            name="hourly">
-          <label class="form-check-label" for="relative_humidity_300hPa">
-            Relative Humidity (300 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_250hPa" id="relative_humidity_250hPa"
-            name="hourly">
-          <label class="form-check-label" for="relative_humidity_250hPa">
-            Relative Humidity (250 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_200hPa" id="relative_humidity_200hPa"
-            name="hourly">
-          <label class="form-check-label" for="relative_humidity_200hPa">
-            Relative Humidity (200 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_50hPa" id="relative_humidity_50hPa"
-            name="hourly">
-          <label class="form-check-label" for="relative_humidity_50hPa">
-            Relative Humidity (50 hPa)
-          </label>
-        </div>
-
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_1000hPa"
-            id="specific_humidity_1000hPa" name="hourly">
-          <label class="form-check-label" for="specific_humidity_1000hPa">
-            Specific Humidity (1000 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_925hPa" id="specific_humidity_925hPa"
-            name="hourly">
-          <label class="form-check-label" for="specific_humidity_925hPa">
-            Specific Humidity (925 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_850hPa" id="specific_humidity_850hPa"
-            name="hourly">
-          <label class="form-check-label" for="specific_humidity_850hPa">
-            Specific Humidity (850 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_700hPa" id="specific_humidity_700hPa"
-            name="hourly">
-          <label class="form-check-label" for="specific_humidity_700hPa">
-            Specific Humidity (700 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_500hPa" id="specific_humidity_500hPa"
-            name="hourly">
-          <label class="form-check-label" for="specific_humidity_500hPa">
-            Specific Humidity (500 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_300hPa" id="specific_humidity_300hPa"
-            name="hourly">
-          <label class="form-check-label" for="specific_humidity_300hPa">
-            Specific Humidity (300 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_250hPa" id="specific_humidity_250hPa"
-            name="hourly">
-          <label class="form-check-label" for="specific_humidity_250hPa">
-            Specific Humidity (250 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_200hPa" id="specific_humidity_200hPa"
-            name="hourly">
-          <label class="form-check-label" for="specific_humidity_200hPa">
-            Specific Humidity (200 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="specific_humidity_50hPa" id="specific_humidity_50hPa"
-            name="hourly">
-          <label class="form-check-label" for="specific_humidity_50hPa">
-            Specific Humidity (50 hPa)
-          </label>
-        </div>
-
-      </div>
-      <div class="col-md-3">
-
-
-
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_1000hPa"
-            id="atmosphere_relative_vorticity_1000hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_1000hPa">
-            Relative Vorticity (1000 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_925hPa"
-            id="atmosphere_relative_vorticity_925hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_925hPa">
-            Relative Vorticity (925 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_850hPa"
-            id="atmosphere_relative_vorticity_850hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_850hPa">
-            Relative Vorticity (850 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_700hPa"
-            id="atmosphere_relative_vorticity_700hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_700hPa">
-            Relative Vorticity (700 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_500hPa"
-            id="atmosphere_relative_vorticity_500hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_500hPa">
-            Relative Vorticity (500 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_300hPa"
-            id="atmosphere_relative_vorticity_300hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_300hPa">
-            Relative Vorticity (300 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_250hPa"
-            id="atmosphere_relative_vorticity_250hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_250hPa">
-            Relative Vorticity (250 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_200hPa"
-            id="atmosphere_relative_vorticity_200hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_200hPa">
-            Relative Vorticity (200 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="atmosphere_relative_vorticity_50hPa"
-            id="atmosphere_relative_vorticity_50hPa" name="hourly">
-          <label class="form-check-label" for="atmosphere_relative_vorticity_50hPa">
-            Relative Vorticity (50 hPa)
-          </label>
-        </div>
-
-
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_1000hPa"
-            id="divergence_of_wind_1000hPa" name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_1000hPa">
-            Divergence of Wind (1000 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_925hPa"
-            id="divergence_of_wind_925hPa" name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_925hPa">
-            Divergence of Wind (925 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_850hPa"
-            id="divergence_of_wind_850hPa" name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_850hPa">
-            Divergence of Wind (850 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_700hPa"
-            id="divergence_of_wind_700hPa" name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_700hPa">
-            Divergence of Wind (700 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_500hPa"
-            id="divergence_of_wind_500hPa" name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_500hPa">
-            Divergence of Wind (500 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_300hPa"
-            id="divergence_of_wind_300hPa" name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_300hPa">
-            Divergence of Wind (300 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_250hPa"
-            id="divergence_of_wind_250hPa" name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_250hPa">
-            Divergence of Wind (250 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_200hPa"
-            id="divergence_of_wind_200hPa" name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_200hPa">
-            Divergence of Wind (200 hPa)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="divergence_of_wind_50hPa" id="divergence_of_wind_50hPa"
-            name="hourly">
-          <label class="form-check-label" for="divergence_of_wind_50hPa">
-            Divergence of Wind (50 hPa)
-          </label>
+    <div class="row py-3 px-0">
+      <div class="accordion" id="accordionVariables">
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading-pressure-levels">
+            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapse-pressure-levels" aria-expanded="false" aria-controls="collapse-pressure-levels">
+              Pressure Levels&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+                data-count-checkboxes-of="#collapse-pressure-levels">0/x
+            </button>
+          </h2>
+          <div id="collapse-pressure-levels" class="accordion-collapse collapse"
+            aria-labelledby="heading-pressure-levels" data-bs-parent="#accordionVariables">
+            <div class="accordion-body">
+              <div class="d-flex align-items-start">
+                <div class="nav flex-column nav-pills me-3" id="v-pills-tab" role="tablist" aria-orientation="vertical">
+                  #for(variable in pressureVariables):
+                  <button class="nav-link text-start text-nowrap #if(isFirst): active#endif"
+                    id="v-pills-#(variable.name)-tab" data-bs-toggle="pill" data-bs-target="#v-pills-#(variable.name)"
+                    type="button" role="tab" aria-controls="v-pills-#(variable.name)"
+                    aria-selected="#(isFirst)">#(variable.label)</button>
+                  #endfor
+                </div>
+                <div class="tab-content" id="v-pills-tabContent">
+                  #for(variable in pressureVariables):
+                  <div class="tab-pane fade #if(isFirst): show active#endif" id="v-pills-#(variable.name)"
+                    role="tabpanel" aria-labelledby="v-pills-#(variable.name)-tab">
+                    <div class="row">
+                      #for(level in levels):
+                      #if(index % (count(levels)/3+1) == 0 || isFirst):
+                      <div class="col-lg-4">
+                        #endif
+                        <div class="form-check">
+                          <input class="form-check-input" type="checkbox" value="#(variable.name)_#(level.level)hPa"
+                            id="#(variable.name)_#(level.level)hPa" name="hourly">
+                          <label class="form-check-label" for="#(variable.name)_#(level.level)hPa">
+                            #(level.level) hPa <small class="text-muted">(#(level.altitude))</small>
+                          </label>
+                        </div>
+                        #if(index % (count(levels)/3+1) == count(levels)/3 || isLast):
+                      </div>
+                      #endif
+                      #endfor
+                    </div>
+                  </div>
+                  #endfor
+                  <div class="mt-3">
+                    <small class="text-muted">Note: Altitudes are approximate and in meters <strong> above sea
+                        level</strong> (not above ground). Use <mark>geopotential_height</mark> to get precise
+                      altitudes above sea level.</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -924,6 +491,18 @@
         </thead>
         <tbody>
           <tr>
+            <th scope="row">precipitation</th>
+            <td>Preceding hour sum</td>
+            <td>mm (inch)</td>
+            <td>Total precipitation (rain, showers, snow) sum of the preceding hour</td>
+          </tr>
+          <tr>
+            <th scope="row">runoff</th>
+            <td>Preceding hour sum</td>
+            <td>mm (inch)</td>
+            <td>Execess rain that is not absorbed by the soil</td>
+          </tr>
+          <tr>
             <th scope="row">pressure_msl<br>surface_air_pressure</th>
             <td>Instant</td>
             <td>hPa</td>
@@ -958,13 +537,7 @@
           <tr>
             <th scope="row">geopotential_height_1000hPa</th>
             <td>Instant</td>
-            <td>gpm</td>
-            <td>Geopotential height on different atmospheric pressure levels</td>
-          </tr>
-          <tr>
-            <th scope="row">windspeed_10m</th>
-            <td>Instant</td>
-            <td>gpm</td>
+            <td>meter</td>
             <td>Geopotential height on different atmospheric pressure levels</td>
           </tr>
           <tr>
