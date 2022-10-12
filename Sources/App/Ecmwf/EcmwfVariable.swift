@@ -438,6 +438,19 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
         }
     }
     
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m:
+            return (1, -273.15)
+        case .pressure_msl:
+            return (1/100, 0)
+        case .surface_air_pressure:
+            return (1/100, 0)
+        default:
+            return nil
+        }
+    }
+    
     var interpolation: ReaderInterpolation {
         switch self {
         case .relative_humidity_1000hPa: fallthrough
