@@ -2,6 +2,8 @@ import Foundation
 
 /// Represent a ECMWF variable as available in the grib2 files
 enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
+    case precipitation
+    case runoff
     case soil_temperature_0_to_7cm
     case skin_temperature
     case geopotential_height_1000hPa
@@ -99,6 +101,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     
     var unit: SiUnit {
         switch self {
+        case .precipitation: fallthrough
+        case .runoff: return .millimeter
         case .soil_temperature_0_to_7cm: fallthrough
         case .skin_temperature: return .celsius
         case .geopotential_height_1000hPa: fallthrough
@@ -109,7 +113,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
         case .geopotential_height_300hPa: fallthrough
         case .geopotential_height_250hPa: fallthrough
         case .geopotential_height_200hPa: fallthrough
-        case .geopotential_height_50hPa: return .gpm
+        case .geopotential_height_50hPa: return .meter
         case .northward_wind_1000hPa: fallthrough
         case .northward_wind_925hPa: fallthrough
         case .northward_wind_850hPa: fallthrough
@@ -145,7 +149,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
         case .relative_humidity_300hPa: fallthrough
         case .relative_humidity_250hPa: fallthrough
         case .relative_humidity_200hPa: fallthrough
-        case .relative_humidity_50hPa: return .gramPerKilogram
+        case .relative_humidity_50hPa: return .percent
         case .surface_air_pressure: return .hectoPascal
         case .pressure_msl: return .hectoPascal
         case .total_column_integrated_water_vapour: return .kilogramPerSquareMeter
@@ -184,6 +188,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     
     var level: Int? {
         switch self {
+        case .precipitation: fallthrough
+        case .runoff: return nil
         case .soil_temperature_0_to_7cm: return 0
         case .skin_temperature: return nil
         case .geopotential_height_1000hPa: return 0
@@ -269,6 +275,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     
     var gribName: String {
         switch self {
+        case .precipitation: return "tp"
+        case .runoff: return "ro"
         case .soil_temperature_0_to_7cm: return "st"
         case .skin_temperature: return "skt"
         case .geopotential_height_1000hPa: return "gh"
@@ -354,7 +362,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     
     var scalefactor: Float {
         switch self {
-            
+        case .precipitation: fallthrough
+        case .runoff: return 10
         case .soil_temperature_0_to_7cm: return 20
         case .skin_temperature: return 20
         case .geopotential_height_1000hPa: fallthrough
@@ -440,19 +449,60 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
+        case .temperature_1000hPa: fallthrough
+        case .temperature_925hPa: fallthrough
+        case .temperature_850hPa: fallthrough
+        case .temperature_700hPa: fallthrough
+        case .temperature_500hPa: fallthrough
+        case .temperature_300hPa: fallthrough
+        case .temperature_250hPa: fallthrough
+        case .temperature_200hPa: fallthrough
+        case .temperature_50hPa: fallthrough
         case .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
             return (1/100, 0)
         case .surface_air_pressure:
             return (1/100, 0)
+        case .precipitation:
+            fallthrough
+        case .runoff:
+            return (1000, 0) // meters to millimeter
+        case .specific_humidity_1000hPa: fallthrough
+        case .specific_humidity_925hPa: fallthrough
+        case .specific_humidity_850hPa: fallthrough
+        case .specific_humidity_700hPa: fallthrough
+        case .specific_humidity_500hPa: fallthrough
+        case .specific_humidity_300hPa: fallthrough
+        case .specific_humidity_250hPa: fallthrough
+        case .specific_humidity_200hPa: fallthrough
+        case .specific_humidity_50hPa:
+            return (1000, 0)
         default:
             return nil
         }
     }
     
+    var skipHour0: Bool {
+        switch self {
+        case .precipitation: return true
+        case .runoff: return true
+        default: return false
+        }
+    }
+    
+    var isAccumulatedSinceModelStart: Bool {
+        switch self {
+        case .precipitation: fallthrough
+        case .runoff: return true
+        default: return false
+        }
+    }
+    
     var interpolation: ReaderInterpolation {
         switch self {
+        case .precipitation: fallthrough
+        case .runoff: return .linear
         case .relative_humidity_1000hPa: fallthrough
         case .relative_humidity_925hPa: fallthrough
         case .relative_humidity_850hPa: fallthrough
