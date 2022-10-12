@@ -115,17 +115,15 @@ struct DownloadEcmwfCommand: Command {
             
             data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid)
             
-            /// Temperature is stored in kelvin. Convert to celsius
-            if variable.rawValue.contains("temperature") {
-                for i in data2d.data.indices {
-                    data2d.data[i] -= 273.15
-                }
+            // Scaling before compression with scalefactor
+            if let fma = variable.multiplyAdd {
+                data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
             }
             
-            /*#if Xcode
-            try! data2d.writeNetcdf(filename: "\(EcmwfDomain.omfileDirectory)\(variable).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            return
-            #endif*/
+            //#if Xcode
+            //try! data2d.transpose().writeNetcdf(filename: "\(domain.omfileDirectory)\(variable).nc", nx: domain.grid.nx, ny: domain.grid.ny)
+            //return
+            //#endif
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
@@ -142,12 +140,13 @@ struct DownloadEcmwfCommand: Command {
         try "\(run.timeIntervalSince1970),\(domain.omFileLength),\(indexTimeStart),\(indexTimeEnd)".write(toFile: "\(domain.omfileDirectory)init.txt", atomically: true, encoding: .utf8)
     }
     
-    static func readNetcdf(file: String, variable: String, levelOffset: Int?, nx: Int, ny: Int) throws -> [Float] {
+    fileprivate static func readNetcdf(file: String, variable: String, levelOffset: Int?, nx: Int, ny: Int) throws -> [Float] {
         guard let nc = try NetCDF.open(path: file, allowUpdate: false) else {
             fatalError("File \(file) does not exist")
         }
-        guard let v = nc.getVariable(name: variable) else {
-            fatalError("Could not find data variable with 3d/4d data")
+        // For some reason total colum water integral is sometimes called "tcwv" or "tciwv"
+        guard let v = variable == "tciwv" ? (nc.getVariable(name: "tciwv") ?? nc.getVariable(name: "tcwv")) : nc.getVariable(name: variable) else {
+            fatalError("Could not find data variable with 3d/4d data. Name: \(variable), File: \(file)")
         }
         precondition(v.dimensions[v.dimensions.count-1].length == nx)
         precondition(v.dimensions[v.dimensions.count-2].length == ny)
