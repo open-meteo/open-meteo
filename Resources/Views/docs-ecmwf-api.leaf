@@ -981,10 +981,10 @@
             <td>Wind direction at 10 meters above ground and different pressure levels.</td>
           </tr>
           <tr>
-            <th scope="row">relativehumidity_2m<br>relative_humidity_1000hPa, ...</th>
+            <th scope="row">relative_humidity_1000hPa, ...</th>
             <td>Instant</td>
             <td>%</td>
-            <td>Relative humidity at 2 meters above ground and atmospheric pressure levels</td>
+            <td>Relative humidity at atmospheric pressure levels. Unfortunately, 2 meter relative humidity is unavailable.</td>
           </tr>
           <tr>
             <th scope="row">specific_humidity_1000hPa, ...</th>
