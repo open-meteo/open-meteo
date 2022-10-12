@@ -96,7 +96,7 @@ struct Curl {
         while true {
             do {
                 let response = try await client.execute(request, timeout: .seconds(Int64(maxTimeSeconds)))
-                if response.status != .ok {
+                if response.status != .ok && response.status != .partialContent {
                     throw CurlError.downloadFailed(code: response.status)
                 }
                 let data = try await response.body.collect(upTo: .max)
@@ -272,13 +272,14 @@ struct Curl {
     }
     
     /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
-    func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") throws -> [(variable: Variable, data: Array2D)] {
+    func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient) async throws -> [(variable: Variable, data: Array2D)] {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return []
         }
         
-        guard let index = String(data: try downloadInMemory(url: "\(url)\(`extension`)"), encoding: .utf8) else {
+        var indexData = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client)
+        guard let index = indexData.readString(length: indexData.readableBytes) else {
             fatalError("Could not decode index to string")
         }
 
@@ -322,19 +323,21 @@ struct Curl {
         
         let ranges = range.range.split(separator: ",")
         var matchesPos = 0
-        return try ranges.flatMap { range in
-            let data = try downloadInMemory(url: url, range: String(range), minSize: nil)
-            return try data.withUnsafeBytes { ptr in
+        var out = [(variable: Variable, data: Array2D)]()
+        for range in ranges {
+            let data = try await downloadInMemoryAsync(url: url, range: String(range), client: client)
+            try data.withUnsafeReadableBytes { ptr in
                 let grib = try GribMemory(ptr: ptr)
-                return grib.messages.map {
+                for message in grib.messages {
                     //try! $0.dumpCoordinates()
                     //fatalError("OK")
                     let variable = matches[matchesPos]
                     matchesPos += 1
-                    return (variable, $0.toArray2d())
+                    out.append((variable, message.toArray2d()))
                 }
             }
         }
+        return out
     }
 }
 

@@ -78,7 +78,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         
         try await downloadElevation(application: context.application, domain: domain)
-        try download(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
+        try await download(application: context.application, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -99,7 +99,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         let curl = Curl(logger: logger)
         let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
         
-        let terrainUrl = "https://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/terrain.grib2"
+        let terrainUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/terrain.grib2"
         for message in try await curl.downloadGrib(url: terrainUrl, client: application.http.client.shared) {
             var data = message.toArray2d()
             if domain.isGlobal {
@@ -112,7 +112,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
             try data.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         }
         
-        let landmaskUrl = "https://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/landmask.grib2"
+        let landmaskUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/landmask.grib2"
         for message in try await curl.downloadGrib(url: landmaskUrl, client: application.http.client.shared) {
             var data = message.toArray2d()
             if domain.isGlobal {
@@ -137,7 +137,8 @@ struct MeteoFranceDownload: AsyncCommandFix {
     }
     
     /// download MeteoFrance
-    func download(logger: Logger, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) throws {
+    func download(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws {
+        let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
@@ -174,9 +175,9 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 //https://mf-nwp-models.s3.amazonaws.com/arpege-world/v1/2022-08-21/00/SP1/00H24H.grib2.inv
                 //https://mf-nwp-models.s3.amazonaws.com/arome-france/v1/2022-09-14/00/SP1/00H24H.grib2.inv
                 let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
-                let url = "https://mf-nwp-models.s3.amazonaws.com/\(dmn)/v1/\(run.iso8601_YYYY_MM_dd)/\(run.hour.zeroPadded(len: 2))/\(package)/\(fileTime.file).grib2"
+                let url = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/v1/\(run.iso8601_YYYY_MM_dd)/\(run.hour.zeroPadded(len: 2))/\(package)/\(fileTime.file).grib2"
                 
-                for (variable, data) in try curl.downloadIndexedGribSequential(url: url, variables: vars, extension: ".inv") {
+                for (variable, data) in try await curl.downloadIndexedGribSequential(url: url, variables: vars, extension: ".inv", client: application.http.client.shared) {
                     var data = data
                     if domain.isGlobal {
                         data.shift180LongitudeAndFlipLatitude()
