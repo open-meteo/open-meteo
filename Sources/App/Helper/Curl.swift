@@ -120,6 +120,34 @@ struct Curl {
         }
     }
     
+    /// Download an entire grib file
+    /// Data is downloaded directly into memory and GRIB decoded while iterating
+    func downloadGrib(url: String) throws -> AnyIterator<GribMessage> {
+        /// Retry download 3 times to get the correct number of grib messages
+        for i in 1...3 {
+            let data = try downloadInMemory(url: url)
+            logger.debug("Converting GRIB, size \(data.count) bytes")
+            do {
+                return try data.withUnsafeBytes { ptr in
+                    let grib = try GribMemory(ptr: ptr)
+                    var itr = grib.messages.makeIterator()
+                    return AnyIterator {
+                        guard let message = itr.next() else {
+                            return nil
+                        }
+                        return message
+                    }
+                }
+            } catch {
+                if i == 3 {
+                    throw error
+                }
+            }
+        }
+        fatalError("not reachable")
+    }
+    
+    
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
     func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") throws -> AnyIterator<(variable: Variable, message: GribMessage)> {

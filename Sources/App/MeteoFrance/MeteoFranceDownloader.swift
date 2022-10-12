@@ -77,58 +77,62 @@ struct MeteoFranceDownload: Command {
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         
+        try downloadElevation(logger: logger, domain: domain)
         try download(logger: logger, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
-    func downloadElevation(logger: Logger, url: String, surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) throws {
-        /// download seamask and height
+    // download seamask and height
+    func downloadElevation(logger: Logger, domain: MeteoFranceDomain) throws {
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         logger.info("Downloading height and elevation data")
-        
-        enum ElevationVariable: String, CurlIndexedVariable, CaseIterable {
-            case height
-            case landmask
-            
-            var gribIndexName: String? {
-                switch self {
-                case .height:
-                    return ":HGT:surface:"
-                case .landmask:
-                    return ":LAND:surface:"
-                }
-            }
-        }
         
         var height: Array2D? = nil
         var landmask: Array2D? = nil
         let curl = Curl(logger: logger)
-        for (variable, message) in try curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases) {
+        let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
+        
+        let terrainUrl = "https://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/terrain.grib2"
+        for message in try curl.downloadGrib(url: terrainUrl) {
             var data = message.toArray2d()
-            if isGlobal {
+            if domain.isGlobal {
                 data.shift180LongitudeAndFlipLatitude()
+            } else {
+                data.flipLatitude()
             }
-            data.ensureDimensions(of: grid)
-            switch variable {
-            case .height:
-                height = data
-            case .landmask:
-                landmask = data
-            }
-            //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
+            data.ensureDimensions(of: domain.grid)
+            height = data
+            try data.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         }
+        
+        let landmaskUrl = "https://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/landmask.grib2"
+        for message in try curl.downloadGrib(url: landmaskUrl) {
+            var data = message.toArray2d()
+            if domain.isGlobal {
+                data.shift180LongitudeAndFlipLatitude()
+            } else {
+                data.flipLatitude()
+            }
+            data.ensureDimensions(of: domain.grid)
+            landmask = data
+            try data.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
+        }
+        
         guard var height = height, let landmask = landmask else {
             fatalError("Could not download land and sea mask")
         }
+        
         for i in height.data.indices {
             // landmask: 0=sea, 1=land
             height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
         }
-        try OmFileWriter.write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20, all: height.data)
+        try OmFileWriter.write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: height.data)
     }
     
     /// download MeteoFrance
@@ -229,19 +233,16 @@ struct MeteoFranceDownload: Command {
             
             let skip = skipHour0 ? 1 : 0
             
-            // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
+            // Deaverage radiation. Not really correct for 3h or 6h data, but solar interpolation will correct it afterwards
+            // radiation in meteofrance is aggregated and not averaged!
             if variable.interpolation.isSolarInterpolation {
                 data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
             }
-            // radiation in meteofrance is aggregated and not averaged!
             
             /// somehow radiation for ARPEGE EUROPE and AROME FRANCE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?
             if let variable = variable as? MeteoFranceSurfaceVariable, variable == .shortwave_radiation, domain != .arpege_world {
                 data2d.data.multiplyAdd(multiply: 3, add: 0)
             }
-            
-            // Fill in missing hourly values after switching to 3h
-            //data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             
             if dtHours == 1 {
                 // Interpolate 6h steps to 3h steps before 1h
@@ -276,7 +277,6 @@ struct MeteoFranceDownload: Command {
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart, !variable.interpolation.isSolarInterpolation {
-                //data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
                 data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
             }
             
@@ -294,21 +294,13 @@ struct MeteoFranceDownload: Command {
     }
 }
 
-struct MfGribVariable: CurlIndexedVariable {
-    //var gribIndexName: String?
+fileprivate struct MfGribVariable: CurlIndexedVariable {
+    /// 0 = anl
+    let hour: Int
     
-    let hour: Int // 0 = anl
-    let gribIndexName: String? // :PRMSL:mean sea level:1 hour fcst:
-    //let backwardsDtHours: Int? // 10 m above ground:0-1 hour max fcst
-    //let isAccumulatedModelStart: Bool // TPRATE:surface:0-1 hour acc fcst
+    /// :PRMSL:mean sea level:1 hour fcst:
+    let gribIndexName: String?
+    
+    /// Pressure or surface variable
     let variable: MeteoFranceVariableDownloadable
-    
-}
-
-enum MfVariablePackages: String, CaseIterable {
-    case SP1
-    case SP2
-    case IP1
-    case IP2
-    case IP3
 }

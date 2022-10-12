@@ -18,6 +18,14 @@ protocol MeteoFranceVariableDownloadable: GenericVariableMixing {
     var isAlwaysHourlyInArgegeEurope: Bool { get }
 }
 
+enum MfVariablePackages: String, CaseIterable {
+    case SP1
+    case SP2
+    case IP1
+    case IP2
+    case IP3
+}
+
 extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     func availableFor(domain: MeteoFranceDomain) -> Bool {
         guard domain == .arome_france_hd else {
