@@ -2,9 +2,9 @@ import Foundation
 
 
 enum SpawnError: Error {
-    case commandFailed(cmd: String, returnCode: Int32, args: [String]?, stderr: String?)
-    case executableDoesNotExist(cmd: String)
-    case posixSpawnFailed(code: Int32)
+    case commandFailed(cmd: String, returnCode: Int32, args: [String]?) //, stderr: String?)
+    //case executableDoesNotExist(cmd: String)
+    case posixSpawnFailed(command: String, args: [String], code: Int32)
 }
 
 public extension Process {
@@ -107,7 +107,7 @@ public extension Process {
         let terminationStatus = try Process.spawnWithExitCode(cmd: cmd, args: args)
         
         guard terminationStatus == 0 else {
-            throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: "")
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args)
         }
     }
     
@@ -125,7 +125,7 @@ public extension Process {
         var pid: Int32 = 0
         let ret = posix_spawnp(&pid, cmd, nil, nil, argv, nil)
         guard ret == 0 else {
-            throw SpawnError.posixSpawnFailed(code: ret)
+            throw SpawnError.posixSpawnFailed(command: cmd, args: args, code: ret)
         }
         
         var status: Int32 = -2
