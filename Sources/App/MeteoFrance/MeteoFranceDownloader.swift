@@ -100,7 +100,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
         
         let terrainUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/terrain.grib2"
-        for message in try await curl.downloadGrib(url: terrainUrl, client: application.http.client.shared) {
+        for message in try await curl.downloadGrib(url: terrainUrl, client: application.http.client.shared).messages {
             var data = message.toArray2d()
             if domain.isGlobal {
                 data.shift180LongitudeAndFlipLatitude()
@@ -113,7 +113,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         }
         
         let landmaskUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/landmask.grib2"
-        for message in try await curl.downloadGrib(url: landmaskUrl, client: application.http.client.shared) {
+        for message in try await curl.downloadGrib(url: landmaskUrl, client: application.http.client.shared).messages {
             var data = message.toArray2d()
             if domain.isGlobal {
                 data.shift180LongitudeAndFlipLatitude()

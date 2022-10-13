@@ -17,7 +17,7 @@ final class OutputformatTests: XCTestCase {
         app = nil
     }
     
-    func testBz2Grib() async throws {
+    /*func testBz2Grib() async throws {
         let url = "http://opendata.dwd.de/weather/nwp/icon-d2/grib/06/relhum/icon-d2_germany_regular-lat-lon_pressure-level_2022101306_004_500_relhum.grib2.bz2"
         let curl = Curl(logger: app!.logger)
         let grib = try await curl.downloadBz2Grib(url: url, client: app!.http.client.shared)
@@ -34,7 +34,7 @@ final class OutputformatTests: XCTestCase {
             print(data.count)
             print(data[0..<10])
         })
-    }
+    }*/
     
     
     func drainString(_ response: Response) -> String {

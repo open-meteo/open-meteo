@@ -1,6 +1,6 @@
 import Foundation
+import SwiftPFor2D
 import Vapor
-import SwiftNetCDF
 
 
 /**
@@ -10,7 +10,7 @@ import SwiftNetCDF
  
  model info (not everything is open data) https://www.ecmwf.int/en/forecasts/datasets/set-i
  */
-struct DownloadEcmwfCommand: Command {
+struct DownloadEcmwfCommand: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Option(name: "run")
         var run: String?
@@ -23,7 +23,7 @@ struct DownloadEcmwfCommand: Command {
         "Download a specified ecmwf model run"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let run = signature.run.map {
             guard let run = Int($0) else {
                 fatalError("Invalid run '\($0)'")
@@ -37,11 +37,12 @@ struct DownloadEcmwfCommand: Command {
         let date = twoHoursAgo.with(hour: run)
         logger.info("Downloading domain ECMWF run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        try downloadEcmwf(logger: logger, run: date, skipFilesIfExisting: signature.skipExisting)
+        try await downloadEcmwf(application: context.application, run: date, skipFilesIfExisting: signature.skipExisting)
         try convertEcmwf(logger: logger, run: date)
     }
     
-    func downloadEcmwf(logger: Logger, run: Timestamp, skipFilesIfExisting: Bool) throws {
+    func downloadEcmwf(application: Application, run: Timestamp, skipFilesIfExisting: Bool) async throws {
+        let logger = application.logger
         let domain = EcmwfDomain.ifs04
         let base = "https://data.ecmwf.int/forecasts/"
         
@@ -61,17 +62,57 @@ struct DownloadEcmwfCommand: Command {
             
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-0h-oper-fc.grib2
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-12h-oper-fc.grib2
-            let filenameFrom = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
-            let filenameConverted = "\(downloadDirectory)/\(hour)h.nc"
+            let url = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
             
-            if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameConverted) {
-                continue
+            let grib = try await curl.downloadGrib(url: url, client: application.http.client.shared)
+            
+            let variables = EcmwfVariable.allCases.filter { variable in
+                let file = "\(downloadDirectory)\(variable.omFileName)_0.om"
+                return !skipFilesIfExisting || FileManager.default.fileExists(atPath: file)
             }
-            try curl.download(
-                url: filenameFrom,
-                to: filenameTemp
-            )
-            try Process.grib2ToNetCDFInvertLatitude(in: filenameTemp, out: filenameConverted)
+            
+            for variable in EcmwfVariable.allCases {
+                if hour == 0 && variable.skipHour0 {
+                    continue
+                }
+                
+                guard let message = grib.messages.first(where: { message in
+                    let shortName = message.get(attribute: "shortName")!
+                    let levelhPa = Int(message.get(attribute: "level")!)!
+                    
+                    if variable.gribName == "tciwv" && shortName == "tcwv" {
+                        return true
+                    }
+                    if variable.gribName == "tp" && shortName == "param193.1.0" {
+                        return true
+                    }
+                    if variable.gribName == "ro" && shortName == "param201.0.2" {
+                        return true
+                    }
+                    return shortName == variable.gribName && levelhPa == (variable.level ?? 0)
+                }) else {
+                    grib.messages.forEach { message in
+                        print(message.get(attribute: "shortName")!,message.get(attribute: "level")!)
+                    }
+                    fatalError("could not find \(variable) \(variable.gribName)")
+                }
+                
+                var data2d = message.toArray2d()
+                data2d.ensureDimensions(of: domain.grid)
+                data2d.flipLatitude()
+                
+                // Scaling before compression with scalefactor
+                if let fma = variable.multiplyAdd {
+                    data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
+                try FileManager.default.removeItemIfExists(at: file)
+                
+                curl.logger.info("Compressing and writing data to \(variable.omFileName)_\(hour).om")
+                let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, dim0: 1, dim1: data2d.count, chunk0: 1, chunk1: 8*1024, all: data2d.data)
+            }
         }
     }
     
@@ -85,6 +126,7 @@ struct DownloadEcmwfCommand: Command {
         let time = TimerangeDt(start: run, nTime: nForecastHours * domain.dtHours, dtSeconds: domain.dtSeconds)
         
         let nLocation = domain.grid.nx * domain.grid.ny
+        let dtHours = domain.dtHours
         
         /// The time data is placed in the ring
         let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
@@ -98,12 +140,12 @@ struct DownloadEcmwfCommand: Command {
             /// Prepare data as time series optimisied array
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
             
-            for hour in forecastSteps {
-                if hour == 0 && variable.skipHour0 {
+            for forecastHour in forecastSteps {
+                if forecastHour == 0 && variable.skipHour0 {
                     continue
                 }
-                let d = try Self.readNetcdf(file: "\(downloadDirectory)\(hour)h.nc", variable: variable.gribName, levelOffset: variable.level, nx: domain.grid.nx, ny: domain.grid.ny)
-                data2d[0..<nLocation, hour/domain.dtHours] = d
+                let file = "\(downloadDirectory)\(variable.omFileName)_\(forecastHour).om"
+                data2d[0..<nLocation, forecastHour / dtHours] = try OmFileReader(file: file).readAll()
             }
             
             let interpolationHours = (0..<nForecastHours).compactMap { hour -> Int? in
@@ -118,11 +160,6 @@ struct DownloadEcmwfCommand: Command {
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
                 data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
-            }
-            
-            // Scaling before compression with scalefactor
-            if let fma = variable.multiplyAdd {
-                data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
             }
             
             //#if Xcode
@@ -144,37 +181,6 @@ struct DownloadEcmwfCommand: Command {
         }
         let indexTimeStart = indexTimeEnd - domain.omFileLength * domain.dtSeconds + 12 * 3600
         try "\(run.timeIntervalSince1970),\(domain.omFileLength),\(indexTimeStart),\(indexTimeEnd)".write(toFile: "\(domain.omfileDirectory)init.txt", atomically: true, encoding: .utf8)
-    }
-    
-    fileprivate static func readNetcdf(file: String, variable: String, levelOffset: Int?, nx: Int, ny: Int) throws -> [Float] {
-        guard let nc = try NetCDF.open(path: file, allowUpdate: false) else {
-            fatalError("File \(file) does not exist")
-        }
-        // For some reason total colum water integral is sometimes called "tcwv" or "tciwv"
-        // total precipitation "tp" "param193.1.0"
-        // runoff "ro" "param201.0.2"
-        guard let v = nc.getVariable(name: variable) ?? (
-            variable == "tciwv" ? nc.getVariable(name: "tcwv") :
-            variable == "tp" ? nc.getVariable(name: "param193.1.0") :
-            variable == "ro" ? nc.getVariable(name: "param201.0.2") :
-            nil) else {
-            fatalError("Could not find data variable with 3d/4d data. Name: \(variable), File: \(file)")
-        }
-        precondition(v.dimensions[v.dimensions.count-1].length == nx)
-        precondition(v.dimensions[v.dimensions.count-2].length == ny)
-        guard let varFloat = v.asType(Float.self) else {
-            fatalError("Netcdf variable is not float type")
-        }
-        /// icon-d2 total precip, aswdir and aswdifd has 15 minutes precip inside
-        let offset = v.dimensions.count == 3 ? [0,0,0] : [0,levelOffset!,0,0]
-        let count = v.dimensions.count == 3 ? [1,ny,nx] : [1,1,ny,nx]
-        var d = try varFloat.read(offset: offset, count: count)
-        for x in d.indices {
-            if d[x] < -100000000 {
-                d[x] = .nan
-            }
-        }
-        return d
     }
 }
 

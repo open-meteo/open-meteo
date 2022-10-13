@@ -131,22 +131,13 @@ struct Curl {
     
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadGrib(url: String, client: HTTPClient) async throws -> AnyIterator<GribMessage> {
+    func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
             let data = try await downloadInMemoryAsync(url: url, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
-                return try data.withUnsafeReadableBytes { ptr in
-                    let grib = try GribMemory(ptr: ptr)
-                    var itr = grib.messages.makeIterator()
-                    return AnyIterator {
-                        guard let message = itr.next() else {
-                            return nil
-                        }
-                        return message
-                    }
-                }
+                return try GribByteBuffer(bytebuffer: data)
             } catch {
                 if i == 3 {
                     throw error
@@ -157,22 +148,13 @@ struct Curl {
     }
     
     /// download a bz2 compressed grib
-    func downloadBz2Grib(url: String, client: HTTPClient) async throws -> AnyIterator<GribMessage> {
+    func downloadBz2Grib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
             let data = try await downloadBz2Decompress(url: url, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
-                return try data.withUnsafeReadableBytes { ptr in
-                    let grib = try GribMemory(ptr: ptr)
-                    var itr = grib.messages.makeIterator()
-                    return AnyIterator {
-                        guard let message = itr.next() else {
-                            return nil
-                        }
-                        return message
-                    }
-                }
+                return try GribByteBuffer(bytebuffer: data)
             } catch {
                 if i == 3 {
                     throw error
@@ -330,6 +312,22 @@ struct Curl {
             }
         }
         return out
+    }
+}
+
+
+/// Small wrapper for GribMemory to keep a reference to bytebuffer
+struct GribByteBuffer {
+    let bytebuffer: ByteBuffer
+    let grib: GribMemory
+    
+    var messages: [GribMessage] {
+        return grib.messages
+    }
+    
+    init(bytebuffer: ByteBuffer) throws {
+        self.bytebuffer = bytebuffer
+        self.grib = try bytebuffer.withUnsafeReadableBytes { try GribMemory(ptr: $0) }
     }
 }
 

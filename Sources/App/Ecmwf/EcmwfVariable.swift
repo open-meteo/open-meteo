@@ -186,90 +186,91 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
         }
     }
     
+    /// pressure level in hPa or meter in the grib files
     var level: Int? {
         switch self {
         case .precipitation: fallthrough
         case .runoff: return nil
         case .soil_temperature_0_to_7cm: return 0
         case .skin_temperature: return nil
-        case .geopotential_height_1000hPa: return 0
-        case .geopotential_height_925hPa: return 1
-        case .geopotential_height_850hPa: return 2
-        case .geopotential_height_700hPa: return 3
-        case .geopotential_height_500hPa: return 4
-        case .geopotential_height_300hPa: return 5
-        case .geopotential_height_250hPa: return 6
-        case .geopotential_height_200hPa: return 7
-        case .geopotential_height_50hPa: return 0
-        case .northward_wind_1000hPa: return 0
-        case .northward_wind_925hPa: return 1
-        case .northward_wind_850hPa: return 2
-        case .northward_wind_700hPa: return 3
-        case .northward_wind_500hPa: return 4
-        case .northward_wind_300hPa: return 5
-        case .northward_wind_250hPa: return 6
-        case .northward_wind_200hPa: return 7
-        case .northward_wind_50hPa: return 0
-        case .eastward_wind_1000hPa: return 0
-        case .eastward_wind_925hPa: return 1
-        case .eastward_wind_850hPa: return 2
-        case .eastward_wind_700hPa: return 3
-        case .eastward_wind_500hPa: return 4
-        case .eastward_wind_300hPa: return 5
-        case .eastward_wind_250hPa: return 6
-        case .eastward_wind_200hPa: return 7
-        case .eastward_wind_50hPa: return 0
-        case .temperature_1000hPa: return 0
-        case .temperature_925hPa: return 1
-        case .temperature_850hPa: return 2
-        case .temperature_700hPa: return 3
-        case .temperature_500hPa: return 4
-        case .temperature_300hPa: return 5
-        case .temperature_250hPa: return 6
-        case .temperature_200hPa: return 7
-        case .temperature_50hPa: return 0
-        case .relative_humidity_1000hPa: return 0
-        case .relative_humidity_925hPa: return 1
-        case .relative_humidity_850hPa: return 2
-        case .relative_humidity_700hPa: return 3
-        case .relative_humidity_500hPa: return 4
-        case .relative_humidity_300hPa: return 5
-        case .relative_humidity_250hPa: return 6
-        case .relative_humidity_200hPa: return 7
-        case .relative_humidity_50hPa: return 0
+        case .geopotential_height_1000hPa: return 1000
+        case .geopotential_height_925hPa: return 925
+        case .geopotential_height_850hPa: return 850
+        case .geopotential_height_700hPa: return 700
+        case .geopotential_height_500hPa: return 500
+        case .geopotential_height_300hPa: return 300
+        case .geopotential_height_250hPa: return 250
+        case .geopotential_height_200hPa: return 200
+        case .geopotential_height_50hPa: return 50
+        case .northward_wind_1000hPa: return 1000
+        case .northward_wind_925hPa: return 925
+        case .northward_wind_850hPa: return 850
+        case .northward_wind_700hPa: return 700
+        case .northward_wind_500hPa: return 500
+        case .northward_wind_300hPa: return 300
+        case .northward_wind_250hPa: return 250
+        case .northward_wind_200hPa: return 200
+        case .northward_wind_50hPa: return 50
+        case .eastward_wind_1000hPa: return 1000
+        case .eastward_wind_925hPa: return 925
+        case .eastward_wind_850hPa: return 850
+        case .eastward_wind_700hPa: return 700
+        case .eastward_wind_500hPa: return 500
+        case .eastward_wind_300hPa: return 300
+        case .eastward_wind_250hPa: return 250
+        case .eastward_wind_200hPa: return 200
+        case .eastward_wind_50hPa: return 50
+        case .temperature_1000hPa: return 1000
+        case .temperature_925hPa: return 925
+        case .temperature_850hPa: return 850
+        case .temperature_700hPa: return 700
+        case .temperature_500hPa: return 500
+        case .temperature_300hPa: return 300
+        case .temperature_250hPa: return 250
+        case .temperature_200hPa: return 200
+        case .temperature_50hPa: return 50
+        case .relative_humidity_1000hPa: return 1000
+        case .relative_humidity_925hPa: return 925
+        case .relative_humidity_850hPa: return 850
+        case .relative_humidity_700hPa: return 700
+        case .relative_humidity_500hPa: return 500
+        case .relative_humidity_300hPa: return 300
+        case .relative_humidity_250hPa: return 250
+        case .relative_humidity_200hPa: return 200
+        case .relative_humidity_50hPa: return 50
         case .surface_air_pressure: return nil
         case .pressure_msl: return nil
         case .total_column_integrated_water_vapour: return nil
-        case .northward_wind_10m: return nil
-        case .eastward_wind_10m: return nil
-        case .specific_humidity_1000hPa: return 0
-        case .specific_humidity_925hPa: return 1
-        case .specific_humidity_850hPa: return 2
-        case .specific_humidity_700hPa: return 3
-        case .specific_humidity_500hPa: return 4
-        case .specific_humidity_300hPa: return 5
-        case .specific_humidity_250hPa: return 6
-        case .specific_humidity_200hPa: return 7
-        case .specific_humidity_50hPa: return 0
-        case .temperature_2m: return nil
-        case .atmosphere_relative_vorticity_1000hPa: return 0
-        case .atmosphere_relative_vorticity_925hPa: return 1
-        case .atmosphere_relative_vorticity_850hPa: return 2
-        case .atmosphere_relative_vorticity_700hPa: return 3
-        case .atmosphere_relative_vorticity_500hPa: return 4
-        case .atmosphere_relative_vorticity_300hPa: return 5
-        case .atmosphere_relative_vorticity_250hPa: return 6
-        case .atmosphere_relative_vorticity_200hPa: return 7
-        case .atmosphere_relative_vorticity_50hPa: return 0
-        case .divergence_of_wind_1000hPa: return 0
-        case .divergence_of_wind_925hPa: return 1
-        case .divergence_of_wind_850hPa: return 2
-        case .divergence_of_wind_700hPa: return 3
-        case .divergence_of_wind_500hPa: return 4
-        case .divergence_of_wind_300hPa: return 5
-        case .divergence_of_wind_250hPa: return 6
-        case .divergence_of_wind_200hPa: return 7
-        case .divergence_of_wind_50hPa: return 0
+        case .northward_wind_10m: return 10
+        case .eastward_wind_10m: return 10
+        case .specific_humidity_1000hPa: return 1000
+        case .specific_humidity_925hPa: return 925
+        case .specific_humidity_850hPa: return 850
+        case .specific_humidity_700hPa: return 700
+        case .specific_humidity_500hPa: return 500
+        case .specific_humidity_300hPa: return 300
+        case .specific_humidity_250hPa: return 250
+        case .specific_humidity_200hPa: return 200
+        case .specific_humidity_50hPa: return 50
+        case .temperature_2m: return 2
+        case .atmosphere_relative_vorticity_1000hPa: return 1000
+        case .atmosphere_relative_vorticity_925hPa: return 925
+        case .atmosphere_relative_vorticity_850hPa: return 850
+        case .atmosphere_relative_vorticity_700hPa: return 700
+        case .atmosphere_relative_vorticity_500hPa: return 500
+        case .atmosphere_relative_vorticity_300hPa: return 300
+        case .atmosphere_relative_vorticity_250hPa: return 250
+        case .atmosphere_relative_vorticity_200hPa: return 200
+        case .atmosphere_relative_vorticity_50hPa: return 50
+        case .divergence_of_wind_1000hPa: return 1000
+        case .divergence_of_wind_925hPa: return 925
+        case .divergence_of_wind_850hPa: return 850
+        case .divergence_of_wind_700hPa: return 700
+        case .divergence_of_wind_500hPa: return 500
+        case .divergence_of_wind_300hPa: return 300
+        case .divergence_of_wind_250hPa: return 250
+        case .divergence_of_wind_200hPa: return 200
+        case .divergence_of_wind_50hPa: return 50
         }
     }
     

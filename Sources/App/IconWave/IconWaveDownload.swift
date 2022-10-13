@@ -85,7 +85,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                     continue
                 }
                 
-                var data2d = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).next()!.toArray2d()
+                var data2d = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).messages[0].toArray2d()
                 data2d.ensureDimensions(of: domain.grid)
                 if domain == .gwam {
                     data2d.shift180LongitudeAndFlipLatitude()
