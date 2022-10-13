@@ -50,7 +50,6 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let curl = Curl(logger: logger)
         let downloadDirectory = "\(OpenMeteo.dataDictionary)ecmwf-forecast/"
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-        let filenameTemp = "\(downloadDirectory)temp.grib2"
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         
@@ -103,9 +102,10 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                             message.get(attribute: "paramId")!
                         )
                         if message.get(attribute: "name") == "unknown" {
-                            message.iterate(namespace: .ls).forEach({print($0)})
-                            message.iterate(namespace: .parameter).forEach({print($0)})
-                            message.iterate(namespace: .mars).forEach({print($0)})
+                            //message.iterate(namespace: .ls).forEach({print($0)})
+                            //message.iterate(namespace: .parameter).forEach({print($0)})
+                            //message.iterate(namespace: .mars).forEach({print($0)})
+                            message.iterate(namespace: .all).forEach({print($0)})
                         }
                     }
                     fatalError("could not find \(variable) \(variable.gribName)")
