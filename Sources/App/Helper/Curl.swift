@@ -132,36 +132,40 @@ struct Curl {
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
     func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
-        /// Retry download 3 times to get the correct number of grib messages
-        for i in 1...3 {
+        // Retry download 3 times to get the correct number of grib messages
+        var retries = 3
+        while true {
             let data = try await downloadInMemoryAsync(url: url, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
             } catch {
-                if i == 3 {
+                retries -= 1
+                if retries == 0 {
                     throw error
                 }
+                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
             }
         }
-        fatalError("not reachable")
     }
     
     /// download a bz2 compressed grib
     func downloadBz2Grib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
-        /// Retry download 3 times to get the correct number of grib messages
-        for i in 1...3 {
+        // Retry download 3 times to get the correct number of grib messages
+        var retries = 3
+        while true {
             let data = try await downloadBz2Decompress(url: url, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
             } catch {
-                if i == 3 {
+                retries -= 1
+                if retries == 0 {
                     throw error
                 }
+                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
             }
         }
-        fatalError("not reachable")
     }
     
     
@@ -216,8 +220,9 @@ struct Curl {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
-        /// Retry download 3 times to get the correct number of grib messages
-        for i in 1...3 {
+        // Retry download 3 times to get the correct number of grib messages
+        var retries = 3
+        while true {
             let data = try await downloadInMemoryAsync(url: url, range: range, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
@@ -237,12 +242,13 @@ struct Curl {
                     }
                 }
             } catch {
-                if i == 3 {
+                retries -= 1
+                if retries == 0 {
                     throw error
                 }
+                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
             }
         }
-        fatalError("not reachable")
     }
     
     /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
@@ -319,15 +325,11 @@ struct Curl {
 /// Small wrapper for GribMemory to keep a reference to bytebuffer
 struct GribByteBuffer {
     let bytebuffer: ByteBuffer
-    let grib: GribMemory
-    
-    var messages: [GribMessage] {
-        return grib.messages
-    }
+    let messages: [GribMessage]
     
     init(bytebuffer: ByteBuffer) throws {
         self.bytebuffer = bytebuffer
-        self.grib = try bytebuffer.withUnsafeReadableBytes { try GribMemory(ptr: $0) }
+        self.messages = try bytebuffer.withUnsafeReadableBytes { try GribMemory(ptr: $0).messages }
     }
 }
 
