@@ -102,6 +102,11 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                             message.get(attribute: "level")!,
                             message.get(attribute: "paramId")!
                         )
+                        if message.get(attribute: "name") == "unknown" {
+                            message.iterate(namespace: .ls).forEach({print($0)})
+                            message.iterate(namespace: .parameter).forEach({print($0)})
+                            message.iterate(namespace: .mars).forEach({print($0)})
+                        }
                     }
                     fatalError("could not find \(variable) \(variable.gribName)")
                 }
