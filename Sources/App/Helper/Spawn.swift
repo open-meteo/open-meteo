@@ -8,7 +8,7 @@ enum SpawnError: Error {
 }
 
 public extension Process {
-    static func spawnWithOutput(cmd: String, args: [String]?) throws -> String {
+    /*static func spawnWithOutput(cmd: String, args: [String]?) throws -> String {
         let data = try spawnWithOutputData(cmd: cmd, args: args)
         return String(data: data, encoding: .utf8) ?? ""
     }
@@ -101,10 +101,18 @@ public extension Process {
         proc.waitUntilExit()
         
         return proc.terminationStatus
+    }*/
+    
+    static func spawn(cmd: String, args: [String]) throws {
+        let terminationStatus = try Process.spawnWithExitCode(cmd: cmd, args: args)
+        
+        guard terminationStatus == 0 else {
+            throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args, stderr: "")
+        }
     }
     
     /// Call `posix_spawn` directly and wait for child to finish. Uses PATH variable to find executable
-    static func nativeSpawn(cmd: String, args: [String]) throws -> Int32 {
+    static func spawnWithExitCode(cmd: String, args: [String]) throws -> Int32 {
         /// Command and arguments as C string
         let argv = ([cmd] + args).map { $0.withCString(strdup) } + [nil]
         

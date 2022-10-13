@@ -60,7 +60,7 @@ final class HelperTests: XCTestCase {
     
     func testNativeSpawn() throws {
         let time = DispatchTime.now()
-        XCTAssertEqual(try Process.nativeSpawn(cmd: "echo", args: ["Hello"]), 0)
-        XCTAssertEqual(try Process.nativeSpawn(cmd: "echo", args: ["World"]), 0)
+        XCTAssertEqual(try Process.spawnWithExitCode(cmd: "echo", args: ["Hello"]), 0)
+        XCTAssertEqual(try Process.spawnWithExitCode(cmd: "echo", args: ["World"]), 0)
     }
 }
