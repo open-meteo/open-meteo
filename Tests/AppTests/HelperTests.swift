@@ -48,7 +48,7 @@ final class HelperTests: XCTestCase {
         })*/
     }
     
-    func testSpawn() async throws {
+    /*func testSpawn() async throws {
         let time = DispatchTime.now()
         async let a: () = try Process.spawn(cmd: "sleep", args: ["1"])
         async let b: () = try Process.spawn(cmd: "sleep", args: ["1"])
@@ -56,5 +56,11 @@ final class HelperTests: XCTestCase {
         try await b
         let elapsedMs = Double((DispatchTime.now().uptimeNanoseconds - time.uptimeNanoseconds) / 1_000_000)
         XCTAssertLessThan(elapsedMs, 1200)
+    }*/
+    
+    func testNativeSpawn() throws {
+        let time = DispatchTime.now()
+        XCTAssertEqual(try Process.nativeSpawn(cmd: "echo", args: ["Hello"]), 0)
+        XCTAssertEqual(try Process.nativeSpawn(cmd: "echo", args: ["World"]), 0)
     }
 }

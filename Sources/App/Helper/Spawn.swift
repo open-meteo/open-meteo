@@ -4,6 +4,7 @@ import Foundation
 enum SpawnError: Error {
     case commandFailed(cmd: String, returnCode: Int32, args: [String]?, stderr: String?)
     case executableDoesNotExist(cmd: String)
+    case posixSpawnFailed(code: Int32)
 }
 
 public extension Process {
@@ -100,5 +101,31 @@ public extension Process {
         proc.waitUntilExit()
         
         return proc.terminationStatus
+    }
+    
+    /// Call `posix_spawn` directly and wait for child to finish. Uses PATH variable to find executable
+    static func nativeSpawn(cmd: String, args: [String]) throws -> Int32 {
+        /// Command and arguments as C string
+        let argv = ([cmd] + args).map { $0.withCString(strdup) } + [nil]
+        
+        defer {
+            for case let arg? in argv {
+                free(arg)
+            }
+        }
+        
+        var pid: Int32 = 0
+        let ret = posix_spawnp(&pid, argv[0], /*&actions*/ nil, nil, argv, nil)
+        guard ret == 0 else {
+            throw SpawnError.posixSpawnFailed(code: ret)
+        }
+        
+        var status: Int32 = -2
+        var waitResult: Int32 = -1
+        repeat {
+            waitResult = waitpid(pid, &status, 0)
+        } while waitResult == -1 && errno == EINTR
+        
+        return status
     }
 }
