@@ -78,18 +78,21 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             let grib = try await curl.downloadGrib(url: url, client: application.http.client.shared)
             
             for variable in variables {
+                var unknown = 0
                 guard let message = grib.messages.first(where: { message in
                     let shortName = message.get(attribute: "shortName")!
                     let levelhPa = Int(message.get(attribute: "level")!)!
-                    let paramId = Int(message.get(attribute: "paramId")!)!
-                    
+                    //let paramId = Int(message.get(attribute: "paramId")!)!
+                    if shortName == "unknown" {
+                        unknown += 1
+                    }
                     if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
                         return true
                     }
-                    if variable == .precipitation && paramId == 193 {
+                    if variable == .precipitation && unknown == 1 {
                         return true
                     }
-                    if variable == .runoff && paramId == 201 {
+                    if variable == .runoff && unknown == 2 {
                         return true
                     }
                     return shortName == variable.gribName && levelhPa == (variable.level ?? 0)
@@ -102,9 +105,9 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                             message.get(attribute: "paramId")!
                         )
                         if message.get(attribute: "name") == "unknown" {
-                            //message.iterate(namespace: .ls).forEach({print($0)})
-                            //message.iterate(namespace: .parameter).forEach({print($0)})
-                            //message.iterate(namespace: .mars).forEach({print($0)})
+                            message.iterate(namespace: .ls).forEach({print($0)})
+                            message.iterate(namespace: .parameter).forEach({print($0)})
+                            message.iterate(namespace: .mars).forEach({print($0)})
                             message.iterate(namespace: .all).forEach({print($0)})
                         }
                     }
