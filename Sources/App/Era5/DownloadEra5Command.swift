@@ -478,8 +478,8 @@ struct DownloadEra5Command: Command {
                             'format': 'netcdf',
                             'variable': \(variablesEncoded),
                             'year': '\(date.year)',
-                            'month': '\(date.month)',
-                            'day': '\(date.day)',
+                            'month': '\(date.month.zeroPadded(len: 2))',
+                            'day': '\(date.day.zeroPadded(len: 2))',
                             'time': [
                                 '00:00', '01:00', '02:00',
                                 '03:00', '04:00', '05:00',
