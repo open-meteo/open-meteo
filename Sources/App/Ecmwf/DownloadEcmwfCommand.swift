@@ -60,33 +60,37 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             
+            let variables = EcmwfVariable.allCases.filter { variable in
+                if hour == 0 && variable.skipHour0 {
+                    return false
+                }
+                let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
+                return !skipFilesIfExisting || FileManager.default.fileExists(atPath: file)
+            }
+            
+            if variables.isEmpty {
+                continue
+            }
+            
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-0h-oper-fc.grib2
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-12h-oper-fc.grib2
             let url = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
             
             let grib = try await curl.downloadGrib(url: url, client: application.http.client.shared)
             
-            let variables = EcmwfVariable.allCases.filter { variable in
-                let file = "\(downloadDirectory)\(variable.omFileName)_0.om"
-                return !skipFilesIfExisting || FileManager.default.fileExists(atPath: file)
-            }
-            
-            for variable in EcmwfVariable.allCases {
-                if hour == 0 && variable.skipHour0 {
-                    continue
-                }
-                
+            for variable in variables {
                 guard let message = grib.messages.first(where: { message in
                     let shortName = message.get(attribute: "shortName")!
                     let levelhPa = Int(message.get(attribute: "level")!)!
+                    let paramId = Int(message.get(attribute: "paramId")!)!
                     
-                    if variable.gribName == "tciwv" && shortName == "tcwv" {
+                    if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
                         return true
                     }
-                    if variable.gribName == "tp" && shortName == "param193.1.0" {
+                    if variable == .precipitation && paramId == 193 {
                         return true
                     }
-                    if variable.gribName == "ro" && shortName == "param201.0.2" {
+                    if variable == .runoff && paramId == 201 {
                         return true
                     }
                     return shortName == variable.gribName && levelhPa == (variable.level ?? 0)
