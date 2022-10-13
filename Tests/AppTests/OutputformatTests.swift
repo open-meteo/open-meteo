@@ -3,7 +3,7 @@ import Foundation
 @testable import App
 import XCTest
 import Vapor
-
+import SwiftEccodes
 
 final class OutputformatTests: XCTestCase {
     var app: Application?
@@ -16,6 +16,26 @@ final class OutputformatTests: XCTestCase {
         app?.shutdown()
         app = nil
     }
+    
+    func testBz2Grib() async throws {
+        let url = "http://opendata.dwd.de/weather/nwp/icon-d2/grib/06/relhum/icon-d2_germany_regular-lat-lon_pressure-level_2022101306_004_500_relhum.grib2.bz2"
+        let curl = Curl(logger: app!.logger)
+        let grib = try await curl.downloadBz2Grib(url: url, client: app!.http.client.shared)
+        
+        try grib.forEach({message in
+            message.iterate(namespace: .ls).forEach({
+                print($0)
+            })
+            message.iterate(namespace: .geography).forEach({
+                print($0)
+            })
+            print(message.get(attribute: "name")!)
+            let data = try message.getDouble()
+            print(data.count)
+            print(data[0..<10])
+        })
+    }
+    
     
     func drainString(_ response: Response) -> String {
         guard var buffer = try? response.body.collect(on: app!.eventLoopGroup.next()).wait() else {

@@ -38,13 +38,15 @@ let package = Package(
         "CHelper",
         "SwiftPFor2D",
         "IkigaJSON",
-        "CZlib"
+        "CZlib",
+        "CBz2lib"
       ],
       swiftSettings: [
         .unsafeFlags(["-cross-module-optimization", "-Ounchecked"], .when(configuration: .release))
       ]
     ),
     .systemLibrary(name: "CZlib", pkgConfig: "z", providers: [.brew(["zlib"]), .apt(["libz-dev"])]),
+    .systemLibrary(name: "CBz2lib", pkgConfig: "bz2", providers: [.brew(["bzip2"]), .apt(["libbz2-dev"])]),
     .target(name: "CHelper", cSettings: [.unsafeFlags(flagsHelper)]),
     .executableTarget(name: "openmeteo-api", dependencies: [.target(name: "App")]),
     .testTarget(name: "AppTests", dependencies: [.target(name: "App")]),

@@ -63,7 +63,7 @@ struct DownloadIconWaveCommand: Command {
     func download(logger: Logger, domain: IconWaveDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconWaveVariable]) throws {
         // https://opendata.dwd.de/weather/maritime/wave_models/gwam/grib/00/mdww/GWAM_MDWW_2022072800_000.grib2.bz2
         // https://opendata.dwd.de/weather/maritime/wave_models/ewam/grib/00/mdww/EWAM_MDWW_2022072800_000.grib2.bz2
-        let baseUrl = "https://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
+        let baseUrl = "http://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let downloadDirectory = "\(OpenMeteo.dataDictionary)\(domain.rawValue)/"
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         

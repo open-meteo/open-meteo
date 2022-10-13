@@ -60,7 +60,7 @@ struct CdoHelper {
     }
 }
 
-struct DownloadIconCommand: Command {
+struct DownloadIconCommand: AsyncCommandFix {
     enum VariableGroup: String, RawRepresentable {
         case all
         case surface
@@ -109,7 +109,7 @@ struct DownloadIconCommand: Command {
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
-        let serverPrefix = "https://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
+        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
         let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
         // surface elevation
@@ -159,7 +159,8 @@ struct DownloadIconCommand: Command {
     
     
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(logger: Logger, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable]) throws {
+    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable]) async throws {
+        let logger = application.logger
         let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -169,7 +170,7 @@ struct DownloadIconCommand: Command {
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
-        let serverPrefix = "https://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
+        let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
         let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
 
@@ -188,20 +189,32 @@ struct DownloadIconCommand: Command {
                     "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable.uppercased()).grib2.bz2" :
                     "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(leveld2)_\(v.variable).grib2.bz2"
                 
+                let url = "\(serverPrefix)\(v.variable)/\(filenameFrom)"
+                
                 let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
                     continue
                 }
-            
-                let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
-                try curl.download(
-                    url: "\(serverPrefix)\(v.variable)/\(filenameFrom)",
-                    to: gribFile
-                )
-                // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
-                // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
-                var data = try cdo.readGrib2Bz2(gribFile)
-                try FileManager.default.removeItem(atPath: gribFile)
+                
+                var data: [Float]
+                if domain == .icon {
+                    // regrid from icosahedral to regular lat-lon
+                    let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2.bz2"
+                    try curl.download(
+                        url: url,
+                        to: gribFile
+                    )
+                    // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
+                    // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
+                    data = try cdo.readGrib2Bz2(gribFile)
+                    try FileManager.default.removeItem(atPath: gribFile)
+                } else {
+                    // Use async in-memory download and decoding -> 4 times faster, but cannot regrid icosahedral data
+                    let data2d = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).makeIterator().next()!.toArray2d()
+                    data2d.ensureDimensions(of: domain.grid)
+                    data = data2d.data
+                }
+                
                 // Write data as encoded floats to disk
                 try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
                 
@@ -295,7 +308,7 @@ struct DownloadIconCommand: Command {
         try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)
     }
 
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         guard let domain = IconDomains.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
@@ -374,7 +387,7 @@ struct DownloadIconCommand: Command {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         try convertSurfaceElevation(logger: logger, domain: domain, run: date)
         
-        try downloadIcon(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
+        try await downloadIcon(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convertIcon(logger: logger, domain: domain, run: date, variables: variables)
         
         logger.info("Finished in \(start.timeElapsedPretty())")

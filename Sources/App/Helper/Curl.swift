@@ -75,8 +75,8 @@ struct Curl {
         }
     }
     
-    /// Use http-async http client to download
-    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
+    /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
+    func withRetriedDownload<T>(url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
             let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
@@ -99,9 +99,7 @@ struct Curl {
                 if response.status != .ok && response.status != .partialContent {
                     throw CurlError.downloadFailed(code: response.status)
                 }
-                let data = try await response.body.collect(upTo: .max)
-                
-                return data
+                return try await callback(response)
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
@@ -117,52 +115,19 @@ struct Curl {
         }
     }
     
-    /// Wait for a download to finish
-    /*func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> Data {
-        // URL might contain password, strip them from logging
-        if url.contains("@") && url.contains(":") {
-            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
-            logger.info("Downloading file \(urlSafe)")
-        } else {
-            logger.info("Downloading file \(url)")
+    /// Use http-async http client to download and decompress as bzip2
+    func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
+        return try await withRetriedDownload(url: url, range: nil, client: client) {
+            return try await $0.body.decompressBzip2().collect(upTo: .max)
         }
-        
-        let startTime = Date()
-        let args = (range.map{["-r",$0]} ?? []) + [
-            "-s",
-            "--show-error",
-            "--fail", // also retry 404
-            "--insecure", // ignore expired or invalid SSL certs
-            "--retry-connrefused",
-            "--limit-rate", "10M", // Limit to 10 MB/s -> 80 Mbps
-            "--connect-timeout", "\(connectTimeout)",
-            "--max-time", "\(maxTimeSeconds)",
-            url
-        ]
-        //logger.debug("Curl command: \(args.joined(separator: " "))")
-        
-        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
-        while true {
-            do {
-                let data = try Process.spawnWithOutputData(cmd: "curl", args: args)
-                if let minSize = minSize, data.count < minSize {
-                    throw CurlError.sizeTooSmall
-                }
-                return data
-            } catch {
-                let timeElapsed = Date().timeIntervalSince(startTime)
-                if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
-                    lastPrint = Date()
-                }
-                if Date() > deadline {
-                    logger.error("Deadline reached")
-                    throw error
-                }
-                sleep(UInt32(retryDelaySeconds))
-            }
+    }
+    
+    /// Use http-async http client to download
+    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
+        return try await withRetriedDownload(url: url, range: nil, client: client) {
+            return try await $0.body.collect(upTo: .max)
         }
-    }*/
+    }
     
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
@@ -170,6 +135,32 @@ struct Curl {
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
             let data = try await downloadInMemoryAsync(url: url, client: client)
+            logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
+            do {
+                return try data.withUnsafeReadableBytes { ptr in
+                    let grib = try GribMemory(ptr: ptr)
+                    var itr = grib.messages.makeIterator()
+                    return AnyIterator {
+                        guard let message = itr.next() else {
+                            return nil
+                        }
+                        return message
+                    }
+                }
+            } catch {
+                if i == 3 {
+                    throw error
+                }
+            }
+        }
+        fatalError("not reachable")
+    }
+    
+    /// download a bz2 compressed grib
+    func downloadBz2Grib(url: String, client: HTTPClient) async throws -> AnyIterator<GribMessage> {
+        /// Retry download 3 times to get the correct number of grib messages
+        for i in 1...3 {
+            let data = try await downloadBz2Decompress(url: url, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try data.withUnsafeReadableBytes { ptr in

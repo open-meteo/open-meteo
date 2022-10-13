@@ -30,7 +30,7 @@ struct CdoIconGlobal {
     public init(logger: Logger, workDirectory: String) throws {
         self.logger = logger
         let fileName = "icon_grid_0026_R03B07_G.nc"
-        let remoteFile = "https://opendata.dwd.de/weather/lib/cdo/\(fileName).bz2"
+        let remoteFile = "http://opendata.dwd.de/weather/lib/cdo/\(fileName).bz2"
         let localFile = "\(workDirectory)\(fileName).bz2"
         let localUncompressed = "\(workDirectory)\(fileName)"
         gridFile = "\(workDirectory)grid_icogl2world_0125.txt"

@@ -6,7 +6,7 @@ EXPOSE 8080
 USER root
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y libnetcdf-dev libeccodes-dev cdo curl python3-pip && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y libnetcdf-dev libeccodes-dev libbz2-dev cdo curl python3-pip && rm -rf /var/lib/apt/lists/*
 RUN pip3 install cdsapi
 RUN mkdir /app
 RUN cd /app
