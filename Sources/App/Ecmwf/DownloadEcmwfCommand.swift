@@ -96,7 +96,12 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     return shortName == variable.gribName && levelhPa == (variable.level ?? 0)
                 }) else {
                     grib.messages.forEach { message in
-                        print(message.get(attribute: "shortName")!,message.get(attribute: "level")!)
+                        print(
+                            message.get(attribute: "name")!,
+                            message.get(attribute: "shortName")!,
+                            message.get(attribute: "level")!,
+                            message.get(attribute: "paramId")!
+                        )
                     }
                     fatalError("could not find \(variable) \(variable.gribName)")
                 }
