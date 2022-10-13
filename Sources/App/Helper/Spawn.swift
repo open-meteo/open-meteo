@@ -115,7 +115,7 @@ public extension Process {
         }
         
         var pid: Int32 = 0
-        let ret = posix_spawnp(&pid, argv[0], /*&actions*/ nil, nil, argv, nil)
+        let ret = posix_spawnp(&pid, cmd, nil, nil, argv, nil)
         guard ret == 0 else {
             throw SpawnError.posixSpawnFailed(code: ret)
         }
