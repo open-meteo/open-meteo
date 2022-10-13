@@ -124,7 +124,7 @@ struct Curl {
     
     /// Use http-async http client to download
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
-        return try await withRetriedDownload(url: url, range: nil, client: client) {
+        return try await withRetriedDownload(url: url, range: range, client: client) {
             return try await $0.body.collect(upTo: .max)
         }
     }
