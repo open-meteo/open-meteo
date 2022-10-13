@@ -14,7 +14,7 @@ import SwiftEccodes
  set DENABLE_JPG_LIBJASPER to ON
  brew reinstall eccodes --build-from-source
  */
-struct SeasonalForecastDownload: Command {
+struct SeasonalForecastDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -33,7 +33,7 @@ struct SeasonalForecastDownload: Command {
         "Download seasonal forecasts from Copernicus"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         guard let domain = SeasonalForecastDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
@@ -59,7 +59,7 @@ struct SeasonalForecastDownload: Command {
             
             /// 18z run is available the day after starting 05:26
             let date = Timestamp.now().add(-8*3600).with(hour: run)
-            try downloadCfsElevation(logger: logger, domain: domain, run: date)
+            try await downloadCfsElevation(application: context.application, domain: domain, run: date)
             
             try downloadCfs(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
             try convertCfs(logger: logger, domain: domain, run: date)
@@ -71,7 +71,7 @@ struct SeasonalForecastDownload: Command {
     }
     
     /// download cfs domain
-    func downloadCfsElevation(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
+    func downloadCfsElevation(application: Application, domain: SeasonalForecastDomain, run: Timestamp) async throws {
         /// download seamask and height
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             return
@@ -80,7 +80,7 @@ struct SeasonalForecastDownload: Command {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
-        try GfsDownload().downloadNcepElevation(logger: logger, url: url, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
+        try await GfsDownload().downloadNcepElevation(application: application, url: url, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
     }
     
     func downloadCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool) throws {

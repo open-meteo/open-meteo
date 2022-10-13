@@ -118,7 +118,7 @@ struct Curl {
     }
     
     /// Wait for a download to finish
-    func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> Data {
+    /*func downloadInMemory(url: String, range: String? = nil, minSize: Int? = nil) throws -> Data {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
             let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
@@ -162,7 +162,7 @@ struct Curl {
                 sleep(UInt32(retryDelaySeconds))
             }
         }
-    }
+    }*/
     
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
@@ -194,13 +194,14 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") throws -> AnyIterator<(variable: Variable, message: GribMessage)> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient) async throws -> AnyIterator<(variable: Variable, message: GribMessage)> {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return AnyIterator { return nil }
         }
         
-        guard let index = String(data: try downloadInMemory(url: "\(url)\(`extension`)"), encoding: .utf8) else {
+        var indexData = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client)
+        guard let index = indexData.readString(length: indexData.readableBytes) else {
             fatalError("Could not decode index to string")
         }
 
@@ -244,11 +245,11 @@ struct Curl {
         
         /// Retry download 3 times to get the correct number of grib messages
         for i in 1...3 {
-            let data = try downloadInMemory(url: url, range: range.range, minSize: range.minSize)
-            logger.debug("Converting GRIB, size \(data.count) bytes (expected minSize \(range.minSize))")
+            let data = try await downloadInMemoryAsync(url: url, range: range, client: client)
+            logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
-                return try data.withUnsafeBytes { ptr in
+                return try data.withUnsafeReadableBytes { ptr in
                     let grib = try GribMemory(ptr: ptr)
                     if grib.messages.count != matches.count {
                         logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(grib.messages.count)")
@@ -321,7 +322,7 @@ struct Curl {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
-        let ranges = range.range.split(separator: ",")
+        let ranges = range.split(separator: ",")
         var matchesPos = 0
         var out = [(variable: Variable, data: Array2D)]()
         for range in ranges {
@@ -380,20 +381,14 @@ protocol CurlIndexedVariable {
 
 extension Sequence where Element == Substring {
     /// Parse a GRID index to curl read ranges
-    func indexToRange(include: (Substring) throws -> Bool) rethrows -> (range: String, minSize: Int)? {
+    func indexToRange(include: (Substring) throws -> Bool) rethrows -> String? {
         var range = ""
         var start: Int? = nil
-        var minSize = 0
-        var previousMatched: Int? = nil
         for line in self {
             let parts = line.split(separator: ":")
             guard parts.count > 2, let messageStart = Int(parts[1]) else {
                 continue
             }
-            if let previousMatched = previousMatched {
-                minSize += messageStart - previousMatched
-            }
-            previousMatched = nil
             guard try include(line) else {
                 if let start = start {
                     range += "\(range.isEmpty ? "" : ",")\(start)-\(messageStart-1)"
@@ -404,7 +399,6 @@ extension Sequence where Element == Substring {
             if start == nil {
                 start = messageStart
             }
-            previousMatched = messageStart
         }
         if let start = start {
             range += "\(range.isEmpty ? "" : ",")\(start)-"
@@ -412,6 +406,6 @@ extension Sequence where Element == Substring {
         if range.isEmpty {
             return nil
         }
-        return (range, minSize)
+        return range
     }
 }
