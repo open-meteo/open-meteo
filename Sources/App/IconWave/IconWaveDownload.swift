@@ -10,7 +10,7 @@ import SwiftPFor2D
  
  All equations: https://library.wmo.int/doc_num.php?explnum_id=10979
  */
-struct DownloadIconWaveCommand: Command {
+struct DownloadIconWaveCommand: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -29,7 +29,7 @@ struct DownloadIconWaveCommand: Command {
         "Download a specified wave model run"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         guard let domain = IconWaveDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
@@ -55,16 +55,17 @@ struct DownloadIconWaveCommand: Command {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         
         let variables = onlyVariables ?? IconWaveVariable.allCases
-        try download(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
+        try await download(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convert(logger: logger, domain: domain, run: date, variables: variables)
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func download(logger: Logger, domain: IconWaveDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconWaveVariable]) throws {
+    func download(application: Application, domain: IconWaveDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconWaveVariable]) async throws {
         // https://opendata.dwd.de/weather/maritime/wave_models/gwam/grib/00/mdww/GWAM_MDWW_2022072800_000.grib2.bz2
         // https://opendata.dwd.de/weather/maritime/wave_models/ewam/grib/00/mdww/EWAM_MDWW_2022072800_000.grib2.bz2
         let baseUrl = "http://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let downloadDirectory = "\(OpenMeteo.dataDictionary)\(domain.rawValue)/"
+        let logger = application.logger
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger)
@@ -83,24 +84,18 @@ struct DownloadIconWaveCommand: Command {
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
                     continue
                 }
-                let tempNc = "\(downloadDirectory)temp.nc"
-                let tempgrib2 = "\(downloadDirectory)temp.grib2"
-                let tempBz2 = "\(tempgrib2).bz2"
-                try curl.download(
-                    url: url,
-                    to: tempBz2
-                )
-                try Process.bunzip2(file: tempBz2)
+                
+                var data2d = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).next()!.toArray2d()
+                data2d.ensureDimensions(of: domain.grid)
                 if domain == .gwam {
-                    try Process.grib2ToNetcdfShiftLongitudeInvertLatitude(in: tempgrib2, out: tempNc)
+                    data2d.shift180LongitudeAndFlipLatitude()
                 } else {
-                    try Process.grib2ToNetCDFInvertLatitude(in: tempgrib2, out: tempNc)
+                    data2d.flipLatitude()
                 }
-                let data = try NetCDF.readIconWave(file: tempNc)
                 
                 /// Create elevation file for sea mask
                 if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
-                    var elevation = data
+                    var elevation = data2d.data
                     for i in elevation.indices {
                         /// `NaN` out of domain, `-999` sea grid point
                         elevation[i] = elevation[i].isNaN ? .nan : -999
@@ -112,7 +107,7 @@ struct DownloadIconWaveCommand: Command {
                 
                 // Save temporarily as compressed om files
                 try FileManager.default.removeItemIfExists(at: fileDest)
-                try OmFileWriter.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, dim0: nx, dim1: ny, chunk0: nx, chunk1: ny, all: data)
+                try OmFileWriter.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, dim0: nx, dim1: ny, chunk0: nx, chunk1: ny, all: data2d.data)
             }
         }
     }
@@ -160,25 +155,3 @@ extension IconWaveDomain {
         }
     }
 }
-
-extension NetCDF {
-    static func readIconWave(file: String) throws -> [Float] {
-        guard let nc = try NetCDF.open(path: file, allowUpdate: false) else {
-            fatalError("File \(file) does not exist")
-        }
-        guard let v = nc.getVariables().first(where: {$0.dimensions.count >= 3}) else {
-            fatalError("Could not find data variable with 3d/4d data")
-        }
-        guard let varFloat = v.asType(Float.self) else {
-            fatalError("Netcdf variable is not float type")
-        }
-        var d = try varFloat.read()
-        for x in d.indices {
-            if d[x] < -100000000 {
-                d[x] = .nan
-            }
-        }
-        return d
-    }
-}
-
