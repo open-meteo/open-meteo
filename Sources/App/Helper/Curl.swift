@@ -132,38 +132,38 @@ struct Curl {
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
     func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
-        // Retry download 3 times to get the correct number of grib messages
-        var retries = 3
+        // Retry download 20 times with increasing retry delay to get the correct number of grib messages
+        var retries = 0
         while true {
             let data = try await downloadInMemoryAsync(url: url, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
             } catch {
-                retries -= 1
-                if retries == 0 {
+                retries += 1
+                if retries >= 20 {
                     throw error
                 }
-                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
+                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
             }
         }
     }
     
     /// download a bz2 compressed grib
     func downloadBz2Grib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
-        // Retry download 3 times to get the correct number of grib messages
-        var retries = 3
+        // Retry download 20 times with increasing retry delay to get the correct number of grib messages
+        var retries = 0
         while true {
             let data = try await downloadBz2Decompress(url: url, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
             } catch {
-                retries -= 1
-                if retries == 0 {
+                retries += 1
+                if retries >= 20 {
                     throw error
                 }
-                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
+                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
             }
         }
     }
@@ -197,7 +197,7 @@ struct Curl {
                 logger.info("Grib variable \(match) matched twice for \(idx)")
                 return false
             }
-            logger.debug("Matched \(match) with \(idx)")
+            //logger.debug("Matched \(match) with \(idx)")
             matches.append(match)
             return true
         }) else {
@@ -220,8 +220,8 @@ struct Curl {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
-        // Retry download 3 times to get the correct number of grib messages
-        var retries = 3
+        // Retry download 20 times with increasing retry delay to get the correct number of grib messages
+        var retries = 0
         while true {
             let data = try await downloadInMemoryAsync(url: url, range: range, client: client)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
@@ -242,11 +242,11 @@ struct Curl {
                     }
                 }
             } catch {
-                retries -= 1
-                if retries == 0 {
+                retries += 1
+                if retries >= 20 {
                     throw error
                 }
-                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
+                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
             }
         }
     }
