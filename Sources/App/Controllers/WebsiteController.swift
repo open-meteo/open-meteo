@@ -139,7 +139,7 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = ContextWithLevels(title: "MeteoFrance ARPEGE & AROME API", levels: MeteoFranceDomain.apiLevels, variables: [
+        let context = ContextWithLevels(title: "MeteoFrance API", levels: MeteoFranceDomain.apiLevels, variables: [
             ContextWithLevels.PressureVariable(label: "Temperature", name: "temperature"),
             ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
             ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
