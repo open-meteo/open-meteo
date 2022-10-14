@@ -17,7 +17,7 @@ final class OmFileManager: LifecycleHandler {
     /// Non existing files are set to nil
     private var cached = [Int: OmFileState]()
     
-    private let lock = Lock()
+    private let lock = NIOLock()
     
     private var backgroundWatcher: RepeatedTask?
     
@@ -112,7 +112,7 @@ extension OmFileReader {
     fileprivate static var buffers = [Thread: UnsafeMutableRawBufferPointer]()
     
     /// Thread safe access to buffers
-    fileprivate static let lockBuffers = Lock()
+    fileprivate static let lockBuffers = NIOLock()
     
     /// Thread safe buffer provider that automatically reallocates buffers
     fileprivate static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
