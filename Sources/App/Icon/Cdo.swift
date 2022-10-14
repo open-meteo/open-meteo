@@ -3,9 +3,9 @@ import Vapor
 
 
 extension Process {
-    static func bunzip2(file: String) throws {
+    /*static func bunzip2(file: String) throws {
         try spawn(cmd: "bunzip2", args: ["--keep", "-f", file])
-    }
+    }*/
     
     static public func grib2ToNetcdf(in inn: String, out: String) throws {
         try spawn(cmd: "cdo", args: ["-s","-f", "nc", "copy", inn, out])
@@ -27,11 +27,10 @@ struct CdoIconGlobal {
     let logger: Logger
 
     /// Download and prepare weights for icon global is missing
-    public init(logger: Logger, workDirectory: String) throws {
+    public init(logger: Logger, workDirectory: String, client: HTTPClient) async throws {
         self.logger = logger
         let fileName = "icon_grid_0026_R03B07_G.nc"
         let remoteFile = "http://opendata.dwd.de/weather/lib/cdo/\(fileName).bz2"
-        let localFile = "\(workDirectory)\(fileName).bz2"
         let localUncompressed = "\(workDirectory)\(fileName)"
         gridFile = "\(workDirectory)grid_icogl2world_0125.txt"
         weightsFile = "\(workDirectory)weights_icogl2world_0125.nc"
@@ -60,14 +59,9 @@ struct CdoIconGlobal {
             try gridContext.write(toFile: gridFile, atomically: true, encoding: .utf8)
         }
 
-        if !fm.fileExists(atPath: localFile) {
-            let curl = Curl(logger: logger)
-            try curl.download(url: remoteFile, to: localFile)
-        }
-
         if !fm.fileExists(atPath: localUncompressed) {
-            logger.info("Uncompressing \(localFile)")
-            try Process.bunzip2(file: localFile)
+            let curl = Curl(logger: logger)
+            try await curl.downloadBz2Decompress(url: remoteFile, toFile: localUncompressed, client: client)
         }
 
         logger.info("Generating weights file \(weightsFile)")
@@ -77,7 +71,6 @@ struct CdoIconGlobal {
         }
 
         try FileManager.default.removeItem(atPath: localUncompressed)
-        try FileManager.default.removeItem(atPath: localFile)
     }
 
     public func remap(in inn: String, out: String) throws {

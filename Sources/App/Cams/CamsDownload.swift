@@ -4,7 +4,7 @@ import SwiftNetCDF
 import SwiftPFor2D
 
 /// Download CAMS Europe and Global air quality forecasts
-struct DownloadCamsCommand: Command {
+struct DownloadCamsCommand: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -32,7 +32,7 @@ struct DownloadCamsCommand: Command {
         "Download global and european CAMS air quality forecasts"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         guard let domain = CamsDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
@@ -68,7 +68,7 @@ struct DownloadCamsCommand: Command {
             guard let ftppassword = signature.ftppassword else {
                 fatalError("ftppassword is required")
             }
-            try downloadCamsGlobal(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
+            try await downloadCamsGlobal(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
             try convertCamsGlobal(logger: logger, domain: domain, run: date, variables: variables)
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
@@ -81,9 +81,10 @@ struct DownloadCamsCommand: Command {
     
     /// Download from the ECMWF CAMS ftp/http server
     /// This data is also available via the ADC API, but queue times are 4 hours!
-    func downloadCamsGlobal(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], user: String, password: String) throws {
+    func downloadCamsGlobal(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], user: String, password: String) async throws {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        let logger = application.logger
         
         let nx = domain.grid.nx
         let ny = domain.grid.ny
@@ -115,7 +116,7 @@ struct DownloadCamsCommand: Command {
                 let dir = meta.isMultiLevel ? remoteDirAdditional : remoteDir
                 let remoteFile = "\(dir)z_cams_c_ecmf_\(dateRun)0000_prod_fc_\(levelType)_\(hour.zeroPadded(len: 3))_\(meta.gribname).nc"
                 let tempNc = "\(domain.downloadDirectory)/temp.nc"
-                try curl.download(url: remoteFile, to: tempNc)
+                try await curl.download(url: remoteFile, toFile: tempNc, client: application.http.client.shared)
                 
                 guard let ncFile = try NetCDF.open(path: tempNc, allowUpdate: false) else {
                     fatalError("Could not open nc file for \(variable)")

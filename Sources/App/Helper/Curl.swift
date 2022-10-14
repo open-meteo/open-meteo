@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 import SwiftEccodes
 import AsyncHTTPClient
+import SwiftPFor2D
 
 
 enum CurlError: Error {
@@ -33,7 +34,7 @@ struct Curl {
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
     }
     
-    func download(url: String, to: String, range: String? = nil) throws {
+    /*func download(url: String, to: String, range: String? = nil) throws {
         // URL might contain password, strip them from logging
         if url.contains("@") && url.contains(":") {
             let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
@@ -73,7 +74,7 @@ struct Curl {
                 sleep(UInt32(retryDelaySeconds))
             }
         }
-    }
+    }*/
     
     /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
     func withRetriedDownload<T>(url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
@@ -112,6 +113,22 @@ struct Curl {
                 }
                 try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
             }
+        }
+    }
+    
+    /// Use http-async http client to download, decompress BZIP2 and store to file. If the file already exists, it will be deleted before
+    func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
+        return try await withRetriedDownload(url: url, range: nil, client: client) {
+            try FileManager.default.removeItemIfExists(at: toFile)
+            return try await $0.body.decompressBzip2().saveTo(file: toFile)
+        }
+    }
+    
+    /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
+    func download(url: String, toFile: String, client: HTTPClient) async throws {
+        return try await withRetriedDownload(url: url, range: nil, client: client) {
+            try FileManager.default.removeItemIfExists(at: toFile)
+            return try await $0.body.saveTo(file: toFile)
         }
     }
     
@@ -369,6 +386,16 @@ protocol CurlIndexedVariable {
     var gribIndexName: String? { get }
 }
 
+extension AsyncSequence where Element == ByteBuffer {
+    /// Store incoming data to file
+    /// NOTE: File IO is blocking e.g. synchronous
+    func saveTo(file: String) async throws {
+        let fn = try FileHandle.createNewFile(file: file)
+        for try await fragment in self {
+            try fn.write(contentsOf: fragment.readableBytesView)
+        }
+    }
+}
 
 extension Sequence where Element == Substring {
     /// Parse a GRID index to curl read ranges

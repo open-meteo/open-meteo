@@ -61,7 +61,7 @@ struct SeasonalForecastDownload: AsyncCommandFix {
             let date = Timestamp.now().add(-8*3600).with(hour: run)
             try await downloadCfsElevation(application: context.application, domain: domain, run: date)
             
-            try downloadCfs(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
+            try await downloadCfs(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
             try convertCfs(logger: logger, domain: domain, run: date)
         case .jma:
             fatalError()
@@ -83,7 +83,8 @@ struct SeasonalForecastDownload: AsyncCommandFix {
         try await GfsDownload().downloadNcepElevation(application: application, url: url, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
     }
     
-    func downloadCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool) throws {
+    func downloadCfs(application: Application, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool) async throws {
+        let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger)
@@ -101,7 +102,7 @@ struct SeasonalForecastDownload: AsyncCommandFix {
                     continue
                 }
                 
-                try curl.download(url: url, to: fileDest)
+                try await curl.download(url: url, toFile: fileDest, client: application.http.client.shared)
             }
         }
     }
