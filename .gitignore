@@ -7,6 +7,5 @@ DerivedData/
 db.sqlite
 .swiftpm
 .env
-Package.resolved
 data/
 data

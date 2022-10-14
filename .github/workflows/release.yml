@@ -9,7 +9,7 @@ env:
   swift_package_resolve: swift package resolve
   swift_build: swift build --enable-test-discovery -c release -Xswiftc -Ounchecked -Xswiftc -g -Xswiftc -static-stdlib -Xswiftc -cross-module-optimization
   swift_test: swift test
-  cache_version: 1
+  cache_version: 2
 
 jobs:
   linux:
@@ -32,7 +32,7 @@ jobs:
           Package.resolved
         key: ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
         restore-keys: |
-          ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift') }}
+          ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
     - name: Resolve dependencies
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
