@@ -194,8 +194,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftEccodes.git",
       "state" : {
-        "revision" : "9777f547aa2707ffc7fa028ebafb05f8d1941956",
-        "version" : "0.0.9"
+        "revision" : "32febebacb9e2cbf347175680678986687567de8",
+        "version" : "0.0.10"
       }
     },
     {
