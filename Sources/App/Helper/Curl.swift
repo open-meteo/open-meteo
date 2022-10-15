@@ -250,7 +250,9 @@ struct Curl {
                         logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
                         throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: matches.count)
                     }
-                    try callback(matches, messages)
+                    for _ in 0..<1000 {
+                        try callback(matches, messages)
+                    }
                 }
                 return
             } catch {
