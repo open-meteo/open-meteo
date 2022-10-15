@@ -251,8 +251,8 @@ struct Curl {
                         throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: matches.count)
                     }
                     try callback(matches, messages)
-                    return
                 }
+                return
             } catch {
                 retries += 1
                 if retries >= 20 {
