@@ -16,7 +16,7 @@ Hardware requirements:
 - For all forecast data, 150 GB disk space are recommended. If only a small selection for weather variables is used, just a couple of GB are fine.
 
 ## Running the API
-There are different option to run Open-Meteo: Docker, native and with prebuilt ubuntu focal packages.
+There are different option to run Open-Meteo: Docker, native and with prebuilt ubuntu jammy packages.
 
 ### Running on docker
 To quickly compile and run Open-Meteo, docker can be used. It will run an container which exposes the open-meteo API to http://127.0.0.1:8080. Afterwards weather datasets can be downloaded.
@@ -80,8 +80,8 @@ Notes:
 - To restart `swift run` press `ctrl+c` and run `swift run` again
 - Add `-c release` to swift run to switch to a faster release build
 
-### Using prebuilt Ubuntu focal packages
-If you are running Ubuntu 20.04 focal, you can use prebuilt binaries.
+### Using prebuilt Ubuntu jammy packages
+If you are running Ubuntu 22.04 jammy, you can use prebuilt binaries.
 
 They can be installed via APT:
 ```bash

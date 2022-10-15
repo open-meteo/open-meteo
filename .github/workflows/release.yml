@@ -13,8 +13,8 @@ env:
 
 jobs:
   linux:
-    runs-on: ubuntu-20.04
-    container: swift:5.7.0-focal
+    runs-on: ubuntu-22.04
+    container: swift:5.7.0-jammy
     name: Linux
     steps:
     - name: Get Swift Version
@@ -49,20 +49,20 @@ jobs:
         fpm_args: './build'
         fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf15 --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-api.service --deb-default build/openmeteo-api.env --before-install build/before-install.sh --before-upgrade build/before-install.sh openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
     - name: Rename deb file
-      run: mv openmeteo-api_${{github.ref_name}}_amd64.deb openmeteo-api_${{github.ref_name}}_focal_amd64.deb
+      run: mv openmeteo-api_${{github.ref_name}}_amd64.deb openmeteo-api_${{github.ref_name}}_jammy_amd64.deb
     - name: Release
       uses: ncipollo/release-action@v1
       with:
         generateReleaseNotes: true
-        artifacts: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
+        artifacts: 'openmeteo-api_${{github.ref_name}}_jammy_amd64.deb'
         draft: true
     - name: Create APT repository
       uses: patrick-zippenfenig/apt-repo-action@master
       with:
         repo_supported_arch: amd64
-        repo_supported_version: focal
-        file: 'openmeteo-api_${{github.ref_name}}_focal_amd64.deb'
-        file_target_version: focal
+        repo_supported_version: jammy
+        file: 'openmeteo-api_${{github.ref_name}}_jammy_amd64.deb'
+        file_target_version: jammy
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}
         key_passphrase: ${{ secrets.GPG_SECRET }}
