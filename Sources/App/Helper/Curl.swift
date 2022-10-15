@@ -188,10 +188,10 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient) async throws -> GribByteBufferWithVariables<Variable> {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: ([Variable], [GribMessage]) throws -> ()) async throws {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
-            return GribByteBufferWithVariables()
+            return
         }
         
         var indexData = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client)
@@ -244,7 +244,14 @@ struct Curl {
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
-                return try GribByteBufferWithVariables(bytebuffer: data, variables: matches, logger: logger)
+                try data.withUnsafeReadableBytes {
+                    let messages = try GribMemory(ptr: $0).messages
+                    if messages.count != variables.count {
+                        logger.error("Grib reader did not get all matched variables. Matches count \(variables.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
+                        throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: variables.count)
+                    }
+                    try callback(matches, messages)
+                }
             } catch {
                 retries += 1
                 if retries >= 20 {
@@ -336,29 +343,6 @@ struct GribByteBuffer {
         self.messages = try bytebuffer.withUnsafeReadableBytes {
             try GribMemory(ptr: $0).messages
         }
-    }
-}
-
-/// Small wrapper for GribMemory to keep a reference to bytebuffer and associated variables
-struct GribByteBufferWithVariables<T> {
-    let bytebuffer: ByteBuffer
-    let messages: [(variable: T, message: GribMessage)]
-    
-    init(bytebuffer: ByteBuffer, variables: [T], logger: Logger) throws {
-        self.bytebuffer = bytebuffer
-        let messages = try bytebuffer.withUnsafeReadableBytes {
-            try GribMemory(ptr: $0).messages
-        }
-        if messages.count != variables.count {
-            logger.error("Grib reader did not get all matched variables. Matches count \(variables.count). Grib count \(messages.count). Grib size \(bytebuffer.readableBytes)")
-            throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: variables.count)
-        }
-        self.messages = zip(variables, messages).map{$0}
-    }
-    
-    init() {
-        bytebuffer = ByteBuffer()
-        messages = []
     }
 }
 

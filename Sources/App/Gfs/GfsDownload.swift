@@ -108,21 +108,23 @@ struct GfsDownload: AsyncCommandFix {
         var height: Array2D? = nil
         var landmask: Array2D? = nil
         let curl = Curl(logger: logger)
-        let grib = try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.http.client.shared)
-        for (variable, message) in grib.messages {
-            var data = message.toArray2d()
-            if isGlobal {
-                data.shift180LongitudeAndFlipLatitude()
+        try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.http.client.shared) { variables, messages in
+            for (variable, message) in zip(variables, messages) {
+                var data = message.toArray2d()
+                if isGlobal {
+                    data.shift180LongitudeAndFlipLatitude()
+                }
+                data.ensureDimensions(of: grid)
+                switch variable {
+                case .height:
+                    height = data
+                case .landmask:
+                    landmask = data
+                }
+                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
             }
-            data.ensureDimensions(of: grid)
-            switch variable {
-            case .height:
-                height = data
-            case .landmask:
-                landmask = data
-            }
-            //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
         }
+        
         guard var height = height, let landmask = landmask else {
             fatalError("Could not download land and sea mask")
         }
@@ -162,31 +164,32 @@ struct GfsDownload: AsyncCommandFix {
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            let grib = try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared)
-            for (variable, message) in grib.messages {
-                var data = message.toArray2d()
-                /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
-                    if i % 10_000 == 0 {
-                        print("grid \(i) lat \(latitude) lon \(longitude)")
+            try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared) { variables, messages in
+                for (variable, message) in zip(variables, messages) {
+                    var data = message.toArray2d()
+                    /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
+                     if i % 10_000 == 0 {
+                     print("grid \(i) lat \(latitude) lon \(longitude)")
+                     }
+                     }
+                     fatalError("OK")*/
+                    if domain.isGlobal {
+                        data.shift180LongitudeAndFlipLatitude()
                     }
+                    data.ensureDimensions(of: domain.grid)
+                    //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
+                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
+                    try FileManager.default.removeItemIfExists(at: file)
+                    
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.variable.multiplyAdd {
+                        data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg")
+                    let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                    try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
                 }
-                fatalError("OK")*/
-                if domain.isGlobal {
-                    data.shift180LongitudeAndFlipLatitude()
-                }
-                data.ensureDimensions(of: domain.grid)
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
-                try FileManager.default.removeItemIfExists(at: file)
-                
-                // Scaling before compression with scalefactor
-                if let fma = variable.variable.multiplyAdd {
-                    data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-                
-                curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg")
-                let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
             }
         }
     }
