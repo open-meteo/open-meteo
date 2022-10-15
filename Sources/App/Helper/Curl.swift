@@ -246,9 +246,9 @@ struct Curl {
             do {
                 try data.withUnsafeReadableBytes {
                     let messages = try GribMemory(ptr: $0).messages
-                    if messages.count != variables.count {
-                        logger.error("Grib reader did not get all matched variables. Matches count \(variables.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
-                        throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: variables.count)
+                    if messages.count != matches.count {
+                        logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
+                        throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: matches.count)
                     }
                     try callback(matches, messages)
                 }
