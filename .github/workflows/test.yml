@@ -40,7 +40,7 @@ jobs:
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
     - name: Install NetCDF
-      run: apt-get update && apt-get -qq -y install libnetcdf-dev libeccodes-dev libbz2-dev libstdc++-9-dev
+      run: apt-get update && apt-get -qq -y install libnetcdf-dev libeccodes-dev libbz2-dev build-essential
     - name: Build
       run: ${{ env.swift_build }}
     - name: Test
