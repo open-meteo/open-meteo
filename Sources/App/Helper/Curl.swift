@@ -79,9 +79,15 @@ struct Curl {
     /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
     func withRetriedDownload<T>(url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
         // URL might contain password, strip them from logging
+        var url = url
+        var auth: String? = nil
         if url.contains("@") && url.contains(":") {
-            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
-            logger.info("Downloading file \(urlSafe)")
+            let usernamePassword = url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0]
+            auth = (usernamePassword).data(using: .utf8)!.base64EncodedString()
+            
+            url = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
+
+            logger.info("Downloading file \(url)")
         } else {
             logger.info("Downloading file \(url)")
         }
@@ -92,6 +98,9 @@ struct Curl {
         var request = HTTPClientRequest(url: url)
         if let range = range {
             request.headers.add(name: "range", value: "bytes=\(range)")
+        }
+        if let auth = auth {
+            request.headers.add(name: "Authorization", value: "Basic \(auth)")
         }
         
         while true {
@@ -245,6 +254,10 @@ struct Curl {
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
                 try data.withUnsafeReadableBytes {
+                    for i in 0..<1000 {
+                        print(i)
+                        let messages = try GribMemory(ptr: $0).messages
+                    }
                     let messages = try GribMemory(ptr: $0).messages
                     if messages.count != matches.count {
                         logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
