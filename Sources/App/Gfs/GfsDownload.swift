@@ -108,7 +108,8 @@ struct GfsDownload: AsyncCommandFix {
         var height: Array2D? = nil
         var landmask: Array2D? = nil
         let curl = Curl(logger: logger)
-        for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.http.client.shared) {
+        let grib = try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.http.client.shared)
+        for (variable, message) in grib.messages {
             var data = message.toArray2d()
             if isGlobal {
                 data.shift180LongitudeAndFlipLatitude()
@@ -161,10 +162,8 @@ struct GfsDownload: AsyncCommandFix {
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            // NOTE: 2022-09-07: Async grib downloads are leaking in release build on linux.
-            // couldn't figure it out after 2 days, so lets stick to sync code.
-            // Either returned data is not released or something in eccodes
-            for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared) {
+            let grib = try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared)
+            for (variable, message) in grib.messages {
                 var data = message.toArray2d()
                 /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
                     if i % 10_000 == 0 {
