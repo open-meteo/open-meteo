@@ -15,7 +15,7 @@ RUN swift package resolve
 COPY . .
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y libnetcdf-dev libeccodes-dev libbz2-dev && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y libnetcdf-dev libeccodes-dev libbz2-dev libstdc++-9-dev && rm -rf /var/lib/apt/lists/*
 
 # Compile with optimizations
 RUN swift build --enable-test-discovery -c release
