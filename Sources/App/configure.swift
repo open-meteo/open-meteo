@@ -4,12 +4,12 @@ import IkigaJSON
 
 struct OpenMeteo {
     /// Data directory with trailing slash
-    static var dataDictionary: String {
+    static var dataDictionary = {
         if let dir = Environment.get("DATA_DIRECTORY") {
             return dir
         }
         return  "./data/"
-    }
+    }()
 }
 
 
