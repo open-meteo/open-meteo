@@ -47,6 +47,36 @@ public enum CompressionType: UInt8 {
  - Data block
  */
 public final class OmFileWriter {
+    let dim0: Int
+    let dim1: Int
+    
+    let chunk0: Int
+    let chunk1: Int
+    
+    var readBuffer: UnsafeMutableRawBufferPointer
+    
+    /// Compressed chunks are written into this buffer
+    /// 8 MB write buffer or larger if chunks are very large
+    var writeBuffer: UnsafeMutableBufferPointer<UInt8>
+    
+    public init(dim0: Int, dim1: Int, chunk0: Int, chunk1: Int) {
+        self.dim0 = dim0
+        self.dim1 = dim1
+        self.chunk0 = chunk0
+        self.chunk1 = chunk1
+
+        
+        // Read buffer needs to be a bit larger for AVX 256 bit alignment
+        self.readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: (chunk0 * chunk1 * 4).P4NENC256_BOUND(), alignment: 4)
+        
+        self.writeBuffer = .allocate(capacity: max(1024 * 1024 * 8, (chunk0 * chunk1 * 4).P4NENC256_BOUND()))
+    }
+    
+    deinit {
+        readBuffer.deallocate()
+        writeBuffer.deallocate()
+    }
+    
     /**
      Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
      
@@ -54,7 +84,7 @@ public final class OmFileWriter {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public static func write(file: String, compressionType: CompressionType, scalefactor: Float, dim0: Int, dim1: Int, chunk0: Int, chunk1: Int, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+    public func write(file: String, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         
         if FileManager.default.fileExists(atPath: file) {
             throw SwiftPFor2DError.fileExistsAlready(filename: file)
@@ -93,26 +123,16 @@ public final class OmFileWriter {
         var chunkOffsetBytes = [Int]()
         chunkOffsetBytes.reserveCapacity(nChunks)
         
-        /// Read buffer needs to be a bit larger for AVX 256 bit alignment
-        let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: (chunk0 * chunk1 * compressionType.bytesPerElement).P4NENC256_BOUND(), alignment: 4)
-        defer { buffer.deallocate() }
-        
         /// Size a compressed chunk might
         let minBufferSize = (chunk0 * chunk1 * compressionType.bytesPerElement).P4NENC256_BOUND()
         var writeBufferPos = 0
-        
-        /// 8 MB write buffer
-        let writeBufferSize = max(1024 * 1024 * 8, minBufferSize)
-        /// Compressed chunks are written into this buffer
-        let writeBuffer: UnsafeMutablePointer<UInt8> = .allocate(capacity: writeBufferSize)
-        defer { writeBuffer.deallocate() }
                 
         /// itterate over all chunks
         var c0 = 0
         
         switch compressionType {
         case .p4nzdec256:
-            let buffer = buffer.baseAddress!.assumingMemoryBound(to: Int16.self)
+            let buffer = readBuffer.baseAddress!.assumingMemoryBound(to: Int16.self)
             while c0 < nDim0Chunks {
                 // Get new data from closure
                 let uncompressedInput = try supplyChunk(c0 * chunk0)
@@ -165,12 +185,12 @@ public final class OmFileWriter {
                             }
                         }
                         
-                        let writeLength = p4nzenc128v16(buffer, length1 * length0, writeBuffer.advanced(by: writeBufferPos))
+                        let writeLength = p4nzenc128v16(buffer, length1 * length0, writeBuffer.baseAddress?.advanced(by: writeBufferPos))
                         
                         /// If the write buffer is too full, write it to disk. Too full means, that the next compressed chunk may not fit inside
                         writeBufferPos += writeLength
-                        if (writeBufferSize-writeBufferPos) < minBufferSize{
-                            try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer, count: writeBufferPos))
+                        if (writeBuffer.count - writeBufferPos) < minBufferSize{
+                            try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer.baseAddress, count: writeBufferPos))
                             // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
                             try fn.synchronize()
                             writeBufferPos = 0
@@ -184,8 +204,8 @@ public final class OmFileWriter {
                 c0 += nReadChunks
             }
         case .fpxdec32:
-            let bufferFloat = buffer.baseAddress!.assumingMemoryBound(to: Float.self)
-            let buffer = buffer.baseAddress!.assumingMemoryBound(to: UInt32.self)
+            let bufferFloat = readBuffer.baseAddress!.assumingMemoryBound(to: Float.self)
+            let buffer = readBuffer.baseAddress!.assumingMemoryBound(to: UInt32.self)
             while c0 < nDim0Chunks {
                 // Get new data from closure
                 let uncompressedInput = try supplyChunk(c0 * chunk0)
@@ -234,12 +254,12 @@ public final class OmFileWriter {
                             }
                         }
                         
-                        let writeLength = fpxenc32(buffer, length1 * length0, writeBuffer.advanced(by: writeBufferPos), 0)
+                        let writeLength = fpxenc32(buffer, length1 * length0, writeBuffer.baseAddress?.advanced(by: writeBufferPos), 0)
                         
                         /// If the write buffer is too full, write it to disk. Too full means, that the next compressed chunk may not fit inside
                         writeBufferPos += writeLength
-                        if (writeBufferSize-writeBufferPos) < minBufferSize{
-                            try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer, count: writeBufferPos))
+                        if (writeBuffer.count - writeBufferPos) < minBufferSize{
+                            try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer.baseAddress, count: writeBufferPos))
                             // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
                             try fn.synchronize()
                             writeBufferPos = 0
@@ -256,7 +276,7 @@ public final class OmFileWriter {
         
         
         // Write remainind data from buffer
-        try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer, count: writeBufferPos))
+        try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer.baseAddress, count: writeBufferPos))
         
         //print("avg chunk size bytes", (chunkOffsetBytes.last ?? 0) / (nDim0Chunks*nDim1Chunks))
         
@@ -275,8 +295,8 @@ public final class OmFileWriter {
     }
     
     /// Write all data at once without any streaming
-    public static func write(file: String, compressionType: CompressionType, scalefactor: Float, dim0: Int, dim1: Int, chunk0: Int, chunk1: Int, all: [Float]) throws {
-        try write(file: file, compressionType: compressionType, scalefactor: scalefactor, dim0: dim0, dim1: dim1, chunk0: chunk0, chunk1: chunk1, supplyChunk: { range in
+    public func write(file: String, compressionType: CompressionType, scalefactor: Float, all: [Float]) throws {
+        try write(file: file, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { range in
             return ArraySlice(all)
         })
     }

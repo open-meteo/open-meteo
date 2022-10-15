@@ -72,6 +72,8 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
+        let writer = OmFileWriter(dim0: nx, dim1: ny, chunk0: nx, chunk1: ny)
+        
         for forecastStep in 0..<domain.countForecastHours {
             /// E.g. 0,3,6...174 for gwam
             let forecastHour = forecastStep * domain.dtHours
@@ -102,12 +104,12 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                     }
                     //let data2d = Array2DFastSpace(data: elevation, nLocations: elevation.count, nTime: 1)
                     //try data2d.writeNetcdf(filename: "\(downloadDirectory)elevation.nc", nx: nx, ny: ny)
-                    try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: elevation)
+                    try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
                 }
                 
                 // Save temporarily as compressed om files
                 try FileManager.default.removeItemIfExists(at: fileDest)
-                try OmFileWriter.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, dim0: nx, dim1: ny, chunk0: nx, chunk1: ny, all: data2d.data)
+                try writer.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data2d.data)
             }
         }
     }

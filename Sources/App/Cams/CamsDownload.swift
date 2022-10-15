@@ -89,6 +89,8 @@ struct DownloadCamsCommand: AsyncCommandFix {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
+        let writer = OmFileWriter(dim0: nx, dim1: ny, chunk0: nx, chunk1: ny)
+        
         let curl = Curl(logger: logger)
         let dateRun = run.format_YYYYMMddHH
         let remoteDir = "https://\(user):\(password)@dissemination.ecmwf.int/ecpds/data/file/CAMS_GLOBAL/\(dateRun)/"
@@ -136,7 +138,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
                 //try data2d.writeNetcdf(filename: "\(domain.downloadDirectory)/\(variable).nc", nx: nx, ny: ny)
                 try FileManager.default.removeItemIfExists(at: filenameDest)
                 // Store as compressed float array
-                try OmFileWriter.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, dim0: nx, dim1: ny, chunk0: nx, chunk1: ny, all: data)
+                try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
             }
         }
         

@@ -131,7 +131,7 @@ struct DownloadDemCommand: Command {
                 try FileManager.default.removeItem(atPath: ncTemp)
                 
 
-                try OmFileWriter.write(file: omFile, compressionType: .p4nzdec256, scalefactor: 1, dim0: data.dimensions[0], dim1: data.dimensions[1], chunk0: 20, chunk1: 20, all: data.data)
+                try OmFileWriter(dim0: data.dimensions[0], dim1: data.dimensions[1], chunk0: 20, chunk1: 20).write(file: omFile, compressionType: .p4nzdec256, scalefactor: 1, all: data.data)
             }
         }
         
@@ -157,7 +157,7 @@ struct DownloadDemCommand: Command {
             }
             //let a2 = Array2DFastSpace(data: line, nLocations: 1200*360*px, nTime: 1)
             //try a2.writeNetcdf(filename: "\(Dem90.downloadDirectory)lat_\(lat).nc", nx: 360*px, ny: 1200)
-            try OmFileWriter.write(file: "\(Dem90.omDirectory)lat_\(lat).om", compressionType: .p4nzdec256, scalefactor: 1, dim0: 1200, dim1: px*360, chunk0: 60, chunk1: 60, all: line)
+            try OmFileWriter(dim0: 1200, dim1: px*360, chunk0: 60, chunk1: 60).write(file: "\(Dem90.omDirectory)lat_\(lat).om", compressionType: .p4nzdec256, scalefactor: 1, all: line)
         }
     }
     

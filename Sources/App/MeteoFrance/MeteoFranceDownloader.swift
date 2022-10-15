@@ -133,7 +133,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
             // landmask: 0=sea, 1=land
             height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
         }
-        try OmFileWriter.write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: height.data)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
     }
     
     /// download MeteoFrance
@@ -147,6 +147,8 @@ struct MeteoFranceDownload: AsyncCommandFix {
         /// world 0-24, 27-48, 51-72, 75-102
         let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)
         let fileTimesHourly = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: true)
+        
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
         
         // loop over time files... every file has 6,12 or 24 hour of data
         for (fileTime, fileTimeHourly) in zip(fileTimes, fileTimesHourly) {
@@ -196,7 +198,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                     
                     curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(variable.hour).om")
                     let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
+                    try writer.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, all: data.data)
                 }
             }
         }

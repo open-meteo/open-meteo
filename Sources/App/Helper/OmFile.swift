@@ -149,6 +149,8 @@ struct OmFileSplitter {
         // Allocate buffers to uncompress existing data
         var fileData = [Float](repeating: .nan, count: nTimePerFile * locationsChunk)
         
+        let writer = OmFileWriter(dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile)
+        
         /// icon global, one file has 4GB uncompressed floats inside....
         /// Therefore we only read 12 locations from each file at once and then write them to the new file
         /// This greatly reduced memory... Otherwise the icon downloader takes 8GB memory
@@ -166,7 +168,7 @@ struct OmFileSplitter {
             try FileManager.default.removeItemIfExists(at: tempFile)
             
             // generate new file, while filling it step by step
-            try OmFileWriter.write(file: tempFile, compressionType: .p4nzdec256, scalefactor: scalefactor, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, supplyChunk: {
+            try writer.write(file: tempFile, compressionType: .p4nzdec256, scalefactor: scalefactor, supplyChunk: {
                 d0offset in
                 
                 // Read existing data for a chunk of locations.. Around 8MB data

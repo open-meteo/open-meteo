@@ -56,6 +56,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
         let runStr = run.hour.zeroPadded(len: 2)
         
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             
@@ -128,7 +130,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 
                 curl.logger.info("Compressing and writing data to \(variable.omFileName)_\(hour).om")
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, dim0: 1, dim1: data2d.count, chunk0: 1, chunk1: 8*1024, all: data2d.data)
+                try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: data2d.data)
             }
         }
     }

@@ -132,7 +132,7 @@ struct GfsDownload: AsyncCommandFix {
             // landmask: 0=sea, 1=land
             height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
         }
-        try OmFileWriter.write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20, all: height.data)
+        try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
     }
     
     /// download GFS025 and NAM CONUS
@@ -147,6 +147,8 @@ struct GfsDownload: AsyncCommandFix {
         let deadLineHours = domain == .gfs025 ? 4 : 2
         let curl = Curl(logger: logger, deadLineHours: deadLineHours)
         let forecastHours = domain.forecastHours(run: run.hour)
+        
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
         
         let variables: [GfsVariableAndDomain] = variables.map {
             GfsVariableAndDomain(variable: $0, domain: domain)
@@ -165,6 +167,7 @@ struct GfsDownload: AsyncCommandFix {
             }
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
             try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared) { variables, messages in
+                curl.logger.info("Compressing and writing data")
                 for (variable, message) in zip(variables, messages) {
                     var data = message.toArray2d()
                     /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
@@ -185,10 +188,8 @@ struct GfsDownload: AsyncCommandFix {
                     if let fma = variable.variable.multiplyAdd {
                         data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
-                    
-                    curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg")
                     let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    try OmFileWriter.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, dim0: 1, dim1: data.count, chunk0: 1, chunk1: 8*1024, all: data.data)
+                    try writer.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, all: data.data)
                 }
             }
         }

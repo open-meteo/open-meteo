@@ -29,7 +29,7 @@ final class SwiftPFor2DTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        XCTAssertThrowsError(try OmFileWriter.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, dim0: 5, dim1: 5, chunk0: 2, chunk1: 2, supplyChunk: { dim0pos in
+        XCTAssertThrowsError(try OmFileWriter(dim0: 5, dim1: 5, chunk0: 2, chunk1: 2).write(file: file, compressionType: .p4nzdec256, scalefactor: 1, supplyChunk: { dim0pos in
             if dim0pos == 0 {
                 return ArraySlice((0..<10).map({ Float($0) }))
             }
@@ -49,7 +49,7 @@ final class SwiftPFor2DTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        try OmFileWriter.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, dim0: 5, dim1: 5, chunk0: 2, chunk1: 2, supplyChunk: { dim0pos in
+        try OmFileWriter(dim0: 5, dim1: 5, chunk0: 2, chunk1: 2).write(file: file, compressionType: .p4nzdec256, scalefactor: 1, supplyChunk: { dim0pos in
             
             if dim0pos == 0 {
                 return ArraySlice((0..<10).map({ Float($0) }))
@@ -117,7 +117,7 @@ final class SwiftPFor2DTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let data = (0..<(5*5)).map({ val in Float.nan })
-        try OmFileWriter.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, dim0: 5, dim1: 5, chunk0: 5, chunk1: 5, all: data)
+        try OmFileWriter(dim0: 5, dim1: 5, chunk0: 5, chunk1: 5).write(file: file, compressionType: .p4nzdec256, scalefactor: 1, all: data)
         
         let read = try OmFileReader(file: file)
         let data2 = try read.read(dim0Slow: nil, dim1: nil)
@@ -129,7 +129,7 @@ final class SwiftPFor2DTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        try OmFileWriter.write(file: file, compressionType: .fpxdec32, scalefactor: 1, dim0: 5, dim1: 5, chunk0: 2, chunk1: 2, supplyChunk: { dim0pos in
+        try OmFileWriter(dim0: 5, dim1: 5, chunk0: 2, chunk1: 2).write(file: file, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0pos in
             
             if dim0pos == 0 {
                 return ArraySlice((0..<10).map({ Float($0) }))
@@ -197,7 +197,7 @@ final class SwiftPFor2DTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let data = (0..<(5*5)).map({ val in Float.nan })
-        try OmFileWriter.write(file: file, compressionType: .fpxdec32, scalefactor: 1, dim0: 5, dim1: 5, chunk0: 5, chunk1: 5, all: data)
+        try OmFileWriter(dim0: 5, dim1: 5, chunk0: 5, chunk1: 5).write(file: file, compressionType: .fpxdec32, scalefactor: 1, all: data)
         
         let read = try OmFileReader(file: file)
         let data2 = try read.read(dim0Slow: nil, dim1: nil)

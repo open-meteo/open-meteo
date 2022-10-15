@@ -274,7 +274,7 @@ struct DownloadEra5Command: Command {
         let read = try OmFileReader(file: readFilePath)
         
         var percent = 0
-        try OmFileWriter.write(file: writeFilePath, compressionType: .p4nzdec256, scalefactor: read.scalefactor, dim0: read.dim0, dim1: read.dim1, chunk0: read.chunk0, chunk1: read.chunk1) { dim0 in
+        try OmFileWriter(dim0: read.dim0, dim1: read.dim1, chunk0: read.chunk0, chunk1: read.chunk1).write(file: writeFilePath, compressionType: .p4nzdec256, scalefactor: read.scalefactor) { dim0 in
             let ratio = Int(Float(dim0) / (Float(read.dim0)) * 100)
             if percent != ratio {
                 logger.info("\(ratio) %")
@@ -364,7 +364,7 @@ struct DownloadEra5Command: Command {
             }
         }
         
-        try OmFileWriter.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20, all: elevation)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
     }
     
     func runStripSea(logger: Logger, year: Int) throws {
@@ -406,7 +406,7 @@ struct DownloadEra5Command: Command {
             }
             var percent = 0
             var looptime = DispatchTime.now()
-            try OmFileWriter.write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: nt/8) { dim0 in
+            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: nt/8).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor) { dim0 in
                 let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
                 if percent != ratio {
                     /// time ~4.5 seconds
@@ -453,6 +453,8 @@ struct DownloadEra5Command: Command {
         /// The lower bound will be adapted if timesteps already exist
         /// The upper bound will be reduced if the files are not yet on the remote server
         var downloadedRange = timeinterval.range.upperBound ..< timeinterval.range.upperBound
+        
+        let writer = OmFileWriter(dim0: domain.grid.count, dim1: 24, chunk0: 600, chunk1: 24)
         
         timeLoop: for timestamp in timeinterval {
             logger.info("Downloading timestamp \(timestamp.iso8601_YYYY_MM_dd)")
@@ -544,7 +546,7 @@ struct DownloadEra5Command: Command {
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timestamp.format_YYYYMMdd).om"
                 try FileManager.default.removeItemIfExists(at: omFile)
                 // Write time oriented file
-                try OmFileWriter.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, dim0: fastTime.nLocations, dim1: fastTime.nTime, chunk0: 600, chunk1: fastTime.nTime, all: fastTime.data)
+                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: fastTime.data)
             }
             
             // Update downloaded range if download successfull
