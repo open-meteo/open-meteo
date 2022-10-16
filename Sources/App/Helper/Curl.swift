@@ -254,10 +254,6 @@ struct Curl {
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
                 try data.withUnsafeReadableBytes {
-                    for i in 0..<1000 {
-                        print(i)
-                        let messages = try GribMemory(ptr: $0).messages
-                    }
                     let messages = try GribMemory(ptr: $0).messages
                     if messages.count != matches.count {
                         logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
