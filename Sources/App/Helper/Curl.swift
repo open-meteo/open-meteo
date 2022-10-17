@@ -319,7 +319,7 @@ struct Curl {
                 logger.info("Grib variable \(match) matched twice for \(idx)")
                 return false
             }
-            logger.debug("Matched \(match) with \(idx)")
+            //logger.debug("Matched \(match) with \(idx)")
             matches.append(match)
             return true
         }) else {

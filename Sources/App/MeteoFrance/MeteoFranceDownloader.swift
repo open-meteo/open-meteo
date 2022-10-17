@@ -77,6 +77,9 @@ struct MeteoFranceDownload: AsyncCommandFix {
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
         
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        
         try await downloadElevation(application: context.application, domain: domain)
         try await download(application: context.application, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
@@ -139,9 +142,6 @@ struct MeteoFranceDownload: AsyncCommandFix {
     /// download MeteoFrance
     func download(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        
         var curl = Curl(logger: logger, deadLineHours: 4)
                 
         /// world 0-24, 27-48, 51-72, 75-102
