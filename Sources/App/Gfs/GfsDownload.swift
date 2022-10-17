@@ -149,6 +149,8 @@ struct GfsDownload: AsyncCommandFix {
         let forecastHours = domain.forecastHours(run: run.hour)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         let variables: [GfsVariableAndDomain] = variables.map {
             GfsVariableAndDomain(variable: $0, domain: domain)
@@ -169,7 +171,7 @@ struct GfsDownload: AsyncCommandFix {
             try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared) { variables, messages in
                 curl.logger.info("Compressing and writing data")
                 for (variable, message) in zip(variables, messages) {
-                    var data = message.toArray2d()
+                    try grib2d.load(message: message)
                     /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {
                      if i % 10_000 == 0 {
                      print("grid \(i) lat \(latitude) lon \(longitude)")
@@ -177,19 +179,18 @@ struct GfsDownload: AsyncCommandFix {
                      }
                      fatalError("OK")*/
                     if domain.isGlobal {
-                        data.shift180LongitudeAndFlipLatitude()
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
                     }
-                    data.ensureDimensions(of: domain.grid)
                     //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                     try FileManager.default.removeItemIfExists(at: file)
                     
                     // Scaling before compression with scalefactor
                     if let fma = variable.variable.multiplyAdd {
-                        data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    try writer.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, all: data.data)
+                    try writer.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                 }
             }
         }

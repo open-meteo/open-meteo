@@ -386,6 +386,41 @@ extension GribMessage {
     }
 }
 
+struct GribArray2D {
+    var bitmap: [Int]
+    var double: [Double]
+    var array: Array2D
+    
+    public init(nx: Int, ny: Int) {
+        array = Array2D(data: [Float](repeating: .nan, count: nx*ny), nx: nx, ny: ny)
+        bitmap = .init(repeating: 0, count: nx*ny)
+        double = .init(repeating: .nan, count: nx*ny)
+    }
+    
+    public mutating func load(message: GribMessage) throws {
+        guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
+            fatalError("Could not get Nx")
+        }
+        guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
+            fatalError("Could not get Ny")
+        }
+        guard nx == array.nx, ny == array.ny else {
+            fatalError("GRIB dimensions (nx=\(nx), ny=\(ny)) do not match domain grid dimensions (nx=\(array.nx), ny=\(array.ny))")
+        }
+        try message.loadDoubleNotNaNChecked(into: &double)
+        for i in double.indices {
+            array.data[i] = Float(double[i])
+        }
+        if try message.loadBitmap(into: &bitmap) {
+            for i in bitmap.indices {
+                if bitmap[i] == 0 {
+                    array.data[i] = .nan
+                }
+            }
+        }
+    }
+}
+
 protocol CurlIndexedVariable {
     /// Return true, if this index string is matching. Index string looks like `13:520719:d=2022080900:ULWRF:top of atmosphere:anl:`
     /// If nil, this record is ignored

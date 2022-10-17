@@ -40,3 +40,85 @@ void windirectionFast(const size_t num_points, const float* ys, const float* xs,
     out[i] = res * (180 / pi) + 180;
   }
 }
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#if __APPLE__
+void display_mallinfo2(void) {
+    printf("display_mallinfo2 not supported for macOS\n");
+}
+#else
+#include <malloc.h>
+
+
+void display_mallinfo2(void) {
+   struct mallinfo2 mi;
+
+   mi = mallinfo2();
+
+   printf("Total non-mmapped bytes (arena):       %zu\n", mi.arena);
+   printf("# of free chunks (ordblks):            %zu\n", mi.ordblks);
+   printf("# of free fastbin blocks (smblks):     %zu\n", mi.smblks);
+   printf("# of mapped regions (hblks):           %zu\n", mi.hblks);
+   printf("Bytes in mapped regions (hblkhd):      %zu\n", mi.hblkhd);
+   printf("Max. total allocated space (usmblks):  %zu\n", mi.usmblks);
+   printf("Free bytes held in fastbins (fsmblks): %zu\n", mi.fsmblks);
+   printf("Total allocated space (uordblks):      %zu\n", mi.uordblks);
+   printf("Total free space (fordblks):           %zu\n", mi.fordblks);
+   printf("Topmost releasable block (keepcost):   %zu\n", mi.keepcost);
+}
+#endif
+
+
+
+/*int
+main(int argc, char *argv[])
+{
+#define MAX_ALLOCS 2000000
+   char *alloc[MAX_ALLOCS];
+   int numBlocks, freeBegin, freeEnd, freeStep;
+   size_t blockSize;
+
+   if (argc < 3 || strcmp(argv[1], "--help") == 0) {
+       fprintf(stderr, "%s num-blocks block-size [free-step "
+               "[start-free [end-free]]]\n", argv[0]);
+       exit(EXIT_FAILURE);
+   }
+
+   numBlocks = atoi(argv[1]);
+   blockSize = atoi(argv[2]);
+   freeStep = (argc > 3) ? atoi(argv[3]) : 1;
+   freeBegin = (argc > 4) ? atoi(argv[4]) : 0;
+   freeEnd = (argc > 5) ? atoi(argv[5]) : numBlocks;
+
+   printf("============== Before allocating blocks ==============\n");
+   display_mallinfo2();
+
+   for (int j = 0; j < numBlocks; j++) {
+       if (numBlocks >= MAX_ALLOCS) {
+           fprintf(stderr, "Too many allocations\n");
+           exit(EXIT_FAILURE);
+       }
+
+       alloc[j] = malloc(blockSize);
+       if (alloc[j] == NULL) {
+           perror("malloc");
+           exit(EXIT_FAILURE);
+       }
+   }
+
+   printf("\n============== After allocating blocks ==============\n");
+   display_mallinfo2();
+
+   for (int j = freeBegin; j < freeEnd; j += freeStep)
+       free(alloc[j]);
+
+   printf("\n============== After freeing blocks ==============\n");
+   display_mallinfo2();
+
+   exit(EXIT_SUCCESS);
+}
+*/
