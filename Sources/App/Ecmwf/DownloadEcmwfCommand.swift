@@ -81,22 +81,14 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             
             let grib = try await curl.downloadGrib(url: url, client: application.http.client.shared)
             
+            logger.info("Compressing and writing data")
+            
             for variable in variables {
-                var unknown = 0
                 guard let message = grib.messages.first(where: { message in
                     let shortName = message.get(attribute: "shortName")!
                     let levelhPa = Int(message.get(attribute: "level")!)!
                     //let paramId = Int(message.get(attribute: "paramId")!)!
-                    if shortName == "unknown" {
-                        unknown += 1
-                    }
                     if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
-                        return true
-                    }
-                    if variable == .precipitation && unknown == 1 {
-                        return true
-                    }
-                    if variable == .runoff && unknown == 2 {
                         return true
                     }
                     return shortName == variable.gribName && levelhPa == (variable.level ?? 0)
@@ -129,7 +121,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
                 try FileManager.default.removeItemIfExists(at: file)
                 
-                curl.logger.info("Compressing and writing data to \(variable.omFileName)_\(hour).om")
+                
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                 try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
