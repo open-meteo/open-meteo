@@ -108,18 +108,18 @@ struct GfsDownload: AsyncCommandFix {
         var height: Array2D? = nil
         var landmask: Array2D? = nil
         var curl = Curl(logger: logger)
+        var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.http.client.shared) { variables, messages in
             for (variable, message) in zip(variables, messages) {
-                var data = message.toArray2d()
+                try grib2d.load(message: message)
                 if isGlobal {
-                    data.shift180LongitudeAndFlipLatitude()
+                    grib2d.array.shift180LongitudeAndFlipLatitude()
                 }
-                data.ensureDimensions(of: grid)
                 switch variable {
                 case .height:
-                    height = data
+                    height = grib2d.array
                 case .landmask:
-                    landmask = data
+                    landmask = grib2d.array
                 }
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
             }

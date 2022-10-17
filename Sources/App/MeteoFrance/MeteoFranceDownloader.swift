@@ -99,30 +99,30 @@ struct MeteoFranceDownload: AsyncCommandFix {
         var curl = Curl(logger: logger)
         let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
         
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
         let terrainUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/terrain.grib2"
         for message in try await curl.downloadGrib(url: terrainUrl, client: application.http.client.shared).messages {
-            var data = message.toArray2d()
+            try grib2d.load(message: message)
             if domain.isGlobal {
-                data.shift180LongitudeAndFlipLatitude()
+                grib2d.array.shift180LongitudeAndFlipLatitude()
             } else {
-                data.flipLatitude()
+                grib2d.array.flipLatitude()
             }
-            data.ensureDimensions(of: domain.grid)
-            height = data
-            try data.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
+            height = grib2d.array
+            try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         }
         
         let landmaskUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/landmask.grib2"
         for message in try await curl.downloadGrib(url: landmaskUrl, client: application.http.client.shared).messages {
-            var data = message.toArray2d()
+            try grib2d.load(message: message)
             if domain.isGlobal {
-                data.shift180LongitudeAndFlipLatitude()
+                grib2d.array.shift180LongitudeAndFlipLatitude()
             } else {
-                data.flipLatitude()
+                grib2d.array.flipLatitude()
             }
-            data.ensureDimensions(of: domain.grid)
-            landmask = data
-            try data.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
+            landmask = grib2d.array
+            try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
         }
         
         guard var height = height, let landmask = landmask else {
@@ -149,6 +149,8 @@ struct MeteoFranceDownload: AsyncCommandFix {
         let fileTimesHourly = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: true)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         // loop over time files... every file has 6,12 or 24 hour of data
         for (fileTime, fileTimeHourly) in zip(fileTimes, fileTimesHourly) {
@@ -179,26 +181,25 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
                 let url = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/v1/\(run.iso8601_YYYY_MM_dd)/\(run.hour.zeroPadded(len: 2))/\(package)/\(fileTime.file).grib2"
                 
-                for (variable, data) in try await curl.downloadIndexedGribSequential(url: url, variables: vars, extension: ".inv", client: application.http.client.shared) {
-                    var data = data
+                try await curl.downloadIndexedGribSequential(url: url, variables: vars, extension: ".inv", client: application.http.client.shared) { (variable, message) in
+                    try grib2d.load(message: message)
                     if domain.isGlobal {
-                        data.shift180LongitudeAndFlipLatitude()
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
                     } else {
-                        data.flipLatitude()
+                        grib2d.array.flipLatitude()
                     }
-                    data.ensureDimensions(of: domain.grid)
                     // Scaling before compression with scalefactor
                     if let fma = variable.variable.multiplyAdd {
-                        data.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
                     //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).om"
                     try FileManager.default.removeItemIfExists(at: file)
                     
-                    curl.logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(variable.hour).om")
+                    logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(variable.hour).om")
                     let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    try writer.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, all: data.data)
+                    try writer.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                 }
             }
         }

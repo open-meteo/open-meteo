@@ -74,6 +74,8 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         
         let writer = OmFileWriter(dim0: nx, dim1: ny, chunk0: nx, chunk1: ny)
         
+        var grib2d = GribArray2D(nx: nx, ny: ny)
+        
         for forecastStep in 0..<domain.countForecastHours {
             /// E.g. 0,3,6...174 for gwam
             let forecastHour = forecastStep * domain.dtHours
@@ -87,17 +89,17 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                     continue
                 }
                 
-                var data2d = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).messages[0].toArray2d()
-                data2d.ensureDimensions(of: domain.grid)
+                let message = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).messages[0]
+                try grib2d.load(message: message)
                 if domain == .gwam {
-                    data2d.shift180LongitudeAndFlipLatitude()
+                    grib2d.array.shift180LongitudeAndFlipLatitude()
                 } else {
-                    data2d.flipLatitude()
+                    grib2d.array.flipLatitude()
                 }
                 
                 /// Create elevation file for sea mask
                 if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
-                    var elevation = data2d.data
+                    var elevation = grib2d.array.data
                     for i in elevation.indices {
                         /// `NaN` out of domain, `-999` sea grid point
                         elevation[i] = elevation[i].isNaN ? .nan : -999
@@ -109,7 +111,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                 
                 // Save temporarily as compressed om files
                 try FileManager.default.removeItemIfExists(at: fileDest)
-                try writer.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data2d.data)
+                try writer.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
         }
     }

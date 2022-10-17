@@ -294,10 +294,10 @@ struct Curl {
     }
     
     /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
-    mutating func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient) async throws -> [(variable: Variable, data: Array2D)] {
+    mutating func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: (Variable, GribMessage) throws -> ()) async throws {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
-            return []
+            return
         }
         
         guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
@@ -344,22 +344,21 @@ struct Curl {
         
         let ranges = range.split(separator: ",")
         var matchesPos = 0
-        var out = [(variable: Variable, data: Array2D)]()
         for range in ranges {
             let data = try await downloadInMemoryAsync(url: url, range: String(range), client: client)
             try data.withUnsafeReadableBytes { ptr in
                 let grib = try GribMemory(ptr: ptr)
+                chelper_malloc_trim()
                 for message in grib.messages {
                     //try! $0.dumpCoordinates()
                     //fatalError("OK")
                     let variable = matches[matchesPos]
                     matchesPos += 1
-                    out.append((variable, message.toArray2d()))
+                    try callback(variable, message)
                 }
+                chelper_malloc_trim()
             }
-            chelper_malloc_trim()
         }
-        return out
     }
 }
 
@@ -385,19 +384,6 @@ struct GribByteBuffer {
 }
 
 extension GribMessage {
-    func toArray2d() -> Array2D {
-        guard let data = try? getDouble().map(Float.init) else {
-            fatalError("Could not read GRIB data")
-        }
-        guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
-            fatalError("Could not get Nx")
-        }
-        guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
-            fatalError("Could not get Ny")
-        }
-        return Array2D(data: data, nx: nx, ny: ny)
-    }
-    
     func dumpCoordinates() throws {
         guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
             fatalError("Could not get Nx")

@@ -56,6 +56,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
         let runStr = run.hour.zeroPadded(len: 2)
         
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
         
         for hour in forecastSteps {
@@ -116,13 +118,12 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     fatalError("could not find \(variable) \(variable.gribName)")
                 }
                 
-                var data2d = message.toArray2d()
-                data2d.ensureDimensions(of: domain.grid)
-                data2d.flipLatitude()
+                try grib2d.load(message: message)
+                grib2d.array.flipLatitude()
                 
                 // Scaling before compression with scalefactor
                 if let fma = variable.multiplyAdd {
-                    data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
                 let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
@@ -130,7 +131,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 
                 curl.logger.info("Compressing and writing data to \(variable.omFileName)_\(hour).om")
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: data2d.data)
+                try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
         }
     }

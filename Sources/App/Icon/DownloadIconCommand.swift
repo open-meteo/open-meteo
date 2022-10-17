@@ -172,6 +172,8 @@ struct DownloadIconCommand: AsyncCommandFix {
         var curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         for hour in forecastSteps {
@@ -210,9 +212,9 @@ struct DownloadIconCommand: AsyncCommandFix {
                     try FileManager.default.removeItem(atPath: gribFile)
                 } else {
                     // Use async in-memory download and decoding -> 4 times faster, but cannot regrid icosahedral data
-                    let data2d = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).messages[0].toArray2d()
-                    data2d.ensureDimensions(of: domain.grid)
-                    data = data2d.data
+                    let message = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).messages[0]
+                    try grib2d.load(message: message)
+                    data = grib2d.array.data
                 }
                 
                 // Write data as encoded floats to disk
