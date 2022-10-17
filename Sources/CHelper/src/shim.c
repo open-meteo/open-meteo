@@ -50,9 +50,17 @@ void windirectionFast(const size_t num_points, const float* ys, const float* xs,
 void display_mallinfo2(void) {
     printf("display_mallinfo2 not supported for macOS\n");
 }
+
+void chelper_malloc_trim() {
+    // not available for macos
+}
 #else
+
 #include <malloc.h>
 
+void chelper_malloc_trim() {
+    malloc_trim(0);
+}
 
 void display_mallinfo2(void) {
    struct mallinfo2 mi;

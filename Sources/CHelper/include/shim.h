@@ -8,4 +8,6 @@ void windirectionFast(const size_t num_points, const float* ys, const float* xs,
 
 void display_mallinfo2(void);
 
+void chelper_malloc_trim(void);
+
 #endif // _CHELPER_

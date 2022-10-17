@@ -3,7 +3,7 @@ import Vapor
 import SwiftEccodes
 import AsyncHTTPClient
 import SwiftPFor2D
-
+import CHelper
 
 enum CurlError: Error {
     case noGribMessagesMatch
@@ -268,12 +268,20 @@ struct Curl {
             do {
                 try data.withUnsafeReadableBytes {
                     let messages = try GribMemory(ptr: $0).messages
+                    
+                    // memory allocations in libeccodes can case severe memory fragementation
+                    // This leads to 20GB+ usage while decoding gfs025 with upper level variables
+                    // malloc_trim() reduces this effect significantly
+                    chelper_malloc_trim()
+                    
                     if messages.count != matches.count {
                         logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
                         throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: matches.count)
                     }
                     try callback(matches, messages)
+                    chelper_malloc_trim()
                 }
+                //display_mallinfo2()
                 return
             } catch {
                 retries += 1
@@ -349,6 +357,7 @@ struct Curl {
                     out.append((variable, message.toArray2d()))
                 }
             }
+            chelper_malloc_trim()
         }
         return out
     }
