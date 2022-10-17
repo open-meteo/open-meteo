@@ -107,7 +107,7 @@ struct GfsDownload: AsyncCommandFix {
         
         var height: Array2D? = nil
         var landmask: Array2D? = nil
-        let curl = Curl(logger: logger)
+        var curl = Curl(logger: logger)
         try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.http.client.shared) { variables, messages in
             for (variable, message) in zip(variables, messages) {
                 var data = message.toArray2d()
@@ -145,7 +145,7 @@ struct GfsDownload: AsyncCommandFix {
         try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         
         let deadLineHours = domain == .gfs025 ? 4 : 2
-        let curl = Curl(logger: logger, deadLineHours: deadLineHours)
+        var curl = Curl(logger: logger, deadLineHours: deadLineHours)
         let forecastHours = domain.forecastHours(run: run.hour)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
@@ -169,7 +169,7 @@ struct GfsDownload: AsyncCommandFix {
             }
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
             try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared) { variables, messages in
-                curl.logger.info("Compressing and writing data")
+                logger.info("Compressing and writing data")
                 for (variable, message) in zip(variables, messages) {
                     try grib2d.load(message: message)
                     /*for (i,(latitude, longitude,value)) in try message.iterateCoordinatesAndValues().enumerated() {

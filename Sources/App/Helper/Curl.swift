@@ -29,9 +29,13 @@ struct Curl {
     /// Wait time after each download
     let retryDelaySeconds = 5
     
+    /// Download buffer which is reused during downloads
+    var buffer: ByteBuffer
+    
     public init(logger: Logger, deadLineHours: Int = 3) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
+        buffer = ByteBuffer()
     }
     
     /*func download(url: String, to: String, range: String? = nil) throws {
@@ -142,22 +146,32 @@ struct Curl {
     }
     
     /// Use http-async http client to download and decompress as bzip2
-    func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
+    mutating func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: nil, client: client) {
-            return try await $0.body.decompressBzip2().collect(upTo: .max)
+            buffer.moveReaderIndex(to: 0)
+            buffer.moveWriterIndex(to: 0)
+            for try await fragement in $0.body.decompressBzip2() {
+                buffer.writeImmutableBuffer(fragement)
+            }
+            return buffer
         }
     }
     
     /// Use http-async http client to download
-    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
+    mutating func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) {
-            return try await $0.body.collect(upTo: .max)
+            buffer.moveReaderIndex(to: 0)
+            buffer.moveWriterIndex(to: 0)
+            for try await fragement in $0.body {
+                buffer.writeImmutableBuffer(fragement)
+            }
+            return buffer
         }
     }
     
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
+    mutating func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
@@ -176,7 +190,7 @@ struct Curl {
     }
     
     /// download a bz2 compressed grib
-    func downloadBz2Grib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
+    mutating func downloadBz2Grib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
@@ -197,14 +211,13 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: ([Variable], [GribMessage]) throws -> ()) async throws {
+    mutating func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: ([Variable], [GribMessage]) throws -> ()) async throws {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return
         }
         
-        var indexData = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client)
-        guard let index = indexData.readString(length: indexData.readableBytes) else {
+        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
             fatalError("Could not decode index to string")
         }
 
@@ -273,14 +286,13 @@ struct Curl {
     }
     
     /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
-    func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient) async throws -> [(variable: Variable, data: Array2D)] {
+    mutating func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient) async throws -> [(variable: Variable, data: Array2D)] {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return []
         }
         
-        var indexData = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client)
-        guard let index = indexData.readString(length: indexData.readableBytes) else {
+        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
             fatalError("Could not decode index to string")
         }
 
@@ -339,6 +351,13 @@ struct Curl {
             }
         }
         return out
+    }
+}
+
+extension ByteBuffer {
+    public func readStringImmutable() -> String? {
+        var b = self
+        return b.readString(length: b.readableBytes)
     }
 }
 

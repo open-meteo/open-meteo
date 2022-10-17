@@ -96,7 +96,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         
         var height: Array2D? = nil
         var landmask: Array2D? = nil
-        let curl = Curl(logger: logger)
+        var curl = Curl(logger: logger)
         let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
         
         let terrainUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/terrain.grib2"
@@ -142,7 +142,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
-        let curl = Curl(logger: logger, deadLineHours: 4)
+        var curl = Curl(logger: logger, deadLineHours: 4)
                 
         /// world 0-24, 27-48, 51-72, 75-102
         let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)
