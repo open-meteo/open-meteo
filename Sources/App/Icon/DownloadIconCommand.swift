@@ -225,7 +225,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
-                logger.info("Compressing and writing data to \(filenameDest)")
+                //logger.info("Compressing and writing data to \(filenameDest)")
                 let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                 try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
             }

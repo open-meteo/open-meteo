@@ -195,7 +195,7 @@ struct Curl {
         var retries = 0
         while true {
             let data = try await downloadBz2Decompress(url: url, client: client)
-            logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
+            //logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
             } catch {
@@ -380,6 +380,7 @@ struct GribByteBuffer {
         self.messages = try bytebuffer.withUnsafeReadableBytes {
             try GribMemory(ptr: $0).messages
         }
+        chelper_malloc_trim()
     }
 }
 
