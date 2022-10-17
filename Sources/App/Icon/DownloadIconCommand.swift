@@ -3,6 +3,7 @@ import Vapor
 import SwiftNetCDF
 import SwiftPFor2D
 import Dispatch
+import CHelper
 
 
 struct CdoHelper {
@@ -230,6 +231,8 @@ struct DownloadIconCommand: AsyncCommandFix {
                 try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
             }
         }
+        // icon global downloads tend to use a lot of memory due to numerous allocations
+        chelper_malloc_trim()
     }
 
     /// unompress and remap
