@@ -93,9 +93,9 @@ struct DownloadCamsCommand: AsyncCommandFix {
         
         let curl = Curl(logger: logger)
         let dateRun = run.format_YYYYMMddHH
-        let remoteDir = "https://\(user):\(password)@dissemination.ecmwf.int/ecpds/data/file/CAMS_GLOBAL/\(dateRun)/"
+        let remoteDir = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CAMS_GLOBAL_TEST/\(dateRun)/"
         /// The surface level of multi-level files is available in the `CAMS_GLOBAL_ADDITIONAL` directory
-        let remoteDirAdditional = "https://\(user):\(password)@dissemination.ecmwf.int/ecpds/data/file/CAMS_GLOBAL_ADDITIONAL/\(dateRun)/"
+        let remoteDirAdditional = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CAMS_GLOBAL_ADDITIONAL_TEST/\(dateRun)/"
         
         for hour in 0..<domain.forecastHours {
             logger.info("Downloading hour \(hour)")
