@@ -14,6 +14,9 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Option(name: "run")
         var run: String?
+        
+        @Option(name: "server", help: "Root server path. Default: 'https://data.ecmwf.int/forecasts/'")
+        var server: String?
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
@@ -36,15 +39,17 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let twoHoursAgo = Timestamp.now().add(-7200)
         let date = twoHoursAgo.with(hour: run)
         logger.info("Downloading domain ECMWF run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
+        
+        let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
-        try await downloadEcmwf(application: context.application, run: date, skipFilesIfExisting: signature.skipExisting)
+        try await downloadEcmwf(application: context.application, base: base, run: date, skipFilesIfExisting: signature.skipExisting)
         try convertEcmwf(logger: logger, run: date)
     }
     
-    func downloadEcmwf(application: Application, run: Timestamp, skipFilesIfExisting: Bool) async throws {
+    func downloadEcmwf(application: Application, base: String, run: Timestamp, skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
         let domain = EcmwfDomain.ifs04
-        let base = "https://data.ecmwf.int/forecasts/"
+        
         
         let dateStr = run.format_YYYYMMdd
         var curl = Curl(logger: logger)
