@@ -13,11 +13,7 @@ FileManager.default.changeCurrentDirectoryPath(projectHome)
 
 var env = try Environment.detect()
 try LoggingSystem.bootstrap(from: &env)
-
-// Use only 1 thread for NIO, to maybe reduce download issues in gfs/hrrrr
-let cores = env.arguments.count >= 2 && env.arguments[1].starts(with: "download") ? 1 : System.coreCount
-
-let app = Application(env, .shared(MultiThreadedEventLoopGroup(numberOfThreads: cores)))
+let app = Application(env)
 defer { app.shutdown() }
 try configure(app)
 try app.run()
