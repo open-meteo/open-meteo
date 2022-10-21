@@ -7,7 +7,7 @@ name: Upload Release Asset
 
 env:
   swift_package_resolve: swift package resolve
-  swift_build: swift build --enable-test-discovery -c release -Xswiftc -Ounchecked -Xswiftc -g -Xswiftc -static-stdlib -Xswiftc -cross-module-optimization
+  swift_build: swift build --enable-test-discovery -c release -Xswiftc -Ounchecked -Xswiftc -g -Xswiftc -cross-module-optimization # -Xswiftc -static-stdlib
   swift_test: swift test
   cache_version: 2
 
@@ -47,7 +47,7 @@ jobs:
       uses: gravitl/github-action-fpm@master
       with:
         fpm_args: './build'
-        fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf15 --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-api.service --deb-default build/openmeteo-api.env --before-install build/before-install.sh --before-upgrade build/before-install.sh openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
+        fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf15 -d swiftlang-slim --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-api.service --deb-default build/openmeteo-api.env --before-install build/before-install.sh --before-upgrade build/before-install.sh openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
     - name: Rename deb file
       run: mv openmeteo-api_${{github.ref_name}}_amd64.deb openmeteo-api_${{github.ref_name}}_jammy_amd64.deb
     - name: Release
@@ -56,12 +56,24 @@ jobs:
         generateReleaseNotes: true
         artifacts: 'openmeteo-api_${{github.ref_name}}_jammy_amd64.deb'
         draft: true
+    - name: Get runtime library
+      run: wget https://archive.swiftlang.xyz/repos/ubuntu/pool/main/s/swiftlang-slim/swiftlang-slim_5.7-01-ubuntu-jammy_amd64.deb
     - name: Create APT repository
       uses: patrick-zippenfenig/apt-repo-action@master
       with:
         repo_supported_arch: amd64
         repo_supported_version: jammy
         file: 'openmeteo-api_${{github.ref_name}}_jammy_amd64.deb'
+        file_target_version: jammy
+        public_key: ${{ secrets.GPG_PUBLIC }}
+        private_key: ${{ secrets.GPG_PRIVATE }}
+        key_passphrase: ${{ secrets.GPG_SECRET }}
+    - name: Create APT repository
+      uses: patrick-zippenfenig/apt-repo-action@master
+      with:
+        repo_supported_arch: amd64
+        repo_supported_version: jammy
+        file: 'swiftlang-slim_5.7-01-ubuntu-jammy_amd64.deb'
         file_target_version: jammy
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}
