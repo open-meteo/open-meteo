@@ -23,6 +23,10 @@ jobs:
         echo "::set-output name=version::$(swift -version | head -n 1 | sed s/,// )"
       shell: bash
     - uses: actions/checkout@v2
+    - name: Get runtime library
+      uses: wei/curl@v1
+      with:
+        args: -o swiftlang-slim_5.7-01-ubuntu-jammy_amd64.deb https://archive.swiftlang.xyz/repos/ubuntu/pool/main/s/swiftlang-slim/swiftlang-slim_5.7-01-ubuntu-jammy_amd64.deb
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
       uses: actions/cache@v3
@@ -56,8 +60,6 @@ jobs:
         generateReleaseNotes: true
         artifacts: 'openmeteo-api_${{github.ref_name}}_jammy_amd64.deb'
         draft: true
-    - name: Get runtime library
-      run: curl -o swiftlang-slim_5.7-01-ubuntu-jammy_amd64.deb https://archive.swiftlang.xyz/repos/ubuntu/pool/main/s/swiftlang-slim/swiftlang-slim_5.7-01-ubuntu-jammy_amd64.deb
     - name: Create APT repository
       uses: patrick-zippenfenig/apt-repo-action@master
       with:
