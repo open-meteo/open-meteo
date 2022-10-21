@@ -81,31 +81,33 @@ struct Curl {
     }*/
     
     /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
-    func withRetriedDownload<T>(url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
+    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
         // URL might contain password, strip them from logging
-        var url = url
-        var auth: String? = nil
-        if url.contains("@") && url.contains(":") {
-            let usernamePassword = url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0]
+        let url: String
+        let auth: String?
+        if _url.contains("@") && _url.contains(":") {
+            let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0]
             auth = (usernamePassword).data(using: .utf8)!.base64EncodedString()
-            
-            url = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
-
-            logger.info("Downloading file \(url)")
+            url = _url.split(separator: "/")[0] + "//" + _url.split(separator: "@")[1]
         } else {
-            logger.info("Downloading file \(url)")
+            url = _url
+            auth = nil
         }
+        logger.info("Downloading file \(url)")
         
         let startTime = Date()
         var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
         
-        var request = HTTPClientRequest(url: url)
-        if let range = range {
-            request.headers.add(name: "range", value: "bytes=\(range)")
-        }
-        if let auth = auth {
-            request.headers.add(name: "Authorization", value: "Basic \(auth)")
-        }
+        let request = {
+            var request = HTTPClientRequest(url: url)
+            if let range = range {
+                request.headers.add(name: "range", value: "bytes=\(range)")
+            }
+            if let auth = auth {
+                request.headers.add(name: "Authorization", value: "Basic \(auth)")
+            }
+            return request
+        }()
         
         while true {
             do {
