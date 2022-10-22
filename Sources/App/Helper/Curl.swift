@@ -112,14 +112,11 @@ final class Curl {
         
         while true {
             do {
-                /// Workround for crash in deadline reached
-                return try await waitForTaskCompletion(withTimeoutInNanoseconds: UInt64(maxTimeSeconds * 1_000_000_000)) {
-                    let response = try await client.execute(request, timeout: .seconds(Int64(self.maxTimeSeconds+5)))
-                    if response.status != .ok && response.status != .partialContent {
-                        throw CurlError.downloadFailed(code: response.status)
-                    }
-                    return try await callback(response)
+                let response = try await client.execute(request, timeout: .seconds(Int64(self.maxTimeSeconds+5)))
+                if response.status != .ok && response.status != .partialContent {
+                    throw CurlError.downloadFailed(code: response.status)
                 }
+                return try await callback(response)
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
@@ -487,27 +484,5 @@ extension Sequence where Element == Substring {
             return nil
         }
         return range
-    }
-}
-
-/// see https://forums.swift.org/t/running-an-async-task-with-a-timeout/49733/21
-fileprivate func waitForTaskCompletion<R>(
-    withTimeoutInNanoseconds timeout: UInt64,
-    _ task: @escaping () async throws -> R
-) async throws -> R {
-    return try await withThrowingTaskGroup(of: R.self) { group in
-        await withUnsafeContinuation { continuation in
-            group.addTask {
-                continuation.resume()
-                return try await task()
-            }
-        }
-        group.addTask {
-            await Task.yield()
-            try await Task.sleep(nanoseconds: timeout)
-            throw CurlError.timeoutReached
-        }
-        defer { group.cancelAll() }
-        return try await group.next()!
     }
 }
