@@ -68,7 +68,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
-        var curl = Curl(logger: logger)
+        let curl = Curl(logger: logger)
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         

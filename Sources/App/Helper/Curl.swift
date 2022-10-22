@@ -14,7 +14,7 @@ enum CurlError: Error {
     case downloadFailed(code: HTTPStatus)
 }
 
-struct Curl {
+final class Curl {
     let logger: Logger
 
     /// Curl connect timeout parameter
@@ -81,7 +81,7 @@ struct Curl {
     }*/
     
     /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
-    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
+    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: @escaping (HTTPClientResponse) async throws -> (T)) async throws -> T {
         // URL might contain password, strip them from logging
         let url: String
         let auth: String?
@@ -111,11 +111,16 @@ struct Curl {
         
         while true {
             do {
-                let response = try await client.execute(request, timeout: .seconds(Int64(maxTimeSeconds)))
-                if response.status != .ok && response.status != .partialContent {
-                    throw CurlError.downloadFailed(code: response.status)
+                let task = Task {
+                    let response = try await client.execute(request, timeout: .seconds(Int64(maxTimeSeconds+5)))
+                    if response.status != .ok && response.status != .partialContent {
+                        throw CurlError.downloadFailed(code: response.status)
+                    }
+                    return try await callback(response)
                 }
-                return try await callback(response)
+                /// Workround for crash in deadline reached
+                _ = Timer(timeInterval: TimeInterval(maxTimeSeconds), repeats: false , block: { timer in task.cancel() })
+                return try await task.value
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
@@ -148,32 +153,32 @@ struct Curl {
     }
     
     /// Use http-async http client to download and decompress as bzip2
-    mutating func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
+    func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: nil, client: client) {
-            buffer.moveReaderIndex(to: 0)
-            buffer.moveWriterIndex(to: 0)
+            self.buffer.moveReaderIndex(to: 0)
+            self.buffer.moveWriterIndex(to: 0)
             for try await fragement in $0.body.decompressBzip2() {
-                buffer.writeImmutableBuffer(fragement)
+                self.buffer.writeImmutableBuffer(fragement)
             }
-            return buffer
+            return self.buffer
         }
     }
     
     /// Use http-async http client to download
-    mutating func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) {
-            buffer.moveReaderIndex(to: 0)
-            buffer.moveWriterIndex(to: 0)
+            self.buffer.moveReaderIndex(to: 0)
+            self.buffer.moveWriterIndex(to: 0)
             for try await fragement in $0.body {
-                buffer.writeImmutableBuffer(fragement)
+                self.buffer.writeImmutableBuffer(fragement)
             }
-            return buffer
+            return self.buffer
         }
     }
     
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    mutating func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
+    func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
@@ -192,7 +197,7 @@ struct Curl {
     }
     
     /// download a bz2 compressed grib
-    mutating func downloadBz2Grib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
+    func downloadBz2Grib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
@@ -213,7 +218,7 @@ struct Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    mutating func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: ([Variable], [GribMessage]) throws -> ()) async throws {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: ([Variable], [GribMessage]) throws -> ()) async throws {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return
@@ -296,7 +301,7 @@ struct Curl {
     }
     
     /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
-    mutating func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: (Variable, GribMessage) throws -> ()) async throws {
+    func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: (Variable, GribMessage) throws -> ()) async throws {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return

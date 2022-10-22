@@ -99,7 +99,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         
         var height: Array2D? = nil
         var landmask: Array2D? = nil
-        var curl = Curl(logger: logger)
+        let curl = Curl(logger: logger)
         let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -142,7 +142,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
     /// download MeteoFrance
     func download(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
-        var curl = Curl(logger: logger, deadLineHours: 4)
+        let curl = Curl(logger: logger, deadLineHours: 4)
                 
         /// world 0-24, 27-48, 51-72, 75-102
         let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)

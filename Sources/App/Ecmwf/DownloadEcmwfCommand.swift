@@ -52,7 +52,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         
         
         let dateStr = run.format_YYYYMMdd
-        var curl = Curl(logger: logger)
+        let curl = Curl(logger: logger)
         let downloadDirectory = "\(OpenMeteo.dataDictionary)ecmwf-forecast/"
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
