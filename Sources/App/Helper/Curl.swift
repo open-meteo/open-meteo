@@ -82,7 +82,7 @@ final class Curl {
     }*/
     
     /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
-    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: @escaping (HTTPClientResponse) async throws -> (T)) async throws -> T {
+    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
         // URL might contain password, strip them from logging
         let url: String
         let auth: String?
