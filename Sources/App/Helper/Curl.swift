@@ -119,8 +119,10 @@ final class Curl {
                     return try await callback(response)
                 }
                 /// Workround for crash in deadline reached
-                _ = Timer(timeInterval: TimeInterval(maxTimeSeconds), repeats: false , block: { timer in task.cancel() })
-                return try await task.value
+                let timer = Timer(timeInterval: TimeInterval(maxTimeSeconds), repeats: false , block: { timer in task.cancel() })
+                let result = try await task.value
+                timer.invalidate()
+                return result
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
