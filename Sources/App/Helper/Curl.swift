@@ -112,7 +112,13 @@ final class Curl {
         
         while true {
             do {
-                let response = try await client.execute(request, timeout: .seconds(Int64(self.maxTimeSeconds+5)))
+                let task = Task {
+                    return try await client.execute(request, timeout: .seconds(Int64(self.maxTimeSeconds+5)))
+                }
+                let connectTimeout = Timer(timeInterval: TimeInterval(self.maxTimeSeconds), repeats: false, block: { _ in task.cancel() })
+                let response = try await task.value
+                connectTimeout.invalidate()
+                
                 if response.status != .ok && response.status != .partialContent {
                     throw CurlError.downloadFailed(code: response.status)
                 }
