@@ -12,6 +12,7 @@ enum CurlError: Error {
     case sizeTooSmall
     case didNotGetAllGribMessages(got: Int, expected: Int)
     case downloadFailed(code: HTTPStatus)
+    case timeoutReached
 }
 
 final class Curl {
@@ -111,18 +112,14 @@ final class Curl {
         
         while true {
             do {
-                let task = Task {
-                    let response = try await client.execute(request, timeout: .seconds(Int64(maxTimeSeconds+5)))
+                /// Workround for crash in deadline reached
+                return try await waitForTaskCompletion(withTimeoutInNanoseconds: UInt64(maxTimeSeconds * 1_000_000_000)) {
+                    let response = try await client.execute(request, timeout: .seconds(Int64(self.maxTimeSeconds+5)))
                     if response.status != .ok && response.status != .partialContent {
                         throw CurlError.downloadFailed(code: response.status)
                     }
                     return try await callback(response)
                 }
-                /// Workround for crash in deadline reached
-                let timer = Timer(timeInterval: TimeInterval(maxTimeSeconds), repeats: false , block: { timer in task.cancel() })
-                let result = try await task.value
-                timer.invalidate()
-                return result
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
@@ -490,5 +487,27 @@ extension Sequence where Element == Substring {
             return nil
         }
         return range
+    }
+}
+
+/// see https://forums.swift.org/t/running-an-async-task-with-a-timeout/49733/21
+fileprivate func waitForTaskCompletion<R>(
+    withTimeoutInNanoseconds timeout: UInt64,
+    _ task: @escaping () async throws -> R
+) async throws -> R {
+    return try await withThrowingTaskGroup(of: R.self) { group in
+        await withUnsafeContinuation { continuation in
+            group.addTask {
+                continuation.resume()
+                return try await task()
+            }
+        }
+        group.addTask {
+            await Task.yield()
+            try await Task.sleep(nanoseconds: timeout)
+            throw CurlError.timeoutReached
+        }
+        defer { group.cancelAll() }
+        return try await group.next()!
     }
 }
