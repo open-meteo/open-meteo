@@ -5,6 +5,10 @@ import AsyncHTTPClient
 import SwiftPFor2D
 import CHelper
 
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+
 enum CurlError: Error {
     case noGribMessagesMatch
     case didNotFindAllVariablesInGribIndex
@@ -138,6 +142,54 @@ final class Curl {
         }
     }
     
+    /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. Uses URLRequest instead of async http client for testing
+    func withRetriedDownloadUrlSession(url _url: String, range: String?) async throws -> Data {
+        // URL might contain password, strip them from logging
+        let url: String
+        let auth: String?
+        if _url.contains("@") && _url.contains(":") {
+            let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0]
+            auth = (usernamePassword).data(using: .utf8)!.base64EncodedString()
+            url = _url.split(separator: "/")[0] + "//" + _url.split(separator: "@")[1]
+        } else {
+            url = _url
+            auth = nil
+        }
+        logger.info("Downloading file \(url)")
+        
+        let startTime = Date()
+        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
+        
+        let request = {
+            var request = URLRequest(url: URL(string: url)!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: TimeInterval(self.connectTimeout + self.readTimeout + 5))
+            if let range = range {
+                request.setValue("bytes=\(range)", forHTTPHeaderField: "Range")
+            }
+            if let auth = auth {
+                request.setValue("Basic \(auth)", forHTTPHeaderField: "Authorization")
+            }
+            return request
+        }()
+        
+        while true {
+            do {
+                let response = try await URLSession.shared.asyncData(for: request)
+                return response.0
+            } catch {
+                let timeElapsed = Date().timeIntervalSince(startTime)
+                if Date().timeIntervalSince(lastPrint) > 60 {
+                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
+                    lastPrint = Date()
+                }
+                if Date() > deadline {
+                    logger.error("Deadline reached")
+                    throw error
+                }
+                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
+            }
+        }
+    }
+    
     /// Use http-async http client to download, decompress BZIP2 and store to file. If the file already exists, it will be deleted before
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
@@ -220,13 +272,14 @@ final class Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: ([Variable], [GribMessage]) throws -> ()) async throws {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", /*client: HTTPClient,*/ callback: ([Variable], [GribMessage]) throws -> ()) async throws {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return
         }
         
-        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
+        //guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
+        guard let index = String(data: try await withRetriedDownloadUrlSession(url: "\(url)\(`extension`)", range: nil), encoding: .utf8) else {
             fatalError("Could not decode index to string")
         }
 
@@ -271,11 +324,12 @@ final class Curl {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
-            let data = try await downloadInMemoryAsync(url: url, range: range, client: client)
-            logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
+            //let data = try await downloadInMemoryAsync(url: url, range: range, client: client)
+            let data = try await withRetriedDownloadUrlSession(url: url, range: range)
+            logger.debug("Converting GRIB, size \(data.count) bytes")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
-                try data.withUnsafeReadableBytes {
+                try data.withUnsafeBytes {
                     let messages = try GribMemory(ptr: $0).messages
                     
                     // memory allocations in libeccodes can case severe memory fragementation
@@ -284,7 +338,7 @@ final class Curl {
                     chelper_malloc_trim()
                     
                     if messages.count != matches.count {
-                        logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
+                        logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.count)")
                         throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: matches.count)
                     }
                     try callback(matches, messages)
@@ -490,5 +544,38 @@ extension Sequence where Element == Substring {
             return nil
         }
         return range
+    }
+}
+
+
+/// Defines the possible errors
+public enum URLSessionAsyncErrors: Error {
+    case invalidUrlResponse, missingResponseData
+}
+
+/// An extension that provides async support for fetching a URL
+///
+/// Needed because the Linux version of Swift does not support async URLSession yet.
+/// https://medium.com/hoursofoperation/use-async-urlsession-with-server-side-swift-67821a64fa91
+public extension URLSession {
+    func asyncData(for request: URLRequest) async throws -> (Data, URLResponse) {
+        return try await withCheckedThrowingContinuation { continuation in
+            let task = URLSession.shared.dataTask(with: request) { data, response, error in
+                if let error = error {
+                    continuation.resume(throwing: error)
+                    return
+                }
+                guard let response = response as? HTTPURLResponse else {
+                    continuation.resume(throwing: URLSessionAsyncErrors.invalidUrlResponse)
+                    return
+                }
+                guard let data = data else {
+                    continuation.resume(throwing: URLSessionAsyncErrors.missingResponseData)
+                    return
+                }
+                continuation.resume(returning: (data, response))
+            }
+            task.resume()
+        }
     }
 }
