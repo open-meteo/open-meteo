@@ -17,15 +17,15 @@ enum CurlError: Error {
 
 final class Curl {
     let logger: Logger
-
-    /// Curl connect timeout parameter
-    let connectTimeout = 30
     
     /// Give up downloading after the time, default 3 hours
     let deadline: Date
 
-    /// Curl max-time paramter to download a single file. Default 5 minutes
-    let maxTimeSeconds = 5*60
+    /// Time to connect. Default 1 minute
+    let connectTimeout = 60
+    
+    /// Time to transfer a file. Default 5 minutes
+    let readTimeout = 5*60
 
     /// Wait time after each download
     let retryDelaySeconds = 5
@@ -113,9 +113,9 @@ final class Curl {
         while true {
             do {
                 let task = Task {
-                    return try await client.execute(request, timeout: .seconds(Int64(self.maxTimeSeconds+5)))
+                    return try await client.execute(request, timeout: .seconds(Int64(self.connectTimeout + self.readTimeout + 5)))
                 }
-                let connectTimeout = Timer(timeInterval: TimeInterval(self.maxTimeSeconds), repeats: false, block: { _ in task.cancel() })
+                let connectTimeout = Timer(timeInterval: TimeInterval(self.connectTimeout), repeats: false, block: { _ in task.cancel() })
                 let response = try await task.value
                 connectTimeout.invalidate()
                 
@@ -140,41 +140,63 @@ final class Curl {
     
     /// Use http-async http client to download, decompress BZIP2 and store to file. If the file already exists, it will be deleted before
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
-        return try await withRetriedDownload(url: url, range: nil, client: client) {
-            try FileManager.default.removeItemIfExists(at: toFile)
-            return try await $0.body.decompressBzip2().saveTo(file: toFile)
+        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
+            let task = Task {
+                try FileManager.default.removeItemIfExists(at: toFile)
+                return try await response.body.decompressBzip2().saveTo(file: toFile)
+            }
+            let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
+            try await task.value
+            readTimeout.invalidate()
         }
     }
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     func download(url: String, toFile: String, client: HTTPClient) async throws {
-        return try await withRetriedDownload(url: url, range: nil, client: client) {
-            try FileManager.default.removeItemIfExists(at: toFile)
-            return try await $0.body.saveTo(file: toFile)
+        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
+            let task = Task {
+                try FileManager.default.removeItemIfExists(at: toFile)
+                return try await response.body.saveTo(file: toFile)
+            }
+            let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
+            try await task.value
+            readTimeout.invalidate()
         }
     }
     
     /// Use http-async http client to download and decompress as bzip2
     func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
-        return try await withRetriedDownload(url: url, range: nil, client: client) {
-            self.buffer.moveReaderIndex(to: 0)
-            self.buffer.moveWriterIndex(to: 0)
-            for try await fragement in $0.body.decompressBzip2() {
-                self.buffer.writeImmutableBuffer(fragement)
+        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
+            let task = Task {
+                self.buffer.moveReaderIndex(to: 0)
+                self.buffer.moveWriterIndex(to: 0)
+                for try await fragement in response.body.decompressBzip2() {
+                    self.buffer.writeImmutableBuffer(fragement)
+                }
+                return self.buffer
             }
-            return self.buffer
+            let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
+            let data = try await task.value
+            readTimeout.invalidate()
+            return data
         }
     }
     
     /// Use http-async http client to download
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
-        return try await withRetriedDownload(url: url, range: range, client: client) {
-            self.buffer.moveReaderIndex(to: 0)
-            self.buffer.moveWriterIndex(to: 0)
-            for try await fragement in $0.body {
-                self.buffer.writeImmutableBuffer(fragement)
+        return try await withRetriedDownload(url: url, range: range, client: client) { response in
+            let task = Task {
+                self.buffer.moveReaderIndex(to: 0)
+                self.buffer.moveWriterIndex(to: 0)
+                for try await fragement in response.body {
+                    self.buffer.writeImmutableBuffer(fragement)
+                }
+                return self.buffer
             }
-            return self.buffer
+            let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
+            let data = try await task.value
+            readTimeout.invalidate()
+            return data
         }
     }
     
