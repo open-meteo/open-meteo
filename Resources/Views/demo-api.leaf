@@ -60,7 +60,6 @@
               <option data-latitude="40.4167" data-longitude="-3.7033" data-asl="588">Madrid</option>
               <option data-latitude="48.2092" data-longitude="16.3728" data-asl="170">Vienna</option>
               <option data-latitude="50.8371" data-longitude="4.3676" data-asl="577">Brussels</option>
-              <option data-latitude="55.7558" data-longitude="37.6176" data-asl="125">Moscow</option>
               <option data-latitude="42.7105" data-longitude="23.3238" data-asl="591">Sofia</option>
               <option data-latitude="55.6763" data-longitude="12.5681" data-asl="0">Copenhagen</option>
               <option data-latitude="37.9792" data-longitude="23.7166" data-asl="153">Athens</option>
@@ -73,7 +72,7 @@
               <option data-latitude="52.2297" data-longitude="21.0122" data-asl="93">Warsaw</option>
               <option data-latitude="38.7072" data-longitude="-9.1355" data-asl="15">Lisabon</option>
               <option data-latitude="46.9480" data-longitude="7.4481" data-asl="513">Bern</option>
-              <option data-latitude="50.4422" data-longitude="30.5367" data-asl="168">Kiev</option>
+              <option data-latitude="50.4422" data-longitude="30.5367" data-asl="168">Kyiv</option>
               <option data-latitude="59.3328" data-longitude="18.0645" data-asl="15">Stockholm</option>
             </optgroup>
             <optgroup label="America">
