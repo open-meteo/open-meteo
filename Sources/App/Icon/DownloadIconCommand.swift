@@ -229,10 +229,11 @@ struct DownloadIconCommand: AsyncCommandFix {
                 //logger.info("Compressing and writing data to \(filenameDest)")
                 let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                 try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
+                
+                // icon global downloads tend to use a lot of memory due to numerous allocations
+                chelper_malloc_trim()
             }
         }
-        // icon global downloads tend to use a lot of memory due to numerous allocations
-        chelper_malloc_trim()
     }
 
     /// unompress and remap

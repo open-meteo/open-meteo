@@ -15,7 +15,7 @@ enum CurlError: Error {
     case timeoutReached
 }
 
-final class Curl {
+struct Curl {
     let logger: Logger
     
     /// Give up downloading after the time, default 3 hours
@@ -30,13 +30,9 @@ final class Curl {
     /// Wait time after each download
     let retryDelaySeconds = 5
     
-    /// Download buffer which is reused during downloads
-    var buffer: ByteBuffer
-    
     public init(logger: Logger, deadLineHours: Int = 3) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
-        buffer = ByteBuffer()
     }
     
     /*func download(url: String, to: String, range: String? = nil) throws {
@@ -168,12 +164,11 @@ final class Curl {
     func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             let task = Task {
-                self.buffer.moveReaderIndex(to: 0)
-                self.buffer.moveWriterIndex(to: 0)
+                var buffer = ByteBuffer()
                 for try await fragement in response.body.decompressBzip2() {
-                    self.buffer.writeImmutableBuffer(fragement)
+                    buffer.writeImmutableBuffer(fragement)
                 }
-                return self.buffer
+                return buffer
             }
             let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
             let data = try await task.value
@@ -186,12 +181,11 @@ final class Curl {
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) { response in
             let task = Task {
-                self.buffer.moveReaderIndex(to: 0)
-                self.buffer.moveWriterIndex(to: 0)
+                var buffer = ByteBuffer()
                 for try await fragement in response.body {
-                    self.buffer.writeImmutableBuffer(fragement)
+                    buffer.writeImmutableBuffer(fragement)
                 }
-                return self.buffer
+                return buffer
             }
             let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
             let data = try await task.value
