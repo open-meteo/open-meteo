@@ -61,5 +61,9 @@ final class HelperTests: XCTestCase {
     func testNativeSpawn() throws {
         XCTAssertEqual(try Process.spawnWithExitCode(cmd: "echo", args: ["Hello"]), 0)
         XCTAssertEqual(try Process.spawnWithExitCode(cmd: "echo", args: ["World"]), 0)
+        
+        try "exit 70".write(toFile: "temp.sh", atomically: true, encoding: .utf8)
+        XCTAssertEqual(try Process.spawnWithExitCode(cmd: "bash", args: ["temp.sh"]), 70)
+        try FileManager.default.removeItem(atPath: "temp.sh")
     }
 }

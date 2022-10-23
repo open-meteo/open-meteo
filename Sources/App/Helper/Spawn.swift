@@ -134,6 +134,6 @@ public extension Process {
             waitResult = waitpid(pid, &status, 0)
         } while waitResult == -1 && errno == EINTR
         
-        return status
+        return (status >> 8) & 0xff
     }
 }
