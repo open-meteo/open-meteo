@@ -15,7 +15,7 @@ enum CurlError: Error {
     case timeoutReached
 }
 
-struct Curl {
+final class Curl {
     let logger: Logger
     
     /// Give up downloading after the time, default 3 hours
@@ -30,9 +30,13 @@ struct Curl {
     /// Wait time after each download
     let retryDelaySeconds = 5
     
+    /// Download buffer which is reused during downloads
+    var buffer: ByteBuffer
+    
     public init(logger: Logger, deadLineHours: Int = 3) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
+        buffer = ByteBuffer()
     }
     
     /*func download(url: String, to: String, range: String? = nil) throws {
@@ -137,60 +141,40 @@ struct Curl {
     /// Use http-async http client to download, decompress BZIP2 and store to file. If the file already exists, it will be deleted before
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            let task = Task {
-                try FileManager.default.removeItemIfExists(at: toFile)
-                return try await response.body.decompressBzip2().saveTo(file: toFile)
-            }
-            let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
-            try await task.value
-            readTimeout.invalidate()
+            try FileManager.default.removeItemIfExists(at: toFile)
+            return try await response.body.decompressBzip2().saveTo(file: toFile)
         }
     }
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     func download(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            let task = Task {
-                try FileManager.default.removeItemIfExists(at: toFile)
-                return try await response.body.saveTo(file: toFile)
-            }
-            let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
-            try await task.value
-            readTimeout.invalidate()
+            try FileManager.default.removeItemIfExists(at: toFile)
+            return try await response.body.saveTo(file: toFile)
         }
     }
     
     /// Use http-async http client to download and decompress as bzip2
     func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            let task = Task {
-                var buffer = ByteBuffer()
-                for try await fragement in response.body.decompressBzip2() {
-                    buffer.writeImmutableBuffer(fragement)
-                }
-                return buffer
+            self.buffer.moveReaderIndex(to: 0)
+            self.buffer.moveWriterIndex(to: 0)
+            for try await fragement in response.body.decompressBzip2() {
+                self.buffer.writeImmutableBuffer(fragement)
             }
-            let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
-            let data = try await task.value
-            readTimeout.invalidate()
-            return data
+            return self.buffer
         }
     }
     
     /// Use http-async http client to download
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) { response in
-            let task = Task {
-                var buffer = ByteBuffer()
-                for try await fragement in response.body {
-                    buffer.writeImmutableBuffer(fragement)
-                }
-                return buffer
+            self.buffer.moveReaderIndex(to: 0)
+            self.buffer.moveWriterIndex(to: 0)
+            for try await fragement in response.body {
+                self.buffer.writeImmutableBuffer(fragement)
             }
-            let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in task.cancel() })
-            let data = try await task.value
-            readTimeout.invalidate()
-            return data
+            return self.buffer
         }
     }
     
