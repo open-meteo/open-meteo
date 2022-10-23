@@ -550,7 +550,7 @@ extension Sequence where Element == Substring {
 
 /// Defines the possible errors
 public enum URLSessionAsyncErrors: Error {
-    case invalidUrlResponse, missingResponseData
+    case invalidUrlResponse, missingResponseData, error404, downloadFailed
 }
 
 /// An extension that provides async support for fetching a URL
@@ -567,6 +567,14 @@ public extension URLSession {
                 }
                 guard let response = response as? HTTPURLResponse else {
                     continuation.resume(throwing: URLSessionAsyncErrors.invalidUrlResponse)
+                    return
+                }
+                if response.statusCode == 404 {
+                    continuation.resume(throwing: URLSessionAsyncErrors.error404)
+                    return
+                }
+                if response.statusCode != 200 {
+                    continuation.resume(throwing: URLSessionAsyncErrors.downloadFailed)
                     return
                 }
                 guard let data = data else {
