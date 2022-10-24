@@ -33,7 +33,7 @@
     <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a href="/en">Home</a></li>
-        <li class="breadcrumb-item"><a href="/en/docs">Weather API</a></li>
+        <li class="breadcrumb-item"><a href="/en/docs">Weather APIs</a></li>
         <li class="breadcrumb-item active" aria-current="page">DWD ICON API</li>
       </ol>
     </nav>
