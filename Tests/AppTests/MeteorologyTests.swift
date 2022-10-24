@@ -86,13 +86,22 @@ final class MeteorologyTests: XCTestCase {
     }
     
     /// model description https://www.jma.go.jp/jma/jma-eng/jma-center/nwp/outline2022-nwp/pdf/outline2022_03.pdf
-    /*func testJMA() throws {
-        let file = "/Users/patrick/Downloads/Z__C_RJTD_20221017000000_MSM_GPV_Rjp_Lsurf_FH00-15_grib2.bin"
+    func testJMA() throws {
+        let file = "/Users/patrick/Downloads/Z__C_RJTD_20221024000000_GSM_GPV_Rgl_FD0006_grib2.bin"
         let grib = try GribFile(file: file)
         for message in grib.messages {
             print(message.get(attribute: "name")!)
+            print(message.get(attribute: "shortName")!)
+            print(message.get(attribute: "level")!)
             print(message.get(attribute: "parameterCategory")) // can be used to identify
             print(message.get(attribute: "parameterNumber")) // can be used to identify
+            guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
+                fatalError("Could not get Nx")
+            }
+            guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
+                fatalError("Could not get Ny")
+            }
+            print(nx, ny)
             /*message.iterate(namespace: .ls).forEach({
                 print($0)
             })
@@ -109,7 +118,7 @@ final class MeteorologyTests: XCTestCase {
             let data = try message.getDouble()
             print(data[0..<10])
             
-            guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
+            /*guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
                 fatalError("Could not get Nx")
             }
             guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
@@ -118,7 +127,7 @@ final class MeteorologyTests: XCTestCase {
             let short = message.get(attribute: "shortName")!
             let stepRange = message.get(attribute: "stepRange")!
             let array2d = Array2D(data: data.map(Float.init), nx: nx, ny: ny)
-            try array2d.writeNetcdf(filename: "/Users/patrick/Downloads/Z__C_RJTD_20221017000000_MSM_GPV_Rjp_Lsurf_FH00-15-\(short)-\(stepRange)")
+            try array2d.writeNetcdf(filename: "\(file)-\(short)-\(stepRange)")*/
         }
-    }*/
+    }
 }
