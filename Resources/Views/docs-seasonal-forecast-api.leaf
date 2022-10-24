@@ -742,8 +742,8 @@
 #endexport
 
 #export("footer"):
-<script src="https://assets.open-meteo.com/libs/highstock-6.0.3/highstock.js"
-  integrity="sha512-xStuxZIFeepdcpLwBhqIuU761mDfYUDbV8C8lUiTX96W+kyL+AYmY9l3o/Ku30gEek9l+hUJGQpmT4pcVm6LeA=="
+<script src="https://assets.open-meteo.com/libs/highstock-6.0.4/highstock.min.js"
+  integrity="sha256-0L3MBlAKkqgWfarnVC3MWPO4h7NpH1W61Yr79nwKXFg="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="/scripts/weather.js"></script>
 <script src="https://assets.open-meteo.com/libs/bootstrap-datepicker-1.9.0/bootstrap-datepicker.min.js"
