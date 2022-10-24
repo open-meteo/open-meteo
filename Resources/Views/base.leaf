@@ -37,46 +37,53 @@
       <div class="collapse navbar-collapse" id="navbarCollapse">
         <ul class="navbar-nav me-auto mb-2 mb-md-0">
           <li class="nav-item">
-            <a href="/en" class="nav-link #if(title == "Free Open-Source Weather API"): active #endif" aria-current="page">Home</a>
+            <a href="/en" class="nav-link #if(title == " Free Open-Source Weather API"): active #endif"
+              aria-current="page">Home</a>
           </li>
           <li class="nav-item">
-            <a href="/en/features" class="nav-link #if(title == "Features"): active #endif">Features</a>
+            <a href="/en/features" class="nav-link #if(title == " Features"): active #endif">Features</a>
           </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle #if(title == "Weather Forecast API" || title == "ECMWF Weather Forecast API" || title == "Historical Weather API" || title == "MeteoFrance API" || title == "DWD ICON API" || title == "GFS & HRRR Forecast API"): active #endif" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <a class="nav-link dropdown-toggle #if(title == " Weather Forecast API" ||
+              title=="ECMWF Weather Forecast API" || title=="Historical Weather API" || title=="MeteoFrance API" ||
+              title=="DWD ICON API" || title=="GFS & HRRR Forecast API" ): active #endif" href="#"
+              id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               Weather APIs
             </a>
             <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-              <li><a class="dropdown-item #if(title=="Weather Forecast API"): active #endif" href="/en/docs">Weather Forecast API</a>
+              <li><a class="dropdown-item #if(title==" Weather Forecast API"): active #endif" href="/en/docs">Weather
+                  Forecast API</a>
               </li>
-              <li><a class="dropdown-item #if(title == "Historical Weather API"): active #endif"
+              <li><a class="dropdown-item #if(title == " Historical Weather API"): active #endif"
                   href="/en/docs/historical-weather-api">Historical Weather API</a></li>
-              <li><a class="dropdown-item #if(title == "ECMWF Weather Forecast API"): active #endif"
+              <li><a class="dropdown-item #if(title == " ECMWF Weather Forecast API"): active #endif"
                   href="/en/docs/ecmwf-api">ECMWF API</a></li>
-              <li><a class="dropdown-item #if(title == "GFS & HRRR Forecast API"): active #endif"
-                    href="/en/docs/gfs-api">GFS &amp; HRRR Forecast API</a></li>
-              <li><a class="dropdown-item #if(title == "MeteoFrance API"): active #endif"
-                    href="/en/docs/meteofrance-api">MeteoFrance API&nbsp;&nbsp;<span
+              <li><a class="dropdown-item #if(title == " GFS & HRRR Forecast API"): active #endif"
+                  href="/en/docs/gfs-api">GFS &amp; HRRR Forecast API</a></li>
+              <li><a class="dropdown-item #if(title == " MeteoFrance API"): active #endif"
+                  href="/en/docs/meteofrance-api">MeteoFrance API&nbsp;&nbsp;<span
                     class="badge bg-secondary">New</span></a></li>
-              <li><a class="dropdown-item #if(title == "DWD ICON API"): active #endif"
-                    href="/en/docs/dwd-api">DWD API</a></li>
+              <li><a class="dropdown-item #if(title == " DWD ICON API"): active #endif" href="/en/docs/dwd-api">DWD
+                  API</a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle #if(title == "Marine Weather API" || title == "Elevation API" || title == "Geocoding API" || title == "Air Quality API" || title == "Seasonal Forecast API"): active #endif" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <a class="nav-link dropdown-toggle #if(title == " Marine Weather API" || title=="Elevation API" ||
+              title=="Geocoding API" || title=="Air Quality API" || title=="Seasonal Forecast API" ): active #endif"
+              href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               Other APIs
             </a>
             <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
-              <li><a class="dropdown-item #if(title == "Marine Weather API"): active #endif"
+              <li><a class="dropdown-item #if(title == " Marine Weather API"): active #endif"
                   href="/en/docs/marine-weather-api">Marine Forecast API</a></li>
-              <li><a class="dropdown-item #if(title == "Air Quality API"): active #endif"
+              <li><a class="dropdown-item #if(title == " Air Quality API"): active #endif"
                   href="/en/docs/air-quality-api">Air Quality API</a></li>
-              <li><a class="dropdown-item #if(title == "Geocoding API"): active #endif"
+              <li><a class="dropdown-item #if(title == " Geocoding API"): active #endif"
                   href="/en/docs/geocoding-api">Geocoding API</a></li>
-              <li><a class="dropdown-item #if(title == "Elevation API"): active #endif"
+              <li><a class="dropdown-item #if(title == " Elevation API"): active #endif"
                   href="/en/docs/elevation-api">Elevation API</a></li>
-              <li class="debug-hidden"><a class="dropdown-item #if(title == "Seasonal Forecast API"): active #endif"
-                    href="/en/docs/seasonal-forecast-api">Seasonal Forecast API</a></li>
+              <li class="debug-hidden"><a class="dropdown-item #if(title == " Seasonal Forecast API"): active #endif"
+                  href="/en/docs/seasonal-forecast-api">Seasonal Forecast API</a></li>
             </ul>
           </li>
           <li class="nav-item">
@@ -116,16 +123,6 @@
 
   <footer class="container py-5 pt-4 my-md-5 pt-md-5 border-top">
     <div class="row">
-      <!--<div class="col-12 col-md">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="currentColor"
-          class="bi bi-cloud-sun d-block mb-2" viewBox="0 0 16 16">
-          <path
-            d="M7 8a3.5 3.5 0 0 1 3.5 3.555.5.5 0 0 0 .624.492A1.503 1.503 0 0 1 13 13.5a1.5 1.5 0 0 1-1.5 1.5H3a2 2 0 1 1 .1-3.998.5.5 0 0 0 .51-.375A3.502 3.502 0 0 1 7 8zm4.473 3a4.5 4.5 0 0 0-8.72-.99A3 3 0 0 0 3 16h8.5a2.5 2.5 0 0 0 0-5h-.027z" />
-          <path
-            d="M10.5 1.5a.5.5 0 0 0-1 0v1a.5.5 0 0 0 1 0v-1zm3.743 1.964a.5.5 0 1 0-.707-.707l-.708.707a.5.5 0 0 0 .708.708l.707-.708zm-7.779-.707a.5.5 0 0 0-.707.707l.707.708a.5.5 0 1 0 .708-.708l-.708-.707zm1.734 3.374a2 2 0 1 1 3.296 2.198c.199.281.372.582.516.898a3 3 0 1 0-4.84-3.225c.352.011.696.055 1.028.129zm4.484 4.074c.6.215 1.125.59 1.522 1.072a.5.5 0 0 0 .039-.742l-.707-.707a.5.5 0 0 0-.854.377zM14.5 6.5a.5.5 0 0 0 0 1h1a.5.5 0 0 0 0-1h-1z" />
-        </svg>
-        <small class="d-block mb-3 text-muted">© 2022</small>
-      </div>-->
       <div class="col-6 col-md">
         <h5>Features</h5>
         <ul class="list-unstyled text-small">
@@ -142,21 +139,29 @@
         <h5>Weather APIs</h5>
         <ul class="list-unstyled text-small">
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs">Weather Forecast API</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/historical-weather-api">Historical Weather API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none"
+              href="/en/docs/historical-weather-api">Historical Weather API</a></li>
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/ecmwf-api">ECMWF API</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/gfs-api">GFS & HRRR Forecast API</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/meteofrance-api">MeteoFrance API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/gfs-api">GFS & HRRR Forecast
+              API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/meteofrance-api">MeteoFrance
+              API</a></li>
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/dwd-api">DWD ICON API</a></li>
         </ul>
       </div>
       <div class="col-6 col-md">
         <h5>Other APIs</h5>
         <ul class="list-unstyled text-small">
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/marine-weather-api">Marine Weather API</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/air-quality-api">Air Quality API</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/geocoding-api">Geocoding API</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/gfs-api">GFS & HRRR Forecast API</a></li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/elevation-api">Elevation API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/marine-weather-api">Marine
+              Weather API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/air-quality-api">Air Quality
+              API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/geocoding-api">Geocoding
+              API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/gfs-api">GFS & HRRR Forecast
+              API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/elevation-api">Elevation
+              API</a></li>
         </ul>
       </div>
       <div class="col-6 col-md">
@@ -169,8 +174,9 @@
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="https://twitter.com/open_meteo"
               target="_blank">Twitter</a></li>
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#contact">Contact us</a>
-              </li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#terms">Terms &amp; Privacy</a>
+          </li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#terms">Terms &amp;
+              Privacy</a>
         </ul>
       </div>
     </div>
