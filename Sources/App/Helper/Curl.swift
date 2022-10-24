@@ -272,14 +272,14 @@ final class Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", /*client: HTTPClient,*/ callback: ([Variable], [GribMessage]) throws -> ()) async throws {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: ([Variable], [GribMessage]) throws -> ()) async throws {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return
         }
         
-        //guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
-        guard let index = String(data: try await withRetriedDownloadUrlSession(url: "\(url)\(`extension`)", range: nil), encoding: .utf8) else {
+        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
+        //guard let index = String(data: try await withRetriedDownloadUrlSession(url: "\(url)\(`extension`)", range: nil), encoding: .utf8) else {
             fatalError("Could not decode index to string")
         }
 
@@ -324,12 +324,12 @@ final class Curl {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
-            //let data = try await downloadInMemoryAsync(url: url, range: range, client: client)
-            let data = try await withRetriedDownloadUrlSession(url: url, range: range)
-            logger.debug("Converting GRIB, size \(data.count) bytes")
+            let data = try await downloadInMemoryAsync(url: url, range: range, client: client)
+            //let data = try await withRetriedDownloadUrlSession(url: url, range: range)
+            logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
-                try data.withUnsafeBytes {
+                try data.withUnsafeReadableBytes {
                     let messages = try GribMemory(ptr: $0).messages
                     
                     // memory allocations in libeccodes can case severe memory fragementation
@@ -338,7 +338,7 @@ final class Curl {
                     chelper_malloc_trim()
                     
                     if messages.count != matches.count {
-                        logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.count)")
+                        logger.error("Grib reader did not get all matched variables. Matches count \(matches.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
                         throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: matches.count)
                     }
                     try callback(matches, messages)
@@ -587,3 +587,5 @@ public extension URLSession {
         }
     }
 }
+
+/// could build a stream downloader like https://stackoverflow.com/questions/68298439/how-to-save-a-downloading-file-at-a-specific-location-so-i-can-read-it-while-dow

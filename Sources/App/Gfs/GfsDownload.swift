@@ -109,7 +109,7 @@ struct GfsDownload: AsyncCommandFix {
         var landmask: Array2D? = nil
         let curl = Curl(logger: logger)
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
-        try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases /*, client: application.http.client.shared*/) { variables, messages in
+        try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.http.client.shared) { variables, messages in
             for (variable, message) in zip(variables, messages) {
                 try grib2d.load(message: message)
                 if isGlobal {
@@ -168,7 +168,7 @@ struct GfsDownload: AsyncCommandFix {
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            try await curl.downloadIndexedGrib(url: url, variables: variables /*, client: application.http.client.shared*/) { variables, messages in
+            try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared) { variables, messages in
                 logger.info("Compressing and writing data")
                 for (variable, message) in zip(variables, messages) {
                     try grib2d.load(message: message)
