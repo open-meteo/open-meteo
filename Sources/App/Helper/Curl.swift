@@ -142,54 +142,6 @@ final class Curl {
         }
     }
     
-    /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. Uses URLRequest instead of async http client for testing
-    func withRetriedDownloadUrlSession(url _url: String, range: String?) async throws -> Data {
-        // URL might contain password, strip them from logging
-        let url: String
-        let auth: String?
-        if _url.contains("@") && _url.contains(":") {
-            let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0]
-            auth = (usernamePassword).data(using: .utf8)!.base64EncodedString()
-            url = _url.split(separator: "/")[0] + "//" + _url.split(separator: "@")[1]
-        } else {
-            url = _url
-            auth = nil
-        }
-        logger.info("Downloading file \(url)")
-        
-        let startTime = Date()
-        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
-        
-        let request = {
-            var request = URLRequest(url: URL(string: url)!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: TimeInterval(self.connectTimeout + self.readTimeout + 5))
-            if let range = range {
-                request.setValue("bytes=\(range)", forHTTPHeaderField: "Range")
-            }
-            if let auth = auth {
-                request.setValue("Basic \(auth)", forHTTPHeaderField: "Authorization")
-            }
-            return request
-        }()
-        
-        while true {
-            do {
-                let response = try await URLSession.shared.asyncData(for: request)
-                return response.0
-            } catch {
-                let timeElapsed = Date().timeIntervalSince(startTime)
-                if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
-                    lastPrint = Date()
-                }
-                if Date() > deadline {
-                    logger.error("Deadline reached")
-                    throw error
-                }
-                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
-            }
-        }
-    }
-    
     /// Use http-async http client to download, decompress BZIP2 and store to file. If the file already exists, it will be deleted before
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
@@ -546,46 +498,3 @@ extension Sequence where Element == Substring {
         return range
     }
 }
-
-
-/// Defines the possible errors
-public enum URLSessionAsyncErrors: Error {
-    case invalidUrlResponse, missingResponseData, error404, downloadFailed
-}
-
-/// An extension that provides async support for fetching a URL
-///
-/// Needed because the Linux version of Swift does not support async URLSession yet.
-/// https://medium.com/hoursofoperation/use-async-urlsession-with-server-side-swift-67821a64fa91
-public extension URLSession {
-    func asyncData(for request: URLRequest) async throws -> (Data, URLResponse) {
-        return try await withCheckedThrowingContinuation { continuation in
-            let task = URLSession.shared.dataTask(with: request) { data, response, error in
-                if let error = error {
-                    continuation.resume(throwing: error)
-                    return
-                }
-                guard let response = response as? HTTPURLResponse else {
-                    continuation.resume(throwing: URLSessionAsyncErrors.invalidUrlResponse)
-                    return
-                }
-                if response.statusCode == 404 {
-                    continuation.resume(throwing: URLSessionAsyncErrors.error404)
-                    return
-                }
-                if response.statusCode != 200 {
-                    continuation.resume(throwing: URLSessionAsyncErrors.downloadFailed)
-                    return
-                }
-                guard let data = data else {
-                    continuation.resume(throwing: URLSessionAsyncErrors.missingResponseData)
-                    return
-                }
-                continuation.resume(returning: (data, response))
-            }
-            task.resume()
-        }
-    }
-}
-
-/// could build a stream downloader like https://stackoverflow.com/questions/68298439/how-to-save-a-downloading-file-at-a-specific-location-so-i-can-read-it-while-dow
