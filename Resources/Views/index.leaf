@@ -18,7 +18,7 @@
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Free Weather API</h1>
   <div class="col-lg-6 mx-auto">
     <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Open-Meteo is an open-source weather API
-      and offers free access for non-commercial use. No API key is required. You can use it immediately!</p>
+       with free access for non-commercial use. No API key is required. You can use it immediately!</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="/en/features" class="btn btn-primary btn-lg px-4 me-sm-3 mr-2">Features</a>
       <a href="/en/docs" class="btn btn-outline-light btn-lg px-4">Documentation</a>
