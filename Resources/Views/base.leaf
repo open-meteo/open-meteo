@@ -170,9 +170,12 @@
               target="_blank">Twitter</a></li>
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#contact">Contact us</a>
               </li>
-          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#terms">Privacy &amp; Terms</a>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#terms">Terms &amp; Privacy</a>
         </ul>
       </div>
+    </div>
+    <div class="text-center pt-3">
+      <small class="d-block text-muted">© 2020 Copyright: Open-Meteo.com</small>
     </div>
   </footer>
 
