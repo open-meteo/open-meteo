@@ -8,7 +8,7 @@
 #endexport
 #export("content"):
 
-<div class="px-4 py-5 mb-5 text-center text-white" style="
+<div class="px-4 py-5 text-center text-white" style="
             background-image: url('https://assets.open-meteo.com/images/mountains2.1.jpeg');
             background-size: cover;
             background-position: center;
@@ -30,11 +30,23 @@
   </div>
 </div>
 
+<div class="mb-5" style="border-bottom: 1px solid #ddd">
+  <div class="container px-4 py-1">
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/en">Home</a></li>
+        <li class="breadcrumb-item"><a href="/en/docs">Weather API</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Historical Weather API</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
 <!-- http://127.0.0.1:8080/v1/era5 -->
 <div class="container px-4 py-0" id="featured-3">
 
   <div class="alert alert-primary" role="alert">
-    The free Open-Meteo Hisotrical Weather API has just been released! Read the <a
+    The free Open-Meteo Historical Weather API has just been released! Read the <a
       href="https://openmeteo.substack.com/p/60-years-of-historical-weather-as" target="_blank">blog article</a>.
   </div>
 

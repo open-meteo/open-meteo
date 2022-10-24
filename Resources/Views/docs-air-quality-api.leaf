@@ -8,7 +8,7 @@
 
 #export("content"):
 
-<div class="px-4 py-5 mb-5 text-center text-white" style="
+<div class="px-4 py-5 text-center text-white" style="
             background-image: url('https://assets.open-meteo.com/images/kuala_lumpur.jpeg');
             background-size: cover;
             background-position: center;
@@ -29,6 +29,18 @@
     </div>
   </div>
 </div>
+<div class="mb-5" style="border-bottom: 1px solid #ddd">
+  <div class="container px-4 py-1">
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/en">Home</a></li>
+        <li class="breadcrumb-item"><a href="/en/docs/marine-weather-api">Other APIs</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Air Quality API</li>
+      </ol>
+    </nav>
+  </div>
+</div>
+
 
 <div class="container px-4 py-0" id="featured-3">
   <form id="api_form" method="get" action="https://air-quality-api.open-meteo.com/v1/air-quality">

@@ -2,7 +2,7 @@
 #export("header"):
 #endexport
 #export("content"):
-<div class="px-4 py-5 mb-5 text-center text-white" style="
+<div class="px-4 py-5 text-center text-white" style="
             background-image: url('https://assets.open-meteo.com/images/features_background.jpeg');
             background-size: cover;
             background-position: center;
@@ -22,6 +22,16 @@
       <a href="#weathervariables" class="btn button btn-primary btn-lg px-4 me-sm-3">Weather Variables</a>
       <a href="#terms" class="btn btn-outline-light btn-lg px-4">Terms &#x26; License</a>
     </div>
+  </div>
+</div>
+<div class="mb-5" style="border-bottom: 1px solid #ddd">
+  <div class="container px-4 py-1">
+    <nav style="--bs-breadcrumb-divider: '>';" aria-label="breadcrumb">
+      <ol class="breadcrumb mb-0">
+        <li class="breadcrumb-item"><a href="/en">Home</a></li>
+        <li class="breadcrumb-item active" aria-current="page">Features</li>
+      </ol>
+    </nav>
   </div>
 </div>
 
