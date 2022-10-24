@@ -2,26 +2,7 @@ import Foundation
 import Vapor
 
 
-public struct ForecastapiController: RouteCollection {
-    public func boot(routes: RoutesBuilder) throws {
-        let cors = CORSMiddleware(configuration: .init(
-            allowedOrigin: .all,
-            allowedMethods: [.GET, /*.POST, .PUT,*/ .OPTIONS, /*.DELETE, .PATCH*/],
-            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith]
-        ))
-        let corsGroup = routes.grouped(cors, ErrorMiddleware.default(environment: try .detect()))
-        let categoriesRoute = corsGroup.grouped("v1")
-        categoriesRoute.get("forecast", use: self.query)
-        categoriesRoute.get("ecmwf", use: EcmwfController().query)
-        categoriesRoute.get("marine", use: IconWaveController().query)
-        categoriesRoute.get("era5", use: Era5Controller().query)
-        categoriesRoute.get("elevation", use: DemController().query)
-        categoriesRoute.get("air-quality", use: CamsController().query)
-        categoriesRoute.get("seasonal", use: SeasonalForecastController().query)
-        categoriesRoute.get("gfs", use: GfsController().query)
-        categoriesRoute.get("meteofrance", use: MeteoFranceController().query)
-    }
-    
+public struct IconController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
         do {
             // API should only be used on the subdomain
