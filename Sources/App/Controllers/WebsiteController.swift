@@ -17,6 +17,7 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "seasonal-forecast-api", use: seasonalForecastApiHandler)
         routes.get("en", "docs", "gfs-api", use: gfsApiHandler)
         routes.get("en", "docs", "meteofrance-api", use: meteoFranceApiHandler)
+        routes.get("en", "docs", "dwd-api", use: dwdApiHandler)
         routes.get("en", "features", use: featuresHandler)
         routes.get("demo-api", use: apiDemoHandler)
     }
@@ -149,6 +150,22 @@ struct WebsiteController: RouteCollection {
             ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
         ])
         return req.view.render("docs-meteofrance-api", context)
+    }
+    
+    func dwdApiHandler(_ req: Request) -> EventLoopFuture<View> {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
+            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
+        }
+        let context = ContextWithLevels(title: "DWD ICON API", levels: IconDomains.apiLevels, variables: [
+            ContextWithLevels.PressureVariable(label: "Temperature", name: "temperature"),
+            ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
+            ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
+            ContextWithLevels.PressureVariable(label: "Cloudcover", name: "cloudcover"),
+            ContextWithLevels.PressureVariable(label: "Wind Speed", name: "windspeed"),
+            ContextWithLevels.PressureVariable(label: "Wind Direction", name: "winddirection"),
+            ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
+        ])
+        return req.view.render("docs-dwd-api", context)
     }
 }
 
