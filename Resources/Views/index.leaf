@@ -3,7 +3,7 @@
 #endexport
 #export("content"):
 <div class="px-4 py-5 mb-5 text-center text-white" style="
-          background-image: url('https://assets.open-meteo.com/images/docs_background.jpeg');
+          background-image: url('https://assets.open-meteo.com/images/convective_clouds.jpeg');
           background-size: cover;
           background-position: center;
           height: 500px;
