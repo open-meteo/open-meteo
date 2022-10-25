@@ -137,8 +137,6 @@ struct JmaDownload: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours(run: run.hour)
         let nForecastHours = forecastHours.max()! / domain.dtHours + 1
-        print(run.hour)
-        print(nForecastHours)
         
         let grid = domain.grid
         let nLocation = grid.count
