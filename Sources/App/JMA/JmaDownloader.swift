@@ -96,7 +96,9 @@ struct JmaDownload: AsyncCommandFix {
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_GSM_GPV_Rgl_FD\((hour/24).zeroPadded(len: 2))\((hour%24).zeroPadded(len: 2))_grib2.bin"
             }
         case .msm:
-            filesToDownload = ["00-15", "16-33", "34-39", "40-51", "52-78"].map { hour in
+            // 0 und 12z run have more data
+            let range = run.hour % 12 == 0 ? ["00-15", "16-33", "34-39", "40-51", "52-78"] : ["00-15", "16-33", "34-39"]
+            filesToDownload = range.map { hour in
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_MSM_GPV_Rjp_Lsurf_FH\(hour)_grib2.bin"
             }
         }
@@ -135,6 +137,8 @@ struct JmaDownload: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours(run: run.hour)
         let nForecastHours = forecastHours.max()! / domain.dtHours + 1
+        print(run.hour)
+        print(nForecastHours)
         
         let grid = domain.grid
         let nLocation = grid.count
@@ -527,10 +531,11 @@ enum JmaDomain: String, GenericDomain {
     func forecastHours(run: Int) -> [Int] {
         switch self {
         case .gsm:
-            return Array(stride(from: 0, through: 264, by: 6))
+            let through = run == 00 || run == 12 ? 264 : 136
+            return Array(stride(from: 0, through: through, by: 6))
         case .msm:
-            //let through = run == 00 || run == 12 ? 42 : 36
-            return Array(stride(from: 0, through: 78, by: 1))
+            let through = run == 00 || run == 12 ? 78 : 39
+            return Array(stride(from: 0, through: through, by: 1))
         }
     }
     
