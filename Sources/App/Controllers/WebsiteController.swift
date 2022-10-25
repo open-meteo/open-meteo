@@ -18,6 +18,7 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "gfs-api", use: gfsApiHandler)
         routes.get("en", "docs", "meteofrance-api", use: meteoFranceApiHandler)
         routes.get("en", "docs", "dwd-api", use: dwdApiHandler)
+        routes.get("en", "docs", "jma-api", use: jmaApiHandler)
         routes.get("en", "features", use: featuresHandler)
         routes.get("demo-api", use: apiDemoHandler)
     }
@@ -150,6 +151,22 @@ struct WebsiteController: RouteCollection {
             ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
         ])
         return req.view.render("docs-meteofrance-api", context)
+    }
+    
+    func jmaApiHandler(_ req: Request) -> EventLoopFuture<View> {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
+            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
+        }
+        let context = ContextWithLevels(title: "JMA API", levels: JmaDomain.apiLevels, variables: [
+            ContextWithLevels.PressureVariable(label: "Temperature", name: "temperature"),
+            ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
+            ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relativehumidity"),
+            ContextWithLevels.PressureVariable(label: "Cloudcover", name: "cloudcover"),
+            ContextWithLevels.PressureVariable(label: "Wind Speed", name: "windspeed"),
+            ContextWithLevels.PressureVariable(label: "Wind Direction", name: "winddirection"),
+            ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
+        ])
+        return req.view.render("docs-jma-api", context)
     }
     
     func dwdApiHandler(_ req: Request) -> EventLoopFuture<View> {
