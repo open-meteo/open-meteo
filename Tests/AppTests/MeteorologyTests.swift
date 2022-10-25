@@ -86,25 +86,30 @@ final class MeteorologyTests: XCTestCase {
     }
     
     /// model description https://www.jma.go.jp/jma/jma-eng/jma-center/nwp/outline2022-nwp/pdf/outline2022_03.pdf
-    func testJMA() throws {
-        let file = "/Users/patrick/Downloads/Z__C_RJTD_20221024000000_GSM_GPV_Rgl_FD0006_grib2.bin"
+    /*func testJMA() throws {
+        let file = "/Users/patrick/Downloads/Z__C_RJTD_20221025000000_MSM_GPV_Rjp_Lsurf_FH00-15_grib2.bin"
         try XCTSkipUnless(FileManager.default.fileExists(atPath: file), "No grib file")
         
         let grib = try GribFile(file: file)
         for message in grib.messages {
-            print(message.get(attribute: "name")!)
-            print(message.get(attribute: "shortName")!)
-            print(message.get(attribute: "level")!)
-            print(message.get(attribute: "parameterCategory")!) // can be used to identify
-            print(message.get(attribute: "parameterNumber")!) // can be used to identify
+            print("name", message.get(attribute: "name")!)
+            print("shortName", message.get(attribute: "shortName")!)
+            print("level", message.get(attribute: "level")!)
+            print("stepRange", message.get(attribute: "stepRange")!)
+            print("startStep end", message.get(attribute: "startStep")!, message.get(attribute: "endStep")!)
+            print("parameterCategory", message.get(attribute: "parameterCategory")!) // can be used to identify
+            print("parameterNumber", message.get(attribute: "parameterNumber")!) // can be used to identify
+            print("JMA", message.toJmaVariable() ?? "nil")
+            
             guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
                 fatalError("Could not get Nx")
             }
             guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
                 fatalError("Could not get Ny")
             }
-            print(nx, ny)
-            /*message.iterate(namespace: .ls).forEach({
+
+            /*print(nx, ny)
+            message.iterate(namespace: .ls).forEach({
                 print($0)
             })
             message.iterate(namespace: .time).forEach({
@@ -114,6 +119,9 @@ final class MeteorologyTests: XCTestCase {
                 print($0)
             })
             message.iterate(namespace: .parameter).forEach({
+                print($0)
+            })
+            message.iterate(namespace: .geography).forEach({
                 print($0)
             })*/
             
@@ -131,5 +139,5 @@ final class MeteorologyTests: XCTestCase {
             let array2d = Array2D(data: data.map(Float.init), nx: nx, ny: ny)
             try array2d.writeNetcdf(filename: "\(file)-\(short)-\(stepRange)")*/
         }
-    }
+    }*/
 }

@@ -1,11 +1,7 @@
-protocol GenericVariableDownloadable: GenericVariableMixing {
+/// Required additions to a MeteoFrance variable to make it downloadable
+protocol MeteoFranceVariableDownloadable: GenericVariableMixing {
     var interpolationType: Interpolation2StepType { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
-}
-
-
-/// Required additions to a MeteoFrance variable to make it downloadable
-protocol MeteoFranceVariableDownloadable: GenericVariableDownloadable {
     func skipHour0(domain: MeteoFranceDomain) -> Bool
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
