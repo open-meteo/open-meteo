@@ -201,6 +201,7 @@ enum JmaPressureVariableDerivedType: String, CaseIterable {
     case windspeed
     case winddirection
     case dewpoint
+    case cloudcover
 }
 
 /**
@@ -391,6 +392,8 @@ extension JmaMixer {
                     case .dewpoint:
                         try mixer.prefetchData(variable: .pressure(JmaPressureVariable(variable: .temperature, level: v.level)), time: time)
                         try mixer.prefetchData(variable: .pressure(JmaPressureVariable(variable: .relativehumidity, level: v.level)), time: time)
+                    case .cloudcover:
+                        try mixer.prefetchData(variable: .pressure(JmaPressureVariable(variable: .relativehumidity, level: v.level)), time: time)
                     }
                 }
             }
@@ -508,6 +511,9 @@ extension JmaMixer {
                 let temperature = try get(variable: .pressure(JmaPressureVariable(variable: .temperature, level: v.level)), time: time)
                 let rh = try get(variable: .pressure(JmaPressureVariable(variable: .relativehumidity, level: v.level)), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+            case .cloudcover:
+                let rh = try get(variable: .pressure(JmaPressureVariable(variable: .relativehumidity, level: v.level)), time: time)
+                return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
             }
         }
     }
