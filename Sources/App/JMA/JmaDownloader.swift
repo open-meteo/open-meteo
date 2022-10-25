@@ -32,7 +32,7 @@ struct JmaDownload: AsyncCommandFix {
     }
     
     var help: String {
-        "Download MeteoFrance models"
+        "Download JMA models"
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -74,7 +74,7 @@ struct JmaDownload: AsyncCommandFix {
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
-    /// download MeteoFrance
+    /// MSM or GSM domain
     func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws {
         let logger = application.logger
         let curl = Curl(logger: logger, deadLineHours: 3)
