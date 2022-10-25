@@ -88,13 +88,15 @@ final class MeteorologyTests: XCTestCase {
     /// model description https://www.jma.go.jp/jma/jma-eng/jma-center/nwp/outline2022-nwp/pdf/outline2022_03.pdf
     func testJMA() throws {
         let file = "/Users/patrick/Downloads/Z__C_RJTD_20221024000000_GSM_GPV_Rgl_FD0006_grib2.bin"
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: file), "No grib file")
+        
         let grib = try GribFile(file: file)
         for message in grib.messages {
             print(message.get(attribute: "name")!)
             print(message.get(attribute: "shortName")!)
             print(message.get(attribute: "level")!)
-            print(message.get(attribute: "parameterCategory")) // can be used to identify
-            print(message.get(attribute: "parameterNumber")) // can be used to identify
+            print(message.get(attribute: "parameterCategory")!) // can be used to identify
+            print(message.get(attribute: "parameterNumber")!) // can be used to identify
             guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
                 fatalError("Could not get Nx")
             }

@@ -121,9 +121,9 @@ struct JmaDownload: AsyncCommandFix {
                 }
                 
                 // Scaling before compression with scalefactor
-                /*if let fma = variable.multiplyAdd {
+                if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }*/
+                }
                 
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om"
@@ -139,7 +139,7 @@ struct JmaDownload: AsyncCommandFix {
 }
 
 extension GribMessage {
-    func toJmaVariable() -> GenericVariable? {
+    func toJmaVariable() -> GenericVariableDownloadable? {
         guard let shortName = get(attribute: "shortName"),
               let parameterCategory = get(attribute: "parameterCategory").flatMap(Int.init),
               let parameterNumber = get(attribute: "parameterNumber").flatMap(Int.init),
@@ -182,7 +182,7 @@ extension GribMessage {
     }
 }
 
-enum JmaSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixing {
+enum JmaSurfaceVariable: String, CaseIterable, Codable, GenericVariableDownloadable {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -223,6 +223,42 @@ enum JmaSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixing {
             return 10
         case .wind_u_component_10m:
             return 10
+        }
+    }
+    
+    var interpolationType: Interpolation2StepType {
+        switch self {
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .cloudcover:
+            return .hermite(bounds: 0...100)
+        case .cloudcover_low:
+            return .hermite(bounds: 0...100)
+        case .cloudcover_mid:
+            return .hermite(bounds: 0...100)
+        case .cloudcover_high:
+            return .hermite(bounds: 0...100)
+        case .relativehumidity_2m:
+            return .hermite(bounds: 0...100)
+        case .precipitation:
+            return .linear
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .wind_v_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_10m:
+            return .hermite(bounds: nil)
+        }
+    }
+    
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m:
+            return (1, -273.15)
+        case .pressure_msl:
+            return (1/100, 0)
+        default:
+            return nil
         }
     }
     
@@ -301,7 +337,7 @@ enum JmaPressureVariableType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct JmaPressureVariable: PressureVariableRespresentable, GenericVariableMixing, Hashable {
+struct JmaPressureVariable: PressureVariableRespresentable, GenericVariableDownloadable, Hashable {
     let variable: JmaPressureVariableType
     let level: Int
     
@@ -347,6 +383,25 @@ struct JmaPressureVariable: PressureVariableRespresentable, GenericVariableMixin
             return .hermite(bounds: nil)
         case .relativehumidity:
             return .hermite(bounds: 0...100)
+        }
+    }
+    
+    var interpolationType: Interpolation2StepType {
+        switch variable {
+        case .relativehumidity: return .hermite(bounds: 0...100)
+        default: return .hermite(bounds: nil)
+        }
+    }
+    
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch variable {
+        case .temperature:
+            return (1, -273.15)
+        case .geopotential_height:
+            // convert geopotential to height (WMO defined gravity constant)
+            return (1/9.80665, 0)
+        default:
+            return nil
         }
     }
     
