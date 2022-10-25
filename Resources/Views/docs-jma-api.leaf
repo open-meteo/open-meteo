@@ -182,12 +182,12 @@
             Sealevel Pressure
           </label>
         </div>
-        <!--<div class="form-check">
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="surface_pressure" id="surface_pressure" name="hourly">
           <label class="form-check-label" for="surface_pressure">
             Surface Pressure
           </label>
-        </div>-->
+        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="precipitation" id="precipitation" name="hourly">
           <label class="form-check-label" for="precipitation">
@@ -258,7 +258,7 @@
           <h2 class="accordion-header" id="heading-solar-variables">
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-solar-variables" aria-expanded="false" aria-controls="collapse-solar-variables">
-              Solar Radiation Variables&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+              Solar Radiation Variables (Only available for Japan) &nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
                 data-count-checkboxes-of="#collapse-solar-variables">0/x</span>
             </button>
           </h2>
@@ -648,7 +648,7 @@
             <td>0.5° (~55 km)</td>
             <td>6-Hourly</td>
             <td>11 days</td>
-            <td>Every 12 hours</td>
+            <td>Every 6 hours</td>
           </tr>
           <tr>
             <th scope="row">MSM</th>
@@ -656,7 +656,7 @@
             <td>0.05° (~5 km)</td>
             <td>Hourly</td>
             <td>4 days</td>
-            <td>Every 6 hours</td>
+            <td>Every 3 hours</td>
           </tr>
         </tbody>
       </table>
@@ -819,10 +819,10 @@
               humidity and solar radiation</td>
           </tr>
           <tr>
-            <th scope="row">pressure_msl<!--br />surface_pressure--></th>
+            <th scope="row">pressure_msl<br />surface_pressure</th>
             <td>Instant</td>
             <td>hPa</td>
-            <td>Atmospheric air pressure reduced to mean sea level (msl)<!-- or pressure at surface-->. Typically pressure on
+            <td>Atmospheric air pressure reduced to mean sea level (msl) or pressure at surface. Typically pressure on
               mean sea level is used in meteorology. Surface pressure gets lower with increasing elevation.</td>
           </tr>
           <tr>

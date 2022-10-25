@@ -41,13 +41,9 @@ struct JmaDownload: AsyncCommandFix {
         guard let domain = JmaDomain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
-        let run = signature.run.map {
-            guard let run = Int($0) else {
-                fatalError("Invalid run '\($0)'")
-            }
-            return run
-        } ?? domain.lastRun
         
+        let run = signature.run.flatMap(Int.init).map { Timestamp.now().with(hour: $0) } ?? domain.lastRun
+
         guard let server = signature.server else {
             fatalError("Parameter server required")
         }
@@ -67,24 +63,21 @@ struct JmaDownload: AsyncCommandFix {
             variables = JmaSurfaceVariable.allCases
         }
         
-        let date = Timestamp.now().add(-24*3600 * (signature.pastDays ?? 0)).with(hour: run)
-        
-        logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
+        logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         //try await downloadElevation(application: context.application, domain: domain)
-        
-        //try await download(application: context.application, domain: domain, run: date, server: server)
-        try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
+        try await download(application: context.application, domain: domain, run: run, server: server)
+        try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
     /// download MeteoFrance
     func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws {
         let logger = application.logger
-        let curl = Curl(logger: logger, deadLineHours: 4)
+        let curl = Curl(logger: logger, deadLineHours: 3)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
         
@@ -141,7 +134,7 @@ struct JmaDownload: AsyncCommandFix {
     func convert(logger: Logger, domain: JmaDomain, variables: [JmaVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let forecastHours = domain.forecastHours(run: run.hour)
-        let nForecastHours = forecastHours.max()!+1
+        let nForecastHours = forecastHours.max()! / domain.dtHours + 1
         
         let grid = domain.grid
         let nLocation = grid.count
@@ -301,17 +294,17 @@ enum JmaSurfaceVariable: String, CaseIterable, Codable, JmaVariableDownloadable 
         case .temperature_2m:
             return .hermite(bounds: nil)
         case .cloudcover:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .cloudcover_low:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .cloudcover_mid:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .cloudcover_high:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .relativehumidity_2m:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .wind_v_component_10m:
             return .hermite(bounds: nil)
         case .wind_u_component_10m:
@@ -512,10 +505,18 @@ enum JmaDomain: String, GenericDomain {
     }
     
     /// Based on the current time , guess the current run that should be available soon on the open-data server
-    var lastRun: Int {
+    var lastRun: Timestamp {
         let t = Timestamp.now()
-        // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00 (arpege) or 2:00 (arome)
-        return ((t.hour - 2 + 24) % 24) / 6 * 6
+        switch self {
+        case .gsm:
+            // First hours 3.5 h delay, second part 6.5 h delay
+            // every 6 hours
+            return t.add(-6*3600).floor(toNearest: 6*3600)
+        case .msm:
+            // Delay of 2-3 hours to init
+            // every 3 hours
+            return t.add(-2*3600).floor(toNearest: 3*3600)
+        }
     }
     
     /// Filename of the surface elevation file

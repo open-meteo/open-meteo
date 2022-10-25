@@ -266,17 +266,17 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariableM
         case .temperature_2m:
             return .hermite(bounds: nil)
         case .cloudcover:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .cloudcover_low:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .cloudcover_mid:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .cloudcover_high:
             return .hermite(bounds: 0...10)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .relativehumidity_2m:
-            return .hermite(bounds: 0...10)
+            return .hermite(bounds: 0...100)
         case .wind_v_component_10m:
             return .hermite(bounds: nil)
         case .wind_u_component_10m:
