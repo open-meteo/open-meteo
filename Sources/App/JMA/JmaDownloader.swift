@@ -52,37 +52,16 @@ struct JmaDownload: AsyncCommandFix {
             fatalError("Parameter server required")
         }
         
-        /*let onlyVariables: [MeteoFranceVariableDownloadable]? = signature.onlyVariables.map {
-            $0.split(separator: ",").map {
-                if let variable = MeteoFrancePressureVariable(rawValue: String($0)) {
-                    return variable
-                }
-                guard let variable = MeteoFranceSurfaceVariable(rawValue: String($0)) else {
-                    fatalError("Invalid variable '\($0)'")
-                }
-                return variable
-            }
-        }
-        
-        let pressureVariables = domain.levels.reversed().flatMap { level in
-            MeteoFrancePressureVariableType.allCases.compactMap { variable -> MeteoFrancePressureVariable? in
-                if variable == .cloudcover && level < 100 {
-                    return nil
-                }
-                return MeteoFrancePressureVariable(variable: variable, level: level)
-            }
-        }
-        let surfaceVariables = MeteoFranceSurfaceVariable.allCases
-        
-        let variablesAll = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
-        
-        let variables = variablesAll.filter({ $0.availableFor(domain: domain) })*/
-        
         let variables: [JmaVariableDownloadable]
         switch domain {
         case .gsm:
             variables = JmaSurfaceVariable.allCases.filter({$0 != .shortwave_radiation}) + domain.levels.flatMap {
-                level in JmaPressureVariableType.allCases.map { JmaPressureVariable(variable: $0, level: level) }
+                level in JmaPressureVariableType.allCases.compactMap { variable in
+                    if variable == .relativehumidity && level <= 250 {
+                        return nil
+                    }
+                    return JmaPressureVariable(variable: variable, level: level)
+                }
             }
         case .msm:
             variables = JmaSurfaceVariable.allCases
