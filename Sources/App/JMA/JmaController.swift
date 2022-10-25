@@ -165,17 +165,9 @@ enum JmaDailyWeatherVariable: String, Codable {
     case apparent_temperature_max
     case apparent_temperature_min
     case precipitation_sum
-    //case snowfall_sum
-    //case rain_sum
-    //case showers_sum
-    //case weathercode
     case shortwave_radiation_sum
-    // cloudcover_total_max?
     case windspeed_10m_max
-    //case windgusts_10m_max
     case winddirection_10m_dominant
-    /// TODO implement aggregation
-    //case sunshine_hours
     case precipitation_hours
     case sunrise
     case sunset
@@ -188,12 +180,6 @@ enum JmaVariableDerivedSurface: String, Codable, CaseIterable {
     case dewpoint_2m
     case windspeed_10m
     case winddirection_10m
-    //case windspeed_80m
-    //case winddirection_80m
-    /*case windspeed_120m
-    case winddirection_120m
-    case windspeed_180m
-    case winddirection_180m*/
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -201,10 +187,8 @@ enum JmaVariableDerivedSurface: String, Codable, CaseIterable {
     case diffuse_radiation_instant
     case diffuse_radiation
     case shortwave_radiation_instant
-    //case evapotranspiration
     case et0_fao_evapotranspiration
     case vapor_pressure_deficit
-    //case snowfall
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
@@ -255,10 +239,6 @@ extension JmaMixer {
             // rounding is required, becuse floating point addition results in uneven numbers
             let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        /*case .weathercode:
-            // not 100% corrct
-            let data = try get(variable: .weathercode).conertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 24), data.unit)*/
         case .shortwave_radiation_sum:
             let data = try get(variable: .shortwave_radiation, time: time).conertAndRound(params: params)
             // 3600s only for hourly data of source
@@ -272,9 +252,6 @@ extension JmaMixer {
             let v = try get(variable: .wind_v_component_10m, time: time).data.sum(by: 24)
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
-        //case .sunshine_hours:
-            /// TODO need sunrise and set time for correct numbers
-            //fatalError()
         case .precipitation_hours:
             let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
@@ -285,12 +262,6 @@ extension JmaMixer {
         case .et0_fao_evapotranspiration:
             let data = try get(variable: .et0_fao_evapotranspiration, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        /*case .rain_sum:
-            let data = try get(variable: .rain).conertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .showers_sum:
-            let data = try get(variable: .showers).conertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)*/
         }
     }
     
@@ -325,8 +296,6 @@ extension JmaMixer {
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .precipitation_sum:
                 try prefetchData(variable: .precipitation, time: time)
-            //case .weathercode:
-            //    try prefetchData(variable: .weathercode)
             case .shortwave_radiation_sum:
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .windspeed_10m_max:
@@ -347,10 +316,6 @@ extension JmaMixer {
                 try prefetchData(variable: .relativehumidity_2m, time: time)
                 try prefetchData(variable: .wind_u_component_10m, time: time)
                 try prefetchData(variable: .wind_v_component_10m, time: time)
-            /*case .rain_sum:
-                try prefetchData(variable: .rain)
-            case .showers_sum:
-                try prefetchData(variable: .showers)*/
             }
         }
     }
@@ -382,28 +347,6 @@ extension JmaMixer {
                     case .winddirection_10m:
                         try prefetchData(variable: .wind_u_component_10m, time: time)
                         try prefetchData(variable: .wind_v_component_10m, time: time)
-                    /*case .windspeed_80m:
-                        try prefetchData(variable: .wind_u_component_80m, time: time)
-                        try prefetchData(variable: .wind_v_component_80m, time: time)
-                    case .winddirection_80m:
-                        try prefetchData(variable: .wind_u_component_80m, time: time)
-                        try prefetchData(variable: .wind_v_component_80m, time: time)*/
-                    /*case .windspeed_120m:
-                        try prefetchData(variable: .u_120m)
-                        try prefetchData(variable: .v_120m)
-                    case .winddirection_120m:
-                        try prefetchData(variable: .u_120m)
-                        try prefetchData(variable: .v_120m)
-                    case .windspeed_180m:
-                        try prefetchData(variable: .u_180m)
-                        try prefetchData(variable: .v_180m)
-                    case .winddirection_180m:
-                        try prefetchData(variable: .u_180m)
-                        try prefetchData(variable: .v_180m)*/
-                    /*case .direct_normal_irradiance:
-                        try prefetchData(variable: .direct_radiation)*/
-                    /*case .evapotranspiration:
-                        try prefetchData(variable: .latent_heatflux, time: time)*/
                     case .vapor_pressure_deficit:
                         try prefetchData(variable: .temperature_2m, time: time)
                         try prefetchData(variable: .relativehumidity_2m, time: time)
@@ -478,26 +421,12 @@ extension JmaMixer {
                 let v = try get(variable: .wind_v_component_10m, time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
-            /*case .windspeed_80m:
-                let u = try get(variable: .wind_u_component_80m, time: time).data
-                let v = try get(variable: .wind_v_component_80m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
-            case .winddirection_80m:
-                let u = try get(variable: .wind_u_component_80m, time: time).data
-                let v = try get(variable: .wind_v_component_80m, time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)*/
             case .apparent_temperature:
                 let windspeed = try get(variable: .windspeed_10m, time: time).data
                 let temperature = try get(variable: .temperature_2m, time: time).data
                 let relhum = try get(variable: .relativehumidity_2m, time: time).data
                 let radiation = try get(variable: .shortwave_radiation, time: time).data
                 return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
-            /*case .evapotranspiration:
-                let latent = try get(variable: .latent_heatflux, time: time).data
-                let evapotranspiration = latent.map(Meteorology.evapotranspiration)
-                return DataAndUnit(evapotranspiration, .millimeter)*/
             case .vapor_pressure_deficit:
                 let temperature = try get(variable: .temperature_2m, time: time).data
                 let rh = try get(variable: .relativehumidity_2m, time: time).data
