@@ -76,7 +76,7 @@ struct JmaDownload: AsyncCommandFix {
         
         //try await downloadElevation(application: context.application, domain: domain)
         
-        try await download(application: context.application, domain: domain, run: date, server: server)
+        //try await download(application: context.application, domain: domain, run: date, server: server)
         try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -158,7 +158,7 @@ struct JmaDownload: AsyncCommandFix {
                     continue
                 }
                 let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).om"
-                data2d[0..<nLocation, forecastHour] = try OmFileReader(file: file).readAll()
+                data2d[0..<nLocation, forecastHour / domain.dtHours] = try OmFileReader(file: file).readAll()
             }
             
             let skip = variable.skipHour0 ? 1 : 0
@@ -529,7 +529,7 @@ enum JmaDomain: String, GenericDomain {
             return Array(stride(from: 0, through: 264, by: 6))
         case .msm:
             //let through = run == 00 || run == 12 ? 42 : 36
-            return Array(stride(from: 0, through: 39, by: 1))
+            return Array(stride(from: 0, through: 78, by: 1))
         }
     }
     

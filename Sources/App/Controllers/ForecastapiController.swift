@@ -21,6 +21,7 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.get("seasonal", use: SeasonalForecastController().query)
         categoriesRoute.get("gfs", use: GfsController().query)
         categoriesRoute.get("meteofrance", use: MeteoFranceController().query)
+        categoriesRoute.get("jma", use: JmaController().query)
     }
     
     func query(_ req: Request) -> EventLoopFuture<Response> {

@@ -37,14 +37,14 @@
       <div class="collapse navbar-collapse" id="navbarCollapse">
         <ul class="navbar-nav me-auto mb-2 mb-md-0">
           <li class="nav-item">
-            <a href="/en" class="nav-link #if(title == " Free Open-Source Weather API"): active #endif"
+            <a href="/en" class="nav-link #if(title == "Free Open-Source Weather API"): active #endif"
               aria-current="page">Home</a>
           </li>
           <li class="nav-item">
-            <a href="/en/features" class="nav-link #if(title == " Features"): active #endif">Features</a>
+            <a href="/en/features" class="nav-link #if(title == "Features"): active #endif">Features</a>
           </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle #if(title == " Weather Forecast API" || title=="ECMWF Weather Forecast API" || title=="Historical Weather API" || title=="MeteoFrance API" || title=="DWD ICON API" || title=="GFS & HRRR Forecast API" ): active #endif" href="#"
+            <a class="nav-link dropdown-toggle #if(title == "Weather Forecast API" || title=="ECMWF Weather Forecast API" || title=="Historical Weather API" || title=="MeteoFrance API" || title=="DWD ICON API" || title=="GFS & HRRR Forecast API" ): active #endif" href="#"
               id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               Weather APIs
             </a>
@@ -52,17 +52,19 @@
               <li><a class="dropdown-item #if(title==" Weather Forecast API"): active #endif" href="/en/docs">Weather
                   Forecast API</a>
               </li>
-              <li><a class="dropdown-item #if(title == " Historical Weather API"): active #endif"
+              <li><a class="dropdown-item #if(title == "Historical Weather API"): active #endif"
                   href="/en/docs/historical-weather-api">Historical Weather API</a></li>
-              <li><a class="dropdown-item #if(title == " ECMWF Weather Forecast API"): active #endif"
+              <li><a class="dropdown-item #if(title == "ECMWF Weather Forecast API"): active #endif"
                   href="/en/docs/ecmwf-api">ECMWF API</a></li>
-              <li><a class="dropdown-item #if(title == " GFS & HRRR Forecast API"): active #endif"
+              <li><a class="dropdown-item #if(title == "GFS & HRRR Forecast API"): active #endif"
                   href="/en/docs/gfs-api">GFS &amp; HRRR Forecast API</a></li>
-              <li><a class="dropdown-item #if(title == " MeteoFrance API"): active #endif"
+              <li><a class="dropdown-item #if(title == "MeteoFrance API"): active #endif"
                   href="/en/docs/meteofrance-api">MeteoFrance API&nbsp;&nbsp;<span
                     class="badge bg-secondary">New</span></a></li>
-              <li><a class="dropdown-item #if(title == " DWD ICON API"): active #endif" href="/en/docs/dwd-api">DWD
+              <li><a class="dropdown-item #if(title == "DWD ICON API"): active #endif" href="/en/docs/dwd-api">DWD
                   API</a></li>
+              <li class="debug-hidden"><a class="dropdown-item #if(title == "JMA API"): active #endif"
+                    href="/en/docs/jma-api">JMA API</a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">
