@@ -557,7 +557,7 @@ enum JmaDomain: String, GenericDomain {
         case .gsm:
             return 110
         case .msm:
-            return 48+18
+            return 78+36
         }
     }
     
