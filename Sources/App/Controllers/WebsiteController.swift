@@ -21,7 +21,6 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "dwd-api", use: dwdApiHandler)
         routes.get("en", "docs", "jma-api", use: jmaApiHandler)
         routes.get("en", "features", use: featuresHandler)
-        routes.get("demo-api", use: apiDemoHandler)
     }
     
     func robotsTxtHandler(_ req: Request) -> String {
@@ -32,7 +31,7 @@ struct WebsiteController: RouteCollection {
     }
     
     func indexHandler(_ req: Request) -> EventLoopFuture<View> {
-        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = IndexContext(title: "Free Open-Source Weather API")
@@ -40,7 +39,7 @@ struct WebsiteController: RouteCollection {
     }
     
     func featuresHandler(_ req: Request) -> EventLoopFuture<View> {
-        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = IndexContext(title: "Features")
@@ -48,7 +47,7 @@ struct WebsiteController: RouteCollection {
     }
     
     func docsHandler(_ req: Request) -> EventLoopFuture<View> {
-        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = ContextWithLevels(title: "Weather Forecast API", levels: IconDomains.apiLevels, variables: [
@@ -63,14 +62,14 @@ struct WebsiteController: RouteCollection {
         return req.view.render("docs", context)
     }
     func docsGeocodingHandler(_ req: Request) -> EventLoopFuture<View> {
-        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = IndexContext(title: "Geocoding API")
         return req.view.render("docs-geocoding-api", context)
     }
     func ecmwfApiHandler(_ req: Request) -> EventLoopFuture<View> {
-        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = ContextWithLevels(title: "ECMWF Weather Forecast API", levels: EcmwfDomain.apiLevels, variables: [
@@ -88,32 +87,25 @@ struct WebsiteController: RouteCollection {
         return req.view.render("docs-ecmwf-api", context)
     }
     func marineApiHandler(_ req: Request) -> EventLoopFuture<View> {
-        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = IndexContext(title: "Marine Weather API")
         return req.view.render("docs-marine-api", context)
     }
     func airQualityApiHandler(_ req: Request) -> EventLoopFuture<View> {
-        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = IndexContext(title: "Air Quality API")
         return req.view.render("docs-air-quality-api", context)
     }
     func historicalWeatherApiHandler(_ req: Request) -> EventLoopFuture<View> {
-        if req.headers[.host].contains(where: { $0.contains("api") || $0.contains("h2978162") }) {
-            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
-        }
-        let context = IndexContext(title: "Historical Weather API")
-        return req.view.render("docs-era5-api", context)
-    }
-    func apiDemoHandler(_ req: Request) -> EventLoopFuture<View> {
         if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = IndexContext(title: "Historical Weather API")
-        return req.view.render("demo-api", context)
+        return req.view.render("docs-era5-api", context)
     }
     
     func elevationApiHandler(_ req: Request) -> EventLoopFuture<View> {
