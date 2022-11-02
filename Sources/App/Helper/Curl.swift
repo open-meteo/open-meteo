@@ -41,6 +41,10 @@ final class Curl {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         buffer = ByteBuffer()
+        
+        /// Access this mutable static variable, to workaround a concurrency issue
+        let error = HTTPClientError.deadlineExceeded
+        logger.info("Curl initialised. Accessed mutable static var \(error)")
     }
     
     /*func download(url: String, to: String, range: String? = nil) throws {
