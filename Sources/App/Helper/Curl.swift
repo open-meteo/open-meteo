@@ -17,6 +17,7 @@ enum CurlError: Error {
     case didNotGetAllGribMessages(got: Int, expected: Int)
     case downloadFailed(code: HTTPStatus)
     case timeoutReached
+    case futimes(error: String)
 }
 
 final class Curl {
@@ -150,15 +151,19 @@ final class Curl {
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             try FileManager.default.removeItemIfExists(at: toFile)
-            return try await response.body.decompressBzip2().saveTo(file: toFile)
+            let lastModified = response.headers.lastModified?.value
+            try await response.body.decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified)
         }
     }
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
+    /// 
     func download(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
+            let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
+            let lastModified = response.headers.lastModified?.value
             try FileManager.default.removeItemIfExists(at: toFile)
-            return try await response.body.saveTo(file: toFile)
+            try await response.body.saveTo(file: toFile, size: contentLength, modificationDate: lastModified)
         }
     }
     
@@ -464,10 +469,16 @@ protocol CurlIndexedVariable {
 extension AsyncSequence where Element == ByteBuffer {
     /// Store incoming data to file
     /// NOTE: File IO is blocking e.g. synchronous
-    func saveTo(file: String) async throws {
-        let fn = try FileHandle.createNewFile(file: file)
+    func saveTo(file: String, size: Int?, modificationDate: Date?) async throws {
+        let fn = try FileHandle.createNewFile(file: file, size: size)
         for try await fragment in self {
             try fn.write(contentsOf: fragment.readableBytesView)
+        }
+        if let modificationDate {
+            var times = timespec(tv_sec: 0, tv_nsec: Int(modificationDate.timeIntervalSince1970 * 1e9))
+            guard futimens(fn.fileDescriptor, &times) == 0 else {
+                throw CurlError.futimes(error: String(cString: strerror(errno)))
+            }
         }
     }
 }

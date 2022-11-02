@@ -11,6 +11,7 @@ public enum SwiftPFor2DError: Error {
     case dimensionMustBeLargerThan0
     case notAOmFile(filename: String)
     case fileExistsAlready(filename: String)
+    case posixFallocateFailed(error: Int32)
 }
 
 
