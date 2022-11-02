@@ -1,5 +1,4 @@
 import Foundation
-import Darwin
 
 extension FileHandle {
     /// Create new file and convert it into a `FileHandle`. For some reason this does not exist in stock swift....
