@@ -6,6 +6,7 @@ struct WebsiteController: RouteCollection {
         routes.get() { req in
             req.redirect(to: "/en")
         }
+        routes.get("robots.txt", use: robotsTxtHandler)
         routes.get("en", use: indexHandler)
         routes.get("en", "docs", use: docsHandler)
         routes.get("en", "docs", "geocoding-api", use: docsGeocodingHandler)
@@ -21,6 +22,13 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "jma-api", use: jmaApiHandler)
         routes.get("en", "features", use: featuresHandler)
         routes.get("demo-api", use: apiDemoHandler)
+    }
+    
+    func robotsTxtHandler(_ req: Request) -> String {
+        if req.headers[.host].contains(where: { $0 == "open-meteo.com" }) {
+            return "User-agent: *\nAllow: /"
+        }
+        return "User-agent: *\nDisallow: /"
     }
     
     func indexHandler(_ req: Request) -> EventLoopFuture<View> {
