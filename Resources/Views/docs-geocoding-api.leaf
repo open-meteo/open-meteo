@@ -1,5 +1,6 @@
 #extend("base"):
 #export("header"):
+<link rel="canonical" href="https://open-meteo.com/en/docs/geocoding-api" />
 #endexport
 
 #export("content"):

@@ -4,7 +4,7 @@
   href="https://assets.open-meteo.com/libs/bootstrap-datepicker-1.9.0/bootstrap-datepicker3.min.css"
   integrity="sha512-rxThY3LYIfYsVCWPCW9dB0k+e3RZB39f23ylUYTEuZMDrN/vRqLdaCBo/FbvVT6uC2r0ObfPzotsfKF9Qc5W5g=="
   crossorigin="anonymous" referrerpolicy="no-referrer" />
-
+<link rel="canonical" href="https://open-meteo.com/en/docs/ecmwf-api" />
 #endexport
 #export("content"):
 

@@ -1,5 +1,6 @@
 #extend("base"):
 #export("header"):
+<link rel="canonical" href="https://open-meteo.com/en" />
 #endexport
 #export("content"):
 <div class="px-4 py-5 mb-5 text-center text-white" style="
