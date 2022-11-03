@@ -26,7 +26,7 @@ struct SyncController: RouteCollection {
     
     struct ListParams: Content {
         let variables: [String]?
-        let domains: [String]?
+        let domains: [String]
         let newerThan: Int?
         let apikey: String
     }
@@ -44,7 +44,7 @@ struct SyncController: RouteCollection {
         
         let params = try req.query.decode(ListParams.self)
         // TODO: apikey check
-        return SyncFileAttributes.list(path: OpenMeteo.dataDictionary, filterDomains: params.domains, filterVariables: params.variables, newerThan: params.newerThan)
+        return SyncFileAttributes.list(path: OpenMeteo.dataDictionary, directories: params.domains, matchFilename: params.variables, newerThan: params.newerThan)
     }
     
     /// Serve files via nginx X-Accel using sendfile zero copy
@@ -73,15 +73,13 @@ struct SyncFileAttributes: Content {
     let size: Int
     let time: Int
     
-    static func list(path: String, filterDomains: [String]?, filterVariables: [String]?, newerThan: Int?) -> [SyncFileAttributes] {
+    static func list(path: String, directories: [String], matchFilename: [String]?, newerThan: Int?, alwaysInclude: [String] = ["HSURF.om", "init.txt"]) -> [SyncFileAttributes] {
         let pathUrl = URL(fileURLWithPath: path, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
         
-        let filterDomains = filterDomains.map {
-            $0.filter { $0 != "" && !$0.contains(".") }
-        }
+        let directories = directories.filter { $0 != "" && !$0.contains(".") }
         
-        let filterVariables = filterVariables.map {
+        let matchFilename = matchFilename.map {
             $0.filter { $0 != "" && !$0.contains(".") }
         }
         
@@ -101,11 +99,8 @@ struct SyncFileAttributes: Content {
             
             if isDirectory {
                 directory = name
-                if !name.starts(with: "omfile-") {
-                    directoryEnumerator.skipDescendants()
-                }
                 // Domain is not in the filtered listt
-                if let filterDomains, !filterDomains.contains(where: { name.contains($0) }) {
+                if !directories.contains(name) {
                     directoryEnumerator.skipDescendants()
                 }
                 continue
@@ -118,9 +113,12 @@ struct SyncFileAttributes: Content {
                 continue
             }
             
-            if let filterVariables, !filterVariables.contains(where: { name.contains($0) }) {
-                // skip variable
-                // always include HSURF?
+            if alwaysInclude.contains(name) {
+                files.append(SyncFileAttributes(file: "\(directory)/\(name)", size: size, time: modificationTime))
+                continue
+            }
+            
+            if let matchFilename, !matchFilename.contains(where: { name.contains($0) }) {
                 continue
             }
             
@@ -142,8 +140,8 @@ struct SyncCommand: AsyncCommandFix {
     }
     
     struct Signature: CommandSignature {
-        @Option(name: "domains", help: "Model domains separated by coma")
-        var domains: String?
+        @Argument(name: "domains", help: "Model domains directories separated by coma")
+        var domains: String
         
         @Option(name: "variables", help: "Weather variables, separated by coma")
         var variables: String?
@@ -154,56 +152,68 @@ struct SyncCommand: AsyncCommandFix {
         @Option(name: "server", help: "Server base URL. Default http://api.open-meteo.com/")
         var server: String?
         
-        // check-every-x-seconds
+        @Option(name: "max-age-days", help: "Maximum age of synchronised files. Default 7 days.")
+        var maxAgeDays: Int?
+        
+        @Option(name: "repreat-interval", help: "If set, check for new files every specified amount of seconds.")
+        var repeatInterval: Int?
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         
-        let domains = signature.domains.map {
-            $0.split(separator: ",").map(String.init)
-        }
-        
-        let variables = signature.variables.map {
-            $0.split(separator: ",").map(String.init)
-        }
-        
-        let locals = SyncFileAttributes.list(path: OpenMeteo.dataDictionary, filterDomains: domains, filterVariables: variables, newerThan: nil)
-        logger.info("Found \(locals.count) local files (\(locals.fileSize) MB)")
-        
-        guard let apikey = signature.apikey else {
-            fatalError("Parameter apikey required")
-        }
-        
         let server = signature.server ?? "http://api.open-meteo.com/"
+        let maxAgeDays = signature.maxAgeDays ?? 7
+        var newerThan = Timestamp.now().add(-24 * 3600 * maxAgeDays).timeIntervalSince1970
         
-        let response = try await context.application.client.get(URI("\(server)sync/list"), beforeSend: {
-            try $0.query.encode(SyncController.ListParams(variables: variables, domains: domains, newerThan: nil, apikey: apikey))
-        })
-        
-        let remotes = try response.content.decode([SyncFileAttributes].self)
-        logger.info("Found \(remotes.count) remote files (\(remotes.fileSize) MB)")
-        
-        // compare remote file to local files
-        let toDownload = remotes.filter { remote in
-            let hasUpToDateFile = locals.contains(where: { $0.file == remote.file && $0.time >= remote.time })
-            return !hasUpToDateFile
-        }
-        
-        logger.info("Downloading \(toDownload.count) files (\(toDownload.fileSize) MB)")
-        
-        let curl = Curl(logger: logger)
-        for download in toDownload {
-            var client = ClientRequest()
-            try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey))
-            let localFile = "\(OpenMeteo.dataDictionary)/\(download.file)"
-            let localFileTemp = "\(localFile)~"
-            let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
-            try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
-            // TODO sha256 hash integration check
+        while true {
+            let domains = signature.domains.split(separator: ",").map(String.init)
             
-            try await curl.download(url: client.url.string, toFile: localFileTemp, client: context.application.http.client.shared)
-            try FileManager.default.moveFileOverwrite(from: localFileTemp, to: localFile)
+            let variables = signature.variables.map {
+                $0.split(separator: ",").map(String.init)
+            }
+            
+            let locals = SyncFileAttributes.list(path: OpenMeteo.dataDictionary, directories: domains, matchFilename: variables, newerThan: newerThan)
+            logger.info("Found \(locals.count) local files (\(locals.fileSize) MB)")
+            
+            guard let apikey = signature.apikey else {
+                fatalError("Parameter apikey required")
+            }
+            
+            let response = try await context.application.client.get(URI("\(server)sync/list"), beforeSend: {
+                try $0.query.encode(SyncController.ListParams(variables: variables, domains: domains, newerThan: newerThan, apikey: apikey))
+            })
+            
+            let remotes = try response.content.decode([SyncFileAttributes].self)
+            logger.info("Found \(remotes.count) remote files (\(remotes.fileSize) MB)")
+            
+            // compare remote file to local files
+            let toDownload = remotes.filter { remote in
+                let hasUpToDateFile = locals.contains(where: { $0.file == remote.file && $0.time >= remote.time })
+                return !hasUpToDateFile
+            }
+            
+            logger.info("Downloading \(toDownload.count) files (\(toDownload.fileSize) MB)")
+            
+            let curl = Curl(logger: logger)
+            for download in toDownload {
+                var client = ClientRequest()
+                try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey))
+                let localFile = "\(OpenMeteo.dataDictionary)/\(download.file)"
+                let localFileTemp = "\(localFile)~"
+                let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
+                try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
+                // TODO sha256 hash integration check
+                
+                try await curl.download(url: client.url.string, toFile: localFileTemp, client: context.application.http.client.shared)
+                try FileManager.default.moveFileOverwrite(from: localFileTemp, to: localFile)
+            }
+            
+            newerThan = toDownload.max(by: { $0.time > $1.time })?.time ?? newerThan
+            guard let repeatInterval = signature.repeatInterval else {
+                break
+            }
+            try await Task.sleep(nanoseconds: UInt64(repeatInterval * 1_000_000_000))
         }
     }
 }
