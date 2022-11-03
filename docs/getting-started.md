@@ -85,7 +85,7 @@ If you are running Ubuntu 22.04 jammy, you can use prebuilt binaries.
 
 They can be installed via APT:
 ```bash
-curl -L https://apt.open-meteo.com/public.key | sudo apt-key add -
+curl -L https://apt.open-meteo.com/public.key | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/openmeteo.gpg
 echo "deb [arch=amd64] https://apt.open-meteo.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/openmeteo-api.list
 sudo apt update
 sudo apt install openmeteo-api
