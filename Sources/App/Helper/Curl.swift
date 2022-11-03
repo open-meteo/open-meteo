@@ -151,19 +151,7 @@ final class Curl {
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             try FileManager.default.removeItemIfExists(at: toFile)
-            // https://github.com/vapor/vapor/pull/2904
-            // let lastModified = response.headers.lastModified?.value
-            let lastModified = response.headers.first(name: HTTPHeaders.Name.lastModified).flatMap { dateString -> Date? in
-                let fmt = DateFormatter()
-                fmt.locale = Locale(identifier: "en_US_POSIX")
-                fmt.timeZone = TimeZone(secondsFromGMT: 0)
-                fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-
-                guard let date = fmt.date(from: dateString) else {
-                    return nil
-                }
-                return date
-            }
+            let lastModified = response.headers.lastModified?.value
             try await response.body.decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified)
         }
     }
@@ -173,19 +161,7 @@ final class Curl {
     func download(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
-            // https://github.com/vapor/vapor/pull/2904
-            // let lastModified = response.headers.lastModified?.value
-            let lastModified = response.headers.first(name: HTTPHeaders.Name.lastModified).flatMap { dateString -> Date? in
-                let fmt = DateFormatter()
-                fmt.locale = Locale(identifier: "en_US_POSIX")
-                fmt.timeZone = TimeZone(secondsFromGMT: 0)
-                fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
-
-                guard let date = fmt.date(from: dateString) else {
-                    return nil
-                }
-                return date
-            }
+            let lastModified = response.headers.lastModified?.value
             try FileManager.default.removeItemIfExists(at: toFile)
             try await response.body.saveTo(file: toFile, size: contentLength, modificationDate: lastModified)
         }
