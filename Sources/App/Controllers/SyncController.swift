@@ -22,8 +22,8 @@ struct SyncController: RouteCollection {
     }
     
     struct ListParams: Content {
-        let variables: String?
-        let domains: String?
+        let variables: [String]?
+        let domains: [String]?
         let newerThan: Double?
         let apikey: String
     }
@@ -60,20 +60,16 @@ struct SyncFileAttributes: Content {
     let size: Int
     let time: Double
     
-    static func list(path: String, filterDomains: String?, filterVariables: String?, newerThan: Double?) -> [SyncFileAttributes] {
+    static func list(path: String, filterDomains: [String]?, filterVariables: [String]?, newerThan: Double?) -> [SyncFileAttributes] {
         let pathUrl = URL(fileURLWithPath: path, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
         
         let filterDomains = filterDomains.map {
-            $0.split(separator: ",").filter {
-                $0 != "" && !$0.contains(".")
-            }
+            $0.filter { $0 != "" && !$0.contains(".") }
         }
         
         let filterVariables = filterVariables.map {
-            $0.split(separator: ",").filter {
-                $0 != "" && !$0.contains(".")
-            }
+            $0.filter { $0 != "" && !$0.contains(".") }
         }
         
         guard let directoryEnumerator = FileManager.default.enumerator(at: pathUrl, includingPropertiesForKeys: Array(resourceKeys), options: .skipsHiddenFiles) else {
@@ -86,7 +82,7 @@ struct SyncFileAttributes: Content {
         for case let fileURL as URL in directoryEnumerator {
             guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                 let isDirectory = resourceValues.isDirectory,
-                let name = resourceValues.name else {
+                let name = resourceValues.name, !name.contains("~") else {
                     continue
             }
             
@@ -144,7 +140,16 @@ struct SyncCommand: AsyncCommandFix {
     
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
-        let locals = SyncFileAttributes.list(path: OpenMeteo.dataDictionary, filterDomains: signature.domains, filterVariables: signature.variables, newerThan: nil)
+        
+        let domains = signature.domains.map {
+            $0.split(separator: ",").map(String.init)
+        }
+        
+        let variables = signature.variables.map {
+            $0.split(separator: ",").map(String.init)
+        }
+        
+        let locals = SyncFileAttributes.list(path: OpenMeteo.dataDictionary, filterDomains: domains, filterVariables: variables, newerThan: nil)
         logger.info("Found \(locals.count) local files (\(locals.fileSize) MB)")
         
         guard let apikey = signature.apikey else {
@@ -154,7 +159,7 @@ struct SyncCommand: AsyncCommandFix {
         let server = "http://api.open-meteo.com/"
         
         let response = try await context.application.client.get(URI("\(server)sync/list"), beforeSend: {
-            try $0.query.encode(SyncController.ListParams(variables: signature.variables, domains: signature.domains, newerThan: nil, apikey: apikey))
+            try $0.query.encode(SyncController.ListParams(variables: variables, domains: domains, newerThan: nil, apikey: apikey))
         })
         
         let remotes = try response.content.decode([SyncFileAttributes].self)

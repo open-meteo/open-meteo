@@ -184,6 +184,9 @@ final class Curl {
         return try await withRetriedDownload(url: url, range: range, client: client) { response in
             self.buffer.moveReaderIndex(to: 0)
             self.buffer.moveWriterIndex(to: 0)
+            if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
+                buffer.reserveCapacity(contentLength)
+            }
             for try await fragement in response.body {
                 self.buffer.writeImmutableBuffer(fragement)
             }
