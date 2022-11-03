@@ -24,7 +24,7 @@ struct SyncController: RouteCollection {
     struct ListParams: Content {
         let variables: [String]?
         let domains: [String]?
-        let newerThan: Double?
+        let newerThan: Int?
         let apikey: String
     }
     
@@ -58,9 +58,9 @@ struct SyncFileAttributes: Content {
     /// relative file with path `omfile-era5/temperature_234.om`
     let file: String
     let size: Int
-    let time: Double
+    let time: Int
     
-    static func list(path: String, filterDomains: [String]?, filterVariables: [String]?, newerThan: Double?) -> [SyncFileAttributes] {
+    static func list(path: String, filterDomains: [String]?, filterVariables: [String]?, newerThan: Int?) -> [SyncFileAttributes] {
         let pathUrl = URL(fileURLWithPath: path, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
         
@@ -101,7 +101,7 @@ struct SyncFileAttributes: Content {
             guard
                 directoryEnumerator.level == 2,
                 let size = resourceValues.fileSize,
-                let modificationTime = resourceValues.contentModificationDate?.timeIntervalSince1970 else {
+                let modificationTime = (resourceValues.contentModificationDate?.timeIntervalSince1970).map(Int.init) else {
                 continue
             }
             
