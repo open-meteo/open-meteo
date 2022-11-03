@@ -156,7 +156,7 @@ struct SyncCommand: AsyncCommandFix {
         @Option(name: "max-age-days", help: "Maximum age of synchronised files. Default 7 days.")
         var maxAgeDays: Int?
         
-        @Option(name: "repreat-interval", help: "If set, check for new files every specified amount of seconds.")
+        @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of seconds.")
         var repeatInterval: Int?
     }
     
