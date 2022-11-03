@@ -2,6 +2,9 @@ import Foundation
 import Vapor
 
 /**
+ Expose file `list` and `download` API to download weather database from another node.
+ This is used generate time-series files on one node and run the API on another node.
+ 
  TODO
  - hash verification, xattr vs .sha256 files -> .sha files might work better
  - case: file is modified while downloading... get hash again?
@@ -34,6 +37,11 @@ struct SyncController: RouteCollection {
     }
     
     func listHandler(_ req: Request) throws -> [SyncFileAttributes] {
+        // API should only be used on the subdomain
+        if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "api.") }) {
+            throw Abort.init(.notFound)
+        }
+        
         let params = try req.query.decode(ListParams.self)
         // TODO: apikey check
         return SyncFileAttributes.list(path: OpenMeteo.dataDictionary, filterDomains: params.domains, filterVariables: params.variables, newerThan: params.newerThan)
@@ -41,6 +49,11 @@ struct SyncController: RouteCollection {
     
     /// Serve files via nginx X-Accel using sendfile zero copy
     func downloadHandler(_ req: Request) throws -> Response {
+        // API should only be used on the subdomain
+        if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "api.") }) {
+            throw Abort.init(.notFound)
+        }
+        
         let params = try req.query.decode(DownloadParams.self)
         // TODO: apikey check
         let response = Response()
@@ -120,6 +133,9 @@ struct SyncFileAttributes: Content {
     }
 }
 
+/**
+ Command to download weather database fom another node
+ */
 struct SyncCommand: AsyncCommandFix {
     var help: String {
         return "Synchronise weather database from a remote server"
@@ -134,6 +150,9 @@ struct SyncCommand: AsyncCommandFix {
         
         @Option(name: "apikey", help: "API key for access")
         var apikey: String?
+        
+        @Option(name: "server", help: "Server base URL. Default http://api.open-meteo.com/")
+        var server: String?
         
         // check-every-x-seconds
     }
@@ -156,7 +175,7 @@ struct SyncCommand: AsyncCommandFix {
             fatalError("Parameter apikey required")
         }
         
-        let server = "http://api.open-meteo.com/"
+        let server = signature.server ?? "http://api.open-meteo.com/"
         
         let response = try await context.application.client.get(URI("\(server)sync/list"), beforeSend: {
             try $0.query.encode(SyncController.ListParams(variables: variables, domains: domains, newerThan: nil, apikey: apikey))
