@@ -478,8 +478,8 @@ extension AsyncSequence where Element == ByteBuffer {
             try fn.write(contentsOf: fragment.readableBytesView)
         }
         if let modificationDate {
-            var times = timespec(tv_sec: 0, tv_nsec: Int(modificationDate.timeIntervalSince1970 * 1e9))
-            guard futimens(fn.fileDescriptor, &times) == 0 else {
+            let times = [timespec](repeating: timespec(tv_sec: Int(modificationDate.timeIntervalSince1970), tv_nsec: 0), count: 2)
+            guard futimens(fn.fileDescriptor, times) == 0 else {
                 throw CurlError.futimes(error: String(cString: strerror(errno)))
             }
         }

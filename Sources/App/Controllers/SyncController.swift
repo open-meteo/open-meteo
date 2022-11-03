@@ -38,7 +38,7 @@ struct SyncController: RouteCollection {
     
     func listHandler(_ req: Request) throws -> [SyncFileAttributes] {
         // API should only be used on the subdomain
-        if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "api.") }) {
+        if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.contains("api") }) {
             throw Abort.init(.notFound)
         }
         
@@ -50,7 +50,7 @@ struct SyncController: RouteCollection {
     /// Serve files via nginx X-Accel using sendfile zero copy
     func downloadHandler(_ req: Request) throws -> Response {
         // API should only be used on the subdomain
-        if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "api.") }) {
+        if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.contains("api") }) {
             throw Abort.init(.notFound)
         }
         
@@ -175,7 +175,7 @@ struct SyncCommand: AsyncCommandFix {
             }
             
             let locals = SyncFileAttributes.list(path: OpenMeteo.dataDictionary, directories: domains, matchFilename: variables, newerThan: newerThan)
-            logger.info("Found \(locals.count) local files (\(locals.fileSize) MB)")
+            logger.info("Found \(locals.count) local files (\(locals.fileSize))")
             
             guard let apikey = signature.apikey else {
                 fatalError("Parameter apikey required")
@@ -186,7 +186,7 @@ struct SyncCommand: AsyncCommandFix {
             })
             
             let remotes = try response.content.decode([SyncFileAttributes].self)
-            logger.info("Found \(remotes.count) remote files (\(remotes.fileSize) MB)")
+            logger.info("Found \(remotes.count) remote files (\(remotes.fileSize))")
             
             // compare remote file to local files
             let toDownload = remotes.filter { remote in
@@ -194,7 +194,7 @@ struct SyncCommand: AsyncCommandFix {
                 return !hasUpToDateFile
             }
             
-            logger.info("Downloading \(toDownload.count) files (\(toDownload.fileSize) MB)")
+            logger.info("Downloading \(toDownload.count) files (\(toDownload.fileSize))")
             
             let curl = Curl(logger: logger)
             for download in toDownload {
