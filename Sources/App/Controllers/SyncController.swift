@@ -25,8 +25,8 @@ struct SyncController: RouteCollection {
     }
     
     struct ListParams: Content {
-        let variables: [String]?
-        let domains: [String]
+        let filenames: [String]?
+        let directories: [String]
         let newerThan: Int?
         let apikey: String
     }
@@ -44,7 +44,7 @@ struct SyncController: RouteCollection {
         
         let params = try req.query.decode(ListParams.self)
         // TODO: apikey check
-        return SyncFileAttributes.list(path: OpenMeteo.dataDictionary, directories: params.domains, matchFilename: params.variables, newerThan: params.newerThan)
+        return SyncFileAttributes.list(path: OpenMeteo.dataDictionary, directories: params.directories, matchFilename: params.filenames, newerThan: params.newerThan)
     }
     
     /// Serve files via nginx X-Accel using sendfile zero copy
@@ -73,6 +73,7 @@ struct SyncFileAttributes: Content {
     let size: Int
     let time: Int
     
+    /// Iterate through data directory and find all matching files
     static func list(path: String, directories: [String], matchFilename: [String]?, newerThan: Int?, alwaysInclude: [String] = ["HSURF.om", "init.txt"]) -> [SyncFileAttributes] {
         let pathUrl = URL(fileURLWithPath: path, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
@@ -181,7 +182,7 @@ struct SyncCommand: AsyncCommandFix {
             }
             
             let response = try await context.application.client.get(URI("\(server)sync/list"), beforeSend: {
-                try $0.query.encode(SyncController.ListParams(variables: variables, domains: domains, newerThan: newerThan, apikey: apikey))
+                try $0.query.encode(SyncController.ListParams(filenames: variables, directories: domains, newerThan: newerThan, apikey: apikey))
             })
             
             let remotes = try response.content.decode([SyncFileAttributes].self)
@@ -197,7 +198,7 @@ struct SyncCommand: AsyncCommandFix {
             
             let curl = Curl(logger: logger)
             for download in toDownload {
-                var client = ClientRequest()
+                var client = ClientRequest(url: URI("\(server)sync/download"))
                 try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey))
                 let localFile = "\(OpenMeteo.dataDictionary)/\(download.file)"
                 let localFileTemp = "\(localFile)~"
