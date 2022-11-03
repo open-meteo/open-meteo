@@ -44,8 +44,8 @@ final class Curl {
         buffer = ByteBuffer()
         
         /// Access this mutable static variable, to workaround a concurrency issue
-        let error = HTTPClientError.deadlineExceeded
-        logger.info("Curl initialised. Accessed mutable static var \(error)")
+        _ = HTTPClientError.deadlineExceeded
+        //logger.info("Curl initialised. Accessed mutable static var \(error)")
     }
     
     /*func download(url: String, to: String, range: String? = nil) throws {
@@ -151,7 +151,19 @@ final class Curl {
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             try FileManager.default.removeItemIfExists(at: toFile)
-            let lastModified = response.headers.lastModified?.value
+            // https://github.com/vapor/vapor/pull/2904
+            // let lastModified = response.headers.lastModified?.value
+            let lastModified = response.headers.first(name: HTTPHeaders.Name.lastModified).flatMap { dateString -> Date? in
+                let fmt = DateFormatter()
+                fmt.locale = Locale(identifier: "en_US_POSIX")
+                fmt.timeZone = TimeZone(secondsFromGMT: 0)
+                fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+
+                guard let date = fmt.date(from: dateString) else {
+                    return nil
+                }
+                return date
+            }
             try await response.body.decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified)
         }
     }
@@ -161,7 +173,19 @@ final class Curl {
     func download(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
-            let lastModified = response.headers.lastModified?.value
+            // https://github.com/vapor/vapor/pull/2904
+            // let lastModified = response.headers.lastModified?.value
+            let lastModified = response.headers.first(name: HTTPHeaders.Name.lastModified).flatMap { dateString -> Date? in
+                let fmt = DateFormatter()
+                fmt.locale = Locale(identifier: "en_US_POSIX")
+                fmt.timeZone = TimeZone(secondsFromGMT: 0)
+                fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+
+                guard let date = fmt.date(from: dateString) else {
+                    return nil
+                }
+                return date
+            }
             try FileManager.default.removeItemIfExists(at: toFile)
             try await response.body.saveTo(file: toFile, size: contentLength, modificationDate: lastModified)
         }
