@@ -42,6 +42,8 @@ final class Curl {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         buffer = ByteBuffer()
+        // Reserve 1MB buffer
+        buffer.reserveCapacity(1024*1024)
         
         /// Access this mutable static variable, to workaround a concurrency issue
         _ = HTTPClientError.deadlineExceeded
@@ -170,6 +172,9 @@ final class Curl {
     /// Use http-async http client to download and decompress as bzip2
     func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
+            if !self.buffer.uniquelyOwned() {
+                fatalError("Download buffer is not uniquely owned!")
+            }
             self.buffer.moveReaderIndex(to: 0)
             self.buffer.moveWriterIndex(to: 0)
             for try await fragement in response.body.decompressBzip2() {
@@ -182,6 +187,9 @@ final class Curl {
     /// Use http-async http client to download
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) { response in
+            if !self.buffer.uniquelyOwned() {
+                fatalError("Download buffer is not uniquely owned!")
+            }
             self.buffer.moveReaderIndex(to: 0)
             self.buffer.moveWriterIndex(to: 0)
             if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
@@ -396,6 +404,10 @@ extension ByteBuffer {
     public func readStringImmutable() -> String? {
         var b = self
         return b.readString(length: b.readableBytes)
+    }
+    
+    public mutating func uniquelyOwned() -> Bool {
+        self.modifyIfUniquelyOwned { _ in } != nil
     }
 }
 
