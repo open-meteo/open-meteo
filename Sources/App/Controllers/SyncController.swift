@@ -8,6 +8,8 @@ import Vapor
  TODO
  - hash verification, xattr vs .sha256 files -> .sha files might work better
  - case: file is modified while downloading... get hash again?
+ - edge case: deleted file on source may cause deadlock
+ - email on failure... systemd timers?
  
  Nginx setting:
  ```

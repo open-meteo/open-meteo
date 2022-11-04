@@ -209,6 +209,7 @@ final class Curl {
                 if retries >= 20 {
                     throw error
                 }
+                logger.warning("Grib decoding failed, retry download")
                 try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
             }
         }
@@ -228,6 +229,7 @@ final class Curl {
                 if retries >= 20 {
                     throw error
                 }
+                logger.warning("Grib decoding failed, retry download")
                 try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
             }
         }
@@ -315,6 +317,7 @@ final class Curl {
                 if retries >= 20 {
                     throw error
                 }
+                logger.warning("Grib decoding failed, retry download")
                 try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
             }
         }
