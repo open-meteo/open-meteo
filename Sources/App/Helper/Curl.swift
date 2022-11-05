@@ -562,19 +562,36 @@ protocol CurlIndexedVariable {
     var gribIndexName: String? { get }
 }
 
+/// Synchronise access to file handles
+fileprivate actor ConcurrentFileHandle {
+    private var fn: FileHandle
+    
+    public init(_ fn: FileHandle) {
+        self.fn = fn
+    }
+    
+    public func write(_ buffer: ByteBuffer) throws {
+        try fn.write(contentsOf: buffer.readableBytesView)
+    }
+    
+    public func setModificationDate(_ date: Date) throws {
+        let times = [timespec](repeating: timespec(tv_sec: Int(date.timeIntervalSince1970), tv_nsec: 0), count: 2)
+        guard futimens(fn.fileDescriptor, times) == 0 else {
+            throw CurlError.futimes(error: String(cString: strerror(errno)))
+        }
+    }
+}
+
 extension AsyncSequence where Element == ByteBuffer {
     /// Store incoming data to file
     /// NOTE: File IO is blocking e.g. synchronous
     func saveTo(file: String, size: Int?, modificationDate: Date?) async throws {
-        let fn = try FileHandle.createNewFile(file: file, size: size)
+        let fn = try ConcurrentFileHandle(FileHandle.createNewFile(file: file, size: size))
         for try await fragment in self {
-            try fn.write(contentsOf: fragment.readableBytesView)
+            try await fn.write(fragment)
         }
         if let modificationDate {
-            let times = [timespec](repeating: timespec(tv_sec: Int(modificationDate.timeIntervalSince1970), tv_nsec: 0), count: 2)
-            guard futimens(fn.fileDescriptor, times) == 0 else {
-                throw CurlError.futimes(error: String(cString: strerror(errno)))
-            }
+            try await fn.setModificationDate(modificationDate)
         }
     }
 }
