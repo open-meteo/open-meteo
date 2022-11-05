@@ -1,6 +1,5 @@
 [Unit]
 Description = Run Open-Meteo API
-OnFailure=openmeteo-notify@%n
 
 [Service]
 EnvironmentFile=/etc/default/openmeteo-api.env
@@ -10,6 +9,7 @@ User=openmeteo-api
 Group=openmeteo-api
 WorkingDirectory=/var/lib/openmeteo-api/
 ExecStart=/usr/local/bin/openmeteo-api serve -b $API_BIND --env $VAPOR_ENV
+ExecStopPost=/bin/bash -c 'if [ "$$EXIT_STATUS" != 0 ]; then systemctl start openmeteo-notify@%N.service; fi'
 Restart=always
 RestartSec=1
 
