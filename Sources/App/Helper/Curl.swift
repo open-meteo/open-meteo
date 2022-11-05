@@ -128,23 +128,29 @@ final class Curl {
                     let task = Task {
                         return try await client.execute(request, timeout: .seconds(Int64(self.connectTimeout + self.readTimeout + 5)))
                     }
-                    let connectTimeout = Timer(timeInterval: TimeInterval(self.connectTimeout), repeats: false, block: { _ in task.cancel() })
+                    var connectTimeout: Timer? = Timer(timeInterval: TimeInterval(self.connectTimeout), repeats: false, block: { _ in task.cancel() })
                     let response = try await task.value
                     defer {
-                        connectTimeout.invalidate()
+                        connectTimeout?.invalidate()
+                        connectTimeout = nil
                     }
-                    connectTimeout.invalidate()
+                    connectTimeout?.invalidate()
+                    connectTimeout = nil
                     
                     if response.status != .ok && response.status != .partialContent {
                         throw CurlError.downloadFailed(code: response.status)
                     }
                     return try await callback(response)
                 }
-                let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in taskTotal.cancel() })
+                var readTimeout: Timer? = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in taskTotal.cancel() })
                 defer {
-                    readTimeout.invalidate()
+                    readTimeout?.invalidate()
+                    readTimeout = nil
                 }
-                return try await taskTotal.value
+                let result = try await taskTotal.value
+                readTimeout?.invalidate()
+                readTimeout = nil
+                return result
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
