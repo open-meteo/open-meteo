@@ -20,7 +20,47 @@ enum CurlError: Error {
     case futimes(error: String)
 }
 
-final actor Curl {
+/// Isolate buffer for concurrent access.. Although it is not really concurrent
+final actor ConcurrentByteBuffer {
+    var buffer: ByteBuffer
+    
+    public init() {
+        buffer = ByteBuffer()
+        // Reserve 1MB buffer
+        buffer.reserveCapacity(1024*1024)
+    }
+    
+    public func reset() {
+        if !self.buffer.uniquelyOwned() {
+            fatalError("Download buffer is not uniquely owned!")
+        }
+        self.buffer.moveReaderIndex(to: 0)
+        self.buffer.moveWriterIndex(to: 0)
+    }
+    
+    public func writeImmutableBuffer(_ input: ByteBuffer) {
+        if !self.buffer.uniquelyOwned() {
+            fatalError("Download buffer is not uniquely owned!")
+        }
+        self.buffer.writeImmutableBuffer(input)
+    }
+    
+    public func reserveCapacity(_ count: Int) {
+        if !self.buffer.uniquelyOwned() {
+            fatalError("Download buffer is not uniquely owned!")
+        }
+        buffer.reserveCapacity(count)
+    }
+    
+    public func getBuffer() -> ByteBuffer {
+        if !self.buffer.uniquelyOwned() {
+            fatalError("Download buffer is not uniquely owned!")
+        }
+        return buffer
+    }
+}
+
+final class Curl {
     let logger: Logger
     
     /// Give up downloading after the time, default 3 hours
@@ -36,14 +76,13 @@ final actor Curl {
     let retryDelaySeconds = 5
     
     /// Download buffer which is reused during downloads
-    var buffer: ByteBuffer
+    var buffer: ConcurrentByteBuffer
     
     public init(logger: Logger, deadLineHours: Int = 3) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
-        buffer = ByteBuffer()
-        // Reserve 1MB buffer
-        buffer.reserveCapacity(1024*1024)
+
+        buffer = ConcurrentByteBuffer()
         
         /// Access this mutable static variable, to workaround a concurrency issue
         _ = HTTPClientError.deadlineExceeded
@@ -130,7 +169,7 @@ final actor Curl {
                 let task = Task {
                     return try await client.execute(request, timeout: .seconds(Int64(connectTimeout + readTimeout + 5)))
                 }
-                var connectTimeout = Timer(timeInterval: TimeInterval(connectTimeout), repeats: false, block: { _ in task.cancel() })
+                let connectTimeout = Timer(timeInterval: TimeInterval(connectTimeout), repeats: false, block: { _ in task.cancel() })
                 let response = try await task.value
                 defer {
                     connectTimeout.invalidate()
@@ -164,7 +203,7 @@ final actor Curl {
                 let lastModified = response.headers.lastModified?.value
                 try await response.body.decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified)
             }
-            var readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
+            let readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
             defer {
                 readTimeout.invalidate()
             }
@@ -182,7 +221,7 @@ final actor Curl {
                 try FileManager.default.removeItemIfExists(at: toFile)
                 try await response.body.saveTo(file: toFile, size: contentLength, modificationDate: lastModified)
             }
-            var readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
+            let readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
             defer {
                 readTimeout.invalidate()
             }
@@ -191,20 +230,16 @@ final actor Curl {
     }
     
     /// Use http-async http client to download and decompress as bzip2
-    func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
+    func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ConcurrentByteBuffer {
         return try await withRetriedDownload(url: url, range: nil, client: client) { [unowned self] response in
             let task = Task {
-                if !self.buffer.uniquelyOwned() {
-                    fatalError("Download buffer is not uniquely owned!")
-                }
-                self.buffer.moveReaderIndex(to: 0)
-                self.buffer.moveWriterIndex(to: 0)
+                await self.buffer.reset()
                 for try await fragement in response.body.decompressBzip2() {
-                    self.buffer.writeImmutableBuffer(fragement)
+                    await self.buffer.writeImmutableBuffer(fragement)
                 }
                 return self.buffer
             }
-            var readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
+            let readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
             defer {
                 readTimeout.invalidate()
             }
@@ -213,23 +248,19 @@ final actor Curl {
     }
     
     /// Use http-async http client to download
-    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ConcurrentByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) { [unowned self] response in
             let task = Task {
-                if !self.buffer.uniquelyOwned() {
-                    fatalError("Download buffer is not uniquely owned!")
-                }
-                self.buffer.moveReaderIndex(to: 0)
-                self.buffer.moveWriterIndex(to: 0)
+                await self.buffer.reset()
                 if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
-                    self.buffer.reserveCapacity(contentLength)
+                    await self.buffer.reserveCapacity(contentLength)
                 }
                 for try await fragement in response.body {
-                    self.buffer.writeImmutableBuffer(fragement)
+                    await self.buffer.writeImmutableBuffer(fragement)
                 }
                 return self.buffer
             }
-            var readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
+            let readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
             defer {
                 readTimeout.invalidate()
             }
@@ -243,7 +274,7 @@ final actor Curl {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
-            let data = try await downloadInMemoryAsync(url: url, client: client)
+            let data = try await downloadInMemoryAsync(url: url, client: client).getBuffer()
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
@@ -263,7 +294,7 @@ final actor Curl {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
-            let data = try await downloadBz2Decompress(url: url, client: client)
+            let data = try await downloadBz2Decompress(url: url, client: client).getBuffer()
             //logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
@@ -287,7 +318,7 @@ final actor Curl {
             return
         }
         
-        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
+        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).getBuffer().readStringImmutable() else {
         //guard let index = String(data: try await withRetriedDownloadUrlSession(url: "\(url)\(`extension`)", range: nil), encoding: .utf8) else {
             fatalError("Could not decode index to string")
         }
@@ -331,7 +362,7 @@ final actor Curl {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
-            let data = try await downloadInMemoryAsync(url: url, range: range, client: client)
+            let data = try await downloadInMemoryAsync(url: url, range: range, client: client).getBuffer()
             //let data = try await withRetriedDownloadUrlSession(url: url, range: range)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
@@ -371,7 +402,7 @@ final actor Curl {
             return
         }
         
-        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).readStringImmutable() else {
+        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).getBuffer().readStringImmutable() else {
             fatalError("Could not decode index to string")
         }
 
@@ -416,7 +447,7 @@ final actor Curl {
         let ranges = range.split(separator: ",")
         var matchesPos = 0
         for range in ranges {
-            let data = try await downloadInMemoryAsync(url: url, range: String(range), client: client)
+            let data = try await downloadInMemoryAsync(url: url, range: String(range), client: client).getBuffer()
             try data.withUnsafeReadableBytes { ptr in
                 let grib = try GribMemory(ptr: ptr)
                 chelper_malloc_trim()
