@@ -20,7 +20,7 @@ enum CurlError: Error {
     case futimes(error: String)
 }
 
-final class Curl {
+final actor Curl {
     let logger: Logger
     
     /// Give up downloading after the time, default 3 hours
