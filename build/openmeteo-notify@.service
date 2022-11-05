@@ -1,0 +1,13 @@
+[Unit]
+Description=Sent email on failed open-meteo services
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/openmeteo-api.env
+ExecStart=/usr/local/bin/openmeteo-notify.sh $NOTIFICATION_EMAIL %i
+ExecCondition=/bin/test -n "$NOTIFICATION_EMAIL"
+User=nobody
+Group=systemd-journal
+
+[Install]
+WantedBy=multi-user.target

@@ -51,7 +51,7 @@ jobs:
       uses: gravitl/github-action-fpm@master
       with:
         fpm_args: './build'
-        fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf19 -d libeccodes0 -d swiftlang-slim --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-sync.service --deb-systemd build/openmeteo-api.service --deb-default build/openmeteo-api.env --before-install build/before-install.sh --before-upgrade build/before-install.sh openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
+        fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf19 -d libeccodes0 -d swiftlang-slim --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-sync.service --deb-systemd build/openmeteo-api.service --deb-default build/openmeteo-api.env --before-install build/before-install.sh --before-upgrade build/before-install.sh build/openmeteo-notify.sh=/usr/local/bin/ openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
     - name: Rename deb file
       run: mv openmeteo-api_${{github.ref_name}}_amd64.deb openmeteo-api_${{github.ref_name}}_jammy_amd64.deb
     - name: Release

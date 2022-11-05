@@ -6,10 +6,7 @@ import Vapor
  This is used generate time-series files on one node and run the API on another node.
  
  TODO
- - hash verification, xattr vs .sha256 files -> .sha files might work better
- - case: file is modified while downloading... get hash again?
- - edge case: deleted file on source may cause deadlock
- - email on failure... systemd timers?
+ - hash verification with .sha256 files (need to modify all downloader to generate hash files)
  
  Nginx setting:
  ```
