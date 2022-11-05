@@ -20,7 +20,13 @@ import Vapor
  ```
  */
 struct SyncController: RouteCollection {
+    static var syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
+    
     func boot(routes: RoutesBuilder) throws {
+        if Self.syncApiKeys.isEmpty {
+            return
+        }
+        
         let group = routes.grouped("sync")
         group.get("list", use: self.listHandler)
         group.get("download", use: self.downloadHandler)
@@ -45,7 +51,9 @@ struct SyncController: RouteCollection {
         }
         
         let params = try req.query.decode(ListParams.self)
-        // TODO: apikey check
+        if !Self.syncApiKeys.contains(where: {$0 == params.apikey}) {
+            throw SyncError.invalidApiKey
+        }
         return SyncFileAttributes.list(path: OpenMeteo.dataDictionary, directories: params.directories, matchFilename: params.filenames, newerThan: params.newerThan)
     }
     
@@ -57,7 +65,9 @@ struct SyncController: RouteCollection {
         }
         
         let params = try req.query.decode(DownloadParams.self)
-        // TODO: apikey check
+        if !Self.syncApiKeys.contains(where: {$0 == params.apikey}) {
+            throw SyncError.invalidApiKey
+        }
         let response = Response()
         if params.file.contains("..") {
             throw Abort(.forbidden)
@@ -66,6 +76,17 @@ struct SyncController: RouteCollection {
         // Bytes per second download speed limit. Set to 50 MB/s.
         response.headers.add(name: "X-Accel-Limit-Rate", value: "\(50*1024*1024)")
         return response
+    }
+}
+
+enum SyncError: AbortError {
+    case invalidApiKey
+    
+    var status: NIOHTTP1.HTTPResponseStatus {
+        switch self {
+        case .invalidApiKey:
+            return .unauthorized
+        }
     }
 }
 
