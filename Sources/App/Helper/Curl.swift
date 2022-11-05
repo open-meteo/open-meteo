@@ -121,14 +121,17 @@ final class Curl {
             return request
         }()
         
+        let connectTimeout = self.connectTimeout
+        let readTimeout = self.readTimeout
+        
         while true {
             do {
                 // All those timers are a workaround for https://github.com/swift-server/async-http-client/issues/642
                 let taskTotal = Task {
                     let task = Task {
-                        return try await client.execute(request, timeout: .seconds(Int64(self.connectTimeout + self.readTimeout + 5)))
+                        return try await client.execute(request, timeout: .seconds(Int64(connectTimeout + readTimeout + 5)))
                     }
-                    var connectTimeout: Timer? = Timer(timeInterval: TimeInterval(self.connectTimeout), repeats: false, block: { _ in task.cancel() })
+                    var connectTimeout: Timer? = Timer(timeInterval: TimeInterval(connectTimeout), repeats: false, block: { _ in task.cancel() })
                     let response = try await task.value
                     defer {
                         connectTimeout?.invalidate()
@@ -142,7 +145,7 @@ final class Curl {
                     }
                     return try await callback(response)
                 }
-                var readTimeout: Timer? = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in taskTotal.cancel() })
+                var readTimeout: Timer? = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in taskTotal.cancel() })
                 defer {
                     readTimeout?.invalidate()
                     readTimeout = nil
@@ -188,7 +191,7 @@ final class Curl {
     
     /// Use http-async http client to download and decompress as bzip2
     func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
-        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
+        return try await withRetriedDownload(url: url, range: nil, client: client) { [unowned self] response in
             if !self.buffer.uniquelyOwned() {
                 fatalError("Download buffer is not uniquely owned!")
             }
@@ -203,7 +206,7 @@ final class Curl {
     
     /// Use http-async http client to download
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
-        return try await withRetriedDownload(url: url, range: range, client: client) { response in
+        return try await withRetriedDownload(url: url, range: range, client: client) { [unowned self] response in
             if !self.buffer.uniquelyOwned() {
                 fatalError("Download buffer is not uniquely owned!")
             }
