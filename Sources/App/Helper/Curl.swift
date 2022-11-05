@@ -177,7 +177,7 @@ final class Curl {
             do {
                 // All those timers are a workaround for https://github.com/swift-server/async-http-client/issues/642
                 let task = Task {
-                    return try await client.execute(request, timeout: .seconds(Int64(connectTimeout + readTimeout + 5)))
+                    return try await client.execute(request, timeout: .seconds(3600*24))
                 }
                 let connectTimeout = Timer(timeInterval: TimeInterval(connectTimeout), repeats: false, block: { _ in task.cancel() })
                 let response = try await task.value
