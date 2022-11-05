@@ -93,7 +93,7 @@ final class Curl {
     }*/
     
     /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
-    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: @escaping (HTTPClientResponse) async throws -> (T)) async throws -> T {
+    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
         // URL might contain password, strip them from logging
         let url: String
         let auth: String?
@@ -127,33 +127,20 @@ final class Curl {
         while true {
             do {
                 // All those timers are a workaround for https://github.com/swift-server/async-http-client/issues/642
-                let taskTotal = Task {
-                    let task = Task {
-                        return try await client.execute(request, timeout: .seconds(Int64(connectTimeout + readTimeout + 5)))
-                    }
-                    var connectTimeout: Timer? = Timer(timeInterval: TimeInterval(connectTimeout), repeats: false, block: { _ in task.cancel() })
-                    let response = try await task.value
-                    defer {
-                        connectTimeout?.invalidate()
-                        connectTimeout = nil
-                    }
-                    connectTimeout?.invalidate()
-                    connectTimeout = nil
-                    
-                    if response.status != .ok && response.status != .partialContent {
-                        throw CurlError.downloadFailed(code: response.status)
-                    }
-                    return try await callback(response)
+                let task = Task {
+                    return try await client.execute(request, timeout: .seconds(Int64(connectTimeout + readTimeout + 5)))
                 }
-                var readTimeout: Timer? = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in taskTotal.cancel() })
+                var connectTimeout = Timer(timeInterval: TimeInterval(connectTimeout), repeats: false, block: { _ in task.cancel() })
+                let response = try await task.value
                 defer {
-                    readTimeout?.invalidate()
-                    readTimeout = nil
+                    connectTimeout.invalidate()
                 }
-                let result = try await taskTotal.value
-                readTimeout?.invalidate()
-                readTimeout = nil
-                return result
+                connectTimeout.invalidate()
+                
+                if response.status != .ok && response.status != .partialContent {
+                    throw CurlError.downloadFailed(code: response.status)
+                }
+                return try await callback(response)
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
@@ -172,9 +159,16 @@ final class Curl {
     /// Use http-async http client to download, decompress BZIP2 and store to file. If the file already exists, it will be deleted before
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            try FileManager.default.removeItemIfExists(at: toFile)
-            let lastModified = response.headers.lastModified?.value
-            try await response.body.decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified)
+            let task = Task {
+                try FileManager.default.removeItemIfExists(at: toFile)
+                let lastModified = response.headers.lastModified?.value
+                try await response.body.decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified)
+            }
+            var readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
+            defer {
+                readTimeout.invalidate()
+            }
+            return try await task.value
         }
     }
     
@@ -182,43 +176,64 @@ final class Curl {
     /// 
     func download(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
-            let lastModified = response.headers.lastModified?.value
-            try FileManager.default.removeItemIfExists(at: toFile)
-            try await response.body.saveTo(file: toFile, size: contentLength, modificationDate: lastModified)
+            let task = Task {
+                let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
+                let lastModified = response.headers.lastModified?.value
+                try FileManager.default.removeItemIfExists(at: toFile)
+                try await response.body.saveTo(file: toFile, size: contentLength, modificationDate: lastModified)
+            }
+            var readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
+            defer {
+                readTimeout.invalidate()
+            }
+            return try await task.value
         }
     }
     
     /// Use http-async http client to download and decompress as bzip2
     func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: nil, client: client) { [unowned self] response in
-            if !self.buffer.uniquelyOwned() {
-                fatalError("Download buffer is not uniquely owned!")
+            let task = Task {
+                if !self.buffer.uniquelyOwned() {
+                    fatalError("Download buffer is not uniquely owned!")
+                }
+                self.buffer.moveReaderIndex(to: 0)
+                self.buffer.moveWriterIndex(to: 0)
+                for try await fragement in response.body.decompressBzip2() {
+                    self.buffer.writeImmutableBuffer(fragement)
+                }
+                return self.buffer
             }
-            self.buffer.moveReaderIndex(to: 0)
-            self.buffer.moveWriterIndex(to: 0)
-            for try await fragement in response.body.decompressBzip2() {
-                self.buffer.writeImmutableBuffer(fragement)
+            var readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
+            defer {
+                readTimeout.invalidate()
             }
-            return self.buffer
+            return try await task.value
         }
     }
     
     /// Use http-async http client to download
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) { [unowned self] response in
-            if !self.buffer.uniquelyOwned() {
-                fatalError("Download buffer is not uniquely owned!")
+            let task = Task {
+                if !self.buffer.uniquelyOwned() {
+                    fatalError("Download buffer is not uniquely owned!")
+                }
+                self.buffer.moveReaderIndex(to: 0)
+                self.buffer.moveWriterIndex(to: 0)
+                if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
+                    self.buffer.reserveCapacity(contentLength)
+                }
+                for try await fragement in response.body {
+                    self.buffer.writeImmutableBuffer(fragement)
+                }
+                return self.buffer
             }
-            self.buffer.moveReaderIndex(to: 0)
-            self.buffer.moveWriterIndex(to: 0)
-            if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
-                self.buffer.reserveCapacity(contentLength)
+            var readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { _ in task.cancel() })
+            defer {
+                readTimeout.invalidate()
             }
-            for try await fragement in response.body {
-                self.buffer.writeImmutableBuffer(fragement)
-            }
-            return self.buffer
+            return try await task.value
         }
     }
     
