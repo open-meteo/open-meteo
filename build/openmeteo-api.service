@@ -3,7 +3,7 @@ Description = Run Open-Meteo API
 
 [Service]
 EnvironmentFile=/etc/default/openmeteo-api.env
-PassEnvironment=VAPOR_ENV API_SYNC_APIKEYS
+PassEnvironment=VAPOR_ENV API_SYNC_APIKEYS LOG_LEVEL
 Type=simple
 User=openmeteo-api
 Group=openmeteo-api
