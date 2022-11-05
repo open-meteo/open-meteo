@@ -93,7 +93,7 @@ final class Curl {
     }*/
     
     /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
-    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
+    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: @escaping (HTTPClientResponse) async throws -> (T)) async throws -> T {
         // URL might contain password, strip them from logging
         let url: String
         let auth: String?
@@ -105,7 +105,7 @@ final class Curl {
             url = _url
             auth = nil
         }
-        logger.info("Downloading file \(url)")
+        logger.info("Downloading\(range != nil ? " [ranged]" : "") file \(url)")
         
         let startTime = Date()
         var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
@@ -123,17 +123,28 @@ final class Curl {
         
         while true {
             do {
-                let task = Task {
-                    return try await client.execute(request, timeout: .seconds(Int64(self.connectTimeout + self.readTimeout + 5)))
+                // All those timers are a workaround for https://github.com/swift-server/async-http-client/issues/642
+                let taskTotal = Task {
+                    let task = Task {
+                        return try await client.execute(request, timeout: .seconds(Int64(self.connectTimeout + self.readTimeout + 5)))
+                    }
+                    let connectTimeout = Timer(timeInterval: TimeInterval(self.connectTimeout), repeats: false, block: { _ in task.cancel() })
+                    let response = try await task.value
+                    defer {
+                        connectTimeout.invalidate()
+                    }
+                    connectTimeout.invalidate()
+                    
+                    if response.status != .ok && response.status != .partialContent {
+                        throw CurlError.downloadFailed(code: response.status)
+                    }
+                    return try await callback(response)
                 }
-                let connectTimeout = Timer(timeInterval: TimeInterval(self.connectTimeout), repeats: false, block: { _ in task.cancel() })
-                let response = try await task.value
-                connectTimeout.invalidate()
-                
-                if response.status != .ok && response.status != .partialContent {
-                    throw CurlError.downloadFailed(code: response.status)
+                let readTimeout = Timer(timeInterval: TimeInterval(self.readTimeout), repeats: false, block: { _ in taskTotal.cancel() })
+                defer {
+                    readTimeout.invalidate()
                 }
-                return try await callback(response)
+                return try await taskTotal.value
             } catch {
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
@@ -193,7 +204,7 @@ final class Curl {
             self.buffer.moveReaderIndex(to: 0)
             self.buffer.moveWriterIndex(to: 0)
             if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
-                buffer.reserveCapacity(contentLength)
+                self.buffer.reserveCapacity(contentLength)
             }
             for try await fragement in response.body {
                 self.buffer.writeImmutableBuffer(fragement)
@@ -278,8 +289,6 @@ final class Curl {
         }) else {
             throw CurlError.noGribMessagesMatch
         }
-        logger.debug("Ranged download \(range)")
-        
         
         var missing = false
         for variable in variables {
