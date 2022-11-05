@@ -6,8 +6,8 @@ Type=oneshot
 EnvironmentFile=/etc/default/openmeteo-api.env
 ExecStart=/usr/local/bin/openmeteo-notify.sh $NOTIFICATION_EMAIL %i
 ExecCondition=/bin/test -n "$NOTIFICATION_EMAIL"
-User=root
-Group=root
+User=nobody
+Group=systemd-journal
 
 [Install]
 WantedBy=multi-user.target
