@@ -1,5 +1,6 @@
 [Unit]
 Description = Run Open-Meteo API
+OnFailure=openmeteo-notify@%n.service
 
 [Service]
 EnvironmentFile=/etc/default/openmeteo-api.env
@@ -11,7 +12,6 @@ WorkingDirectory=/var/lib/openmeteo-api/
 ExecStart=/usr/local/bin/openmeteo-api serve -b $API_BIND --env $VAPOR_ENV
 Restart=always
 RestartSec=1
-OnFailure=openmeteo-notify@%n.service
 
 [Install]
 WantedBy = multi-user.target
