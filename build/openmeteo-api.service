@@ -1,6 +1,6 @@
 [Unit]
 Description = Run Open-Meteo API
-OnFailure=openmeteo-notify@%n.service
+OnFailure=openmeteo-notify@%n
 
 [Service]
 EnvironmentFile=/etc/default/openmeteo-api.env
