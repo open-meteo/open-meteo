@@ -190,6 +190,8 @@ struct SyncCommand: AsyncCommandFix {
         let maxAgeDays = signature.maxAgeDays ?? 7
         var newerThan = Timestamp.now().add(-24 * 3600 * maxAgeDays).timeIntervalSince1970
         
+        let curl = Curl(logger: logger, retryError4xx: false)
+        
         while true {
             let domains = signature.domains.split(separator: ",").map(String.init)
             
@@ -203,12 +205,14 @@ struct SyncCommand: AsyncCommandFix {
             guard let apikey = signature.apikey else {
                 fatalError("Parameter apikey required")
             }
+            curl.setDeadlineIn(minutes: 30)
             
-            let response = try await context.application.client.get(URI("\(server)sync/list"), beforeSend: {
-                try $0.query.encode(SyncController.ListParams(filenames: variables, directories: domains, newerThan: newerThan, apikey: apikey))
-            })
-            
-            let remotes = try response.content.decode([SyncFileAttributes].self)
+            var request = ClientRequest(method: .GET, url: URI("\(server)sync/list"))
+            let params = SyncController.ListParams(filenames: variables, directories: domains, newerThan: newerThan, apikey: apikey)
+            try request.query.encode(params)
+            let response = try await curl.downloadInMemoryAsync(url: request.url.string, client: context.application.http.client.shared)
+            let decoder = try ContentConfiguration.global.requireDecoder(for: .jsonAPI)
+            let remotes = try await decoder.decode([SyncFileAttributes].self, from: response.getBuffer(), headers: [:])
             logger.info("Found \(remotes.count) remote files (\(remotes.fileSize))")
             
             // compare remote file to local files
@@ -218,9 +222,8 @@ struct SyncCommand: AsyncCommandFix {
             }
             
             logger.info("Downloading \(toDownload.count) files (\(toDownload.fileSize))")
-            
-            let curl = Curl(logger: logger)
             for download in toDownload {
+                curl.setDeadlineIn(minutes: 30)
                 var client = ClientRequest(url: URI("\(server)sync/download"))
                 try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey))
                 let localFile = "\(OpenMeteo.dataDictionary)/\(download.file)"

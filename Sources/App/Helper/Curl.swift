@@ -22,7 +22,7 @@ enum CurlError: Error {
 
 /// Isolate buffer for concurrent access.. Although it is not really concurrent
 final actor ConcurrentByteBuffer {
-    var buffer: ByteBuffer
+    private var buffer: ByteBuffer
     
     public init() {
         buffer = ByteBuffer()
@@ -64,7 +64,7 @@ final class Curl {
     let logger: Logger
     
     /// Give up downloading after the time, default 3 hours
-    let deadline: Date
+    var deadline: Date
 
     /// Time to connect. Default 1 minute
     let connectTimeout = 60
@@ -75,18 +75,27 @@ final class Curl {
     /// Wait time after each download
     let retryDelaySeconds = 5
     
+    /// Retry 4xx errors
+    let retryError4xx: Bool
+    
     /// Download buffer which is reused during downloads
     var buffer: ConcurrentByteBuffer
-    
-    public init(logger: Logger, deadLineHours: Int = 3) {
+
+    public init(logger: Logger, deadLineHours: Int = 3, retryError4xx: Bool = true) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
+        self.retryError4xx = retryError4xx
 
         buffer = ConcurrentByteBuffer()
         
         /// Access this mutable static variable, to workaround a concurrency issue
         _ = HTTPClientError.deadlineExceeded
         //logger.info("Curl initialised. Accessed mutable static var \(error)")
+    }
+    
+    /// Set new deadline
+    public func setDeadlineIn(minutes: Int) {
+        self.deadline = Date().addingTimeInterval(TimeInterval(minutes * 60))
     }
     
     /*func download(url: String, to: String, range: String? = nil) throws {
@@ -162,6 +171,7 @@ final class Curl {
         
         let connectTimeout = self.connectTimeout
         let readTimeout = self.readTimeout
+        let retryError4xx = self.retryError4xx
         
         while true {
             do {
@@ -181,6 +191,10 @@ final class Curl {
                 }
                 return try await callback(response)
             } catch {
+                if !retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code) {
+                    logger.error("Download failed with 4xx error, \(error)")
+                    throw error
+                }
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
                     logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
