@@ -151,11 +151,12 @@ final class Curl {
                 }
                 let connectTimeout: Timer = Timer(timeInterval: TimeInterval(connectTimeout), repeats: false, block: { [weak self] _ in self?.downloadTask?.cancel() })
                 let response = try await downloadTask!.value
-                self.downloadTask = nil
                 defer {
                     connectTimeout.invalidate()
+                    downloadTask = nil
                 }
                 connectTimeout.invalidate()
+                downloadTask = nil
                 
                 if response.status != .ok && response.status != .partialContent {
                     throw CurlError.downloadFailed(code: response.status)
@@ -259,6 +260,7 @@ final class Curl {
             let readTimeout: Timer = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { [weak self] _ in self?.processByteBuffer?.cancel() })
             defer {
                 readTimeout.invalidate()
+                processByteBuffer = nil
             }
             let buffer = try await processByteBuffer!.value
             processByteBuffer = nil
