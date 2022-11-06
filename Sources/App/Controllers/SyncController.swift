@@ -209,7 +209,7 @@ struct SyncCommand: AsyncCommandFix {
             try request.query.encode(params)
             let response = try await curl.downloadInMemoryAsync(url: request.url.string, client: context.application.http.client.shared, minSize: nil)
             let decoder = try ContentConfiguration.global.requireDecoder(for: .jsonAPI)
-            let remotes = try await decoder.decode([SyncFileAttributes].self, from: response.getBuffer(), headers: [:])
+            let remotes = try decoder.decode([SyncFileAttributes].self, from: response, headers: [:])
             logger.info("Found \(remotes.count) remote files (\(remotes.fileSize))")
             
             // compare remote file to local files
