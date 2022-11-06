@@ -207,7 +207,7 @@ struct SyncCommand: AsyncCommandFix {
             var request = ClientRequest(method: .GET, url: URI("\(server)sync/list"))
             let params = SyncController.ListParams(filenames: variables, directories: domains, newerThan: newerThan, apikey: apikey)
             try request.query.encode(params)
-            let response = try await curl.downloadInMemoryAsync(url: request.url.string, client: context.application.http.client.shared)
+            let response = try await curl.downloadInMemoryAsync(url: request.url.string, client: context.application.http.client.shared, minSize: nil)
             let decoder = try ContentConfiguration.global.requireDecoder(for: .jsonAPI)
             let remotes = try await decoder.decode([SyncFileAttributes].self, from: response.getBuffer(), headers: [:])
             logger.info("Found \(remotes.count) remote files (\(remotes.fileSize))")

@@ -25,12 +25,14 @@ final class HelperTests: XCTestCase {
         let range = index.split(separator: "\n").indexToRange { line in
             line.contains("SHTFL") || line.contains("LHTFL") || line.contains("USWRF") || line.contains("TMP")
         }
-        XCTAssertEqual(range, "104746-276986,344851-430542,564311-")
+        XCTAssertEqual(range?.range, "104746-276986,344851-430542,564311-")
+        XCTAssertEqual(range?.minSize, 257933)
         
         let range2 = index.split(separator: "\n").indexToRange { line in
             return true
         }
-        XCTAssertEqual(range2, "0-")
+        XCTAssertEqual(range2?.range, "0-")
+        XCTAssertEqual(range2?.minSize, 564311)
         
         let range3 = index.split(separator: "\n").indexToRange { line in
             return false
@@ -40,8 +42,8 @@ final class HelperTests: XCTestCase {
         let range4 = index.split(separator: "\n").indexToRange { line in
             line.contains("TMP") || line.contains("UFLX")
         }
-        XCTAssertEqual(range4, "0-52675,191888-276986,344851-430542")
-        
+        XCTAssertEqual(range4?.range, "0-52675,191888-276986,344851-430542")
+        XCTAssertEqual(range4?.minSize, 223467)
         /*let curl = Curl(logger: Logger(label: ""))
         try! curl.downloadIndexedGrib(url: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/00/6hrly_grib_01/flxf2022080812.01.2022080800.grb2", to: "/Users/patrick/Downloads/test.grib", include: { line in
             line.contains(":")

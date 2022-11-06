@@ -30,6 +30,10 @@ final actor ConcurrentByteBuffer {
         buffer.reserveCapacity(1024*1024)
     }
     
+    public var readableBytes: Int {
+        return buffer.readableBytes
+    }
+    
     public func reset() {
         if !self.buffer.uniquelyOwned() {
             fatalError("Download buffer is not uniquely owned!")
@@ -170,7 +174,6 @@ final class Curl {
         }()
         
         let connectTimeout = self.connectTimeout
-        let readTimeout = self.readTimeout
         let retryError4xx = self.retryError4xx
         
         while true {
@@ -262,7 +265,7 @@ final class Curl {
     }
     
     /// Use http-async http client to download
-    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient) async throws -> ConcurrentByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient, minSize: Int?) async throws -> ConcurrentByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) { [unowned self] response in
             let task = Task {
                 await self.buffer.reset()
@@ -278,7 +281,11 @@ final class Curl {
             defer {
                 readTimeout.invalidate()
             }
-            return try await task.value
+            let buffer = try await task.value
+            if let minSize = minSize, await buffer.readableBytes < minSize {
+                throw CurlError.sizeTooSmall
+            }
+            return buffer
         }
     }
     
@@ -288,7 +295,7 @@ final class Curl {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
-            let data = try await downloadInMemoryAsync(url: url, client: client).getBuffer()
+            let data = try await downloadInMemoryAsync(url: url, client: client, minSize: nil).getBuffer()
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
@@ -332,7 +339,7 @@ final class Curl {
             return
         }
         
-        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).getBuffer().readStringImmutable() else {
+        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client, minSize: nil).getBuffer().readStringImmutable() else {
         //guard let index = String(data: try await withRetriedDownloadUrlSession(url: "\(url)\(`extension`)", range: nil), encoding: .utf8) else {
             fatalError("Could not decode index to string")
         }
@@ -376,7 +383,7 @@ final class Curl {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
-            let data = try await downloadInMemoryAsync(url: url, range: range, client: client).getBuffer()
+            let data = try await downloadInMemoryAsync(url: url, range: range.range, client: client, minSize: range.minSize).getBuffer()
             //let data = try await withRetriedDownloadUrlSession(url: url, range: range)
             logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
@@ -416,7 +423,7 @@ final class Curl {
             return
         }
         
-        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client).getBuffer().readStringImmutable() else {
+        guard let index = try await downloadInMemoryAsync(url: "\(url)\(`extension`)", client: client, minSize: nil).getBuffer().readStringImmutable() else {
             fatalError("Could not decode index to string")
         }
 
@@ -458,10 +465,10 @@ final class Curl {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
-        let ranges = range.split(separator: ",")
+        let ranges = range.range.split(separator: ",")
         var matchesPos = 0
         for range in ranges {
-            let data = try await downloadInMemoryAsync(url: url, range: String(range), client: client).getBuffer()
+            let data = try await downloadInMemoryAsync(url: url, range: String(range), client: client, minSize: nil).getBuffer()
             try data.withUnsafeReadableBytes { ptr in
                 let grib = try GribMemory(ptr: ptr)
                 chelper_malloc_trim()
@@ -598,14 +605,20 @@ extension AsyncSequence where Element == ByteBuffer {
 
 extension Sequence where Element == Substring {
     /// Parse a GRID index to curl read ranges
-    func indexToRange(include: (Substring) throws -> Bool) rethrows -> String? {
+    func indexToRange(include: (Substring) throws -> Bool) rethrows -> (range: String, minSize: Int)? {
         var range = ""
         var start: Int? = nil
+        var minSize = 0
+        var previousMatched: Int? = nil
         for line in self {
             let parts = line.split(separator: ":")
             guard parts.count > 2, let messageStart = Int(parts[1]) else {
                 continue
             }
+            if let previousMatched = previousMatched {
+                minSize += messageStart - previousMatched
+            }
+            previousMatched = nil
             guard try include(line) else {
                 if let start = start {
                     range += "\(range.isEmpty ? "" : ",")\(start)-\(messageStart-1)"
@@ -616,6 +629,7 @@ extension Sequence where Element == Substring {
             if start == nil {
                 start = messageStart
             }
+            previousMatched = messageStart
         }
         if let start = start {
             range += "\(range.isEmpty ? "" : ",")\(start)-"
@@ -623,6 +637,6 @@ extension Sequence where Element == Substring {
         if range.isEmpty {
             return nil
         }
-        return range
+        return (range, minSize)
     }
 }
