@@ -20,8 +20,8 @@ enum CurlError: Error {
     case futimes(error: String)
 }
 
-/// Isolate buffer for concurrent access.. Although it is not really concurrent
-final actor ConcurrentByteBuffer {
+/// Isolate buffer to keep always a single refere nce
+final class ConcurrentByteBuffer {
     private var buffer: ByteBuffer
     
     public init() {
@@ -250,9 +250,9 @@ final class Curl {
     func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ConcurrentByteBuffer {
         return try await withRetriedDownload(url: url, range: nil, client: client) { [unowned self] response in
             let task = Task {
-                await self.buffer.reset()
+                self.buffer.reset()
                 for try await fragement in response.body.decompressBzip2() {
-                    await self.buffer.writeImmutableBuffer(fragement)
+                    self.buffer.writeImmutableBuffer(fragement)
                 }
                 return self.buffer
             }
@@ -268,12 +268,12 @@ final class Curl {
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient, minSize: Int?) async throws -> ConcurrentByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) { [unowned self] response in
             let task = Task {
-                await self.buffer.reset()
+                self.buffer.reset()
                 if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
-                    await self.buffer.reserveCapacity(contentLength)
+                    self.buffer.reserveCapacity(contentLength)
                 }
                 for try await fragement in response.body {
-                    await self.buffer.writeImmutableBuffer(fragement)
+                    self.buffer.writeImmutableBuffer(fragement)
                 }
                 return self.buffer
             }
@@ -282,7 +282,7 @@ final class Curl {
                 readTimeout.invalidate()
             }
             let buffer = try await task.value
-            if let minSize = minSize, await buffer.readableBytes < minSize {
+            if let minSize = minSize, buffer.readableBytes < minSize {
                 throw CurlError.sizeTooSmall
             }
             return buffer
@@ -569,36 +569,19 @@ protocol CurlIndexedVariable {
     var gribIndexName: String? { get }
 }
 
-/// Synchronise access to file handles
-fileprivate actor ConcurrentFileHandle {
-    private var fn: FileHandle
-    
-    public init(_ fn: FileHandle) {
-        self.fn = fn
-    }
-    
-    public func write(_ buffer: ByteBuffer) throws {
-        try fn.write(contentsOf: buffer.readableBytesView)
-    }
-    
-    public func setModificationDate(_ date: Date) throws {
-        let times = [timespec](repeating: timespec(tv_sec: Int(date.timeIntervalSince1970), tv_nsec: 0), count: 2)
-        guard futimens(fn.fileDescriptor, times) == 0 else {
-            throw CurlError.futimes(error: String(cString: strerror(errno)))
-        }
-    }
-}
-
 extension AsyncSequence where Element == ByteBuffer {
     /// Store incoming data to file
     /// NOTE: File IO is blocking e.g. synchronous
     func saveTo(file: String, size: Int?, modificationDate: Date?) async throws {
-        let fn = try ConcurrentFileHandle(FileHandle.createNewFile(file: file, size: size))
+        let fn = try FileHandle.createNewFile(file: file, size: size)
         for try await fragment in self {
-            try await fn.write(fragment)
+            try fn.write(contentsOf: fragment.readableBytesView)
         }
         if let modificationDate {
-            try await fn.setModificationDate(modificationDate)
+            let times = [timespec](repeating: timespec(tv_sec: Int(modificationDate.timeIntervalSince1970), tv_nsec: 0), count: 2)
+            guard futimens(fn.fileDescriptor, times) == 0 else {
+                throw CurlError.futimes(error: String(cString: strerror(errno)))
+            }
         }
     }
 }
