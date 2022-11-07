@@ -17,6 +17,9 @@ enum IconWaveDomain: String, Codable, CaseIterable, GenericDomain {
     var omfileArchive: String? {
         return nil
     }
+    var downloadDirectory: String {
+        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+    }
     
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {

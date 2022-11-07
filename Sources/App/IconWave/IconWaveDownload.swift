@@ -64,9 +64,8 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         // https://opendata.dwd.de/weather/maritime/wave_models/gwam/grib/00/mdww/GWAM_MDWW_2022072800_000.grib2.bz2
         // https://opendata.dwd.de/weather/maritime/wave_models/ewam/grib/00/mdww/EWAM_MDWW_2022072800_000.grib2.bz2
         let baseUrl = "http://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
-        let downloadDirectory = "\(OpenMeteo.dataDictionary)\(domain.rawValue)/"
         let logger = application.logger
-        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger)
         let nx = domain.grid.nx
@@ -84,7 +83,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
             for variable in variables {
                 let url = "\(baseUrl)\(variable.dwdName)/\(domain.rawValue.uppercased())_\(variable.dwdName.uppercased())_\(run.format_YYYYMMddHH)_\(forecastHour.zeroPadded(len: 3)).grib2.bz2"
                 
-                let fileDest = "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om"
+                let fileDest = "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).om"
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
                     continue
                 }
@@ -117,9 +116,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
     }
     
     /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable]) throws {
-        let downloadDirectory = "\(OpenMeteo.dataDictionary)\(domain.rawValue)/"
-        
+    func convert(logger: Logger, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable]) throws {        
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
@@ -131,7 +128,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                 
             for forecastStep in 0..<domain.countForecastHours {
                 let forecastHour = forecastStep * domain.dtSeconds / 3600
-                let d = try OmFileReader(file: "\(downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
+                let d = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
                 data2d[0..<data2d.nLocations, forecastStep] = d
             }
 

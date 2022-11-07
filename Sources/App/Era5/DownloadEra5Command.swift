@@ -23,7 +23,7 @@ enum Era5: GenericDomain {
     }
     
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)era5/"
+        return "\(OpenMeteo.dataDictionary)download-era5/"
     }
     
     var omfileDirectory: String {

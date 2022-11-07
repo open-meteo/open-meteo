@@ -13,7 +13,7 @@ import SwiftPFor2D
  Total size after conversion `10.48 GB`
  */
 struct Dem90 {
-    static let downloadDirectory = "data/dem90/"
+    static let downloadDirectory = "data/download-dem90/"
     static let omDirectory = "data/omfile-dem90/"
     
     /// Get elevation for coordinate. Access to om files is cached.

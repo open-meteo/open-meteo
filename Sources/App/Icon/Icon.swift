@@ -82,7 +82,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)\(rawValue)/"
+        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
     }
     var omfileArchive: String? {
         return nil
