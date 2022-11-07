@@ -1,7 +1,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:5.7.0-jammy as build
+FROM swift:5.7.1-jammy as build
 WORKDIR /build
 
 # First just resolve dependencies.
@@ -23,7 +23,7 @@ RUN swift build --enable-test-discovery -c release
 # ================================
 # Run image
 # ================================
-FROM swift:5.7.0-jammy-slim
+FROM swift:5.7.1-jammy-slim
 
 # Create a vapor user and group with /app as its home directory
 RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app vapor
