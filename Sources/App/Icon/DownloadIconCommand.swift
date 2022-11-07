@@ -428,6 +428,7 @@ extension AsyncCommandFix {
         let promise = context.application.eventLoopGroup.next().makePromise(of: Void.self)
         
         // set timers very high, to use own timers
+        context.application.http.client.configuration.connectionPool.idleTimeout = .seconds(3600 * 24)
         context.application.http.client.configuration.timeout.connect = .seconds(3600 * 24)
         context.application.http.client.configuration.timeout.read = .seconds(3600 * 24)
 
