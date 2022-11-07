@@ -66,8 +66,8 @@ extension IconMixer {
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .winddirection_10m_dominant:
             // vector addition
-            let u = try get(variable: .u_10m, time: time).data.sum(by: 24)
-            let v = try get(variable: .v_10m, time: time).data.sum(by: 24)
+            let u = try get(variable: .wind_u_component_10m, time: time).data.sum(by: 24)
+            let v = try get(variable: .wind_v_component_10m, time: time).data.sum(by: 24)
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         //case .sunshine_hours:
@@ -129,8 +129,8 @@ extension IconMixer {
                 fallthrough
             case .apparent_temperature_min:
                 try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .u_10m, time: time)
-                try prefetchData(variable: .v_10m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
                 try prefetchData(variable: .relativehumidity_2m, time: time)
                 try prefetchData(variable: .direct_radiation, time: time)
                 try prefetchData(variable: .diffuse_radiation, time: time)
@@ -142,13 +142,13 @@ extension IconMixer {
                 try prefetchData(variable: .direct_radiation, time: time)
                 try prefetchData(variable: .diffuse_radiation, time: time)
             case .windspeed_10m_max:
-                try prefetchData(variable: .u_10m, time: time)
-                try prefetchData(variable: .v_10m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
             case .windgusts_10m_max:
                 try prefetchData(variable: .windgusts_10m, time: time)
             case .winddirection_10m_dominant:
-                try prefetchData(variable: .u_10m, time: time)
-                try prefetchData(variable: .v_10m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
             case .precipitation_hours:
                 try prefetchData(variable: .precipitation, time: time)
             case .sunrise:
@@ -160,8 +160,8 @@ extension IconMixer {
                 try prefetchData(variable: .diffuse_radiation, time: time)
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relativehumidity_2m, time: time)
-                try prefetchData(variable: .u_10m, time: time)
-                try prefetchData(variable: .v_10m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
             case .snowfall_sum:
                 try prefetchData(variable: .precipitation, time: time)
                 try prefetchData(variable: .showers, time: time)
@@ -185,37 +185,37 @@ extension IconMixer {
                     switch variable {
                     case .apparent_temperature:
                         try prefetchData(variable: .temperature_2m, time: time)
-                        try prefetchData(variable: .u_10m, time: time)
-                        try prefetchData(variable: .v_10m, time: time)
+                        try prefetchData(variable: .wind_u_component_10m, time: time)
+                        try prefetchData(variable: .wind_v_component_10m, time: time)
                         try prefetchData(variable: .relativehumidity_2m, time: time)
                         try prefetchData(variable: .direct_radiation, time: time)
                         try prefetchData(variable: .diffuse_radiation, time: time)
                     case .relativehumitidy_2m:
                         try prefetchData(variable: .relativehumidity_2m, time: time)
                     case .windspeed_10m:
-                        try prefetchData(variable: .u_10m, time: time)
-                        try prefetchData(variable: .v_10m, time: time)
+                        try prefetchData(variable: .wind_u_component_10m, time: time)
+                        try prefetchData(variable: .wind_v_component_10m, time: time)
                     case .winddirection_10m:
-                        try prefetchData(variable: .u_10m, time: time)
-                        try prefetchData(variable: .v_10m, time: time)
+                        try prefetchData(variable: .wind_u_component_10m, time: time)
+                        try prefetchData(variable: .wind_v_component_10m, time: time)
                     case .windspeed_80m:
-                        try prefetchData(variable: .u_80m, time: time)
-                        try prefetchData(variable: .v_80m, time: time)
+                        try prefetchData(variable: .wind_u_component_80m, time: time)
+                        try prefetchData(variable: .wind_v_component_80m, time: time)
                     case .winddirection_80m:
-                        try prefetchData(variable: .u_80m, time: time)
-                        try prefetchData(variable: .v_80m, time: time)
+                        try prefetchData(variable: .wind_u_component_80m, time: time)
+                        try prefetchData(variable: .wind_v_component_80m, time: time)
                     case .windspeed_120m:
-                        try prefetchData(variable: .u_120m, time: time)
-                        try prefetchData(variable: .v_120m, time: time)
+                        try prefetchData(variable: .wind_u_component_120m, time: time)
+                        try prefetchData(variable: .wind_v_component_120m, time: time)
                     case .winddirection_120m:
-                        try prefetchData(variable: .u_120m, time: time)
-                        try prefetchData(variable: .v_120m, time: time)
+                        try prefetchData(variable: .wind_u_component_120m, time: time)
+                        try prefetchData(variable: .wind_v_component_120m, time: time)
                     case .windspeed_180m:
-                        try prefetchData(variable: .u_180m, time: time)
-                        try prefetchData(variable: .v_180m, time: time)
+                        try prefetchData(variable: .wind_u_component_180m, time: time)
+                        try prefetchData(variable: .wind_v_component_180m, time: time)
                     case .winddirection_180m:
-                        try prefetchData(variable: .u_180m, time: time)
-                        try prefetchData(variable: .v_180m, time: time)
+                        try prefetchData(variable: .wind_u_component_180m, time: time)
+                        try prefetchData(variable: .wind_v_component_180m, time: time)
                     case .snow_height:
                         try prefetchData(variable: .snow_depth, time: time)
                     case .shortwave_radiation:
@@ -233,8 +233,8 @@ extension IconMixer {
                         try prefetchData(variable: .diffuse_radiation, time: time)
                         try prefetchData(variable: .temperature_2m, time: time)
                         try prefetchData(variable: .dewpoint_2m, time: time)
-                        try prefetchData(variable: .u_10m, time: time)
-                        try prefetchData(variable: .v_10m, time: time)
+                        try prefetchData(variable: .wind_u_component_10m, time: time)
+                        try prefetchData(variable: .wind_v_component_10m, time: time)
                     case .snowfall:
                         try prefetchData(variable: .snowfall_water_equivalent, time: time)
                         try prefetchData(variable: .snowfall_convective_water_equivalent, time: time)
@@ -302,43 +302,43 @@ extension IconMixer {
         
         switch variable {
         case .windspeed_10m:
-            let u = try get(variable: .u_10m, time: time).data
-            let v = try get(variable: .v_10m, time: time).data
+            let u = try get(variable: .wind_u_component_10m, time: time).data
+            let v = try get(variable: .wind_v_component_10m, time: time).data
             let speed = zip(u,v).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .winddirection_10m:
-            let u = try get(variable: .u_10m, time: time).data
-            let v = try get(variable: .v_10m, time: time).data
+            let u = try get(variable: .wind_u_component_10m, time: time).data
+            let v = try get(variable: .wind_v_component_10m, time: time).data
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .windspeed_80m:
-            let u = try get(variable: .u_80m, time: time).data
-            let v = try get(variable: .v_80m, time: time).data
+            let u = try get(variable: .wind_u_component_80m, time: time).data
+            let v = try get(variable: .wind_v_component_80m, time: time).data
             let speed = zip(u,v).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .winddirection_80m:
-            let u = try get(variable: .u_80m, time: time).data
-            let v = try get(variable: .v_80m, time: time).data
+            let u = try get(variable: .wind_u_component_80m, time: time).data
+            let v = try get(variable: .wind_v_component_80m, time: time).data
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .windspeed_120m:
-            let u = try get(variable: .u_120m, time: time).data
-            let v = try get(variable: .v_120m, time: time).data
+            let u = try get(variable: .wind_u_component_120m, time: time).data
+            let v = try get(variable: .wind_v_component_120m, time: time).data
             let speed = zip(u,v).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .winddirection_120m:
-            let u = try get(variable: .u_120m, time: time).data
-            let v = try get(variable: .v_120m, time: time).data
+            let u = try get(variable: .wind_u_component_120m, time: time).data
+            let v = try get(variable: .wind_v_component_120m, time: time).data
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .windspeed_180m:
-            let u = try get(variable: .u_180m, time: time).data
-            let v = try get(variable: .v_180m, time: time).data
+            let u = try get(variable: .wind_u_component_180m, time: time).data
+            let v = try get(variable: .wind_v_component_180m, time: time).data
             let speed = zip(u,v).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)
         case .winddirection_180m:
-            let u = try get(variable: .u_180m, time: time).data
-            let v = try get(variable: .v_180m, time: time).data
+            let u = try get(variable: .wind_u_component_180m, time: time).data
+            let v = try get(variable: .wind_v_component_180m, time: time).data
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .snow_height:

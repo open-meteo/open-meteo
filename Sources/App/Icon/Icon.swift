@@ -278,16 +278,16 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
     /// Significant weather of the last hour. The predicted weather will be diagnosed hourly at each model grid point and coded as a key number. The latter is called ww-code and represents weather phenomena within the last hour. The interpretation of such weather phenomena from raw model output relies on an independent post-processing method. This technique applies a number of thresholding processes based on WMO criteria. Therefore, a couple of ww-codes may differ from the direct model output (e.g. ww-category snow vs. SNOW_GSP/SNOW_CON). Due to limitations in temporal and spatial resolution, not all ww-codes as defined by the WMO criteria can be determined. However, the simulated ww-code is able to take the following values: no significant weather/ cloud cover (0, 1, 2, 3), fog (45, 48), drizzle (51, 53, 55, 56, 57), rain (61, 63, 65, 66, 67), solid precip not in showers (71, 73, 75, 77), showery precip (liquid & solid) (80, 81, 82, 85, 86), thunderstorm (95, 96, 99 (only ICON- D2)) (see also Table 7.1).
     case weathercode
 
-    case v_10m
+    case wind_v_component_10m
 
-    case u_10m
+    case wind_u_component_10m
     
-    case v_80m
-    case u_80m
-    case v_120m
-    case u_120m
-    case v_180m
-    case u_180m
+    case wind_v_component_80m
+    case wind_u_component_80m
+    case wind_v_component_120m
+    case wind_u_component_120m
+    case wind_v_component_180m
+    case wind_u_component_180m
     
     case temperature_80m
     case temperature_120m
@@ -373,14 +373,14 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
         case .relativehumidity_2m: return 1
         case .precipitation: return 10
         case .weathercode: return 1
-        case .v_10m: return 10
-        case .u_10m: return 10
-        case .v_80m: return 10
-        case .u_80m: return 10
-        case .v_120m: return 10
-        case .u_120m: return 10
-        case .v_180m: return 10
-        case .u_180m: return 10
+        case .wind_v_component_10m: return 10
+        case .wind_u_component_10m: return 10
+        case .wind_v_component_80m: return 10
+        case .wind_u_component_80m: return 10
+        case .wind_v_component_120m: return 10
+        case .wind_u_component_120m: return 10
+        case .wind_v_component_180m: return 10
+        case .wind_u_component_180m: return 10
         case .soil_temperature_0cm: return 20
         case .soil_temperature_6cm: return 20
         case .soil_temperature_18cm: return 20
@@ -423,14 +423,14 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
         case .relativehumidity_2m: return .percent
         case .precipitation: return .millimeter
         case .weathercode: return .wmoCode
-        case .v_10m: return .ms
-        case .u_10m: return .ms
-        case .v_80m: return .ms
-        case .u_80m: return .ms
-        case .v_120m: return .ms
-        case .u_120m: return .ms
-        case .v_180m: return .ms
-        case .u_180m: return .ms
+        case .wind_v_component_10m: return .ms
+        case .wind_u_component_10m: return .ms
+        case .wind_v_component_80m: return .ms
+        case .wind_u_component_80m: return .ms
+        case .wind_v_component_120m: return .ms
+        case .wind_u_component_120m: return .ms
+        case .wind_v_component_180m: return .ms
+        case .wind_u_component_180m: return .ms
         case .soil_temperature_0cm: return .celsius
         case .soil_temperature_6cm: return .celsius
         case .soil_temperature_18cm: return .celsius
@@ -477,52 +477,7 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
     
     /// Name in dwd filenames
     var omFileName: String {
-        switch self {
-        case .temperature_2m: return "t_2m"
-        case .cloudcover: return "clct"
-        case .cloudcover_low: return "clcl"
-        case .cloudcover_mid: return "clcm"
-        case .cloudcover_high: return "clch"
-        case .relativehumidity_2m: return "relhum_2m"
-        case .precipitation: return "tot_prec"
-        case .weathercode: return "ww"
-        case .v_10m: return "v_10m"
-        case .u_10m: return "u_10m"
-        case .v_80m: return "v_80m"
-        case .u_80m: return "u_80m"
-        case .v_120m: return "v_120m"
-        case .u_120m: return "u_120m"
-        case .v_180m: return "v_180m"
-        case .u_180m: return "u_180m"
-        case .soil_temperature_0cm: return "t_so_0"
-        case .soil_temperature_6cm: return "t_so_6"
-        case .soil_temperature_18cm: return "t_so_18"
-        case .soil_temperature_54cm: return "t_so_54"
-        case .soil_moisture_0_1cm: return "w_so_0"
-        case .soil_moisture_1_3cm: return "w_so_1"
-        case .soil_moisture_3_9cm: return "w_so_3"
-        case .soil_moisture_9_27cm: return "w_so_9"
-        case .soil_moisture_27_81cm: return "w_so_27"
-        case .snow_depth: return "h_snow"
-        case .sensible_heatflux: return "ashfl_s"
-        case .latent_heatflux: return "alhfl_s"
-        case .showers: return "rain_con"
-        case .rain: return "rain_gsp"
-        case .windgusts_10m: return "vmax_10m"
-        case .freezinglevel_height: return "hzerocl"
-        case .dewpoint_2m: return "td_2m"
-        case .pressure_msl: return "pmsl"
-        case .diffuse_radiation: return "aswdifd_s"
-        case .direct_radiation: return "aswdir_s"
-        case .snowfall_convective_water_equivalent: return "snow_con"
-        case .snowfall_water_equivalent: return "snow_gsp"
-        case .temperature_80m:
-            return rawValue
-        case .temperature_120m:
-            return rawValue
-        case .temperature_180m:
-            return rawValue
-        }
+        return rawValue
     }
     
     var interpolation: ReaderInterpolation {

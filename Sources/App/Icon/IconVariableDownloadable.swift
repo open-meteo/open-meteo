@@ -1,5 +1,5 @@
 
-
+/// Define functions to download surface and pressure level variables for ICON
 protocol IconVariableDownloadable: GenericVariableMixing {
     var skipHour0: Bool { get }
     var isAveragedOverForecastTime: Bool { get }
@@ -44,8 +44,8 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .relativehumidity_2m: return .hermite(bounds: 0...100)
         case .precipitation: return .linear
         case .weathercode: return .nearest
-        case .v_10m: return .hermite(bounds: nil)
-        case .u_10m: return .hermite(bounds: nil)
+        case .wind_v_component_10m: return .hermite(bounds: nil)
+        case .wind_u_component_10m: return .hermite(bounds: nil)
         case .snow_depth: return .linear
         case .sensible_heatflux: return .hermite_backwards_averaged(bounds: nil)
         case .latent_heatflux: return .hermite_backwards_averaged(bounds: nil)
@@ -63,14 +63,14 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .soil_moisture_3_9cm: return .hermite(bounds: nil)
         case .soil_moisture_9_27cm: return .hermite(bounds: nil)
         case .soil_moisture_27_81cm: return .hermite(bounds: nil)
-        case .v_80m: return .hermite(bounds: nil)
-        case .u_80m: return .hermite(bounds: nil)
-        case .v_120m: return .hermite(bounds: nil)
-        case .u_120m: return .hermite(bounds: nil)
-        case .v_180m: return .hermite(bounds: nil)
+        case .wind_v_component_80m: return .hermite(bounds: nil)
+        case .wind_u_component_80m: return .hermite(bounds: nil)
+        case .wind_v_component_120m: return .hermite(bounds: nil)
+        case .wind_u_component_120m: return .hermite(bounds: nil)
+        case .wind_v_component_180m: return .hermite(bounds: nil)
         case .snowfall_convective_water_equivalent: return .linear
         case .snowfall_water_equivalent: return .linear
-        case .u_180m: return .hermite(bounds: nil)
+        case .wind_u_component_180m: return .hermite(bounds: nil)
         case .showers: return .linear
         case .pressure_msl: return .hermite(bounds: nil)
         case .rain: return .linear
@@ -105,16 +105,38 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .soil_moisture_3_9cm: return ("w_so", "soil-level", 3)
         case .soil_moisture_9_27cm: return ("w_so", "soil-level", 9)
         case .soil_moisture_27_81cm: return ("w_so", "soil-level", 27)
-        case .u_80m: return ("u", "model-level", domain.numberOfModelFullLevels-2)
-        case .v_80m: return ("v", "model-level", domain.numberOfModelFullLevels-2)
-        case .u_120m: return ("u", "model-level", domain.numberOfModelFullLevels-3)
-        case .v_120m: return ("v", "model-level", domain.numberOfModelFullLevels-3)
-        case .u_180m: return ("u", "model-level", domain.numberOfModelFullLevels-4)
-        case .v_180m: return ("v", "model-level", domain.numberOfModelFullLevels-4)
+        case .wind_u_component_80m: return ("u", "model-level", domain.numberOfModelFullLevels-2)
+        case .wind_v_component_80m: return ("v", "model-level", domain.numberOfModelFullLevels-2)
+        case .wind_u_component_120m: return ("u", "model-level", domain.numberOfModelFullLevels-3)
+        case .wind_v_component_120m: return ("v", "model-level", domain.numberOfModelFullLevels-3)
+        case .wind_u_component_180m: return ("u", "model-level", domain.numberOfModelFullLevels-4)
+        case .wind_v_component_180m: return ("v", "model-level", domain.numberOfModelFullLevels-4)
         case .temperature_80m: return ("t", "model-level", domain.numberOfModelFullLevels-2)
         case .temperature_120m: return ("t", "model-level", domain.numberOfModelFullLevels-3)
         case .temperature_180m: return ("t", "model-level", domain.numberOfModelFullLevels-4)
-        default: return (omFileName, "single-level", nil)
+        case .temperature_2m: return ("t_2m", "single-level", nil)
+        case .cloudcover: return ("clct", "single-level", nil)
+        case .cloudcover_low: return ("clcl", "single-level", nil)
+        case .cloudcover_mid: return ("clcm", "single-level", nil)
+        case .cloudcover_high: return ("clch", "single-level", nil)
+        case .relativehumidity_2m: return ("relhum_2m", "single-level", nil)
+        case .precipitation: return ("tot_prec", "single-level", nil)
+        case .weathercode: return ("ww", "single-level", nil)
+        case .wind_v_component_10m: return ("v_10m", "single-level", nil)
+        case .wind_u_component_10m: return ("u_10m", "single-level", nil)
+        case .snow_depth: return ("h_snow", "single-level", nil)
+        case .sensible_heatflux: return ("ashfl_s", "single-level", nil)
+        case .latent_heatflux: return ("alhfl_s", "single-level", nil)
+        case .showers: return ("rain_con", "single-level", nil)
+        case .rain: return ("rain_gsp", "single-level", nil)
+        case .windgusts_10m: return ("vmax_10m", "single-level", nil)
+        case .freezinglevel_height: return ("hzerocl", "single-level", nil)
+        case .dewpoint_2m: return ("td_2m", "single-level", nil)
+        case .pressure_msl: return ("pmsl", "single-level", nil)
+        case .diffuse_radiation: return ("aswdifd_s", "single-level", nil)
+        case .direct_radiation: return ("aswdir_s", "single-level", nil)
+        case .snowfall_convective_water_equivalent: return ("snow_con", "single-level", nil)
+        case .snowfall_water_equivalent: return ("snow_gsp", "single-level", nil)
         }
     }
     
