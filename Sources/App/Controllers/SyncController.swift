@@ -121,7 +121,15 @@ struct SyncFileAttributes: Content {
             if isDirectory {
                 directory = name
                 // Domain is not in the filtered listt
-                if !directories.contains(name) {
+                if !directories.contains(where: {
+                    if $0.hasSuffix("*") {
+                        return name.starts(with: $0.dropLast(1))
+                    }
+                    if $0.hasPrefix("*") {
+                        return name.hasSuffix($0.dropFirst(1))
+                    }
+                    return $0 == name
+                }) {
                     directoryEnumerator.skipDescendants()
                 }
                 continue
