@@ -3,7 +3,7 @@ import Vapor
 import SwiftPFor2D
 
 
-enum EcmwfDomain: GenericDomain {
+enum EcmwfDomain: String, GenericDomain {
     case ifs04
     
     /// There is no elevation file for ECMWF
@@ -29,8 +29,13 @@ enum EcmwfDomain: GenericDomain {
     }
     
     var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-ecmwf/"
+        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
+    
+    var downloadDirectory: String {
+        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+    }
+    
     var omfileArchive: String? {
         return nil
     }
