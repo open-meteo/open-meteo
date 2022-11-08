@@ -159,6 +159,11 @@ struct GfsDownload: AsyncCommandFix {
         
         let variablesHour0 = variables.filter({!$0.variable.skipHour0})
         
+        let client = HTTPClient(
+            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 1)),
+            configuration: application.http.client.configuration,
+            backgroundActivityLogger: logger)
+        
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
             /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
@@ -168,7 +173,8 @@ struct GfsDownload: AsyncCommandFix {
                 return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
             }
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
-            try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.http.client.shared) { variables, messages in
+            
+            try await curl.downloadIndexedGrib(url: url, variables: variables, client: client) { variables, messages in
                 logger.info("Compressing and writing data")
                 for (variable, message) in zip(variables, messages) {
                     try grib2d.load(message: message)
