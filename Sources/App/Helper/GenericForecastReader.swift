@@ -15,10 +15,59 @@ protocol GenericReaderDerived {
     var reader: GenericReaderCached<Domain, Variable> { get }
     
     init(reader: GenericReaderCached<Domain, Variable>)
+
     func get(derived: Derived, time: TimerangeDt) throws -> DataAndUnit
     func prefetchData(derived: Derived, time: TimerangeDt) throws
+    
+    func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit
+    func prefetchData(raw: Variable, time: TimerangeDt) throws
 }
 
+extension GenericReaderDerived {
+    init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReaderCached<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.init(reader: reader)
+    }
+    
+    func prefetchData(variable: VariableOrDerived<Variable, Derived>, time: TimerangeDt) throws {
+        switch variable {
+        case .raw(let raw):
+            return try prefetchData(raw: raw, time: time)
+        case .derived(let derived):
+            return try prefetchData(derived: derived, time: time)
+        }
+    }
+    
+    func get(variable: VariableOrDerived<Variable, Derived>, time: TimerangeDt) throws -> DataAndUnit {
+        switch variable {
+        case .raw(let raw):
+            return try get(raw: raw, time: time)
+        case .derived(let derived):
+            return try get(derived: derived, time: time)
+        }
+    }
+}
+
+/// A reader that does not modify reader. E.g. pass all reads directly to reader
+protocol GenericReaderDerivedSimple: GenericReaderDerived {
+
+}
+
+extension GenericReaderDerivedSimple {
+    func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
+        try reader.get(variable: raw, time: time)
+    }
+    
+    func prefetchData(raw: Variable, time: TimerangeDt) throws {
+        try reader.prefetchData(variable: raw, time: time)
+    }
+}
+
+
+
+/// A generic reader that caches all file system reads
 final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable> where Variable: Hashable {
     private var cache: [Variable: DataAndUnit]
     let reader: GenericReader<Domain, Variable>
@@ -43,6 +92,11 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
         return reader.modelLon
     }
     
+    /// Longitude of the grid point
+    var domain: Domain {
+        return reader.domain
+    }
+    
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -62,42 +116,6 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
     
     func prefetchData(variable: Variable, time: TimerangeDt) throws {
         try reader.prefetchData(variable: variable, time: time)
-    }
-}
-
-
-extension GenericReaderDerived {
-    init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let reader = try GenericReaderCached<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            return nil
-        }
-        self.init(reader: reader)
-    }
-    
-    func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        try reader.get(variable: raw, time: time)
-    }
-    
-    func prefetchData(raw: Variable, time: TimerangeDt) throws {
-        try reader.prefetchData(variable: raw, time: time)
-    }
-    
-    func prefetchData(variable: VariableOrDerived<Variable, Derived>, time: TimerangeDt) throws {
-        switch variable {
-        case .raw(let raw):
-            return try prefetchData(raw: raw, time: time)
-        case .derived(let derived):
-            return try prefetchData(derived: derived, time: time)
-        }
-    }
-    
-    func get(variable: VariableOrDerived<Variable, Derived>, time: TimerangeDt) throws -> DataAndUnit {
-        switch variable {
-        case .raw(let raw):
-            return try get(raw: raw, time: time)
-        case .derived(let derived):
-            return try get(derived: derived, time: time)
-        }
     }
 }
 
