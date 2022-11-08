@@ -231,7 +231,7 @@ extension GribMessage {
     }
 }
 
-enum JmaSurfaceVariable: String, CaseIterable, Codable, JmaVariableDownloadable {
+enum JmaSurfaceVariable: String, CaseIterable, Codable, JmaVariableDownloadable, GenericVariableMixing2 {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -378,7 +378,7 @@ enum JmaPressureVariableType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloadable, Hashable {
+struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloadable, Hashable, GenericVariableMixing2 {
     let variable: JmaPressureVariableType
     let level: Int
     
