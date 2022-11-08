@@ -487,7 +487,7 @@ struct GfsReader: GenericReaderDerived {
 }
 
 
-typealias GfsMixer = GenericReaderMixer2<GfsReader>
+typealias GfsMixer = GenericReaderMixer<GfsReader>
 
 extension GfsMixer {
     func getDaily(variable: GfsDailyWeatherVariable, params: GfsQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {

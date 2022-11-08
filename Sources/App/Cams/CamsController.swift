@@ -40,7 +40,7 @@ struct CamsController {
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.rawValue)
+                    let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.name)
                     res.append(d)
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
@@ -73,12 +73,39 @@ struct CamsController {
     }
 }
 
-typealias CamsMixer = GenericReaderMixer<CamsDomain, CamsVariable>
+/// TODO can later be used for air quality index
+enum CamsVariableDerived: String, Codable, GenericVariableMixing2 {
+    case none
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+struct CamsReader: GenericReaderDerivedSimple {
+    typealias Domain = CamsDomain
+    
+    typealias Raw = CamsVariable
+    
+    typealias Derived = CamsVariableDerived
+    
+    var reader: GenericReaderCached<CamsDomain, CamsVariable>
+    
+    func get(derived: CamsVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
+        fatalError()
+    }
+    
+    func prefetchData(derived: CamsVariableDerived, time: TimerangeDt) throws {
+        fatalError()
+    }
+}
+
+typealias CamsMixer = GenericReaderMixer<CamsReader>
 
 struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let hourly: [CamsVariable]?
+    let hourly: [VariableOrDerived<CamsVariable, CamsVariableDerived>]?
     //let daily: [CamsVariableDaily]?
     //let temperature_unit: TemperatureUnit?
     //let windspeed_unit: WindspeedUnit?

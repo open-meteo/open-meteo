@@ -351,7 +351,7 @@ struct IconReader: GenericReaderDerived {
     }
 }
 
-typealias IconMixer = GenericReaderMixer2<IconReader>
+typealias IconMixer = GenericReaderMixer<IconReader>
 
 extension IconMixer {
     func get(variable: IconSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {

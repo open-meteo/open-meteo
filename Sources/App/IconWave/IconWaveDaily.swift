@@ -18,6 +18,14 @@ enum IconWaveVariableDaily: String, Codable {
 }
 
 extension IconWaveMixer {
+    func get(variable: IconWaveVariable, time: TimerangeDt) throws -> DataAndUnit {
+        return try get(variable: .raw(variable), time: time)
+    }
+    
+    func prefetchData(variable: IconWaveVariable, time: TimerangeDt) throws {
+        try prefetchData(variable: .raw(variable), time: time)
+    }
+    
     func getDaily(variable: IconWaveVariableDaily, time timeDaily: TimerangeDt) throws -> DataAndUnit {
         let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
