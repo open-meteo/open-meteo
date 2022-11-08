@@ -76,7 +76,7 @@ enum IconWaveVariableDerived: String, Codable, GenericVariableMixing2 {
     }
 }
 
-struct IconWaveReader: GenericReaderDerivedSimple {
+struct IconWaveReader: GenericReaderDerivedSimple, GenericReaderMixable {
     typealias Domain = IconWaveDomain
     
     typealias Variable = IconWaveVariable
