@@ -164,58 +164,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         return DataAndUnit(data, read.unit)
     }
     
-    /// TODO get rid of code duplication here
-    private func interpolatePressureLevel(variable: MeteoFrancePressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDt) throws -> DataAndUnit {
-        let lower = try get(variable: MeteoFranceVariable.pressure(MeteoFrancePressureVariable(variable: variable, level: lowerLevel)) as! Variable, time: time)
-        let upper = try get(variable: MeteoFranceVariable.pressure(MeteoFrancePressureVariable(variable: variable, level: upperLevel)) as! Variable, time: time)
-        
-        switch variable {
-        case .temperature:
-            // temperature/pressure is linear, therefore
-            // perform linear interpolation between 2 points
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
-            }, lower.unit)
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
-            }, lower.unit)
-        case .geopotential_height:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                let lP = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: l)
-                let hP = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: h)
-                let adjPressure = lP + Float(level - lowerLevel) * (hP - lP) / Float(upperLevel - lowerLevel)
-                return Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: adjPressure)
-            }, lower.unit)
-        case .relativehumidity:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return (l + h) / 2
-            }, lower.unit)
-        case .cloudcover:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
-            }, lower.unit)
-        }
-    }
     
-    // TODO: parts need to be replicated in prefetch
+    
     func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        if let domain = domain as? MeteoFranceDomain, let variable = variable as? MeteoFranceVariable {
-            // arpege_europe and arpege_world have no level 125
-            if domain == .arpege_europe || domain == .arpege_world, case let .pressure(pressure) = variable, pressure.level == 125  {
-                return try self.interpolatePressureLevel(variable: pressure.variable, level: 125, lowerLevel: 100, upperLevel: 150, time: time)
-            }
-            
-            /// AROME France domain has no cloud cover for pressure levels, calculate from RH
-            if domain == .arome_france, case let .pressure(pressure) = variable, pressure.variable == .cloudcover {
-                let rh = try get(variable: MeteoFranceVariable.pressure(MeteoFrancePressureVariable(variable: .relativehumidity, level: pressure.level)) as! Variable, time: time)
-                let clc = rh.data.map(Meteorology.relativeHumidityToCloudCover)
-                return DataAndUnit(clc, .percent)
-            }
-        }
-        
         return try readAndInterpolate(variable: variable, time: time)
     }
 }
