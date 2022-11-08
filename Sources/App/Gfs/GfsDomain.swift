@@ -143,7 +143,7 @@ enum GfsDomain: String, GenericDomain {
 /**
  List of all surface GFS variables
  */
-enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixing {
+enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixing, GenericVariableMixing2 {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -315,7 +315,7 @@ enum GfsPressureVariableType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct GfsPressureVariable: PressureVariableRespresentable, GenericVariableMixing, Hashable {
+struct GfsPressureVariable: PressureVariableRespresentable, GenericVariableMixing, Hashable, GenericVariableMixing2 {
     let variable: GfsPressureVariableType
     let level: Int
     

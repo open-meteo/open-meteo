@@ -135,11 +135,23 @@ extension SurfaceAndPressureVariable: GenericVariableMixing, GenericVariable whe
     
 }
 
+extension SurfaceAndPressureVariable: GenericVariableMixing2 where Surface: GenericVariableMixing2, Pressure: GenericVariableMixing2 {
+    var requiresOffsetCorrectionForMixing: Bool {
+        switch self {
+        case .surface(let surface):
+            return surface.requiresOffsetCorrectionForMixing
+        case .pressure(let pressure):
+            return pressure.requiresOffsetCorrectionForMixing
+        }
+    }
+}
 
-enum VariableOrDerived<Raw, Derived>: Codable where Raw: Codable, Raw: RawRepresentable, Derived: Codable, Derived: RawRepresentable, Raw.RawValue == Derived.RawValue {
+enum VariableOrDerived<Raw, Derived> {
     case raw(Raw)
     case derived(Derived)
-    
+}
+
+extension VariableOrDerived: Codable where Raw: Codable, Raw: RawRepresentable, Derived: Codable, Derived: RawRepresentable, Raw.RawValue == Derived.RawValue {
     init(from decoder: Decoder) throws {
         do {
             let variable = try Derived(from: decoder)
