@@ -35,7 +35,7 @@ struct IconWaveController {
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.name)
+                    let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.rawValue)
                     res.append(d)
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
@@ -68,38 +68,14 @@ struct IconWaveController {
     }
 }
 
-enum IconWaveVariableDerived: String, Codable, GenericVariableMixing2 {
-    case none
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-}
-
-struct IconWaveReader: GenericReaderDerivedSimple, GenericReaderMixable {
-    typealias Domain = IconWaveDomain
-    
-    typealias Variable = IconWaveVariable
-    
-    typealias Derived = IconWaveVariableDerived
-    
-    var reader: GenericReaderCached<IconWaveDomain, IconWaveVariable>
-    
-    func get(derived: IconWaveVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
-        fatalError()
-    }
-    
-    func prefetchData(derived: IconWaveVariableDerived, time: TimerangeDt) throws {
-        fatalError()
-    }
-}
+typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
 
 typealias IconWaveMixer = GenericReaderMixer<IconWaveReader>
 
 struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let hourly: [VariableOrDerived<IconWaveVariable, IconWaveVariableDerived>]?
+    let hourly: [IconWaveVariable]?
     let daily: [IconWaveVariableDaily]?
     //let temperature_unit: TemperatureUnit?
     //let windspeed_unit: WindspeedUnit?
