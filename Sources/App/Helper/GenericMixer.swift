@@ -1,13 +1,17 @@
 import Foundation
 
-
 protocol GenericVariableMixing: GenericVariable {
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool { get }
 }
 
-struct GenericReaderMixer<Domain: GenericDomain, Variable: GenericVariableMixing> {
-    let reader: [GenericReader<Domain, Variable>]
+protocol GenericVariableMixing2 {
+    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
+    var requiresOffsetCorrectionForMixing: Bool { get }
+}
+
+struct GenericReaderMixer<Reader: GenericReaderDerived> {
+    let reader: [Reader]
     
     var modelLat: Float {
         reader.last!.modelLat
@@ -18,29 +22,32 @@ struct GenericReaderMixer<Domain: GenericDomain, Variable: GenericVariableMixing
     var targetElevation: Float {
         reader.last!.targetElevation
     }
+    var modelDtSeconds: Int {
+        reader.first!.modelDtSeconds
+    }
     
-    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         reader = try domains.compactMap {
-            try GenericReader(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            try Reader(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode)
         }
         guard !reader.isEmpty else {
             return nil
         }
     }
     
-    func prefetchData(variable: Variable, time: TimerangeDt) throws {
+    func prefetchData(variable: VariableOrDerived<Reader.Variable, Reader.Derived>, time: TimerangeDt) throws {
         for reader in reader {
             try reader.prefetchData(variable: variable, time: time)
         }
     }
     
-    func prefetchData(variables: [Variable], time: TimerangeDt) throws {
+    func prefetchData(variables: [VariableOrDerived<Reader.Variable, Reader.Derived>], time: TimerangeDt) throws {
         try variables.forEach { variable in
             try prefetchData(variable: variable, time: time)
         }
     }
     
-    func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: VariableOrDerived<Reader.Variable, Reader.Derived>, time: TimerangeDt) throws -> DataAndUnit {
         /// Last reader return highest resolution data
         guard let highestResolutionData = try reader.last?.get(variable: variable, time: time) else {
             fatalError()
@@ -99,28 +106,5 @@ fileprivate extension Array where Element == Float {
                 self[x] = other[x]
             }
         }
-    }
-}
-
-
-final class GenericReaderMixerCached<Domain: GenericDomain, Variable: GenericVariableMixing> where Variable: Hashable {
-    var cache: [Variable: DataAndUnit]
-    let mixer: GenericReaderMixer<Domain, Variable>
-    
-    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let mixer = try GenericReaderMixer<Domain, Variable>(domains: domains, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            return nil
-        }
-        self.mixer = mixer
-        self.cache = .init()
-    }
-    
-    func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        if let value = cache[variable] {
-            return value
-        }
-        let data = try mixer.get(variable: variable, time: time)
-        cache[variable] = data
-        return data
     }
 }

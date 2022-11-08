@@ -418,7 +418,7 @@ struct JmaReader: GenericReaderDerivedSimple {
     }
 }
 
-typealias JmaMixer = GenericReaderMixer2<JmaReader>
+typealias JmaMixer = GenericReaderMixer<JmaReader>
 
 extension JmaMixer {
     func prefetchData(variable: JmaSurfaceVariable, time: TimerangeDt) throws {

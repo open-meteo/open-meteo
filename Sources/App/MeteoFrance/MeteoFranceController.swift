@@ -509,7 +509,7 @@ struct MeteoFranceReader: GenericReaderDerived {
     }
 }
 
-typealias MeteoFranceMixer = GenericReaderMixer2<MeteoFranceReader>
+typealias MeteoFranceMixer = GenericReaderMixer<MeteoFranceReader>
 
 extension MeteoFranceMixer {
     func getDaily(variable: MeteoFranceDailyWeatherVariable, params: MeteoFranceQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
