@@ -164,37 +164,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         return DataAndUnit(data, read.unit)
     }
     
-    private func interpolatePressureLevel(variable: IconPressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDt) throws -> DataAndUnit {
-        let lower = try get(variable: IconVariable.pressure(IconPressureVariable(variable: variable, level: lowerLevel)) as! Variable, time: time)
-        let upper = try get(variable: IconVariable.pressure(IconPressureVariable(variable: variable, level: upperLevel)) as! Variable, time: time)
-        
-        switch variable {
-        case .temperature:
-            // temperature/pressure is linear, therefore
-            // perform linear interpolation between 2 points
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
-            }, lower.unit)
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
-            }, lower.unit)
-        case .geopotential_height:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                let lP = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: l)
-                let hP = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: h)
-                let adjPressure = lP + Float(level - lowerLevel) * (hP - lP) / Float(upperLevel - lowerLevel)
-                return Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: adjPressure)
-            }, lower.unit)
-        case .relativehumidity:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return (l + h) / 2
-            }, lower.unit)
-        }
-    }
-    
     /// TODO get rid of code duplication here
     private func interpolatePressureLevel(variable: MeteoFrancePressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDt) throws -> DataAndUnit {
         let lower = try get(variable: MeteoFranceVariable.pressure(MeteoFrancePressureVariable(variable: variable, level: lowerLevel)) as! Variable, time: time)
@@ -233,28 +202,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     
     // TODO: parts need to be replicated in prefetch
     func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        if let domain = domain as? IconDomains, let variable = variable as? IconVariable {
-            // icon-d2 has no levels 800, 900, 925
-            if domain == .iconD2, case let .pressure(pressure) = variable  {
-                let level = pressure.level
-                let variable = pressure.variable
-                switch level {
-                case 800:
-                    return try self.interpolatePressureLevel(variable: variable, level: level, lowerLevel: 700, upperLevel: 850, time: time)
-                case 900:
-                    return try self.interpolatePressureLevel(variable: variable, level: level, lowerLevel: 850, upperLevel: 950, time: time)
-                case 925:
-                    return try self.interpolatePressureLevel(variable: variable, level: level, lowerLevel: 850, upperLevel: 950, time: time)
-                default: break
-                }
-            }
-            
-            // icon global and EU lack level 975
-            if domain != .iconD2, case let .pressure(pressure) = variable, pressure.level == 975  {
-                return try self.interpolatePressureLevel(variable: pressure.variable, level: pressure.level, lowerLevel: 950, upperLevel: 1000, time: time)
-            }
-        }
-        
         if let domain = domain as? MeteoFranceDomain, let variable = variable as? MeteoFranceVariable {
             // arpege_europe and arpege_world have no level 125
             if domain == .arpege_europe || domain == .arpege_world, case let .pressure(pressure) = variable, pressure.level == 125  {

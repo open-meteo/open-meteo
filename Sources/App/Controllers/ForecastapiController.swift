@@ -148,9 +148,9 @@ public struct ForecastapiController: RouteCollection {
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
-                latitude: reader.mixer.modelLat,
-                longitude: reader.mixer.modelLon,
-                elevation: reader.mixer.targetElevation,
+                latitude: reader.modelLat,
+                longitude: reader.modelLon,
+                elevation: reader.targetElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,

@@ -98,9 +98,9 @@ public struct IconController {
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
-                latitude: reader.mixer.modelLat,
-                longitude: reader.mixer.modelLon,
-                elevation: reader.mixer.targetElevation,
+                latitude: reader.modelLat,
+                longitude: reader.modelLon,
+                elevation: reader.targetElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,
@@ -220,14 +220,18 @@ enum IconPressureVariableDerivedType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct IconPressureVariableDerived: PressureVariableRespresentable {
+struct IconPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixing2 {
     let variable: IconPressureVariableDerivedType
     let level: Int
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
 }
 
 typealias IconVariableDerived = SurfaceAndPressureVariable<IconSurfaceVariableDerived, IconPressureVariableDerived>
 
-enum IconSurfaceVariableDerived: String, Codable, CaseIterable {
+enum IconSurfaceVariableDerived: String, Codable, CaseIterable, GenericVariableMixing2 {
     case apparent_temperature
     case relativehumitidy_2m
     case windspeed_10m
@@ -252,5 +256,9 @@ enum IconSurfaceVariableDerived: String, Codable, CaseIterable {
     case diffuse_radiation_instant
     case direct_radiation_instant
     case direct_normal_irradiance_instant
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return self == .snow_height
+    }
 }
 

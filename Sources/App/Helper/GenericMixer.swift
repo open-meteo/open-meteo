@@ -101,3 +101,26 @@ fileprivate extension Array where Element == Float {
         }
     }
 }
+
+
+final class GenericReaderMixerCached<Domain: GenericDomain, Variable: GenericVariableMixing> where Variable: Hashable {
+    var cache: [Variable: DataAndUnit]
+    let mixer: GenericReaderMixer<Domain, Variable>
+    
+    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let mixer = try GenericReaderMixer<Domain, Variable>(domains: domains, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.mixer = mixer
+        self.cache = .init()
+    }
+    
+    func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
+        if let value = cache[variable] {
+            return value
+        }
+        let data = try mixer.get(variable: variable, time: time)
+        cache[variable] = data
+        return data
+    }
+}

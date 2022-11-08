@@ -194,7 +194,7 @@ enum IconPressureVariableType: String, CaseIterable {
     case relativehumidity
 }
 
-struct IconPressureVariable: PressureVariableRespresentable, Hashable {
+struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixing2 {
     let variable: IconPressureVariableType
     let level: Int
     
@@ -259,7 +259,7 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable {
 typealias IconVariable = SurfaceAndPressureVariable<IconSurfaceVariable, IconPressureVariable>
 
 
-enum IconSurfaceVariable: String, CaseIterable, Codable {
+enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixing2 {
     case temperature_2m
     case cloudcover // cloudcover total
     case cloudcover_low
@@ -487,5 +487,4 @@ enum IconSurfaceVariable: String, CaseIterable, Codable {
     var isElevationCorrectable: Bool {
         return self == .temperature_2m || self == .temperature_80m || self == .temperature_120m || self == .temperature_180m || self == .dewpoint_2m
     }
-
 }
