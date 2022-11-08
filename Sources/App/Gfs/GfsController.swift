@@ -108,9 +108,9 @@ public struct GfsController {
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
-                latitude: reader.mixer.modelLat,
-                longitude: reader.mixer.modelLon,
-                elevation: reader.mixer.targetElevation,
+                latitude: reader.modelLat,
+                longitude: reader.modelLon,
+                elevation: reader.targetElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,
@@ -246,8 +246,6 @@ struct GfsPressureVariableDerived: PressureVariableRespresentable, GenericVariab
 typealias GfsVariableDerived = SurfaceAndPressureVariable<GfsVariableDerivedSurface, GfsPressureVariableDerived>
 
 typealias GfsVariableCombined = VariableOrDerived<GfsVariable, GfsVariableDerived>
-
-//typealias GfsReader = GenericReader<GfsDomain, GfsVariable>
 
 struct GfsReader: GenericReaderDerived {
     typealias Domain = GfsDomain
@@ -457,11 +455,11 @@ struct GfsReader: GenericReaderDerived {
 }
 
 
-typealias GfsMixer = GenericReaderMixerCached<GfsDomain, GfsVariable>
+typealias GfsMixer = GenericReaderMixer2<GfsReader>
 
 extension GfsMixer {
     func getDaily(variable: GfsDailyWeatherVariable, params: GfsQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
-        let time = timeDaily.with(dtSeconds: mixer.reader.last!.domain.dtSeconds)
+        let time = timeDaily.with(dtSeconds: reader.last!.reader.reader.domain.dtSeconds)
         switch variable {
         case .temperature_2m_max:
             let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
@@ -524,21 +522,8 @@ extension GfsMixer {
         }
     }
     
-    func get(variable: GfsVariableCombined, time: TimerangeDt) throws -> DataAndUnit {
-        switch variable {
-        case .raw(let variable):
-            return try get(variable: variable, time: time)
-        case .derived(let variable):
-            return try get(variable: variable, time: time)
-        }
-    }
-    
-    func prefetchData(variable: Variable, time: TimerangeDt) throws {
-        try mixer.prefetchData(variable: variable, time: time)
-    }
-    
     func prefetchData(variables: [GfsDailyWeatherVariable], time timeDaily: TimerangeDt) throws {
-        let time = timeDaily.with(dtSeconds: mixer.reader.last!.domain.dtSeconds)
+        let time = timeDaily.with(dtSeconds: reader.last!.reader.reader.domain.dtSeconds)
         for variable in variables {
             switch variable {
             case .temperature_2m_max:
@@ -591,10 +576,14 @@ extension GfsMixer {
     }
     
     func get(variable: GfsSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {
-        return try get(variable: .surface(variable), time: time)
+        return try get(variable: .raw(.surface(variable)), time: time)
     }
     
     func get(variable: GfsVariableDerivedSurface, time: TimerangeDt) throws -> DataAndUnit {
         return try get(variable: .derived(.surface(variable)), time: time)
+    }
+    
+    func prefetchData(variable: GfsSurfaceVariable, time: TimerangeDt) throws {
+        try prefetchData(variable: .raw(.surface(variable)), time: time)
     }
 }
