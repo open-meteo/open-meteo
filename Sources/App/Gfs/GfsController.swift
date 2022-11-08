@@ -256,7 +256,7 @@ struct GfsReader: GenericReaderDerived {
     
     typealias Derived = GfsVariableDerived
     
-    var reader: GenericReader<GfsDomain, GfsVariable>
+    var reader: GenericReaderCached<GfsDomain, GfsVariable>
     
     func prefetchData(derived: GfsVariableDerived, time: TimerangeDt) throws {
         switch derived {
