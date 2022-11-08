@@ -53,10 +53,10 @@ public struct IconController {
                 guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                let temperature = try reader.get(variable: .temperature_2m, time: time).conertAndRound(params: params)
-                let winddirection = try reader.get(variable: .winddirection_10m, time: time).conertAndRound(params: params)
-                let windspeed = try reader.get(variable: .windspeed_10m, time: time).conertAndRound(params: params)
-                let weathercode = try reader.get(variable: .weathercode, time: time).conertAndRound(params: params)
+                let temperature = try reader.get(raw: .temperature_2m, time: time).conertAndRound(params: params)
+                let winddirection = try reader.get(derived: .winddirection_10m, time: time).conertAndRound(params: params)
+                let windspeed = try reader.get(derived: .windspeed_10m, time: time).conertAndRound(params: params)
+                let weathercode = try reader.get(raw: .weathercode, time: time).conertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],

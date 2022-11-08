@@ -9,8 +9,8 @@ import Foundation
 
 protocol GenericReaderDerived {
     associatedtype Domain: GenericDomain
-    associatedtype Variable: GenericVariable, GenericVariableMixing2, Hashable
-    associatedtype Derived: GenericVariableMixing2
+    associatedtype Variable: GenericVariable, Hashable
+    associatedtype Derived
     
     var reader: GenericReaderCached<Domain, Variable> { get }
     

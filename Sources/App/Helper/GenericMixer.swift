@@ -10,7 +10,24 @@ protocol GenericVariableMixing2 {
     var requiresOffsetCorrectionForMixing: Bool { get }
 }
 
-struct GenericReaderMixer<Reader: GenericReaderDerived> {
+
+protocol GenericReaderMixable {
+    associatedtype MixingVar: GenericVariableMixing2
+    associatedtype Domain
+    
+    var modelLat: Float { get }
+    var modelLon: Float { get }
+    var targetElevation: Float { get }
+    var modelDtSeconds: Int { get }
+    
+    func get(variable: MixingVar, time: TimerangeDt) throws -> DataAndUnit
+    func prefetchData(variable: MixingVar, time: TimerangeDt) throws
+
+    init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws
+}
+
+
+struct GenericReaderMixer<Reader: GenericReaderMixable> {
     let reader: [Reader]
     
     var modelLat: Float {
@@ -35,19 +52,19 @@ struct GenericReaderMixer<Reader: GenericReaderDerived> {
         }
     }
     
-    func prefetchData(variable: VariableOrDerived<Reader.Variable, Reader.Derived>, time: TimerangeDt) throws {
+    func prefetchData(variable: Reader.MixingVar, time: TimerangeDt) throws {
         for reader in reader {
             try reader.prefetchData(variable: variable, time: time)
         }
     }
     
-    func prefetchData(variables: [VariableOrDerived<Reader.Variable, Reader.Derived>], time: TimerangeDt) throws {
+    func prefetchData(variables: [Reader.MixingVar], time: TimerangeDt) throws {
         try variables.forEach { variable in
             try prefetchData(variable: variable, time: time)
         }
     }
     
-    func get(variable: VariableOrDerived<Reader.Variable, Reader.Derived>, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Reader.MixingVar, time: TimerangeDt) throws -> DataAndUnit {
         /// Last reader return highest resolution data
         guard let highestResolutionData = try reader.last?.get(variable: variable, time: time) else {
             fatalError()
