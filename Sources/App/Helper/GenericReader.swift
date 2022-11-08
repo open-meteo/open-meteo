@@ -105,6 +105,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     /// If set, use new data files
     let omFileSplitter: OmFileSplitter
     
+    var modelDtSeconds: Int {
+        return domain.dtSeconds
+    }
+    
     /// Return nil, if the coordinates are outside the domain grid
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         // check if coordinates are in domain, otherwise return nil
@@ -170,6 +174,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         return try readAndInterpolate(variable: variable, time: time)
     }
 }
+
+
+extension GenericReader: GenericReaderMixable where Variable: GenericVariableMixing2 { }
+
 
 extension TimerangeDt {
     func forInterpolationTo(modelDt: Int) -> TimerangeDt {
