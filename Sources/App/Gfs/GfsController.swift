@@ -191,7 +191,7 @@ enum GfsDailyWeatherVariable: String, Codable {
     case et0_fao_evapotranspiration
 }
 
-enum GfsVariableDerivedSurface: String, Codable, CaseIterable {
+enum GfsVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixing2 {
     case apparent_temperature
     case relativehumitidy_2m
     case dewpoint_2m
@@ -216,6 +216,10 @@ enum GfsVariableDerivedSurface: String, Codable, CaseIterable {
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
 }
 
 /**
@@ -230,16 +234,228 @@ enum GfsPressureVariableDerivedType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct GfsPressureVariableDerived: PressureVariableRespresentable {
+struct GfsPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixing2 {
     let variable: GfsPressureVariableDerivedType
     let level: Int
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
 }
 
 typealias GfsVariableDerived = SurfaceAndPressureVariable<GfsVariableDerivedSurface, GfsPressureVariableDerived>
 
 typealias GfsVariableCombined = VariableOrDerived<GfsVariable, GfsVariableDerived>
 
-typealias GfsReader = GenericReader<GfsDomain, GfsVariable>
+//typealias GfsReader = GenericReader<GfsDomain, GfsVariable>
+
+struct GfsReader: GenericReaderDerived {
+    typealias Domain = GfsDomain
+    
+    typealias Variable = GfsVariable
+    
+    typealias Derived = GfsVariableDerived
+    
+    var reader: GenericReader<GfsDomain, GfsVariable>
+    
+    func prefetchData(derived: GfsVariableDerived, time: TimerangeDt) throws {
+        switch derived {
+        case .surface(let surface):
+            switch surface {
+            case .apparent_temperature:
+                try prefetchData(raw: .surface(.temperature_2m), time: time)
+                try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
+                try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
+                try prefetchData(raw: .surface(.shortwave_radiation), time: time)
+            case .relativehumitidy_2m:
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
+            case .windspeed_10m:
+                try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
+                try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+            case .winddirection_10m:
+                try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
+                try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+            case .windspeed_80m:
+                try prefetchData(raw: .surface(.wind_u_component_80m), time: time)
+                try prefetchData(raw: .surface(.wind_v_component_80m), time: time)
+            case .winddirection_80m:
+                try prefetchData(raw: .surface(.wind_u_component_80m), time: time)
+                try prefetchData(raw: .surface(.wind_v_component_80m), time: time)
+            case .evapotranspiration:
+                try prefetchData(raw: .surface(.latent_heatflux), time: time)
+            case .vapor_pressure_deficit:
+                try prefetchData(raw: .surface(.temperature_2m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
+            case .et0_fao_evapotranspiration:
+                try prefetchData(raw: .surface(.shortwave_radiation), time: time)
+                try prefetchData(raw: .surface(.temperature_2m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
+                try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
+                try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+            case .snowfall:
+                try prefetchData(raw: .surface(.frozen_precipitation_percent), time: time)
+                try prefetchData(raw: .surface(.precipitation), time: time)
+            case .surface_pressure:
+                try prefetchData(raw: .surface(.pressure_msl), time: time)
+                try prefetchData(raw: .surface(.temperature_2m), time: time)
+            case .terrestrial_radiation:
+                break
+            case .terrestrial_radiation_instant:
+                break
+            case .dewpoint_2m:
+                try prefetchData(raw: .surface(.temperature_2m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
+            case .diffuse_radiation_instant:
+                try prefetchData(raw: .surface(.diffuse_radiation), time: time)
+            case .direct_normal_irradiance:
+                fallthrough
+            case .direct_normal_irradiance_instant:
+                fallthrough
+            case .direct_radiation:
+                fallthrough
+            case .direct_radiation_instant:
+                try prefetchData(raw: .surface(.shortwave_radiation), time: time)
+                try prefetchData(raw: .surface(.diffuse_radiation), time: time)
+            case .shortwave_radiation_instant:
+                try prefetchData(raw: .surface(.shortwave_radiation), time: time)
+            }
+        case .pressure(let v):
+            switch v.variable {
+            case .windspeed:
+                fallthrough
+            case .winddirection:
+                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
+                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
+            case .dewpoint:
+                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .temperature, level: v.level)), time: time)
+                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)), time: time)
+            }
+        }
+    }
+    
+    func get(derived: GfsVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
+        switch derived {
+        case .surface(let gfsVariableDerivedSurface):
+            switch gfsVariableDerivedSurface {
+            case .windspeed_10m:
+                let u = try get(raw: .surface(.wind_u_component_10m), time: time).data
+                let v = try get(raw: .surface(.wind_v_component_10m), time: time).data
+                let speed = zip(u,v).map(Meteorology.windspeed)
+                return DataAndUnit(speed, .ms)
+            case .winddirection_10m:
+                let u = try get(raw: .surface(.wind_u_component_10m), time: time).data
+                let v = try get(raw: .surface(.wind_v_component_10m), time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .windspeed_80m:
+                let u = try get(raw: .surface(.wind_u_component_80m), time: time).data
+                let v = try get(raw: .surface(.wind_v_component_80m), time: time).data
+                let speed = zip(u,v).map(Meteorology.windspeed)
+                return DataAndUnit(speed, .ms)
+            case .winddirection_80m:
+                let u = try get(raw: .surface(.wind_u_component_80m), time: time).data
+                let v = try get(raw: .surface(.wind_v_component_80m), time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .apparent_temperature:
+                let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
+                let temperature = try get(raw: .surface(.temperature_2m), time: time).data
+                let relhum = try get(raw: .surface(.relativehumidity_2m), time: time).data
+                let radiation = try get(raw: .surface(.shortwave_radiation), time: time).data
+                return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
+            case .evapotranspiration:
+                let latent = try get(raw: .surface(.latent_heatflux), time: time).data
+                let evapotranspiration = latent.map(Meteorology.evapotranspiration)
+                return DataAndUnit(evapotranspiration, .millimeter)
+            case .vapor_pressure_deficit:
+                let temperature = try get(raw: .surface(.temperature_2m), time: time).data
+                let rh = try get(raw: .surface(.relativehumidity_2m), time: time).data
+                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
+                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
+            case .et0_fao_evapotranspiration:
+                let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let swrad = try get(raw: .surface(.shortwave_radiation), time: time).data
+                let temperature = try get(raw: .surface(.temperature_2m), time: time).data
+                let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
+                let rh = try get(raw: .surface(.relativehumidity_2m), time: time).data
+                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
+                
+                let et0 = swrad.indices.map { i in
+                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
+                }
+                return DataAndUnit(et0, .millimeter)
+            case .snowfall:
+                let frozen_precipitation_percent = try get(raw: .surface(.frozen_precipitation_percent), time: time).data
+                let precipitation = try get(raw: .surface(.precipitation), time: time).data
+                let snowfall = zip(frozen_precipitation_percent, precipitation).map({
+                    max($0/100 * $1 * 0.7, 0)
+                })
+                return DataAndUnit(snowfall, SiUnit.centimeter)
+            case .relativehumitidy_2m:
+                return try get(raw: .surface(.relativehumidity_2m), time: time)
+            case .surface_pressure:
+                let temperature = try get(raw: .surface(.temperature_2m), time: time).data
+                let pressure = try get(raw: .surface(.pressure_msl), time: time)
+                return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
+            case .terrestrial_radiation:
+                /// Use center averaged
+                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                return DataAndUnit(solar, .wattPerSquareMeter)
+            case .terrestrial_radiation_instant:
+                /// Use center averaged
+                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                return DataAndUnit(solar, .wattPerSquareMeter)
+            case .dewpoint_2m:
+                let temperature = try get(raw: .surface(.temperature_2m), time: time)
+                let rh = try get(raw: .surface(.relativehumidity_2m), time: time)
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+            case .shortwave_radiation_instant:
+                let sw = try get(raw: .surface(.shortwave_radiation), time: time)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+                return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
+            case .direct_normal_irradiance:
+                let dhi = try get(derived: .surface(.direct_radiation), time: time).data
+                let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                return DataAndUnit(dni, .wattPerSquareMeter)
+            case .direct_normal_irradiance_instant:
+                let direct = try get(derived: .surface(.direct_radiation_instant), time: time)
+                let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                return DataAndUnit(dni, direct.unit)
+            case .direct_radiation:
+                let diffuse = try get(raw: .surface(.diffuse_radiation), time: time)
+                let swrad = try get(raw: .surface(.shortwave_radiation), time: time)
+                return DataAndUnit(zip(swrad.data, diffuse.data).map(-), diffuse.unit)
+            case .direct_radiation_instant:
+                let direct = try get(derived: .surface(.direct_radiation), time: time)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+                return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
+            case .diffuse_radiation_instant:
+                let diff = try get(raw: .surface(.diffuse_radiation), time: time)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+                return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
+            }
+        case .pressure(let v):
+            switch v.variable {
+            case .windspeed:
+                let u = try get(raw: .pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
+                let v = try get(raw: .pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
+                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+                return DataAndUnit(speed, u.unit)
+            case .winddirection:
+                let u = try get(raw: .pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), time: time).data
+                let v = try get(raw: .pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .dewpoint:
+                let temperature = try get(raw: .pressure(GfsPressureVariable(variable: .temperature, level: v.level)), time: time)
+                let rh = try get(raw: .pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)), time: time)
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+            }
+        }
+    }
+}
+
 
 typealias GfsMixer = GenericReaderMixerCached<GfsDomain, GfsVariable>
 
@@ -374,235 +590,11 @@ extension GfsMixer {
         }
     }
     
-    func prefetchData(variable: GfsSurfaceVariable, time: TimerangeDt) throws {
-        try prefetchData(variable: .surface(variable), time: time)
-    }
-    
-    func prefetchData(variables: [GfsVariableCombined], time: TimerangeDt) throws {
-        for variable in variables {
-            switch variable {
-            case .raw(let variable):
-                try prefetchData(variable: variable, time: time)
-            case .derived(let variable):
-                switch variable {
-                case .surface(let surface):
-                    switch surface {
-                    case .apparent_temperature:
-                        try prefetchData(variable: .temperature_2m, time: time)
-                        try prefetchData(variable: .wind_u_component_10m, time: time)
-                        try prefetchData(variable: .wind_v_component_10m, time: time)
-                        try prefetchData(variable: .relativehumidity_2m, time: time)
-                        try prefetchData(variable: .shortwave_radiation, time: time)
-                    case .relativehumitidy_2m:
-                        try prefetchData(variable: .relativehumidity_2m, time: time)
-                    case .windspeed_10m:
-                        try prefetchData(variable: .wind_u_component_10m, time: time)
-                        try prefetchData(variable: .wind_v_component_10m, time: time)
-                    case .winddirection_10m:
-                        try prefetchData(variable: .wind_u_component_10m, time: time)
-                        try prefetchData(variable: .wind_v_component_10m, time: time)
-                    case .windspeed_80m:
-                        try prefetchData(variable: .wind_u_component_80m, time: time)
-                        try prefetchData(variable: .wind_v_component_80m, time: time)
-                    case .winddirection_80m:
-                        try prefetchData(variable: .wind_u_component_80m, time: time)
-                        try prefetchData(variable: .wind_v_component_80m, time: time)
-                    /*case .windspeed_120m:
-                        try prefetchData(variable: .u_120m)
-                        try prefetchData(variable: .v_120m)
-                    case .winddirection_120m:
-                        try prefetchData(variable: .u_120m)
-                        try prefetchData(variable: .v_120m)
-                    case .windspeed_180m:
-                        try prefetchData(variable: .u_180m)
-                        try prefetchData(variable: .v_180m)
-                    case .winddirection_180m:
-                        try prefetchData(variable: .u_180m)
-                        try prefetchData(variable: .v_180m)*/
-                    /*case .direct_normal_irradiance:
-                        try prefetchData(variable: .direct_radiation)*/
-                    case .evapotranspiration:
-                        try prefetchData(variable: .latent_heatflux, time: time)
-                    case .vapor_pressure_deficit:
-                        try prefetchData(variable: .temperature_2m, time: time)
-                        try prefetchData(variable: .relativehumidity_2m, time: time)
-                    case .et0_fao_evapotranspiration:
-                        try prefetchData(variable: .shortwave_radiation, time: time)
-                        try prefetchData(variable: .temperature_2m, time: time)
-                        try prefetchData(variable: .relativehumidity_2m, time: time)
-                        try prefetchData(variable: .wind_u_component_10m, time: time)
-                        try prefetchData(variable: .wind_v_component_10m, time: time)
-                    case .snowfall:
-                        try prefetchData(variable: .frozen_precipitation_percent, time: time)
-                        try prefetchData(variable: .precipitation, time: time)
-                    case .surface_pressure:
-                        try prefetchData(variable: .pressure_msl, time: time)
-                        try prefetchData(variable: .temperature_2m, time: time)
-                    case .terrestrial_radiation:
-                        break
-                    case .terrestrial_radiation_instant:
-                        break
-                    case .dewpoint_2m:
-                        try prefetchData(variable: .temperature_2m, time: time)
-                        try prefetchData(variable: .relativehumidity_2m, time: time)
-                    case .diffuse_radiation_instant:
-                        try prefetchData(variable: .diffuse_radiation, time: time)
-                    case .direct_normal_irradiance:
-                        fallthrough
-                    case .direct_normal_irradiance_instant:
-                        fallthrough
-                    case .direct_radiation:
-                        fallthrough
-                    case .direct_radiation_instant:
-                        try prefetchData(variable: .shortwave_radiation, time: time)
-                        try prefetchData(variable: .diffuse_radiation, time: time)
-                    case .shortwave_radiation_instant:
-                        try prefetchData(variable: .shortwave_radiation, time: time)
-                    }
-                case .pressure(let v):
-                    switch v.variable {
-                    case .windspeed:
-                        fallthrough
-                    case .winddirection:
-                        try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
-                        try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
-                    case .dewpoint:
-                        try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .temperature, level: v.level)), time: time)
-                        try mixer.prefetchData(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)), time: time)
-                    }
-                }
-            }
-        }
-    }
-    
     func get(variable: GfsSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {
         return try get(variable: .surface(variable), time: time)
     }
     
     func get(variable: GfsVariableDerivedSurface, time: TimerangeDt) throws -> DataAndUnit {
         return try get(variable: .derived(.surface(variable)), time: time)
-    }
-    
-    
-    
-    func get(variable: GfsVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
-        switch variable {
-        case .surface(let gfsVariableDerivedSurface):
-            switch gfsVariableDerivedSurface {
-            case .windspeed_10m:
-                let u = try get(variable: .wind_u_component_10m, time: time).data
-                let v = try get(variable: .wind_v_component_10m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
-            case .winddirection_10m:
-                let u = try get(variable: .wind_u_component_10m, time: time).data
-                let v = try get(variable: .wind_v_component_10m, time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .windspeed_80m:
-                let u = try get(variable: .wind_u_component_80m, time: time).data
-                let v = try get(variable: .wind_v_component_80m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
-            case .winddirection_80m:
-                let u = try get(variable: .wind_u_component_80m, time: time).data
-                let v = try get(variable: .wind_v_component_80m, time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .apparent_temperature:
-                let windspeed = try get(variable: .windspeed_10m, time: time).data
-                let temperature = try get(variable: .temperature_2m, time: time).data
-                let relhum = try get(variable: .relativehumidity_2m, time: time).data
-                let radiation = try get(variable: .shortwave_radiation, time: time).data
-                return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
-            case .evapotranspiration:
-                let latent = try get(variable: .latent_heatflux, time: time).data
-                let evapotranspiration = latent.map(Meteorology.evapotranspiration)
-                return DataAndUnit(evapotranspiration, .millimeter)
-            case .vapor_pressure_deficit:
-                let temperature = try get(variable: .temperature_2m, time: time).data
-                let rh = try get(variable: .relativehumidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
-            case .et0_fao_evapotranspiration:
-                let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: time)
-                let swrad = try get(variable: .shortwave_radiation, time: time).data
-                let temperature = try get(variable: .temperature_2m, time: time).data
-                let windspeed = try get(variable: .windspeed_10m, time: time).data
-                let rh = try get(variable: .relativehumidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                
-                let et0 = swrad.indices.map { i in
-                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: mixer.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
-                }
-                return DataAndUnit(et0, .millimeter)
-            case .snowfall:
-                let frozen_precipitation_percent = try get(variable: .frozen_precipitation_percent, time: time).data
-                let precipitation = try get(variable: .precipitation, time: time).data
-                let snowfall = zip(frozen_precipitation_percent, precipitation).map({
-                    max($0/100 * $1 * 0.7, 0)
-                })
-                return DataAndUnit(snowfall, SiUnit.centimeter)
-            case .relativehumitidy_2m:
-                return try get(variable: .relativehumidity_2m, time: time)
-            case .surface_pressure:
-                let temperature = try get(variable: .temperature_2m, time: time).data
-                let pressure = try get(variable: .pressure_msl, time: time)
-                return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: mixer.targetElevation), pressure.unit)
-            case .terrestrial_radiation:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: time)
-                return DataAndUnit(solar, .wattPerSquareMeter)
-            case .terrestrial_radiation_instant:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: time)
-                return DataAndUnit(solar, .wattPerSquareMeter)
-            case .dewpoint_2m:
-                let temperature = try get(variable: .temperature_2m, time: time)
-                let rh = try get(variable: .relativehumidity_2m, time: time)
-                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-            case .shortwave_radiation_instant:
-                let sw = try get(variable: .shortwave_radiation, time: time)
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: mixer.modelLat, longitude: mixer.modelLon)
-                return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
-            case .direct_normal_irradiance:
-                let dhi = try get(variable: .direct_radiation, time: time).data
-                let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: time)
-                return DataAndUnit(dni, .wattPerSquareMeter)
-            case .direct_normal_irradiance_instant:
-                let direct = try get(variable: .direct_radiation_instant, time: time)
-                let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: mixer.modelLat, longitude: mixer.modelLon, timerange: time)
-                return DataAndUnit(dni, direct.unit)
-            case .direct_radiation:
-                let diffuse = try get(variable: .diffuse_radiation, time: time)
-                let swrad = try get(variable: .shortwave_radiation, time: time)
-                return DataAndUnit(zip(swrad.data, diffuse.data).map(-), diffuse.unit)
-            case .direct_radiation_instant:
-                let direct = try get(variable: .direct_radiation, time: time)
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: mixer.modelLat, longitude: mixer.modelLon)
-                return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
-            case .diffuse_radiation_instant:
-                let diff = try get(variable: .diffuse_radiation, time: time)
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: mixer.modelLat, longitude: mixer.modelLon)
-                return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
-            }
-        case .pressure(let v):
-            switch v.variable {
-            case .windspeed:
-                let u = try get(variable: .pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
-                let v = try get(variable: .pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
-                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-                return DataAndUnit(speed, u.unit)
-            case .winddirection:
-                let u = try get(variable: .pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), time: time).data
-                let v = try get(variable: .pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .dewpoint:
-                let temperature = try get(variable: .pressure(GfsPressureVariable(variable: .temperature, level: v.level)), time: time)
-                let rh = try get(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)), time: time)
-                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-            }
-        }
     }
 }

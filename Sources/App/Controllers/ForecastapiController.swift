@@ -2,6 +2,35 @@ import Foundation
 import Vapor
 
 
+enum MultiDomains: String {
+    case auto
+
+    case gfs_combined
+    case gfs
+    case gfs_hrrr
+    
+    case meteofrance
+    case meteofrance_arpege_world
+    case meteofrance_arpege_europe
+    case meteofrance_arome_france
+    case meteofrance_arome_france_hd
+    
+    case jma
+    case jma_msm
+    case jms_gsm
+    
+    case icon
+    case icon_global
+    case icon_eu
+    case icon_d2
+    
+    case ifs04
+    
+    public func getReader() {
+        
+    }
+}
+
 public struct ForecastapiController: RouteCollection {
     public func boot(routes: RoutesBuilder) throws {
         let cors = CORSMiddleware(configuration: .init(
