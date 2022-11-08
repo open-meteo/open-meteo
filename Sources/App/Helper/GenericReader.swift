@@ -269,22 +269,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
             }
         }
         
-        if let domain = domain as? GfsDomain, let variable = variable as? GfsVariable {
-            /// HRRR domain has no cloud cover for pressure levels, calculate from RH
-            if domain != .gfs025, case let .pressure(pressure) = variable, pressure.variable == .cloudcover {
-                let rh = try get(variable: GfsVariable.pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)) as! Variable, time: time)
-                let clc = rh.data.map(Meteorology.relativeHumidityToCloudCover)
-                return DataAndUnit(clc, .percent)
-            }
-            
-            /// GFS has no diffuse radiation
-            if domain == .gfs025, case let .surface(variable) = variable, variable == .diffuse_radiation {
-                let ghi = try get(variable: GfsVariable.surface(.shortwave_radiation) as! Variable, time: time)
-                let dhi = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: ghi.data, latitude: modelLat, longitude: modelLon, timerange: time)
-                return DataAndUnit(dhi, ghi.unit)
-            }
-        }
-        
         return try readAndInterpolate(variable: variable, time: time)
     }
 }

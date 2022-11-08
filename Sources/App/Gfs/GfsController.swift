@@ -256,6 +256,38 @@ struct GfsReader: GenericReaderDerived {
     
     var reader: GenericReaderCached<GfsDomain, GfsVariable>
     
+    func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
+        /// HRRR domain has no cloud cover for pressure levels, calculate from RH
+        if reader.domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloudcover {
+            let rh = try reader.get(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)), time: time)
+            let clc = rh.data.map(Meteorology.relativeHumidityToCloudCover)
+            return DataAndUnit(clc, .percent)
+        }
+        
+        /// GFS has no diffuse radiation
+        if reader.domain == .gfs025, case let .surface(variable) = raw, variable == .diffuse_radiation {
+            let ghi = try reader.get(variable: .surface(.shortwave_radiation), time: time)
+            let dhi = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: ghi.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            return DataAndUnit(dhi, ghi.unit)
+        }
+        
+        return try reader.get(variable: raw, time: time)
+    }
+    
+    func prefetchData(raw: Variable, time: TimerangeDt) throws {
+        /// HRRR domain has no cloud cover for pressure levels, calculate from RH
+        if reader.domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloudcover {
+            return try reader.prefetchData(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)), time: time)
+        }
+        
+        /// GFS has no diffuse radiation
+        if reader.domain == .gfs025, case let .surface(variable) = raw, variable == .diffuse_radiation {
+            return try reader.prefetchData(variable: .surface(.shortwave_radiation), time: time)
+        }
+        
+        try reader.prefetchData(variable: raw, time: time)
+    }
+    
     func prefetchData(derived: GfsVariableDerived, time: TimerangeDt) throws {
         switch derived {
         case .surface(let surface):
