@@ -48,6 +48,12 @@ extension GenericReaderDerived {
             return try get(derived: derived, time: time)
         }
     }
+    
+    func prefetchData(variables: [VariableOrDerived<Variable, Derived>], time: TimerangeDt) throws {
+        try variables.forEach { variable in
+            try prefetchData(variable: variable, time: time)
+        }
+    }
 }
 
 /// A reader that does not modify reader. E.g. pass all reads directly to reader

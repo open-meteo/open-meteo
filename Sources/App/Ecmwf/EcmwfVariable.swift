@@ -1,7 +1,7 @@
 import Foundation
 
 /// Represent a ECMWF variable as available in the grib2 files
-enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
+enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable, GenericVariableMixing2 {
     case precipitation
     case runoff
     case soil_temperature_0_to_7cm
@@ -97,6 +97,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     
     var nameInFiles: String {
         return rawValue
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
     }
     
     var unit: SiUnit {
@@ -518,7 +522,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable {
     }
 }
 
-enum EcmwfVariableDerived: String, Codable {
+enum EcmwfVariableDerived: String, Codable, GenericVariableMixing2 {
     case windspeed_10m
     case windspeed_1000hPa
     case windspeed_925hPa
@@ -540,4 +544,8 @@ enum EcmwfVariableDerived: String, Codable {
     case winddirection_200hPa
     case winddirection_50hPa
     case soil_temperature_0_7cm
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
 }
