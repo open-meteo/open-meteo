@@ -39,8 +39,8 @@ struct EcmwfController {
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
-                latitude: reader.modelLat,
-                longitude: reader.modelLon,
+                latitude: reader.reader.modelLat,
+                longitude: reader.reader.modelLon,
                 elevation: nil,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
