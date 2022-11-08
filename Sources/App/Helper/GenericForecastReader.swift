@@ -154,6 +154,9 @@ struct GenericReaderMixer2<Reader: GenericReaderDerived> {
     var targetElevation: Float {
         reader.last!.reader.targetElevation
     }
+    var modelDtSeconds: Int {
+        reader.first!.reader.domain.dtSeconds
+    }
     
     public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         reader = try domains.compactMap {
