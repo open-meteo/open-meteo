@@ -141,7 +141,7 @@
             <td>No</td>
             <td><mark>json</mark></td>
             <td>By default, results are returned as JSON. Alternatively, <mark>protobuf</mark> is supported for more
-              efficient encoding and transfer.</td>
+              efficient encoding and transfer. The .proto file to decode the protobuf message is available in the <a href="https://github.com/open-meteo/geocoding-api/blob/main/Sources/App/api.proto" target="_blank">geocoding GitHub repository</a>.</td>
           </tr>
           <tr>
             <th scope="row">language</th>
