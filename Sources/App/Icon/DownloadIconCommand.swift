@@ -431,7 +431,7 @@ extension AsyncCommandFix {
         context.application.http.client.configuration.connectionPool.idleTimeout = .seconds(3600 * 24)
         context.application.http.client.configuration.timeout.connect = .seconds(3600 * 24)
         context.application.http.client.configuration.timeout.read = .seconds(3600 * 24)
-
+        context.application.http.client.configuration.httpVersion = .http1Only
         
         promise.completeWithTask {
             try await run(using: context, signature: signature)
