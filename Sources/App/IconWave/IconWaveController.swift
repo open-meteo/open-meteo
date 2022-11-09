@@ -20,7 +20,7 @@ struct IconWaveController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try IconWaveMixer(domains: IconWaveDomain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .sea) else {
+            guard let reader = try IconWaveMixer(domains: IconWaveReader.Domain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .sea) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
@@ -70,7 +70,9 @@ struct IconWaveController {
 
 typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
 
-typealias IconWaveMixer = GenericReaderMixer<IconWaveReader>
+struct IconWaveMixer: GenericReaderMixer {
+    let reader: [IconWaveReader]
+}
 
 struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
