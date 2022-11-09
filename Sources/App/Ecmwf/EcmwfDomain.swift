@@ -60,7 +60,7 @@ enum EcmwfDomain: String, GenericDomain {
 }
 
 
-struct EcmwfReader: GenericReaderDerivedSimple {
+struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderMixable {
     var reader: GenericReaderCached<EcmwfDomain, EcmwfVariable>
     
     typealias Domain = EcmwfDomain
