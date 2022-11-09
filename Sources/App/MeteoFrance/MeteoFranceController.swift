@@ -251,6 +251,8 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderMixable {
     
     typealias Derived = MeteoFranceVariableDerived
     
+    typealias MixingVar = MeteoFranceVariableCombined
+    
     var reader: GenericReaderCached<MeteoFranceDomain, MeteoFranceVariable>
     
     func get(raw: MeteoFranceVariable, time: TimerangeDt) throws -> DataAndUnit {
@@ -509,7 +511,9 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderMixable {
     }
 }
 
-typealias MeteoFranceMixer = GenericReaderMixer<MeteoFranceReader>
+struct MeteoFranceMixer: GenericReaderMixer {
+    let reader: [MeteoFranceReader]
+}
 
 extension MeteoFranceMixer {
     func getDaily(variable: MeteoFranceDailyWeatherVariable, params: MeteoFranceQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {

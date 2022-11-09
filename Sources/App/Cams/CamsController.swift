@@ -83,9 +83,11 @@ enum CamsVariableDerived: String, Codable, GenericVariableMixable {
 }
 
 struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
+    typealias MixingVar = VariableOrDerived<CamsVariable, CamsVariableDerived>
+    
     typealias Domain = CamsDomain
     
-    typealias Raw = CamsVariable
+    typealias Variable = CamsVariable
     
     typealias Derived = CamsVariableDerived
     
@@ -100,7 +102,9 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
     }
 }
 
-typealias CamsMixer = GenericReaderMixer<CamsReader>
+struct CamsMixer: GenericReaderMixer {
+    let reader: [CamsReader]
+}
 
 struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float

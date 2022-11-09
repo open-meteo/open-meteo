@@ -254,6 +254,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
     
     typealias Derived = GfsVariableDerived
     
+    typealias MixingVar = GfsVariableCombined
+    
     var reader: GenericReaderCached<GfsDomain, GfsVariable>
     
     func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
@@ -487,7 +489,9 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
 }
 
 
-typealias GfsMixer = GenericReaderMixer<GfsReader>
+struct GfsMixer: GenericReaderMixer {
+    let reader: [GfsReader]
+}
 
 extension GfsMixer {
     func getDaily(variable: GfsDailyWeatherVariable, params: GfsQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {

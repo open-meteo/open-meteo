@@ -5,7 +5,15 @@ protocol GenericVariableMixable {
     var requiresOffsetCorrectionForMixing: Bool { get }
 }
 
+/// Mix differnet domains together, that offer the same or similar variable set
+protocol GenericReaderMixer {
+    associatedtype Reader: GenericReaderMixable
+    
+    var reader: [Reader] { get }
+    init(reader: [Reader])
+}
 
+/// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
 protocol GenericReaderMixable {
     associatedtype MixingVar: GenericVariableMixable
     associatedtype Domain
@@ -21,10 +29,7 @@ protocol GenericReaderMixable {
     init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws
 }
 
-
-struct GenericReaderMixer<Reader: GenericReaderMixable> {
-    let reader: [Reader]
-    
+extension GenericReaderMixer {   
     var modelLat: Float {
         reader.last!.modelLat
     }
@@ -39,12 +44,13 @@ struct GenericReaderMixer<Reader: GenericReaderMixable> {
     }
     
     public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        reader = try domains.compactMap {
+        let reader = try domains.compactMap {
             try Reader(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode)
         }
         guard !reader.isEmpty else {
             return nil
         }
+        self.init(reader: reader)
     }
     
     func prefetchData(variable: Reader.MixingVar, time: TimerangeDt) throws {
