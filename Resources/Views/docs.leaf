@@ -596,7 +596,7 @@
               <div class="col-md-6">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="auto" id="auto"
-                    name="models" selected>
+                    name="models" checked>
                   <label class="form-check-label" for="auto">
                     Best match
                   </label>
@@ -605,120 +605,119 @@
                   <input class="form-check-input" type="checkbox" value="icon_mix" id="icon_mix"
                     name="models">
                   <label class="form-check-label" for="icon_mix">
-                    ICON Mix
+                    DWD Icon Mix
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="icon_global" id="icon_global"
                     name="models">
                   <label class="form-check-label" for="icon_global">
-                    ICON Global
+                    DWD Icon Global
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="icon_eu" id="icon_eu"
                     name="models">
                   <label class="form-check-label" for="icon_eu">
-                    ICON EU
+                    DWD Icon EU
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="icon_d2"
                     id="icon_d2" name="models">
                   <label class="form-check-label" for="icon_d2">
-                    ICON D2
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="jma_mix"
-                    id="jma_mix" name="models">
-                  <label class="form-check-label" for="jma_mix">
-                    jma_mix
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="jma_msm"
-                    id="jma_msm" name="models">
-                  <label class="form-check-label" for="jma_msm">
-                    jma_msm
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="jms_gsm"
-                    id="jms_gsm" name="models">
-                  <label class="form-check-label" for="jms_gsm">
-                    jms_gsm
-                  </label>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gfs_mix"
-                    id="gfs_mix" name="models">
-                  <label class="form-check-label" for="gfs_mix">
-                    gfs_mix
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gfs_global"
-                    id="gfs_global" name="models">
-                  <label class="form-check-label" for="gfs_global">
-                    gfs_global
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gfs_hrrr"
-                    id="gfs_hrrr" name="models">
-                  <label class="form-check-label" for="gfs_hrrr">
-                    gfs_hrrr
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="meteofrance_mix"
-                    id="meteofrance_mix" name="models">
-                  <label class="form-check-label" for="meteofrance_mix">
-                    meteofrance_mix
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="meteofrance_arpege_world"
-                    id="meteofrance_arpege_world" name="models">
-                  <label class="form-check-label" for="meteofrance_arpege_world">
-                    meteofrance_arpege_world
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="meteofrance_arpege_europe"
-                    id="meteofrance_arpege_europe" name="models">
-                  <label class="form-check-label" for="meteofrance_arpege_europe">
-                    meteofrance_arpege_europe
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="meteofrance_arome_france"
-                    id="meteofrance_arome_france" name="models">
-                  <label class="form-check-label" for="meteofrance_arome_france">
-                    meteofrance_arome_france
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="meteofrance_arome_france_hd"
-                    id="meteofrance_arome_france_hd" name="models">
-                  <label class="form-check-label" for="meteofrance_arome_france_hd">
-                    meteofrance_arome_france_hd
+                    DWD Icon D2
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="ecmwf_ifs04"
                     id="ecmwf_ifs04" name="models">
                   <label class="form-check-label" for="ecmwf_ifs04">
-                    ecmwf_ifs04
+                    ECMWF IFS
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="gfs_mix"
+                    id="gfs_mix" name="models">
+                  <label class="form-check-label" for="gfs_mix">
+                    GFS Mix
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="gfs_global"
+                    id="gfs_global" name="models">
+                  <label class="form-check-label" for="gfs_global">
+                    GFS Global
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="gfs_hrrr"
+                    id="gfs_hrrr" name="models">
+                  <label class="form-check-label" for="gfs_hrrr">
+                    GFS HRRR
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="meteofrance_mix"
+                    id="meteofrance_mix" name="models">
+                  <label class="form-check-label" for="meteofrance_mix">
+                    MeteoFrance Mix
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="meteofrance_arpege_world"
+                    id="meteofrance_arpege_world" name="models">
+                  <label class="form-check-label" for="meteofrance_arpege_world">
+                    MeteoFrance Arpege World
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="meteofrance_arpege_europe"
+                    id="meteofrance_arpege_europe" name="models">
+                  <label class="form-check-label" for="meteofrance_arpege_europe">
+                    MeteoFrance Arpege Europe
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="meteofrance_arome_france"
+                    id="meteofrance_arome_france" name="models">
+                  <label class="form-check-label" for="meteofrance_arome_france">
+                    MeteoFrance Arome France
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="meteofrance_arome_france_hd"
+                    id="meteofrance_arome_france_hd" name="models">
+                  <label class="form-check-label" for="meteofrance_arome_france_hd">
+                    MeteoFrance Arome France HD
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="jma_mix"
+                    id="jma_mix" name="models">
+                  <label class="form-check-label" for="jma_mix">
+                    JMA Mix
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="jma_msm"
+                    id="jma_msm" name="models">
+                  <label class="form-check-label" for="jma_msm">
+                    JMA MSM
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="jms_gsm"
+                    id="jms_gsm" name="models">
+                  <label class="form-check-label" for="jms_gsm">
+                    JMA GSM
                   </label>
                 </div>
               </div>
               <div class="col-md-12">
-                <small class="text-muted">Note: Solar radiation is averaged over the past hour. Use
-                  <mark>instant</mark> for radiation at the indicated time.</small>
+                <small class="text-muted">Note: <mark>Best Match</mark> will provide the best forecast for any given location. Not all weather models offer all variables.</small>
               </div>
             </div>
           </div>
