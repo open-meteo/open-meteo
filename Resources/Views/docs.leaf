@@ -987,7 +987,7 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>The Open-Meteo weather forecast APIs use weather models from multiple national weather providers. For each location worldwide, the best models will be combined to provide the best possible forecast.</p>
+    <p>Open-Meteo weather forecast APIs use weather models from multiple national weather providers. For each location worldwide, the best models will be combined to provide the best possible forecast.</p>
     <p>Weather models cover different geographic areas at diffent resolution with different weather variables. Depending on the model not all data is available. With the drop down <mark>Weather models</mark> (just below the hourly variables), you can select and compare individual weather models.</p>
     <div class="table-responsive">
       <table class="table">
