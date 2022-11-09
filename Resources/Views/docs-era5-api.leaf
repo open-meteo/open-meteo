@@ -52,7 +52,7 @@
 
   <form id="api_form" method="get" action="https://archive-api.open-meteo.com/v1/era5">
     <div class="row py-3 px-0">
-      <h3>Select Coordinates or City</h3>
+      <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
         <div class="form-floating">
           <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="52.52">
@@ -151,7 +151,7 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h3>Specify Time Interval</h3>
+      <h2>Specify Time Interval</h2>
       <div class="col-md-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
@@ -171,7 +171,7 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h3>Hourly Weather Variables</h3>
+      <h2>Hourly Weather Variables</h2>
       <div class="col-md-3">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m" id="temperature_2m" name="hourly"
@@ -396,7 +396,7 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h3>Daily Weather Variables <small class="text-muted">(*)</small></h3>
+      <h2>Daily Weather Variables <small class="text-muted">(*)</small></h2>
       <div class="col-md-6">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max"
@@ -503,7 +503,7 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h3>Settings</h3>
+      <h2>Settings</h2>
       <div class="col-3">
         <div class="form-floating mb-3">
           <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="GMT">

@@ -53,7 +53,7 @@
 
   <form id="api_form" method="get" action="https://api.open-meteo.com/v1/ecmwf">
     <div class="row py-3 px-0">
-      <h3>Select Coordinates or City</h3>
+      <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
         <div class="form-floating">
           <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="52.52">
@@ -151,7 +151,7 @@
       </div>
     </div>
     <div class="row py-3 px-0">
-      <h3>3-Hourly Weather Variables</h3>
+      <h2>3-Hourly Weather Variables</h2>
       <div class="col-md-3">
 
         <div class="form-check">
@@ -295,7 +295,7 @@
 
 
     <div class="row py-3 px-0">
-      <h3>Settings</h3>
+      <h2>Settings</h2>
       <div class="col-3">
         <div class="form-floating mb-3">
           <select class="form-select" name="temperature_unit" id="temperature_unit" aria-label="Temperature Unit"
