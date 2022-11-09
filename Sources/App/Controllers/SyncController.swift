@@ -215,7 +215,7 @@ struct SyncCommand: AsyncCommandFix {
             var request = ClientRequest(method: .GET, url: URI("\(server)sync/list"))
             let params = SyncController.ListParams(filenames: variables, directories: domains, newerThan: newerThan, apikey: apikey)
             try request.query.encode(params)
-            let response = try await curl.downloadInMemoryAsync(url: request.url.string, client: context.dedicatedHttpClient, minSize: nil)
+            let response = try await curl.downloadInMemoryAsync(url: request.url.string, client: context.application.dedicatedHttpClient, minSize: nil)
             let decoder = try ContentConfiguration.global.requireDecoder(for: .jsonAPI)
             let remotes = try decoder.decode([SyncFileAttributes].self, from: response, headers: [:])
             logger.info("Found \(remotes.count) remote files (\(remotes.fileSize))")
@@ -237,7 +237,7 @@ struct SyncCommand: AsyncCommandFix {
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                 // TODO sha256 hash integration check
                 
-                try await curl.download(url: client.url.string, toFile: localFileTemp, client: context.dedicatedHttpClient)
+                try await curl.download(url: client.url.string, toFile: localFileTemp, client: context.application.dedicatedHttpClient)
                 try FileManager.default.moveFileOverwrite(from: localFileTemp, to: localFile)
             }
             
