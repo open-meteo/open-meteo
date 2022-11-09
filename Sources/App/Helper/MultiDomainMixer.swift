@@ -97,13 +97,13 @@ enum MultiDomains: String, Codable, CaseIterable {
         case .meteofrance_arome_france_hd:
             return try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .jma_mix:
-            return try JmaMixer(domains: [.msm, .gsm], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try JmaMixer(domains: [.gsm, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .jma_msm:
             return try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .jms_gsm:
             return try JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .icon_mix:
-            return try IconMixer(domains: [.iconD2, .iconEu, .icon], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try IconMixer(domains: [.icon, .iconEu, .iconD2], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .icon_global:
             return try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .icon_eu:
