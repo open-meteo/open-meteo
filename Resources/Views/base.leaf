@@ -63,7 +63,7 @@
                     class="badge bg-secondary">New</span></a></li>
               <li><a class="dropdown-item #if(title == "DWD ICON API"): active #endif" href="/en/docs/dwd-api">DWD
                   API</a></li>
-              <li class="debug-hidden"><a class="dropdown-item #if(title == "JMA API"): active #endif"
+              <li><a class="dropdown-item #if(title == "JMA API"): active #endif"
                     href="/en/docs/jma-api">JMA API</a></li>
             </ul>
           </li>
