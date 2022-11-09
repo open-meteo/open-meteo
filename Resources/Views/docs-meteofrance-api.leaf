@@ -1129,7 +1129,7 @@
             <td>Preceding hour sum</td>
             <td>mm (inch)</td>
             <td>ET₀ Reference Evapotranspiration of a well watered grass field. Based on <a
-                href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations<a> ET₀
+                href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations</a> ET₀
                   is calculated from temperature, wind speed, humidity and solar radiation. Unlimited soil water is
                   assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
           </tr>

@@ -255,6 +255,12 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="visibility" id="visibility" name="hourly">
+          <label class="form-check-label" for="visibility">
+            Visibility
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="evapotranspiration" id="evapotranspiration"
             name="hourly">
           <label class="form-check-label" for="evapotranspiration">
@@ -533,8 +539,7 @@
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-pressure-levels" aria-expanded="false" aria-controls="collapse-pressure-levels">
               Pressure Levels&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
-                data-count-checkboxes-of="#collapse-pressure-levels">0/x</span>&nbsp;<span
-                class="badge bg-primary">New</span>
+                data-count-checkboxes-of="#collapse-pressure-levels">0/x</span>
             </button>
           </h2>
           <div id="collapse-pressure-levels" class="accordion-collapse collapse"
@@ -587,7 +592,8 @@
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-models" aria-expanded="false" aria-controls="collapse-models">
               Weather models&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
-                data-count-checkboxes-of="#collapse-models">0/x</span>
+                data-count-checkboxes-of="#collapse-models">0/x</span>&nbsp;<span
+                class="badge bg-primary">New</span>
             </button>
           </h2>
           <div id="collapse-models" class="accordion-collapse collapse"
@@ -717,7 +723,7 @@
                 </div>
               </div>
               <div class="col-md-12">
-                <small class="text-muted">Note: <mark>Best Match</mark> will provide the best forecast for any given location. Not all weather models offer all variables.</small>
+                <small class="text-muted">Note: <mark>Best Match</mark> will provide the best forecast for any given location worldwide. <mark>Mix</mark> combines all models from a given provider.</small>
               </div>
             </div>
           </div>
@@ -980,7 +986,67 @@
   </div>
 
   <div class="col-12 py-5">
-    <h2 id="api-documentation">API Documentation</h2>
+    <h2 id="data-sources">Data Source</h2>
+    <p>The Open-Meteo weather forecast APIs use weather models from multiple national weather providers. For each location worldwide, the best models will be combined to provide the best possible forecast.</p>
+    <p>Weather models cover different geographic areas at diffent resolution with different weather variables. Depending on the model not all data is available. With the drop down <mark>Weather models</mark> (just below the hourly variables), you can select and compare individual weather models.</p>
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Weather Model</th>
+            <th scope="col">National Weather Provider</th>
+            <th scope="col">Origin Country</th>
+            <th scope="col">Resolution</th>
+            <th scope="col">Forecast Length</th>
+            <th scope="col">Update frequency</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row"><a href="/en/docs/dwd-api">DWD ICON</a></th>
+            <td>Deutscher Wetterdienst (DWD)</td>
+            <td>Germany</td>
+            <td>2 - 11 km</td>
+            <td>7.5 days</td>
+            <td>Every 3 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="/en/docs/gfs-api">GFS</a></th>
+            <td>NOAA</td>
+            <td>United States</td>
+            <td>3 - 25 km</td>
+            <td>16 days</td>
+            <td>Every hour</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="/en/docs/meteofrance-api">Arpege & Arome</a></th>
+            <td>MeteoFrance</td>
+            <td>France</td>
+            <td>1 - 40 km</td>
+            <td>4 days</td>
+            <td>Every 6 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="/en/docs/ecmwf-api">IFS</a></th>
+            <td>ECMWF</td>
+            <td>European Union</td>
+            <td>44 km</td>
+            <td>7 days</td>
+            <td>Every 6 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="/en/docs/jma-api">JMA</a></th>
+            <td>JMA</td>
+            <td>Japan</td>
+            <td>5 - 55 km</td>
+            <td>11 days</td>
+            <td>Every 3 hours</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="api-documentation" class="mt-5">API Documentation</h2>
     <p>The API endpoint <mark>/v1/forecast</mark> accepts a geographical coordinate, a list of weather variables and
       responds with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours.
       All URL parameters are listed below:</p>
@@ -1084,6 +1150,14 @@
             <td></td>
             <td>The time interval to get weather data. A day must be specified as an ISO8601 date (e.g.
               <mark>2022-06-30</mark>).
+            </td>
+          </tr>
+          <tr>
+            <th scope="row">models</th>
+            <td>String array</td>
+            <td>No</td>
+            <td><mark>auto</mark></td>
+            <td>Manually select one or more weahter models. Per default, the best suitable weather models will be combined.
             </td>
           </tr>
         </tbody>
@@ -1222,7 +1296,7 @@
             <td>Preceding hour sum</td>
             <td>mm (inch)</td>
             <td>ET₀ Reference Evapotranspiration of a well watered grass field. Based on <a
-                href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations<a> ET₀
+                href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations</a> ET₀
                   is calculated from temperature, wind speed, humidity and solar radiation. Unlimited soil water is
                   assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
           </tr>
@@ -1269,6 +1343,12 @@
             <td>Instant</td>
             <td>meters</td>
             <td>Altitude above sea level of the 0°C level</td>
+          </tr>
+          <tr>
+            <th scope="row">visibility</th>
+            <td>Instant</td>
+            <td>meters</td>
+            <td>Viewing distance in meters. Influenced by low clouds, humidity and aerosols. Maximum visibility is approximately 24 km.</td>
           </tr>
           <tr>
             <th scope="row">

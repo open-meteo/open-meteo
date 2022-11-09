@@ -38,7 +38,7 @@ public struct ForecastapiController: RouteCollection {
             
             let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 8)
             let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 16, allowedRange: allowedRange)
             
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
