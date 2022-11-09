@@ -118,7 +118,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
                 let dir = meta.isMultiLevel ? remoteDirAdditional : remoteDir
                 let remoteFile = "\(dir)z_cams_c_ecmf_\(dateRun)0000_prod_fc_\(levelType)_\(hour.zeroPadded(len: 3))_\(meta.gribname).nc"
                 let tempNc = "\(domain.downloadDirectory)/temp.nc"
-                try await curl.download(url: remoteFile, toFile: tempNc, client: application.http.client.shared)
+                try await curl.download(url: remoteFile, toFile: tempNc, client: application.dedicatedHttpClient)
                 
                 guard let ncFile = try NetCDF.open(path: tempNc, allowUpdate: false) else {
                     fatalError("Could not open nc file for \(variable)")

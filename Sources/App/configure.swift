@@ -12,6 +12,34 @@ struct OpenMeteo {
     }()
 }
 
+extension Application {
+    fileprivate struct HttpClientKey: StorageKey, LockKey {
+        typealias Value = HTTPClient
+    }
+    
+    /// Get dedicated HTTPClient instance with a dedicated threadpool
+    var dedicatedHttpClient: HTTPClient {
+        let lock = self.locks.lock(for: HttpClientKey.self)
+        lock.lock()
+        defer { lock.unlock() }
+        if let existing = self.storage[HttpClientKey.self] {
+            return existing
+        }
+        // set timers very high, to use own timers
+        let configuration = HTTPClient.Configuration(
+            timeout: .init(connect: .seconds(60), read: .seconds(5*60)),
+            connectionPool: .init(idleTimeout: .seconds(30*60)))
+        
+        let new = HTTPClient(
+            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 2)),
+            configuration: configuration,
+            backgroundActivityLogger: logger)
+        self.storage.set(HttpClientKey.self, to: new) {
+            try $0.syncShutdown()
+        }
+        return new
+    }
+}
 
 // configures your application
 public func configure(_ app: Application) throws {

@@ -109,7 +109,7 @@ struct GfsDownload: AsyncCommandFix {
         var landmask: Array2D? = nil
         let curl = Curl(logger: logger)
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
-        try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.http.client.shared) { variables, messages in
+        try await curl.downloadIndexedGrib(url: url, variables: ElevationVariable.allCases, client: application.dedicatedHttpClient) { variables, messages in
             for (variable, message) in zip(variables, messages) {
                 try grib2d.load(message: message)
                 if isGlobal {
@@ -159,11 +159,6 @@ struct GfsDownload: AsyncCommandFix {
         
         let variablesHour0 = variables.filter({!$0.variable.skipHour0})
         
-        let client = HTTPClient(
-            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 2)),
-            configuration: application.http.client.configuration,
-            backgroundActivityLogger: logger)
-        
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
             /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
@@ -174,7 +169,7 @@ struct GfsDownload: AsyncCommandFix {
             }
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
             
-            try await curl.downloadIndexedGrib(url: url, variables: variables, client: client) { variables, messages in
+            try await curl.downloadIndexedGrib(url: url, variables: variables, client: application.dedicatedHttpClient) { variables, messages in
                 logger.info("Compressing and writing data")
                 for (variable, message) in zip(variables, messages) {
                     try grib2d.load(message: message)

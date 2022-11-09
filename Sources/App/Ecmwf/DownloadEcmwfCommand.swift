@@ -84,7 +84,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-12h-oper-fc.grib2
             let url = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
             
-            let grib = try await curl.downloadGrib(url: url, client: application.http.client.shared)
+            let grib = try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient)
             
             logger.info("Compressing and writing data")
             

@@ -105,7 +105,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         let terrainUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/terrain.grib2"
-        for message in try await curl.downloadGrib(url: terrainUrl, client: application.http.client.shared).messages {
+        for message in try await curl.downloadGrib(url: terrainUrl, client: application.dedicatedHttpClient).messages {
             try grib2d.load(message: message)
             if domain.isGlobal {
                 grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -117,7 +117,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         }
         
         let landmaskUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/landmask.grib2"
-        for message in try await curl.downloadGrib(url: landmaskUrl, client: application.http.client.shared).messages {
+        for message in try await curl.downloadGrib(url: landmaskUrl, client: application.dedicatedHttpClient).messages {
             try grib2d.load(message: message)
             if domain.isGlobal {
                 grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -181,7 +181,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
                 let url = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/v1/\(run.iso8601_YYYY_MM_dd)/\(run.hour.zeroPadded(len: 2))/\(package)/\(fileTime.file).grib2"
                 
-                try await curl.downloadIndexedGribSequential(url: url, variables: vars, extension: ".inv", client: application.http.client.shared) { (variable, message) in
+                try await curl.downloadIndexedGribSequential(url: url, variables: vars, extension: ".inv", client: application.dedicatedHttpClient) { (variable, message) in
                     try grib2d.load(message: message)
                     if domain.isGlobal {
                         grib2d.array.shift180LongitudeAndFlipLatitude()

@@ -104,7 +104,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger, client: application.http.client.shared)
+        let cdo = try await CdoHelper(domain: domain, logger: logger, client: application.dedicatedHttpClient)
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
@@ -123,7 +123,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             try await curl.downloadBz2Decompress(
                 url: file,
                 toFile: "\(downloadDirectory)time-invariant_HSURF.grib2",
-                client: application.http.client.shared
+                client: application.dedicatedHttpClient
             )
         
             // land fraction
@@ -136,7 +136,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             try await curl.downloadBz2Decompress(
                 url: file2,
                 toFile: "\(downloadDirectory)time-invariant_FR_LAND.grib2",
-                client: application.http.client.shared
+                client: application.dedicatedHttpClient
             )
         }
         
@@ -164,7 +164,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger, client: application.http.client.shared)
+        let cdo = try await CdoHelper(domain: domain, logger: logger, client: application.dedicatedHttpClient)
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
@@ -205,7 +205,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     try await curl.downloadBz2Decompress(
                         url: url,
                         toFile: gribFile,
-                        client: application.http.client.shared
+                        client: application.dedicatedHttpClient
                     )
                     // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
                     // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
@@ -213,7 +213,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     try FileManager.default.removeItem(atPath: gribFile)
                 } else {
                     // Use async in-memory download and decoding -> 4 times faster, but cannot regrid icosahedral data
-                    let message = try await curl.downloadBz2Grib(url: url, client: application.http.client.shared).messages[0]
+                    let message = try await curl.downloadBz2Grib(url: url, client: application.dedicatedHttpClient).messages[0]
                     try grib2d.load(message: message)
                     data = grib2d.array.data
                 }
@@ -426,13 +426,6 @@ protocol AsyncCommandFix: Command {
 extension AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) throws {
         let promise = context.application.eventLoopGroup.next().makePromise(of: Void.self)
-        
-        // set timers very high, to use own timers
-        context.application.http.client.configuration.connectionPool.idleTimeout = .seconds(3600 * 24)
-        context.application.http.client.configuration.timeout.connect = .seconds(3600 * 24)
-        context.application.http.client.configuration.timeout.read = .seconds(3600 * 24)
-        context.application.http.client.configuration.httpVersion = .http1Only
-        
         promise.completeWithTask {
             try await run(using: context, signature: signature)
         }

@@ -102,7 +102,7 @@ struct SeasonalForecastDownload: AsyncCommandFix {
                     continue
                 }
                 
-                try await curl.download(url: url, toFile: fileDest, client: application.http.client.shared)
+                try await curl.download(url: url, toFile: fileDest, client: application.dedicatedHttpClient)
             }
         }
     }
