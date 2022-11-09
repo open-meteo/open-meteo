@@ -196,6 +196,7 @@ struct MultiDomainMixer {
     
     func get(variable: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit {
         /// Last reader return highest resolution data
+        /// TODO: fix
         guard let highestResolutionData = try reader.last?.get(mixed: variable, time: time) else {
             fatalError()
         }
