@@ -1,8 +1,120 @@
 import Foundation
 import Vapor
 
+/// Define all available surface weather variables
+enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
+    case temperature_2m
+    case cloudcover
+    case cloudcover_low
+    case cloudcover_mid
+    case cloudcover_high
+    case pressure_msl
+    case relativehumidity_2m
+    case precipitation
+    case weathercode
+    case temperature_80m
+    case temperature_120m
+    case temperature_180m
+    case soil_temperature_0cm
+    case soil_temperature_6cm
+    case soil_temperature_18cm
+    case soil_temperature_54cm
+    case soil_moisture_0_1cm
+    case soil_moisture_1_3cm
+    case soil_moisture_3_9cm
+    case soil_moisture_9_27cm
+    case soil_moisture_27_81cm
+    case snow_depth
+    case sensible_heatflux
+    case latent_heatflux
+    case showers
+    case rain
+    case snowfall_convective_water_equivalent
+    case snowfall_water_equivalent
+    case windgusts_10m
+    case freezinglevel_height
+    case dewpoint_2m
+    case diffuse_radiation
+    case direct_radiation
+    case apparent_temperature
+    case windspeed_10m
+    case winddirection_10m
+    case windspeed_80m
+    case winddirection_80m
+    case windspeed_120m
+    case winddirection_120m
+    case windspeed_180m
+    case winddirection_180m
+    case direct_normal_irradiance
+    case evapotranspiration
+    case et0_fao_evapotranspiration
+    case vapor_pressure_deficit
+    case shortwave_radiation
+    case snow_height
+    case snowfall
+    case surface_pressure
+    case terrestrial_radiation
+    case terrestrial_radiation_instant
+    case shortwave_radiation_instant
+    case diffuse_radiation_instant
+    case direct_radiation_instant
+    case direct_normal_irradiance_instant
+    case visibility
+    
+    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
+    var requiresOffsetCorrectionForMixing: Bool {
+        switch self {
+        case .soil_moisture_0_1cm: return true
+        case .soil_moisture_1_3cm: return true
+        case .soil_moisture_3_9cm: return true
+        case .soil_moisture_9_27cm: return true
+        case .soil_moisture_27_81cm: return true
+        case .snow_depth: return true
+        default: return false
+        }
+    }
+}
 
-enum MultiDomains: String {
+/// Available pressure level variables
+enum ForecastPressureVariable: String, Codable, GenericVariableMixable {
+    case temperature
+    case geopotential_height
+    case relativehumidity
+    case windspeed
+    case winddirection
+    case dewpoint
+    case cloudcover
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable, ForecastPressureVariable>
+
+/// Available daily aggregations
+enum ForecastVariableDaily: String, Codable {
+    case temperature_2m_max
+    case temperature_2m_min
+    case apparent_temperature_max
+    case apparent_temperature_min
+    case precipitation_sum
+    case snowfall_sum
+    case rain_sum
+    case showers_sum
+    case weathercode
+    case shortwave_radiation_sum
+    case windspeed_10m_max
+    case windgusts_10m_max
+    case winddirection_10m_dominant
+    case precipitation_hours
+    case sunrise
+    case sunset
+    case et0_fao_evapotranspiration
+}
+
+
+enum MultiDomains: String, Codable, CaseIterable {
     case auto
 
     case gfs_combined
@@ -30,6 +142,63 @@ enum MultiDomains: String {
         
     }
 }
+
+struct MultiDomainReader: GenericReaderMixable {
+    typealias MixingVar = ForecastVariable
+    
+    typealias Domain = MultiDomains
+    
+    var modelLat: Float
+    
+    var modelLon: Float
+    
+    var targetElevation: Float
+    
+    var modelDtSeconds: Int
+    
+    let domain: MultiDomains
+    
+    func get(variable: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit {
+        <#code#>
+    }
+    
+    func prefetchData(variable: ForecastVariable, time: TimerangeDt) throws {
+        <#code#>
+    }
+    
+    init?(domain: MultiDomains, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        <#code#>
+    }
+}
+
+extension GfsVariableCombined {
+    static func fromForecastVariable(variable: ForecastVariable) -> Self? {
+        return Self.init(rawValue: variable.rawValue)
+    }
+}
+
+fileprivate extension GenericReaderMixer where Reader.MixingVar: RawRepresentable, Reader.MixingVar.RawValue == String {
+    func get(mixed: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit? {
+        guard let v = Reader.MixingVar(rawValue: mixed.rawValue) else {
+            return nil
+        }
+        return try self.get(variable: v, time: time)
+    }
+    
+    func prefetchData(mixed: ForecastVariable, time: TimerangeDt) throws {
+        guard let v = Reader.MixingVar(rawValue: mixed.rawValue) else {
+            return
+        }
+        try self.prefetchData(variable: v, time: time)
+    }
+}
+
+
+struct MultiDomainMixer {
+    let reader: [any GenericReaderMixer]
+}
+
+
 
 public struct ForecastapiController: RouteCollection {
     public func boot(routes: RoutesBuilder) throws {
@@ -72,7 +241,7 @@ public struct ForecastapiController: RouteCollection {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+            guard let reader = try MultiDomainMixer(domains: MultiDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
@@ -89,7 +258,7 @@ public struct ForecastapiController: RouteCollection {
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).conertAndRound(params: params).toApi(name: variable.name)
+                    let d = try reader.get(variable: variable, time: hourlyTime).conertAndRound(params: params).toApi(name: variable.rawValue)
                     assert(hourlyTime.count == d.data.count)
                     res.append(d)
                 }
@@ -100,13 +269,13 @@ public struct ForecastapiController: RouteCollection {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+                guard let reader = try MultiDomainMixer(domains: MultiDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                let temperature = try reader.get(raw: .temperature_2m, time: time).conertAndRound(params: params)
-                let winddirection = try reader.get(derived: .winddirection_10m, time: time).conertAndRound(params: params)
-                let windspeed = try reader.get(derived: .windspeed_10m, time: time).conertAndRound(params: params)
-                let weathercode = try reader.get(raw: .weathercode, time: time).conertAndRound(params: params)
+                let temperature = try reader.get(variable: .surface(.temperature_2m), time: time).conertAndRound(params: params)
+                let winddirection = try reader.get(variable: .surface(.winddirection_10m), time: time).conertAndRound(params: params)
+                let windspeed = try reader.get(variable: .surface(.windspeed_10m), time: time).conertAndRound(params: params)
+                let weathercode = try reader.get(variable: .surface(.weathercode), time: time).conertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],
@@ -165,3 +334,40 @@ public struct ForecastapiController: RouteCollection {
     }
 }
 
+
+struct ForecastapiQuery: Content, QueryWithStartEndDateTimeZone {
+    let latitude: Float
+    let longitude: Float
+    let hourly: [ForecastVariable]?
+    let daily: [ForecastVariableDaily]?
+    let current_weather: Bool?
+    let elevation: Float?
+    let timezone: String?
+    let temperature_unit: TemperatureUnit?
+    let windspeed_unit: WindspeedUnit?
+    let precipitation_unit: PrecipitationUnit?
+    let timeformat: Timeformat?
+    let past_days: Int?
+    let format: ForecastResultFormat?
+    
+    /// iso starting date `2022-02-01`
+    let start_date: IsoDate?
+    /// included end date `2022-06-01`
+    let end_date: IsoDate?
+    
+    func validate() throws {
+        if latitude > 90 || latitude < -90 || latitude.isNaN {
+            throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
+        }
+        if longitude > 180 || longitude < -180 || longitude.isNaN {
+            throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
+        }
+        if daily?.count ?? 0 > 0 && timezone == nil {
+            throw ForecastapiError.timezoneRequired
+        }
+    }
+    
+    var timeformatOrDefault: Timeformat {
+        return timeformat ?? .iso8601
+    }
+}
