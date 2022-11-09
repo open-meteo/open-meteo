@@ -4,7 +4,7 @@
 #endexport
 #export("content"):
 <div class="px-4 py-5 text-center text-white" style="
-            background-image: url('https://assets.open-meteo.com/images/features_background.jpeg');
+            background-image: url('https://assets.open-meteo.com/images/features_background.webp');
             background-size: cover;
             background-position: center;
             height: 500px;
@@ -148,7 +148,7 @@
   <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-lg-3 g-4 py-5">
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Temperature</h4>
+        <h3 class="fw-bold mb-0">Temperature</h3>
         <p>Temperature forecasts from weather models are comparable to weather station measurements at 2 meter above
           ground. The modeled temperature is an average over a small area (2-11 km). Local effect like heat radiation
           from streets and buildings are not represented.</p>
@@ -156,14 +156,14 @@
     </div>
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Apparent temperature</h4>
+        <h3 class="fw-bold mb-0">Apparent temperature</h3>
         <p>High humidity, wind, and direct sunlight influence how temperature is perceived. Apparent temperature is a
           better indicator how temperature is felt for humans.</p>
       </div>
     </div>
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Humidity</h4>
+        <h3 class="fw-bold mb-0">Humidity</h3>
         <p>Air moisture is given as relative humidity and dew point temperature.</p>
         <p>Humidity can be very local as well. Humidity is averaged within the weather model resolution of 2 to 11 km.
         </p>
@@ -171,21 +171,21 @@
     </div>
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Wind</h4>
+        <h3 class="fw-bold mb-0">Wind</h3>
         <p>Wind is comparable to wind speed measurements at 10 meter above ground. It is averaged over an area and over
           one hour. Wind gusts are the maximum wind speeds within one hour.</p>
       </div>
     </div>
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Precipitation</h4>
+        <h3 class="fw-bold mb-0">Precipitation</h3>
         <p>Rain, showers and snowfall form total precipitation. Showers can be very local and hard to forecast. With 3
           hourly weather models runs, observations from rain radars constantly correct our forecast.</p>
       </div>
     </div>
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Clouds</h4>
+        <h3 class="fw-bold mb-0">Clouds</h3>
         <p>Clouds are calculated as a percentage of area covered with clouds on different altitude levels. Low level
           clouds covering 80% or more are perceived as overcast. While high level cirrus clouds do not affect sunshine
           significantly.</p>
@@ -193,14 +193,14 @@
     </div>
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Pressure</h4>
+        <h3 class="fw-bold mb-0">Pressure</h3>
         <p>Atmospheric pressure is given in pascal at any given location. Additionally, the pressure reduced to mean sea
           level (msl) can be used to better compare pressure to the actual weather condition.</p>
       </div>
     </div>
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Weather interpretation</h4>
+        <h3 class="fw-bold mb-0">Weather interpretation</h3>
         <p>All weather variables like clouds, fog, rain, or thunderstorm likelihood are combined to an interpreted
           weather condition code. Codes follow WMO criteria including codes for fair weather, cloudy, overcast, drizzle,
           rain, shower, snow, and thunderstorms.</p>
@@ -208,7 +208,7 @@
     </div>
     <div class="col d-flex align-items-start">
       <div>
-        <h4 class="fw-bold mb-0">Many more</h4>
+        <h3 class="fw-bold mb-0">Many more</h3>
         <p>... like snow depth, sensible &#x26; latent heat flux, evapotranspiration, freezing level height (0°C
           altitude), direct, diffuse and total solar radiation, CAPE, TKE, lifted index, air mass, vapor pressure with
           deficit.</p>
