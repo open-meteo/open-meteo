@@ -44,7 +44,7 @@
 <div class="container px-4 py-0" id="featured-3">
   <form id="api_form" method="get" action="https://api.open-meteo.com/v1/dwd-icon">
     <div class="row py-3 px-0">
-      <h3>Select Coordinates or City</h3>
+      <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
         <div class="form-floating">
           <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="52.52">
@@ -142,7 +142,7 @@
       </div>
     </div>
     <div class="row py-3 px-0">
-      <h3>Hourly Weather Variables</h3>
+      <h2>Hourly Weather Variables</h2>
       <div class="col-md-3">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m" id="temperature_2m" name="hourly"
@@ -584,7 +584,7 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h3>Daily Weather Variables <small class="text-muted">(*)</small></h3>
+      <h2>Daily Weather Variables <small class="text-muted">(*)</small></h2>
       <div class="col-md-6">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode_daily" name="daily">
@@ -703,7 +703,7 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h3>Settings</h3>
+      <h2>Settings</h2>
       <div class="col-12 pb-3">
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="current_weather" name="current_weather" value="true">

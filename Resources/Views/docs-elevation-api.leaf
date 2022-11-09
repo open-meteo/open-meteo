@@ -47,7 +47,7 @@
 
   <form id="elevation_form" method="get" target="container" action="https://api.open-meteo.com/v1/elevation">
     <div class="row py-3 px-0">
-      <h3>Select Coordinates or City</h3>
+      <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
         <div class="form-floating">
           <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="52.52">

@@ -44,7 +44,7 @@
   <form id="geocoding_form" method="get" action2="http://127.0.0.1:8912/v1/search"
     action="https://geocoding-api.open-meteo.com/v1/search">
     <div class="row py-3 px-0">
-      <h3>Search for cities or postal code</h3>
+      <h2>Search for cities or postal code</h2>
       <div class="col-md-3">
         <div class="form-floating">
           <input type="text" class="form-control" name="name" id="name" value="Berlin">
