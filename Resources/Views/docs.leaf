@@ -988,7 +988,7 @@
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
     <p>Open-Meteo weather forecast APIs use weather models from multiple national weather providers. For each location worldwide, the best models will be combined to provide the best possible forecast.</p>
-    <p>Weather models cover different geographic areas at diffent resolution with different weather variables. Depending on the model, not all data is available. With the drop down <mark>Weather models</mark> (just below the hourly variables), you can select and compare individual weather models.</p>
+    <p>Weather models cover different geographic areas at diffent resolutions and provide different weather variables. Depending on the model, not all data is available. With the drop down <mark>Weather models</mark> (just below the hourly variables), you can select and compare individual weather models.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -1003,7 +1003,7 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row"><a href="/en/docs/dwd-api">DWD ICON</a></th>
+            <th scope="row"><a href="/en/docs/dwd-api">ICON</a></th>
             <td>Deutscher Wetterdienst (DWD)</td>
             <td>Germany</td>
             <td>2 - 11 km</td>
