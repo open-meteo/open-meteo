@@ -116,7 +116,7 @@ extension VariableOrDerived: GenericVariableMixable where Raw: GenericVariableMi
 }
 
 
-fileprivate extension Array where Element == Float {
+extension Array where Element == Float {
     mutating func integrateIfNaN(_ other: [Float]) {
         for x in other.indices {
             if other[x].isNaN || !self[x].isNaN {

@@ -225,6 +225,8 @@ typealias JmaVariableDerived = SurfaceAndPressureVariable<JmaVariableDerivedSurf
 typealias JmaVariableCombined = VariableOrDerived<JmaVariable, JmaVariableDerived>
 
 struct JmaReader: GenericReaderDerivedSimple, GenericReaderMixable {
+    typealias MixingVar = JmaVariableCombined
+    
     typealias Domain = JmaDomain
     
     typealias Variable = JmaVariable

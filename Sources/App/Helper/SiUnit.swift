@@ -98,7 +98,7 @@ struct DataAndUnit {
         self.unit = unit
     }
     
-    func conertAndRound(params: ForecastapiQuery) -> DataAndUnit {
+    func conertAndRound(params: ForecastApiQuery) -> DataAndUnit {
         return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
     }
     
