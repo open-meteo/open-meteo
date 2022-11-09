@@ -43,7 +43,7 @@ public struct ForecastapiController: RouteCollection {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            let domains = params.models ?? [.auto]
+            let domains = params.models ?? [.best_match]
             
             let readers = try domains.compactMap {
                 try MultiDomainMixer(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised)
@@ -86,7 +86,7 @@ public struct ForecastapiController: RouteCollection {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                guard let reader = try MultiDomainMixer(domain: MultiDomains.auto, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+                guard let reader = try MultiDomainMixer(domain: MultiDomains.best_match, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
                 let temperature = try reader.get(variable: .surface(.temperature_2m), time: time)!.conertAndRound(params: params)
@@ -329,7 +329,7 @@ extension MultiDomainMixer {
     
     
     func getDaily(variable: ForecastVariableDaily, params: ForecastApiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit? {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
+        let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
         case .temperature_2m_max:
             guard let data = try get(variable: .temperature_2m, time: time)?.conertAndRound(params: params) else {
@@ -424,7 +424,7 @@ extension MultiDomainMixer {
     
 
     func prefetchData(variables: [ForecastVariableDaily], time timeDaily: TimerangeDt) throws {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
+        let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             switch variable {
             case .temperature_2m_max:

@@ -11,7 +11,7 @@ import Vapor
  - default ICON + GFS
  */
 enum MultiDomains: String, Codable, CaseIterable {
-    case auto
+    case best_match
 
     case gfs_mix
     case gfs_global
@@ -38,7 +38,7 @@ enum MultiDomains: String, Codable, CaseIterable {
     /// Note: last reader has highes resolution data
     fileprivate func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixerForecast] {
         switch self {
-        case .auto:
+        case .best_match:
             guard let icon: GenericReaderMixerForecast = try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }

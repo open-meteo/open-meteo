@@ -601,9 +601,9 @@
             <div class="accordion-body row">
               <div class="col-md-6">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="auto" id="auto"
-                    name="models" checked>
-                  <label class="form-check-label" for="auto">
+                  <input class="form-check-input" type="checkbox" value="best_match" id="best_match"
+                    name="models">
+                  <label class="form-check-label" for="best_match">
                     Best match
                   </label>
                 </div>
@@ -723,7 +723,7 @@
                 </div>
               </div>
               <div class="col-md-12">
-                <small class="text-muted">Note: <mark>Best Match</mark> will provide the best forecast for any given location worldwide. <mark>Mix</mark> combines all models from a given provider.</small>
+                <small class="text-muted">Note: The default <mark>Best Match</mark> will provide the best forecast for any given location worldwide. <mark>Mix</mark> combines all models from a given provider.</small>
               </div>
             </div>
           </div>
@@ -988,7 +988,7 @@
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
     <p>Open-Meteo weather forecast APIs use weather models from multiple national weather providers. For each location worldwide, the best models will be combined to provide the best possible forecast.</p>
-    <p>Weather models cover different geographic areas at diffent resolution with different weather variables. Depending on the model not all data is available. With the drop down <mark>Weather models</mark> (just below the hourly variables), you can select and compare individual weather models.</p>
+    <p>Weather models cover different geographic areas at diffent resolution with different weather variables. Depending on the model, not all data is available. With the drop down <mark>Weather models</mark> (just below the hourly variables), you can select and compare individual weather models.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -1157,7 +1157,7 @@
             <td>String array</td>
             <td>No</td>
             <td><mark>auto</mark></td>
-            <td>Manually select one or more weahter models. Per default, the best suitable weather models will be combined.
+            <td>Manually select one or more weather models. Per default, the best suitable weather models will be combined.
             </td>
           </tr>
         </tbody>
