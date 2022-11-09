@@ -138,11 +138,17 @@ enum MultiDomains: String, Codable, CaseIterable {
     
     case ifs04
     
-    fileprivate func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReaderMixerForecast? {
-        fatalError()
+    fileprivate func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [GenericReaderMixerForecast] {
+        switch self {
+        case .auto:
+            return try IconMixer(domains: IconDomains.allCases, lat: lat, lon: lon, elevation: elevation, mode: mode)!.reader
+        default:
+            fatalError()
+        }
     }
 }
 
+/// Define functions to read data for mixing. Similar to `GenericReaderMixer` but with optional `get` and without any generic constraints
 fileprivate protocol GenericReaderMixerForecast {
     func get(mixed: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit?
     func prefetchData(mixed: ForecastVariable, time: TimerangeDt) throws -> Bool
@@ -153,17 +159,17 @@ fileprivate protocol GenericReaderMixerForecast {
     var modelDtSeconds: Int { get }
 }
 
-///
-extension GenericReaderMixer where Reader.MixingVar: RawRepresentable, Reader.MixingVar.RawValue == String {
+/// Conditional conformace just use RawValue (String) to resolve `ForecastVariable` to a specific type
+extension GenericReaderMixable where MixingVar: RawRepresentable, MixingVar.RawValue == String {
     func get(mixed: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit? {
-        guard let v = Reader.MixingVar(rawValue: mixed.rawValue) else {
+        guard let v = MixingVar(rawValue: mixed.rawValue) else {
             return nil
         }
         return try self.get(variable: v, time: time)
     }
     
     func prefetchData(mixed: ForecastVariable, time: TimerangeDt) throws -> Bool {
-        guard let v = Reader.MixingVar(rawValue: mixed.rawValue) else {
+        guard let v = MixingVar(rawValue: mixed.rawValue) else {
             return false
         }
         try self.prefetchData(variable: v, time: time)
@@ -172,13 +178,15 @@ extension GenericReaderMixer where Reader.MixingVar: RawRepresentable, Reader.Mi
 }
 
 
-extension GfsMixer: GenericReaderMixerForecast { }
-extension IconMixer: GenericReaderMixerForecast { }
-extension MeteoFranceMixer: GenericReaderMixerForecast { }
-extension JmaMixer: GenericReaderMixerForecast { }
+extension GfsReader: GenericReaderMixerForecast { }
+extension IconReader: GenericReaderMixerForecast { }
+extension MeteoFranceReader: GenericReaderMixerForecast { }
+extension JmaReader: GenericReaderMixerForecast { }
 
 fileprivate struct MultiDomainMixer {
     let reader: [any GenericReaderMixerForecast]
+    
+    let domain: MultiDomains
     
     var modelLat: Float {
         reader.last!.modelLat
@@ -193,13 +201,12 @@ fileprivate struct MultiDomainMixer {
         reader.first!.modelDtSeconds
     }
     
-    public init?(domains: [MultiDomains], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        let reader = try domains.compactMap {
-            try $0.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-        }
+    public init?(domain: MultiDomains, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        let reader = try domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
         guard !reader.isEmpty else {
             return nil
         }
+        self.domain = domain
         self.reader = reader
     }
     
@@ -434,7 +441,7 @@ public struct ForecastapiController: RouteCollection {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try MultiDomainMixer(domains: MultiDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+            guard let reader = try MultiDomainMixer(domain: MultiDomains.auto, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
@@ -462,7 +469,7 @@ public struct ForecastapiController: RouteCollection {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                guard let reader = try MultiDomainMixer(domains: MultiDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+                guard let reader = try MultiDomainMixer(domain: MultiDomains.auto, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
                 let temperature = try reader.get(variable: .surface(.temperature_2m), time: time).conertAndRound(params: params)
