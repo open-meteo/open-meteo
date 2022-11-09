@@ -175,8 +175,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
     }
 }
 
-
-extension GenericReader: GenericReaderMixable where Variable: GenericVariableMixing2 { }
+/// Allow GenericReader to be used in mixing directly
+extension GenericReader: GenericReaderMixable where Variable: GenericVariableMixable { }
 
 
 extension TimerangeDt {

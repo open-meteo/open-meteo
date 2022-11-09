@@ -187,7 +187,7 @@ enum MeteoFranceDailyWeatherVariable: String, Codable {
     case et0_fao_evapotranspiration
 }
 
-enum MeteoFranceVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixing2 {
+enum MeteoFranceVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumitidy_2m
     case dewpoint_2m
@@ -231,7 +231,7 @@ enum MeteoFrancePressureVariableDerivedType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct MeteoFrancePressureVariableDerived: PressureVariableRespresentable, GenericVariableMixing2 {
+struct MeteoFrancePressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: MeteoFrancePressureVariableDerivedType
     let level: Int
     

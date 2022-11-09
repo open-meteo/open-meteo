@@ -1,5 +1,5 @@
 /// Required additions to a MeteoFrance variable to make it downloadable
-protocol MeteoFranceVariableDownloadable: GenericVariableMixing {
+protocol MeteoFranceVariableDownloadable: GenericVariable {
     var interpolationType: Interpolation2StepType { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     func skipHour0(domain: MeteoFranceDomain) -> Bool

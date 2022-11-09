@@ -174,7 +174,7 @@ enum JmaDailyWeatherVariable: String, Codable {
     case et0_fao_evapotranspiration
 }
 
-enum JmaVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixing2 {
+enum JmaVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumitidy_2m
     case dewpoint_2m
@@ -211,7 +211,7 @@ enum JmaPressureVariableDerivedType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct JmaPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixing2 {
+struct JmaPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: JmaPressureVariableDerivedType
     let level: Int
     

@@ -98,18 +98,14 @@ extension SurfaceAndPressureVariable: Hashable, Equatable where Pressure: Hashab
     
 }
 
-extension SurfaceAndPressureVariable: GenericVariableMixing, GenericVariable where Surface: GenericVariableMixing, Pressure: GenericVariableMixing {
-    var asGenericVariable: GenericVariableMixing {
+extension SurfaceAndPressureVariable: GenericVariable where Surface: GenericVariable, Pressure: GenericVariable {
+    var asGenericVariable: GenericVariable {
         switch self {
         case .surface(let surface):
             return surface
         case .pressure(let pressure):
             return pressure
         }
-    }
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-        asGenericVariable.requiresOffsetCorrectionForMixing
     }
     
     var omFileName: String {
@@ -131,11 +127,9 @@ extension SurfaceAndPressureVariable: GenericVariableMixing, GenericVariable whe
     var isElevationCorrectable: Bool {
         asGenericVariable.isElevationCorrectable
     }
-    
-    
 }
 
-extension SurfaceAndPressureVariable: GenericVariableMixing2 where Surface: GenericVariableMixing2, Pressure: GenericVariableMixing2 {
+extension SurfaceAndPressureVariable: GenericVariableMixable where Surface: GenericVariableMixable, Pressure: GenericVariableMixable {
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
         case .surface(let surface):

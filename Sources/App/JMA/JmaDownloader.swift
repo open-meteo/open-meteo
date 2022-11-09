@@ -172,7 +172,7 @@ struct JmaDownload: AsyncCommandFix {
     }
 }
 
-protocol JmaVariableDownloadable: GenericVariableMixing {
+protocol JmaVariableDownloadable: GenericVariable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var skipHour0: Bool { get }
 }
@@ -231,7 +231,7 @@ extension GribMessage {
     }
 }
 
-enum JmaSurfaceVariable: String, CaseIterable, Codable, JmaVariableDownloadable, GenericVariableMixing2 {
+enum JmaSurfaceVariable: String, CaseIterable, Codable, JmaVariableDownloadable, GenericVariableMixable {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -378,7 +378,7 @@ enum JmaPressureVariableType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloadable, Hashable, GenericVariableMixing2 {
+struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: JmaPressureVariableType
     let level: Int
     

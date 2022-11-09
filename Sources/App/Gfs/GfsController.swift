@@ -191,7 +191,7 @@ enum GfsDailyWeatherVariable: String, Codable {
     case et0_fao_evapotranspiration
 }
 
-enum GfsVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixing2 {
+enum GfsVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumitidy_2m
     case dewpoint_2m
@@ -234,7 +234,7 @@ enum GfsPressureVariableDerivedType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct GfsPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixing2 {
+struct GfsPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: GfsPressureVariableDerivedType
     let level: Int
     

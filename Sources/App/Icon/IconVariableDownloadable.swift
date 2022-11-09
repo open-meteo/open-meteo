@@ -1,6 +1,6 @@
 
 /// Define functions to download surface and pressure level variables for ICON
-protocol IconVariableDownloadable: GenericVariableMixing {
+protocol IconVariableDownloadable: GenericVariable {
     var skipHour0: Bool { get }
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
