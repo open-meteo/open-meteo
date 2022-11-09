@@ -194,47 +194,53 @@ struct MultiDomainMixer {
         }
     }
     
-    func get(variable: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit {
-        /// Last reader return highest resolution data
-        /// TODO: fix
-        guard let highestResolutionData = try reader.last?.get(mixed: variable, time: time) else {
-            fatalError()
-        }
-        if !highestResolutionData.data.containsNaN() {
-            return highestResolutionData
-        }
-        
+    func get(variable: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit? {
+        // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
-        var data = highestResolutionData.data
+        var data: [Float]? = nil
+        var unit: SiUnit? = nil
         if variable.requiresOffsetCorrectionForMixing {
-            data.deltaEncode()
-            for r in reader.reversed().dropFirst() {
+            for r in reader.reversed() {
                 guard let d = try r.get(mixed: variable, time: time) else {
                     continue
                 }
-                data.integrateIfNaNDeltaCoded(d.data)
-                
-                if !data.containsNaN() {
+                if data == nil {
+                    // first iteration
+                    data = d.data
+                    unit = d.unit
+                    data?.deltaEncode()
+                } else {
+                    data?.integrateIfNaNDeltaCoded(d.data)
+                }
+                if data?.containsNaN() == false {
                     break
                 }
             }
             // undo delta operation
-            data.deltaDecode()
-            return DataAndUnit(data, highestResolutionData.unit)
-        }
-        
-        // default case, just place new data in 1:1
-        for r in reader.reversed() {
-            guard let d = try r.get(mixed: variable, time: time) else {
-                continue
+            data?.deltaDecode()
+
+        } else {
+            // default case, just place new data in 1:1
+            for r in reader.reversed() {
+                guard let d = try r.get(mixed: variable, time: time) else {
+                    continue
+                }
+                if data == nil {
+                    // first iteration
+                    data = d.data
+                    unit = d.unit
+                } else {
+                    data?.integrateIfNaN(d.data)
+                }
+                if data?.containsNaN() == false {
+                    break
+                }
             }
-            data.integrateIfNaN(d.data)
-            
-            if !data.containsNaN() {
-                break
-            }
         }
-        return DataAndUnit(data, highestResolutionData.unit)
+        guard let data, let unit else {
+            return nil
+        }
+        return DataAndUnit(data, unit)
     }
 }
 
