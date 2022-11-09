@@ -66,41 +66,48 @@ extension GenericReaderMixer {
     }
     
     func get(variable: Reader.MixingVar, time: TimerangeDt) throws -> DataAndUnit {
-        /// Last reader return highest resolution data
-        guard let highestResolutionData = try reader.last?.get(variable: variable, time: time) else {
-            fatalError()
-        }
-        if !highestResolutionData.data.containsNaN() {
-            return highestResolutionData
-        }
-        
+        // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
-        var data = highestResolutionData.data
+        var data: [Float]? = nil
+        var unit: SiUnit? = nil
         if variable.requiresOffsetCorrectionForMixing {
-            data.deltaEncode()
-            for r in reader.reversed().dropFirst() {
+            for r in reader.reversed() {
                 let d = try r.get(variable: variable, time: time)
-                data.integrateIfNaNDeltaCoded(d.data)
-                
-                if !data.containsNaN() {
+                if data == nil {
+                    // first iteration
+                    data = d.data
+                    unit = d.unit
+                    data?.deltaEncode()
+                } else {
+                    data?.integrateIfNaNDeltaCoded(d.data)
+                }
+                if data?.containsNaN() == false {
                     break
                 }
             }
             // undo delta operation
-            data.deltaDecode()
-            return DataAndUnit(data, highestResolutionData.unit)
-        }
-        
-        // default case, just place new data in 1:1
-        for r in reader.reversed() {
-            let d = try r.get(variable: variable, time: time)
-            data.integrateIfNaN(d.data)
-            
-            if !data.containsNaN() {
-                break
+            data?.deltaDecode()
+
+        } else {
+            // default case, just place new data in 1:1
+            for r in reader.reversed() {
+                let d = try r.get(variable: variable, time: time)
+                if data == nil {
+                    // first iteration
+                    data = d.data
+                    unit = d.unit
+                } else {
+                    data?.integrateIfNaN(d.data)
+                }
+                if data?.containsNaN() == false {
+                    break
+                }
             }
         }
-        return DataAndUnit(data, highestResolutionData.unit)
+        guard let data, let unit else {
+            fatalError("Expected data in mixer for variable \(variable)")
+        }
+        return DataAndUnit(data, unit)
     }
 }
 

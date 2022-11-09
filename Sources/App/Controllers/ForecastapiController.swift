@@ -72,7 +72,9 @@ public struct ForecastapiController: RouteCollection {
                 for reader in readers {
                     for variable in variables {
                         let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                        let d = try reader.get(variable: variable, time: hourlyTime).conertAndRound(params: params).toApi(name: name)
+                        guard let d = try reader.get(variable: variable, time: hourlyTime)?.conertAndRound(params: params).toApi(name: name) else {
+                            continue
+                        }
                         assert(hourlyTime.count == d.data.count)
                         res.append(d)
                     }
@@ -87,10 +89,10 @@ public struct ForecastapiController: RouteCollection {
                 guard let reader = try MultiDomainMixer(domain: MultiDomains.auto, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                let temperature = try reader.get(variable: .surface(.temperature_2m), time: time).conertAndRound(params: params)
-                let winddirection = try reader.get(variable: .surface(.winddirection_10m), time: time).conertAndRound(params: params)
-                let windspeed = try reader.get(variable: .surface(.windspeed_10m), time: time).conertAndRound(params: params)
-                let weathercode = try reader.get(variable: .surface(.weathercode), time: time).conertAndRound(params: params)
+                let temperature = try reader.get(variable: .surface(.temperature_2m), time: time)!.conertAndRound(params: params)
+                let winddirection = try reader.get(variable: .surface(.winddirection_10m), time: time)!.conertAndRound(params: params)
+                let windspeed = try reader.get(variable: .surface(.windspeed_10m), time: time)!.conertAndRound(params: params)
+                let weathercode = try reader.get(variable: .surface(.weathercode), time: time)!.conertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],
@@ -125,7 +127,9 @@ public struct ForecastapiController: RouteCollection {
                             continue
                         }
                         let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                        let d = try reader.getDaily(variable: variable, params: params, time: dailyTime).toApi(name: name)
+                        guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime)?.toApi(name: name) else {
+                            continue
+                        }
                         assert(dailyTime.count == d.data.count)
                         res.append(d)
                     }
@@ -307,7 +311,7 @@ enum ForecastVariableDaily: String, Codable {
 
 
 extension MultiDomainMixer {
-    func get(variable: ForecastSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: ForecastSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit? {
         return try get(variable: .surface(variable), time: time)
     }
     func prefetchData(variable: ForecastSurfaceVariable, time: TimerangeDt) throws {
@@ -315,66 +319,96 @@ extension MultiDomainMixer {
     }
     
     
-    func getDaily(variable: ForecastVariableDaily, params: ForecastApiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
+    func getDaily(variable: ForecastVariableDaily, params: ForecastApiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit? {
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:
-            let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .temperature_2m, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .temperature_2m_min:
-            let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .temperature_2m, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .apparent_temperature_max:
-            let data = try get(variable: .apparent_temperature, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .apparent_temperature, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .apparent_temperature_min:
-            let data = try get(variable: .apparent_temperature, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .apparent_temperature, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .precipitation_sum:
             // rounding is required, becuse floating point addition results in uneven numbers
-            let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .precipitation, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .weathercode:
             // not 100% corrct
-            let data = try get(variable: .weathercode, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .weathercode, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .shortwave_radiation_sum:
-            let data = try get(variable: .shortwave_radiation, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .shortwave_radiation, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             // 3600s only for hourly data of source
             return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megaJoulesPerSquareMeter)
         case .windspeed_10m_max:
-            let data = try get(variable: .windspeed_10m, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .windspeed_10m, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .windgusts_10m_max:
-            let data = try get(variable: .windgusts_10m, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .windgusts_10m, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .winddirection_10m_dominant:
             // vector addition
-            let u = try get(variable: .wind_u_component_10m, time: time).data.sum(by: 24)
-            let v = try get(variable: .wind_v_component_10m, time: time).data.sum(by: 24)
+            guard let u = try get(variable: .wind_u_component_10m, time: time)?.data.sum(by: 24),
+                let v = try get(variable: .wind_v_component_10m, time: time)?.data.sum(by: 24) else {
+                return nil
+            }
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         //case .sunshine_hours:
             /// TODO need sunrise and set time for correct numbers
             //fatalError()
         case .precipitation_hours:
-            let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .precipitation, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
         case .sunrise:
             return DataAndUnit([],.hours)
         case .sunset:
             return DataAndUnit([],.hours)
         case .et0_fao_evapotranspiration:
-            let data = try get(variable: .et0_fao_evapotranspiration, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .et0_fao_evapotranspiration, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .snowfall_sum:
-            let data = try get(variable: .snowfall, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .snowfall, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .rain_sum:
-            let data = try get(variable: .rain, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .rain, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .showers_sum:
-            let data = try get(variable: .showers, time: time).conertAndRound(params: params)
+            guard let data = try get(variable: .showers, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         }
     }
