@@ -43,26 +43,39 @@ public struct ForecastapiController: RouteCollection {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try MultiDomainMixer(domain: MultiDomains.auto, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+            let domains = params.models ?? [.auto]
+            
+            let readers = try domains.compactMap {
+                try MultiDomainMixer(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised)
+            }
+            
+            guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
             
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
-                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                for reader in readers {
+                    try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                }
             }
             if let dailyVariables = params.daily {
-                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+                for reader in readers {
+                    try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+                }
             }
             
             let hourly: ApiSection? = try params.hourly.map { variables in
                 var res = [ApiColumn]()
-                res.reserveCapacity(variables.count)
-                for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).conertAndRound(params: params).toApi(name: variable.rawValue)
-                    assert(hourlyTime.count == d.data.count)
-                    res.append(d)
+                res.reserveCapacity(variables.count * readers.count)
+                for reader in readers {
+                    for variable in variables {
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                        let d = try reader.get(variable: variable, time: hourlyTime).conertAndRound(params: params).toApi(name: name)
+                        assert(hourlyTime.count == d.data.count)
+                        res.append(d)
+                    }
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
             }
@@ -95,33 +108,37 @@ public struct ForecastapiController: RouteCollection {
             
             let daily: ApiSection? = try params.daily.map { dailyVariables in
                 var res = [ApiColumn]()
-                res.reserveCapacity(dailyVariables.count)
+                res.reserveCapacity(dailyVariables.count * readers.count)
                 var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
                 
-                for variable in dailyVariables {
-                    if variable == .sunrise || variable == .sunset {
-                        // only calculate sunrise/set once
-                        let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
-                        riseSet = times
-                        if variable == .sunset {
-                            res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
-                        } else {
-                            res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
+                for reader in readers {
+                    for variable in dailyVariables {
+                        if variable == .sunrise || variable == .sunset {
+                            // only calculate sunrise/set once
+                            let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
+                            riseSet = times
+                            if variable == .sunset {
+                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
+                            } else {
+                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
+                            }
+                            continue
                         }
-                        continue
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                        let d = try reader.getDaily(variable: variable, params: params, time: dailyTime).toApi(name: name)
+                        assert(dailyTime.count == d.data.count)
+                        res.append(d)
                     }
-                    let d = try reader.getDaily(variable: variable, params: params, time: dailyTime).toApi(name: variable.rawValue)
-                    assert(dailyTime.count == d.data.count)
-                    res.append(d)
                 }
+                
                 return ApiSection(name: "daily", time: dailyTime, columns: res)
             }
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
-                latitude: reader.modelLat,
-                longitude: reader.modelLon,
-                elevation: reader.targetElevation,
+                latitude: readers[0].modelLat,
+                longitude: readers[0].modelLon,
+                elevation: readers[0].targetElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,
@@ -151,6 +168,7 @@ struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone {
     let timeformat: Timeformat?
     let past_days: Int?
     let format: ForecastResultFormat?
+    let models: [MultiDomains]?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?
