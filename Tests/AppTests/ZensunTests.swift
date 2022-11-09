@@ -8,7 +8,7 @@ final class ZensunTests: XCTestCase {
     func testSunRiseSetLosAngeles() {
         let utcOffsetSeconds = -25200
         let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = ForecastapiQuery.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
+        let time = ForecastApiQuery.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
         
         let times = Zensun.calculateSunRiseSet(timeRange: time.range, lat: 49.25, lon: -123.12, utcOffsetSeconds: utcOffsetSeconds)
         XCTAssertEqual(times.rise[0], Timestamp(1636211261))
