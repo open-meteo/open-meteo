@@ -11,19 +11,33 @@ extension FileHandle {
             let error = String(cString: strerror(errno))
             throw SwiftPFor2DError.cannotOpenFile(filename: file, errno: errno, error: error)
         }
-        #if os(Linux)
-        if let size {
-            let error = posix_fallocate(fn, 0, size)
-            guard error == 0 else {
-                throw SwiftPFor2DError.posixFallocateFailed(error: error)
-            }
-        }
-        #endif
         
         let handle = FileHandle(fileDescriptor: fn, closeOnDealloc: true)
-                
+        if let size {
+            try handle.preAllocate(size: size)
+        }
         try handle.seek(toOffset: 0)
         return handle
+    }
+    
+    /// Allocate the required diskspace for a given file
+    func preAllocate(size: Int) throws {
+        #if os(Linux)
+        let error = posix_fallocate(fileDescriptor, 0, size)
+        guard error == 0 else {
+            throw SwiftPFor2DError.posixFallocateFailed(error: error)
+        }
+        #else
+        var store = fstore(fst_flags: UInt32(F_ALLOCATEALL), fst_posmode: F_PEOFPOSMODE, fst_offset: 0, fst_length: off_t(size), fst_bytesalloc: 0)
+        let error = fcntl(fileDescriptor, F_PREALLOCATE, &store)
+        guard error >= 0 else {
+            throw SwiftPFor2DError.posixFallocateFailed(error: error)
+        }
+        let error2 = ftruncate(fileDescriptor, off_t(size))
+        guard error2 >= 0 else {
+            throw SwiftPFor2DError.ftruncateFailed(error: error2)
+        }
+        #endif
     }
     
     /// Open file for reading

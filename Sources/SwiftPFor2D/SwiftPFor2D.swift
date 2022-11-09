@@ -12,6 +12,7 @@ public enum SwiftPFor2DError: Error {
     case notAOmFile(filename: String)
     case fileExistsAlready(filename: String)
     case posixFallocateFailed(error: Int32)
+    case ftruncateFailed(error: Int32)
 }
 
 
