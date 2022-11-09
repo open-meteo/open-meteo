@@ -10,7 +10,7 @@ public struct IconController {
                 throw Abort.init(.notFound)
             }
             let generationTimeStart = Date()
-            let params = try req.query.decode(ForecastapiQuery.self)
+            let params = try req.query.decode(IconApiQuery.self)
             try params.validate()
             let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
             let currentTime = Timestamp.now()
@@ -116,7 +116,7 @@ public struct IconController {
 }
 
 
-struct ForecastapiQuery: Content, QueryWithStartEndDateTimeZone {
+struct IconApiQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
     let hourly: [IconApiVariable]?

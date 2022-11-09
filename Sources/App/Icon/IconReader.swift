@@ -364,7 +364,7 @@ extension IconMixer {
         return try get(variable: .derived(.surface(derived)), time: time)
     }
     
-    func getDaily(variable: DailyWeatherVariable, params: ForecastapiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
+    func getDaily(variable: DailyWeatherVariable, params: IconApiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:

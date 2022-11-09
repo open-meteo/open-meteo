@@ -29,7 +29,7 @@ protocol GenericReaderMixable {
     init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws
 }
 
-extension GenericReaderMixer {   
+extension GenericReaderMixer {
     var modelLat: Float {
         reader.last!.modelLat
     }

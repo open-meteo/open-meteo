@@ -121,6 +121,10 @@ struct DataAndUnit {
     func conertAndRound(params: JmaQuery) -> DataAndUnit {
         return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
     }
+    
+    func conertAndRound(params: IconApiQuery) -> DataAndUnit {
+        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
+    }
 
     /// Convert a given array to target unit
     func convertAndRound(temperatureUnit: TemperatureUnit?, windspeedUnit: WindspeedUnit?, precipitationUnit: PrecipitationUnit?) -> DataAndUnit {

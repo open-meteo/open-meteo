@@ -145,7 +145,7 @@ enum VariableOrDerived<Raw, Derived> {
     case derived(Derived)
 }
 
-extension VariableOrDerived: Codable where Raw: Codable, Raw: RawRepresentable, Derived: Codable, Derived: RawRepresentable, Raw.RawValue == Derived.RawValue {
+extension VariableOrDerived: Codable where Raw: Codable, Derived: Codable {
     init(from decoder: Decoder) throws {
         do {
             let variable = try Derived(from: decoder)
@@ -166,7 +166,10 @@ extension VariableOrDerived: Codable where Raw: Codable, Raw: RawRepresentable, 
             try value.encode(to: encoder)
         }
     }
-    
+
+}
+
+extension VariableOrDerived: Codable where Raw: RawRepresentable, Derived: RawRepresentable, Raw.RawValue == Derived.RawValue {
     var name: Raw.RawValue {
         switch self {
         case .raw(let variable): return variable.rawValue
