@@ -160,7 +160,7 @@ struct GfsDownload: AsyncCommandFix {
         let variablesHour0 = variables.filter({!$0.variable.skipHour0})
         
         let client = HTTPClient(
-            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 1)),
+            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 2)),
             configuration: application.http.client.configuration,
             backgroundActivityLogger: logger)
         
