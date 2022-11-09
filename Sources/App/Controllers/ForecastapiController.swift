@@ -36,9 +36,9 @@ public struct ForecastapiController: RouteCollection {
             let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
             let currentTime = Timestamp.now()
             
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 8)
+            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 16)
             let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 16, allowedRange: allowedRange)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
             
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
@@ -271,7 +271,7 @@ enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
 }
 
 /// Available pressure level variables
-enum ForecastPressureVariable: String, Codable, GenericVariableMixable {
+enum ForecastPressureVariableType: String, Codable, GenericVariableMixable {
     case temperature
     case geopotential_height
     case relativehumidity
@@ -279,6 +279,15 @@ enum ForecastPressureVariable: String, Codable, GenericVariableMixable {
     case winddirection
     case dewpoint
     case cloudcover
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariableMixable {
+    let variable: ForecastPressureVariableType
+    let level: Int
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
