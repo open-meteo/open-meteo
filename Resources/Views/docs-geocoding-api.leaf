@@ -6,7 +6,7 @@
 #export("content"):
 
 <div class="px-4 py-5 text-center text-white" style="
-            background-image: url('https://assets.open-meteo.com/images/beach_sunset.jpg');
+            background-image: url('https://assets.open-meteo.com/images/beach_sunset.webp');
             background-size: cover;
             background-position: center;
             height: 500px;
