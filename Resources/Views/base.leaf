@@ -45,10 +45,10 @@
           </li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle #if(title == "Weather Forecast API" || title=="ECMWF Weather Forecast API" || title=="Historical Weather API" || title=="MeteoFrance API" || title=="DWD ICON API" || title=="GFS & HRRR Forecast API" ): active #endif" href="#"
-              id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              id="navbarDropdownWeatherApis" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               Weather APIs
             </a>
-            <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+            <ul class="dropdown-menu" aria-labelledby="navbarDropdownWeatherApis">
               <li><a class="dropdown-item #if(title==" Weather Forecast API"): active #endif" href="/en/docs">Weather
                   Forecast API</a>
               </li>
@@ -69,10 +69,10 @@
           </li>
           <li class="nav-item dropdown">
             <a class="nav-link dropdown-toggle #if(title == " Marine Weather API" || title=="Elevation API" || title=="Geocoding API" || title=="Air Quality API" || title=="Seasonal Forecast API" ): active #endif"
-              href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              href="#" id="navbarDropdownOtherApis" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               Other APIs
             </a>
-            <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+            <ul class="dropdown-menu" aria-labelledby="navbarDropdownOtherApis">
               <li><a class="dropdown-item #if(title == " Marine Weather API"): active #endif"
                   href="/en/docs/marine-weather-api">Marine Forecast API</a></li>
               <li><a class="dropdown-item #if(title == " Air Quality API"): active #endif"
@@ -123,7 +123,7 @@
   <footer class="container py-5 pt-4 my-md-5 pt-md-5 border-top">
     <div class="row">
       <div class="col-6 col-md">
-        <h5>Features</h5>
+        <p class="h5">Features</p>
         <ul class="list-unstyled text-small">
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features">Local models</a></li>
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#weathervariables">Weather
@@ -135,7 +135,7 @@
         </ul>
       </div>
       <div class="col-6 col-md">
-        <h5>Weather APIs</h5>
+        <p class="h5">Weather APIs</p>
         <ul class="list-unstyled text-small">
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs">Weather Forecast API</a></li>
           <li class="mb-1"><a class="link-secondary text-decoration-none"
@@ -149,7 +149,7 @@
         </ul>
       </div>
       <div class="col-6 col-md">
-        <h5>Other APIs</h5>
+        <p class="h5">Other APIs</p>
         <ul class="list-unstyled text-small">
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/marine-weather-api">Marine
               Weather API</a></li>
@@ -164,7 +164,7 @@
         </ul>
       </div>
       <div class="col-6 col-md">
-        <h5>About</h5>
+        <p class="h5">About</p>
         <ul class="list-unstyled text-small">
           <li class="mb-1"><a class="link-secondary text-decoration-none"
               href="https://github.com/open-meteo/open-meteo" target="_blank">GitHub</a></li>
