@@ -1,493 +1,6 @@
 import Foundation
 import Vapor
 
-/// Define all available surface weather variables
-enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
-    case temperature_2m
-    case cloudcover
-    case cloudcover_low
-    case cloudcover_mid
-    case cloudcover_high
-    case pressure_msl
-    case relativehumidity_2m
-    case precipitation
-    case weathercode
-    case temperature_80m
-    case temperature_120m
-    case temperature_180m
-    case soil_temperature_0cm
-    case soil_temperature_6cm
-    case soil_temperature_18cm
-    case soil_temperature_54cm
-    case soil_moisture_0_1cm
-    case soil_moisture_1_3cm
-    case soil_moisture_3_9cm
-    case soil_moisture_9_27cm
-    case soil_moisture_27_81cm
-    case snow_depth
-    case snow_height
-    case sensible_heatflux
-    case latent_heatflux
-    case showers
-    case rain
-    case windgusts_10m
-    case freezinglevel_height
-    case dewpoint_2m
-    case diffuse_radiation
-    case direct_radiation
-    case apparent_temperature
-    case wind_u_component_10m
-    case wind_v_component_10m
-    case windspeed_10m
-    case winddirection_10m
-    case windspeed_80m
-    case winddirection_80m
-    case windspeed_120m
-    case winddirection_120m
-    case windspeed_180m
-    case winddirection_180m
-    case direct_normal_irradiance
-    case evapotranspiration
-    case et0_fao_evapotranspiration
-    case vapor_pressure_deficit
-    case shortwave_radiation
-    case snowfall
-    case surface_pressure
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
-    case shortwave_radiation_instant
-    case diffuse_radiation_instant
-    case direct_radiation_instant
-    case direct_normal_irradiance_instant
-    case visibility
-    
-    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_1cm: return true
-        case .soil_moisture_1_3cm: return true
-        case .soil_moisture_3_9cm: return true
-        case .soil_moisture_9_27cm: return true
-        case .soil_moisture_27_81cm: return true
-        case .snow_depth: return true
-        default: return false
-        }
-    }
-}
-
-/// Available pressure level variables
-enum ForecastPressureVariable: String, Codable, GenericVariableMixable {
-    case temperature
-    case geopotential_height
-    case relativehumidity
-    case windspeed
-    case winddirection
-    case dewpoint
-    case cloudcover
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-}
-
-typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable, ForecastPressureVariable>
-
-/// Available daily aggregations
-enum ForecastVariableDaily: String, Codable {
-    case temperature_2m_max
-    case temperature_2m_min
-    case apparent_temperature_max
-    case apparent_temperature_min
-    case precipitation_sum
-    case snowfall_sum
-    case rain_sum
-    case showers_sum
-    case weathercode
-    case shortwave_radiation_sum
-    case windspeed_10m_max
-    case windgusts_10m_max
-    case winddirection_10m_dominant
-    case precipitation_hours
-    case sunrise
-    case sunset
-    case et0_fao_evapotranspiration
-}
-
-enum ModelError: AbortError {
-    var status: NIOHTTP1.HTTPResponseStatus {
-        return .badRequest
-    }
-    
-    case domainInitFailed(domain: String)
-}
-
-/**
- Automatic domain selection rules:
- - If HRRR domain matches, use HRRR+GFS+ICON
- - If Western Europe, use Arome + ICON_EU+ ICON + GFS
- - If Central Europe, use ICON_D2, ICON_EU, ICON + GFS
- - If Japan, use JMA_MSM + ICON + GFS
- - default ICON + GFS
- */
-enum MultiDomains: String, Codable, CaseIterable {
-    case auto
-
-    case gfs_mix
-    case gfs_global
-    case gfs_hrrr
-    
-    case meteofrance_mix
-    case meteofrance_arpege_world
-    case meteofrance_arpege_europe
-    case meteofrance_arome_france
-    case meteofrance_arome_france_hd
-    
-    case jma_mix
-    case jma_msm
-    case jms_gsm
-    
-    case icon_mix
-    case icon_global
-    case icon_eu
-    case icon_d2
-    
-    case ecmwf_ifs04
-    
-    /// Return the required readers for this domain configuration
-    /// Note: last reader has highes resolution data
-    fileprivate func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixerForecast] {
-        switch self {
-        case .auto:
-            guard let icon: GenericReaderMixerForecast = try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
-            }
-            guard let gfs025: GenericReaderMixerForecast = try GfsReader(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
-            }
-            // If Icon-d2 is available, use icon domains
-            if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                // TODO: check how out of projection areas are handled
-                guard let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                    throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
-                }
-                return [gfs025, icon, iconEu, iconD2]
-            }
-            // For western europe, use arome models
-            if let arome_france_hd = try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                let arome_france = try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode)
-                let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode)
-                return Array([gfs025, icon, arpege_europe, arome_france, arome_france_hd].compacted())
-            }
-            // For North America, use HRRR
-            if let hrrr = try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [icon, gfs025, hrrr]
-            }
-            // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
-            if let jma_msm = try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, icon, jma_msm]
-            }
-            
-            // Remaining eastern europe
-            if let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, icon, iconEu]
-            }
-            
-            // Northern africa
-            if let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, icon, arpege_europe]
-            }
-            
-            // Remaining parts of the world
-            return [gfs025, icon]
-        case .gfs_mix:
-            return try GfsMixer(domains: [.gfs025, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
-        case .gfs_global:
-            return try GfsReader(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .gfs_hrrr:
-            return try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .meteofrance_mix:
-            return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
-        case .meteofrance_arpege_world:
-            return try MeteoFranceReader(domain: .arpege_world, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .meteofrance_arpege_europe:
-            return try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .meteofrance_arome_france:
-            return try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .meteofrance_arome_france_hd:
-            return try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .jma_mix:
-            return try JmaMixer(domains: [.msm, .gsm], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
-        case .jma_msm:
-            return try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .jms_gsm:
-            return try JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .icon_mix:
-            return try IconMixer(domains: [.iconD2, .iconEu, .icon], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
-        case .icon_global:
-            return try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .icon_eu:
-            return try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .icon_d2:
-            return try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .ecmwf_ifs04:
-            return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        }
-    }
-}
-
-/// Define functions to read data for mixing. Similar to `GenericReaderMixer` but with optional `get` and without any generic constraints
-fileprivate protocol GenericReaderMixerForecast {
-    func get(mixed: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit?
-    func prefetchData(mixed: ForecastVariable, time: TimerangeDt) throws -> Bool
-    
-    var modelLat: Float { get }
-    var modelLon: Float { get }
-    var targetElevation: Float { get }
-    var modelDtSeconds: Int { get }
-}
-
-/// Conditional conformace just use RawValue (String) to resolve `ForecastVariable` to a specific type
-extension GenericReaderMixable where MixingVar: RawRepresentable, MixingVar.RawValue == String {
-    func get(mixed: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit? {
-        guard let v = MixingVar(rawValue: mixed.rawValue) else {
-            return nil
-        }
-        return try self.get(variable: v, time: time)
-    }
-    
-    func prefetchData(mixed: ForecastVariable, time: TimerangeDt) throws -> Bool {
-        guard let v = MixingVar(rawValue: mixed.rawValue) else {
-            return false
-        }
-        try self.prefetchData(variable: v, time: time)
-        return true
-    }
-}
-
-
-extension GfsReader: GenericReaderMixerForecast { }
-extension IconReader: GenericReaderMixerForecast { }
-extension MeteoFranceReader: GenericReaderMixerForecast { }
-extension JmaReader: GenericReaderMixerForecast { }
-extension EcmwfReader: GenericReaderMixerForecast { }
-
-/// Combine multiple independent weahter models, that may not have given forecast variable
-fileprivate struct MultiDomainMixer {
-    let reader: [any GenericReaderMixerForecast]
-    
-    let domain: MultiDomains
-    
-    var modelLat: Float {
-        reader.last!.modelLat
-    }
-    var modelLon: Float {
-        reader.last!.modelLon
-    }
-    var targetElevation: Float {
-        reader.last!.targetElevation
-    }
-    var modelDtSeconds: Int {
-        reader.first!.modelDtSeconds
-    }
-    
-    public init?(domain: MultiDomains, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        let reader = try domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-        guard !reader.isEmpty else {
-            return nil
-        }
-        self.domain = domain
-        self.reader = reader
-    }
-    
-    func prefetchData(variable: ForecastVariable, time: TimerangeDt) throws {
-        for reader in reader {
-            if try reader.prefetchData(mixed: variable, time: time) {
-                break
-            }
-        }
-    }
-    
-    func prefetchData(variables: [ForecastVariable], time: TimerangeDt) throws {
-        try variables.forEach { variable in
-            try prefetchData(variable: variable, time: time)
-        }
-    }
-    
-    func get(variable: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit {
-        /// Last reader return highest resolution data
-        guard let highestResolutionData = try reader.last?.get(mixed: variable, time: time) else {
-            fatalError()
-        }
-        if !highestResolutionData.data.containsNaN() {
-            return highestResolutionData
-        }
-        
-        // Integrate now lower resolution models
-        var data = highestResolutionData.data
-        if variable.requiresOffsetCorrectionForMixing {
-            data.deltaEncode()
-            for r in reader.reversed().dropFirst() {
-                guard let d = try r.get(mixed: variable, time: time) else {
-                    continue
-                }
-                data.integrateIfNaNDeltaCoded(d.data)
-                
-                if !data.containsNaN() {
-                    break
-                }
-            }
-            // undo delta operation
-            data.deltaDecode()
-            return DataAndUnit(data, highestResolutionData.unit)
-        }
-        
-        // default case, just place new data in 1:1
-        for r in reader.reversed() {
-            guard let d = try r.get(mixed: variable, time: time) else {
-                continue
-            }
-            data.integrateIfNaN(d.data)
-            
-            if !data.containsNaN() {
-                break
-            }
-        }
-        return DataAndUnit(data, highestResolutionData.unit)
-    }
-}
-
-extension MultiDomainMixer {
-    func get(variable: ForecastSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {
-        return try get(variable: .surface(variable), time: time)
-    }
-    func prefetchData(variable: ForecastSurfaceVariable, time: TimerangeDt) throws {
-        try prefetchData(variable: .surface(variable), time: time)
-    }
-    
-    
-    func getDaily(variable: ForecastVariableDaily, params: ForecastApiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
-        switch variable {
-        case .temperature_2m_max:
-            let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .temperature_2m_min:
-            let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.min(by: 24), data.unit)
-        case .apparent_temperature_max:
-            let data = try get(variable: .apparent_temperature, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .apparent_temperature_min:
-            let data = try get(variable: .apparent_temperature, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.min(by: 24), data.unit)
-        case .precipitation_sum:
-            // rounding is required, becuse floating point addition results in uneven numbers
-            let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .weathercode:
-            // not 100% corrct
-            let data = try get(variable: .weathercode, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .shortwave_radiation_sum:
-            let data = try get(variable: .shortwave_radiation, time: time).conertAndRound(params: params)
-            // 3600s only for hourly data of source
-            return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megaJoulesPerSquareMeter)
-        case .windspeed_10m_max:
-            let data = try get(variable: .windspeed_10m, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .windgusts_10m_max:
-            let data = try get(variable: .windgusts_10m, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .winddirection_10m_dominant:
-            // vector addition
-            let u = try get(variable: .wind_u_component_10m, time: time).data.sum(by: 24)
-            let v = try get(variable: .wind_v_component_10m, time: time).data.sum(by: 24)
-            let direction = Meteorology.windirectionFast(u: u, v: v)
-            return DataAndUnit(direction, .degreeDirection)
-        //case .sunshine_hours:
-            /// TODO need sunrise and set time for correct numbers
-            //fatalError()
-        case .precipitation_hours:
-            let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
-        case .sunrise:
-            return DataAndUnit([],.hours)
-        case .sunset:
-            return DataAndUnit([],.hours)
-        case .et0_fao_evapotranspiration:
-            let data = try get(variable: .et0_fao_evapotranspiration, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .snowfall_sum:
-            let data = try get(variable: .snowfall, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .rain_sum:
-            let data = try get(variable: .rain, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .showers_sum:
-            let data = try get(variable: .showers, time: time).conertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        }
-    }
-    
-
-    func prefetchData(variables: [ForecastVariableDaily], time timeDaily: TimerangeDt) throws {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
-        for variable in variables {
-            switch variable {
-            case .temperature_2m_max:
-                fallthrough
-            case .temperature_2m_min:
-                try prefetchData(variable: .temperature_2m, time: time)
-            case .apparent_temperature_max:
-                fallthrough
-            case .apparent_temperature_min:
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
-                try prefetchData(variable: .relativehumidity_2m, time: time)
-                try prefetchData(variable: .direct_radiation, time: time)
-                try prefetchData(variable: .diffuse_radiation, time: time)
-            case .precipitation_sum:
-                try prefetchData(variable: .precipitation, time: time)
-            case .weathercode:
-                try prefetchData(variable: .weathercode, time: time)
-            case .shortwave_radiation_sum:
-                try prefetchData(variable: .direct_radiation, time: time)
-                try prefetchData(variable: .diffuse_radiation, time: time)
-            case .windspeed_10m_max:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
-            case .windgusts_10m_max:
-                try prefetchData(variable: .windgusts_10m, time: time)
-            case .winddirection_10m_dominant:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
-            case .precipitation_hours:
-                try prefetchData(variable: .precipitation, time: time)
-            case .sunrise:
-                break
-            case .sunset:
-                break
-            case .et0_fao_evapotranspiration:
-                try prefetchData(variable: .direct_radiation, time: time)
-                try prefetchData(variable: .diffuse_radiation, time: time)
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .relativehumidity_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
-            case .snowfall_sum:
-                try prefetchData(variable: .precipitation, time: time)
-                try prefetchData(variable: .showers, time: time)
-                try prefetchData(variable: .rain, time: time)
-            case .rain_sum:
-                try prefetchData(variable: .rain, time: time)
-            case .showers_sum:
-                try prefetchData(variable: .showers, time: time)
-            }
-        }
-    }
-}
-
 
 public struct ForecastapiController: RouteCollection {
     public func boot(routes: RoutesBuilder) throws {
@@ -658,5 +171,251 @@ struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone {
     
     var timeformatOrDefault: Timeformat {
         return timeformat ?? .iso8601
+    }
+}
+
+/// Define all available surface weather variables
+enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
+    case temperature_2m
+    case cloudcover
+    case cloudcover_low
+    case cloudcover_mid
+    case cloudcover_high
+    case pressure_msl
+    case relativehumidity_2m
+    case precipitation
+    case weathercode
+    case temperature_80m
+    case temperature_120m
+    case temperature_180m
+    case soil_temperature_0cm
+    case soil_temperature_6cm
+    case soil_temperature_18cm
+    case soil_temperature_54cm
+    case soil_moisture_0_1cm
+    case soil_moisture_1_3cm
+    case soil_moisture_3_9cm
+    case soil_moisture_9_27cm
+    case soil_moisture_27_81cm
+    case snow_depth
+    case snow_height
+    case sensible_heatflux
+    case latent_heatflux
+    case showers
+    case rain
+    case windgusts_10m
+    case freezinglevel_height
+    case dewpoint_2m
+    case diffuse_radiation
+    case direct_radiation
+    case apparent_temperature
+    case wind_u_component_10m
+    case wind_v_component_10m
+    case windspeed_10m
+    case winddirection_10m
+    case windspeed_80m
+    case winddirection_80m
+    case windspeed_120m
+    case winddirection_120m
+    case windspeed_180m
+    case winddirection_180m
+    case direct_normal_irradiance
+    case evapotranspiration
+    case et0_fao_evapotranspiration
+    case vapor_pressure_deficit
+    case shortwave_radiation
+    case snowfall
+    case surface_pressure
+    case terrestrial_radiation
+    case terrestrial_radiation_instant
+    case shortwave_radiation_instant
+    case diffuse_radiation_instant
+    case direct_radiation_instant
+    case direct_normal_irradiance_instant
+    case visibility
+    
+    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
+    var requiresOffsetCorrectionForMixing: Bool {
+        switch self {
+        case .soil_moisture_0_1cm: return true
+        case .soil_moisture_1_3cm: return true
+        case .soil_moisture_3_9cm: return true
+        case .soil_moisture_9_27cm: return true
+        case .soil_moisture_27_81cm: return true
+        case .snow_depth: return true
+        default: return false
+        }
+    }
+}
+
+/// Available pressure level variables
+enum ForecastPressureVariable: String, Codable, GenericVariableMixable {
+    case temperature
+    case geopotential_height
+    case relativehumidity
+    case windspeed
+    case winddirection
+    case dewpoint
+    case cloudcover
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable, ForecastPressureVariable>
+
+/// Available daily aggregations
+enum ForecastVariableDaily: String, Codable {
+    case temperature_2m_max
+    case temperature_2m_min
+    case apparent_temperature_max
+    case apparent_temperature_min
+    case precipitation_sum
+    case snowfall_sum
+    case rain_sum
+    case showers_sum
+    case weathercode
+    case shortwave_radiation_sum
+    case windspeed_10m_max
+    case windgusts_10m_max
+    case winddirection_10m_dominant
+    case precipitation_hours
+    case sunrise
+    case sunset
+    case et0_fao_evapotranspiration
+}
+
+
+
+extension MultiDomainMixer {
+    func get(variable: ForecastSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {
+        return try get(variable: .surface(variable), time: time)
+    }
+    func prefetchData(variable: ForecastSurfaceVariable, time: TimerangeDt) throws {
+        try prefetchData(variable: .surface(variable), time: time)
+    }
+    
+    
+    func getDaily(variable: ForecastVariableDaily, params: ForecastApiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
+        let time = timeDaily.with(dtSeconds: modelDtSeconds)
+        switch variable {
+        case .temperature_2m_max:
+            let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .temperature_2m_min:
+            let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .apparent_temperature_max:
+            let data = try get(variable: .apparent_temperature, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .apparent_temperature_min:
+            let data = try get(variable: .apparent_temperature, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .precipitation_sum:
+            // rounding is required, becuse floating point addition results in uneven numbers
+            let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .weathercode:
+            // not 100% corrct
+            let data = try get(variable: .weathercode, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .shortwave_radiation_sum:
+            let data = try get(variable: .shortwave_radiation, time: time).conertAndRound(params: params)
+            // 3600s only for hourly data of source
+            return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megaJoulesPerSquareMeter)
+        case .windspeed_10m_max:
+            let data = try get(variable: .windspeed_10m, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .windgusts_10m_max:
+            let data = try get(variable: .windgusts_10m, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .winddirection_10m_dominant:
+            // vector addition
+            let u = try get(variable: .wind_u_component_10m, time: time).data.sum(by: 24)
+            let v = try get(variable: .wind_v_component_10m, time: time).data.sum(by: 24)
+            let direction = Meteorology.windirectionFast(u: u, v: v)
+            return DataAndUnit(direction, .degreeDirection)
+        //case .sunshine_hours:
+            /// TODO need sunrise and set time for correct numbers
+            //fatalError()
+        case .precipitation_hours:
+            let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
+        case .sunrise:
+            return DataAndUnit([],.hours)
+        case .sunset:
+            return DataAndUnit([],.hours)
+        case .et0_fao_evapotranspiration:
+            let data = try get(variable: .et0_fao_evapotranspiration, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .snowfall_sum:
+            let data = try get(variable: .snowfall, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .rain_sum:
+            let data = try get(variable: .rain, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .showers_sum:
+            let data = try get(variable: .showers, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        }
+    }
+    
+
+    func prefetchData(variables: [ForecastVariableDaily], time timeDaily: TimerangeDt) throws {
+        let time = timeDaily.with(dtSeconds: modelDtSeconds)
+        for variable in variables {
+            switch variable {
+            case .temperature_2m_max:
+                fallthrough
+            case .temperature_2m_min:
+                try prefetchData(variable: .temperature_2m, time: time)
+            case .apparent_temperature_max:
+                fallthrough
+            case .apparent_temperature_min:
+                try prefetchData(variable: .temperature_2m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .relativehumidity_2m, time: time)
+                try prefetchData(variable: .direct_radiation, time: time)
+                try prefetchData(variable: .diffuse_radiation, time: time)
+            case .precipitation_sum:
+                try prefetchData(variable: .precipitation, time: time)
+            case .weathercode:
+                try prefetchData(variable: .weathercode, time: time)
+            case .shortwave_radiation_sum:
+                try prefetchData(variable: .direct_radiation, time: time)
+                try prefetchData(variable: .diffuse_radiation, time: time)
+            case .windspeed_10m_max:
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
+            case .windgusts_10m_max:
+                try prefetchData(variable: .windgusts_10m, time: time)
+            case .winddirection_10m_dominant:
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
+            case .precipitation_hours:
+                try prefetchData(variable: .precipitation, time: time)
+            case .sunrise:
+                break
+            case .sunset:
+                break
+            case .et0_fao_evapotranspiration:
+                try prefetchData(variable: .direct_radiation, time: time)
+                try prefetchData(variable: .diffuse_radiation, time: time)
+                try prefetchData(variable: .temperature_2m, time: time)
+                try prefetchData(variable: .relativehumidity_2m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
+            case .snowfall_sum:
+                try prefetchData(variable: .precipitation, time: time)
+                try prefetchData(variable: .showers, time: time)
+                try prefetchData(variable: .rain, time: time)
+            case .rain_sum:
+                try prefetchData(variable: .rain, time: time)
+            case .showers_sum:
+                try prefetchData(variable: .showers, time: time)
+            }
+        }
     }
 }
