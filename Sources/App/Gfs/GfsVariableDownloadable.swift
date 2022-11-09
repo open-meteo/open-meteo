@@ -1,5 +1,5 @@
 /// Required additions to a GFS variable to make it downloadable
-protocol GfsVariableDownloadable: GenericVariableMixing {
+protocol GfsVariableDownloadable: GenericVariable {
     func gribIndexName(for domain: GfsDomain) -> String?
     var skipHour0: Bool { get }
     var interpolationType: Interpolation2StepType { get }

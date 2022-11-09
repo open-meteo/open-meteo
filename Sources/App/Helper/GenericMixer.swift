@@ -1,18 +1,13 @@
 import Foundation
 
-protocol GenericVariableMixing: GenericVariable {
-    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
-    var requiresOffsetCorrectionForMixing: Bool { get }
-}
-
-protocol GenericVariableMixing2 {
+protocol GenericVariableMixable {
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool { get }
 }
 
 
 protocol GenericReaderMixable {
-    associatedtype MixingVar: GenericVariableMixing2
+    associatedtype MixingVar: GenericVariableMixable
     associatedtype Domain
     
     var modelLat: Float { get }
@@ -102,6 +97,18 @@ struct GenericReaderMixer<Reader: GenericReaderMixable> {
         return DataAndUnit(data, highestResolutionData.unit)
     }
 }
+
+extension VariableOrDerived: GenericVariableMixable where Raw: GenericVariableMixable, Derived: GenericVariableMixable {
+    var requiresOffsetCorrectionForMixing: Bool {
+        switch self {
+        case .raw(let raw):
+            return raw.requiresOffsetCorrectionForMixing
+        case .derived(let derived):
+            return derived.requiresOffsetCorrectionForMixing
+        }
+    }
+}
+
 
 fileprivate extension Array where Element == Float {
     mutating func integrateIfNaN(_ other: [Float]) {

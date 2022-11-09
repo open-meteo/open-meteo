@@ -194,7 +194,7 @@ enum IconPressureVariableType: String, CaseIterable {
     case relativehumidity
 }
 
-struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixing2 {
+struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixable {
     let variable: IconPressureVariableType
     let level: Int
     
@@ -259,7 +259,7 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
 typealias IconVariable = SurfaceAndPressureVariable<IconSurfaceVariable, IconPressureVariable>
 
 
-enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixing2 {
+enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable {
     case temperature_2m
     case cloudcover // cloudcover total
     case cloudcover_low

@@ -220,7 +220,7 @@ enum IconPressureVariableDerivedType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct IconPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixing2 {
+struct IconPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: IconPressureVariableDerivedType
     let level: Int
     
@@ -231,7 +231,7 @@ struct IconPressureVariableDerived: PressureVariableRespresentable, GenericVaria
 
 typealias IconVariableDerived = SurfaceAndPressureVariable<IconSurfaceVariableDerived, IconPressureVariableDerived>
 
-enum IconSurfaceVariableDerived: String, Codable, CaseIterable, GenericVariableMixing2 {
+enum IconSurfaceVariableDerived: String, Codable, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumitidy_2m
     case windspeed_10m

@@ -70,7 +70,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, GenericDomain {
     }
 }
 
-enum IconWaveVariable: String, CaseIterable, Codable, GenericVariableMixing, GenericVariableMixing2 {
+enum IconWaveVariable: String, CaseIterable, Codable, GenericVariable, GenericVariableMixable {
     //case windspeed_10m // Disabled, because already available in better quality in regular domains
     //case winddirection_10m
     case wave_height

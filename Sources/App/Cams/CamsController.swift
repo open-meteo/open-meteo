@@ -74,7 +74,7 @@ struct CamsController {
 }
 
 /// TODO can later be used for air quality index
-enum CamsVariableDerived: String, Codable, GenericVariableMixing2 {
+enum CamsVariableDerived: String, Codable, GenericVariableMixable {
     case none
     
     var requiresOffsetCorrectionForMixing: Bool {

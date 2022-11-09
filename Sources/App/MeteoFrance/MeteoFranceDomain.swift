@@ -197,7 +197,7 @@ enum MeteoFranceDomain: String, GenericDomain {
 /**
  List of all surface MeteoFrance variables
  */
-enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixing, GenericVariableMixing2 {
+enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariable, GenericVariableMixable {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -348,7 +348,7 @@ enum MeteoFrancePressureVariableType: String, CaseIterable {
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVariableMixing, Hashable, GenericVariableMixing2 {
+struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
     let variable: MeteoFrancePressureVariableType
     let level: Int
     
