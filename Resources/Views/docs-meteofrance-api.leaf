@@ -768,7 +768,7 @@
       <div class="col-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="2022-06-08" value="" data-default="" name="start_date"><span
+            data-date-start-date="2022-06-08" value="" data-default="" name="start_date" id="start_date"><span
             class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
           <label for="start_date">Start date</label>
         </div>
@@ -776,7 +776,7 @@
       <div class="col-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="2022-06-08" value="" data-default="" name="end_date"><span
+            data-date-start-date="2022-06-08" value="" data-default="" name="end_date" id="end_date"><span
             class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
           <label for="end_date">End date</label>
         </div>
@@ -1486,8 +1486,8 @@
 #endexport
 
 #export("footer"):
-<script src="https://assets.open-meteo.com/libs/highstock-6.0.4/highstock.min.js"
-  integrity="sha256-0L3MBlAKkqgWfarnVC3MWPO4h7NpH1W61Yr79nwKXFg="
+<script src="https://assets.open-meteo.com/libs/highstock-10.3.1/highstock.js"
+  integrity="sha512-FpTlH4AK/Pw9x4jCRet+EKF+8l2iWK9vJ4gjAfDhWFCHq/rfitKEvPphq8mFx4DoMKCXe/jpRpKta423ymyNLA=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="/scripts/weather.js"></script>
 <script src="https://assets.open-meteo.com/libs/bootstrap-datepicker-1.9.0/bootstrap-datepicker.min.js"

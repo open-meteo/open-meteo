@@ -46,7 +46,7 @@
 <div class="container px-4 py-0" id="featured-3">
   <form id="api_form" method="get" action="https://api.open-meteo.com/v1/forecast">
     <div class="row py-3 px-0">
-      <h3>Select Coordinates or City</h3>
+      <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
         <div class="form-floating">
           <input type="number" step="0.0001" class="form-control" name="latitude" id="latitude" value="52.52">
@@ -144,7 +144,7 @@
       </div>
     </div>
     <div class="row py-3 px-0">
-      <h3>Hourly Weather Variables</h3>
+      <h2>Hourly Weather Variables</h2>
       <div class="col-md-3">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m" id="temperature_2m" name="hourly"
@@ -732,7 +732,7 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h3>Daily Weather Variables <small class="text-muted">(*)</small></h3>
+      <h2>Daily Weather Variables <small class="text-muted">(*)</small></h2>
       <div class="col-md-6">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode_daily" name="daily">
@@ -851,7 +851,7 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h3>Settings</h3>
+      <h2>Settings</h2>
       <div class="col-12 pb-3">
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="current_weather" name="current_weather" value="true">
@@ -944,7 +944,7 @@
       <div class="col-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="2022-06-08" value="" data-default="" name="start_date"><span
+            data-date-start-date="2022-06-08" value="" data-default="" name="start_date" id="start_date"><span
             class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
           <label for="start_date">Start date</label>
         </div>
@@ -952,7 +952,7 @@
       <div class="col-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="2022-06-08" value="" data-default="" name="end_date"><span
+            data-date-start-date="2022-06-08" value="" data-default="" name="end_date" id="end_date"><span
             class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
           <label for="end_date">End date</label>
         </div>
@@ -1740,8 +1740,8 @@
 #endexport
 
 #export("footer"):
-<script src="https://assets.open-meteo.com/libs/highstock-6.0.4/highstock.min.js"
-  integrity="sha256-0L3MBlAKkqgWfarnVC3MWPO4h7NpH1W61Yr79nwKXFg="
+<script src="https://assets.open-meteo.com/libs/highstock-10.3.1/highstock.js"
+  integrity="sha512-FpTlH4AK/Pw9x4jCRet+EKF+8l2iWK9vJ4gjAfDhWFCHq/rfitKEvPphq8mFx4DoMKCXe/jpRpKta423ymyNLA=="
   crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 <script src="/scripts/weather.js"></script>
 <script src="https://assets.open-meteo.com/libs/bootstrap-datepicker-1.9.0/bootstrap-datepicker.min.js"
