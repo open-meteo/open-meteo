@@ -31,7 +31,7 @@ extension Application {
             connectionPool: .init(idleTimeout: .seconds(30*60)))
         
         let new = HTTPClient(
-            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 2)),
+            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 1)),
             configuration: configuration,
             backgroundActivityLogger: logger)
         self.storage.set(HttpClientKey.self, to: new) {
