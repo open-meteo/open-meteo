@@ -517,7 +517,7 @@ struct MeteoFranceMixer: GenericReaderMixer {
 
 extension MeteoFranceMixer {
     func getDaily(variable: MeteoFranceDailyWeatherVariable, params: MeteoFranceQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
+        let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
         case .temperature_2m_max:
             let data = try get(raw: .temperature_2m, time: time).conertAndRound(params: params)
@@ -581,7 +581,7 @@ extension MeteoFranceMixer {
     }
     
     func prefetchData(variables: [MeteoFranceDailyWeatherVariable], time timeDaily: TimerangeDt) throws {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
+        let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             switch variable {
             case .temperature_2m_max:
