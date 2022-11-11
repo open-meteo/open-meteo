@@ -41,6 +41,16 @@ struct Meteorology {
         }
     }
     
+    /// Calculate wind component from speed and direction
+    @inlinable static func uWind(speed: Float, directionDegree: Float) -> Float {
+        return -1 * speed * sin(directionDegree.degreesToRadians)
+    }
+    
+    /// Calculate wind component from speed and direction
+    @inlinable static func vWind(speed: Float, directionDegree: Float) -> Float {
+        return -1 * speed * cos(directionDegree.degreesToRadians)
+    }
+    
     /// Calculate mea nsea level pressure, corrected by temperature.
     static func sealevelPressure(temperature: [Float], pressure: [Float], elevation: Float) -> [Float] {
         precondition(temperature.count == pressure.count)
