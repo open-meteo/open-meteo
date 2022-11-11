@@ -147,6 +147,17 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
             fallthrough
         case .shortwave_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
+        case .cloudcover_low:
+            fallthrough
+        case .cloudcover_mid:
+            fallthrough
+        case .cloudcover_high:
+            try prefetchData(raw: .cloudcover, time: time)
+        case .wind_u_component_10m:
+            fallthrough
+        case .wind_v_component_10m:
+            try prefetchData(raw: .windspeed_10m, time: time)
+            try prefetchData(raw: .winddirection_10m, time: time)
         }
     }
     
@@ -219,11 +230,32 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
             let diff = try get(derived: .diffuse_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
+        case .cloudcover_low:
+            return try get(raw: .cloudcover, time: time)
+        case .cloudcover_mid:
+            return try get(raw: .cloudcover, time: time)
+        case .cloudcover_high:
+            return try get(raw: .cloudcover, time: time)
+        case .wind_u_component_10m:
+            let speed = try get(raw: .windspeed_10m, time: time)
+            let direction = try get(raw: .winddirection_10m, time: time)
+            return DataAndUnit(zip(speed.data, direction.data).map(Meteorology.uWind), speed.unit)
+        case .wind_v_component_10m:
+            let speed = try get(raw: .windspeed_10m, time: time)
+            let direction = try get(raw: .winddirection_10m, time: time)
+            return DataAndUnit(zip(speed.data, direction.data).map(Meteorology.vWind), speed.unit)
         }
     }
 }
 
+/// cloudcover low/mid/high and wind u/v components are requried to be used in the general forecast api
 enum MetNoVariableDerived: String, Codable, GenericVariableMixable {
+    case cloudcover_low
+    case cloudcover_mid
+    case cloudcover_high
+    case wind_u_component_10m
+    case wind_v_component_10m
+    
     case apparent_temperature
     case dewpoint_2m
     case direct_normal_irradiance
