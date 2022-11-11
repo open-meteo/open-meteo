@@ -87,7 +87,7 @@ struct MetNoDownloader: AsyncCommandFix {
         guard nx == domain.grid.nx, ny == domain.grid.ny else {
             fatalError("Wrong domain dimensions \(nx), \(ny)")
         }
-        guard (57...64).contains(nTime) else {
+        guard (48...64).contains(nTime) else {
             fatalError("Wrong time dimensions \(nTime)")
         }
         
