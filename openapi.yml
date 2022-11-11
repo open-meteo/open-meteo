@@ -8,8 +8,8 @@ info:
     url: https://open-meteo.com
     email: info@open-meteo.com
   license:
-    name: Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
-    url: https://creativecommons.org/licenses/by-nc/4.0/
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
   termsOfService: https://open-meteo.com/en/features#terms
 paths:
   /v1/forecast:

@@ -1,6 +1,6 @@
 # 🌤 Open-Meteo Weather API
 
-[![Test](https://github.com/open-meteo/open-meteo/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/open-meteo/open-meteo/actions/workflows/test.yml) [![codebeat badge](https://codebeat.co/badges/af28fed6-9cbf-41df-96a1-9bba03ae3c53)](https://codebeat.co/projects/github-com-open-meteo-open-meteo-main) [![GitHub license](https://img.shields.io/github/license/open-meteo/open-meteo)](https://github.com/open-meteo/open-meteo/blob/main/LICENSE) [![license: CC BY-NC 4.0](https://img.shields.io/badge/license-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/) [![Twitter](https://img.shields.io/twitter/follow/open_meteo)](https://twitter.com/open_meteo) [![Mastodon](https://img.shields.io/mastodon/follow/109320332765909743?domain=https%3A%2F%2Ffosstodon.org)](https://fosstodon.org/@openmeteo)
+[![Test](https://github.com/open-meteo/open-meteo/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/open-meteo/open-meteo/actions/workflows/test.yml) [![codebeat badge](https://codebeat.co/badges/af28fed6-9cbf-41df-96a1-9bba03ae3c53)](https://codebeat.co/projects/github-com-open-meteo-open-meteo-main) [![GitHub license](https://img.shields.io/github/license/open-meteo/open-meteo)](https://github.com/open-meteo/open-meteo/blob/main/LICENSE) [![license: CC BY 4.0](https://img.shields.io/badge/license-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/) [![Twitter](https://img.shields.io/twitter/follow/open_meteo)](https://twitter.com/open_meteo) [![Mastodon](https://img.shields.io/mastodon/follow/109320332765909743?domain=https%3A%2F%2Ffosstodon.org)](https://fosstodon.org/@openmeteo)
 
 
 Open-Meteo is an open-source weather API and offers free access for non-commercial use. No API key is required. You can use it immediately!
@@ -8,11 +8,13 @@ Open-Meteo is an open-source weather API and offers free access for non-commerci
 Head over to https://open-meteo.com! Stay up to date with our blog at https://openmeteo.substack.com.
 
 ## Features 
-- Hourly weather forecast for 7 days
-- Global weather models 11 km and regional up to 2 km resolution
-- 60 years Historical Weather API
+- [Hourly weather forecast](https://open-meteo.com/en/docs) for 7 days
+- Global weather models 11 km and regional up to 1.5 km resolution
+- 60 years [Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api)
+- Based on the best weather models: [NOAA GFS with HRRR](https://open-meteo.com/en/docs/gfs-api), [DWD ICON](https://open-meteo.com/en/docs/dwd-api), [MeteoFrance Arome&Arpege](https://open-meteo.com/en/docs/meteofrance-api), [ECMWF IFS](https://open-meteo.com/en/docs/ecmwf-api), [JMA](https://open-meteo.com/en/docs/jma-api) 
+- [Marine Forecast API](https://open-meteo.com/en/docs/marine-weather-api), [Air Quality API](https://open-meteo.com/en/docs/air-quality-api), [Geocoding API](https://open-meteo.com/en/docs/geocoding-api), [Elevation API](https://open-meteo.com/en/docs/elevation-api)
 - No API key required, CORS supported, no ads, no tracking, not even cookies
-- Free for non-commercial use under Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+- Free for non-commercial use with data under Attribution 4.0 International (CC BY 4.0)
 - Lightning fast APIs with response times below 10 ms
 - Servers located in Germany (POP for North-America in planning. Sponsors welcome!)
 - Source code available under AGPLv3
@@ -83,7 +85,7 @@ All data is provided as is without any warranty.
 We do not collect any personal data. We do not share any personal information. We do not integrate any third party analytics, ads, beacons or plugins.
 
 ## Data License
-API data are offered under Attribution-NonCommercial 4.0 International (CC BY-NC 4.0)
+API data are offered under Attribution 4.0 International (CC BY 4.0)
 
 You are free to share: copy and redistribute the material in any medium or format and adapt: remix, transform, and build upon the material.
 
@@ -92,8 +94,6 @@ Attribution: You must give appropriate credit, provide a link to the license, an
 You must include a link next to any location, Open-Meteo data are displayed like:
 
 <a href="https://open-meteo.com/">Weather data by Open-Meteo.com</a>
-
-NonCommercial: You may not use the material for commercial purposes.
 
 
 ## Source Code License
