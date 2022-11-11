@@ -5,6 +5,8 @@ import SwiftNetCDF
 
 
 /// Download MetNo domains from OpenDAP server
+/// https://github.com/metno/NWPdocs/wiki
+/// Nordic dataset (same as yr.no API) https://github.com/metno/NWPdocs/wiki/MET-Nordic-dataset
 struct MetNoDownloader: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
@@ -72,7 +74,8 @@ struct MetNoDownloader: AsyncCommandFix {
         
         let openDap = "https://thredds.met.no/thredds/dodsC/metpplatest/met_forecast_1_0km_nordic_\(run.format_YYYYMMdd)T\(run.hour)Z.nc"
         
-        let ncFile = try NetCDF.openOrWait(path: openDap, deadline: Date().addingTimeInterval(3600), logger: logger)
+        // Wait up to 30 minutes until data is availble
+        let ncFile = try NetCDF.openOrWait(path: openDap, deadline: Date().addingTimeInterval(30*60), logger: logger)
         let dimensions = ncFile.getDimensions()
         guard dimensions.count == 3 else {
             fatalError("Expected 3 dimensions, got \(dimensions.count)")
