@@ -59,8 +59,8 @@ enum MetNoVariable: String, CaseIterable, Codable, GenericVariable, GenericVaria
     case cloudcover
     case pressure_msl
     case relativehumidity_2m
-    case wind_speed_10m
-    case wind_direction_10m
+    case windspeed_10m
+    case winddirection_10m
     case windgusts_10m
     case shortwave_radiation
     case precipitation
@@ -89,9 +89,9 @@ enum MetNoVariable: String, CaseIterable, Codable, GenericVariable, GenericVaria
             return 10
         case .shortwave_radiation:
             return 1
-        case .wind_speed_10m:
+        case .windspeed_10m:
             return 10
-        case .wind_direction_10m:
+        case .winddirection_10m:
             return 1
         }
     }
@@ -106,9 +106,9 @@ enum MetNoVariable: String, CaseIterable, Codable, GenericVariable, GenericVaria
             return .hermite(bounds: nil)
         case .relativehumidity_2m:
             return .hermite(bounds: 0...100)
-        case .wind_speed_10m:
+        case .windspeed_10m:
             return .hermite(bounds: nil)
-        case .wind_direction_10m:
+        case .winddirection_10m:
             return .hermite(bounds: nil)
         case .precipitation:
             return .linear
@@ -135,9 +135,9 @@ enum MetNoVariable: String, CaseIterable, Codable, GenericVariable, GenericVaria
             return .hectoPascal
         case .shortwave_radiation:
             return .wattPerSquareMeter
-        case .wind_speed_10m:
+        case .windspeed_10m:
             return .ms
-        case .wind_direction_10m:
+        case .winddirection_10m:
             return .degreeDirection
         }
     }
@@ -189,9 +189,9 @@ enum MetNoVariable: String, CaseIterable, Codable, GenericVariable, GenericVaria
             return "air_pressure_at_sea_level"
         case .relativehumidity_2m:
             return "relative_humidity_2m"
-        case .wind_speed_10m:
+        case .windspeed_10m:
             return "wind_speed_10m"
-        case .wind_direction_10m:
+        case .winddirection_10m:
             return "wind_direction_10m"
         case .windgusts_10m:
             return "wind_speed_of_gust"
