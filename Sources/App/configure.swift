@@ -69,6 +69,7 @@ public func configure(_ app: Application) throws {
     app.commands.use(SeasonalForecastDownload(), as: "download-seasonal-forecast")
     app.commands.use(GfsDownload(), as: "download-gfs")
     app.commands.use(JmaDownload(), as: "download-jma")
+    app.commands.use(MetNoDownloader(), as: "download-metno")
     app.commands.use(SyncCommand(), as: "sync")
 
     app.http.server.configuration.hostname = "0.0.0.0"

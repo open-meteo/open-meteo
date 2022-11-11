@@ -55,6 +55,9 @@ struct LambertConformalConicProjection {
     /// Radius of Earth
     static var R: Float = 6370.997
     
+    /// λ0 reference longitude
+    /// ϕ0  reference latitude
+    /// ϕ0 and ϕ1 standard parallels
     public init(λ0: Float, ϕ0: Float, ϕ1: Float) {
         // https://mathworld.wolfram.com/LambertConformalConicProjection.html
         λ0_rad = (λ0 + 360).truncatingRemainder(dividingBy: 360).degreesToRadians
