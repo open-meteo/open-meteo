@@ -111,17 +111,17 @@ struct MetNoDownloader: AsyncCommandFix {
             try OmFileWriter(dim0: ny, dim1: nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: altitude)
         }
         
+        /// Verify projection and grid coordinates
         /*if true {
-            guard var lats = try ncFile.getVariable(name: "latitude")?.asType(Float.self)?.read() else {
+            guard let lats = try ncFile.getVariable(name: "latitude")?.asType(Float.self)?.read() else {
                 fatalError("Could not get float data from latitude")
             }
-            guard var lons = try ncFile.getVariable(name: "longitude")?.asType(Float.self)?.read() else {
+            guard let lons = try ncFile.getVariable(name: "longitude")?.asType(Float.self)?.read() else {
                 fatalError("Could not get float data from longitude")
             }
-            var lats2 = Array2D(data: lats, nx: nx, ny: ny)
-            lats2.flipLatitude()
-            var lons2 = Array2D(data: lons, nx: nx, ny: ny)
-            lons2.flipLatitude()
+            
+            print("0,0 \(lats[0])/\(lons[0])")
+            print("ny-1,nx-1 \(lats[(ny-1)*nx+nx-1])/\(lons[(ny-1)*nx+nx-1])")
             
             for x in 0..<nx {
                 for y in 0..<ny {
