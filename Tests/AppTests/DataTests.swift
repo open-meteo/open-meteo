@@ -43,7 +43,7 @@ final class DataTests: XCTestCase {
     }
     
     func testLambertConformal() {
-        let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
+        let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
         let pos = proj.forward(latitude: 47, longitude: -8)
         XCTAssertEqual(pos.x, 5833.868)
         XCTAssertEqual(pos.y, 8632.734)

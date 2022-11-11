@@ -57,13 +57,19 @@ struct LambertConformalConicProjection {
     
     /// λ0 reference longitude
     /// ϕ0  reference latitude
-    /// ϕ0 and ϕ1 standard parallels
-    public init(λ0: Float, ϕ0: Float, ϕ1: Float) {
+    /// ϕ1 and ϕ2 standard parallels
+    public init(λ0: Float, ϕ0: Float, ϕ1: Float, ϕ2: Float) {
         // https://mathworld.wolfram.com/LambertConformalConicProjection.html
         λ0_rad = (λ0 + 360).truncatingRemainder(dividingBy: 360).degreesToRadians
         ϕ0_rad = ϕ0.degreesToRadians
         let ϕ1_rad = ϕ1.degreesToRadians
-        n = sin(ϕ1_rad)
+        let ϕ2_rad = ϕ2.degreesToRadians
+        if ϕ1 == ϕ2 {
+            n = sin(ϕ1_rad)
+        } else {
+            n = log(cos(ϕ1_rad) / cos(ϕ2_rad)) / log(tan(.pi/4 + 0.5*ϕ1_rad) / tan(.pi/4 + 0.5*ϕ2_rad))
+        }
+        
         F = (cos(ϕ1_rad) * powf(tan(.pi/4 + ϕ1_rad/2), n))/n
         ρ0 = F/powf(tan(.pi/4 + ϕ0_rad/2),n)
     }
