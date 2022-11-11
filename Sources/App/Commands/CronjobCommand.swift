@@ -55,6 +55,8 @@ struct CronjobCommand: Command {
         0 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-meteofrance arome_france --upper-level > ~/log/arome_france_upper-level.log 2>&1 || cat ~/log/arome_france_upper-level.log
         
         0 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-meteofrance arome_france_hd > ~/log/arome_france_hd.log 2>&1 || cat ~/log/arome_france_hd.log
+
+        27 * * * * /usr/local/bin/openmeteo-api download-metno nordic_pp > ~/log/nordic_pp.log 2>&1 || cat ~/log/nordic_pp.log
         """)
     }
 }
