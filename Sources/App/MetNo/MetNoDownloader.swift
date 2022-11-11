@@ -111,6 +111,31 @@ struct MetNoDownloader: AsyncCommandFix {
             try OmFileWriter(dim0: ny, dim1: nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: altitude)
         }
         
+        /*if true {
+            guard var lats = try ncFile.getVariable(name: "latitude")?.asType(Float.self)?.read() else {
+                fatalError("Could not get float data from latitude")
+            }
+            guard var lons = try ncFile.getVariable(name: "longitude")?.asType(Float.self)?.read() else {
+                fatalError("Could not get float data from longitude")
+            }
+            var lats2 = Array2D(data: lats, nx: nx, ny: ny)
+            lats2.flipLatitude()
+            var lons2 = Array2D(data: lons, nx: nx, ny: ny)
+            lons2.flipLatitude()
+            
+            for x in 0..<nx {
+                for y in 0..<ny {
+                    let coord = domain.grid.getCoordinates(gridpoint: y*nx + x)
+                    let lat = lats[y*nx + x]
+                    let lon = lons[y*nx + x]
+                    if abs(coord.latitude - lat) > 0.1 || abs(coord.longitude - lon) > 0.1 {
+                        fatalError("lat \(x) \(y) diffs \(coord) \(lat) \(lon)")
+                    }
+                }
+            }
+            return
+        }*/
+        
         let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
         
         for variable in variables {
