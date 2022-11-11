@@ -34,6 +34,8 @@ enum MultiDomains: String, Codable, CaseIterable {
     
     case ecmwf_ifs04
     
+    case metno_nordic
+    
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
     fileprivate func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixerForecast] {
@@ -112,6 +114,8 @@ enum MultiDomains: String, Codable, CaseIterable {
             return try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .ecmwf_ifs04:
             return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .metno_nordic:
+            return try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
 }
@@ -151,6 +155,7 @@ extension IconReader: GenericReaderMixerForecast { }
 extension MeteoFranceReader: GenericReaderMixerForecast { }
 extension JmaReader: GenericReaderMixerForecast { }
 extension EcmwfReader: GenericReaderMixerForecast { }
+extension MetNoReader: GenericReaderMixerForecast { }
 
 /// Combine multiple independent weahter models, that may not have given forecast variable
 struct MultiDomainMixer {

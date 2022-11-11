@@ -642,6 +642,13 @@
                     ECMWF IFS
                   </label>
                 </div>
+                <div class="form-check debug-hidden">
+                  <input class="form-check-input" type="checkbox" value="metno_nordic"
+                    id="metno_nordic" name="models">
+                  <label class="form-check-label" for="metno_nordic">
+                    Met.no Nordic
+                  </label>
+                </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="gfs_mix"
                     id="gfs_mix" name="models">

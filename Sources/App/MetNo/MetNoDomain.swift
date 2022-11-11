@@ -153,7 +153,7 @@ enum MetNoVariable: String, CaseIterable, Codable, GenericVariable, GenericVaria
         case .pressure_msl:
             return (1/100, 0)
         case .shortwave_radiation:
-            return (1/1_000, 0)
+            return (1/3600, 0)
         default:
             return nil
         }
