@@ -26,9 +26,10 @@ extension Application {
             return existing
         }
         // set timers very high, to use own timers
-        let configuration = HTTPClient.Configuration(
+        var configuration = HTTPClient.Configuration(
             timeout: .init(connect: .seconds(60), read: .seconds(5*60)),
             connectionPool: .init(idleTimeout: .seconds(30*60)))
+        configuration.httpVersion = .http1Only
         
         let new = HTTPClient(
             eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 1)),
