@@ -25,9 +25,9 @@ extension Application {
         if let existing = self.storage[HttpClientKey.self] {
             return existing
         }
-        // set timers very high, to use own timers
+        // +10s to make sure curl internal timers trigger first
         var configuration = HTTPClient.Configuration(
-            timeout: .init(connect: .seconds(60), read: .seconds(5*60)),
+            timeout: .init(connect: .seconds(60 + 10), read: .seconds(5*60 + 10)),
             connectionPool: .init(idleTimeout: .seconds(30*60)))
         configuration.httpVersion = .http1Only
         
