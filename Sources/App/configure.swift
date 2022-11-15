@@ -25,10 +25,10 @@ extension Application {
         if let existing = self.storage[HttpClientKey.self] {
             return existing
         }
-        // +10s to make sure curl internal timers trigger first
+        // try again with very high timeouts, so only the curl internal timers are used
         var configuration = HTTPClient.Configuration(
-            timeout: .init(connect: .seconds(60 + 10), read: .seconds(5*60 + 10)),
-            connectionPool: .init(idleTimeout: .seconds(30*60)))
+            timeout: .init(connect: .hours(24), read: .hours(24)),
+            connectionPool: .init(idleTimeout: .hours(24)))
         configuration.httpVersion = .http1Only
         
         let new = HTTPClient(
