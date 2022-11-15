@@ -426,7 +426,7 @@ protocol AsyncCommandFix: Command {
 extension AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) throws {
         // use same thread as downloader, do not use main loop
-        let eventloop = context.application.dedicatedHttpClient.eventLoopGroup.next()
+        /*let eventloop = context.application.dedicatedHttpClient.eventLoopGroup.next()
         let result = eventloop.flatSubmit {
             let promise = eventloop.makePromise(of: Void.self)
             promise.completeWithTask {
@@ -434,6 +434,14 @@ extension AsyncCommandFix {
             }
             return promise.futureResult
         }
-        try result.wait()
+        try result.wait()*/
+        
+        // mainloop or dedicated loop make no difference apparently
+        let eventloop = context.application.eventLoopGroup.next()
+        let promise = eventloop.makePromise(of: Void.self)
+        promise.completeWithTask {
+            try await run(using: context, signature: signature)
+        }
+        try promise.futureResult.wait()
     }
 }
