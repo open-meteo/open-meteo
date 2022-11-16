@@ -14,13 +14,13 @@ struct MetNoController {
             try params.validate()
             let currentTime = Timestamp.now()
             
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 11)
+            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 4)
             let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 10, allowedRange: allowedRange)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600)
             
             guard let reader = try MetNoReader(domain: MetNoDomain.nordic_pp, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
-                fatalError("Not possible, ECMWF is global")
+                throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = params.hourly {
@@ -86,9 +86,6 @@ struct MetNoQuery: Content, QueryWithStartEndDateTimeZone {
         if longitude > 180 || longitude < -180 || longitude.isNaN {
             throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
         }
-        if let timezone = timezone, !timezone.isEmpty {
-            throw ForecastapiError.timezoneNotSupported
-        }
         /*if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
         }*/
@@ -147,12 +144,12 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
             fallthrough
         case .shortwave_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
-        case .cloudcover_low:
+        /*case .cloudcover_low:
             fallthrough
         case .cloudcover_mid:
             fallthrough
         case .cloudcover_high:
-            try prefetchData(raw: .cloudcover, time: time)
+            try prefetchData(raw: .cloudcover, time: time)*/
         case .wind_u_component_10m:
             fallthrough
         case .wind_v_component_10m:
@@ -230,12 +227,12 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
             let diff = try get(derived: .diffuse_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
-        case .cloudcover_low:
+        /*case .cloudcover_low:
             return try get(raw: .cloudcover, time: time)
         case .cloudcover_mid:
             return try get(raw: .cloudcover, time: time)
         case .cloudcover_high:
-            return try get(raw: .cloudcover, time: time)
+            return try get(raw: .cloudcover, time: time)*/
         case .wind_u_component_10m:
             let speed = try get(raw: .windspeed_10m, time: time)
             let direction = try get(raw: .winddirection_10m, time: time)
@@ -250,9 +247,9 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
 
 /// cloudcover low/mid/high and wind u/v components are requried to be used in the general forecast api
 enum MetNoVariableDerived: String, Codable, GenericVariableMixable {
-    case cloudcover_low
+    /*case cloudcover_low
     case cloudcover_mid
-    case cloudcover_high
+    case cloudcover_high*/
     case wind_u_component_10m
     case wind_v_component_10m
     

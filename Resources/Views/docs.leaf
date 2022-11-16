@@ -571,11 +571,11 @@
                     ECMWF IFS
                   </label>
                 </div>
-                <div class="form-check debug-hidden">
+                <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="metno_nordic"
                     id="metno_nordic" name="models">
                   <label class="form-check-label" for="metno_nordic">
-                    Met.no Nordic
+                    MET Norway Nordic
                   </label>
                 </div>
                 <div class="form-check">
@@ -977,6 +977,14 @@
             <td>5 - 55 km</td>
             <td>11 days</td>
             <td>Every 3 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="/en/docs/metno-api">MET Nordic</a></th>
+            <td>MET Norway</td>
+            <td>Norway</td>
+            <td>1 km</td>
+            <td>2.5 days</td>
+            <td>Every hour</td>
           </tr>
         </tbody>
       </table>

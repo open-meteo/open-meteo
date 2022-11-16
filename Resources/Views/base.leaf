@@ -59,12 +59,14 @@
               <li><a class="dropdown-item #if(title == "GFS & HRRR Forecast API"): active #endif"
                   href="/en/docs/gfs-api">GFS &amp; HRRR Forecast API</a></li>
               <li><a class="dropdown-item #if(title == "MeteoFrance API"): active #endif"
-                  href="/en/docs/meteofrance-api">MeteoFrance API&nbsp;&nbsp;<span
-                    class="badge bg-secondary">New</span></a></li>
+                  href="/en/docs/meteofrance-api">MeteoFrance API</a></li>
               <li><a class="dropdown-item #if(title == "DWD ICON API"): active #endif" href="/en/docs/dwd-api">DWD
                   API</a></li>
               <li><a class="dropdown-item #if(title == "JMA API"): active #endif"
                     href="/en/docs/jma-api">JMA API</a></li>
+              <li><a class="dropdown-item #if(title == "MET Norway API"): active #endif"
+                    href="/en/docs/metno-api">MET Norway API&nbsp;&nbsp;<span
+                    class="badge bg-secondary">New</span></a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">

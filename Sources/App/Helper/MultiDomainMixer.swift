@@ -47,6 +47,11 @@ enum MultiDomains: String, Codable, CaseIterable {
             guard let gfs025: GenericReaderMixerForecast = try GfsReader(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
+            // Scandinavian region, combine with ICON
+            if lat >= 54.9, let metno = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode) {
+                let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode)
+                return Array([gfs025, icon, iconEu, metno].compacted())
+            }
             // If Icon-d2 is available, use icon domains
             if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode) {
                 // TODO: check how out of projection areas are handled

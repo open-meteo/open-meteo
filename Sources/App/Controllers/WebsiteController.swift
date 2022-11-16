@@ -20,6 +20,7 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "meteofrance-api", use: meteoFranceApiHandler)
         routes.get("en", "docs", "dwd-api", use: dwdApiHandler)
         routes.get("en", "docs", "jma-api", use: jmaApiHandler)
+        routes.get("en", "docs", "metno-api", use: metNoApiHandler)
         routes.get("en", "features", use: featuresHandler)
     }
     
@@ -167,6 +168,13 @@ struct WebsiteController: RouteCollection {
             ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
         ])
         return req.view.render("docs-jma-api", context)
+    }
+    func metNoApiHandler(_ req: Request) -> EventLoopFuture<View> {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
+            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
+        }
+        let context = IndexContext(title: "MET Norway API")
+        return req.view.render("docs-metno-api", context)
     }
     
     func dwdApiHandler(_ req: Request) -> EventLoopFuture<View> {
