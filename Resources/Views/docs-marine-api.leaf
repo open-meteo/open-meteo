@@ -76,7 +76,7 @@
               <option data-latitude="44.4047" data-longitude="8.9443" data-asl="19">Genoa</option>
               <option data-latitude="57.7071" data-longitude="11.9667" data-asl="10">Gothenburg</option>
               <option data-latitude="54.3522" data-longitude="18.6491" data-asl="8">Gdansk</option>
-              <option data-latitude="38.7072" data-longitude="-9.1355" data-asl="15">Lisabon</option>
+              <option data-latitude="38.7072" data-longitude="-9.1355" data-asl="15">Lisbon</option>
               <option data-latitude="59.3328" data-longitude="18.0645" data-asl="15">Stockholm</option>
             </optgroup>
             <optgroup label="America">
