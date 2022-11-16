@@ -60,53 +60,14 @@
         </div>
       </div>
       <div class="col-md-6">
-        <div class="input-group form-floating mb-3">
-          <select class="form-select" id="select_city" aria-label="Select city">
-            <optgroup label="Europe">
-              <option selected data-latitude="54.3213" data-longitude="10.1348" data-asl="0">Kiel</option>
-              <option data-latitude="48.2976" data-longitude="-4.6735" data-asl="0">Brest</option>
-              <option data-latitude="50.7989" data-longitude="-1.0912" data-asl="0">Portsmouth</option>
-              <option data-latitude="41.3887" data-longitude="2.1589" data-asl="0">Barcelona</option>
-              <option data-latitude="52.370850" data-longitude="5.065805" data-asl="0">Amsterdam</option>
-              <option data-latitude="43.2166" data-longitude="27.9166" data-asl="1">Varna</option>
-              <option data-latitude="55.6763" data-longitude="12.5681" data-asl="0">Copenhagen</option>
-              <option data-latitude="37.9792" data-longitude="23.7166" data-asl="153">Athens</option>
-              <option data-latitude="64.1353" data-longitude="-21.8952" data-asl="15">Reykjavik</option>
-              <option data-latitude="53.3441" data-longitude="-6.2675" data-asl="8">Dublin</option>
-              <option data-latitude="44.4047" data-longitude="8.9443" data-asl="19">Genoa</option>
-              <option data-latitude="57.7071" data-longitude="11.9667" data-asl="10">Gothenburg</option>
-              <option data-latitude="54.3522" data-longitude="18.6491" data-asl="8">Gdansk</option>
-              <option data-latitude="38.7072" data-longitude="-9.1355" data-asl="15">Lisbon</option>
-              <option data-latitude="59.3328" data-longitude="18.0645" data-asl="15">Stockholm</option>
-            </optgroup>
-            <optgroup label="America">
-              <option data-latitude="40.71" data-longitude="-74.01" data-asl="10">New York</option>
-              <option data-latitude="34.05" data-longitude="-118.24" data-asl="89">Los Angeles</option>
-              <option data-latitude="29.76" data-longitude="-95.36" data-asl="12">Houston</option>
-              <option data-latitude="49.25" data-longitude="-123.12" data-asl="70">Vancouver</option>
-              <option data-latitude="-34.6118" data-longitude="-58.4173" data-asl="10">Buenos Aires</option>
-              <option data-latitude="-12.0931" data-longitude="-77.0465" data-asl="107">Lima</option>
-              <option data-latitude="-34.8941" data-longitude="-56.0675" data-asl="43">Montevideo</option>
-            </optgroup>
-            <optgroup label="Asia">
-              <option data-latitude="23.7106" data-longitude="90.3978" data-asl="3">Dhaka</option>
-              <option data-latitude="-6.1862" data-longitude="106.8063" data-asl="3">Jakarta</option>
-              <option data-latitude="31.7857" data-longitude="35.2007" data-asl="580">Jerusalem</option>
-              <option data-latitude="35.6785" data-longitude="139.6823" data-asl="17">Tokyo</option>
-              <option data-latitude="1.2894" data-longitude="103.8500" data-asl="0">Singapore</option>
-              <option data-latitude="37.5139" data-longitude="126.9828" data-asl="33">Seoul</option>
-              <option data-latitude="24.4764" data-longitude="54.3705" data-asl="13">Abu Dhabi</option>
-            </optgroup>
-            <optgroup label="Africa">
-              <option data-latitude="36.7755" data-longitude="3.0597" data-asl="0">Algiers</option>
-              <option data-latitude="-8.8159" data-longitude="13.2306" data-asl="6">Luanda</option>
-              <option data-latitude="32.8830" data-longitude="13.1897" data-asl="6">Tripoli</option>
-            </optgroup>
-            <optgroup label="Oceanic">
-              <option data-latitude="-41.2865" data-longitude="174.7762" data-asl="20">Wellington</option>
-            </optgroup>
-          </select>
-          <label for="select_city">Select city</label>
+        <div class="input-group mb-3">
+          <div class="form-floating dropdown">
+            <input type="text" class="form-control" id="select_city" autocomplete="off" spellcheck="false" aria-label="Select city" data-bs-toggle="dropdown"/>
+            <ul id="select_city_results" class="dropdown-menu" aria-labelledby="select_city">
+              <li><span class="dropdown-item">Start typing to search for locations</span></li>
+            </ul>
+            <label for="select_city">Select city</label>
+          </div>
           <button class="btn btn-outline-secondary" type="button" id="detect_gps">Detect GPS Position</button>
         </div>
       </div>

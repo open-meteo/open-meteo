@@ -191,12 +191,71 @@ $("#detect_gps").click(function(e){
      });
 });
 
-$("#select_city").change(function(e){
-    let selected = $(this).find(':selected');
-    $('#latitude').val(selected.data('latitude'));
-    $('#longitude').val(selected.data('longitude'));
+
+$('#select_city_results').on("click", "a", function (e) {
+    e.preventDefault();
+    var row = $(e.currentTarget).data('item')
+    $('#latitude').val(row.latitude.toFixed(2));
+    $('#longitude').val(row.longitude.toFixed(2));
+    $('#select_city').val(row.name);
+    $('#select_city').blur();
     $('#api_form').submit();
+    $('#select_city').dropdown('hide');
 });
+
+var render = (items) => {
+    var resultsDiv = $('#select_city_results');
+    resultsDiv.empty();
+    if (items.length == 0) {
+        resultsDiv.append($('<li><span class="dropdown-item">No locations found</span></li>'));
+    }
+    for (var i = 0, len = items.length; i < len; i++) {
+        let row = items[i];
+        var a = $(`<a class="dropdown-item" href="#">
+            <img height=24 src="https://assets.open-meteo.com/images/country-flags/${row.country_code.toLowerCase()}.svg" title="${row.country}"/> 
+            ${row.name} <small class="text-muted">${row.admin1||''} (${row.latitude.toFixed(2)}°E ${row.longitude.toFixed(2)}°N ${row.elevation}m asl)</small>
+            </a>`
+        );
+        a.data('item', row);
+        resultsDiv.append($('<li></li>').append(a));
+    }
+    $('#select_city').dropdown('show');
+};
+
+var lastsearch = null;
+
+function onChangeSearch(e) {
+    console.log(e.target.value)
+    var query = e.target.value;
+    if (lastsearch == query) {
+        return
+    }
+    lastsearch = query;
+    var url = 'https://geocoding-api.open-meteo.com/v1/search?name=' + encodeURIComponent(query);
+
+    $.ajax({
+        type: "GET",
+        url: url,
+        dataType: 'json',
+        success: function (data) {
+            console.log('Submission was successful.');
+            console.log(data);
+            if (query == lastsearch) {
+                render(data.results||[]);
+            }
+        },
+        error: function (data) {
+            console.log('An error occurred.');
+            console.log(data);
+            alert("API error: "+data.responseJSON.reason);
+        },
+    });
+}
+$("#select_city").change(onChangeSearch);
+$("#select_city").keyup(onChangeSearch);
+
+
+
 
 var frm = $('#api_form');
 var frmInitialParameter = frm.serialize();
