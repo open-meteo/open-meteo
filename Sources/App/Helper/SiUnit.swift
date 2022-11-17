@@ -24,6 +24,7 @@ enum SiUnit: String, Codable {
     case perSecond = "s⁻¹"
     case second = "s"
     case qubicMeterPerQubicMeter = "m³/m³"
+    case qubicMeterPerSecond = "m³/s"
     case kiloPascal = "kPa"
     case megaJoulesPerSquareMeter = "MJ/m²"
     case joulesPerKilogram = "J/kg"
@@ -67,6 +68,7 @@ enum SiUnit: String, Codable {
         case .grainsPerQuibicMeter: return 1
         case .dimensionless: return 2
         case .joulesPerKilogram: return 0
+        case .qubicMeterPerSecond: return 2
         }
     }
 }
