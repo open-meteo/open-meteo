@@ -125,15 +125,13 @@ struct GloFasDownloader: Command {
             grib2d.array.flipLatitude()
             //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
            
-            // TODO: enable lossy compression, once data quality is checked
-            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .fpxdec32, scalefactor: 1, all: grib2d.array.data)
+            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
         }
         
         logger.info("Converting daily files time series")
         let time = TimerangeDt(range: Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1), dtSeconds: 3600*24)
         let nt = time.count
-        let yearlyFile = "\(domain.omfileArchive!)river_\(year).om"
-        
+        let yearlyFile = "\(domain.omfileArchive!)river_discharge_\(year).om"
         
         let omFiles = try time.map { time -> OmFileReader in
             let omFile = "\(downloadDir)glofas_\(time.format_YYYYMMdd).fpx"
