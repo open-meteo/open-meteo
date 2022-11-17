@@ -147,13 +147,16 @@ final class Curl {
                 self.downloadTask = Task {
                     return try await client.execute(request, timeout: .seconds(3600*24))
                 }
-                let connectTimeout: Timer = Timer(timeInterval: TimeInterval(connectTimeout), repeats: false, block: { [weak self] _ in self?.downloadTask?.cancel() })
+                let connectTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(connectTimeout))) { [weak self] in
+                    self?.logger.error("Timeout reached, canceling download")
+                    self?.downloadTask?.cancel()
+                }
                 let response = try await downloadTask!.value
                 defer {
-                    connectTimeout.invalidate()
+                    connectTimeout.cancel()
                     downloadTask = nil
                 }
-                connectTimeout.invalidate()
+                connectTimeout.cancel()
                 downloadTask = nil
                 
                 if response.status != .ok && response.status != .partialContent {
@@ -185,11 +188,14 @@ final class Curl {
             processVoid = Task {
                 try FileManager.default.removeItemIfExists(at: toFile)
                 let lastModified = response.headers.lastModified?.value
-                try await response.body.decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified)
+                try await response.body.decompressBzip2().saveTo(logger: self.logger, file: toFile, size: nil, modificationDate: lastModified)
             }
-            let readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { [weak self] _ in self?.processVoid?.cancel() })
+            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
+                self?.logger.error("Timeout reached, canceling download processing")
+                self?.processVoid?.cancel()
+            }
             defer {
-                readTimeout.invalidate()
+                readTimeout.cancel()
                 processVoid = nil
             }
             return try await processVoid!.value
@@ -204,11 +210,14 @@ final class Curl {
                 let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
                 let lastModified = response.headers.lastModified?.value
                 try FileManager.default.removeItemIfExists(at: toFile)
-                try await response.body.saveTo(file: toFile, size: contentLength, modificationDate: lastModified)
+                try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
             }
-            let readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { [weak self] _ in self?.processVoid?.cancel() })
+            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
+                self?.logger.error("Timeout reached, canceling download processing")
+                self?.processVoid?.cancel()
+            }
             defer {
-                readTimeout.invalidate()
+                readTimeout.cancel()
                 processVoid = nil
             }
             return try await processVoid!.value
@@ -225,13 +234,17 @@ final class Curl {
                 self.buffer.moveReaderIndex(to: 0)
                 self.buffer.moveWriterIndex(to: 0)
                 for try await fragement in response.body.decompressBzip2() {
+                    try Task.checkCancellation()
                     self.buffer.writeImmutableBuffer(fragement)
                 }
                 return self.buffer
             }
-            let readTimeout = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { [weak self] _ in self?.processByteBuffer?.cancel() })
+            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
+                self?.logger.error("Timeout reached, canceling download processing")
+                self?.processByteBuffer?.cancel()
+            }
             defer {
-                readTimeout.invalidate()
+                readTimeout.cancel()
                 processByteBuffer = nil
             }
             return try await processByteBuffer!.value
@@ -251,18 +264,22 @@ final class Curl {
                     self.buffer.reserveCapacity(contentLength)
                 }
                 for try await fragement in response.body {
+                    try Task.checkCancellation()
                     self.buffer.writeImmutableBuffer(fragement)
                 }
                 return self.buffer
             }
-            let readTimeout: Timer = Timer(timeInterval: TimeInterval(readTimeout), repeats: false, block: { [weak self] _ in self?.processByteBuffer?.cancel() })
+            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
+                self?.logger.error("Timeout reached, canceling download processing")
+                self?.processByteBuffer?.cancel()
+            }
             defer {
-                readTimeout.invalidate()
+                readTimeout.cancel()
                 processByteBuffer = nil
             }
             let buffer = try await processByteBuffer!.value
             processByteBuffer = nil
-            readTimeout.invalidate()
+            readTimeout.cancel()
             if let minSize = minSize, buffer.readableBytes < minSize {
                 throw CurlError.sizeTooSmall
             }
@@ -522,10 +539,22 @@ protocol CurlIndexedVariable {
 extension AsyncSequence where Element == ByteBuffer {
     /// Store incoming data to file
     /// NOTE: File IO is blocking e.g. synchronous
-    func saveTo(file: String, size: Int?, modificationDate: Date?) async throws {
+    func saveTo(logger: Logger, file: String, size: Int?, modificationDate: Date?) async throws {
         let fn = try FileHandle.createNewFile(file: file, size: size)
+        var transfered = 0
+        let startTime = Date()
+        var lastPrint = Date()
         for try await fragment in self {
+            try Task.checkCancellation()
+            transfered += fragment.readableBytes
             try fn.write(contentsOf: fragment.readableBytesView)
+            
+            if Date().timeIntervalSince(lastPrint) > 10 {
+                let timeElapsed = Date().timeIntervalSince(startTime)
+                let rate = transfered / Int(timeElapsed)
+                logger.info("Transferred \(transfered.bytesHumabReadable) MB in (\(Int(timeElapsed/60)) minutes, \(rate.bytesHumabReadable)/s")
+                lastPrint = Date()
+            }
         }
         if let modificationDate {
             let times = [timespec](repeating: timespec(tv_sec: Int(modificationDate.timeIntervalSince1970), tv_nsec: 0), count: 2)
@@ -533,6 +562,31 @@ extension AsyncSequence where Element == ByteBuffer {
                 throw CurlError.futimes(error: String(cString: strerror(errno)))
             }
         }
+    }
+}
+
+extension Int {
+    /// Format number of bytes to a human readable format like `5.5 MB`
+    var bytesHumabReadable: String {
+        if self > 5 * 1024*1024*1024 {
+            return "\((Double(self)/1024/1024/1024).round(digits: 1)) GB"
+        }
+        if self > 1 * 1024*1024*1024 {
+            return "\((Double(self)/1024/1024/1024).round(digits: 2)) GB"
+        }
+        if self > 5 * 1024*1024 {
+            return "\((Double(self)/1024/1024).round(digits: 1)) MB"
+        }
+        if self > 1 * 1024*1024 {
+            return "\((Double(self)/1024/1024).round(digits: 2)) MB"
+        }
+        if self > 5 * 1024 {
+            return "\((Double(self)/1024).round(digits: 1)) KB"
+        }
+        if self > 1 * 1024 {
+            return "\((Double(self)/1024).round(digits: 2)) KB"
+        }
+        return "\(self) bytes"
     }
 }
 

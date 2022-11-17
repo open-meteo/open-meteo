@@ -102,9 +102,9 @@ struct GloFasDownloader: AsyncCommandFix {
         let curl = Curl(logger: logger, readTimeout: 20*60)
         let dateRun = run.format_YYYYMMdd
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/fc_grib/\(dateRun)/dis_\(dateRun)00.grib"
-        let file = "\(domain.downloadDirectory)dis.grib"
+        let file = "\(domain.downloadDirectory)dis2.grib"
         
-        if skipFilesIfExisting && !FileManager.default.fileExists(atPath: file) {
+        if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: file) {
             try await curl.download(url: remote, toFile: file, client: application.dedicatedHttpClient)
         }
         
@@ -165,7 +165,7 @@ struct GloFasDownloader: AsyncCommandFix {
                         'system_version': 'version_4_0',
                         'variable': 'river_discharge_in_the_last_24_hours',
                         'format': 'grib',
-                        'hyear': '2021',
+                        'hyear': '\(year)',
                         'hmonth': [
                             'april', 'august', 'december',
                             'february', 'january', 'july',
