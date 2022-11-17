@@ -121,6 +121,9 @@ struct GloFasDownloader: Command {
                 continue
             }
             try grib2d.load(message: message)
+            grib2d.array.flipLatitude()
+            //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
+           
             /// lossless compression 2D delta coding
             try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .fpxdec32, scalefactor: 1, all: grib2d.array.data)
         }
@@ -138,7 +141,7 @@ struct GloFasDownloader: Command {
         
         var percent = 0
         var looptime = DispatchTime.now()
-        // scaing with log(a + x) / b (a=10, b=5000) could be an option
+        // scaing with log(a + x) / b (a=10, b=5000) could be an option.. NOTE: max discharge around 10_000 m3/s
         try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 8, chunk1: time.count).write(file: yearlyFile, compressionType: .p4nzdec256, scalefactor: 1, supplyChunk: { dim0 in
             
             let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
@@ -203,7 +206,7 @@ enum GloFasDomain: String, GenericDomain {
     }
 }
 
-enum GloFasVariable: String, GenericVariable {
+enum GloFasVariable: String, Codable, GenericVariable {
     case river_discharge
     
     var omFileName: String {

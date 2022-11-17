@@ -23,6 +23,7 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.get("meteofrance", use: MeteoFranceController().query)
         categoriesRoute.get("jma", use: JmaController().query)
         categoriesRoute.get("metno", use: MetNoController().query)
+        categoriesRoute.get("flood", use: GloFasController().query)
     }
     
     func query(_ req: Request) -> EventLoopFuture<Response> {
