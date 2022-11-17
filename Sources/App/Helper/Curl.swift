@@ -556,7 +556,8 @@ extension AsyncSequence where Element == ByteBuffer {
             buffer.writeImmutableBuffer(fragment)
             if buffer.readableBytes > 128*1024 {
                 try fn.write(contentsOf: buffer.readableBytesView)
-                buffer.moveReaderIndex(forwardBy: buffer.readableBytes)
+                buffer.moveReaderIndex(to: 0)
+                buffer.moveWriterIndex(to: 0)
             }
             
             let deltaT = Date().timeIntervalSince(lastPrint)
