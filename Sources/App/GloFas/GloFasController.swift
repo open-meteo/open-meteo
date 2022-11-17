@@ -21,7 +21,6 @@ struct GloFasController {
             let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 32)
             let timezone = try params.resolveTimezone()
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
-            let hourlyTime = time.range.range(dtSeconds: domain.dtSeconds)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
             guard let reader = try GenericReader<GloFasDomain, GloFasVariable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
