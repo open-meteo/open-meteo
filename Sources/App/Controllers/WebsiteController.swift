@@ -21,6 +21,7 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "dwd-api", use: dwdApiHandler)
         routes.get("en", "docs", "jma-api", use: jmaApiHandler)
         routes.get("en", "docs", "metno-api", use: metNoApiHandler)
+        routes.get("en", "docs", "flood-api", use: floodApiHandler)
         routes.get("en", "features", use: featuresHandler)
     }
     
@@ -175,6 +176,13 @@ struct WebsiteController: RouteCollection {
         }
         let context = IndexContext(title: "MET Norway API")
         return req.view.render("docs-metno-api", context)
+    }
+    func floodApiHandler(_ req: Request) -> EventLoopFuture<View> {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
+            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
+        }
+        let context = IndexContext(title: "Flood API")
+        return req.view.render("docs-flood-api", context)
     }
     
     func dwdApiHandler(_ req: Request) -> EventLoopFuture<View> {
