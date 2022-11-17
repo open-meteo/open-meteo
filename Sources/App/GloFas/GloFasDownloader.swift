@@ -108,6 +108,7 @@ struct GloFasDownloader: Command {
         
         let ny = domain.grid.ny
         let nx = domain.grid.nx
+        // 21k locations -> 30MB chunks for 1 year
         let nLocationChunk = nx * ny / 1000
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
@@ -124,14 +125,14 @@ struct GloFasDownloader: Command {
             grib2d.array.flipLatitude()
             //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
            
-            /// lossless compression 2D delta coding
+            // TODO: enable lossy compression, once data quality is checked
             try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .fpxdec32, scalefactor: 1, all: grib2d.array.data)
         }
         
         logger.info("Converting daily files time series")
         let time = TimerangeDt(range: Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1), dtSeconds: 3600*24)
         let nt = time.count
-        let yearlyFile = "\(domain.omfileArchive!)river_discharge_\(year).om"
+        let yearlyFile = "\(domain.omfileArchive!)river_\(year).om"
         
         
         let omFiles = try time.map { time -> OmFileReader in
@@ -141,8 +142,9 @@ struct GloFasDownloader: Command {
         
         var percent = 0
         var looptime = DispatchTime.now()
-        // scaing with log(a + x) / b (a=10, b=5000) could be an option.. NOTE: max discharge around 10_000 m3/s
-        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 8, chunk1: time.count).write(file: yearlyFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
+        // Scale logarithmic. Max discharge around 400_000 m3/s
+        // Note: delta 2d coding (chunk0=6) save around 15% space
+        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, supplyChunk: { dim0 in
             
             let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
             if percent != ratio {
@@ -186,7 +188,7 @@ enum GloFasDomain: String, GenericDomain {
     var grid: Gridable {
         switch self {
         case .consolidated:
-            return RegularGrid(nx: 7200, ny: 3000, latMin: -90, lonMin: -180, dx: 0.05, dy: 0.06)
+            return RegularGrid(nx: 7200, ny: 3000, latMin: -60, lonMin: -180, dx: 0.05, dy: 0.05)
         }
     }
     
