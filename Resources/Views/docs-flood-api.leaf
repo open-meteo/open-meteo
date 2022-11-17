@@ -19,7 +19,7 @@
     <path
       d="M7.068.727c.243-.97 1.62-.97 1.864 0l.071.286a.96.96 0 0 0 1.622.434l.205-.211c.695-.719 1.888-.03 1.613.931l-.08.284a.96.96 0 0 0 1.187 1.187l.283-.081c.96-.275 1.65.918.931 1.613l-.211.205a.96.96 0 0 0 .434 1.622l.286.071c.97.243.97 1.62 0 1.864l-.286.071a.96.96 0 0 0-.434 1.622l.211.205c.719.695.03 1.888-.931 1.613l-.284-.08a.96.96 0 0 0-1.187 1.187l.081.283c.275.96-.918 1.65-1.613.931l-.205-.211a.96.96 0 0 0-1.622.434l-.071.286c-.243.97-1.62.97-1.864 0l-.071-.286a.96.96 0 0 0-1.622-.434l-.205.211c-.695.719-1.888.03-1.613-.931l.08-.284a.96.96 0 0 0-1.186-1.187l-.284.081c-.96.275-1.65-.918-.931-1.613l.211-.205a.96.96 0 0 0-.434-1.622l-.286-.071c-.97-.243-.97-1.62 0-1.864l.286-.071a.96.96 0 0 0 .434-1.622l-.211-.205c-.719-.695-.03-1.888.931-1.613l.284.08a.96.96 0 0 0 1.187-1.186l-.081-.284c-.275-.96.918-1.65 1.613-.931l.205.211a.96.96 0 0 0 1.622-.434l.071-.286zM12.973 8.5H8.25l-2.834 3.779A4.998 4.998 0 0 0 12.973 8.5zm0-1a4.998 4.998 0 0 0-7.557-3.779l2.834 3.78h4.723zM5.048 3.967c-.03.021-.058.043-.087.065l.087-.065zm-.431.355A4.984 4.984 0 0 0 3.002 8c0 1.455.622 2.765 1.615 3.678L7.375 8 4.617 4.322zm.344 7.646.087.065-.087-.065z" />
   </svg>
-  <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Flood API</h1>
+  <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Global Flood API</h1>
   <div class="col-lg-6 mx-auto">
     <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Simulated river discharge at 5 km resolution</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
@@ -214,8 +214,7 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses local weather models from the Norwegian Meteorological Institute. The <a href="https://github.com/metno/NWPdocs/wiki/MET-Nordic-dataset" target="_blank">MET Nordic</a> dataset is derived from the 2.5 km MetCoOp ensemble model with ECMWF initialization. With post-processing based on measurement & radar and with updates every hour, the short-term forecast performance skill should be high.</p>
-    <p>Unfortunately, only 2.5 days of forecast are available. The Open-Meteo <a href="/en/docs">weather forecast API</a> automatically uses MET Nordic in combination with larger scale models to offer a 7 days forecast.</p>
+    <p>This API uses reanalysis and forecast data from the <a href="https://www.globalfloods.eu" target="_blank">Global Flood Awareness System</a>.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -230,19 +229,19 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row"><a href="https://github.com/metno/NWPdocs/wiki/MET-Nordic-dataset" target="_blank">MET Nordic</a></th>
-            <td>Norway, Denmark, Sweden, Finland</td>
-            <td>1 km</td>
-            <td>Hourly</td>
-            <td>2.5 days</td>
-            <td>Every hour</td>
+            <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-historical?tab=overview" target="_blank">GloFAS v4 Reanalysis</a></th>
+            <td>Global</td>
+            <td>0.05° (~5 km)</td>
+            <td>Daily</td>
+            <td>1984-2022</td>
+            <td>Monthly</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <h2 id="api-documentation" class="mt-5">API Documentation</h2>
-    <p>The API endpoint <mark>/v1/metno</mark> accepts a geographical coordinate, a list of weather variables and
+    <p>The API endpoint <mark>/v1/flood</mark> accepts a geographical coordinate, a list of weather variables and
       responds with a JSON hourly weather forecast for 2.5 days. Time always starts at 0:00 today. Data is only available in the Scandinavian region.
       All URL parameters are listed below:</p>
     <div class="table-responsive">
@@ -381,14 +380,14 @@
             <td>Timezone identifier (e.g. <mark>Europe/Berlin</mark>) and abbreviation (e.g. <mark>CEST</mark>)</td>
           </tr>
           <tr>
-            <th scope="row">hourly</th>
+            <th scope="row">daily</th>
             <td>Object</td>
             <td>For each selected weather variable, data will be returned as a floating point array. Additionally a
               <mark>time</mark> array will be returned with ISO8601 timestamps.
             </td>
           </tr>
           <tr>
-            <th scope="row">hourly_units</th>
+            <th scope="row">daily_units</th>
             <td>Object</td>
             <td>For each selected weather variable, the unit will be listed here.</td>
           </tr>
