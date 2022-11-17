@@ -76,7 +76,7 @@
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="river_discharge" id="river_discharge" name="daily"
             checked>
-          <label class="form-check-label" for="temperature_2m">
+          <label class="form-check-label" for="river_discharge">
             River discharge
           </label>
         </div>

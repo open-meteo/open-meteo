@@ -23,7 +23,7 @@ public enum CompressionType: UInt8 {
     /// Lossless compression using 2D xor coding
     case fpxdec32 = 1
     
-    ///  Similar to `p4nzdec256` but apply `log(1+x)` before
+    ///  Similar to `p4nzdec256` but apply `log10(1+x)` before
     case p4nzdec256logarithmic = 3
     
     public var bytesPerElement: Int {
@@ -180,7 +180,7 @@ public final class OmFileWriter {
                                     // Int16.min is not representable because of zigzag coding
                                     buffer[posBuffer] = Int16.max
                                 }
-                                let scaled = compressionType == .p4nzdec256logarithmic ? log(1+val) * scalefactor : val * scalefactor
+                                let scaled = compressionType == .p4nzdec256logarithmic ? (log10(1+val) * scalefactor) : (val * scalefactor)
                                 buffer[posBuffer] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
                             }
                         }
@@ -516,7 +516,7 @@ public final class OmFileReader {
                             if val == Int16.max {
                                 into.advanced(by: posOut).pointee = .nan
                             } else {
-                                let unscaled = compression == .p4nzdec256logarithmic ? powf(10, Float(val) / scalefactor) - 1 : Float(val) / scalefactor
+                                let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
                                 into.advanced(by: posOut).pointee = unscaled
                             }
                         }
