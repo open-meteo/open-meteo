@@ -99,7 +99,7 @@ struct GloFasDownloader: AsyncCommandFix {
         let nLocationChunk = nx * ny / 1000
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        let curl = Curl(logger: logger, readTimeout: 20*60)
+        let curl = Curl(logger: logger, readTimeout: 60*60)
         let dateRun = run.format_YYYYMMdd
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/fc_grib/\(dateRun)/dis_\(dateRun)00.grib"
         let file = "\(domain.downloadDirectory)dis2.grib"
