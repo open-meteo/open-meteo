@@ -142,7 +142,7 @@ struct GloFasDownloader: Command {
         var percent = 0
         var looptime = DispatchTime.now()
         // scaing with log(a + x) / b (a=10, b=5000) could be an option.. NOTE: max discharge around 10_000 m3/s
-        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 8, chunk1: time.count).write(file: yearlyFile, compressionType: .p4nzdec256, scalefactor: 1, supplyChunk: { dim0 in
+        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 8, chunk1: time.count).write(file: yearlyFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
             
             let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
             if percent != ratio {
