@@ -71,6 +71,7 @@ public func configure(_ app: Application) throws {
     app.commands.use(GfsDownload(), as: "download-gfs")
     app.commands.use(JmaDownload(), as: "download-jma")
     app.commands.use(MetNoDownloader(), as: "download-metno")
+    app.commands.use(GloFasDownloader(), as: "download-glofas")
     app.commands.use(SyncCommand(), as: "sync")
 
     app.http.server.configuration.hostname = "0.0.0.0"
