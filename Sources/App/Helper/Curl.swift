@@ -27,7 +27,7 @@ final class Curl {
     let connectTimeout = 60
     
     /// Time to transfer a file. Default 5 minutes
-    let readTimeout = 5*60
+    let readTimeout: Int
 
     /// Wait time after each download
     let retryDelaySeconds = 5
@@ -47,10 +47,11 @@ final class Curl {
     /// Running task is kept as a reference to cancel
     private var processVoid: Task<(), Error>? = nil
 
-    public init(logger: Logger, deadLineHours: Int = 3, retryError4xx: Bool = true) {
+    public init(logger: Logger, deadLineHours: Int = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
+        self.readTimeout = readTimeout
 
         buffer = ByteBuffer()
         // Reserve 1MB buffer
