@@ -99,37 +99,44 @@ struct GloFasDownloader: AsyncCommandFix {
         let nLocationChunk = nx * ny / 1000
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        let curl = Curl(logger: logger, readTimeout: 60*60)
+        let curl = Curl(logger: logger, readTimeout: 80*60)
         let dateRun = run.format_YYYYMMdd
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/fc_grib/\(dateRun)/dis_\(dateRun)00.grib"
-        let file = "\(domain.downloadDirectory)dis2.grib"
+        let file = "\(domain.downloadDirectory)dis.grib"
         
         if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: file) {
             try await curl.download(url: remote, toFile: file, client: application.dedicatedHttpClient)
         }
         
-        let grib = try GribFile(file: file)
+        logger.info("Reading grib file")
+        /// TODO eccodes copy everything into memory.... quite large for 8+GB and the 5km will be 32GB
+        let mmap = try MmapFile(fn: try FileHandle.openFileReading(file: file))
+        let grib = try GribMemory(ptr: UnsafeRawBufferPointer(mmap.data))
         for message in grib.messages {
             /// Date in ISO timestamp string format `20210101`
-            let date = message.get(attribute: "dataDate")!
+            let date = message.get(attribute: "validityDate")!
             grib.messages.forEach { message in
                 print(
                     message.get(attribute: "name")!,
                     message.get(attribute: "shortName")!,
+                    message.get(attribute: "validityDate")!,
                     message.get(attribute: "level")!,
-                    message.get(attribute: "paramId")!
+                    message.get(attribute: "paramId")!,
+                    message.get(attribute: "number")!
                 )
                 //if message.get(attribute: "name") == "unknown" {
-                    message.iterate(namespace: .ls).forEach({print($0)})
-                    message.iterate(namespace: .parameter).forEach({print($0)})
-                    message.iterate(namespace: .mars).forEach({print($0)})
-                    message.iterate(namespace: .all).forEach({print($0)})
+                //message.iterate(namespace: .ls).forEach({print($0)})
+                    //message.iterate(namespace: .time).forEach({print($0)})
+                    //message.iterate(namespace: .parameter).forEach({print($0)})
+                    //message.iterate(namespace: .mars).forEach({print($0)})
+                    //message.iterate(namespace: .all).forEach({print($0)})
                 //}
             }
             
-            exit(0);
+            //exit(0);
             
-            let member = message.get(attribute: "member")!
+            /// 0 = control
+            /*let member = message.get(attribute: "number")!
             
             logger.info("Converting day \(date) Member \(member)")
             let dailyFile = "\(domain.downloadDirectory)glofas_member\(member)_\(date).om"
@@ -140,7 +147,7 @@ struct GloFasDownloader: AsyncCommandFix {
             grib2d.array.flipLatitude()
             //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
            
-            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
+            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)*/
         }
         
     }
