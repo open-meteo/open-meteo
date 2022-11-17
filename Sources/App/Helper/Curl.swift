@@ -537,25 +537,41 @@ protocol CurlIndexedVariable {
 }
 
 extension AsyncSequence where Element == ByteBuffer {
-    /// Store incoming data to file
+    /// Store incoming data to file. Buffers up to 150kb until flushed to disk.
     /// NOTE: File IO is blocking e.g. synchronous
     func saveTo(logger: Logger, file: String, size: Int?, modificationDate: Date?) async throws {
         let fn = try FileHandle.createNewFile(file: file, size: size)
         var transfered = 0
+        var transferedLastPrint = 0
+        let printDelta: Double = 10
         let startTime = Date()
         var lastPrint = Date()
+        
+        /// Buffer up to 150kb and then write larger chunks
+        var buffer = ByteBuffer()
+        buffer.reserveCapacity(150*1024)
         for try await fragment in self {
             try Task.checkCancellation()
             transfered += fragment.readableBytes
-            try fn.write(contentsOf: fragment.readableBytesView)
+            buffer.writeImmutableBuffer(fragment)
+            if buffer.readableBytes > 128*1024 {
+                try fn.write(contentsOf: buffer.readableBytesView)
+                buffer.moveReaderIndex(forwardBy: buffer.readableBytes)
+            }
             
-            if Date().timeIntervalSince(lastPrint) > 10 {
+            let deltaT = Date().timeIntervalSince(lastPrint)
+            if deltaT > printDelta {
                 let timeElapsed = Date().timeIntervalSince(startTime)
-                let rate = transfered / Int(timeElapsed)
-                logger.info("Transferred \(transfered.bytesHumabReadable) MB in (\(Int(timeElapsed/60)) minutes, \(rate.bytesHumabReadable)/s")
+                let rate = (transfered - transferedLastPrint) / Int(deltaT)
+                logger.info("Transferred \(transfered.bytesHumanReadable) / \(size?.bytesHumanReadable ?? "-") in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2)), \(rate.bytesHumanReadable)/s")
                 lastPrint = Date()
+                transferedLastPrint = transfered
             }
         }
+        // write remaining data
+        try fn.write(contentsOf: buffer.readableBytesView)
+        buffer.moveReaderIndex(forwardBy: buffer.readableBytes)
+        
         if let modificationDate {
             let times = [timespec](repeating: timespec(tv_sec: Int(modificationDate.timeIntervalSince1970), tv_nsec: 0), count: 2)
             guard futimens(fn.fileDescriptor, times) == 0 else {
@@ -567,7 +583,7 @@ extension AsyncSequence where Element == ByteBuffer {
 
 extension Int {
     /// Format number of bytes to a human readable format like `5.5 MB`
-    var bytesHumabReadable: String {
+    var bytesHumanReadable: String {
         if self > 5 * 1024*1024*1024 {
             return "\((Double(self)/1024/1024/1024).round(digits: 1)) GB"
         }
