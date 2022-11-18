@@ -141,7 +141,7 @@ struct OmFileSplitter {
      TODO: smoothing is not implemented
      TODO: a data callback would be possible to reduce memory every further -> issue with itterating over time, have to completely change OmFileWriter
      */
-    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, ringtime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float) throws {
+    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, ringtime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
         
         // optimise to use 8 MB memory, but aligned to even `chunknLocations`
         let locationsChunk = 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / chunknLocations * chunknLocations
@@ -168,7 +168,7 @@ struct OmFileSplitter {
             try FileManager.default.removeItemIfExists(at: tempFile)
             
             // generate new file, while filling it step by step
-            try writer.write(file: tempFile, compressionType: .p4nzdec256, scalefactor: scalefactor, supplyChunk: {
+            try writer.write(file: tempFile, compressionType: compression, scalefactor: scalefactor, supplyChunk: {
                 d0offset in
                 
                 // Read existing data for a chunk of locations.. Around 8MB data
