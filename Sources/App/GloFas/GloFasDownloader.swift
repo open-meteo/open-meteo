@@ -58,7 +58,7 @@ struct GloFasDownloader: AsyncCommandFix {
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            /*for year in 2015...2018 {
+            /*for year in 1984...2007 {
                 try downloadYear(logger: logger, year: year, cdskey: cdskey)
                 
             }
@@ -109,29 +109,24 @@ struct GloFasDownloader: AsyncCommandFix {
         }
         
         logger.info("Reading grib file")
-        /// TODO eccodes copy everything into memory.... quite large for 8+GB and the 5km will be 32GB
-        let mmap = try MmapFile(fn: try FileHandle.openFileReading(file: file))
-        let grib = try GribMemory(ptr: UnsafeRawBufferPointer(mmap.data))
-        for message in grib.messages {
+        try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
             /// Date in ISO timestamp string format `20210101`
             let date = message.get(attribute: "validityDate")!
-            grib.messages.forEach { message in
-                print(
-                    message.get(attribute: "name")!,
-                    message.get(attribute: "shortName")!,
-                    message.get(attribute: "validityDate")!,
-                    message.get(attribute: "level")!,
-                    message.get(attribute: "paramId")!,
-                    message.get(attribute: "number")!
-                )
-                //if message.get(attribute: "name") == "unknown" {
-                //message.iterate(namespace: .ls).forEach({print($0)})
-                    //message.iterate(namespace: .time).forEach({print($0)})
-                    //message.iterate(namespace: .parameter).forEach({print($0)})
-                    //message.iterate(namespace: .mars).forEach({print($0)})
-                    //message.iterate(namespace: .all).forEach({print($0)})
-                //}
-            }
+            print(
+                message.get(attribute: "name")!,
+                message.get(attribute: "shortName")!,
+                message.get(attribute: "validityDate")!,
+                message.get(attribute: "level")!,
+                message.get(attribute: "paramId")!,
+                message.get(attribute: "number")!
+            )
+            //if message.get(attribute: "name") == "unknown" {
+            //message.iterate(namespace: .ls).forEach({print($0)})
+                //message.iterate(namespace: .time).forEach({print($0)})
+                //message.iterate(namespace: .parameter).forEach({print($0)})
+                //message.iterate(namespace: .mars).forEach({print($0)})
+                //message.iterate(namespace: .all).forEach({print($0)})
+            //}
             
             //exit(0);
             
@@ -211,14 +206,13 @@ struct GloFasDownloader: AsyncCommandFix {
         let nLocationChunk = nx * ny / 1000
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        let grib = try GribFile(file: gribFile)
-        for message in grib.messages {
+        try SwiftEccodes.iterateMessages(fileName: gribFile, multiSupport: true) { message in
             /// Date in ISO timestamp string format `20210101`
             let date = message.get(attribute: "dataDate")!
             logger.info("Converting day \(date)")
             let dailyFile = "\(downloadDir)glofas_\(date).om"
             if FileManager.default.fileExists(atPath: dailyFile) {
-                continue
+                return
             }
             try grib2d.load(message: message)
             grib2d.array.flipLatitude()
