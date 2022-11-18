@@ -398,7 +398,7 @@ final class Curl {
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
                 try data.withUnsafeReadableBytes {
-                    let messages = try GribMemory(ptr: $0).messages
+                    let messages = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)
                     
                     // memory allocations in libeccodes can case severe memory fragementation
                     // This leads to 20GB+ usage while decoding gfs025 with upper level variables
@@ -437,9 +437,8 @@ final class Curl {
         for range in ranges {
             let data = try await downloadInMemoryAsync(url: url, range: String(range), client: client, minSize: nil)
             try data.withUnsafeReadableBytes { ptr in
-                let grib = try GribMemory(ptr: ptr)
-                chelper_malloc_trim()
-                for message in grib.messages {
+                try SwiftEccodes.iterateMessages(memory: ptr, multiSupport: true) { message in
+                    chelper_malloc_trim()
                     //try! $0.dumpCoordinates()
                     //fatalError("OK")
                     let variable = inventory.matches[matchesPos]
@@ -472,7 +471,7 @@ struct GribByteBuffer {
     init(bytebuffer: ByteBuffer) throws {
         self.bytebuffer = bytebuffer
         self.messages = try bytebuffer.withUnsafeReadableBytes {
-            try GribMemory(ptr: $0).messages
+            try SwiftEccodes.getMessages(memory: $0, multiSupport: true)
         }
         chelper_malloc_trim()
     }

@@ -199,21 +199,21 @@ fileprivate extension Array2DFastTime {
 }
 
 
-fileprivate extension GribFile {
+fileprivate struct GribFile {
     static func readAndConvert(logger: Logger, gribName: String, member: Int, domain: SeasonalForecastDomain, multiply: Float = 1, add: Float = 0) throws -> [String: Array2DFastTime] {
         logger.info("Reading grib '\(gribName)' for member \(member)")
         let startReadGrib = DispatchTime.now()
         var vars = [String: Array2DFastTime]()
         
-        let grib = try GribFile(file: "\(domain.downloadDirectory)\(gribName)_\(member).grb2")
+        let messages = try SwiftEccodes.getMessages(fileName: "\(domain.downloadDirectory)\(gribName)_\(member).grb2", multiSupport: true)
         
         /// Note, first forecast hour is always missing
-        let nForecastHours = Int(grib.messages.last!.get(attribute: "step")!)! / domain.dtHours + 1
+        let nForecastHours = Int(messages.last!.get(attribute: "step")!)! / domain.dtHours + 1
         guard nForecastHours > 10 else {
             fatalError("nForecastHours is \(nForecastHours)")
         }
         
-        for message in grib.messages {
+        for message in messages {
             let shortName = message.get(attribute: "shortName")!
             let forecastStep = Int(message.get(attribute: "step")!)! / domain.dtHours
             var data = try message.read2D()
