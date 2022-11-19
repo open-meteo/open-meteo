@@ -245,6 +245,9 @@ struct DownloadEra5Command: Command {
         @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
         var cdskey: String?
         
+        @Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless of files could be downloaded")
+        var force: Bool
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() -> TimerangeDt {
             if let timeinterval = timeinterval {
@@ -635,9 +638,9 @@ struct DownloadEra5Command: Command {
         }
         
         /// Select the desired timerange, or use last 14 day
-        var timeinterval = signature.getTimeinterval()
-        timeinterval = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
-        try convertDailyFiles(logger: logger, timeinterval: timeinterval)
+        let timeinterval = signature.getTimeinterval()
+        let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
+        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned)
     }
 }
 
