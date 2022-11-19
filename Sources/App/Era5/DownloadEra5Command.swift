@@ -522,6 +522,10 @@ struct DownloadEra5Command: Command {
                 guard let ncVariable = ncfile.getVariable(name: variable.netCdfName) else {
                     fatalError("No variable named MyData available")
                 }
+                guard ncVariable.dimensionsFlat[0] == 24 else {
+                    logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) has only \(ncVariable.dimensionsFlat[0]) timesteps. Skipping.")
+                    break timeLoop
+                }
                 let scaling = variable.netCdfScaling
                 var data = try ncVariable.readWithScalefactorAndOffset(scalefactor: scaling.scalefactor, offset: scaling.offest)
                 
