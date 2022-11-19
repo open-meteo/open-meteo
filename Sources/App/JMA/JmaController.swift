@@ -438,7 +438,7 @@ extension JmaMixer {
     }
     
     func getDaily(variable: JmaDailyWeatherVariable, params: JmaQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
+        let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
         case .temperature_2m_max:
             let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
@@ -483,7 +483,7 @@ extension JmaMixer {
     }
     
     func prefetchData(variables: [JmaDailyWeatherVariable], time timeDaily: TimerangeDt) throws {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
+        let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             switch variable {
             case .temperature_2m_max:
