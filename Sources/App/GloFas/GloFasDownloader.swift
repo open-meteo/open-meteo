@@ -61,7 +61,7 @@ struct GloFasDownloader: AsyncCommandFix {
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            /*for year in 1984...2007 {
+            /*for year in 2008...2013 {
                 try downloadYear(logger: logger, year: year, cdskey: cdskey)
                 
             }
