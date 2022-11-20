@@ -70,20 +70,22 @@
             </ul>
           </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle #if(title == " Marine Weather API" || title=="Elevation API" || title=="Geocoding API" || title=="Air Quality API" || title=="Seasonal Forecast API" ): active #endif"
+            <a class="nav-link dropdown-toggle #if(title == " Marine Weather API" || title=="Elevation API" || title=="Geocoding API" || title=="Air Quality API" || title=="Seasonal Forecast API" || title=="Flood API" ): active #endif"
               href="#" id="navbarDropdownOtherApis" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               Other APIs
             </a>
             <ul class="dropdown-menu" aria-labelledby="navbarDropdownOtherApis">
-              <li><a class="dropdown-item #if(title == " Marine Weather API"): active #endif"
+              <li><a class="dropdown-item #if(title == "Marine Weather API"): active #endif"
                   href="/en/docs/marine-weather-api">Marine Forecast API</a></li>
-              <li><a class="dropdown-item #if(title == " Air Quality API"): active #endif"
+              <li><a class="dropdown-item #if(title == "Air Quality API"): active #endif"
                   href="/en/docs/air-quality-api">Air Quality API</a></li>
-              <li><a class="dropdown-item #if(title == " Geocoding API"): active #endif"
+              <li><a class="dropdown-item #if(title == "Geocoding API"): active #endif"
                   href="/en/docs/geocoding-api">Geocoding API</a></li>
-              <li><a class="dropdown-item #if(title == " Elevation API"): active #endif"
+              <li><a class="dropdown-item #if(title == "Elevation API"): active #endif"
                   href="/en/docs/elevation-api">Elevation API</a></li>
-              <li class="debug-hidden"><a class="dropdown-item #if(title == " Seasonal Forecast API"): active #endif"
+              <li><a class="dropdown-item #if(title == "Flood API"): active #endif"
+                    href="/en/docs/flood-api">Flood API</a></li>
+              <li class="debug-hidden"><a class="dropdown-item #if(title == "Seasonal Forecast API"): active #endif"
                   href="/en/docs/seasonal-forecast-api">Seasonal Forecast API</a></li>
             </ul>
           </li>
@@ -183,7 +185,7 @@
       </div>
     </div>
     <div class="text-center pt-3">
-      <small class="d-block text-muted">© 2020 Copyright: Open-Meteo.com</small>
+      <small class="d-block text-muted">© 2022 Copyright: Open-Meteo.com</small>
     </div>
   </footer>
 
