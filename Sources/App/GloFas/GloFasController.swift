@@ -15,7 +15,7 @@ struct GloFasController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
         do {
             // API should only be used on the subdomain
-            if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "api.") }) {
+            if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "flood-api.") }) {
                 throw Abort.init(.notFound)
             }
             let generationTimeStart = Date()
