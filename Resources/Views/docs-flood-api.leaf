@@ -21,7 +21,7 @@
   </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Global Flood API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Simulated river discharge at 5 km resolution</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Simulated river discharge at 5 km resolution, starting from 1984.</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -42,7 +42,11 @@
 
 <!-- http://127.0.0.1:8080/v1/forecast/query -->
 <div class="container px-4 py-0" id="featured-3">
-  <form id="api_form" method="get" action="https://api.open-meteo.com/v1/flood">
+  <div class="alert alert-primary" role="alert">
+    This is a pre-release. Data from 1984 until July 2022 are integrated, but forecast data are not yet available. The forecast will provide 30 days forecast with 50 ensemble members. Additional variables like soil moisture and snow depth may follow aswell. Availability of forecast data is not yet known.
+  </div>
+
+  <form id="api_form" method="get" action="https://flood-api.open-meteo.com/v1/flood">
     <div class="row py-3 px-0">
       <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
@@ -86,6 +90,22 @@
     <div class="row py-3 px-0">
       <h2>Settings</h2>
       <div class="col-3">
+        <div class="form-floating">
+          <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
+            data-date-start-date="1984-01-01" value="2021-01-01" data-default="" name="start_date" id="start_date"><span
+            class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+          <label for="start_date">Start date</label>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="form-floating">
+          <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
+            data-date-start-date="1984-01-01" value="2022-07-31" data-default="" name="end_date" id="end_date"><span
+            class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+          <label for="end_date">End date</label>
+        </div>
+      </div>
+      <div class="col-3">
         <div class="form-floating mb-3">
           <select class="form-select" name="timeformat" id="timeformat" aria-label="Timeformat" data-default="iso8601">
             <option selected value="iso8601">ISO 8601 (e.g. 2022-12-31)</option>
@@ -94,7 +114,7 @@
           <label for="timeformat">Timeformat</label>
         </div>
       </div>
-      <div class="col-3">
+      <!--<div class="col-3">
         <div class="form-floating mb-3">
           <select class="form-select" name="past_days" id="past_days" aria-label="Past days" data-default="0">
             <option selected value="0">0</option>
@@ -110,23 +130,7 @@
           </select>
           <label for="past_days">Past days</label>
         </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating">
-          <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="1984-01-01" value="" data-default="" name="start_date" id="start_date"><span
-            class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
-          <label for="start_date">Start date</label>
-        </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating">
-          <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="1984-01-01" value="" data-default="" name="end_date" id="end_date"><span
-            class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
-          <label for="end_date">End date</label>
-        </div>
-      </div>
+      </div>-->
       <div class="col-12 pb-3 debug-hidden">
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="localhost" name="localhost" value="true">
@@ -158,7 +162,8 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses reanalysis and forecast data from the <a href="https://www.globalfloods.eu" target="_blank">Global Flood Awareness System</a>.</p>
+    <p>This API uses reanalysis and forecast data from the <a href="https://www.globalfloods.eu" target="_blank">Global Flood Awareness System (GloFAS)</a>. Data have been available since 16. November 2022.</p>
+    <p>Please note: Due to the 5 km resolution the closest river might not be selected correctly. Varying coordiantes by 0.05° can help to get a more representable discharge rate. The GloFAS website provides additional maps to help understand how rivers are covered in this dataset.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -167,7 +172,7 @@
             <th scope="col">Region</th>
             <th scope="col">Spatial Resolution</th>
             <th scope="col">Temporal Resolution</th>
-            <th scope="col">Forecast Length</th>
+            <th scope="col">Data Length</th>
             <th scope="col">Update frequency</th>
           </tr>
         </thead>
@@ -177,16 +182,33 @@
             <td>Global</td>
             <td>0.05° (~5 km)</td>
             <td>Daily</td>
-            <td>1984-2022</td>
+            <td>1984 - July 2022</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-historical?tab=overview" target="_blank">GloFAS v4 Forecast</a> *</th>
+            <td>Global</td>
+            <td>0.05° (~5 km)</td>
+            <td>Daily</td>
+            <td>30 days forecast</td>
+            <td>Daily</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-historical?tab=overview" target="_blank">GloFAS v4 Seasonal Forecast</a> *</th>
+            <td>Global</td>
+            <td>0.05° (~5 km)</td>
+            <td>Daily</td>
+            <td>90 days forecast</td>
             <td>Monthly</td>
           </tr>
         </tbody>
       </table>
+
+      <small class="text-muted">* Forecasts are not yet available</small>
     </div>
 
     <h2 id="api-documentation" class="mt-5">API Documentation</h2>
-    <p>The API endpoint <mark>/v1/flood</mark> accepts a geographical coordinate, a list of weather variables and
-      responds with a JSON hourly weather forecast for 2.5 days. Time always starts at 0:00 today. Data is only available in the Scandinavian region.
+    <p>The API endpoint <mark>/v1/flood</mark> accepts a geographical coordinate and returns river discharge data from the largest river in a 5 km area for the given coordinates.
       All URL parameters are listed below:</p>
     <div class="table-responsive">
       <table class="table">
@@ -208,12 +230,12 @@
             <td>Geographical WGS84 coordinate of the location</td>
           </tr>
           <tr>
-            <th scope="row">hourly</th>
+            <th scope="row">daily</th>
             <td>String array</td>
             <td>No</td>
             <td></td>
-            <td>A list of weather variables which should be returned. Values can be comma separated, or multiple
-              <mark>&hourly=</mark> parameter in the URL can be used.
+            <td>A list of weather variables which should be returned. Currently only "river_discharge" is available. Values can be comma separated, or multiple
+              <mark>&daily=</mark> parameter in the URL can be used.
             </td>
           </tr>
           <tr>
@@ -222,17 +244,16 @@
             <td>No</td>
             <td><mark>iso8601</mark></td>
             <td>If format <mark>unixtime</mark> is selected, all time values are returned in UNIX epoch time in seconds.
-              Please note that all time is then in GMT+0! For daily values with unix timestamp, please apply
-              <mark>utc_offset_seconds</mark> again to get the correct date.
+              Please note that all time is then in GMT+0!
             </td>
           </tr>
-          <tr>
+          <!--<tr>
             <th scope="row">past_days</th>
             <td>Integer (0-2)</td>
             <td>No</td>
             <td><mark>0</mark></td>
             <td>If <mark>past_days</mark> is set, yesterday or the day before yesterday data are also returned.</td>
-          </tr>
+          </tr>-->
           <tr>
             <th scope="row">start_date<br />end_date</th>
             <td>String (yyyy-mm-dd)</td>
@@ -265,7 +286,7 @@
             <tr>
               <th scope="row">river_discharge</th>
               <td>m3/s</td>
-              <td>Daily river discharge rate in m3/s</td>
+              <td>Daily river discharge rate in m³/s</td>
             </tr>
           </tbody>
         </table>
@@ -312,16 +333,6 @@
             <td>Floating point</td>
             <td>Generation time of the weather forecast in milliseconds. This is mainly used for performance monitoring
               and improvements.</td>
-          </tr>
-          <tr>
-            <th scope="row">utc_offset_seconds</th>
-            <td>Integer</td>
-            <td>Applied timezone offset from the <mark>&timezone=</mark> parameter.</td>
-          </tr>
-          <tr>
-            <th scope="row">timezone<br />timezone_abbreviation</th>
-            <td>String</td>
-            <td>Timezone identifier (e.g. <mark>Europe/Berlin</mark>) and abbreviation (e.g. <mark>CEST</mark>)</td>
           </tr>
           <tr>
             <th scope="row">daily</th>
