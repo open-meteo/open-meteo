@@ -176,7 +176,7 @@
               target="_blank">Blog</a></li>
           <li class="mb-1"><a rel="me" class="link-secondary text-decoration-none" href="https://twitter.com/open_meteo"
               target="_blank">Twitter</a></li>
-          <li class="mb-1"> <a rel="me" href="https://fosstodon.org/@openmeteo" target="_blank">Mastodon</a></li>
+          <li class="mb-1"><a rel="me" class="link-secondary text-decoration-none" href="https://fosstodon.org/@openmeteo" target="_blank">Mastodon</a></li>
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#contact">Contact us</a>
           </li>
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/features#terms">Terms &amp;
