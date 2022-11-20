@@ -1,6 +1,15 @@
 import Foundation
 import Vapor
 
+struct GloFasMixer: GenericReaderMixer {
+    var reader: [GenericReader<GloFasDomain, GloFasVariable>]
+}
+
+extension GloFasVariable: GenericVariableMixable {
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
 
 struct GloFasController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
@@ -15,7 +24,7 @@ struct GloFasController {
             let currentTime = Timestamp.now()
             
             /// Will be configurable by API later
-            let domain = GloFasDomain.consolidated
+            //let domain = GloFasDomain.consolidated
             //let members = 1..<domain.nMembers+1
             
             let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 32)
@@ -23,7 +32,7 @@ struct GloFasController {
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try GenericReader<GloFasDomain, GloFasVariable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
+            guard let reader = try GloFasMixer(domains: [.consolidated, .forecastv3], lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
