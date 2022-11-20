@@ -222,6 +222,7 @@ struct GloFasDownloader: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         var data2d = Array2DFastTime(nLocations: nx*ny, nTime: timeinterval.count)
         for (i, date) in timeinterval.enumerated() {
+            logger.info("Reading \(date.format_YYYYMMdd)")
             let dailyFile = try OmFileReader(file: "\(downloadDir)glofas_\(date.format_YYYYMMdd).om")
             data2d[0..<nx*ny, i] = try dailyFile.readAll()
         }
