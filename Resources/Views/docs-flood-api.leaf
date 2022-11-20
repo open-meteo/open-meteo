@@ -87,67 +87,11 @@
       <h2>Settings</h2>
       <div class="col-3">
         <div class="form-floating mb-3">
-          <select class="form-select" name="temperature_unit" id="temperature_unit" aria-label="Temperature Unit"
-            data-default="celsius">
-            <option selected value="celsius">Celsius °C</option>
-            <option value="fahrenheit">Fahrenheit °F</option>
-          </select>
-          <label for="temperature_unit">Temperature Unit</label>
-        </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating mb-3">
-          <select class="form-select" name="windspeed_unit" id="windspeed_unit" aria-label="Windspeed Unit"
-            data-default="kmh">
-            <option selected value="kmh">Km/h</option>
-            <option value="ms">m/s</option>
-            <option value="mph">Mph</option>
-            <option value="kn">Knots</option>
-          </select>
-          <label for="windspeed_unit">Wind Speed Unit</label>
-        </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating mb-3">
-          <select class="form-select" name="precipitation_unit" id="precipitation_unit" aria-label="Precipitation Unit"
-            data-default="mm">
-            <option selected value="mm">Millimeter</option>
-            <option value="inch">Inch</option>
-          </select>
-          <label for="precipitation_unit">Precipitation Unit</label>
-        </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating mb-3">
           <select class="form-select" name="timeformat" id="timeformat" aria-label="Timeformat" data-default="iso8601">
             <option selected value="iso8601">ISO 8601 (e.g. 2022-12-31)</option>
             <option value="unixtime">Unix timestamp</option>
           </select>
           <label for="timeformat">Timeformat</label>
-        </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating mb-3">
-          <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="GMT">
-            <option value="America/Anchorage">America/Anchorage</option>
-            <option value="America/Los_Angeles">America/Los_Angeles</option>
-            <option value="America/Denver">America/Denver</option>
-            <option value="America/Chicago">America/Chicago</option>
-            <option value="America/New_York">America/New_York</option>
-            <option value="America/Sao_Paulo">America/Sao_Paulo</option>
-            <option selected value="GMT">GMT+0</option>
-            <option value="auto">Automatically detect time zone</option>
-            <option value="Europe/London">Europe/London</option>
-            <option value="Europe/Berlin">Europe/Berlin</option>
-            <option value="Europe/Moscow">Europe/Moscow</option>
-            <option value="Africa/Cairo">Africa/Cairo</option>
-            <option value="Asia/Bangkok">Asia/Bangkok</option>
-            <option value="Asia/Singapore">Asia/Singapore</option>
-            <option value="Asia/Tokyo">Asia/Tokyo</option>
-            <option value="Australia/Sydney">Australia/Sydney</option>
-            <option value="Pacific/Auckland">Pacific/Auckland</option>
-          </select>
-          <label for="timezone">Timezone</label>
         </div>
       </div>
       <div class="col-3">
