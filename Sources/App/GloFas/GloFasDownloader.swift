@@ -47,7 +47,7 @@ struct GloFasDownloader: AsyncCommandFix {
     }
     
     var help: String {
-        "Download ERA5 from the ECMWF climate data store and convert"
+        "Download river discharge data from GloFAS"
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -75,6 +75,9 @@ struct GloFasDownloader: AsyncCommandFix {
                 try downloadYear(logger: logger, year: year, cdskey: cdskey)
                 return
             }
+            
+            let timeInterval = signature.getTimeinterval()
+            try downloadTimeIntervalConsolidated(logger: logger, timeinterval: timeInterval, cdskey: cdskey)
         case .forecastv3:
             let run = Timestamp.now().with(hour: 0)
             guard let ftpuser = signature.ftpuser else {
@@ -152,6 +155,82 @@ struct GloFasDownloader: AsyncCommandFix {
         }
     }
     
+    /// Download timeinterval and convert to omfile database
+    func downloadTimeIntervalConsolidated(logger: Logger, timeinterval: TimerangeDt, cdskey: String) throws {
+        let domain = GloFasDomain.consolidated
+        
+        let downloadDir = domain.downloadDirectory
+        try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        let gribFile = "\(downloadDir)glofasv4_temp.grib"
+        
+        let ny = domain.grid.ny
+        let nx = domain.grid.nx
+        // 21k locations -> 30MB chunks for 1 year
+        let nLocationChunk = nx * ny / 1000
+        var grib2d = GribArray2D(nx: nx, ny: ny)
+        
+        for date in timeinterval {
+            logger.info("Downloading date \(date.format_YYYYMMdd)")
+            
+            let dailyFile = "\(downloadDir)glofas_\(date.format_YYYYMMdd).om"
+            if FileManager.default.fileExists(atPath: dailyFile) {
+                continue
+            }
+            
+            let day = date.toComponents()
+            let pyCode = """
+                import cdsapi
+                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
+                
+                c.retrieve(
+                    'cems-glofas-historical',
+                    {
+                        'system_version': 'version_4_0',
+                        'variable': 'river_discharge_in_the_last_24_hours',
+                        'format': 'grib',
+                        'hyear': '\(day.year)',
+                        'hmonth': [
+                            '\(day.month.zeroPadded(len: 2))',
+                        ],
+                        'hday': [
+                            '\(day.day.zeroPadded(len: 2))',
+                        ],
+                        'hydrological_model': 'lisflood',
+                        'product_type': 'consolidated',
+                    },
+                    '\(gribFile)')
+                """
+            let tempPythonFile = "\(downloadDir)glofasdownload_interval.py"
+            
+            try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
+            try Process.spawn(cmd: "python3", args: [tempPythonFile])
+            
+            try SwiftEccodes.iterateMessages(fileName: gribFile, multiSupport: true) { message in
+                /// Date in ISO timestamp string format `20210101`
+                precondition(message.get(attribute: "dataDate") == date.format_YYYYMMdd)
+                logger.info("Converting day \(date.format_YYYYMMdd)")
+                try grib2d.load(message: message)
+                grib2d.array.flipLatitude()
+                //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
+               
+                try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
+            }
+        }
+        
+        logger.info("Reading to timeseries")
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        var data2d = Array2DFastTime(nLocations: nx*ny, nTime: timeinterval.count)
+        for (i, date) in timeinterval.enumerated() {
+            let dailyFile = try OmFileReader(file: "\(downloadDir)glofas_\(date.format_YYYYMMdd).om")
+            data2d[0..<nx*ny, i] = try dailyFile.readAll()
+        }
+        logger.info("Update om database")
+        let indextime = timeinterval.toIndexTime()
+        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, ringtime: indextime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+    }
+    
+    /// Download and convert entire year to yearly files
     func downloadYear(logger: Logger, year: Int, cdskey: String) throws {
         let domain = GloFasDomain.consolidated
         
