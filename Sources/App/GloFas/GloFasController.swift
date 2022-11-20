@@ -27,12 +27,12 @@ struct GloFasController {
             //let domain = GloFasDomain.consolidated
             //let members = 1..<domain.nMembers+1
             
-            let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 32)
+            let allowedRange = Timestamp(1984, 1, 1) ..< Timestamp(2022, 8, 1) //currentTime.add(86400 * 32)
             let timezone = try params.resolveTimezone()
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try GloFasMixer(domains: [.consolidated, .forecastv3], lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
+            guard let reader = try GloFasMixer(domains: [.consolidated /*, .forecastv3*/], lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
