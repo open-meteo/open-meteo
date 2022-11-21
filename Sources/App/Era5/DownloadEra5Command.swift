@@ -245,7 +245,7 @@ struct DownloadEra5Command: Command {
         @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
         var cdskey: String?
         
-        @Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless of files could be downloaded")
+        @Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless if files could be downloaded")
         var force: Bool
         
         @Flag(name: "hourlyfiles", help: "Download hourly files instead of daily files")

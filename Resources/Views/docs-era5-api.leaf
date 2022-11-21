@@ -84,7 +84,7 @@
       <div class="col-md-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="1959-01-01" value="2022-01-01" name="start_date"  id="start_date"><span class="input-group-addon"><i
+            data-date-start-date="#(date_start)" data-date-end-date="#(date_end)" data-date-today-highlight="1" value="#(date_start_default)" name="start_date" id="start_date"><span class="input-group-addon"><i
               class="glyphicon glyphicon-th"></i></span>
           <label for="start_date">Start date</label>
         </div>
@@ -92,7 +92,7 @@
       <div class="col-md-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="1959-01-01" value="2022-07-13" name="end_date"  id="end_date"><span class="input-group-addon"><i
+            data-date-start-date="#(date_start)" data-date-end-date="#(date_end)" data-date-today-highlight="1" value="#(date_end_default)" name="end_date" id="end_date"><span class="input-group-addon"><i
               class="glyphicon glyphicon-th"></i></span>
           <label for="end_date">End date</label>
         </div>

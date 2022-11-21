@@ -107,7 +107,14 @@ struct WebsiteController: RouteCollection {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
         let context = IndexContext(title: "Historical Weather API")
-        return req.view.render("docs-era5-api", context)
+        
+        return req.view.render("docs-era5-api", [
+            "title": "Historical Weather API",
+            "date_start": "1959-01-01",
+            "date_end": Timestamp.now().iso8601_YYYY_MM_dd,
+            "date_end_default": Timestamp.now().add(-5*85400).iso8601_YYYY_MM_dd,
+            "date_start_default": Timestamp.now().add((-5-30)*85400).iso8601_YYYY_MM_dd
+        ])
     }
     
     func elevationApiHandler(_ req: Request) -> EventLoopFuture<View> {
