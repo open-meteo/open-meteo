@@ -248,20 +248,24 @@ struct DownloadEra5Command: Command {
         @Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless of files could be downloaded")
         var force: Bool
         
+        @Flag(name: "hourlyfiles", help: "Download hourly files instead of daily files")
+        var hourlyFiles: Bool
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() -> TimerangeDt {
+            let dt = hourlyFiles ? 3600 : 86400
             if let timeinterval = timeinterval {
                 guard timeinterval.count == 17, timeinterval.contains("-") else {
                     fatalError("format looks wrong")
                 }
                 let start = Timestamp(Int(timeinterval[0..<4])!, Int(timeinterval[4..<6])!, Int(timeinterval[6..<8])!)
                 let end = Timestamp(Int(timeinterval[9..<13])!, Int(timeinterval[13..<15])!, Int(timeinterval[15..<17])!).add(86400)
-                return TimerangeDt(start: start, to: end, dtSeconds: 24*3600)
+                return TimerangeDt(start: start, to: end, dtSeconds: dt)
             }
             // Era5 has a typical delay of 5 days
             // Per default, check last 14 days for new data. If data is already downloaded, downloading is skipped
             let lastDays = 14
-            return TimerangeDt(start: Timestamp.now().with(hour: 0).add(lastDays * -86400), nTime: lastDays, dtSeconds: 86400)
+            return TimerangeDt(start: Timestamp.now().with(hour: 0).add(lastDays * -86400), nTime: lastDays, dtSeconds: dt)
         }
     }
 
@@ -457,19 +461,26 @@ struct DownloadEra5Command: Command {
         /// The upper bound will be reduced if the files are not yet on the remote server
         var downloadedRange = timeinterval.range.upperBound ..< timeinterval.range.upperBound
         
-        let writer = OmFileWriter(dim0: domain.grid.count, dim1: 24, chunk0: 600, chunk1: 24)
+        /// Number of timestamps per file
+        let nt = timeinterval.dtSeconds == 3600 ? 1 : 24
+        let writer = OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 600, chunk1: nt)
         
         timeLoop: for timestamp in timeinterval {
-            logger.info("Downloading timestamp \(timestamp.iso8601_YYYY_MM_dd)")
+            let timestampDailyHourly = timeinterval.dtSeconds == 3600 ? timestamp.format_YYYYMMddHH : timestamp.format_YYYYMMdd
+            logger.info("Downloading timestamp \(timestampDailyHourly)")
             let date = timestamp.toComponents()
             let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
             
-            if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd).om") {
+            if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestampDailyHourly).om") {
                 continue
             }
             
             let ncvariables = variables.map { $0.cdsApiName }
             let variablesEncoded = String(data: try JSONEncoder().encode(ncvariables), encoding: .utf8)!
+            
+            // Download 1 hour or 24 hours
+            let hours = timeinterval.dtSeconds == 3600 ? [timestamp.hour] : Array(0..<24)
+            let hoursString = hours.map({"'\($0.zeroPadded(len: 2)):00'"}).joined(separator: ",")
             
             let pyCode = """
                 import cdsapi
@@ -485,16 +496,7 @@ struct DownloadEra5Command: Command {
                             'year': '\(date.year)',
                             'month': '\(date.month.zeroPadded(len: 2))',
                             'day': '\(date.day.zeroPadded(len: 2))',
-                            'time': [
-                                '00:00', '01:00', '02:00',
-                                '03:00', '04:00', '05:00',
-                                '06:00', '07:00', '08:00',
-                                '09:00', '10:00', '11:00',
-                                '12:00', '13:00', '14:00',
-                                '15:00', '16:00', '17:00',
-                                '18:00', '19:00', '20:00',
-                                '21:00', '22:00', '23:00',
-                            ],
+                            'time': [\(hoursString)],
                         },
                         '\(tempDownloadNetcdfFile)')
                 except Exception as e:
@@ -525,18 +527,18 @@ struct DownloadEra5Command: Command {
                 guard let ncVariable = ncfile.getVariable(name: variable.netCdfName) else {
                     fatalError("No variable named MyData available")
                 }
-                guard ncVariable.dimensionsFlat[0] == 24 else {
+                guard ncVariable.dimensionsFlat[0] == nt else {
                     logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) has only \(ncVariable.dimensionsFlat[0]) timesteps. Skipping.")
                     break timeLoop
                 }
                 let scaling = variable.netCdfScaling
                 var data = try ncVariable.readWithScalefactorAndOffset(scalefactor: scaling.scalefactor, offset: scaling.offest)
                 
-                data.shift180LongitudeAndFlipLatitude(nt: 24, ny: 721, nx: 1440)
+                data.shift180LongitudeAndFlipLatitude(nt: nt, ny: 721, nx: 1440)
                 
-                let fastTime = Array2DFastSpace(data: data, nLocations: 721*1440, nTime: 24).transpose()
+                let fastTime = Array2DFastSpace(data: data, nLocations: 721*1440, nTime: nt).transpose()
                 
-                guard !fastTime[0, 0..<24].contains(.nan) else {
+                guard !fastTime[0, 0..<nt].contains(.nan) else {
                     // For realtime updates, the latest day could only contain partial data. Skip it.
                     logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) contains missing data. Skipping.")
                     break timeLoop
@@ -550,7 +552,7 @@ struct DownloadEra5Command: Command {
                 //let start = (0*1440*721) + basel
                 //print(data[start..<start+100])
                 
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timestamp.format_YYYYMMdd).om"
+                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timestampDailyHourly).om"
                 try FileManager.default.removeItemIfExists(at: omFile)
                 // Write time oriented file
                 try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: fastTime.data)
@@ -585,28 +587,30 @@ struct DownloadEra5Command: Command {
         
         let variables = Era5Variable.allCases // [Era5Variable.wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m]
         
+        let ntPerFile = timeinterval.dtSeconds == 3600 ? 1 : 24
+        
         /// loop over each day convert it
         for variable in variables {
             logger.info("Converting variable \(variable)")
             
-            let nt = timeinterval.count * 24
+            let nt = timeinterval.count * ntPerFile
             let nLoc = domain.grid.count
             
             var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt*nLoc), nLocations: nLoc, nTime: nt)
             
             for (i,timestamp) in timeinterval.enumerated() {
-                logger.info("Reading timestamp \(timestamp.iso8601_YYYY_MM_dd)")
+                let timestampDailyHourly = timeinterval.dtSeconds == 3600 ? timestamp.format_YYYYMMddHH : timestamp.format_YYYYMMdd
+                logger.info("Reading timestamp \(timestampDailyHourly)")
                 let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
-                guard FileManager.default.fileExists(atPath: timestampDir) else {
+                let omFile =  "\(timestampDir)/\(variable.rawValue)_\(timestampDailyHourly).om"
+                
+                guard FileManager.default.fileExists(atPath: omFile) else {
                     continue
                 }
-                
-                let omFile =  "\(timestampDir)/\(variable.rawValue)_\(timestamp.format_YYYYMMdd).om"
-                let dataDay = try OmFileReader(file: omFile).readAll()
-                
-                let read2d = Array2DFastTime(data: dataDay, nLocations: nLoc, nTime: 24)
+                let data = try OmFileReader(file: omFile).readAll()
+                let read2d = Array2DFastTime(data: data, nLocations: nLoc, nTime: ntPerFile)
                 for l in 0..<nLoc {
-                    fasttime[l, i*24 ..< (i+1)*24] = read2d[l, 0..<24]
+                    fasttime[l, i*ntPerFile ..< (i+1)*ntPerFile] = read2d[l, 0..<ntPerFile]
                 }
             }
             
