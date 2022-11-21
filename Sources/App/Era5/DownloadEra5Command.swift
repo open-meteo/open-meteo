@@ -265,7 +265,8 @@ struct DownloadEra5Command: Command {
             // Era5 has a typical delay of 5 days
             // Per default, check last 14 days for new data. If data is already downloaded, downloading is skipped
             let lastDays = 14
-            return TimerangeDt(start: Timestamp.now().with(hour: 0).add(lastDays * -86400), nTime: lastDays, dtSeconds: dt)
+            let time0z = Timestamp.now().with(hour: 0)
+            return TimerangeDt(start: time0z.add(lastDays * -86400), to: time0z, dtSeconds: dt)
         }
     }
 
