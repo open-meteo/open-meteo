@@ -503,6 +503,8 @@ struct DownloadEra5Command: Command {
                 except Exception as e:
                     if "Please, check that your date selection is valid" in str(e):
                         exit(70)
+                    if "the request you have submitted is not valid" in str(e):
+                        exit(70)
                     raise e
                 """
             

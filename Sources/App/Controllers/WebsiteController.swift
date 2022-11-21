@@ -106,8 +106,6 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = IndexContext(title: "Historical Weather API")
-        
         return req.view.render("docs-era5-api", [
             "title": "Historical Weather API",
             "date_start": "1959-01-01",
