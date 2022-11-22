@@ -294,7 +294,7 @@ final class Curl {
         var retries = 0
         while true {
             let data = try await downloadInMemoryAsync(url: url, client: client, minSize: nil)
-            logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
+            //logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             do {
                 return try GribByteBuffer(bytebuffer: data)
             } catch {
@@ -394,7 +394,7 @@ final class Curl {
             
             let data = try await downloadInMemoryAsync(url: url, range: inventory.range, client: client, minSize: inventory.minSize)
             //let data = try await withRetriedDownloadUrlSession(url: url, range: range)
-            logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
+            //logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
             //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
                 try data.withUnsafeReadableBytes {

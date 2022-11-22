@@ -228,7 +228,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         case .dewpoint_2m:
             return "DPT_TGL_2"
         case .convective_precipitation:
-            return "ACPCP_SFC"
+            return "ACPCP_SFC_0"
         case .cloudcover:
             return "TCDC_SFC_0"
         case .pressure_msl:
@@ -238,7 +238,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         case .windgusts:
             return "GUST_TGL_10"
         case .precipitation:
-            return "APCP_SFC"
+            return "APCP_SFC_0"
         case .snowfall_water_equivalent:
             return "WEASN_SFC_0"
         case .cape:
@@ -463,6 +463,8 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     var skipHour0: Bool {
         switch self {
         case .precipitation: return true
+        case .convective_precipitation: return true
+        case .snowfall_water_equivalent: return true
         case .shortwave_radiation: return true
         default: return false
         }
@@ -498,7 +500,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         return rawValue
     }
     var gribName: String {
-        let isbl = "ISBL_\(level.zeroPadded(len: 4))"
+        let isbl = "ISBL_\(level)"
         switch variable {
         case .temperature:
             return "TMP_\(isbl)"
@@ -592,8 +594,8 @@ typealias GemVariable = SurfaceAndPressureVariable<GemSurfaceVariable, GemPressu
 
 
 enum GemDomain: String, GenericDomain {
-    case global
-    case regional
+    case gem_global
+    case gem_regional
     //case highres
     
     var omfileDirectory: String {
@@ -607,23 +609,23 @@ enum GemDomain: String, GenericDomain {
     }
     
     var dtSeconds: Int {
-        if self == .global {
+        if self == .gem_global {
             return 3*3600
         }
         return 3600
     }
     var isGlobal: Bool {
-        return self == .global
+        return self == .gem_global
     }
 
-    private static var gsmElevationFile = try? OmFileReader(file: Self.global.surfaceElevationFileOm)
-    private static var msmElevationFile = try? OmFileReader(file: Self.regional.surfaceElevationFileOm)
+    private static var gsmElevationFile = try? OmFileReader(file: Self.gem_global.surfaceElevationFileOm)
+    private static var msmElevationFile = try? OmFileReader(file: Self.gem_regional.surfaceElevationFileOm)
     
     var elevationFile: OmFileReader? {
         switch self {
-        case .global:
+        case .gem_global:
             return Self.gsmElevationFile
-        case .regional:
+        case .gem_regional:
             return Self.msmElevationFile
         }
     }
@@ -632,11 +634,11 @@ enum GemDomain: String, GenericDomain {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .global:
+        case .gem_global:
             // First hours 3:40 h delay, second part 6.5 h delay
             // every 12 hours
             return t.add(-3*3600).floor(toNearest: 12*3600)
-        case .regional:
+        case .gem_regional:
             // Delay of 2:47 hours to init
             // every 6 hours
             return t.add(-2*3600).floor(toNearest: 6*3600)
@@ -650,42 +652,37 @@ enum GemDomain: String, GenericDomain {
     
     var forecastHours: [Int] {
         switch self {
-        case .global:
+        case .gem_global:
             return Array(stride(from: 0, through: 240, by: 3))
-        case .regional:
+        case .gem_regional:
             return Array(stride(from: 0, through: 84, by: 1))
         }
     }
     
     /// pressure levels
     var levels: [Int] {
-        switch self {
-        case .global:
-            return [1000, 925, 850, 700, 500, 400, 300, 250, 200, 150, 100]
-        case .regional:
-            return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50, 30, 20, 10, 5, 1]
-        }
+        return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50, 30, 20, 10/*, 5, 1*/] // 5 and 1 not available for dewpoint
     }
     
     /// All levels available in the API
     static var apiLevels: [Int] {
-        return Self.global.levels
+        return Self.gem_global.levels
     }
     
     var omFileLength: Int {
         switch self {
-        case .global:
+        case .gem_global:
             return 110
-        case .regional:
+        case .gem_regional:
             return 78+36
         }
     }
     
     var grid: Gridable {
         switch self {
-        case .global:
-            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
-        case .regional:
+        case .gem_global:
+            return RegularGrid(nx: 2400, ny: 1201, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
+        case .gem_regional:
             return RegularGrid(nx: 481, ny: 505, latMin: 22.4, lonMin: 120, dx: 0.0625, dy: 0.05)
         }
     }
