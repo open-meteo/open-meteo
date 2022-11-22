@@ -85,6 +85,9 @@ struct GemDownload: AsyncCommandFix {
                 if hour == 0 && variable.skipHour0 {
                     continue
                 }
+                if !variable.includedFor(hour: hour) {
+                    continue
+                }
                 let filenameDest = "\(downloadDirectory)\(variable.omFileName)_\(h3).om"
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameDest) {
                     continue
@@ -188,6 +191,7 @@ struct GemDownload: AsyncCommandFix {
 protocol GemVariableDownloadable: GenericVariable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var skipHour0: Bool { get }
+    func includedFor(hour: Int) -> Bool
     var gribName: String { get }
     var isAccumulatedSinceModelStart: Bool { get }
 }
@@ -285,6 +289,13 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         case .soil_moisture_0_to_10cm:
             return "SOILW_DBLY_10"
         }
+    }
+    
+    func includedFor(hour: Int) -> Bool {
+        if self == .cape && hour >= 171 {
+            return false
+        }
+        return true
     }
     
     var isAccumulatedSinceModelStart: Bool {
@@ -520,8 +531,6 @@ enum GemPressureVariableType: String, CaseIterable {
  A pressure level variable on a given level in hPa / mb
  */
 struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloadable, Hashable, GenericVariableMixable {
-    
-    
     let variable: GemPressureVariableType
     let level: Int
     
@@ -546,6 +555,13 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         case .dewpoint_depression:
             return "DEPR_\(isbl)"
         }
+    }
+    
+    func includedFor(hour: Int) -> Bool {
+        if hour >= 171 && ![1000, 925, 850, 700, 500, 5, 1].contains(level) {
+            return false
+        }
+        return true
     }
     
     var scalefactor: Float {
