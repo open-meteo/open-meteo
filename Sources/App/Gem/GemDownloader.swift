@@ -74,7 +74,7 @@ struct GemDownload: AsyncCommandFix {
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        let server = "https://hpfx.collab.science.gc.ca/\(run.format_YYYYMMdd)/WXO-DD/model_gem_global/15km/grib2/lat_lon/\(run.hh)/"
+        let server = "https://hpfx.collab.science.gc.ca/\(run.format_YYYYMMdd)/WXO-DD/\(domain.gribFileGridResolution)/\(run.hh)/"
         
         let forecastHours = domain.forecastHours
         for hour in forecastHours {
@@ -90,7 +90,7 @@ struct GemDownload: AsyncCommandFix {
                     continue
                 }
                 /// 003/CMC_glb_CIN_SFC_0_latlon.15x.15_2022112100_P003.grib2
-                let url = "\(server)\(h3)/CMC_glb_\(variable.gribName)_latlon.15x.15_\(yyyymmddhh)_P\(h3).grib2"
+                let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(variable.gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(h3).grib2"
                 for message in try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient).messages {
                     try grib2d.load(message: message)
                     grib2d.array.flipLatitude()
@@ -109,41 +109,79 @@ struct GemDownload: AsyncCommandFix {
     
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        let forecastHours = domain.forecastHours
-        let nForecastHours = forecastHours.max()! / domain.dtHours + 1
-        
+        /*let downloadDirectory = domain.downloadDirectory
         let grid = domain.grid
-        let nLocation = grid.count
         
+        let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
+        let nForecastHours = domain.nForecastHours(run: run.hour)
+        let nLocation = grid.nx * grid.ny
+        
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocation, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+
+        // ICON global + eu only have 3h data after 78 hours
+        // ICON global 6z and 18z have 120 instead of 180 forecast hours
+        // Stategy: Read each variable in a spatial array and interpolate missing values
+        // Afterwards merge into temporal data files
+
         for variable in variables {
             let startConvert = DispatchTime.now()
-            
             logger.info("Converting \(variable)")
             
+            let v = variable.omFileName.uppercased()
+
+            /// time oriented, but after 72 hours only 3 hour values are filled.
+            /// 2.86GB high water for this array
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
 
-            for forecastHour in forecastHours {
-                if forecastHour == 0 && variable.skipHour0 {
+            for hour in forecastSteps {
+                if hour == 0 && variable.skipHour0 {
                     continue
                 }
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).om"
-                data2d[0..<nLocation, forecastHour / domain.dtHours] = try OmFileReader(file: file).readAll()
+                let h3 = hour.zeroPadded(len: 3)
+                data2d[0..<nLocation, hour] = try OmFileReader(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg").readAll()
             }
             
+            
+            // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
+            if variable.isAveragedOverForecastTime {
+                data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+            }
+            
+            // interpolate missing timesteps. We always fill 2 timesteps at once
+            // data looks like: DDDDDDDDDD--D--D--D--D--D
+            let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
+                if forecastSteps.contains(hour) || hour % 3 != 1 {
+                    // process 2 timesteps at once
+                    return nil
+                }
+                return hour
+            }
+            
+            // Fill in missing hourly values after switching to 3h
+            data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
+            
+            // De-accumulate precipitation
+            if variable.isAccumulatedSinceModelStart {
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+            }
+            
+            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
+            
+            let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
             let skip = variable.skipHour0 ? 1 : 0
-            
-            let time = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
-            
-            if createNetcdf {
-                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
-            }
+            /// the last hour in D2 is broken for latent heat flux and sensible heatflux -> 2022-06-07: fluxes are ok in D2, actually skipLast feature was buggy
+            //let skipLast = (variable == .ashfl_s || variable == .alhfl_s) && domain == .iconD2 ? 1 : 0
+            let skipLast = 0
             
             logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
             let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: time, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: skipLast, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
+        logger.info("write init.txt")
+        // TODO write also valid until date range
+        try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)*/
     }
 }
 
@@ -154,11 +192,6 @@ protocol GemVariableDownloadable: GenericVariable {
     var isAccumulatedSinceModelStart: Bool { get }
 }
 
-/**
- ABSV
- CWAT
- 
- */
 enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable, GenericVariableMixable {
     case temperature_2m
     case temperature_40m
@@ -669,6 +702,33 @@ enum GemDomain: String, GenericDomain {
         return Self.gem_global.levels
     }
     
+    var gribFileDomainName: String {
+        switch self {
+        case .gem_global:
+            return "glb"
+        case .gem_regional:
+            return "reg"
+        }
+    }
+    
+    var gribFileGridName: String {
+        switch self {
+        case .gem_global:
+            return "latlon.15x.15"
+        case .gem_regional:
+            return "ps10km"
+        }
+    }
+    
+    var gribFileGridResolution: String {
+        switch self {
+        case .gem_global:
+            return "model_\(rawValue)/15km/grib2/lat_lon"
+        case .gem_regional:
+            return "model_\(rawValue)/10km/grib2"
+        }
+    }
+    
     var omFileLength: Int {
         switch self {
         case .gem_global:
@@ -683,7 +743,8 @@ enum GemDomain: String, GenericDomain {
         case .gem_global:
             return RegularGrid(nx: 2400, ny: 1201, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
         case .gem_regional:
-            return RegularGrid(nx: 481, ny: 505, latMin: 22.4, lonMin: 120, dx: 0.0625, dy: 0.05)
+            /// TODO projection
+            return RegularGrid(nx: 935, ny: 824, latMin: 22.4, lonMin: 120, dx: 0.0625, dy: 0.05)
         }
     }
 }
