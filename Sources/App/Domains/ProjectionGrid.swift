@@ -38,7 +38,8 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         let x = gridpoint-y * nx
         let xcord = Float(x)/Float(nx-1) * xrange.length + xrange.lowerBound
         let ycord = Float(y)/Float(ny-1) * yrange.length + yrange.lowerBound
-        return projection.inverse(x: xcord, y: ycord)
+        let (lat,lon) = projection.inverse(x: xcord, y: ycord)
+        return (lat, (lon+180).truncatingRemainder(dividingBy: 360) - 180 )
     }
 }
 

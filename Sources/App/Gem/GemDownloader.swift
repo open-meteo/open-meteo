@@ -112,6 +112,8 @@ struct GemDownload: AsyncCommandFix {
                 /// 003/CMC_glb_CIN_SFC_0_latlon.15x.15_2022112100_P003.grib2
                 let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(variable.gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(h3).grib2"
                 for message in try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient).messages {
+                    try message.debugGrid(grid: domain.grid)
+                    fatalError()
                     try grib2d.load(message: message)
                     
                     try FileManager.default.removeItemIfExists(at: filenameDest)
@@ -750,8 +752,7 @@ enum GemDomain: String, GenericDomain {
         case .gem_global:
             return RegularGrid(nx: 2400, ny: 1201, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
         case .gem_regional:
-            /// TODO projection
-            return RegularGrid(nx: 935, ny: 824, latMin: 22.4, lonMin: 120, dx: 0.0625, dy: 0.05)
+            return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
         }
     }
 }
