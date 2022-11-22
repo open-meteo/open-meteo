@@ -51,7 +51,7 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(coords.latitude, 47, accuracy: 0.0001)
         XCTAssertEqual(coords.longitude, -8, accuracy: 0.0001)
         
-        let nam = LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
+        let nam = ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
         let pos2 = nam.findPoint(lat: 34, lon: -118)
         XCTAssertEqual(pos2, 777441)
         let coords2 = nam.getCoordinates(gridpoint: pos2!)
