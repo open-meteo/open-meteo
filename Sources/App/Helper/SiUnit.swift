@@ -4,6 +4,7 @@ import Foundation
 enum SiUnit: String, Codable {
     case celsius = "°C"
     case fahrenheit = "°F"
+    case kelvin = "°K"
     case kmh = "km/h"
     case mph = "mp/h"
     case knots = "kn"
@@ -39,6 +40,7 @@ enum SiUnit: String, Codable {
         switch self {
         case .celsius: return 1
         case .fahrenheit: return 1
+        case .kelvin: return 1
         case .kmh: return 1
         case .mph: return 1
         case .knots: return 1

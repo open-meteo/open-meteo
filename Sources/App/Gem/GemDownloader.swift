@@ -7,6 +7,10 @@ import SwiftEccodes
 Gem regional and global Downloader
  - Regional https://dd.weather.gc.ca/model_gem_regional/10km/grib2/
  - Global https://dd.weather.gc.ca/model_gem_global/15km/grib2/lat_lon/
+ 
+ High perf server
+ - Global https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_global/15km/grib2/lat_lon/00/
+ - Regional
 
  */
 struct GemDownload: AsyncCommandFix {
@@ -14,14 +18,14 @@ struct GemDownload: AsyncCommandFix {
         @Argument(name: "domain")
         var domain: String
         
-        @Option(name: "server", help: "Base URL with username and password for Gem server")
-        var server: String?
-        
         @Option(name: "run")
         var run: String?
         
         @Option(name: "past-days")
         var pastDays: Int?
+        
+        @Flag(name: "skip-existing")
+        var skipExisting: Bool
         
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
@@ -42,24 +46,11 @@ struct GemDownload: AsyncCommandFix {
         }
         
         let run = signature.run.flatMap(Int.init).map { Timestamp.now().with(hour: $0) } ?? domain.lastRun
-
-        guard let server = signature.server else {
-            fatalError("Parameter server required")
-        }
         
-        let variables: [GemVariableDownloadable]
-        switch domain {
-        case .global:
-            variables = GemSurfaceVariable.allCases.filter({$0 != .shortwave_radiation}) + domain.levels.flatMap {
-                level in GemPressureVariableType.allCases.compactMap { variable in
-                    if variable == .relativehumidity && level <= 250 {
-                        return nil
-                    }
-                    return GemPressureVariable(variable: variable, level: level)
-                }
+        let variables: [GemVariableDownloadable] = GemSurfaceVariable.allCases + domain.levels.flatMap {
+            level in GemPressureVariableType.allCases.compactMap { variable in
+                return GemPressureVariable(variable: variable, level: level)
             }
-        case .regional:
-            variables = GemSurfaceVariable.allCases
         }
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
@@ -68,65 +59,50 @@ struct GemDownload: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         //try await downloadElevation(application: context.application, domain: domain)
-        try await download(application: context.application, domain: domain, run: run, server: server)
+        try await download(application: context.application, domain: domain, variables: variables, run: run, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
-    /// MSM or GSM domain
-    func download(application: Application, domain: GemDomain, run: Timestamp, server: String) async throws {
+    /// Download data and store as compressed files for each timestep
+    func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
         let curl = Curl(logger: logger, deadLineHours: 3)
+        let downloadDirectory = domain.downloadDirectory
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        let runDate = run.toComponents()
-        let server = server.replacingOccurrences(of: "YYYY", with: runDate.year.zeroPadded(len: 4))
-            .replacingOccurrences(of: "MM", with: runDate.month.zeroPadded(len: 2))
-            .replacingOccurrences(of: "DD", with: runDate.day.zeroPadded(len: 2))
-            .replacingOccurrences(of: "HH", with: run.hour.zeroPadded(len: 2))
+        let server = "https://hpfx.collab.science.gc.ca/\(run.format_YYYYMMdd)/WXO-DD/model_gem_global/15km/grib2/lat_lon/\(run.hh)/"
         
-        let filesToDownload: [String]
-        switch domain {
-        case .global:
-            filesToDownload = domain.forecastHours(run: run.hour).map { hour in
-                "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_GSM_GPV_Rgl_FD\((hour/24).zeroPadded(len: 2))\((hour%24).zeroPadded(len: 2))_grib2.bin"
-            }
-        case .regional:
-            // 0 und 12z run have more data
-            let range = run.hour % 12 == 0 ? ["00-15", "16-33", "34-39", "40-51", "52-78"] : ["00-15", "16-33", "34-39"]
-            filesToDownload = range.map { hour in
-                "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_MSM_GPV_Rjp_Lsurf_FH\(hour)_grib2.bin"
-            }
-        }
-        
-        for filename in filesToDownload {
-            for message in try await curl.downloadGrib(url: "\(server)\(filename)", client: application.dedicatedHttpClient).messages {
-                guard let variable = message.toGemVariable(),
-                      let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
+        let forecastHours = domain.forecastHours
+        for hour in forecastHours {
+            logger.info("Downloading hour \(hour)")
+            let h3 = hour.zeroPadded(len: 3)
+            let yyyymmddhh = run.format_YYYYMMddHH
+            for variable in variables {
+                if hour == 0 && variable.skipHour0 {
                     continue
                 }
-                try grib2d.load(message: message)
-                if domain.isGlobal {
-                    grib2d.array.shift180LongitudeAndFlipLatitude()
-                } else {
+                let filenameDest = "\(downloadDirectory)\(variable.omFileName)_\(h3).om"
+                if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameDest) {
+                    continue
+                }
+                /// 003/CMC_glb_CIN_SFC_0_latlon.15x.15_2022112100_P003.grib2
+                let url = "\(server)\(h3)/CMC_glb_\(variable.gribName)_latlon.15x.15_\(yyyymmddhh)_P\(h3).grib2"
+                for message in try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient).messages {
+                    try grib2d.load(message: message)
                     grib2d.array.flipLatitude()
+                    
+                    try FileManager.default.removeItemIfExists(at: filenameDest)
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.multiplyAdd {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                    try writer.write(file: filenameDest, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 }
-                
-                // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd {
-                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-                
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om"
-                try FileManager.default.removeItemIfExists(at: file)
-                
-                logger.info("Compressing and writing data to \(variable.omFileName)_\(hour).om")
-                //let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
         }
     }
@@ -134,7 +110,7 @@ struct GemDownload: AsyncCommandFix {
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        let forecastHours = domain.forecastHours(run: run.hour)
+        let forecastHours = domain.forecastHours
         let nForecastHours = forecastHours.max()! / domain.dtHours + 1
         
         let grid = domain.grid
@@ -175,6 +151,7 @@ protocol GemVariableDownloadable: GenericVariable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var skipHour0: Bool { get }
     var gribName: String { get }
+    var isAccumulatedSinceModelStart: Bool { get }
 }
 
 /**
@@ -183,8 +160,6 @@ protocol GemVariableDownloadable: GenericVariable {
  
  */
 enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable, GenericVariableMixable {
-    
-    
     case temperature_2m
     case temperature_40m
     case temperature_80m
@@ -193,8 +168,6 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     case cloudcover
     case pressure_msl
     
-    
-    /// not in global model
     case shortwave_radiation
     
     case windspeed_10m
@@ -281,6 +254,21 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         }
     }
     
+    var isAccumulatedSinceModelStart: Bool {
+        switch self {
+        case .shortwave_radiation:
+            fallthrough
+        case .precipitation:
+            fallthrough
+        case .convective_precipitation:
+            fallthrough
+        case .snowfall_water_equivalent:
+            return true
+        default:
+            return false
+        }
+    }
+    
     
     
     var omFileName: String {
@@ -293,24 +281,48 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             return 20
         case .cloudcover:
             return 1
-        case .cloudcover_low:
-            return 1
-        case .cloudcover_mid:
-            return 1
-        case .cloudcover_high:
-            return 1
-        case .relativehumidity_2m:
-            return 1
         case .precipitation:
             return 10
         case .pressure_msl:
             return 10
-        case .wind_v_component_10m:
+        case .windspeed_10m:
             return 10
-        case .wind_u_component_10m:
+        case .winddirection_10m:
+            return 1
+        case .windspeed_40m:
             return 10
+        case .winddirection_40m:
+            return 1
+        case .windspeed_80m:
+            return 10
+        case .winddirection_80m:
+            return 1
+        case .windspeed_120m:
+            return 10
+        case .winddirection_120m:
+            return 1
+        case .soil_temperature_0_to_10cm:
+            return 20
+        case .soil_moisture_0_to_10cm:
+            return 1000
         case .shortwave_radiation:
             return 1
+        case .temperature_40m:
+            return 20
+        case .temperature_80m:
+            return 20
+        case .temperature_120m:
+            return 20
+        case .dewpoint_2m:
+            return 20
+        case .windgusts:
+            return 10
+        case .convective_precipitation:
+            return 10
+        case .snowfall_water_equivalent:
+            return 10
+        case .cape:
+            return 0.1
         }
     }
     
@@ -318,9 +330,21 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
+            fallthrough
+        case .temperature_40m:
+            fallthrough
+        case .temperature_80m:
+            fallthrough
+        case .temperature_120m:
+            fallthrough
+        case .dewpoint_2m:
+            fallthrough
+        case .soil_temperature_0_to_10cm:
             return (1, -273.15)
         case .pressure_msl:
             return (1/100, 0)
+        case .shortwave_radiation:
+            return (0, 1/3600) // joules to watt
         default:
             return nil
         }
@@ -332,24 +356,48 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             return .hermite(bounds: nil)
         case .cloudcover:
             return .hermite(bounds: 0...100)
-        case .cloudcover_low:
-            return .hermite(bounds: 0...100)
-        case .cloudcover_mid:
-            return .hermite(bounds: 0...100)
-        case .cloudcover_high:
-            return .hermite(bounds: 0...100)
         case .pressure_msl:
-            return .hermite(bounds: nil)
-        case .relativehumidity_2m:
-            return .hermite(bounds: 0...100)
-        case .wind_v_component_10m:
-            return .hermite(bounds: nil)
-        case .wind_u_component_10m:
             return .hermite(bounds: nil)
         case .precipitation:
             return .linear
         case .shortwave_radiation:
             return .solar_backwards_averaged
+        case .temperature_40m:
+            return .hermite(bounds: nil)
+        case .temperature_80m:
+            return .hermite(bounds: nil)
+        case .temperature_120m:
+            return .hermite(bounds: nil)
+        case .dewpoint_2m:
+            return .hermite(bounds: nil)
+        case .windspeed_10m:
+            return .hermite(bounds: nil)
+        case .winddirection_10m:
+            return .hermite(bounds: 0...360)
+        case .windspeed_40m:
+            return .hermite(bounds: nil)
+        case .winddirection_40m:
+            return .hermite(bounds: 0...360)
+        case .windspeed_80m:
+            return .hermite(bounds: nil)
+        case .winddirection_80m:
+            return .hermite(bounds: 0...360)
+        case .windspeed_120m:
+            return .hermite(bounds: nil)
+        case .winddirection_120m:
+            return .hermite(bounds: 0...360)
+        case .windgusts:
+            return .hermite(bounds: nil)
+        case .convective_precipitation:
+            return .linear
+        case .snowfall_water_equivalent:
+            return .linear
+        case .soil_temperature_0_to_10cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_0_to_10cm:
+            return .hermite(bounds: nil)
+        case .cape:
+            return .hermite(bounds: 0...10e9)
         }
     }
     
@@ -359,24 +407,48 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             return .celsius
         case .cloudcover:
             return .percent
-        case .cloudcover_low:
-            return .percent
-        case .cloudcover_mid:
-            return .percent
-        case .cloudcover_high:
-            return .percent
-        case .relativehumidity_2m:
-            return .percent
         case .precipitation:
             return .millimeter
         case .pressure_msl:
             return .hectoPascal
-        case .wind_v_component_10m:
-            return .ms
-        case .wind_u_component_10m:
-            return .ms
         case .shortwave_radiation:
             return .wattPerSquareMeter
+        case .temperature_40m:
+            return .celsius
+        case .temperature_80m:
+            return .celsius
+        case .temperature_120m:
+            return .celsius
+        case .dewpoint_2m:
+            return .celsius
+        case .windspeed_10m:
+            return .ms
+        case .winddirection_10m:
+            return .degreeDirection
+        case .windspeed_40m:
+            return .ms
+        case .winddirection_40m:
+            return .degreeDirection
+        case .windspeed_80m:
+            return .ms
+        case .winddirection_80m:
+            return .degreeDirection
+        case .windspeed_120m:
+            return .ms
+        case .winddirection_120m:
+            return .degreeDirection
+        case .windgusts:
+            return .ms
+        case .convective_precipitation:
+            return .millimeter
+        case .snowfall_water_equivalent:
+            return .millimeter
+        case .soil_temperature_0_to_10cm:
+            return .celsius
+        case .soil_moisture_0_to_10cm:
+            return .qubicMeterPerQubicMeter
+        case .cape:
+            return .joulesPerKilogram
         }
     }
     
@@ -385,7 +457,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     }
     
     var requiresOffsetCorrectionForMixing: Bool {
-        return false
+        return self == .soil_moisture_0_to_10cm
     }
     
     var skipHour0: Bool {
@@ -447,34 +519,34 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .dewpoint_depression:
+            return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
+        case.winddirection:
+            return (0.2..<1).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+        case .windspeed:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
-        case .vertical_velocity:
-            return (10..<15).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
-        case .relativehumidity:
-            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
+    }
+    
+    var isAccumulatedSinceModelStart: Bool {
+        return false
     }
     
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
             return .hermite(bounds: nil)
-        case .wind_u_component:
+        case .windspeed:
             return .hermite(bounds: nil)
-        case .wind_v_component:
-            return .hermite(bounds: nil)
+        case .winddirection:
+            return .hermite(bounds: 0...360)
         case .geopotential_height:
             return .hermite(bounds: nil)
-        case .vertical_velocity:
+        case .dewpoint_depression:
             return .hermite(bounds: nil)
-        case .relativehumidity:
-            return .hermite(bounds: 0...100)
         }
     }
     
@@ -482,9 +554,9 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         switch variable {
         case .temperature:
             return (1, -273.15)
-        case .geopotential_height:
+        //case .geopotential_height:
             // convert geopotential to height (WMO defined gravity constant)
-            return (1/9.80665, 0)
+            //return (1/9.80665, 0)
         default:
             return nil
         }
@@ -494,16 +566,14 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         switch variable {
         case .temperature:
             return .celsius
-        case .wind_u_component:
+        case .windspeed:
             return .ms
-        case .wind_v_component:
-            return .ms
+        case .winddirection:
+            return .degreeDirection
         case .geopotential_height:
             return .meter
-        case .vertical_velocity:
-            return .ms
-        case .relativehumidity:
-            return .percent
+        case .dewpoint_depression:
+            return .kelvin
         }
     }
     
@@ -578,7 +648,7 @@ enum GemDomain: String, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
-    func forecastHours(run: Int) -> [Int] {
+    var forecastHours: [Int] {
         switch self {
         case .global:
             return Array(stride(from: 0, through: 240, by: 3))
