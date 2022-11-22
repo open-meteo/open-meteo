@@ -32,6 +32,9 @@ struct GemDownload: AsyncCommandFix {
         
         @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
         var upperLevel: Bool
+        
+        @Option(name: "only-variables")
+        var onlyVariables: String?
     }
     
     var help: String {
@@ -47,11 +50,25 @@ struct GemDownload: AsyncCommandFix {
         
         let run = signature.run.flatMap(Int.init).map { Timestamp.now().with(hour: $0) } ?? domain.lastRun
         
-        let variables: [GemVariableDownloadable] = GemSurfaceVariable.allCases + domain.levels.flatMap {
+        let onlyVariables: [GemVariableDownloadable]? = signature.onlyVariables.map {
+            $0.split(separator: ",").map {
+                if let variable = GemPressureVariable(rawValue: String($0)) {
+                    return variable
+                }
+                guard let variable = GemSurfaceVariable(rawValue: String($0)) else {
+                    fatalError("Invalid variable '\($0)'")
+                }
+                return variable
+            }
+        }
+        
+        let variablesAll: [GemVariableDownloadable] = GemSurfaceVariable.allCases + domain.levels.flatMap {
             level in GemPressureVariableType.allCases.compactMap { variable in
                 return GemPressureVariable(variable: variable, level: level)
             }
         }
+        
+        let variables = onlyVariables ?? variablesAll
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
@@ -96,13 +113,14 @@ struct GemDownload: AsyncCommandFix {
                 let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(variable.gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(h3).grib2"
                 for message in try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient).messages {
                     try grib2d.load(message: message)
-                    grib2d.array.flipLatitude()
                     
                     try FileManager.default.removeItemIfExists(at: filenameDest)
                     // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd {
+                    if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
+                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(h3).nc")
+                    
                     let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                     try writer.write(file: filenameDest, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 }
@@ -135,7 +153,8 @@ struct GemDownload: AsyncCommandFix {
                     continue
                 }
                 let h3 = hour.zeroPadded(len: 3)
-                data2d[0..<nLocation, hour] = try OmFileReader(file:  "\(downloadDirectory)\(variable.omFileName)_\(h3).om").readAll()
+                var data = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(h3).om").readAll()
+                data2d[0..<nLocation, hour/domain.dtHours] = data
             }
             
             // De-accumulate precipitation
@@ -161,7 +180,7 @@ struct GemDownload: AsyncCommandFix {
 }
 
 protocol GemVariableDownloadable: GenericVariable {
-    var multiplyAdd: (multiply: Float, add: Float)? { get }
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     var skipHour0: Bool { get }
     func includedFor(hour: Int) -> Bool
     var gribName: String { get }
@@ -343,7 +362,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     }
     
     
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
             fallthrough
@@ -360,7 +379,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         case .pressure_msl:
             return (1/100, 0)
         case .shortwave_radiation:
-            return (0, 1/3600) // joules to watt
+            return (1/Float(dtSeconds), 0) // joules to watt
         default:
             return nil
         }
@@ -573,7 +592,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         }
     }
     
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch variable {
         case .temperature:
             return (1, -273.15)
