@@ -102,4 +102,14 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).latitude, 24.007414634071907, accuracy: 0.001)
         XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).longitude, 248.77817290935954 - 360, accuracy: 0.001)
     }
+    
+    func testStereographic() {
+        let nx = 935
+        let grid = ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
+        
+        
+        let pos = grid.findPoint(lat: 64.79836, lon: 241.40111)!
+        XCTAssertEqual(pos % nx, 420)
+        XCTAssertEqual(pos / nx, 468)
+    }
 }

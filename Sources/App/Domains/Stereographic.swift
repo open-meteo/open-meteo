@@ -14,12 +14,13 @@ struct StereograpicProjection: Projectable {
     let cosϕ1: Float
     
     /// Radius of Earth
-    var R: Float { 6370.997 }
+    var R: Float
     
-    public init(latitude: Float, longitude: Float) {
+    public init(latitude: Float, longitude: Float, radius: Float) {
         λ0 = longitude.degreesToRadians
         sinϕ1 = sin(latitude.degreesToRadians)
         cosϕ1 = cos(latitude.degreesToRadians)
+        R = radius
     }
     
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float) {
@@ -33,9 +34,9 @@ struct StereograpicProjection: Projectable {
     
     func inverse(x: Float, y: Float) -> (latitude: Float, longitude: Float) {
         let p = sqrt(x*x + y*y)
-        let c = 2 * atan(p / (2*R))
+        let c = 2 * atan2(p, 2*R)
         let ϕ = asin(cos(c) * sinϕ1 + (y * sin(c) * cosϕ1) / p)
-        let λ = λ0 + atan(x * sin(c) / (p * cosϕ1 * cos(c) - y * sinϕ1 * sin(c)))
+        let λ = λ0 + atan2(x * sin(c), p * cosϕ1 * cos(c) - y * sinϕ1 * sin(c))
         return (ϕ.radiansToDegrees, λ.radiansToDegrees)
     }
 }
