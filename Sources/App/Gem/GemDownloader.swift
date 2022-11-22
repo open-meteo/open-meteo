@@ -112,66 +112,41 @@ struct GemDownload: AsyncCommandFix {
     
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
-        /*let downloadDirectory = domain.downloadDirectory
+        let downloadDirectory = domain.downloadDirectory
         let grid = domain.grid
         
-        let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        let nForecastHours = domain.nForecastHours(run: run.hour)
+        let forecastHours = domain.forecastHours
+        let nForecastHours = forecastHours.max()! / domain.dtHours + 1
         let nLocation = grid.nx * grid.ny
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocation, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
 
-        // ICON global + eu only have 3h data after 78 hours
-        // ICON global 6z and 18z have 120 instead of 180 forecast hours
-        // Stategy: Read each variable in a spatial array and interpolate missing values
-        // Afterwards merge into temporal data files
-
         for variable in variables {
             let startConvert = DispatchTime.now()
             logger.info("Converting \(variable)")
-            
-            let v = variable.omFileName.uppercased()
-
-            /// time oriented, but after 72 hours only 3 hour values are filled.
-            /// 2.86GB high water for this array
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
 
-            for hour in forecastSteps {
+            for hour in forecastHours {
                 if hour == 0 && variable.skipHour0 {
                     continue
                 }
-                let h3 = hour.zeroPadded(len: 3)
-                data2d[0..<nLocation, hour] = try OmFileReader(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg").readAll()
-            }
-            
-            
-            // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
-            if variable.isAveragedOverForecastTime {
-                data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
-            }
-            
-            // interpolate missing timesteps. We always fill 2 timesteps at once
-            // data looks like: DDDDDDDDDD--D--D--D--D--D
-            let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
-                if forecastSteps.contains(hour) || hour % 3 != 1 {
-                    // process 2 timesteps at once
-                    return nil
+                if !variable.includedFor(hour: hour) {
+                    continue
                 }
-                return hour
+                let h3 = hour.zeroPadded(len: 3)
+                data2d[0..<nLocation, hour] = try OmFileReader(file:  "\(downloadDirectory)\(variable.omFileName)_\(h3).om").readAll()
             }
-            
-            // Fill in missing hourly values after switching to 3h
-            data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
                 data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
             }
             
-            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
-            
-            let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
+            if createNetcdf {
+                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
+            }
+            let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
             let skip = variable.skipHour0 ? 1 : 0
             /// the last hour in D2 is broken for latent heat flux and sensible heatflux -> 2022-06-07: fluxes are ok in D2, actually skipLast feature was buggy
             //let skipLast = (variable == .ashfl_s || variable == .alhfl_s) && domain == .iconD2 ? 1 : 0
@@ -182,9 +157,6 @@ struct GemDownload: AsyncCommandFix {
             try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: skipLast, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
-        logger.info("write init.txt")
-        // TODO write also valid until date range
-        try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)*/
     }
 }
 
