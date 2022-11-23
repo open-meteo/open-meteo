@@ -102,6 +102,9 @@ struct GemDownload: AsyncCommandFix {
             let h3 = hour.zeroPadded(len: 3)
             let yyyymmddhh = run.format_YYYYMMddHH
             for variable in variables {
+                if !variable.availableFor(domain: domain) {
+                    continue
+                }
                 if hour == 0 && variable.skipHour0 {
                     continue
                 }
@@ -113,7 +116,9 @@ struct GemDownload: AsyncCommandFix {
                     continue
                 }
                 /// 003/CMC_glb_CIN_SFC_0_latlon.15x.15_2022112100_P003.grib2
-                let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(variable.gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(h3).grib2"
+                let hhhmm = domain == .gem_hrdps_continental ? "\(h3)-00" : "\(h3)"
+                let gribName = variable.gribName(domain: domain)
+                let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
                 for message in try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient).messages {
                     //try message.debugGrid(grid: domain.grid)
                     //fatalError()
@@ -146,6 +151,9 @@ struct GemDownload: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocation, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
 
         for variable in variables {
+            if !variable.availableFor(domain: domain) {
+                continue
+            }
             let startConvert = DispatchTime.now()
             logger.info("Converting \(variable)")
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
@@ -188,8 +196,9 @@ protocol GemVariableDownloadable: GenericVariable {
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     var skipHour0: Bool { get }
     func includedFor(hour: Int) -> Bool
-    var gribName: String { get }
+    func gribName(domain: GemDomain) -> String
     var isAccumulatedSinceModelStart: Bool { get }
+    func availableFor(domain: GemDomain) -> Bool
 }
 
 enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable, GenericVariableMixable {
@@ -232,7 +241,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     
     //case lifted_index
     
-    var gribName: String {
+    func gribName(domain: GemDomain) -> String {
         switch self {
         case .temperature_2m:
             return "TMP_TGL_2"
@@ -309,7 +318,14 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         }
     }
     
-    
+    func availableFor(domain: GemDomain) -> Bool {
+        if domain == .gem_hrdps_continental {
+            if self == .cape || self == .showers {
+                return false
+            }
+        }
+        return true
+    }
     
     var omFileName: String {
         return rawValue
@@ -537,8 +553,8 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
     var omFileName: String {
         return rawValue
     }
-    var gribName: String {
-        let isbl = "ISBL_\(level)"
+    func gribName(domain: GemDomain) -> String {
+        let isbl = domain == .gem_hrdps_continental ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
         switch variable {
         case .temperature:
             return "TMP_\(isbl)"
@@ -557,6 +573,10 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         if hour >= 171 && ![1000, 925, 850, 700, 500, 5, 1].contains(level) {
             return false
         }
+        return true
+    }
+    
+    func availableFor(domain: GemDomain) -> Bool {
         return true
     }
     
@@ -730,7 +750,7 @@ enum GemDomain: String, GenericDomain {
         case .gem_regional:
             return "reg"
         case .gem_hrdps_continental:
-            return "HRDPS"
+            return "hrdps_continental"
         }
     }
     
