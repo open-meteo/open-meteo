@@ -180,7 +180,7 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = ContextWithLevels(title: "Gem API", levels: GemDomain.apiLevels, variables: [
+        let context = ContextWithLevels(title: "GEM API", levels: GemDomain.apiLevels, variables: [
             ContextWithLevels.PressureVariable(label: "Temperature", name: "temperature"),
             ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
             ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relativehumidity"),

@@ -21,7 +21,7 @@ public struct GemController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            let domains = [GemDomain.gem_global, .gem_regional]
+            let domains = [GemDomain.gem_global, .gem_regional, .gem_hrdps_continental]
             
             guard let reader = try GemMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
