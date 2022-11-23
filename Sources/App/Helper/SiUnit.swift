@@ -92,6 +92,11 @@ enum PrecipitationUnit: String, Codable {
     case inch
 }
 
+protocol ApiUnitsSelectable {
+    var temperature_unit: TemperatureUnit? { get }
+    var windspeed_unit: WindspeedUnit? { get }
+    var precipitation_unit: PrecipitationUnit? { get }
+}
 
 struct DataAndUnit {
     let data: [Float]
@@ -102,31 +107,7 @@ struct DataAndUnit {
         self.unit = unit
     }
     
-    func conertAndRound(params: ForecastApiQuery) -> DataAndUnit {
-        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
-    }
-    
-    func conertAndRound(params: GfsQuery) -> DataAndUnit {
-        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
-    }
-    
-    func conertAndRound(params: SeasonalQuery) -> DataAndUnit {
-        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
-    }
-    
-    func conertAndRound(params: MeteoFranceQuery) -> DataAndUnit {
-        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
-    }
-    
-    func conertAndRound(params: Era5Query) -> DataAndUnit {
-        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
-    }
-    
-    func conertAndRound(params: JmaQuery) -> DataAndUnit {
-        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
-    }
-    
-    func conertAndRound(params: IconApiQuery) -> DataAndUnit {
+    func conertAndRound<Query: ApiUnitsSelectable>(params: Query) -> DataAndUnit {
         return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
     }
 

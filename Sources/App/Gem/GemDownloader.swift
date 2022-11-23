@@ -12,6 +12,8 @@ Gem regional and global Downloader
  - Global https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_global/15km/grib2/lat_lon/00/
  - Regional
 
+ TODO:
+ -  wind direction in regional model needs to be corrected for true north pole
  */
 struct GemDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
@@ -112,8 +114,8 @@ struct GemDownload: AsyncCommandFix {
                 /// 003/CMC_glb_CIN_SFC_0_latlon.15x.15_2022112100_P003.grib2
                 let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(variable.gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(h3).grib2"
                 for message in try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient).messages {
-                    try message.debugGrid(grid: domain.grid)
-                    fatalError()
+                    //try message.debugGrid(grid: domain.grid)
+                    //fatalError()
                     try grib2d.load(message: message)
                     
                     try FileManager.default.removeItemIfExists(at: filenameDest)
@@ -155,7 +157,7 @@ struct GemDownload: AsyncCommandFix {
                     continue
                 }
                 let h3 = hour.zeroPadded(len: 3)
-                var data = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(h3).om").readAll()
+                let data = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(h3).om").readAll()
                 data2d[0..<nLocation, hour/domain.dtHours] = data
             }
             

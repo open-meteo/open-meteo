@@ -237,7 +237,7 @@ struct SeasonalForecastController {
     }
 }
 
-struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone {
+struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
     let six_hourly: [SeasonalForecastVariable]?

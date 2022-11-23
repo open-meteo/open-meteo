@@ -129,7 +129,7 @@ enum Era5DailyWeatherVariable: String, Codable {
     case et0_fao_evapotranspiration
 }
 
-struct Era5Query: Content, QueryWithTimezone {
+struct Era5Query: Content, QueryWithTimezone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
     let hourly: [Era5HourlyVariable]?
