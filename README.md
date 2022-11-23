@@ -42,6 +42,7 @@ Repositories:
 - [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
 
 Other:
+- [Menubar Weather](https://www.raycast.com/koinzhang/menubar-weather) A Raycast extension that displays live weather information in your menu bar
 - Contributions welcome!
 
 Do you use Open-Meteo? Please open a pull request and add your repository or app to the list!
