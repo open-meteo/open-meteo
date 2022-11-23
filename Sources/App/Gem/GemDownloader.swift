@@ -13,7 +13,8 @@ Gem regional and global Downloader
  - Regional https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_regional/10km/grib2/00/
 
  TODO:
- -  wind direction in regional model needs to be corrected for true north pole
+ - elevation and sea mask
+ - wind direction in regional model needs to be corrected for true north pole
  */
 struct GemDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
@@ -212,9 +213,9 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     case winddirection_120m
     
     /// there is also min/max
-    case windgusts
+    case windgusts_10m
     
-    case convective_precipitation
+    case showers
     
     case snowfall_water_equivalent
     
@@ -259,7 +260,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             return "WDIR_TGL_120"
         case .dewpoint_2m:
             return "DPT_TGL_2"
-        case .convective_precipitation:
+        case .showers:
             return "ACPCP_SFC_0"
         case .cloudcover:
             return "TCDC_SFC_0"
@@ -267,7 +268,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             return "PRMSL_MSL_0"
         case .shortwave_radiation:
             return "DSWRF_SFC_0"
-        case .windgusts:
+        case .windgusts_10m:
             return "GUST_TGL_10"
         case .precipitation:
             return "APCP_SFC_0"
@@ -299,7 +300,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             fallthrough
         case .precipitation:
             fallthrough
-        case .convective_precipitation:
+        case .showers:
             fallthrough
         case .snowfall_water_equivalent:
             return true
@@ -354,9 +355,9 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             return 20
         case .dewpoint_2m:
             return 20
-        case .windgusts:
+        case .windgusts_10m:
             return 10
-        case .convective_precipitation:
+        case .showers:
             return 10
         case .snowfall_water_equivalent:
             return 10
@@ -425,9 +426,9 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             return .hermite(bounds: nil)
         case .winddirection_120m:
             return .hermite(bounds: 0...360)
-        case .windgusts:
+        case .windgusts_10m:
             return .hermite(bounds: nil)
-        case .convective_precipitation:
+        case .showers:
             return .linear
         case .snowfall_water_equivalent:
             return .linear
@@ -476,9 +477,9 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
             return .ms
         case .winddirection_120m:
             return .degreeDirection
-        case .windgusts:
+        case .windgusts_10m:
             return .ms
-        case .convective_precipitation:
+        case .showers:
             return .millimeter
         case .snowfall_water_equivalent:
             return .millimeter
@@ -502,7 +503,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     var skipHour0: Bool {
         switch self {
         case .precipitation: return true
-        case .convective_precipitation: return true
+        case .showers: return true
         case .snowfall_water_equivalent: return true
         case .shortwave_radiation: return true
         default: return false
