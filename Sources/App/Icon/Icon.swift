@@ -177,9 +177,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     var numberOfModelFullLevels: Int {
         switch self {
         case .icon:
-            return 90
+            return 120 // was 90
         case .iconEu:
-            return 60
+            return 74 // was 60
         case .iconD2:
             return 65
         }
