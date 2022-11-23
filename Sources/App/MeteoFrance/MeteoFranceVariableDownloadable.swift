@@ -264,6 +264,8 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
         switch variable {
         case .temperature:
             return (1, -273.15)
+        case .cloudcover:
+            return (100, 0)
         case .geopotential_height:
             // convert geopotential to height (WMO defined gravity constant)
             return (1/9.80665, 0)

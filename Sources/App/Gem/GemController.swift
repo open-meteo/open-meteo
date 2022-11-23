@@ -181,6 +181,9 @@ enum GemDailyWeatherVariable: String, Codable {
 enum GemVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumidity_2m
+    case cloudcover_low
+    case cloudcover_mid
+    case cloudcover_high
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -290,6 +293,18 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
             case .rain:
                 try prefetchData(raw: .precipitation, time: time)
                 try prefetchData(raw: .snowfall_water_equivalent, time: time)
+            case .cloudcover_low:
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 1000))), time: time)
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 950))), time: time)
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 850))), time: time)
+            case .cloudcover_mid:
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 700))), time: time)
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 600))), time: time)
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 500))), time: time)
+            case .cloudcover_high:
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 400))), time: time)
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 300))), time: time)
+                try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 200))), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -384,6 +399,21 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 let total = try get(raw: .precipitation, time: time).data
                 let showers = try get(raw: .showers, time: time).data
                 return DataAndUnit(zip(zip(total, snowwater).map(-), showers).map(-), .millimeter)
+            case .cloudcover_low:
+                let cl0 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 1000))), time: time)
+                let cl1 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 950))), time: time)
+                let cl2 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 850))), time: time)
+                return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
+            case .cloudcover_mid:
+                let cl0 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 700))), time: time)
+                let cl1 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 600))), time: time)
+                let cl2 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 500))), time: time)
+                return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
+            case .cloudcover_high:
+                let cl0 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 400))), time: time)
+                let cl1 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 300))), time: time)
+                let cl2 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 200))), time: time)
+                return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
             }
         case .pressure(let v):
             switch v.variable {

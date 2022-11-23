@@ -151,6 +151,24 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cloudcover_low" id="cloudcover_low" name="hourly">
+          <label class="form-check-label" for="cloudcover_low">
+            Cloudcover Low
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cloudcover_mid" id="cloudcover_mid" name="hourly">
+          <label class="form-check-label" for="cloudcover_mid">
+            Cloudcover Mid
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cloudcover_high" id="cloudcover_high" name="hourly">
+          <label class="form-check-label" for="cloudcover_high">
+            Cloudcover High
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="et0_fao_evapotranspiration"
             id="et0_fao_evapotranspiration" name="hourly">
           <label class="form-check-label" for="et0_fao_evapotranspiration">

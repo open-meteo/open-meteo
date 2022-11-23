@@ -135,7 +135,7 @@ struct Meteorology {
     @inlinable public static func relativeHumidity(temperature: Float, dewpoint: Float) -> Float {
         let β = Float(17.625)
         let λ = Float(243.04)
-        return 100 * exp((β * dewpoint) / (λ + dewpoint)) / exp((β * temperature) / (λ + temperature))
+        return max(min(100 * exp((β * dewpoint) / (λ + dewpoint)) / exp((β * temperature) / (λ + temperature)), 100), 0)
     }
     
     /// Calculate relative dewpoint from humidity and temperature
