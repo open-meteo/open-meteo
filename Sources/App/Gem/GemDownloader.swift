@@ -14,7 +14,6 @@ Gem regional and global Downloader
 
  TODO:
  - elevation and sea mask for hrdps
- - wind direction in regional model needs to be corrected for true north pole
  */
 struct GemDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
@@ -182,8 +181,15 @@ struct GemDownload: AsyncCommandFix {
                     if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
-                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(h3).nc")
                     
+                    /// Correct wind direction for true north -> GEM winddirection is already true north corrected....
+                    /*if let trueNorthDirection, variable.unit == .degreeDirection {
+                        for i in trueNorthDirection.indices {
+                            grib2d.array.data[i] = (grib2d.array.data[i] - trueNorthDirection[i] + 360).truncatingRemainder(dividingBy: 360)
+                        }
+                    }*/
+                    
+                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(h3).nc")
                     let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                     try writer.write(file: filenameDest, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 }
