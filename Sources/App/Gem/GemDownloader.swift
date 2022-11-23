@@ -107,7 +107,7 @@ struct GemDownload: AsyncCommandFix {
         
         var height: Array2D? = nil
         var landmask: Array2D? = nil
-        let curl = Curl(logger: logger)
+        let curl = Curl(logger: logger, deadLineHours: 4)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
@@ -343,7 +343,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         case .snowfall_water_equivalent:
             return "WEASN_SFC_0"
         case .cape:
-            return "CAPE_SFC_0"
+            return domain == .gem_hrdps_continental ? "CAPE_ETAL_10000" : "CAPE_SFC_0"
         //case .cin:
         //    return "CIN_SFC_0"
         //case .lifted_index:
@@ -379,7 +379,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     
     func availableFor(domain: GemDomain) -> Bool {
         if domain == .gem_hrdps_continental {
-            if self == .cape || self == .showers {
+            if self == .showers {
                 return false
             }
         }
