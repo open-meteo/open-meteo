@@ -10,7 +10,7 @@
 #export("content"):
 
 <div class="px-4 py-5 text-center text-white" style="
-            background-image: url('https://assets.open-meteo.com/images/cloudy_cirrus.webp');
+            background-image: url('https://assets.open-meteo.com/images/coastal.webp');
             background-size: cover;
             background-position: center;
             height: 500px;
@@ -22,7 +22,7 @@
   </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Gem API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">10-km high resolution forecasts for North America</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">2.5-km high resolution forecasts for North America</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -501,6 +501,12 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="windgusts_10m_max" id="windgusts_10m_max" name="daily">
+          <label class="form-check-label" for="windgusts_10m_max">
+            Maximum Wind Gusts (10 m)
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="winddirection_10m_dominant"
             id="winddirection_10m_dominant" name="daily">
           <label class="form-check-label" for="winddirection_10m_dominant">
@@ -662,7 +668,7 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses global and local weather models from the Japan Meteorological Agency JMA. Due to data license restrictions only a limited version of data is available. A list of official JMA data is available on the <a target="_blank" href="https://www.jma.go.jp/jma/en/Activities/nwp.html">JMA website</a>.</p>
+    <p>This API uses weather models from the Canadian weather service. Global and regional weather models are combined for a seamless prediction..</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -677,30 +683,36 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row">GSM</th>
+            <th scope="row"><a href="https://weather.gc.ca/grib/grib2_glb_25km_e.html" target="_blank">GEM Global</a></th>
             <td>Global</td>
-            <td>0.5° (~55 km)</td>
-            <td>6-Hourly</td>
-            <td>11 days</td>
+            <td>0.15° (~15 km)</td>
+            <td>3-Hourly</td>
+            <td>10 days</td>
+            <td>Every 12 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://weather.gc.ca/grib/grib2_reg_10km_e.html" target="_blank">GEM Regional</a></th>
+            <td>North America, North Pole</td>
+            <td>10 km</td>
+            <td>Hourly</td>
+            <td>3.5 days</td>
             <td>Every 6 hours</td>
           </tr>
           <tr>
-            <th scope="row">MSM</th>
-            <td>Japan, Korea</td>
-            <td>0.05° (~5 km)</td>
+            <th scope="row"><a href="https://weather.gc.ca/grib/grib2_HRDPS_HR_e.html" target="_blank">HRDPS Continental</a></th>
+            <td>Canada, Nothern US</td>
+            <td>2.5 km</td>
             <td>Hourly</td>
-            <td>4 days</td>
-            <td>Every 3 hours</td>
+            <td>2 days</td>
+            <td>Every 6 hours</td>
           </tr>
         </tbody>
       </table>
-
-      <small class="text-muted">JMA models like RSM are not available.</small>
     </div>
 
     <h2 id="api-documentation" class="mt-5">API Documentation</h2>
-    <p>The API endpoint <mark>/v1/jma</mark> accepts a geographical coordinate, a list of weather variables and responds
-      with a JSON hourly weather forecast for 4 days. Time always starts at 0:00 today and contains 168 hours. All URL parameters are listed
+    <p>The API endpoint <mark>/v1/gem</mark> accepts a geographical coordinate, a list of weather variables and responds
+      with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours. All URL parameters are listed
       below:
     </p>
     <div class="table-responsive">

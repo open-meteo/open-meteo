@@ -14,7 +14,7 @@ public struct GemController {
             let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
             let currentTime = Timestamp.now()
             
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 8)
+            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 11)
             let timezone = try params.resolveTimezone()
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, allowedRange: allowedRange)
             
@@ -170,6 +170,7 @@ enum GemDailyWeatherVariable: String, Codable {
     case showers_sum
     case shortwave_radiation_sum
     case windspeed_10m_max
+    case windgusts_10m_max
     case winddirection_10m_dominant
     case precipitation_hours
     case sunrise
@@ -393,7 +394,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
             case .relativehumidity:
                 let temperature = try get(raw: .pressure(GemPressureVariable(variable: .temperature, level: v.level)), time: time)
                 let dewpoint = try get(derived: .pressure(GemPressureVariableDerived(variable: .dewpoint, level: v.level)), time: time)
-                return DataAndUnit(zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity), temperature.unit)
+                return DataAndUnit(zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity), .percent)
             case .cloudcover:
                 let rh = try get(derived: .pressure(GemPressureVariableDerived(variable: .relativehumidity, level: v.level)), time: time)
                 return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
@@ -445,6 +446,9 @@ extension GemMixer {
         case .windspeed_10m_max:
             let data = try get(variable: .windspeed_10m, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .windgusts_10m_max:
+            let data = try get(variable: .windgusts_10m, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
         case .winddirection_10m_dominant:
             // vector addition
             let speed = try get(variable: .windspeed_10m, time: time).data
@@ -495,6 +499,8 @@ extension GemMixer {
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .windspeed_10m_max:
                 try prefetchData(variable: .windspeed_10m, time: time)
+            case .windgusts_10m_max:
+                try prefetchData(variable: .windgusts_10m, time: time)
             case .winddirection_10m_dominant:
                 try prefetchData(variable: .windspeed_10m, time: time)
                 try prefetchData(variable: .winddirection_10m, time: time)
