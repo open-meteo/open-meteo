@@ -13,7 +13,7 @@ final class MeteorologyTests: XCTestCase {
         // not possible
         XCTAssertEqual(Meteorology.relativeHumidity(temperature: 0, dewpoint: 0), 100.0)
         XCTAssertEqual(Meteorology.relativeHumidity(temperature: 15, dewpoint: 15), 100.0)
-        XCTAssertEqual(Meteorology.relativeHumidity(temperature: 5, dewpoint: 15), 195.28018)
+        XCTAssertEqual(Meteorology.relativeHumidity(temperature: 5, dewpoint: 15), 100)
     }
     
     func testWindScale() {

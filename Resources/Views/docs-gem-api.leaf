@@ -35,7 +35,7 @@
       <ol class="breadcrumb mb-0">
         <li class="breadcrumb-item"><a class="link-secondary" href="/en">Home</a></li>
         <li class="breadcrumb-item"><a class="link-secondary" href="/en/docs">Weather APIs</a></li>
-        <li class="breadcrumb-item active" aria-current="page">Gem API</li>
+        <li class="breadcrumb-item active" aria-current="page">CMC GEM API</li>
       </ol>
     </nav>
   </div>
