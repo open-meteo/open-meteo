@@ -44,7 +44,7 @@
 
 <div class="container px-4 py-0" id="featured-3">
   <div class="alert alert-primary" role="alert">
-    This API uses JMA global GSM and local MSM models and is optimised for Japan. For most use-cases the generic <a
+    This API uses global and regional GEM models from the Candian weather service and is optimised for North America. For most use-cases the generic <a
       href="/en/docs">Weather Forecast API</a> is recommended. Weather models are listed <a href="#data-sources">below</a>.
   </div>
 
@@ -87,6 +87,27 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_40m" id="temperature_40m" name="hourly"
+            checked>
+          <label class="form-check-label" for="temperature_40m">
+            Temperature (40 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_80m" id="temperature_80m" name="hourly"
+            checked>
+          <label class="form-check-label" for="temperature_80m">
+            Temperature (80 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_120m" id="temperature_120m" name="hourly"
+            checked>
+          <label class="form-check-label" for="temperature_120m">
+            Temperature (120 m)
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="relativehumidity_2m" id="relativehumidity_2m"
             name="hourly">
           <label class="form-check-label" for="relativehumidity_2m">
@@ -121,7 +142,25 @@
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="precipitation" id="precipitation" name="hourly">
           <label class="form-check-label" for="precipitation">
-            Precipitation (rain + snow)
+            Precipitation (rain + showers + snow)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="rain" id="rain" name="hourly">
+          <label class="form-check-label" for="rain">
+            Rain
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="showers" id="showers" name="hourly">
+          <label class="form-check-label" for="showers">
+            Showers
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall" id="snowfall" name="hourly">
+          <label class="form-check-label" for="snowfall">
+            Snowfall
           </label>
         </div>
       </div>
@@ -130,24 +169,6 @@
           <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover" name="hourly">
           <label class="form-check-label" for="cloudcover">
             Cloudcover Total
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="cloudcover_low" id="cloudcover_low" name="hourly">
-          <label class="form-check-label" for="cloudcover_low">
-            Cloudcover Low
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="cloudcover_mid" id="cloudcover_mid" name="hourly">
-          <label class="form-check-label" for="cloudcover_mid">
-            Cloudcover Mid
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="cloudcover_high" id="cloudcover_high" name="hourly">
-          <label class="form-check-label" for="cloudcover_high">
-            Cloudcover High
           </label>
         </div>
         <div class="form-check">
@@ -164,6 +185,12 @@
             Vapor Pressure Deficit
           </label>
         </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cape" id="cape" name="hourly">
+          <label class="form-check-label" for="cape">
+            CAPE
+          </label>
+        </div>
       </div>
       <div class="col-md-3">
         <div class="form-check">
@@ -173,10 +200,69 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="windspeed_40m" id="windspeed_40m" name="hourly">
+          <label class="form-check-label" for="windspeed_40m">
+            Wind Speed (40 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="windspeed_80m" id="windspeed_80m" name="hourly">
+          <label class="form-check-label" for="windspeed_80m">
+            Wind Speed (80 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="windspeed_120m" id="windspeed_120m" name="hourly">
+          <label class="form-check-label" for="windspeed_120m">
+            Wind Speed (120 m)
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="winddirection_10m" id="winddirection_10m"
             name="hourly">
           <label class="form-check-label" for="winddirection_10m">
             Wind Direction (10 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="winddirection_40m" id="winddirection_40m"
+            name="hourly">
+          <label class="form-check-label" for="winddirection_40m">
+            Wind Direction (40 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="winddirection_80m" id="winddirection_80m"
+            name="hourly">
+          <label class="form-check-label" for="winddirection_80m">
+            Wind Direction (80 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="winddirection_120m" id="winddirection_120m"
+            name="hourly">
+          <label class="form-check-label" for="winddirection_120m">
+            Wind Direction (120 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="windgusts_10m" id="windgusts_10m" name="hourly">
+          <label class="form-check-label" for="windgusts_10m">
+            Wind Gusts (10 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="soil_temperature_0_to_10cm"
+            id="soil_temperature_0_to_10cm" name="hourly">
+          <label class="form-check-label" for="soil_temperature_0_to_10cm">
+            Soil Temperature (0-10 cm)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm" id="soil_moisture_0_to_10cm"
+            name="hourly">
+          <label class="form-check-label" for="soil_moisture_0_to_10cm">
+            Soil Moisture (0-10 cm)
           </label>
         </div>
       </div>
@@ -188,7 +274,7 @@
           <h2 class="accordion-header" id="heading-solar-variables">
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-solar-variables" aria-expanded="false" aria-controls="collapse-solar-variables">
-              Solar Radiation Variables (Only available for Japan) &nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+              Solar Radiation Variables&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
                 data-count-checkboxes-of="#collapse-solar-variables">0/x</span>
             </button>
           </h2>
@@ -381,6 +467,24 @@
           <input class="form-check-input" type="checkbox" value="precipitation_sum" id="precipitation_sum" name="daily">
           <label class="form-check-label" for="precipitation_sum">
             Precipitation Sum
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="rain_sum" id="rain_sum" name="daily">
+          <label class="form-check-label" for="rain_sum">
+            Rain Sum
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="showers_sum" id="showers_sum" name="daily">
+          <label class="form-check-label" for="showers_sum">
+            Showers Sum
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall_sum" id="snowfall_sum" name="daily">
+          <label class="form-check-label" for="snowfall_sum">
+            Snowfall Sum
           </label>
         </div>
         <div class="form-check">

@@ -165,6 +165,9 @@ enum GemDailyWeatherVariable: String, Codable {
     case apparent_temperature_max
     case apparent_temperature_min
     case precipitation_sum
+    case snowfall_sum
+    case rain_sum
+    case showers_sum
     case shortwave_radiation_sum
     case windspeed_10m_max
     case winddirection_10m_dominant
@@ -189,6 +192,8 @@ enum GemVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMi
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
+    case snowfall
+    case rain
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -279,6 +284,11 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 fallthrough
             case .shortwave_radiation_instant:
                 try prefetchData(raw: .shortwave_radiation, time: time)
+            case .snowfall:
+                try prefetchData(raw: .snowfall_water_equivalent, time: time)
+            case .rain:
+                try prefetchData(raw: .precipitation, time: time)
+                try prefetchData(raw: .snowfall_water_equivalent, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -364,6 +374,15 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let dewpoint = try get(raw: .dewpoint_2m, time: time)
                 return DataAndUnit(zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity), .percent)
+            case .snowfall:
+                let snowwater = try get(raw: .snowfall_water_equivalent, time: time).data
+                let snowfall = snowwater.map { $0 * 0.7 }
+                return DataAndUnit(snowfall, .centimeter)
+            case .rain:
+                let snowwater = try get(raw: .snowfall_water_equivalent, time: time).data
+                let total = try get(raw: .precipitation, time: time).data
+                let showers = try get(raw: .showers, time: time).data
+                return DataAndUnit(zip(zip(total, snowwater).map(-), showers).map(-), .millimeter)
             }
         case .pressure(let v):
             switch v.variable {
@@ -443,6 +462,15 @@ extension GemMixer {
         case .et0_fao_evapotranspiration:
             let data = try get(variable: .et0_fao_evapotranspiration, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .snowfall_sum:
+            let data = try get(variable: .snowfall, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .rain_sum:
+            let data = try get(variable: .rain, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .showers_sum:
+            let data = try get(variable: .showers, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         }
     }
     
@@ -481,6 +509,13 @@ extension GemMixer {
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .dewpoint_2m, time: time)
                 try prefetchData(variable: .windspeed_10m, time: time)
+            case .snowfall_sum:
+                try prefetchData(variable: .snowfall_water_equivalent, time: time)
+            case .rain_sum:
+                try prefetchData(variable: .precipitation, time: time)
+                try prefetchData(variable: .snowfall_water_equivalent, time: time)
+            case .showers_sum:
+                try prefetchData(variable: .showers, time: time)
             }
         }
     }
