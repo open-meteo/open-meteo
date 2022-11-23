@@ -41,6 +41,19 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         let (lat,lon) = projection.inverse(x: xcord, y: ycord)
         return (lat, (lon+180).truncatingRemainder(dividingBy: 360) - 180 )
     }
+    
+    /// Get angle towards true north. 0 = points towards north pole (e.g. no correction necessary), range -180;180
+    func getTrueNorthDirection() -> [Float] {
+        let pos = projection.forward(latitude: 90, longitude: 0)
+        let northPoleX = (pos.x - xrange.lowerBound) / xrange.length * Float(nx-1)
+        let northPoleY = (pos.y - yrange.lowerBound) / yrange.length * Float(ny-1)
+        let trueNorthDirection = (0..<count).map { gridpoint in
+            let x = Float(gridpoint % nx)
+            let y = Float(gridpoint / nx)
+            return atan2(northPoleX - x, northPoleY - y).radiansToDegrees
+        }
+        return trueNorthDirection
+    }
 }
 
 fileprivate extension ClosedRange where Bound == Float {
