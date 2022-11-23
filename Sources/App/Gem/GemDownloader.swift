@@ -641,7 +641,7 @@ typealias GemVariable = SurfaceAndPressureVariable<GemSurfaceVariable, GemPressu
 enum GemDomain: String, GenericDomain {
     case gem_global
     case gem_regional
-    //case highres
+    case gem_hrdps_continental
     
     var omfileDirectory: String {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
@@ -663,15 +663,18 @@ enum GemDomain: String, GenericDomain {
         return self == .gem_global
     }
 
-    private static var gsmElevationFile = try? OmFileReader(file: Self.gem_global.surfaceElevationFileOm)
-    private static var msmElevationFile = try? OmFileReader(file: Self.gem_regional.surfaceElevationFileOm)
+    private static var gemGlobalElevationFile = try? OmFileReader(file: Self.gem_global.surfaceElevationFileOm)
+    private static var gemRegionalElevationFile = try? OmFileReader(file: Self.gem_regional.surfaceElevationFileOm)
+    private static var gemHrdpsContinentalElevationFile = try? OmFileReader(file: Self.gem_hrdps_continental.surfaceElevationFileOm)
     
     var elevationFile: OmFileReader? {
         switch self {
         case .gem_global:
-            return Self.gsmElevationFile
+            return Self.gemGlobalElevationFile
         case .gem_regional:
-            return Self.msmElevationFile
+            return Self.gemRegionalElevationFile
+        case .gem_hrdps_continental:
+            return Self.gemHrdpsContinentalElevationFile
         }
     }
     
@@ -685,6 +688,10 @@ enum GemDomain: String, GenericDomain {
             return t.add(-3*3600).floor(toNearest: 12*3600)
         case .gem_regional:
             // Delay of 2:47 hours to init
+            // every 6 hours
+            return t.add(-2*3600).floor(toNearest: 6*3600)
+        case .gem_hrdps_continental:
+            // Delay of 3:08 hours to init
             // every 6 hours
             return t.add(-2*3600).floor(toNearest: 6*3600)
         }
@@ -701,6 +708,8 @@ enum GemDomain: String, GenericDomain {
             return Array(stride(from: 0, through: 240, by: 3))
         case .gem_regional:
             return Array(stride(from: 0, through: 84, by: 1))
+        case .gem_hrdps_continental:
+            return Array(stride(from: 0, through: 48, by: 1))
         }
     }
     
@@ -720,6 +729,8 @@ enum GemDomain: String, GenericDomain {
             return "glb"
         case .gem_regional:
             return "reg"
+        case .gem_hrdps_continental:
+            return "HRDPS"
         }
     }
     
@@ -729,6 +740,8 @@ enum GemDomain: String, GenericDomain {
             return "latlon.15x.15"
         case .gem_regional:
             return "ps10km"
+        case .gem_hrdps_continental:
+            return "ps2.5km"
         }
     }
     
@@ -738,6 +751,8 @@ enum GemDomain: String, GenericDomain {
             return "model_\(rawValue)/15km/grib2/lat_lon"
         case .gem_regional:
             return "model_\(rawValue)/10km/grib2"
+        case .gem_hrdps_continental:
+            return "model_hrdps/continental/grib2"
         }
     }
     
@@ -747,6 +762,8 @@ enum GemDomain: String, GenericDomain {
             return 110
         case .gem_regional:
             return 78+36
+        case .gem_hrdps_continental:
+            return 48+36
         }
     }
     
@@ -756,6 +773,9 @@ enum GemDomain: String, GenericDomain {
             return RegularGrid(nx: 2400, ny: 1201, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
         case .gem_regional:
             return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
+        case .gem_hrdps_continental:
+            // TODO grid... could be some kind of lambert conformal
+            return RegularGrid(nx: 2576, ny: 1456, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
         }
     }
 }
