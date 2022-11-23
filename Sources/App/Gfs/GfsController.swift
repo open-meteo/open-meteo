@@ -126,7 +126,7 @@ public struct GfsController {
 }
 
 
-struct GfsQuery: Content, QueryWithStartEndDateTimeZone {
+struct GfsQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
     let hourly: [GfsVariableCombined]?

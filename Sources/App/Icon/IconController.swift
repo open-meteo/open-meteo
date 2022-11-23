@@ -116,7 +116,7 @@ public struct IconController {
 }
 
 
-struct IconApiQuery: Content, QueryWithStartEndDateTimeZone {
+struct IconApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
     let hourly: [IconApiVariable]?

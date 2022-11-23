@@ -150,11 +150,6 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
             fallthrough
         case .cloudcover_high:
             try prefetchData(raw: .cloudcover, time: time)*/
-        case .wind_u_component_10m:
-            fallthrough
-        case .wind_v_component_10m:
-            try prefetchData(raw: .windspeed_10m, time: time)
-            try prefetchData(raw: .winddirection_10m, time: time)
         }
     }
     
@@ -233,14 +228,6 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
             return try get(raw: .cloudcover, time: time)
         case .cloudcover_high:
             return try get(raw: .cloudcover, time: time)*/
-        case .wind_u_component_10m:
-            let speed = try get(raw: .windspeed_10m, time: time)
-            let direction = try get(raw: .winddirection_10m, time: time)
-            return DataAndUnit(zip(speed.data, direction.data).map(Meteorology.uWind), speed.unit)
-        case .wind_v_component_10m:
-            let speed = try get(raw: .windspeed_10m, time: time)
-            let direction = try get(raw: .winddirection_10m, time: time)
-            return DataAndUnit(zip(speed.data, direction.data).map(Meteorology.vWind), speed.unit)
         }
     }
 }
@@ -250,8 +237,6 @@ enum MetNoVariableDerived: String, Codable, GenericVariableMixable {
     /*case cloudcover_low
     case cloudcover_mid
     case cloudcover_high*/
-    case wind_u_component_10m
-    case wind_v_component_10m
     
     case apparent_temperature
     case dewpoint_2m

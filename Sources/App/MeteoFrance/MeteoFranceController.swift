@@ -122,7 +122,7 @@ public struct MeteoFranceController {
 }
 
 
-struct MeteoFranceQuery: Content, QueryWithStartEndDateTimeZone {
+struct MeteoFranceQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
     let hourly: [MeteoFranceVariableCombined]?
