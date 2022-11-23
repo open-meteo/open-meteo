@@ -57,6 +57,10 @@ struct CronjobCommand: Command {
         0 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-meteofrance arome_france_hd > ~/log/arome_france_hd.log 2>&1 || cat ~/log/arome_france_hd.log
 
         27 * * * * /usr/local/bin/openmeteo-api download-metno nordic_pp > ~/log/nordic_pp.log 2>&1 || cat ~/log/nordic_pp.log
+        
+        7 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gem gem_hrdps_continental > ~/log/gem_hrdps_continental.log 2>&1 || cat ~/log/gem_hrdps_continental.log
+        47 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-gem gem_regional > ~/log/gem_regional.log 2>&1 || cat ~/log/gem_regional.log
+        39 3,15 * * * /usr/local/bin/openmeteo-api download-gem gem_global > ~/log/gem_global.log 2>&1 || cat ~/log/gem_global.log
         """)
     }
 }
