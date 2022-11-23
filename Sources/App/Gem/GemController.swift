@@ -363,7 +363,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
             case .relativehumidity_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let dewpoint = try get(raw: .dewpoint_2m, time: time)
-                return DataAndUnit(zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity), temperature.unit)
+                return DataAndUnit(zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity), .percent)
             }
         case .pressure(let v):
             switch v.variable {

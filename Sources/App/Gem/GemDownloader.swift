@@ -10,7 +10,7 @@ Gem regional and global Downloader
  
  High perf server
  - Global https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_global/15km/grib2/lat_lon/00/
- - Regional
+ - Regional https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_regional/10km/grib2/00/
 
  TODO:
  -  wind direction in regional model needs to be corrected for true north pole
