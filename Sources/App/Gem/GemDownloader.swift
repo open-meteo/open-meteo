@@ -13,7 +13,7 @@ Gem regional and global Downloader
  - Regional https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_regional/10km/grib2/00/
 
  TODO:
- - elevation and sea mask
+ - elevation and sea mask for hrdps
  - wind direction in regional model needs to be corrected for true north pole
  */
 struct GemDownload: AsyncCommandFix {
@@ -78,10 +78,63 @@ struct GemDownload: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
-        //try await downloadElevation(application: context.application, domain: domain)
+        try await downloadElevation(application: context.application, domain: domain, run: run)
         try await download(application: context.application, domain: domain, variables: variables, run: run, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
+    }
+    
+    // download seamask and height
+    func downloadElevation(application: Application, domain: GemDomain, run: Timestamp) async throws {
+        if domain == .gem_hrdps_continental {
+            // HGT_SFC_0 file is missing... no idea why
+            return
+        }
+        
+        let logger = application.logger
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
+            return
+        }
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        
+        logger.info("Downloading height and elevation data")
+        
+        let server = "https://hpfx.collab.science.gc.ca/\(run.format_YYYYMMdd)/WXO-DD/\(domain.gribFileGridResolution)/\(run.hh)/"
+        
+        let yyyymmddhh = run.format_YYYYMMddHH
+        let hhhmm = domain == .gem_hrdps_continental ? "000-00" : "000"
+        
+        
+        var height: Array2D? = nil
+        var landmask: Array2D? = nil
+        let curl = Curl(logger: logger)
+        
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
+        let terrainUrl = "\(server)000/CMC_\(domain.gribFileDomainName)_HGT_SFC_0_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
+        for message in try await curl.downloadGrib(url: terrainUrl, client: application.dedicatedHttpClient).messages {
+            try grib2d.load(message: message)
+            height = grib2d.array
+            //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
+        }
+        
+        let landmaskUrl = "\(server)000/CMC_\(domain.gribFileDomainName)_LAND_SFC_0_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
+        for message in try await curl.downloadGrib(url: landmaskUrl, client: application.dedicatedHttpClient).messages {
+            try grib2d.load(message: message)
+            landmask = grib2d.array
+            //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
+        }
+        
+        guard var height = height, let landmask = landmask else {
+            fatalError("Could not download land and sea mask")
+        }
+        
+        for i in height.data.indices {
+            // landmask: 0=sea, 1=land
+            height.data[i] = landmask.data[i] >= 0.5 ? height.data[i] : -999
+        }
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
     }
     
     /// Download data and store as compressed files for each timestep

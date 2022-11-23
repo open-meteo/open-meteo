@@ -113,7 +113,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 grib2d.array.flipLatitude()
             }
             height = grib2d.array
-            try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
+            //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         }
         
         let landmaskUrl = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/static/landmask.grib2"
@@ -125,7 +125,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 grib2d.array.flipLatitude()
             }
             landmask = grib2d.array
-            try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
+            //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
         }
         
         guard var height = height, let landmask = landmask else {
