@@ -794,8 +794,7 @@ enum GemDomain: String, GenericDomain {
         case .gem_regional:
             return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
         case .gem_hrdps_continental:
-            // TODO grid... could be some kind of lambert conformal
-            return RegularGrid(nx: 2576, ny: 1456, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
+            return ProjectionGrid(nx: 2576, ny: 1456, latitude: 35.603374...45.85184, longitude: -128.08255...(-43.829773), projection: StereograpicProjection(latitude: 90, longitude: 252, radius: 6371229))
         }
     }
 }
