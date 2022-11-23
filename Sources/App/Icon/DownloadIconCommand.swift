@@ -214,6 +214,8 @@ struct DownloadIconCommand: AsyncCommandFix {
                 } else {
                     // Use async in-memory download and decoding -> 4 times faster, but cannot regrid icosahedral data
                     let message = try await curl.downloadBz2Grib(url: url, client: application.dedicatedHttpClient).messages[0]
+                    //try message.debugGrid(grid: domain.grid)
+                    //fatalError()
                     try grib2d.load(message: message)
                     data = grib2d.array.data
                 }

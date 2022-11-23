@@ -68,6 +68,9 @@ struct OmFileSplitter {
                 guard let omFile = try OmFileManager.get(basePath: yearlyArchivePath, variable: variable, timeChunk: year) else {
                     continue
                 }
+                guard omFile.dim0 == nLocations else {
+                    continue
+                }
                 try omFile.willNeed(dim0Slow: location..<location+1, dim1: offsets.file)
                 start = fileTime.upperBound
             }
@@ -82,6 +85,9 @@ struct OmFileSplitter {
                 continue
             }
             guard let omFile = try OmFileManager.get(basePath: basePath, variable: variable, timeChunk: timeChunk) else {
+                continue
+            }
+            guard omFile.dim0 == nLocations else {
                 continue
             }
             try omFile.willNeed(dim0Slow: location..<location+1, dim1: offsets.file)
@@ -108,6 +114,9 @@ struct OmFileSplitter {
                 guard let omFile = try OmFileManager.get(basePath: yearlyArchivePath, variable: variable, timeChunk: year) else {
                     continue
                 }
+                guard omFile.dim0 == nLocations else {
+                    continue
+                }
                 //assert(omFile.chunk0 == nLocations)
                 //assert(omFile.chunk1 == nTimePerFile)
                 try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location..<location+1, dim1: offsets.file)
@@ -125,6 +134,9 @@ struct OmFileSplitter {
                 continue
             }
             guard let omFile = try OmFileManager.get(basePath: basePath, variable: variable, timeChunk: timeChunk) else {
+                continue
+            }
+            guard omFile.dim0 == nLocations else {
                 continue
             }
             //assert(omFile.chunk0 == nLocations)
@@ -173,7 +185,7 @@ struct OmFileSplitter {
                 
                 // Read existing data for a chunk of locations.. Around 8MB data
                 let locationRange = d0offset ..< min(d0offset+locationsChunk, nLocations)
-                if let omRead = omRead {
+                if let omRead = omRead, omRead.dim0 == nLocations, omRead.dim1 == nTimePerFile {
                     try omRead.read(into: &fileData, arrayRange: fileData.indices, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
                 } else {
                     /// If the old file does not exist, just make sure it is filled with NaNs
