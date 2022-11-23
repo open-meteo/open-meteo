@@ -42,7 +42,7 @@ extension GribMessage {
                 coords.append(c)
             }
             
-            if i % 3000 == 0 {
+            if i % (nx*ny/100) == 0 {
                 coords.append(c)
             }
         }
