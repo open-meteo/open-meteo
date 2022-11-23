@@ -27,6 +27,11 @@ enum MultiDomains: String, Codable, CaseIterable {
     case jma_msm
     case jms_gsm
     
+    case gem_mix
+    case gem_global
+    case gem_regional
+    case gem_hrdps_continental
+    
     case icon_mix
     case icon_global
     case icon_eu
@@ -121,6 +126,14 @@ enum MultiDomains: String, Codable, CaseIterable {
             return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .metno_nordic:
             return try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .gem_mix:
+            return try GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+        case .gem_global:
+            return try GemReader(domain: .gem_global, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .gem_regional:
+            return try GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .gem_hrdps_continental:
+            return try GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
 }
@@ -161,6 +174,7 @@ extension MeteoFranceReader: GenericReaderMixerForecast { }
 extension JmaReader: GenericReaderMixerForecast { }
 extension EcmwfReader: GenericReaderMixerForecast { }
 extension MetNoReader: GenericReaderMixerForecast { }
+extension GemReader: GenericReaderMixerForecast { }
 
 /// Combine multiple independent weahter models, that may not have given forecast variable
 struct MultiDomainMixer {

@@ -15,6 +15,7 @@ Gem regional and global Downloader
  TODO:
  - elevation and sea mask
  - wind direction in regional model needs to be corrected for true north pole
+ - use pressure level clouds for low,mid,high clouds in mixing
  */
 struct GemDownload: AsyncCommandFix {
     struct Signature: CommandSignature {

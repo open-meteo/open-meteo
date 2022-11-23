@@ -44,7 +44,7 @@
             <a href="/en/features" class="nav-link #if(title == "Features"): active #endif">Features</a>
           </li>
           <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle #if(title == "Weather Forecast API" || title=="ECMWF Weather Forecast API" || title=="Historical Weather API" || title=="MeteoFrance API" || title=="DWD ICON API" || title=="GFS & HRRR Forecast API" ): active #endif" href="#"
+            <a class="nav-link dropdown-toggle #if(title == "Weather Forecast API" || title=="ECMWF Weather Forecast API" || title=="Historical Weather API" || title=="MeteoFrance API" || title=="DWD ICON API" || title=="GFS & HRRR Forecast API" || title=="GEM API" ): active #endif" href="#"
               id="navbarDropdownWeatherApis" role="button" data-bs-toggle="dropdown" aria-expanded="false">
               Weather APIs
             </a>
@@ -67,6 +67,9 @@
               <li><a class="dropdown-item #if(title == "MET Norway API"): active #endif"
                     href="/en/docs/metno-api">MET Norway API&nbsp;&nbsp;<span
                     class="badge bg-secondary">New</span></a></li>
+              <li><a class="dropdown-item #if(title == "GEM API"): active #endif"
+                href="/en/docs/gem-api">GEM API&nbsp;&nbsp;<span
+                class="badge bg-secondary">New</span></a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">
@@ -150,6 +153,7 @@
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/meteofrance-api">MeteoFrance
               API</a></li>
           <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/dwd-api">DWD ICON API</a></li>
+          <li class="mb-1"><a class="link-secondary text-decoration-none" href="/en/docs/gem-api">GEM API</a></li>
         </ul>
       </div>
       <div class="col-6 col-md">
