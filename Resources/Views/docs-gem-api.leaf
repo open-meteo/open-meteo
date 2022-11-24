@@ -44,7 +44,7 @@
 
 <div class="container px-4 py-0" id="featured-3">
   <div class="alert alert-primary" role="alert">
-    This API uses global and regional GEM models from the Candian Meteorological Center CMC and is optimised for North America. For most use-cases the generic <a
+    This API uses global and regional GEM models from the Canadian Meteorological Center CMC and is optimised for North America. For most use-cases the generic <a
       href="/en/docs">Weather Forecast API</a> is recommended. Weather models are listed <a href="#data-sources">below</a>.
   </div>
 
