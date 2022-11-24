@@ -405,17 +405,17 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         case .winddirection_10m:
             return 1
         case .windspeed_40m:
-            return 10
+            return 8
         case .winddirection_40m:
-            return 1
+            return 0.5
         case .windspeed_80m:
-            return 10
+            return 8
         case .winddirection_80m:
-            return 1
+            return 0.5
         case .windspeed_120m:
-            return 10
+            return 8
         case .winddirection_120m:
-            return 1
+            return 0.5
         case .soil_temperature_0_to_10cm:
             return 20
         case .soil_moisture_0_to_10cm:
@@ -643,15 +643,15 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
         case .temperature:
+            fallthrough
+        case .dewpoint_depression:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .dewpoint_depression:
-            return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
         case.winddirection:
-            return (0.2..<1).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+            return (0.2..<0.5).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .windspeed:
             // Use scalefactor 3 for levels higher than 500 hPa.
-            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+            return (3..<8).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
