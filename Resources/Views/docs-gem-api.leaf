@@ -20,9 +20,9 @@
     <path
       d="M7.068.727c.243-.97 1.62-.97 1.864 0l.071.286a.96.96 0 0 0 1.622.434l.205-.211c.695-.719 1.888-.03 1.613.931l-.08.284a.96.96 0 0 0 1.187 1.187l.283-.081c.96-.275 1.65.918.931 1.613l-.211.205a.96.96 0 0 0 .434 1.622l.286.071c.97.243.97 1.62 0 1.864l-.286.071a.96.96 0 0 0-.434 1.622l.211.205c.719.695.03 1.888-.931 1.613l-.284-.08a.96.96 0 0 0-1.187 1.187l.081.283c.275.96-.918 1.65-1.613.931l-.205-.211a.96.96 0 0 0-1.622.434l-.071.286c-.243.97-1.62.97-1.864 0l-.071-.286a.96.96 0 0 0-1.622-.434l-.205.211c-.695.719-1.888.03-1.613-.931l.08-.284a.96.96 0 0 0-1.186-1.187l-.284.081c-.96.275-1.65-.918-.931-1.613l.211-.205a.96.96 0 0 0-.434-1.622l-.286-.071c-.97-.243-.97-1.62 0-1.864l.286-.071a.96.96 0 0 0 .434-1.622l-.211-.205c-.719-.695-.03-1.888.931-1.613l.284.08a.96.96 0 0 0 1.187-1.186l-.081-.284c-.275-.96.918-1.65 1.613-.931l.205.211a.96.96 0 0 0 1.622-.434l.071-.286zM12.973 8.5H8.25l-2.834 3.779A4.998 4.998 0 0 0 12.973 8.5zm0-1a4.998 4.998 0 0 0-7.557-3.779l2.834 3.78h4.723zM5.048 3.967c-.03.021-.058.043-.087.065l.087-.065zm-.431.355A4.984 4.984 0 0 0 3.002 8c0 1.455.622 2.765 1.615 3.678L7.375 8 4.617 4.322zm.344 7.646.087.065-.087-.065z" />
   </svg>
-  <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">CMC GEM API</h1>
+  <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">GEM API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">2.5-km high resolution forecasts for North America</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">2.5 km high resolution forecasts for North America</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -685,7 +685,7 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses <a href="https://en.wikipedia.org/wiki/Global_Environmental_Multiscale_Model" target="_new">GEM models</a> from the Canadian weather service. Global and regional weather models are combined for a seamless prediction.</p>
+    <p>This API uses <a href="https://en.wikipedia.org/wiki/Global_Environmental_Multiscale_Model" target="_new">Global Environmental Multiscale Model (GEM)</a> from the Canadian weather service. Global and regional weather models are combined into a seamless prediction.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -857,10 +857,10 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row">temperature_2m</th>
+            <th scope="row">temperature_2m<br/>temperature_40m<br/>temperature_80m<br/>temperature_120m</th>
             <td>Instant</td>
             <td>°C (°F)</td>
-            <td>Air temperature at 2 meters above ground</td>
+            <td>Air temperature at 2, 40, 80 or 120 meters above ground. 2 m is the standard level.</td>
           </tr>
           <tr>
             <th scope="row">relativehumidity_2m</th>
@@ -898,7 +898,7 @@
             <th scope="row">cloudcover_low</th>
             <td>Instant</td>
             <td>%</td>
-            <td>Low level clouds and fog up to 3 km altitude</td>
+            <td>Low level clouds and fog up to 3 km altitude. Note: Low, medium and high clouds are calculated from pressure level data. Totcal cloud cover might differ.</td>
           </tr>
           <tr>
             <th scope="row">cloudcover_mid</th>
@@ -913,16 +913,23 @@
             <td>High level clouds from 8 km altitude</td>
           </tr>
           <tr>
-            <th scope="row">windspeed_10m</th>
+            <th scope="row">windspeed_10m<br />windspeed_40m<br>windspeed_80m<br>windspeed_120m</th>
             <td>Instant</td>
             <td>km/h (mph, m/s, knots)</td>
-            <td>Wind speed at 10 meters above ground. Wind speed on 10 meters is the standard level.</td>
+            <td>Wind speed at 10, 40, 80 or 120 meters above ground. Wind speed on 10 meters is the standard level.
+            </td>
           </tr>
           <tr>
-            <th scope="row">winddirection_10m</th>
+            <th scope="row">winddirection_10m<br>winddirection_40m<br />winddirection_80m<br />winddirection_120m</th>
             <td>Instant</td>
             <td>°</td>
-            <td>Wind direction at 10 meters above ground</td>
+            <td>Wind direction at 10, 40, 80 or 120 meters above ground</td>
+          </tr>
+          <tr>
+            <th scope="row">windgusts_10m</th>
+            <td>Preceding hour max</td>
+            <td>km/h (mph, m/s, knots)</td>
+            <td>Gusts at 10 meters above ground as a maximum of the preceding hour</td>
           </tr>
           <tr>
             <th scope="row">shortwave_radiation</th>
@@ -935,13 +942,13 @@
             <th scope="row">direct_radiation<br/>direct_normal_irradiance</th>
             <td>Preceding hour mean</td>
             <td>W/m²</td>
-            <td>Direct solar radiation as average of the preceding hour on the horizontal plane and the normal plane (perpendicular to the sun). JMA does not offers diffuse and direct radiation directly. It is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
+            <td>Direct solar radiation as average of the preceding hour on the horizontal plane and the normal plane (perpendicular to the sun). GEM does not offers diffuse and direct radiation directly. It is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
           </tr>
           <tr>
             <th scope="row">diffuse_radiation</th>
             <td>Preceding hour mean</td>
             <td>W/m²</td>
-            <td>Diffuse solar radiation as average of the preceding hour.  MA does not offers diffuse and direct radiation directly. It is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
+            <td>Diffuse solar radiation as average of the preceding hour. GEM does not offers diffuse and direct radiation directly. It is approximated based on <a href="https://www.ise.fraunhofer.de/content/dam/ise/de/documents/publications/conference-paper/36-eupvsec-2019/Guzman_5CV31.pdf" target="_blank">Razo, Müller Witwer</a></td>
           </tr>
           <tr>
             <th scope="row">vapor_pressure_deficit</th>
@@ -965,6 +972,37 @@
             <td>mm (inch)</td>
             <td>Total precipitation (rain, showers, snow) sum of the preceding hour</td>
           </tr>
+          <tr>
+            <th scope="row">snowfall</th>
+            <td>Preceding hour sum</td>
+            <td>cm (inch)</td>
+            <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by
+              7. E.g. 7 cm snow = 10 mm precipitation water equivalent</td>
+          </tr>
+          <tr>
+            <th scope="row">rain</th>
+            <td>Preceding hour sum</td>
+            <td>mm (inch)</td>
+            <td>Rain from large scale weather systems of the preceding hour in millimeter</td>
+          </tr>
+          <tr>
+            <th scope="row">showers</th>
+            <td>Preceding hour sum</td>
+            <td>mm (inch)</td>
+            <td>Showers from convective precipitation in millimeters from the preceding hour</td>
+          </tr>
+          <tr>
+            <th scope="row">soil_temperature_0_to_10cm</th>
+            <td>Instant</td>
+            <td>°C (°F)</td>
+            <td>Average temperature in the soil at 0-10 cm depts.</td>
+          </tr>
+          <tr>
+            <th scope="row">soil_moisture_0_to_10cm</th>
+            <td>Instant</td>
+            <td>m³/m³</td>
+            <td>Average soil water content as volumetric mixing ratio at 0-10 cm depth.</td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -973,6 +1011,7 @@
     <p>Pressure level variables do not have fixed altitudes. Altitude varies with atmospheric pressure. 1000 hPa is
       roughly between 60 and 160 meters above sea level. Estimated altitudes are given below. Altitudes are in meters
       above sea level (not above ground). For precise altitudes, <mark>geopotential_height</mark> can be used.</p>
+      <p>GEM includes a 1050 hPa level, which technically is to a level below ground. Please note, that this is not the soil temperature! If geopotential height is below ground, data should not be used.</p>
     <div class="table-responsive">
       <table class="table">
         <tr>
@@ -1015,7 +1054,7 @@
           <tr>
             <th scope="row">cloudcover_1000hPa<br />cloudcover_975hPa, ...</th>
             <td>%</td>
-            <td>Cloud cover at the specified pressure level. JMA models do not inlude parameterised cloud cover directly. It is approximated based on relative humidity
+            <td>Cloud cover at the specified pressure level. GEM does not inlude parameterised cloud cover directly. It is approximated based on relative humidity
               using <a
                 href="https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf"
                 target="_blank">Sundqvist et al. (1989)</a>. It may not match perfectly with low, mid and high cloud
@@ -1069,6 +1108,21 @@
             <th scope="row">precipitation_sum</th>
             <td>mm</td>
             <td>Sum of daily precipitation (including rain, showers and snowfall)</td>
+          </tr>
+          <tr>
+            <th scope="row">rain_sum</th>
+            <td>mm</td>
+            <td>Sum of daily rain</td>
+          </tr>
+          <tr>
+            <th scope="row">showers_sum</th>
+            <td>mm</td>
+            <td>Sum of daily showers</td>
+          </tr>
+          <tr>
+            <th scope="row">snowfall_sum</th>
+            <td>cm</td>
+            <td>Sum of daily snowfall</td>
           </tr>
           <tr>
             <th scope="row">precipitation_hours</th>
