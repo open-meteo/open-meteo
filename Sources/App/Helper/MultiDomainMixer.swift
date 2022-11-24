@@ -9,29 +9,35 @@ import Vapor
  - If Central Europe, use ICON_D2, ICON_EU, ICON + GFS
  - If Japan, use JMA_MSM + ICON + GFS
  - default ICON + GFS
+ 
+ Note Nov 2022: Use the term `seamless` instead of `mix`
  */
 enum MultiDomains: String, Codable, CaseIterable {
     case best_match
 
+    case gfs_seamless
     case gfs_mix
     case gfs_global
     case gfs_hrrr
     
+    case meteofrance_seamless
     case meteofrance_mix
     case meteofrance_arpege_world
     case meteofrance_arpege_europe
     case meteofrance_arome_france
     case meteofrance_arome_france_hd
     
+    case jma_seamless
     case jma_mix
     case jma_msm
     case jms_gsm
     
-    case gem_mix
+    case gem_seamless
     case gem_global
     case gem_regional
     case gem_hrdps_continental
     
+    case icon_seamless
     case icon_mix
     case icon_global
     case icon_eu
@@ -92,12 +98,16 @@ enum MultiDomains: String, Codable, CaseIterable {
             
             // Remaining parts of the world
             return [gfs025, icon]
+        case .gfs_seamless:
+            fallthrough
         case .gfs_mix:
             return try GfsMixer(domains: [.gfs025, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_global:
             return try GfsReader(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gfs_hrrr:
             return try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .meteofrance_seamless:
+            fallthrough
         case .meteofrance_mix:
             return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .meteofrance_arpege_world:
@@ -108,12 +118,16 @@ enum MultiDomains: String, Codable, CaseIterable {
             return try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .meteofrance_arome_france_hd:
             return try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .jma_seamless:
+            fallthrough
         case .jma_mix:
             return try JmaMixer(domains: [.gsm, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .jma_msm:
             return try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .jms_gsm:
             return try JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .icon_seamless:
+            fallthrough
         case .icon_mix:
             return try IconMixer(domains: [.icon, .iconEu, .iconD2], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .icon_global:
@@ -126,7 +140,7 @@ enum MultiDomains: String, Codable, CaseIterable {
             return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .metno_nordic:
             return try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .gem_mix:
+        case .gem_seamless:
             return try GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gem_global:
             return try GemReader(domain: .gem_global, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []

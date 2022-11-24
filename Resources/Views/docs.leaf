@@ -528,7 +528,7 @@
           <div id="collapse-models" class="accordion-collapse collapse"
             aria-labelledby="heading-models" data-bs-parent="#accordionVariables">
             <div class="accordion-body row">
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="best_match" id="best_match"
                     name="models">
@@ -537,10 +537,73 @@
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="icon_mix" id="icon_mix"
+                  <input class="form-check-input" type="checkbox" value="ecmwf_ifs04"
+                    id="ecmwf_ifs04" name="models">
+                  <label class="form-check-label" for="ecmwf_ifs04">
+                    ECMWF IFS
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="metno_nordic"
+                    id="metno_nordic" name="models">
+                  <label class="form-check-label" for="metno_nordic">
+                    MET Norway Nordic
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="gfs_seamless"
+                    id="gfs_seamless" name="models">
+                  <label class="form-check-label" for="gfs_seamless">
+                    GFS Seamless
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="gfs_global"
+                    id="gfs_global" name="models">
+                  <label class="form-check-label" for="gfs_global">
+                    GFS Global
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="gfs_hrrr"
+                    id="gfs_hrrr" name="models">
+                  <label class="form-check-label" for="gfs_hrrr">
+                    GFS HRRR
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="jma_seamless"
+                    id="jma_seamless" name="models">
+                  <label class="form-check-label" for="jma_seamless">
+                    JMA Seamless
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="jma_msm"
+                    id="jma_msm" name="models">
+                  <label class="form-check-label" for="jma_msm">
+                    JMA MSM
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="jms_gsm"
+                    id="jms_gsm" name="models">
+                  <label class="form-check-label" for="jms_gsm">
+                    JMA GSM
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-12 mb-3"></div>
+              <div class="col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="icon_seamless" id="icon_seamless"
                     name="models">
-                  <label class="form-check-label" for="icon_mix">
-                    DWD Icon Mix
+                  <label class="form-check-label" for="icon_seamless">
+                    DWD Icon Seamless
                   </label>
                 </div>
                 <div class="form-check">
@@ -564,48 +627,43 @@
                     DWD Icon D2
                   </label>
                 </div>
+              </div>
+              <div class="col-md-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="ecmwf_ifs04"
-                    id="ecmwf_ifs04" name="models">
-                  <label class="form-check-label" for="ecmwf_ifs04">
-                    ECMWF IFS
+                  <input class="form-check-input" type="checkbox" value="gem_seamless"
+                    id="gem_seamless" name="models">
+                  <label class="form-check-label" for="gem_seamless">
+                    GEM Seamless
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="metno_nordic"
-                    id="metno_nordic" name="models">
-                  <label class="form-check-label" for="metno_nordic">
-                    MET Norway Nordic
+                  <input class="form-check-input" type="checkbox" value="gem_global"
+                    id="gem_global" name="models">
+                  <label class="form-check-label" for="gem_global">
+                    GEM Global
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gfs_mix"
-                    id="gfs_mix" name="models">
-                  <label class="form-check-label" for="gfs_mix">
-                    GFS Mix
+                  <input class="form-check-input" type="checkbox" value="gem_regional"
+                    id="gem_regional" name="models">
+                  <label class="form-check-label" for="gem_regional">
+                    GEM Regional
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gfs_global"
-                    id="gfs_global" name="models">
-                  <label class="form-check-label" for="gfs_global">
-                    GFS Global
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gfs_hrrr"
-                    id="gfs_hrrr" name="models">
-                  <label class="form-check-label" for="gfs_hrrr">
-                    GFS HRRR
+                  <input class="form-check-input" type="checkbox" value="gem_hrdps_continental"
+                    id="gem_hrdps_continental" name="models">
+                  <label class="form-check-label" for="gem_hrdps_continental">
+                    GEM HRDPS Continental
                   </label>
                 </div>
               </div>
-              <div class="col-md-6">
+              <div class="col-md-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="meteofrance_mix"
-                    id="meteofrance_mix" name="models">
-                  <label class="form-check-label" for="meteofrance_mix">
-                    MeteoFrance Mix
+                  <input class="form-check-input" type="checkbox" value="meteofrance_seamless"
+                    id="meteofrance_seamless" name="models">
+                  <label class="form-check-label" for="meteofrance_seamless">
+                    MeteoFrance Seamless
                   </label>
                 </div>
                 <div class="form-check">
@@ -636,58 +694,9 @@
                     MeteoFrance Arome France HD
                   </label>
                 </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="jma_mix"
-                    id="jma_mix" name="models">
-                  <label class="form-check-label" for="jma_mix">
-                    JMA Mix
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="jma_msm"
-                    id="jma_msm" name="models">
-                  <label class="form-check-label" for="jma_msm">
-                    JMA MSM
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="jms_gsm"
-                    id="jms_gsm" name="models">
-                  <label class="form-check-label" for="jms_gsm">
-                    JMA GSM
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gem_mix"
-                    id="gem_mix" name="models">
-                  <label class="form-check-label" for="gem_mix">
-                    GEM Mix
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gem_global"
-                    id="gem_global" name="models">
-                  <label class="form-check-label" for="gem_global">
-                    GEM Global
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gem_regional"
-                    id="gem_regional" name="models">
-                  <label class="form-check-label" for="gem_regional">
-                    GEM Regional
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="gem_hrdps_continental"
-                    id="gem_hrdps_continental" name="models">
-                  <label class="form-check-label" for="gem_hrdps_continental">
-                    GEM HRDPS Continental
-                  </label>
-                </div>
               </div>
               <div class="col-md-12">
-                <small class="text-muted">Note: The default <mark>Best Match</mark> will provide the best forecast for any given location worldwide. <mark>Mix</mark> combines all models from a given provider.</small>
+                <small class="text-muted">Note: The default <mark>Best Match</mark> provides the best forecast for any given location worldwide. <mark>Seamless</mark> combines all models from a given provider into a seamless prediction.</small>
               </div>
             </div>
           </div>
