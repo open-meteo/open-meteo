@@ -130,6 +130,7 @@ struct JmaDownload: AsyncCommandFix {
                 try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
         }
+        curl.printStatistics()
     }
     
     /// Process each variable and update time-series optimised files

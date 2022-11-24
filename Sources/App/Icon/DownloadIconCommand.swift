@@ -236,6 +236,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 chelper_malloc_trim()
             }
         }
+        curl.printStatistics()
     }
 
     /// unompress and remap

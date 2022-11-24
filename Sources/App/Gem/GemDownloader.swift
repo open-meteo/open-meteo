@@ -195,6 +195,7 @@ struct GemDownload: AsyncCommandFix {
                 }
             }
         }
+        curl.printStatistics()
     }
     
     /// Process each variable and update time-series optimised files

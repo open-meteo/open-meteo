@@ -131,6 +131,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
         }
+        curl.printStatistics()
     }
     
     func convertEcmwf(logger: Logger, run: Timestamp) throws {

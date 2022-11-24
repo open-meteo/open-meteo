@@ -22,6 +22,9 @@ final class Curl {
     
     /// Give up downloading after the time, default 3 hours
     var deadline: Date
+    
+    /// start time of downloading
+    let startTime = DispatchTime.now()
 
     /// Time to connect. Default 1 minute
     let connectTimeout = 60
@@ -34,6 +37,9 @@ final class Curl {
     
     /// Retry 4xx errors
     let retryError4xx: Bool
+    
+    /// Number of bytes of how much data was transfered
+    var totalBytesTransfered: Int = 0
     
     /// Download buffer which is reused during downloads
     private var buffer: ByteBuffer
@@ -65,6 +71,10 @@ final class Curl {
     /// Set new deadline
     public func setDeadlineIn(minutes: Int) {
         self.deadline = Date().addingTimeInterval(TimeInterval(minutes * 60))
+    }
+    
+    public func printStatistics() {
+        logger.info("Finished downloading \(totalBytesTransfered.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
     }
     
     /*func download(url: String, to: String, range: String? = nil) throws {
@@ -186,6 +196,10 @@ final class Curl {
     func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             processVoid = Task {
+                let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
+                if let contentLength {
+                    self.totalBytesTransfered += contentLength
+                }
                 try FileManager.default.removeItemIfExists(at: toFile)
                 let lastModified = response.headers.lastModified?.value
                 try await response.body.decompressBzip2().saveTo(logger: self.logger, file: toFile, size: nil, modificationDate: lastModified)
@@ -208,6 +222,9 @@ final class Curl {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             processVoid = Task {
                 let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
+                if let contentLength {
+                    self.totalBytesTransfered += contentLength
+                }
                 let lastModified = response.headers.lastModified?.value
                 try FileManager.default.removeItemIfExists(at: toFile)
                 try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
@@ -233,6 +250,9 @@ final class Curl {
                 }
                 self.buffer.moveReaderIndex(to: 0)
                 self.buffer.moveWriterIndex(to: 0)
+                if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
+                    self.totalBytesTransfered += contentLength
+                }
                 for try await fragement in response.body.decompressBzip2() {
                     try Task.checkCancellation()
                     self.buffer.writeImmutableBuffer(fragement)
@@ -265,6 +285,7 @@ final class Curl {
                 }
                 for try await fragement in response.body {
                     try Task.checkCancellation()
+                    self.totalBytesTransfered += fragement.readableBytes
                     self.buffer.writeImmutableBuffer(fragement)
                 }
                 return self.buffer

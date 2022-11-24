@@ -247,6 +247,7 @@ struct SyncCommand: AsyncCommandFix {
             }
             try await Task.sleep(nanoseconds: UInt64(repeatInterval * 1_000_000_000))
         }
+        curl.printStatistics()
     }
 }
 

@@ -153,6 +153,7 @@ struct GloFasDownloader: AsyncCommandFix {
             try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
+        curl.printStatistics()
     }
     
     /// Download timeinterval and convert to omfile database
