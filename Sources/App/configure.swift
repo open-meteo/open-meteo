@@ -29,7 +29,7 @@ extension Application {
         var configuration = HTTPClient.Configuration(
             timeout: .init(connect: .hours(24), read: .hours(24)),
             connectionPool: .init(idleTimeout: .hours(24)))
-        //configuration.connectionPool.disableRetryConnectionEstablishment()
+        configuration.connectionPool.disableRetryConnectionEstablishment()
         configuration.httpVersion = .http1Only
         
         let new = HTTPClient(
@@ -168,17 +168,18 @@ fileprivate extension HTTPClient.Configuration.ConnectionPool {
             let propertyType = swift_reflectionMirror_recursiveChildMetadata(Self.self, index: i, fieldMetadata: &fieldMetadata)
             defer { fieldMetadata.freeFunc?(fieldMetadata.name) }
             let offset = swift_reflectionMirror_recursiveChildOffset(Self.self, index: i)
-            guard let name = fieldMetadata.name.map({String(cString: $0)}) else {
+            guard let name = fieldMetadata.name else {
                 continue
             }
             //print(fieldMetadata, name, propertyType, offset)
-            if name == "retryConnectionEstablishment" {
+            if strcmp(name, "retryConnectionEstablishment") == 0 {
                 withUnsafeMutableBytes(of: &self) { ptr in
                     ptr.baseAddress?.advanced(by: offset).assumingMemoryBound(to: Bool.self).pointee = false
                 }
+                print("Successfully set retryConnectionEstablishment \(self)")
                 return
             }
         }
-        fatalError("Could not set retryConnectionEstablishment")
+        print("WARNING: Could not set retryConnectionEstablishment")
     }
 }
