@@ -29,7 +29,7 @@ extension Application {
         var configuration = HTTPClient.Configuration(
             timeout: .init(connect: .hours(24), read: .hours(24)),
             connectionPool: .init(idleTimeout: .hours(24)))
-        configuration.connectionPool.disableRetryConnectionEstablishment()
+        //configuration.connectionPool.disableRetryConnectionEstablishment()
         configuration.httpVersion = .http1Only
         
         let new = HTTPClient(
