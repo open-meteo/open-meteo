@@ -4,7 +4,7 @@ import SwiftNetCDF
 import SwiftPFor2D
 
 
-enum CdsDomain: String GenericDomain {
+enum CdsDomain: String, GenericDomain {
     case era5
     case cerra
     

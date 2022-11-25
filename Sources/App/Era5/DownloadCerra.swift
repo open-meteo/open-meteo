@@ -79,6 +79,29 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         }
     }
     
+    var hasAnalysis: Bool {
+        switch self {
+        case .temperature_2m:
+            return true
+        case .windspeed_10m:
+            return true
+        case .winddirection_10m:
+            return true
+        case .relativehumidity_2m:
+            return true
+        case .cloudcover_low:
+            return true
+        case .cloudcover_mid:
+            return true
+        case .cloudcover_high:
+            return true
+        case .pressure_msl:
+            return true
+        default:
+            return false
+        }
+    }
+    
     /// Applied to the netcdf file after reading
     var netCdfScaling: (offest: Double, scalefactor: Double) {
         switch self {
@@ -111,34 +134,37 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         }
     }
     
-    /// Name in the resulting netCdf file from CDS API
-    /*var netCdfName: String {
+    /// shortName attribute in GRIB
+    var gribShortName: String {
         switch self {
-        case .wind_u_component_100m: return "v100"
+        /*case .wind_u_component_100m: return "v100"
         case .wind_v_component_100m: return "u100"
         case .wind_u_component_10m: return "v10"
-        case .wind_v_component_10m: return "u10"
-        case .windgusts_10m: return "i10fg"
-        case .dewpoint_2m: return "d2m"
-        case .temperature_2m: return "t2m"
+        case .wind_v_component_10m: return "u10"*/
+        case .windspeed_10m: return "10si"
+        case .winddirection_10m: return "10wdir"
+        case .windgusts_10m: return "10fg"
+        //case .dewpoint_2m: return "d2m"
+        case .relativehumidity_2m: return "2r"
+        case .temperature_2m: return "2t"
         case .cloudcover_low: return "lcc"
         case .cloudcover_mid: return "mcc"
         case .cloudcover_high: return "hcc"
         case .pressure_msl: return "msl"
         case .snowfall_water_equivalent: return "sf"
-        case .soil_temperature_0_to_7cm: return "stl1"
+        /*case .soil_temperature_0_to_7cm: return "stl1"
         case .soil_temperature_7_to_28cm: return "stl2"
         case .soil_temperature_28_to_100cm: return "stl3"
-        case .soil_temperature_100_to_255cm: return "stl4"
+        case .soil_temperature_100_to_255cm: return "stl4"*/
         case .shortwave_radiation: return "ssrd"
         case .precipitation: return "tp"
-        case .direct_radiation: return "fdir"
-        case .soil_moisture_0_to_7cm: return "swvl1"
+        case .direct_radiation: return "tidirswrf"
+        /*case .soil_moisture_0_to_7cm: return "swvl1"
         case .soil_moisture_7_to_28cm: return "swvl2"
         case .soil_moisture_28_to_100cm: return "swvl3"
-        case .soil_moisture_100_to_255cm: return "swvl4"
+        case .soil_moisture_100_to_255cm: return "swvl4"*/
         }
-    }*/
+    }
     
     /// Scalefactor to compress data
     var scalefactor: Float {
@@ -218,14 +244,14 @@ struct DownloadCerraCommand: Command {
         @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
         var cdskey: String?
         
-        @Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless if files could be downloaded")
-        var force: Bool
+        //@Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless if files could be downloaded")
+        //var force: Bool
         
-        @Flag(name: "hourlyfiles", help: "Download hourly files instead of daily files")
-        var hourlyFiles: Bool
+        //@Flag(name: "hourlyfiles", help: "Download hourly files instead of daily files")
+        //var hourlyFiles: Bool
         
         /// Get the specified timerange in the command, or use the last 7 days as range
-        func getTimeinterval() -> TimerangeDt {
+        /*func getTimeinterval() -> TimerangeDt {
             let dt = hourlyFiles ? 3600 : 86400
             if let timeinterval = timeinterval {
                 guard timeinterval.count == 17, timeinterval.contains("-") else {
@@ -240,7 +266,7 @@ struct DownloadCerraCommand: Command {
             let lastDays = 14
             let time0z = Timestamp.now().with(hour: 0)
             return TimerangeDt(start: time0z.add(lastDays * -86400), to: time0z, dtSeconds: dt)
-        }
+        }*/
     }
 
     var help: String {
@@ -297,27 +323,29 @@ struct DownloadCerraCommand: Command {
         }
     }
     
+    // Data is stored in one file per hour
     func runYear(logger: Logger, year: Int, cdskey: String) throws {
         let domain = CdsDomain.cerra
-        let timeinterval = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
+        let timeinterval = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
         let _ = try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
         
         let nx = domain.grid.nx // 721
         let ny = domain.grid.ny // 1440
-        let nt = timeinterval.count * 24 // 8784
-        
-        let variables = CerraVariable.allCases
+        let nt = timeinterval.count // 8784
         
         // convert to yearly file
-        for variable in variables {
+        for variable in CerraVariable.allCases {
             logger.info("Converting variable \(variable)")
             let writeFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
             if FileManager.default.fileExists(atPath: writeFile) {
                 continue
             }
-            let omFiles = try timeinterval.map { timeinterval -> OmFileReader in
+            let omFiles = try timeinterval.map { timeinterval -> OmFileReader? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMdd).om"
+                if !FileManager.default.fileExists(atPath: omFile) {
+                    return nil
+                }
                 return try OmFileReader(file: omFile)
             }
             var percent = 0
@@ -338,11 +366,13 @@ struct DownloadCerraCommand: Command {
                 var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
                 
                 for (i, omfile) in omFiles.enumerated() {
-                    try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<24)
-                    let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<24)
-                    let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: 24)
+                    guard let omfile else {
+                        continue
+                    }
+                    try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
+                    let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
                     for l in 0..<locationRange.count {
-                        fasttime[l, i*24 ..< (i+1)*24] = read2d[l, 0..<24]
+                        fasttime[l, i] = read[l]
                     }
                 }
                 return ArraySlice(fasttime.data)
@@ -350,7 +380,7 @@ struct DownloadCerraCommand: Command {
         }
     }
     
-    /// Download ERA5 files from CDS and convert them to daily compressed files
+    /// Dowload CERRA data, use analysis if available, otherwise use forecast
     func downloadDailyFilesCerra(logger: Logger, cdskey: String, timeinterval: TimerangeDt) throws {
         let domain = CdsDomain.cerra
         logger.info("Downloading timerange \(timeinterval.prettyString())")
@@ -362,22 +392,41 @@ struct DownloadCerraCommand: Command {
         let variables = CerraVariable.allCases
         
         /// loop over each day, download data and convert it
-        let pid = 98495 //ProcessInfo.processInfo.processIdentifier
+        let pid = ProcessInfo.processInfo.processIdentifier
         let tempDownloadGribFile = "\(downloadDir)cerradownload_\(pid).grib"
         let tempPythonFile = "\(downloadDir)cerradownload_\(pid).py"
         
-        /// The effective range of downloaded steps
-        /// The lower bound will be adapted if timesteps already exist
-        /// The upper bound will be reduced if the files are not yet on the remote server
-        var downloadedRange = timeinterval.range.upperBound ..< timeinterval.range.upperBound
-        
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        /// Number of timestamps per file
-        let nt = timeinterval.dtSeconds == 3600 ? 1 : 24
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 600)
         
-        timeLoop: for timestamp in timeinterval {
+        func downloadAndConvert(json: String) throws {
+            try json.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
+            try Process.spawn(cmd: "python3", args: [tempPythonFile])
+            try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
+                let shortName = message.get(attribute: "shortName")!
+                guard let variable = variables.first(where: {$0.gribShortName == shortName}) else {
+                    fatalError("Could not find \(shortName) in grib")
+                }
+                
+                /// (key: "validityTime", value: "1700")
+                let hour = Int(message.get(attribute: "validityTime")!)!/100
+                let date = message.get(attribute: "validityDate")!
+                logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                //try message.debugGrid(grid: domain.grid)
+                
+                try grib2d.load(message: message)
+                let scaling = variable.netCdfScaling
+                grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                
+                try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
+                let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
+                try FileManager.default.removeItemIfExists(at: omFile)
+                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+            }
+        }
+        
+        for timestamp in timeinterval {
             logger.info("Downloading timestamp \(timestamp.format_YYYYMMdd)")
             let date = timestamp.toComponents()
             let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
@@ -386,143 +435,84 @@ struct DownloadCerraCommand: Command {
                 continue
             }
             
-            let ncvariables = variables.map { $0.cdsApiName }
-            let variablesEncoded = String(data: try JSONEncoder().encode(ncvariables), encoding: .utf8)!
+            let variablesAnalysisEncoded = String(data: try JSONEncoder().encode(variables.compactMap { return $0.hasAnalysis ? $0.cdsApiName : nil }), encoding: .utf8)!
             
             // download analysis
-            let pyCode = """
+            try downloadAndConvert(json: """
                 import cdsapi
 
                 c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                try:
-                    c.retrieve(
-                        '\(domain.cdsDatasetName)',
-                        {
-                            'product_type': 'analysis',
-                            'format': 'grib',
-                            'variable': \(variablesEncoded),
-                            'level_type': 'surface_or_atmosphere',
-                            'data_type': 'reanalysis',
-                            'year': '\(date.year)',
-                            'month': '\(date.month.zeroPadded(len: 2))',
-                            'day': '\(date.day.zeroPadded(len: 2))',
-                            'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
-                        },
-                        '\(tempDownloadGribFile)')
-                except Exception as e:
-                    if "Please, check that your date selection is valid" in str(e):
-                        exit(70)
-                    if "the request you have submitted is not valid" in str(e):
-                        exit(70)
-                    raise e
-                """
+                c.retrieve(
+                    '\(domain.cdsDatasetName)',
+                    {
+                        'product_type': 'analysis',
+                        'format': 'grib',
+                        'variable': \(variablesAnalysisEncoded),
+                        'level_type': 'surface_or_atmosphere',
+                        'data_type': 'reanalysis',
+                        'year': '\(date.year)',
+                        'month': '\(date.month.zeroPadded(len: 2))',
+                        'day': '\(date.day.zeroPadded(len: 2))',
+                        'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
+                    },
+                    '\(tempDownloadGribFile)')
+                """)
             
-            try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            do {
-                try Process.spawn(cmd: "python3", args: [tempPythonFile])
-            } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
-                if code == 70 {
-                    logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
-                    downloadedRange = min(downloadedRange.lowerBound, timestamp) ..< timestamp
-                    break timeLoop
-                } else {
-                    throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args)
-                }
-            }
-            try FileManager.default.createDirectory(atPath: timestampDir, withIntermediateDirectories: true)
             
-            var i = 0
-            try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
-                let variable = variables[i % variables.count]
-                i += 1
-                
-                /// (key: "validityTime", value: "1700")
-                let hour = Int(message.get(attribute: "validityTime")!)!/100
-                logger.info("Converting variable \(variable) hour \(hour)")
-                //try message.debugGrid(grid: domain.grid)
-                
-                try grib2d.load(message: message)
-                let scaling = variable.netCdfScaling
-                grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
-                
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timestamp.format_YYYYMMdd)\(hour.zeroPadded(len: 2)).om"
-                try FileManager.default.removeItemIfExists(at: omFile)
-                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-            }
+            let variablesEncoded = String(data: try JSONEncoder().encode(variables.map { $0.cdsApiName }), encoding: .utf8)!
             
             // download forecast
-            let pyCode2 = """
+            try downloadAndConvert(json: """
                 import cdsapi
 
                 c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                try:
-                    c.retrieve(
-                        '\(domain.cdsDatasetName)',
-                        {
-                            'product_type': 'forecast',
-                            'format': 'grib',
-                            'variable': \(variablesEncoded),
-                            'level_type': 'surface_or_atmosphere',
-                            'data_type': 'reanalysis',
-                            'year': '\(date.year)',
-                            'month': '\(date.month.zeroPadded(len: 2))',
-                            'day': '\(date.day.zeroPadded(len: 2))',
-                            'leadtime_hour': ['1', '2'],
-                            'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
-                        },
-                        '\(tempDownloadGribFile)')
-                except Exception as e:
-                    if "Please, check that your date selection is valid" in str(e):
-                        exit(70)
-                    if "the request you have submitted is not valid" in str(e):
-                        exit(70)
-                    raise e
-                """
+                c.retrieve(
+                    '\(domain.cdsDatasetName)',
+                    {
+                        'product_type': 'forecast',
+                        'format': 'grib',
+                        'variable': \(variablesEncoded),
+                        'level_type': 'surface_or_atmosphere',
+                        'data_type': 'reanalysis',
+                        'year': '\(date.year)',
+                        'month': '\(date.month.zeroPadded(len: 2))',
+                        'day': '\(date.day.zeroPadded(len: 2))',
+                        'leadtime_hour': ['1', '2'],
+                        'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
+                    },
+                    '\(tempDownloadGribFile)')
+                """)
             
-            try pyCode2.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            do {
-                try Process.spawn(cmd: "python3", args: [tempPythonFile])
-            } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
-                if code == 70 {
-                    logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
-                    downloadedRange = min(downloadedRange.lowerBound, timestamp) ..< timestamp
-                    break timeLoop
-                } else {
-                    throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args)
-                }
-            }
-            try FileManager.default.createDirectory(atPath: timestampDir, withIntermediateDirectories: true)
-            
-            i = 0
-            try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
-                let variable = variables[i % variables.count]
-                i += 1
-                
-                /// (key: "validityTime", value: "1700")
-                let hour = Int(message.get(attribute: "validityTime")!)!/100
-                logger.info("Converting variable \(variable) hour \(hour)")
-                //try message.debugGrid(grid: domain.grid)
-                
-                try grib2d.load(message: message)
-                let scaling = variable.netCdfScaling
-                grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
-                
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timestamp.format_YYYYMMdd)\(hour.zeroPadded(len: 2)).om"
-                try FileManager.default.removeItemIfExists(at: omFile)
-                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-            }
-            
-            
-            fatalError()
+            // download forecast hour 3 for variables without analysis
+            let variablesNoAnalysisEncoded = String(data: try JSONEncoder().encode(variables.compactMap { return $0.hasAnalysis ? nil : $0.cdsApiName }), encoding: .utf8)!
+            try downloadAndConvert(json: """
+                import cdsapi
+
+                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
+                c.retrieve(
+                    '\(domain.cdsDatasetName)',
+                    {
+                        'product_type': 'forecast',
+                        'format': 'grib',
+                        'variable': \(variablesNoAnalysisEncoded),
+                        'level_type': 'surface_or_atmosphere',
+                        'data_type': 'reanalysis',
+                        'year': '\(date.year)',
+                        'month': '\(date.month.zeroPadded(len: 2))',
+                        'day': '\(date.day.zeroPadded(len: 2))',
+                        'leadtime_hour': ['3'],
+                        'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
+                    },
+                    '\(tempDownloadGribFile)')
+                """)
         }
-        
         
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         try FileManager.default.removeItemIfExists(at: tempPythonFile)
     }
     
     /// Convert daily compressed files to longer compressed files specified by `Cerra.omFileLength`. E.g. 14 days in one file.
-    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt) throws {
+    /*func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt) throws {
         let domain = CdsDomain.cerra
         if timeinterval.count == 0 {
             logger.info("No new timesteps could be downloaded. Nothing to do. Existing")
@@ -570,7 +560,7 @@ struct DownloadCerraCommand: Command {
             let ringtime = timeinterval.range.lowerBound.timeIntervalSince1970 / 3600 ..< timeinterval.range.upperBound.timeIntervalSince1970 / 3600
             try om.updateFromTimeOriented(variable: variable.rawValue, array2d: fasttime, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
         }
-    }
+    }*/
     
     func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
@@ -581,8 +571,8 @@ struct DownloadCerraCommand: Command {
         guard let cdskey = signature.cdskey else {
             fatalError("cds key is required")
         }
-        let domain = CdsDomain.cerra
-        try DownloadEra5Command().downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
+        //let domain = CdsDomain.cerra
+        //try DownloadEra5Command().downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
         
         /// Only download one specified year
         if let yearStr = signature.year {
@@ -593,10 +583,12 @@ struct DownloadCerraCommand: Command {
             return
         }
         
+        fatalError("only yearlt download supported")
+        
         /// Select the desired timerange, or use last 14 day
-        let timeinterval = signature.getTimeinterval()
-        try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
-        try convertDailyFiles(logger: logger, timeinterval: timeinterval)
+        //let timeinterval = signature.getTimeinterval()
+        //try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
+        //try convertDailyFiles(logger: logger, timeinterval: timeinterval)
     }
 }
 
