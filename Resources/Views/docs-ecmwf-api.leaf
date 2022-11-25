@@ -44,11 +44,10 @@
 <!-- http://127.0.0.1:8080/v1/forecast/query -->
 <div class="container px-4 py-0" id="featured-3">
   <div class="alert alert-primary" role="alert">
-    This API returns <a href="https://www.ecmwf.int/en/forecasts/datasets/open-data">open-data ECMWF</a> 3-hourly
-    weather forecasts for 10 days with 0.4° spatial resolution (~44 km). Updated every 6 hours. The number of weather
-    variables is fairly limited on the open-data version. As soon as ECWMF includes additional data, they will be made
-    available in this API.<br><br> For hourly and high-resolution data (up to 2 km) try our <a href="/en/docs">forecast
-      API</a> which combines multiple models.
+    This API provides <a href="https://www.ecmwf.int/en/forecasts/datasets/open-data" target="_blank">open-data ECMWF IFS</a> weather forecasts for 10 days. 
+    ECMWF IFS models run every 6 hours at 9 km resolution, but only 0.4° grid spacing (~44 km) is available as open data with a limited number of 
+    weather variables at 3-hourly intervals. As soon as ECWMF includes additional data, they will be made
+    available in this API.<br><br> For hourly and high-resolution data (up to 1 km) try our <a href="/en/docs">forecast API</a> which combines multiple models.
   </div>
 
   <form id="api_form" method="get" action="https://api.open-meteo.com/v1/ecmwf">
