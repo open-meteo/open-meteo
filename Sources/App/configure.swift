@@ -64,6 +64,7 @@ public func configure(_ app: Application) throws {
     app.commands.use(DownloadIconWaveCommand(), as: "download-iconwave")
     app.commands.use(DownloadEcmwfCommand(), as: "download-ecmwf")
     app.commands.use(DownloadEra5Command(), as: "download-era5")
+    app.commands.use(DownloadCerraCommand(), as: "download-cerra")
     app.commands.use(DownloadDemCommand(), as: "download-dem")
     app.commands.use(DownloadCamsCommand(), as: "download-cams")
     app.commands.use(MeteoFranceDownload(), as: "download-meteofrance")

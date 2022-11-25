@@ -23,7 +23,7 @@ struct Era5Controller {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try Era5Reader(domain: Era5.era5, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+            guard let reader = try Era5Reader(domain: CdsDomain.era5, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
@@ -202,7 +202,7 @@ struct Era5Query: Content, QueryWithTimezone, ApiUnitsSelectable {
     }*/
 }
 
-typealias Era5Reader = GenericReader<Era5, Era5Variable>
+typealias Era5Reader = GenericReader<CdsDomain, Era5Variable>
 
 extension Era5Reader {
     func prefetchData(variables: [Era5HourlyVariable], time: TimerangeDt) throws {

@@ -23,7 +23,7 @@ struct LambertConformalConicProjection: Projectable {
         if ϕ1 == ϕ2 {
             n = sin(ϕ1_rad)
         } else {
-            n = log(cos(ϕ1_rad) / cos(ϕ2_rad)) / log(tan(.pi/4 + 0.5*ϕ1_rad) / tan(.pi/4 + 0.5*ϕ2_rad))
+            n = log(cos(ϕ1_rad) / cos(ϕ2_rad)) / log(tan(.pi/4 + ϕ2_rad/2) / tan(.pi/4 + ϕ1_rad/2))
         }
         
         F = (cos(ϕ1_rad) * powf(tan(.pi/4 + ϕ1_rad/2), n))/n
