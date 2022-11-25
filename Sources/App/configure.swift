@@ -176,10 +176,10 @@ fileprivate extension HTTPClient.Configuration.ConnectionPool {
                 withUnsafeMutableBytes(of: &self) { ptr in
                     ptr.baseAddress?.advanced(by: offset).assumingMemoryBound(to: Bool.self).pointee = false
                 }
-                print("Successfully set retryConnectionEstablishment \(self)")
+                //print("Successfully set retryConnectionEstablishment \(self)")
                 return
             }
         }
-        print("WARNING: Could not set retryConnectionEstablishment")
+        print("WARNING: Could not set retryConnectionEstablishment \(self)")
     }
 }
