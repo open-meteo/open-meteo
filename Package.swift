@@ -16,7 +16,7 @@ let package = Package(
     .macOS(.v12)
   ],
   dependencies: [
-    .package(url: "https://github.com/vapor/vapor.git", from: "4.67.1"),
+    .package(url: "https://github.com/vapor/vapor.git", from: "4.67.4"),
     .package(url: "https://github.com/vapor/leaf.git", from: "4.0.0"),
     .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.0.0"),
     .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.1"),
