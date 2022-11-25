@@ -326,12 +326,13 @@ struct DownloadCerraCommand: Command {
     // Data is stored in one file per hour
     func runYear(logger: Logger, year: Int, cdskey: String) throws {
         let domain = CdsDomain.cerra
-        let timeinterval = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
-        let _ = try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
+        let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
+        let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
+        try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily)
         
         let nx = domain.grid.nx // 721
         let ny = domain.grid.ny // 1440
-        let nt = timeinterval.count // 8784
+        let nt = timeintervalHourly.count // 8784
         
         // convert to yearly file
         for variable in CerraVariable.allCases {
@@ -340,7 +341,7 @@ struct DownloadCerraCommand: Command {
             if FileManager.default.fileExists(atPath: writeFile) {
                 continue
             }
-            let omFiles = try timeinterval.map { timeinterval -> OmFileReader? in
+            let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMdd).om"
                 if !FileManager.default.fileExists(atPath: omFile) {
@@ -576,10 +577,20 @@ struct DownloadCerraCommand: Command {
         
         /// Only download one specified year
         if let yearStr = signature.year {
-            guard let year = Int(yearStr) else {
-                fatalError("Could not convert year to integer")
+            if yearStr.contains("-") {
+                let split = yearStr.split(separator: "-")
+                guard split.count == 2 else {
+                    fatalError("year invalid")
+                }
+                for year in Int(split[0])! ... Int(split[1])! {
+                    try runYear(logger: logger, year: year, cdskey: cdskey)
+                }
+            } else {
+                guard let year = Int(yearStr) else {
+                    fatalError("Could not convert year to integer")
+                }
+                try runYear(logger: logger, year: year, cdskey: cdskey)
             }
-            try runYear(logger: logger, year: year, cdskey: cdskey)
             return
         }
         
