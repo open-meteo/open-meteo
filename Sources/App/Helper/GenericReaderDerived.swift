@@ -11,7 +11,7 @@ import Foundation
 protocol GenericReaderDerived {
     associatedtype Domain: GenericDomain
     associatedtype Variable: GenericVariable, Hashable
-    associatedtype Derived
+    associatedtype Derived: RawRepresentableString
     
     var reader: GenericReaderCached<Domain, Variable> { get }
     

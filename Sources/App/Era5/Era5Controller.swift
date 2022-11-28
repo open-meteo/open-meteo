@@ -91,7 +91,7 @@ struct Era5Controller {
 
 typealias Era5HourlyVariable = VariableOrDerived<Era5Variable, Era5VariableDerived>
 
-enum Era5VariableDerived: String, Codable {
+enum Era5VariableDerived: String, Codable, RawRepresentableString {
     case apparent_temperature
     case relativehumidity_2m
     case windspeed_10m

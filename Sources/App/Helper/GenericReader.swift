@@ -31,7 +31,7 @@ extension GenericDomain {
 /**
  Generic variable for the reader implementation
  */
-protocol GenericVariable {
+protocol GenericVariable: RawRepresentableString {
     /// The filename of the variable. Typically just `temperature_2m`
     var omFileName: String { get }
     
