@@ -190,21 +190,18 @@ extension CerraReader {
 
 /// Might be used to decode API queries later
 enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
-    case temperature_2m // ok
-    /*case wind_u_component_100m // only model level
-    case wind_v_component_100m
-    case wind_u_component_10m // partly, speed and direction now, but model level available
-    case wind_v_component_10m // partly*/
+    case temperature_2m
     case windspeed_10m
     case winddirection_10m
-    case windgusts_10m  // ok
-    //case dewpoint_2m // relative humidity nowc
+    case windspeed_100m
+    case winddirection_100m
+    case windgusts_10m
     case relativehumidity_2m
-    case cloudcover_low  // ok
-    case cloudcover_mid  // ok
-    case cloudcover_high  // ok
-    case pressure_msl  // ok
-    case snowfall_water_equivalent  // ok
+    case cloudcover_low
+    case cloudcover_mid
+    case cloudcover_high
+    case pressure_msl
+    case snowfall_water_equivalent
     /*case soil_temperature_0_to_7cm  // special dataset now, with very fine grained spacing ~1-4cm
     case soil_temperature_7_to_28cm
     case soil_temperature_28_to_100cm
@@ -213,9 +210,9 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
     case soil_moisture_7_to_28cm
     case soil_moisture_28_to_100cm
     case soil_moisture_100_to_255cm*/
-    case shortwave_radiation // ok
-    case precipitation // ok
-    case direct_radiation // ok, probaly
+    case shortwave_radiation
+    case precipitation
+    case direct_radiation
     
     var isElevationCorrectable: Bool {
         return self == .temperature_2m
@@ -236,12 +233,7 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
     /// Name used to query the ECMWF CDS API via python
     var cdsApiName: String {
         switch self {
-        /*case .wind_u_component_100m: return "100m_u_component_of_wind"
-        case .wind_v_component_100m: return "100m_v_component_of_wind"
-        case .wind_u_component_10m: return "10m_u_component_of_wind"
-        case .wind_v_component_10m: return "10m_v_component_of_wind"*/
         case .windgusts_10m: return "10m_wind_gust_since_previous_post_processing"
-        //case .dewpoint_2m: return "2m_dewpoint_temperature"
         case .relativehumidity_2m: return "2m_relative_humidity"
         case .temperature_2m: return "2m_temperature"
         case .cloudcover_low: return "low_cloud_cover"
@@ -249,21 +241,13 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         case .cloudcover_high: return "high_cloud_cover"
         case .pressure_msl: return "mean_sea_level_pressure"
         case .snowfall_water_equivalent: return "snow_fall_water_equivalent"
-        /*case .soil_temperature_0_to_7cm: return "soil_temperature_level_1"
-        case .soil_temperature_7_to_28cm: return "soil_temperature_level_2"
-        case .soil_temperature_28_to_100cm: return "soil_temperature_level_3"
-        case .soil_temperature_100_to_255cm: return "soil_temperature_level_4"*/
         case .shortwave_radiation: return "surface_solar_radiation_downwards"
         case .precipitation: return "total_precipitation"
         case .direct_radiation: return "time_integrated_surface_direct_short_wave_radiation_flux"
-        /*case .soil_moisture_0_to_7cm: return "volumetric_soil_water_layer_1"
-        case .soil_moisture_7_to_28cm: return "volumetric_soil_water_layer_2"
-        case .soil_moisture_28_to_100cm: return "volumetric_soil_water_layer_3"
-        case .soil_moisture_100_to_255cm: return "volumetric_soil_water_layer_4"*/
-        case .windspeed_10m:
-            return "10m_wind_speed"
-        case .winddirection_10m:
-            return "10m_wind_direction"
+        case .windspeed_10m: return "10m_wind_speed"
+        case .winddirection_10m: return "10m_wind_direction"
+        case .windspeed_100m: return "wind_speed"
+        case .winddirection_100m: return "wind_direction"
         }
     }
     
@@ -290,6 +274,10 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
             return true
         case .winddirection_10m:
             return true
+        case .windspeed_100m:
+            return true
+        case .winddirection_100m:
+            return true
         case .relativehumidity_2m:
             return true
         case .cloudcover_low:
@@ -302,6 +290,14 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
             return true
         default:
             return false
+        }
+    }
+    
+    var isHeightLevel: Bool {
+        switch self {
+        case .windspeed_100m: fallthrough
+        case .winddirection_100m: return true
+        default: return false
         }
     }
     
@@ -320,6 +316,8 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         switch self {
         case .windspeed_10m: return "10si"
         case .winddirection_10m: return "10wdir"
+        case .windspeed_100m: return "ws"
+        case .winddirection_100m: return "wdir"
         case .windgusts_10m: return "10fg"
         case .relativehumidity_2m: return "2r"
         case .temperature_2m: return "2t"
@@ -350,14 +348,18 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         case .direct_radiation: return 1
         case .windspeed_10m: return 10
         case .winddirection_10m: return 0.5
+        case .windspeed_100m: return 10
+        case .winddirection_100m: return 0.5
         }
     }
     
     var unit: SiUnit {
         switch self {
         case .windspeed_10m: fallthrough
+        case .windspeed_100m: fallthrough
         case .windgusts_10m: return .ms
         case .winddirection_10m: return .degreeDirection
+        case .winddirection_100m: return .degreeDirection
         case .relativehumidity_2m: return .percent
         case .temperature_2m: return .celsius
         case .cloudcover_low: return .percent
@@ -585,7 +587,9 @@ struct DownloadCerraCommand: Command {
                 continue
             }
             
-            let variablesAnalysisEncoded = String(data: try JSONEncoder().encode(variables.compactMap { return $0.hasAnalysis ? $0.cdsApiName : nil }), encoding: .utf8)!
+            let variablesAnalysisEncoded = String(data: try JSONEncoder().encode(variables.compactMap {
+                return ($0.hasAnalysis && !$0.isHeightLevel) ? $0.cdsApiName : nil
+            }), encoding: .utf8)!
             
             // download analysis
             try downloadAndConvert(json: """
@@ -609,7 +613,9 @@ struct DownloadCerraCommand: Command {
                 """)
             
             
-            let variablesEncoded = String(data: try JSONEncoder().encode(variables.map { $0.cdsApiName }), encoding: .utf8)!
+            let variablesEncoded = String(data: try JSONEncoder().encode(variables.compactMap {
+                !$0.isHeightLevel ? $0.cdsApiName : nil
+            }), encoding: .utf8)!
             
             // download forecast
             try downloadAndConvert(json: """
@@ -634,7 +640,9 @@ struct DownloadCerraCommand: Command {
                 """)
             
             // download forecast hour 3 for variables without analysis
-            let variablesNoAnalysisEncoded = String(data: try JSONEncoder().encode(variables.compactMap { return $0.hasAnalysis ? nil : $0.cdsApiName }), encoding: .utf8)!
+            let variablesNoAnalysisEncoded = String(data: try JSONEncoder().encode(variables.compactMap {
+                return (!$0.hasAnalysis && !$0.isHeightLevel) ? $0.cdsApiName : nil
+            }), encoding: .utf8)!
             try downloadAndConvert(json: """
                 import cdsapi
 
@@ -652,6 +660,31 @@ struct DownloadCerraCommand: Command {
                         'day': '\(date.day.zeroPadded(len: 2))',
                         'leadtime_hour': ['3'],
                         'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
+                    },
+                    '\(tempDownloadGribFile)')
+                """)
+            
+            // download analysis + 2 forecast steps from level 100m
+            let variablesHeightLevel = String(data: try JSONEncoder().encode(variables.compactMap {
+                return $0.isHeightLevel ? $0.cdsApiName : nil
+            }), encoding: .utf8)!
+            try downloadAndConvert(json: """
+                import cdsapi
+
+                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
+                c.retrieve(
+                    'reanalysis-cerra-height-levels',
+                    {
+                        'product_type': ['analysis', 'forecast'],
+                        'format': 'grib',
+                        'height_level': '100_m',
+                        'variable': \(variablesHeightLevel),
+                        'data_type': 'reanalysis',
+                        'year': '\(date.year)',
+                        'month': '\(date.month.zeroPadded(len: 2))',
+                        'day': '\(date.day.zeroPadded(len: 2))',
+                        'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
+                        'leadtime_hour': ['1', '2'],
                     },
                     '\(tempDownloadGribFile)')
                 """)
