@@ -46,7 +46,7 @@ struct LambertConformalConicProjection: Projectable {
         let x_skaliert = x / R
         let y_skaliert = y / R
         
-        let θ = atan(x_skaliert/(ρ0 - y_skaliert))
+        let θ = n >= 0 ? atan2(x_skaliert, ρ0 - y_skaliert) : atan2(-1 * x_skaliert, y_skaliert - ρ0)
         let ρ = (n>0 ? 1 : -1) * sqrt(powf(x_skaliert,2) + powf(ρ0 - y_skaliert,2))
 
         let ϕ_rad = 2*atan(powf(F/ρ, 1/n)) - .pi/2
