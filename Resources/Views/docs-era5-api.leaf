@@ -324,6 +324,54 @@
       </div>
     </div>
 
+
+    <div class="row py-3 px-0 debug-hidden">
+      <div class="accordion" id="accordionVariables">
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading-models">
+            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapse-models" aria-expanded="false" aria-controls="collapse-models">
+              Weather models&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+                data-count-checkboxes-of="#collapse-models">0/x</span>&nbsp;<span
+                class="badge bg-primary">New</span>
+            </button>
+          </h2>
+          <div id="collapse-models" class="accordion-collapse collapse"
+            aria-labelledby="heading-models" data-bs-parent="#accordionVariables">
+            <div class="accordion-body row">
+              <div class="col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="best_match" id="best_match"
+                    name="models">
+                  <label class="form-check-label" for="best_match">
+                    Best match
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="era5"
+                    id="era5" name="models">
+                  <label class="form-check-label" for="era5">
+                    ERA5
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="cerra"
+                    id="cerra" name="models">
+                  <label class="form-check-label" for="cerra">
+                    CERRA
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-12">
+                <small class="text-muted">Note: The default <mark>Best Match</mark> provides the best forecast for any given location worldwide.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+
     <div class="row py-3 px-0">
       <h2>Daily Weather Variables <small class="text-muted">(*)</small></h2>
       <div class="col-md-6">

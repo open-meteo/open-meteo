@@ -20,6 +20,7 @@ protocol GenericReaderMixable {
     
     var modelLat: Float { get }
     var modelLon: Float { get }
+    var modelElevation: Float { get }
     var targetElevation: Float { get }
     var modelDtSeconds: Int { get }
     
@@ -35,6 +36,9 @@ extension GenericReaderMixer {
     }
     var modelLon: Float {
         reader.last!.modelLon
+    }
+    var modelElevation: Float {
+        reader.last!.modelElevation
     }
     var targetElevation: Float {
         reader.last!.targetElevation
