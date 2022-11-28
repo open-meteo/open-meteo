@@ -363,7 +363,8 @@
                 </div>
               </div>
               <div class="col-md-12">
-                <small class="text-muted">Note: The default <mark>Best Match</mark> provides the best forecast for any given location worldwide.</small>
+                <small class="text-muted">Note: The default <mark>Best Match</mark> provides the best forecast for any given location worldwide. For CERRA, the following variables are not (yet) available: Wind on 100 meter, soil temperature and moisture. </small>
+                
               </div>
             </div>
           </div>
