@@ -26,8 +26,8 @@ final class Curl {
     /// start time of downloading
     let startTime = DispatchTime.now()
 
-    /// Time to connect. Default 1 minute
-    let connectTimeout = 60
+    /// Time to connect. Default 9 seconds. 10 sconds is the http client default
+    let connectTimeout = 9
     
     /// Time to transfer a file. Default 5 minutes
     let readTimeout: Int
@@ -246,7 +246,8 @@ final class Curl {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             processByteBuffer = Task {
                 if !self.buffer.uniquelyOwned() {
-                    fatalError("Download buffer is not uniquely owned!")
+                    //fatalError("Download buffer is not uniquely owned!")
+                    logger.warning("Download buffer is not uniquely owned in downloadBz2Decompress!")
                 }
                 self.buffer.moveReaderIndex(to: 0)
                 self.buffer.moveWriterIndex(to: 0)
