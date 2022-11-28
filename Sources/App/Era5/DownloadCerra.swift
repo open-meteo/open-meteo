@@ -533,7 +533,7 @@ struct DownloadCerraCommand: Command {
             }
             let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMdd).om"
+                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
                 if !FileManager.default.fileExists(atPath: omFile) {
                     return nil
                 }
