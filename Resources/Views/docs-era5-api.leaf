@@ -331,7 +331,7 @@
           <h2 class="accordion-header" id="heading-models">
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-models" aria-expanded="false" aria-controls="collapse-models">
-              Weather models&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+              Reanalysis models&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
                 data-count-checkboxes-of="#collapse-models">0/x</span>&nbsp;<span
                 class="badge bg-primary">New</span>
             </button>
@@ -363,7 +363,7 @@
                 </div>
               </div>
               <div class="col-md-12">
-                <small class="text-muted">Note: The default <mark>Best Match</mark> provides the best forecast for any given location worldwide.
+                <small class="text-muted">Note: The default <mark>Best Match</mark> provides the best forecast for any given location worldwide.</small>
               </div>
             </div>
           </div>

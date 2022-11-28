@@ -133,7 +133,7 @@ enum CdsDomainApi: String, Codable, CaseIterable, MultiDomainMixerDomain {
         case .era5:
             return try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .cerra:
-            return try CerraReader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
 }
