@@ -267,6 +267,21 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         }
     }
     
+    var isAccumulatedSinceModelStart: Bool {
+        switch self {
+        case .shortwave_radiation:
+            fallthrough
+        case .direct_radiation:
+            fallthrough
+        case .precipitation:
+            fallthrough
+        case .snowfall_water_equivalent:
+            return true
+        default:
+            return false
+        }
+    }
+    
     var hasAnalysis: Bool {
         switch self {
         case .temperature_2m:
@@ -291,48 +306,21 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
     }
     
     /// Applied to the netcdf file after reading
-    var netCdfScaling: (offest: Double, scalefactor: Double) {
+    var netCdfScaling: (offest: Double, scalefactor: Double)? {
         switch self {
-        /*case .wind_u_component_100m: return (0, 1)
-        case .wind_v_component_100m: return (0, 1)
-        case .wind_u_component_10m: return (0, 1)
-        case .wind_v_component_10m: return (0, 1)*/
-        case .windgusts_10m: return (0, 1)
         case .temperature_2m: return (-273.15, 1) // kelvin to celsius
-        //case .dewpoint_2m: return (-273.15, 1)
-        case .relativehumidity_2m: return (0, 1)
-        case .cloudcover_low: return (0, 100) // fraction to percent
-        case .cloudcover_mid: return (0, 100)
-        case .cloudcover_high: return (0, 100)
-        case .pressure_msl: return (0, 1) // keep in Pa (not hPa)
-        case .snowfall_water_equivalent: return (0, 1000) // meter to millimeter
-        /*case .soil_temperature_0_to_7cm: return (-273.15, 1) // kelvin to celsius
-        case .soil_temperature_7_to_28cm: return (-273.15, 1)
-        case .soil_temperature_28_to_100cm: return (-273.15, 1)
-        case .soil_temperature_100_to_255cm: return (-273.15, 1)
-        case .soil_moisture_0_to_7cm: return (0, 1)
-        case .soil_moisture_7_to_28cm: return (0, 1)
-        case .soil_moisture_28_to_100cm: return (0, 1)
-        case .soil_moisture_100_to_255cm: return (0, 1)*/
-        case .shortwave_radiation: return (0, 1/3600) // joules to watt
-        case .precipitation: return (0, 1000) // meter to millimeter
+        case .shortwave_radiation: fallthrough // joules to watt
         case .direct_radiation: return (0, 1/3600)
-        case .windspeed_10m: return (0, 1)
-        case .winddirection_10m: return (0, 1)
+        default: return nil
         }
     }
     
     /// shortName attribute in GRIB
     var gribShortName: String {
         switch self {
-        /*case .wind_u_component_100m: return "v100"
-        case .wind_v_component_100m: return "u100"
-        case .wind_u_component_10m: return "v10"
-        case .wind_v_component_10m: return "u10"*/
         case .windspeed_10m: return "10si"
         case .winddirection_10m: return "10wdir"
         case .windgusts_10m: return "10fg"
-        //case .dewpoint_2m: return "d2m"
         case .relativehumidity_2m: return "2r"
         case .temperature_2m: return "2t"
         case .cloudcover_low: return "lcc"
@@ -340,47 +328,26 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         case .cloudcover_high: return "hcc"
         case .pressure_msl: return "msl"
         case .snowfall_water_equivalent: return "sf"
-        /*case .soil_temperature_0_to_7cm: return "stl1"
-        case .soil_temperature_7_to_28cm: return "stl2"
-        case .soil_temperature_28_to_100cm: return "stl3"
-        case .soil_temperature_100_to_255cm: return "stl4"*/
         case .shortwave_radiation: return "ssrd"
         case .precipitation: return "tp"
         case .direct_radiation: return "tidirswrf"
-        /*case .soil_moisture_0_to_7cm: return "swvl1"
-        case .soil_moisture_7_to_28cm: return "swvl2"
-        case .soil_moisture_28_to_100cm: return "swvl3"
-        case .soil_moisture_100_to_255cm: return "swvl4"*/
         }
     }
     
     /// Scalefactor to compress data
     var scalefactor: Float {
         switch self {
-        /*case .wind_u_component_100m: return 10
-        case .wind_v_component_100m: return 10
-        case .wind_u_component_10m: return 10
-        case .wind_v_component_10m: return 10*/
         case .cloudcover_low: return 1
         case .cloudcover_mid: return 1
         case .cloudcover_high: return 1
         case .windgusts_10m: return 10
-        //case .dewpoint_2m: return 20c
         case .relativehumidity_2m: return 1
         case .temperature_2m: return 20
         case .pressure_msl: return 0.1
         case .snowfall_water_equivalent: return 10
-        /*case .soil_temperature_0_to_7cm: return 20
-        case .soil_temperature_7_to_28cm: return 20
-        case .soil_temperature_28_to_100cm: return 20
-        case .soil_temperature_100_to_255cm: return 20*/
         case .shortwave_radiation: return 1
         case .precipitation: return 10
         case .direct_radiation: return 1
-        /*case .soil_moisture_0_to_7cm: return 1000
-        case .soil_moisture_7_to_28cm: return 1000
-        case .soil_moisture_28_to_100cm: return 1000
-        case .soil_moisture_100_to_255cm: return 1000*/
         case .windspeed_10m: return 10
         case .winddirection_10m: return 0.5
         }
@@ -388,14 +355,9 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
     
     var unit: SiUnit {
         switch self {
-        /*case .wind_u_component_100m: fallthrough
-        case .wind_v_component_100m: fallthrough
-        case .wind_u_component_10m: fallthrough
-        case .wind_v_component_10m: fallthrough*/
         case .windspeed_10m: fallthrough
         case .windgusts_10m: return .ms
         case .winddirection_10m: return .degreeDirection
-        //case .dewpoint_2m: return .celsius
         case .relativehumidity_2m: return .percent
         case .temperature_2m: return .celsius
         case .cloudcover_low: return .percent
@@ -403,17 +365,9 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         case .cloudcover_high: return .percent
         case .pressure_msl: return .pascal
         case .snowfall_water_equivalent: return .millimeter
-        /*case .soil_temperature_0_to_7cm: return .celsius
-        case .soil_temperature_7_to_28cm: return .celsius
-        case .soil_temperature_28_to_100cm: return .celsius
-        case .soil_temperature_100_to_255cm: return .celsius*/
         case .shortwave_radiation: return .wattPerSquareMeter
         case .precipitation: return .millimeter
         case .direct_radiation: return .wattPerSquareMeter
-        /*case .soil_moisture_0_to_7cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_7_to_28cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_28_to_100cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_100_to_255cm: return .qubicMeterPerQubicMeter*/
         }
     }
 }
@@ -541,7 +495,8 @@ struct DownloadCerraCommand: Command {
             }
             var percent = 0
             var looptime = DispatchTime.now()
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: nt/8).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor) { dim0 in
+            // chunk1 must be multiple of 24 hours for deaccumulation
+            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 45*24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor) { dim0 in
                 let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
                 if percent != ratio {
                     /// time ~4.5 seconds
@@ -565,6 +520,9 @@ struct DownloadCerraCommand: Command {
                     for l in 0..<locationRange.count {
                         fasttime[l, i] = read[l]
                     }
+                }
+                if variable.isAccumulatedSinceModelStart {
+                    fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: variable.hasAnalysis ? 0 : 1)
                 }
                 return ArraySlice(fasttime.data)
             }
@@ -607,8 +565,9 @@ struct DownloadCerraCommand: Command {
                 //try message.debugGrid(grid: domain.grid)
                 
                 try grib2d.load(message: message)
-                let scaling = variable.netCdfScaling
-                grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                if let scaling = variable.netCdfScaling {
+                    grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                }
                 
                 try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
                 let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
