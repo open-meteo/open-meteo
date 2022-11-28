@@ -164,7 +164,7 @@ fileprivate protocol GenericReaderMixerForecast {
 }
 
 /// Conditional conformace just use RawValue (String) to resolve `ForecastVariable` to a specific type
-extension GenericReaderMixable where MixingVar: RawRepresentable, MixingVar.RawValue == String {
+extension GenericReaderMixable {
     func get(mixed: ForecastVariable, time: TimerangeDt) throws -> DataAndUnit? {
         guard let v = MixingVar(rawValue: mixed.rawValue) else {
             return nil

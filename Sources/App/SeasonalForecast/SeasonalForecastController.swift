@@ -30,6 +30,14 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
     var isElevationCorrectable: Bool {
         variable.isElevationCorrectable
     }
+    
+    init?(rawValue: String) {
+        fatalError()
+    }
+    
+    var rawValue: String {
+        "\(variable.omFileName)_\(member)"
+    }
 }
 
 typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableDerived>
@@ -37,7 +45,7 @@ typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableD
 typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, VariableAndMember<CfsVariable>>
 
 
-enum CfsVariableDerived: String, Codable {
+enum CfsVariableDerived: String, Codable, RawRepresentableString {
     case windspeed_10m
     case winddirection_10m
 }

@@ -47,10 +47,34 @@ extension PressureVariableRespresentable {
     }
 }
 
+protocol RawRepresentableString {
+    init?(rawValue: String)
+    var rawValue: String { get }
+}
+
 /// Enum with surface and pressure variable
-enum SurfaceAndPressureVariable<Surface, Pressure> {
+enum SurfaceAndPressureVariable<Surface: RawRepresentableString, Pressure: RawRepresentableString>: RawRepresentableString {
     case surface(Surface)
     case pressure(Pressure)
+    
+    init?(rawValue: String) {
+        if let variable = Pressure(rawValue: rawValue) {
+            self = .pressure(variable)
+            return
+        }
+        if let variable = Surface(rawValue: rawValue) {
+            self = .surface(variable)
+            return
+        }
+        return nil
+    }
+    
+    var rawValue: String {
+        switch self {
+        case .surface(let variable): return variable.rawValue
+        case .pressure(let variable): return variable.rawValue
+        }
+    }
 }
 
 extension SurfaceAndPressureVariable: Codable where Surface: Codable, Pressure: Codable {
@@ -75,29 +99,6 @@ extension SurfaceAndPressureVariable: Codable where Surface: Codable, Pressure: 
         }
     }
 }
-
-extension SurfaceAndPressureVariable: RawRepresentable where Surface: RawRepresentable, Pressure: RawRepresentable, Surface.RawValue == Pressure.RawValue {
-    
-    init?(rawValue: Surface.RawValue) {
-        if let variable = Pressure(rawValue: rawValue) {
-            self = .pressure(variable)
-            return
-        }
-        if let variable = Surface(rawValue: rawValue) {
-            self = .surface(variable)
-            return
-        }
-        return nil
-    }
-    
-    var rawValue: Surface.RawValue {
-        switch self {
-        case .surface(let variable): return variable.rawValue
-        case .pressure(let variable): return variable.rawValue
-        }
-    }
-}
-
 
 extension SurfaceAndPressureVariable: Hashable, Equatable where Pressure: Hashable, Surface: Hashable {
     
@@ -145,9 +146,37 @@ extension SurfaceAndPressureVariable: GenericVariableMixable where Surface: Gene
     }
 }
 
-enum VariableOrDerived<Raw, Derived> {
+enum VariableOrDerived<Raw: RawRepresentableString, Derived: RawRepresentableString>: RawRepresentableString {
     case raw(Raw)
     case derived(Derived)
+    
+    init?(rawValue: String) {
+        if let val = Raw.init(rawValue: rawValue) {
+            self = .raw(val)
+            return
+        }
+        if let val = Derived.init(rawValue: rawValue) {
+            self = .derived(val)
+            return
+        }
+        return nil
+    }
+    
+    var rawValue: String {
+        switch self {
+        case .raw(let raw):
+            return raw.rawValue
+        case .derived(let derived):
+            return derived.rawValue
+        }
+    }
+    
+    var name: String {
+        switch self {
+        case .raw(let variable): return variable.rawValue
+        case .derived(let variable): return variable.rawValue
+        }
+    }
 }
 
 extension VariableOrDerived: Codable where Raw: Codable, Derived: Codable {
@@ -169,37 +198,6 @@ extension VariableOrDerived: Codable where Raw: Codable, Derived: Codable {
             try value.encode(to: encoder)
         case .derived(let value):
             try value.encode(to: encoder)
-        }
-    }
-
-}
-
-extension VariableOrDerived: RawRepresentable where Raw: RawRepresentable, Derived: RawRepresentable, Raw.RawValue == Derived.RawValue {
-    init?(rawValue: Raw.RawValue) {
-        if let val = Raw.init(rawValue: rawValue) {
-            self = .raw(val)
-            return
-        }
-        if let val = Derived.init(rawValue: rawValue) {
-            self = .derived(val)
-            return
-        }
-        return nil
-    }
-    
-    var rawValue: Raw.RawValue {
-        switch self {
-        case .raw(let raw):
-            return raw.rawValue
-        case .derived(let derived):
-            return derived.rawValue
-        }
-    }
-    
-    var name: Raw.RawValue {
-        switch self {
-        case .raw(let variable): return variable.rawValue
-        case .derived(let variable): return variable.rawValue
         }
     }
 }

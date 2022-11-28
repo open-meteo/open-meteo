@@ -1,6 +1,6 @@
 import Foundation
 
-protocol GenericVariableMixable {
+protocol GenericVariableMixable: RawRepresentableString {
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool { get }
 }
