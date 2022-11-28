@@ -312,23 +312,23 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
     }
     
     /// shortName attribute in GRIB
-    var gribShortName: String {
+    var gribShortName: [String] {
         switch self {
-        case .windspeed_10m: return "10si"
-        case .winddirection_10m: return "10wdir"
-        case .windspeed_100m: return "ws"
-        case .winddirection_100m: return "wdir"
-        case .windgusts_10m: return "10fg"
-        case .relativehumidity_2m: return "2r"
-        case .temperature_2m: return "2t"
-        case .cloudcover_low: return "lcc"
-        case .cloudcover_mid: return "mcc"
-        case .cloudcover_high: return "hcc"
-        case .pressure_msl: return "msl"
-        case .snowfall_water_equivalent: return "sf"
-        case .shortwave_radiation: return "ssrd"
-        case .precipitation: return "tp"
-        case .direct_radiation: return "tidirswrf"
+        case .windspeed_10m: return ["10si"]
+        case .winddirection_10m: return ["10wdir"]
+        case .windspeed_100m: return ["ws"]
+        case .winddirection_100m: return ["wdir"]
+        case .windgusts_10m: return ["10fg", "gust"] // or "gust" on ubuntu 22.04
+        case .relativehumidity_2m: return ["2r"]
+        case .temperature_2m: return ["2t"]
+        case .cloudcover_low: return ["lcc"]
+        case .cloudcover_mid: return ["mcc"]
+        case .cloudcover_high: return ["hcc"]
+        case .pressure_msl: return ["msl"]
+        case .snowfall_water_equivalent: return ["sf"]
+        case .shortwave_radiation: return ["ssrd"]
+        case .precipitation: return ["tp"]
+        case .direct_radiation: return ["tidirswrf"]
         }
     }
     
@@ -556,7 +556,7 @@ struct DownloadCerraCommand: Command {
             try Process.spawn(cmd: "python3", args: [tempPythonFile])
             try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
                 let shortName = message.get(attribute: "shortName")!
-                guard let variable = variables.first(where: {$0.gribShortName == shortName}) else {
+                guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
                     fatalError("Could not find \(shortName) in grib")
                 }
                 
