@@ -33,6 +33,10 @@ extension GenericReaderDerived {
         reader.modelLon
     }
     
+    var modelElevation: Float {
+        reader.modelElevation
+    }
+    
     var modelDtSeconds: Int {
         reader.domain.dtSeconds
     }
