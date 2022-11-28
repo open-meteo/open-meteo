@@ -38,6 +38,10 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
     var rawValue: String {
         "\(variable.omFileName)_\(member)"
     }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return variable.requiresOffsetCorrectionForMixing
+    }
 }
 
 typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableDerived>

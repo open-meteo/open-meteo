@@ -180,6 +180,21 @@ enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
         fatalError("Interpolation from 6h data to 1h not supported")
     }
     
+    var requiresOffsetCorrectionForMixing: Bool {
+        switch self {
+        case .soil_moisture_0_to_10cm:
+            fallthrough
+        case .soil_moisture_10_to_40cm:
+            fallthrough
+        case .soil_moisture_40_to_100cm:
+            fallthrough
+        case .soil_moisture_100_to_200cm:
+            return true
+        default:
+            return false
+        }
+    }
+    
     var isElevationCorrectable: Bool {
         return self == .temperature_2m || self == .temperature_2m_max || self == .temperature_2m_min
     }

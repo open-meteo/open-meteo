@@ -105,6 +105,10 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
         return rawValue
     }
     
+    var requiresOffsetCorrectionForMixing: Bool {
+         return false
+    }
+    
     var interpolation: ReaderInterpolation {
         fatalError("Interpolation not required for era5")
     }

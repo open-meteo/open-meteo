@@ -31,7 +31,7 @@ extension GenericDomain {
 /**
  Generic variable for the reader implementation
  */
-protocol GenericVariable: RawRepresentableString {
+protocol GenericVariable: GenericVariableMixable {
     /// The filename of the variable. Typically just `temperature_2m`
     var omFileName: String { get }
     
@@ -81,9 +81,10 @@ enum ReaderInterpolation {
 
 
 /**
- Generic reader implementation that resolves a grid point and interpolates data
+ Generic reader implementation that resolves a grid point and interpolates data.
+ Corrects elevation
  */
-struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
+struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericReaderMixable {
     /// Regerence to the domain object
     let domain: Domain
     
@@ -145,7 +146,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
                 data[i] += (modelElevation - targetElevation) * 0.0065
             }
         }
-        
         return DataAndUnit(data, variable.unit)
     }
     
@@ -168,16 +168,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable> {
         return DataAndUnit(data, read.unit)
     }
     
-    
-    
     func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
         return try readAndInterpolate(variable: variable, time: time)
     }
 }
-
-/// Allow GenericReader to be used in mixing directly
-extension GenericReader: GenericReaderMixable where Variable: GenericVariableMixable { }
-
 
 extension TimerangeDt {
     func forInterpolationTo(modelDt: Int) -> TimerangeDt {

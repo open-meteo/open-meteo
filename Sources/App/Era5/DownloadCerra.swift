@@ -45,6 +45,10 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
         fatalError("Interpolation not required for cerra")
     }
     
+    var requiresOffsetCorrectionForMixing: Bool {
+         return false
+    }
+    
     /// Name used to query the ECMWF CDS API via python
     var cdsApiName: String {
         switch self {
