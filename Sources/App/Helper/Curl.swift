@@ -220,8 +220,9 @@ final class Curl {
             processVoid = nil
             readTimeout.cancel()
             if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - Date.now.distance(to: lastModified)
+                let delta = waitAfterLastModified - lastModified.distance(to: Date())
                 if delta > 1 {
+                    //logger.info("sleeping for \(delta) seconds")
                     try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
                 }
             }
@@ -253,8 +254,9 @@ final class Curl {
             processVoid = nil
             readTimeout.cancel()
             if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - Date.now.distance(to: lastModified)
+                let delta = waitAfterLastModified - lastModified.distance(to: Date())
                 if delta > 1 {
+                    //logger.info("sleeping for \(delta) seconds")
                     try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
                 }
             }
@@ -292,8 +294,9 @@ final class Curl {
             processByteBuffer = nil
             readTimeout.cancel()
             if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - Date.now.distance(to: lastModified)
+                let delta = waitAfterLastModified - lastModified.distance(to: Date())
                 if delta > 1 {
+                    //logger.info("sleeping for \(delta) seconds")
                     try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
                 }
             }
@@ -336,7 +339,7 @@ final class Curl {
                 throw CurlError.sizeTooSmall
             }
             if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - lastModified.distance(to: .now) // Date.now.distance(to: )
+                let delta = waitAfterLastModified - lastModified.distance(to: Date())
                 if delta > 1 {
                     //logger.info("sleeping for \(delta) seconds")
                     try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))

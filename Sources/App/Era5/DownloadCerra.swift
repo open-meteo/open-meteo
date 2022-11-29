@@ -374,6 +374,12 @@ enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
     }
 }
 
+/**
+Sources:
+ - https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-cerra-land?tab=form
+ - https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-cerra-single-levels?tab=form
+ - https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-cerra-height-levels?tab=overview
+ */
 struct DownloadCerraCommand: Command {
     struct Signature: CommandSignature {
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download with format 20220101-20220131")
