@@ -57,27 +57,33 @@ struct GloFasDownloader: AsyncCommandFix {
         }
         
         switch domain {
+        case .consolidatedv3:
+            fallthrough
         case .consolidated:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            /*for year in 2008...2013 {
-                try downloadYear(logger: logger, year: year, cdskey: cdskey)
-                
-            }
-            exit(0)*/
-            
             /// Only download one specified year
             if let yearStr = signature.year {
-                guard let year = Int(yearStr) else {
-                    fatalError("Could not convert year to integer")
+                if yearStr.contains("-") {
+                    let split = yearStr.split(separator: "-")
+                    guard split.count == 2 else {
+                        fatalError("year invalid")
+                    }
+                    for year in Int(split[0])! ... Int(split[1])! {
+                        try downloadYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+                    }
+                } else {
+                    guard let year = Int(yearStr) else {
+                        fatalError("Could not convert year to integer")
+                    }
+                    try downloadYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
                 }
-                try downloadYear(logger: logger, year: year, cdskey: cdskey)
                 return
             }
             
             let timeInterval = signature.getTimeinterval()
-            try downloadTimeIntervalConsolidated(logger: logger, timeinterval: timeInterval, cdskey: cdskey)
+            try downloadTimeIntervalConsolidated(logger: logger, timeinterval: timeInterval, cdskey: cdskey, domain: domain)
         case .forecastv3:
             let run = Timestamp.now().with(hour: 0)
             guard let ftpuser = signature.ftpuser else {
@@ -157,9 +163,7 @@ struct GloFasDownloader: AsyncCommandFix {
     }
     
     /// Download timeinterval and convert to omfile database
-    func downloadTimeIntervalConsolidated(logger: Logger, timeinterval: TimerangeDt, cdskey: String) throws {
-        let domain = GloFasDomain.consolidated
-        
+    func downloadTimeIntervalConsolidated(logger: Logger, timeinterval: TimerangeDt, cdskey: String, domain: GloFasDomain) throws {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
@@ -187,7 +191,7 @@ struct GloFasDownloader: AsyncCommandFix {
                 c.retrieve(
                     'cems-glofas-historical',
                     {
-                        'system_version': 'version_4_0',
+                        'system_version': '\(domain.version)',
                         'variable': 'river_discharge_in_the_last_24_hours',
                         'format': 'grib',
                         'hyear': '\(day.year)',
@@ -233,9 +237,7 @@ struct GloFasDownloader: AsyncCommandFix {
     }
     
     /// Download and convert entire year to yearly files
-    func downloadYear(logger: Logger, year: Int, cdskey: String) throws {
-        let domain = GloFasDomain.consolidated
-        
+    func downloadYear(logger: Logger, year: Int, cdskey: String, domain: GloFasDomain) throws {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileArchive!, withIntermediateDirectories: true)
@@ -250,7 +252,7 @@ struct GloFasDownloader: AsyncCommandFix {
                 c.retrieve(
                     'cems-glofas-historical',
                     {
-                        'system_version': 'version_4_0',
+                        'system_version': '\(domain.version)',
                         'variable': 'river_discharge_in_the_last_24_hours',
                         'format': 'grib',
                         'hyear': '\(year)',
@@ -352,6 +354,7 @@ struct GloFasDownloader: AsyncCommandFix {
 enum GloFasDomain: String, GenericDomain {
     case consolidated
     case forecastv3
+    case consolidatedv3
     
     var omfileDirectory: String {
         return "\(OpenMeteo.dataDictionary)omfile-glofas-\(rawValue)/"
@@ -367,6 +370,8 @@ enum GloFasDomain: String, GenericDomain {
         switch self {
         case .consolidated:
             return RegularGrid(nx: 7200, ny: 3000, latMin: -60, lonMin: -180, dx: 0.05, dy: 0.05)
+        case .consolidatedv3:
+            fallthrough
         case .forecastv3:
             return RegularGrid(nx: 3600, ny: 1500, latMin: -60, lonMin: -180, dx: 0.1, dy: 0.1)
         }
@@ -380,8 +385,22 @@ enum GloFasDomain: String, GenericDomain {
         return nil
     }
     
+    /// `version_3_1` or  `version_4_0`
+    var version: String {
+        switch self {
+        case .consolidated:
+            return "version_3_1"
+        case .forecastv3:
+            fallthrough
+        case .consolidatedv3:
+            return "version_3_1"
+        }
+    }
+    
     var omFileLength: Int {
         switch self {
+        case.consolidatedv3:
+            fallthrough
         case .consolidated:
             return 100 // 100 days per file
         case .forecastv3:
