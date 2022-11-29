@@ -173,17 +173,16 @@ struct GloFasDownloader: AsyncCommandFix {
         let nx = domain.grid.nx
         // 21k locations -> 30MB chunks for 1 year
         let nLocationChunk = nx * ny / 1000
-        var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        for date in timeinterval {
-            logger.info("Downloading date \(date.format_YYYYMMdd)")
+        /// download multiple months at once
+        if timeinterval.count > 61 {
+            let year = timeinterval.range.lowerBound.toComponents().year
+            let months = timeinterval.range.lowerBound.toComponents().month ..< timeinterval.range.upperBound.toComponents().month
+            let monthNames = ["", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
+            let monthsJson = String(data: try JSONEncoder().encode(Array(monthNames[months])), encoding: .utf8)!
             
-            let dailyFile = "\(downloadDir)glofas_\(date.format_YYYYMMdd).om"
-            if FileManager.default.fileExists(atPath: dailyFile) {
-                continue
-            }
+            logger.info("Downloading year \(year) months \(monthsJson)")
             
-            let day = date.toComponents()
             let pyCode = """
                 import cdsapi
                 c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
@@ -194,12 +193,11 @@ struct GloFasDownloader: AsyncCommandFix {
                         'system_version': '\(domain.version)',
                         'variable': 'river_discharge_in_the_last_24_hours',
                         'format': 'grib',
-                        'hyear': '\(day.year)',
-                        'hmonth': [
-                            '\(day.month.zeroPadded(len: 2))',
-                        ],
+                        'hyear': '\(year)',
+                        'hmonth': \(monthsJson),
                         'hday': [
-                            '\(day.day.zeroPadded(len: 2))',
+                            '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15',
+                             '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31'
                         ],
                         'hydrological_model': 'lisflood',
                         'product_type': 'consolidated',
@@ -211,17 +209,49 @@ struct GloFasDownloader: AsyncCommandFix {
             try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
             try Process.spawn(cmd: "python3", args: [tempPythonFile])
             
-            try SwiftEccodes.iterateMessages(fileName: gribFile, multiSupport: true) { message in
-                /// Date in ISO timestamp string format `20210101`
-                precondition(message.get(attribute: "dataDate") == date.format_YYYYMMdd)
-                logger.info("Converting day \(date.format_YYYYMMdd)")
-                try grib2d.load(message: message)
-                grib2d.array.flipLatitude()
-                //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
-               
-                try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
+            try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
+        } else {
+            // download day by day
+            for date in timeinterval {
+                logger.info("Downloading date \(date.format_YYYYMMdd)")
+                
+                let dailyFile = "\(downloadDir)glofas_\(date.format_YYYYMMdd).om"
+                if FileManager.default.fileExists(atPath: dailyFile) {
+                    continue
+                }
+                
+                let day = date.toComponents()
+                let pyCode = """
+                    import cdsapi
+                    c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
+                    
+                    c.retrieve(
+                        'cems-glofas-historical',
+                        {
+                            'system_version': '\(domain.version)',
+                            'variable': 'river_discharge_in_the_last_24_hours',
+                            'format': 'grib',
+                            'hyear': '\(day.year)',
+                            'hmonth': [
+                                '\(day.month.zeroPadded(len: 2))',
+                            ],
+                            'hday': [
+                                '\(day.day.zeroPadded(len: 2))',
+                            ],
+                            'hydrological_model': 'lisflood',
+                            'product_type': 'consolidated',
+                        },
+                        '\(gribFile)')
+                    """
+                let tempPythonFile = "\(downloadDir)glofasdownload_interval.py"
+                
+                try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
+                try Process.spawn(cmd: "python3", args: [tempPythonFile])
+                
+                try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
             }
         }
+        
         
         logger.info("Reading to timeseries")
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
@@ -234,6 +264,30 @@ struct GloFasDownloader: AsyncCommandFix {
         logger.info("Update om database")
         let indextime = timeinterval.toIndexTime()
         try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, ringtime: indextime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+    }
+    
+    /// Convert a single file
+    func convertGribFileToDaily(logger: Logger, domain: GloFasDomain, gribFile: String) throws {
+        let ny = domain.grid.ny
+        let nx = domain.grid.nx
+        // 21k locations -> 30MB chunks for 1 year
+        let nLocationChunk = nx * ny / 1000
+        var grib2d = GribArray2D(nx: nx, ny: ny)
+        
+        try SwiftEccodes.iterateMessages(fileName: gribFile, multiSupport: true) { message in
+            /// Date in ISO timestamp string format `20210101`
+            let date = message.get(attribute: "dataDate")!
+            logger.info("Converting day \(date)")
+            let dailyFile = "\(domain.downloadDirectory)glofas_\(date).om"
+            if FileManager.default.fileExists(atPath: dailyFile) {
+                return
+            }
+            try grib2d.load(message: message)
+            grib2d.array.flipLatitude()
+            //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
+           
+            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
+        }
     }
     
     /// Download and convert entire year to yearly files
@@ -288,26 +342,7 @@ struct GloFasDownloader: AsyncCommandFix {
         
         logger.info("Converting year \(year) to daily files")
         
-        let ny = domain.grid.ny
-        let nx = domain.grid.nx
-        // 21k locations -> 30MB chunks for 1 year
-        let nLocationChunk = nx * ny / 1000
-        var grib2d = GribArray2D(nx: nx, ny: ny)
-        
-        try SwiftEccodes.iterateMessages(fileName: gribFile, multiSupport: true) { message in
-            /// Date in ISO timestamp string format `20210101`
-            let date = message.get(attribute: "dataDate")!
-            logger.info("Converting day \(date)")
-            let dailyFile = "\(downloadDir)glofas_\(date).om"
-            if FileManager.default.fileExists(atPath: dailyFile) {
-                return
-            }
-            try grib2d.load(message: message)
-            grib2d.array.flipLatitude()
-            //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
-           
-            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
-        }
+        try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
         
         logger.info("Converting daily files time series")
         let time = TimerangeDt(range: Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1), dtSeconds: 3600*24)
@@ -319,6 +354,10 @@ struct GloFasDownloader: AsyncCommandFix {
             return try OmFileReader(file: omFile)
         }
         
+        let ny = domain.grid.ny
+        let nx = domain.grid.nx
+        // 21k locations -> 30MB chunks for 1 year
+        let nLocationChunk = nx * ny / 1000
         var percent = 0
         var looptime = DispatchTime.now()
         // Scale logarithmic. Max discharge around 400_000 m3/s
