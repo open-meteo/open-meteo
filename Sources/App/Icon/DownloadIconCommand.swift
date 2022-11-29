@@ -170,7 +170,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-        let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
+        let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5, waitAfterLastModified: 120)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
         

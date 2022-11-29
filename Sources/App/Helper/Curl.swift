@@ -41,6 +41,9 @@ final class Curl {
     /// Number of bytes of how much data was transfered
     var totalBytesTransfered: Int = 0
     
+    /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
+    let waitAfterLastModified: TimeInterval?
+    
     /// Download buffer which is reused during downloads
     private var buffer: ByteBuffer
     
@@ -53,11 +56,12 @@ final class Curl {
     /// Running task is kept as a reference to cancel
     private var processVoid: Task<(), Error>? = nil
 
-    public init(logger: Logger, deadLineHours: Int = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true) {
+    public init(logger: Logger, deadLineHours: Int = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
         self.readTimeout = readTimeout
+        self.waitAfterLastModified = waitAfterLastModified
 
         buffer = ByteBuffer()
         // Reserve 1MB buffer
@@ -212,7 +216,15 @@ final class Curl {
                 readTimeout.cancel()
                 processVoid = nil
             }
-            return try await processVoid!.value
+            try await processVoid!.value
+            processVoid = nil
+            readTimeout.cancel()
+            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                let delta = waitAfterLastModified - Date.now.distance(to: lastModified)
+                if delta > 1 {
+                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                }
+            }
         }
     }
     
@@ -237,7 +249,15 @@ final class Curl {
                 readTimeout.cancel()
                 processVoid = nil
             }
-            return try await processVoid!.value
+            try await processVoid!.value
+            processVoid = nil
+            readTimeout.cancel()
+            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                let delta = waitAfterLastModified - Date.now.distance(to: lastModified)
+                if delta > 1 {
+                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                }
+            }
         }
     }
     
@@ -268,11 +288,21 @@ final class Curl {
                 readTimeout.cancel()
                 processByteBuffer = nil
             }
-            return try await processByteBuffer!.value
+            let buffer = try await processByteBuffer!.value
+            processByteBuffer = nil
+            readTimeout.cancel()
+            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                let delta = waitAfterLastModified - Date.now.distance(to: lastModified)
+                if delta > 1 {
+                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                }
+            }
+            return buffer
         }
     }
     
     /// Use http-async http client to download
+    /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient, minSize: Int?) async throws -> ByteBuffer {
         return try await withRetriedDownload(url: url, range: range, client: client) { response in
             processByteBuffer = Task {
@@ -304,6 +334,13 @@ final class Curl {
             readTimeout.cancel()
             if let minSize = minSize, buffer.readableBytes < minSize {
                 throw CurlError.sizeTooSmall
+            }
+            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                let delta = waitAfterLastModified - lastModified.distance(to: .now) // Date.now.distance(to: )
+                if delta > 1 {
+                    //logger.info("sleeping for \(delta) seconds")
+                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                }
             }
             return buffer
         }

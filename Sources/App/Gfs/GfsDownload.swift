@@ -145,7 +145,8 @@ struct GfsDownload: AsyncCommandFix {
         try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         
         let deadLineHours = domain == .gfs025 ? 4 : 2
-        let curl = Curl(logger: logger, deadLineHours: deadLineHours)
+        let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
+        let curl = Curl(logger: logger, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
         let forecastHours = domain.forecastHours(run: run.hour)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
