@@ -745,6 +745,81 @@ struct DownloadCerraCommand: Command {
         }
     }*/
     
+    func downloadElevation(logger: Logger, cdskey: String, domain: CdsDomain) throws {
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+            return
+        }
+        
+        let downloadDir = domain.downloadDirectory
+        try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        let tempDownloadGribFile = "\(downloadDir)elevation.grib"
+                
+        if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
+            logger.info("Downloading elevation and sea mask")
+            let pyCode = """
+                import cdsapi
+                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
+
+                c.retrieve(
+                    '\(domain.cdsDatasetName)',
+                    {
+                        'format': 'grib',
+                        'variable': [
+                            'land_sea_mask', 'orography',
+                        ],
+                        'data_type': 'reanalysis',
+                        'product_type': 'analysis',
+                        'level_type': 'surface_or_atmosphere',
+                        'year': '2019',
+                        'month': '12',
+                        'day': '23',
+                        'time': '00:00',
+                    },
+                    '\(tempDownloadGribFile)')
+                """
+            let tempPythonFile = "\(downloadDir)elevation.py"
+
+            try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
+            try Process.spawn(cmd: "python3", args: [tempPythonFile])
+        }
+        
+        logger.info("Converting elevation and sea mask")
+        var landmask: [Float]? = nil
+        var elevation: [Float]? = nil
+        try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
+            let shortName = message.get(attribute: "shortName")!
+            let data = try message.getDouble().map(Float.init)
+            switch shortName {
+            case "orog":
+                elevation = data
+            case "lsm":
+                landmask = data
+            default:
+                fatalError("Found \(shortName) in grib")
+            }
+        }
+    
+        guard var elevation, var landmask else {
+            fatalError("missing elevation in grib")
+        }
+        
+        /*let a1 = Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1)
+        try a1.writeNetcdf(filename: "\(downloadDir)/elevation_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)
+        let a2 = Array2DFastSpace(data: landmask, nLocations: domain.grid.count, nTime: 1)
+        try a2.writeNetcdf(filename: "\(downloadDir)/landmask_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)*/
+        
+        // Set all sea grid points to -999
+        precondition(elevation.count == landmask.count)
+        for i in elevation.indices {
+            if landmask[i] < 0.5 {
+                elevation[i] = -999
+            }
+        }
+        
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+    }
+    
     func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
         if let stripseaYear = signature.stripseaYear {
@@ -755,7 +830,7 @@ struct DownloadCerraCommand: Command {
             fatalError("cds key is required")
         }
         //let domain = CdsDomain.cerra
-        //try DownloadEra5Command().downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
+        try downloadElevation(logger: logger, cdskey: cdskey, domain: .cerra)
         
         /// Only download one specified year
         if let yearStr = signature.year {
