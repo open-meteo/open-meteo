@@ -59,6 +59,8 @@ struct GloFasDownloader: AsyncCommandFix {
         switch domain {
         case .consolidatedv3:
             fallthrough
+        case .intermediatev3:
+            fallthrough
         case .consolidated:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
@@ -200,7 +202,7 @@ struct GloFasDownloader: AsyncCommandFix {
                              '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31'
                         ],
                         'hydrological_model': 'lisflood',
-                        'product_type': 'consolidated',
+                        'product_type': '\(domain.productType)',
                     },
                     '\(gribFile)')
                 """
@@ -239,7 +241,7 @@ struct GloFasDownloader: AsyncCommandFix {
                                 '\(day.day.zeroPadded(len: 2))',
                             ],
                             'hydrological_model': 'lisflood',
-                            'product_type': 'consolidated',
+                            'product_type': '\(domain.productType)',
                         },
                         '\(gribFile)')
                     """
@@ -258,7 +260,11 @@ struct GloFasDownloader: AsyncCommandFix {
         var data2d = Array2DFastTime(nLocations: nx*ny, nTime: timeinterval.count)
         for (i, date) in timeinterval.enumerated() {
             logger.info("Reading \(date.format_YYYYMMdd)")
-            let dailyFile = try OmFileReader(file: "\(downloadDir)glofas_\(date.format_YYYYMMdd).om")
+            let file = "\(downloadDir)glofas_\(date.format_YYYYMMdd).om"
+            guard FileManager.default.fileExists(atPath: file) else {
+                continue
+            }
+            let dailyFile = try OmFileReader(file: file)
             data2d[0..<nx*ny, i] = try dailyFile.readAll()
         }
         logger.info("Update om database")
@@ -330,7 +336,7 @@ struct GloFasDownloader: AsyncCommandFix {
                             '31',
                         ],
                         'hydrological_model': 'lisflood',
-                        'product_type': 'consolidated',
+                        'product_type': '\(domain.productType)',
                     },
                     '\(gribFile)')
                 """
@@ -394,6 +400,7 @@ enum GloFasDomain: String, GenericDomain {
     case consolidated
     case forecastv3
     case consolidatedv3
+    case intermediatev3
     
     var omfileDirectory: String {
         return "\(OpenMeteo.dataDictionary)omfile-glofas-\(rawValue)/"
@@ -410,6 +417,8 @@ enum GloFasDomain: String, GenericDomain {
         case .consolidated:
             return RegularGrid(nx: 7200, ny: 3000, latMin: -60, lonMin: -180, dx: 0.05, dy: 0.05)
         case .consolidatedv3:
+            fallthrough
+        case .intermediatev3:
             fallthrough
         case .forecastv3:
             return RegularGrid(nx: 3600, ny: 1500, latMin: -60, lonMin: -180, dx: 0.1, dy: 0.1)
@@ -428,17 +437,35 @@ enum GloFasDomain: String, GenericDomain {
     var version: String {
         switch self {
         case .consolidated:
-            return "version_3_1"
+            return "version_4_0"
         case .forecastv3:
+            fatalError("should never be called")
+        case.intermediatev3:
             fallthrough
         case .consolidatedv3:
             return "version_3_1"
         }
     }
     
+    /// `intermediate` or `consolidated`
+    var productType: String {
+        switch self {
+        case .consolidatedv3:
+            fallthrough
+        case .consolidated:
+            return "consolidated"
+        case .forecastv3:
+            fatalError("should never be called")
+        case .intermediatev3:
+            return "intermediate"
+        }
+    }
+    
     var omFileLength: Int {
         switch self {
-        case.consolidatedv3:
+        case .consolidatedv3:
+            fallthrough
+        case .intermediatev3:
             fallthrough
         case .consolidated:
             return 100 // 100 days per file

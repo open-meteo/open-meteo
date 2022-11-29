@@ -87,6 +87,61 @@
       </div>
     </div>
 
+    <div class="row py-3 px-0 debug-hidden">
+      <div class="accordion" id="accordionVariables">
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading-models">
+            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapse-models" aria-expanded="false" aria-controls="collapse-models">
+              Flood models&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+                data-count-checkboxes-of="#collapse-models">0/x</span>&nbsp;<span
+                class="badge bg-primary">New</span>
+            </button>
+          </h2>
+          <div id="collapse-models" class="accordion-collapse collapse"
+            aria-labelledby="heading-models" data-bs-parent="#accordionVariables">
+            <div class="accordion-body row">
+              <div class="col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="seamless_v3" id="seamless_v3"
+                    name="models">
+                  <label class="form-check-label" for="seamless_v3">
+                    Seamless v3
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="forecast_v3"
+                    id="forecast_v3" name="models">
+                  <label class="form-check-label" for="forecast_v3">
+                    Forecast v3
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="consolidated_v3"
+                    id="consolidated_v3" name="models">
+                  <label class="form-check-label" for="consolidated_v3">
+                    Consolidated v3
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="consolidated_v4"
+                    id="consolidated_v4" name="models">
+                  <label class="form-check-label" for="consolidated_v4">
+                    Consolidated v4
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-12">
+                <small class="text-muted">Note: <mark>Seamless</mark> combines forecast and consolidated data. For Version 4, no forecast is available yet.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <div class="row py-3 px-0">
       <h2>Settings</h2>
       <div class="col-3">

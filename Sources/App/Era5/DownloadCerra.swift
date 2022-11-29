@@ -806,7 +806,7 @@ struct DownloadCerraCommand: Command {
             }
         }
     
-        guard var elevation, var landmask else {
+        guard var elevation, let landmask else {
             fatalError("missing elevation in grib")
         }
         
