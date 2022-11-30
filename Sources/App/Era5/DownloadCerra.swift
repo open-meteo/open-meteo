@@ -576,6 +576,12 @@ struct DownloadCerraCommand: Command {
             let lastDayInMonth = Timestamp(year, month % 12 + 1, 1).add(-86400).toComponents().day
             let days = day.map{[$0.zeroPadded(len: 2)]} ?? (1...lastDayInMonth).map{$0.zeroPadded(len: 2)}
             
+            let YYYYMMdd = "\(year)\(month.zeroPadded(len: 2))\(days[0])"
+            if FileManager.default.fileExists(atPath: "\(downloadDir)\(YYYYMMdd)/\(variables[0].rawValue)_\(YYYYMMdd)01.om") {
+                logger.info("Already exists \(YYYYMMdd) variable \(variables[0]). Skipping.")
+                return
+            }
+            
             let query = CdsQuery(
                 product_type: productType,
                 height_level: height_level,
@@ -626,10 +632,6 @@ struct DownloadCerraCommand: Command {
             let months = timeinterval.range.lowerBound.toComponents().month ... timeinterval.range.upperBound.toComponents().month-1
             for month in months {
                 logger.info("Downloading year \(year) month \(month)")
-                let YYYYMMdd = "\(year)\(month.zeroPadded(len: 2))00"
-                if FileManager.default.fileExists(atPath: "\(domain.downloadDirectory)\(YYYYMMdd)/\(variables[0].rawValue)_\(YYYYMMdd)00.om") {
-                    continue
-                }
                 
                 // download analysis + forecast hour 1,2
                 let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
@@ -645,11 +647,7 @@ struct DownloadCerraCommand: Command {
             }
         } else {
             for timestamp in timeinterval {
-                let YYYYMMdd = timestamp.format_YYYYMMdd
-                logger.info("Downloading day \(YYYYMMdd)")
-                if FileManager.default.fileExists(atPath: "\(domain.downloadDirectory)\(YYYYMMdd)/\(variables[0].rawValue)_\(YYYYMMdd)00.om") {
-                    continue
-                }
+                logger.info("Downloading day \(timestamp.format_YYYYMMdd)")
                 let date = timestamp.toComponents()
                 
                 // download analysis + forecast hour 1,2
