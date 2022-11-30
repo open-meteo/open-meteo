@@ -51,10 +51,11 @@
       <h2>Local Models</h2>
       <p>Open-Meteo combines local (1 km resolution) and global (11 km) weather models from national weather services.
         For every location on earth, the best forecast is available.</p>
-      <p>National weather services include <a href="https://www.dwd.de/">Deutscher Wetter Dienst (DWD)</a>, <a
-          href="https://www.noaa.gov/">National Oceanic and Atmospheric Administration (NOAA)</a>, <a
-          href="https://meteofrance.com/">Meteofrance</a> and <a href="https://www.knmi.nl/">Koninklijk Nederlands
-          Meteorologisch Instituut</a>.</p>
+      <p>National weather services include <a href="https://www.dwd.de/" title="German Weather Service">Deutscher Wetter
+          Dienst (DWD)</a>, <a href="https://www.noaa.gov/" title="American Weather Service">National Oceanic and
+          Atmospheric Administration (NOAA)</a>, <a href="https://meteofrance.com/"
+          title="French Weather Service">Meteofrance</a> and <a href="https://weather.gc.ca"
+          title="Canadian Weather Serice">Canadian Meteorological Center (CMC)</a>.</p>
     </div>
     <div class="feature col">
       <div class="feature-icon bg-primary bg-gradient">
@@ -67,7 +68,7 @@
       <h2>High Resolution</h2>
       <p>Open-Meteo APIs select the highest resolution weather model for your location. For locations in Europe and the
         US, 2 km high resolution models are used.</p>
-      <p>Weather data are provided in hourly resolution with 7 days forecast. Typically, the first 48 hours are
+      <p>Weather data are provided in hourly resolution with 7 days forecast. Typically, the first 2-3 days hours are
         calculated with high resolution weather models, followed by global weather models up to 180 hours. Our APIs
         integrate data seamlessly to offer a simple hourly 7-day forecast.</p>
     </div>
@@ -80,8 +81,8 @@
             d="M5.667 16C4.747 16 4 15.254 4 14.333v-1.86A5.985 5.985 0 0 1 2 8c0-1.777.772-3.374 2-4.472V1.667C4 .747 4.746 0 5.667 0h4.666C11.253 0 12 .746 12 1.667v1.86a5.99 5.99 0 0 1 1.918 3.48.502.502 0 0 1 .582.493v1a.5.5 0 0 1-.582.493A5.99 5.99 0 0 1 12 12.473v1.86c0 .92-.746 1.667-1.667 1.667H5.667zM13 8A5 5 0 1 0 3 8a5 5 0 0 0 10 0z" />
         </svg>
       </div>
-      <h2>3-Hourly Updates</h2>
-      <p>To continuously correct weather forecasts, our local 2 km resolution models update every 3 hours. Open-Meteo
+      <h2>Hourly Updates</h2>
+      <p>To continuously correct weather forecasts, our local 1 km resolution models update every hour. Open-Meteo
         forecasts are always up to date.</p>
       <p>Weather models use real-time measurements, airplane data, buoys, rain radar and satellite observations for
         numerical weather predictions.</p>
@@ -136,7 +137,7 @@
       <div>
         <h3 class="fw-bold mb-0">Temperature</h3>
         <p>Temperature forecasts from weather models are comparable to weather station measurements at 2 meter above
-          ground. The modeled temperature is an average over a small area (2-11 km). Local effect like heat radiation
+          ground. The modeled temperature is an average over a small area (1-11 km). Local effect like heat radiation
           from streets and buildings are not represented.</p>
       </div>
     </div>
@@ -264,7 +265,8 @@
         access, but ask for fair use.</p>
       <p>If your application exceeds 10'000 requests per day, please contact us. We reserve the right to block
         applications and IP addresses that misuse our service.</p>
-      <p><strong>Free for non-commercial:</strong> You may not use the API services for commercial purposes. For further questions, please contact us.</p>
+      <p><strong>Free for non-commercial:</strong> You may not use the API services for commercial purposes. For further
+        questions, please contact us.</p>
       <p>All data is provided as is without any warranty.</p>
       <p>We do not collect any personal data. We do not share any personal information. We do not integrate any
         third-party analytics, ads, beacons or plugins.</p>
@@ -281,7 +283,8 @@
       <p class="lead">API data are offered under <a href="https://creativecommons.org/licenses/by/4.0/"
           target="_blank">Attribution 4.0 International (CC BY 4.0)</a></p>
       <p>You are free to <strong>share:</strong> copy and redistribute the material in any medium or format and
-        <strong>adapt:</strong> remix, transform, and build upon the material.</p>
+        <strong>adapt:</strong> remix, transform, and build upon the material.
+      </p>
       <p><strong>Attribution:</strong> You must give appropriate credit, provide a link to the license, and indicate if
         changes were made. You may do so in any reasonable manner, but not in any way that suggests the licensor
         endorses you or your use.</p>
