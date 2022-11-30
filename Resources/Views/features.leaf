@@ -17,7 +17,7 @@
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Features</h1>
   <div class="col-lg-6 mx-auto">
     <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Easily integrate high accuracy weather
-      forecasts in your applications. Simple JSON APIs for hourly data, globally available and up to 2 km resolution.
+      forecasts in your applications. Simple JSON APIs for hourly data, globally available at up to 1 km resolution.
     </p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#weathervariables" class="btn button btn-primary btn-lg px-4 me-sm-3">Weather Variables</a>
@@ -36,20 +36,6 @@
   </div>
 </div>
 
-<style>
-  .feature-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 4rem;
-    height: 4rem;
-    margin-bottom: 1rem;
-    font-size: 2rem;
-    color: #fff;
-    border-radius: .75rem;
-  }
-</style>
-
 <div class="container px-4 py-5" id="featured-3">
   <div class="row g-4 py-5 row-cols-1 row-cols-lg-3">
     <div class="feature col">
@@ -63,7 +49,7 @@
         </svg>
       </div>
       <h2>Local Models</h2>
-      <p>Open-Meteo combines local (2 km resolution) and global (11 km) weather models from national weather services.
+      <p>Open-Meteo combines local (1 km resolution) and global (11 km) weather models from national weather services.
         For every location on earth, the best forecast is available.</p>
       <p>National weather services include <a href="https://www.dwd.de/">Deutscher Wetter Dienst (DWD)</a>, <a
           href="https://www.noaa.gov/">National Oceanic and Atmospheric Administration (NOAA)</a>, <a
@@ -109,7 +95,7 @@
         </svg>
       </div>
       <h2>60 years historical data</h2>
-      <p>Our <a href="http://127.0.0.1:8080/en/docs/historical-weather-api">Historical Weather API</a> contains more
+      <p>Our <a href="/en/docs/historical-weather-api">Historical Weather API</a> contains more
         then 60 years of hourly weather data at 25 kilometer resolution.</p>
       <p>All APIs continously archive data. You can seamlessly fetch the most recent forecast combined with multiple
         weeks of past data to train machine learning applications.</p>
