@@ -179,7 +179,7 @@ struct GloFasDownloader: AsyncCommandFix {
         /// download multiple months at once
         if timeinterval.count > 61 {
             let year = timeinterval.range.lowerBound.toComponents().year
-            let months = timeinterval.range.lowerBound.toComponents().month ..< timeinterval.range.upperBound.toComponents().month
+            let months = timeinterval.range.lowerBound.toComponents().month ... timeinterval.range.upperBound.toComponents().month-1
             let monthNames = ["", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
             let monthsJson = String(data: try JSONEncoder().encode(Array(monthNames[months])), encoding: .utf8)!
             

@@ -537,6 +537,20 @@ struct DownloadCerraCommand: Command {
         }
     }
     
+    struct CdsQuery: Encodable {
+        let product_type: [String]
+        let format = "grib"
+        /// might be optional
+        let level_type = "surface_or_atmosphere"
+        let datatype = "reanalysis"
+        let height_level: String?
+        let year: String
+        let month: String
+        let day: [String]
+        let leadtime_hour: [String]
+        let time: [String] = ["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"]
+    }
+    
     /// Dowload CERRA data, use analysis if available, otherwise use forecast
     func downloadDailyFilesCerra(logger: Logger, cdskey: String, timeinterval: TimerangeDt) throws {
         let domain = CdsDomain.cerra
@@ -557,7 +571,29 @@ struct DownloadCerraCommand: Command {
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 600)
         
-        func downloadAndConvert(json: String) throws {
+        func downloadAndConvert(datasetName: String, productType: [String], variables: [CerraVariable], height_level: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
+            let variablesEncoded = String(data: try JSONEncoder().encode(variables.map {$0.cdsApiName}), encoding: .utf8)!
+            let lastDayInMonth = Timestamp(year, month % 12 + 1, 1).add(-86400).toComponents().day
+            let days = day.map{[$0.zeroPadded(len: 2)]} ?? (1...lastDayInMonth).map{$0.zeroPadded(len: 2)}
+            
+            let query = CdsQuery(
+                product_type: productType,
+                height_level: height_level,
+                year: year.zeroPadded(len: 2),
+                month: month.zeroPadded(len: 2),
+                day: days,
+                leadtime_hour: leadtime_hours.map(String.init)
+            )
+            
+            let queryEncoded = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
+            
+            let json = """
+                import cdsapi
+
+                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
+                c.retrieve('\(datasetName)',\(queryEncoded),'\(tempDownloadGribFile)')
+                """
+            
             try json.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
             try Process.spawn(cmd: "python3", args: [tempPythonFile])
             try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
@@ -584,118 +620,52 @@ struct DownloadCerraCommand: Command {
             }
         }
         
-        for timestamp in timeinterval {
-            logger.info("Downloading timestamp \(timestamp.format_YYYYMMdd)")
-            let date = timestamp.toComponents()
-            let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
-            
-            if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd)00.om") {
-                continue
+        if timeinterval.count > 62 {
+            /// Download one month at once
+            let year = timeinterval.range.lowerBound.toComponents().year
+            let months = timeinterval.range.lowerBound.toComponents().month ... timeinterval.range.upperBound.toComponents().month-1
+            for month in months {
+                logger.info("Downloading year \(year) month \(month)")
+                let YYYYMMdd = "\(year)\(month.zeroPadded(len: 2))00"
+                if FileManager.default.fileExists(atPath: "\(domain.downloadDirectory)\(YYYYMMdd)/\(variables[0].rawValue)_\(YYYYMMdd)00.om") {
+                    continue
+                }
+                
+                // download analysis + forecast hour 1,2
+                let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
+                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, year: year, month: month, day: nil, leadtime_hours: [1,2])
+                
+                // download forecast hour 1,2,3 for variables without analysis
+                let variablesForecastHour3 = variables.filter { !$0.hasAnalysis && !$0.isHeightLevel }
+                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, year: year, month: month, day: nil, leadtime_hours: [1,2,3])
+                
+                // download analysis + 2 forecast steps from level 100m
+                let variablesHeightLevel = variables.filter { $0.isHeightLevel }
+                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", year: year, month: month, day: nil, leadtime_hours: [1,2])
             }
-            
-            let variablesAnalysisEncoded = String(data: try JSONEncoder().encode(variables.compactMap {
-                return ($0.hasAnalysis && !$0.isHeightLevel) ? $0.cdsApiName : nil
-            }), encoding: .utf8)!
-            
-            // download analysis
-            try downloadAndConvert(json: """
-                import cdsapi
-
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                c.retrieve(
-                    '\(domain.cdsDatasetName)',
-                    {
-                        'product_type': 'analysis',
-                        'format': 'grib',
-                        'variable': \(variablesAnalysisEncoded),
-                        'level_type': 'surface_or_atmosphere',
-                        'data_type': 'reanalysis',
-                        'year': '\(date.year)',
-                        'month': '\(date.month.zeroPadded(len: 2))',
-                        'day': '\(date.day.zeroPadded(len: 2))',
-                        'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
-                    },
-                    '\(tempDownloadGribFile)')
-                """)
-            
-            
-            let variablesEncoded = String(data: try JSONEncoder().encode(variables.compactMap {
-                !$0.isHeightLevel ? $0.cdsApiName : nil
-            }), encoding: .utf8)!
-            
-            // download forecast
-            try downloadAndConvert(json: """
-                import cdsapi
-
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                c.retrieve(
-                    '\(domain.cdsDatasetName)',
-                    {
-                        'product_type': 'forecast',
-                        'format': 'grib',
-                        'variable': \(variablesEncoded),
-                        'level_type': 'surface_or_atmosphere',
-                        'data_type': 'reanalysis',
-                        'year': '\(date.year)',
-                        'month': '\(date.month.zeroPadded(len: 2))',
-                        'day': '\(date.day.zeroPadded(len: 2))',
-                        'leadtime_hour': ['1', '2'],
-                        'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
-                    },
-                    '\(tempDownloadGribFile)')
-                """)
-            
-            // download forecast hour 3 for variables without analysis
-            let variablesNoAnalysisEncoded = String(data: try JSONEncoder().encode(variables.compactMap {
-                return (!$0.hasAnalysis && !$0.isHeightLevel) ? $0.cdsApiName : nil
-            }), encoding: .utf8)!
-            try downloadAndConvert(json: """
-                import cdsapi
-
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                c.retrieve(
-                    '\(domain.cdsDatasetName)',
-                    {
-                        'product_type': 'forecast',
-                        'format': 'grib',
-                        'variable': \(variablesNoAnalysisEncoded),
-                        'level_type': 'surface_or_atmosphere',
-                        'data_type': 'reanalysis',
-                        'year': '\(date.year)',
-                        'month': '\(date.month.zeroPadded(len: 2))',
-                        'day': '\(date.day.zeroPadded(len: 2))',
-                        'leadtime_hour': ['3'],
-                        'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
-                    },
-                    '\(tempDownloadGribFile)')
-                """)
-            
-            // download analysis + 2 forecast steps from level 100m
-            let variablesHeightLevel = String(data: try JSONEncoder().encode(variables.compactMap {
-                return $0.isHeightLevel ? $0.cdsApiName : nil
-            }), encoding: .utf8)!
-            try downloadAndConvert(json: """
-                import cdsapi
-
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                c.retrieve(
-                    'reanalysis-cerra-height-levels',
-                    {
-                        'product_type': ['analysis', 'forecast'],
-                        'format': 'grib',
-                        'height_level': '100_m',
-                        'variable': \(variablesHeightLevel),
-                        'data_type': 'reanalysis',
-                        'year': '\(date.year)',
-                        'month': '\(date.month.zeroPadded(len: 2))',
-                        'day': '\(date.day.zeroPadded(len: 2))',
-                        'time': ['00:00', '03:00', '06:00', '09:00', '12:00', '15:00', '18:00', '21:00',],
-                        'leadtime_hour': ['1', '2'],
-                    },
-                    '\(tempDownloadGribFile)')
-                """)
+        } else {
+            for timestamp in timeinterval {
+                let YYYYMMdd = timestamp.format_YYYYMMdd
+                logger.info("Downloading day \(YYYYMMdd)")
+                if FileManager.default.fileExists(atPath: "\(domain.downloadDirectory)\(YYYYMMdd)/\(variables[0].rawValue)_\(YYYYMMdd)00.om") {
+                    continue
+                }
+                let date = timestamp.toComponents()
+                
+                // download analysis + forecast hour 1,2
+                let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
+                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2])
+                
+                // download forecast hour 1,2,3 for variables without analysis
+                let variablesForecastHour3 = variables.filter { !$0.hasAnalysis && !$0.isHeightLevel }
+                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2,3])
+                
+                // download analysis + 2 forecast steps from level 100m
+                let variablesHeightLevel = variables.filter { $0.isHeightLevel }
+                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2])
+            }
         }
-        
+            
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         try FileManager.default.removeItemIfExists(at: tempPythonFile)
     }
