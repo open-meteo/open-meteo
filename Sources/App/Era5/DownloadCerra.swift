@@ -542,13 +542,14 @@ struct DownloadCerraCommand: Command {
         let format = "grib"
         /// might be optional
         let level_type = "surface_or_atmosphere"
-        let datatype = "reanalysis"
+        let data_type = "reanalysis"
         let height_level: String?
         let year: String
         let month: String
         let day: [String]
         let leadtime_hour: [String]
         let time: [String] = ["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"]
+        let variable: [String]
     }
     
     /// Dowload CERRA data, use analysis if available, otherwise use forecast
@@ -572,7 +573,6 @@ struct DownloadCerraCommand: Command {
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 600)
         
         func downloadAndConvert(datasetName: String, productType: [String], variables: [CerraVariable], height_level: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
-            let variablesEncoded = String(data: try JSONEncoder().encode(variables.map {$0.cdsApiName}), encoding: .utf8)!
             let lastDayInMonth = Timestamp(year, month % 12 + 1, 1).add(-86400).toComponents().day
             let days = day.map{[$0.zeroPadded(len: 2)]} ?? (1...lastDayInMonth).map{$0.zeroPadded(len: 2)}
             
@@ -588,7 +588,8 @@ struct DownloadCerraCommand: Command {
                 year: year.zeroPadded(len: 2),
                 month: month.zeroPadded(len: 2),
                 day: days,
-                leadtime_hour: leadtime_hours.map(String.init)
+                leadtime_hour: leadtime_hours.map(String.init),
+                variable: variables.map {$0.cdsApiName}
             )
             
             let queryEncoded = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
