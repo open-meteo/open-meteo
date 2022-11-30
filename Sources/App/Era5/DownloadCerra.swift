@@ -540,8 +540,7 @@ struct DownloadCerraCommand: Command {
     struct CdsQuery: Encodable {
         let product_type: [String]
         let format = "grib"
-        /// might be optional
-        let level_type = "surface_or_atmosphere"
+        let level_type: String?
         let data_type = "reanalysis"
         let height_level: String?
         let year: String
@@ -572,7 +571,7 @@ struct DownloadCerraCommand: Command {
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 600)
         
-        func downloadAndConvert(datasetName: String, productType: [String], variables: [CerraVariable], height_level: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
+        func downloadAndConvert(datasetName: String, productType: [String], variables: [CerraVariable], height_level: String?, level_type: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
             let lastDayInMonth = Timestamp(year, month % 12 + 1, 1).add(-86400).toComponents().day
             let days = day.map{[$0.zeroPadded(len: 2)]} ?? (1...lastDayInMonth).map{$0.zeroPadded(len: 2)}
             
@@ -584,6 +583,7 @@ struct DownloadCerraCommand: Command {
             
             let query = CdsQuery(
                 product_type: productType,
+                level_type: level_type,
                 height_level: height_level,
                 year: year.zeroPadded(len: 2),
                 month: month.zeroPadded(len: 2),
@@ -631,15 +631,15 @@ struct DownloadCerraCommand: Command {
          
             // download analysis + forecast hour 1,2
             let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
-            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, year: year, month: month, day: day, leadtime_hours: [1,2])
+            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2])
             
             // download forecast hour 1,2,3 for variables without analysis
             let variablesForecastHour3 = variables.filter { !$0.hasAnalysis && !$0.isHeightLevel }
-            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, year: year, month: month, day: day, leadtime_hours: [1,2,3])
+            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2,3])
             
             // download analysis + 2 forecast steps from level 100m
             let variablesHeightLevel = variables.filter { $0.isHeightLevel }
-            try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", year: year, month: month, day: day, leadtime_hours: [1,2])
+            try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", level_type: nil, year: year, month: month, day: day, leadtime_hours: [1,2])
         }
         
         if timeinterval.count > 62 {
