@@ -626,41 +626,34 @@ struct DownloadCerraCommand: Command {
             }
         }
         
+        func downloadAndConvertAll(datasetName: String, productType: [String], height_level: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
+         
+            // download analysis + forecast hour 1,2
+            let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
+            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, year: year, month: month, day: day, leadtime_hours: [1,2])
+            
+            // download forecast hour 1,2,3 for variables without analysis
+            let variablesForecastHour3 = variables.filter { !$0.hasAnalysis && !$0.isHeightLevel }
+            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, year: year, month: month, day: day, leadtime_hours: [1,2,3])
+            
+            // download analysis + 2 forecast steps from level 100m
+            let variablesHeightLevel = variables.filter { $0.isHeightLevel }
+            try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", year: year, month: month, day: day, leadtime_hours: [1,2])
+        }
+        
         if timeinterval.count > 62 {
             /// Download one month at once
             let year = timeinterval.range.lowerBound.toComponents().year
             let months = timeinterval.range.lowerBound.toComponents().month ... timeinterval.range.upperBound.toComponents().month-1
             for month in months {
                 logger.info("Downloading year \(year) month \(month)")
-                
-                // download analysis + forecast hour 1,2
-                let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
-                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, year: year, month: month, day: nil, leadtime_hours: [1,2])
-                
-                // download forecast hour 1,2,3 for variables without analysis
-                let variablesForecastHour3 = variables.filter { !$0.hasAnalysis && !$0.isHeightLevel }
-                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, year: year, month: month, day: nil, leadtime_hours: [1,2,3])
-                
-                // download analysis + 2 forecast steps from level 100m
-                let variablesHeightLevel = variables.filter { $0.isHeightLevel }
-                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", year: year, month: month, day: nil, leadtime_hours: [1,2])
+                try downloadAndConvertAll(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], height_level: nil, year: year, month: month, day: nil, leadtime_hours: [1,2])
             }
         } else {
             for timestamp in timeinterval {
                 logger.info("Downloading day \(timestamp.format_YYYYMMdd)")
                 let date = timestamp.toComponents()
-                
-                // download analysis + forecast hour 1,2
-                let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
-                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2])
-                
-                // download forecast hour 1,2,3 for variables without analysis
-                let variablesForecastHour3 = variables.filter { !$0.hasAnalysis && !$0.isHeightLevel }
-                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2,3])
-                
-                // download analysis + 2 forecast steps from level 100m
-                let variablesHeightLevel = variables.filter { $0.isHeightLevel }
-                try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2])
+                try downloadAndConvertAll(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], height_level: nil, year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2])
             }
         }
             
