@@ -349,6 +349,11 @@ final class Curl {
         }
     }
     
+    /// Download a grib file and decode individual mesages directly while downloading
+    /*func downloadGribStreaming(url: String, client: HTTPClient) async throws -> GribByteBuffer {
+        
+    }*/
+    
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
     func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
