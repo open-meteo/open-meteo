@@ -113,20 +113,21 @@ struct GloFasDownloader: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        let curl = Curl(logger: logger, readTimeout: 80*60)
+        let curl = Curl(logger: logger, readTimeout: 3600*3)
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/fc_grib/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
-        let file = "\(domain.downloadDirectory)dis.grib"
+        //let file = "\(domain.downloadDirectory)dis.grib"
         
         var data2d = Array2DFastTime(nLocations: nx*ny, nTime: 30)
         let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + data2d.nTime
         
-        if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: file) {
-            try await curl.download(url: remote, toFile: file, client: application.dedicatedHttpClient)
-        }
+        //if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: file) {
+        //    try await curl.download(url: remote, toFile: file, client: application.dedicatedHttpClient)
+        //}
         
         // Read all GRIB messages and directly update OM file database
         logger.info("Reading grib file")
-        try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
+        try await curl.downloadGribStreaming(url: remote, client: application.dedicatedHttpClient) { message in
+        //try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
             /// Date in ISO timestamp string format `20210101`
             let date = message.get(attribute: "validityDate")!
             /// 0 = control
@@ -138,14 +139,14 @@ struct GloFasDownloader: AsyncCommandFix {
             }
             
             logger.info("Converting day \(date) Member \(member) forecastDate \(forecastDate)")
-            let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
-            try FileManager.default.removeItemIfExists(at: dailyFile)
+            //let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
+            //try FileManager.default.removeItemIfExists(at: dailyFile)
             try grib2d.load(message: message)
             grib2d.array.flipLatitude()
             data2d[0..<nx*ny, forecastDate] = grib2d.array.data
             
             // iterates from 0 to 29 forecast date and then updates om file
-            guard forecastDate == 29 else {
+            guard forecastDate == data2d.nTime-1 else {
                 return
             }
             
@@ -154,10 +155,8 @@ struct GloFasDownloader: AsyncCommandFix {
                 try data2d.transpose().writeNetcdf(filename: "\(name).nc", nx: nx, ny: ny)
             }
             
-            let startConvert = DispatchTime.now()
-            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
+            logger.info("Starting om file update")
             let startOm = DispatchTime.now()
-            
             try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }

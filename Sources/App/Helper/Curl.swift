@@ -350,9 +350,38 @@ final class Curl {
     }
     
     /// Download a grib file and decode individual mesages directly while downloading
-    /*func downloadGribStreaming(url: String, client: HTTPClient) async throws -> GribByteBuffer {
-        
-    }*/
+    func downloadGribStreaming(url: String, client: HTTPClient, callback: @escaping (GribMessage) throws -> ()) async throws {
+        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
+            processVoid = Task {
+                let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
+                if let contentLength {
+                    self.totalBytesTransfered += contentLength
+                }
+                for try await message in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
+                    try Task.checkCancellation()
+                    try message.forEach(callback)
+                }
+            }
+            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
+                self?.logger.error("Timeout reached, canceling download processing")
+                self?.processVoid?.cancel()
+            }
+            defer {
+                readTimeout.cancel()
+                processVoid = nil
+            }
+            try await processVoid!.value
+            processVoid = nil
+            readTimeout.cancel()
+            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                let delta = waitAfterLastModified - lastModified.distance(to: Date())
+                if delta > 1 {
+                    //logger.info("sleeping for \(delta) seconds")
+                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                }
+            }
+        }
+    }
     
     /// Download an entire grib file
     /// Data is downloaded directly into memory and GRIB decoded while iterating
