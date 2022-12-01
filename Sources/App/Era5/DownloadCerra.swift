@@ -6,7 +6,7 @@ import SwiftPFor2D
 
 typealias CerraHourlyVariable = VariableOrDerived<CerraVariable, CerraVariableDerived>
 
-enum CerraVariableDerived: String, Codable, RawRepresentableString {
+enum CerraVariableDerived: String, Codable, RawRepresentableString, GenericVariableMixable {
     case apparent_temperature
     case dewpoint_2m
     //case relativehumidity_2m
@@ -22,16 +22,26 @@ enum CerraVariableDerived: String, Codable, RawRepresentableString {
     case et0_fao_evapotranspiration
     case cloudcover
     case direct_normal_irradiance
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
 }
 
-typealias CerraReader = GenericReader<CdsDomain, CerraVariable>
-
-extension CerraReader {
+struct CerraReader: GenericReaderDerivedSimple, GenericReaderMixable {
+    var reader: GenericReaderCached<CdsDomain, CerraVariable>
+    
+    typealias Domain = CdsDomain
+    
+    typealias Variable = CerraVariable
+    
+    typealias Derived = CerraVariableDerived
+    
     func prefetchData(variables: [CerraHourlyVariable], time: TimerangeDt) throws {
         for variable in variables {
             switch variable {
             case .raw(let v):
-                try prefetchData(variable: v, time: time)
+                try prefetchData(raw: v, time: time)
             case .derived(let v):
                 try prefetchData(derived: v, time: time)
             }
@@ -44,14 +54,14 @@ extension CerraReader {
         //    try prefetchData(variable: .wind_u_component_10m, time: time)
         //    try prefetchData(variable: .wind_v_component_10m, time: time)
         case .apparent_temperature:
-            try prefetchData(variable: .temperature_2m, time: time)
-            try prefetchData(variable: .windspeed_10m, time: time)
-            try prefetchData(variable: .relativehumidity_2m, time: time)
-            try prefetchData(variable: .direct_radiation, time: time)
-            try prefetchData(variable: .shortwave_radiation, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .windspeed_10m, time: time)
+            try prefetchData(raw: .relativehumidity_2m, time: time)
+            try prefetchData(raw: .direct_radiation, time: time)
+            try prefetchData(raw: .shortwave_radiation, time: time)
         case .dewpoint_2m:
-            try prefetchData(variable: .temperature_2m, time: time)
-            try prefetchData(variable: .relativehumidity_2m, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .relativehumidity_2m, time: time)
             /*case .relativehumidity_2m:
             try prefetchData(variable: .temperature_2m, time: time)
             try prefetchData(variable: .dewpoint_2m, time: time)
@@ -65,37 +75,37 @@ extension CerraReader {
             try prefetchData(variable: .wind_u_component_100m, time: time)
             try prefetchData(variable: .wind_v_component_100m, time: time)*/
         case .vapor_pressure_deficit:
-            try prefetchData(variable: .temperature_2m, time: time)
-            try prefetchData(variable: .relativehumidity_2m, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .relativehumidity_2m, time: time)
         case .diffuse_radiation:
-            try prefetchData(variable: .shortwave_radiation, time: time)
-            try prefetchData(variable: .direct_radiation, time: time)
+            try prefetchData(raw: .shortwave_radiation, time: time)
+            try prefetchData(raw: .direct_radiation, time: time)
         case .et0_fao_evapotranspiration:
-            try prefetchData(variable: .direct_radiation, time: time)
+            try prefetchData(raw: .direct_radiation, time: time)
             try prefetchData(derived: .diffuse_radiation, time: time)
-            try prefetchData(variable: .temperature_2m, time: time)
-            try prefetchData(variable: .relativehumidity_2m, time: time)
-            try prefetchData(variable: .windspeed_10m, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .relativehumidity_2m, time: time)
+            try prefetchData(raw: .windspeed_10m, time: time)
         case .surface_pressure:
-            try prefetchData(variable: .pressure_msl, time: time)
+            try prefetchData(raw: .pressure_msl, time: time)
         case .snowfall:
-            try prefetchData(variable: .snowfall_water_equivalent, time: time)
+            try prefetchData(raw: .snowfall_water_equivalent, time: time)
         case .cloudcover:
-            try prefetchData(variable: .cloudcover_low, time: time)
-            try prefetchData(variable: .cloudcover_mid, time: time)
-            try prefetchData(variable: .cloudcover_high, time: time)
+            try prefetchData(raw: .cloudcover_low, time: time)
+            try prefetchData(raw: .cloudcover_mid, time: time)
+            try prefetchData(raw: .cloudcover_high, time: time)
         case .direct_normal_irradiance:
-            try prefetchData(variable: .direct_radiation, time: time)
+            try prefetchData(raw: .direct_radiation, time: time)
         case .rain:
-            try prefetchData(variable: .precipitation, time: time)
-            try prefetchData(variable: .snowfall_water_equivalent, time: time)
+            try prefetchData(raw: .precipitation, time: time)
+            try prefetchData(raw: .snowfall_water_equivalent, time: time)
         }
     }
     
     func get(variable: CerraHourlyVariable, time: TimerangeDt) throws -> DataAndUnit {
         switch variable {
         case .raw(let variable):
-            return try get(variable: variable, time: time)
+            return try get(raw: variable, time: time)
         case .derived(let variable):
             return try get(derived: variable, time: time)
         }
@@ -110,14 +120,14 @@ extension CerraReader {
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .ms)*/
         case .dewpoint_2m:
-            let relhum = try get(variable: .relativehumidity_2m, time: time)
-            let temperature = try get(variable: .temperature_2m, time: time)
+            let relhum = try get(raw: .relativehumidity_2m, time: time)
+            let temperature = try get(raw: .temperature_2m, time: time)
             return DataAndUnit(zip(temperature.data,relhum.data).map(Meteorology.dewpoint), temperature.unit)
         case .apparent_temperature:
-            let windspeed = try get(variable: .windspeed_10m, time: time).data
-            let temperature = try get(variable: .temperature_2m, time: time).data
-            let relhum = try get(variable: .relativehumidity_2m, time: time).data
-            let radiation = try get(variable: .shortwave_radiation, time: time).data
+            let windspeed = try get(raw: .windspeed_10m, time: time).data
+            let temperature = try get(raw: .temperature_2m, time: time).data
+            let relhum = try get(raw: .relativehumidity_2m, time: time).data
+            let radiation = try get(raw: .shortwave_radiation, time: time).data
             return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
             /*case .relativehumidity_2m:
             let temperature = try get(variable: .temperature_2m, time: time).data
@@ -140,14 +150,14 @@ extension CerraReader {
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)*/
         case .vapor_pressure_deficit:
-            let temperature = try get(variable: .temperature_2m, time: time).data
+            let temperature = try get(raw: .temperature_2m, time: time).data
             let dewpoint = try get(derived: .dewpoint_2m, time: time).data
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
         case .et0_fao_evapotranspiration:
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time)
-            let swrad = try get(variable: .shortwave_radiation, time: time).data
-            let temperature = try get(variable: .temperature_2m, time: time).data
-            let windspeed = try get(variable: .windspeed_10m, time: time).data
+            let swrad = try get(raw: .shortwave_radiation, time: time).data
+            let temperature = try get(raw: .temperature_2m, time: time).data
+            let windspeed = try get(raw: .windspeed_10m, time: time).data
             let dewpoint = try get(derived: .dewpoint_2m, time: time).data
             
             let et0 = swrad.indices.map { i in
@@ -155,30 +165,30 @@ extension CerraReader {
             }
             return DataAndUnit(et0, .millimeter)
         case .diffuse_radiation:
-            let swrad = try get(variable: .shortwave_radiation, time: time).data
-            let direct = try get(variable: .direct_radiation, time: time).data
+            let swrad = try get(raw: .shortwave_radiation, time: time).data
+            let direct = try get(raw: .direct_radiation, time: time).data
             let diff = zip(swrad,direct).map(-)
             return DataAndUnit(diff, .wattPerSquareMeter)
         case .surface_pressure:
-            let temperature = try get(variable: .temperature_2m, time: time).data
-            let pressure = try get(variable: .pressure_msl, time: time)
+            let temperature = try get(raw: .temperature_2m, time: time).data
+            let pressure = try get(raw: .pressure_msl, time: time)
             return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: modelElevation), pressure.unit)
         case .cloudcover:
-            let low = try get(variable: .cloudcover_low, time: time).data
-            let mid = try get(variable: .cloudcover_mid, time: time).data
-            let high = try get(variable: .cloudcover_high, time: time).data
+            let low = try get(raw: .cloudcover_low, time: time).data
+            let mid = try get(raw: .cloudcover_mid, time: time).data
+            let high = try get(raw: .cloudcover_high, time: time).data
             return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percent)
         case .snowfall:
-            let snowwater = try get(variable: .snowfall_water_equivalent, time: time).data
+            let snowwater = try get(raw: .snowfall_water_equivalent, time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
             return DataAndUnit(snowfall, .centimeter)
         case .direct_normal_irradiance:
-            let dhi = try get(variable: .direct_radiation, time: time).data
+            let dhi = try get(raw: .direct_radiation, time: time).data
             let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, timerange: time)
             return DataAndUnit(dni, .wattPerSquareMeter)
         case .rain:
-            let snowwater = try get(variable: .snowfall_water_equivalent, time: time)
-            let precip = try get(variable: .precipitation, time: time)
+            let snowwater = try get(raw: .snowfall_water_equivalent, time: time)
+            let precip = try get(raw: .precipitation, time: time)
             let rain = zip(precip.data, snowwater.data).map({
                 return max($0.0-$0.1, 0)
             })
