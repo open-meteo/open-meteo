@@ -31,6 +31,11 @@ public struct IsoDate: Codable {
         Timestamp(year, month, day)
     }
     
+    /// Convert to strideable `YearMonth`
+    public func toYearMonth() -> YearMonth {
+        return YearMonth(year: year, month: month)
+    }
+    
     public init(from decoder: Decoder) throws {
         let str = try decoder.singleValueContainer().decode(String.self)
         try self.init(fromIsoString: str)

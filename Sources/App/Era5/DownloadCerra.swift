@@ -642,13 +642,12 @@ struct DownloadCerraCommand: Command {
             try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", level_type: nil, year: year, month: month, day: day, leadtime_hours: [1,2])
         }
         
-        if timeinterval.count > 62 {
+        let months = timeinterval.toYearMonth()
+        if months.count >= 6 {
             /// Download one month at once
-            let year = timeinterval.range.lowerBound.toComponents().year
-            let months = timeinterval.range.lowerBound.toComponents().month ... timeinterval.range.upperBound.toComponents().month-1
-            for month in months {
-                logger.info("Downloading year \(year) month \(month)")
-                try downloadAndConvertAll(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], height_level: nil, year: year, month: month, day: nil, leadtime_hours: [1,2])
+            for date in months {
+                logger.info("Downloading year \(date.year) month \(date.month)")
+                try downloadAndConvertAll(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], height_level: nil, year: date.year, month: date.month, day: nil, leadtime_hours: [1,2])
             }
         } else {
             for timestamp in timeinterval {

@@ -173,13 +173,13 @@ struct GloFasDownloader: AsyncCommandFix {
         
         let ny = domain.grid.ny
         let nx = domain.grid.nx
-        // 21k locations -> 30MB chunks for 1 year
-        let nLocationChunk = nx * ny / 1000
+        
+        let months = timeinterval.toYearMonth()
         
         /// download multiple months at once
-        if timeinterval.count > 61 {
-            let year = timeinterval.range.lowerBound.toComponents().year
-            let months = timeinterval.range.lowerBound.toComponents().month ... timeinterval.range.upperBound.toComponents().month-1
+        if months.count >= 2 {
+            let year = months.lowerBound.year
+            let months = months.lowerBound.month ... months.upperBound.advanced(by: -1).month
             let monthNames = ["", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
             let monthsJson = String(data: try JSONEncoder().encode(Array(monthNames[months])), encoding: .utf8)!
             

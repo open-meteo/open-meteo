@@ -124,7 +124,7 @@ extension Timestamp: Comparable {
 
 extension Timestamp: Strideable {
     public func distance(to other: Timestamp) -> Int {
-        return timeIntervalSince1970 - other.timeIntervalSince1970
+        return other.timeIntervalSince1970 - timeIntervalSince1970
     }
     
     public func advanced(by n: Int) -> Timestamp {
@@ -144,6 +144,11 @@ extension Range where Bound == Timestamp {
     /// Form a timerange with dt seconds
     @inlinable public func range(dtSeconds: Int) -> TimerangeDt {
         TimerangeDt(start: lowerBound, to: upperBound, dtSeconds: dtSeconds)
+    }
+    
+    /// Convert to a striable year month range
+    @inlinable public func toYearMonth() -> Range<YearMonth> {
+        lowerBound.toComponents().toYearMonth() ..< upperBound.toComponents().toYearMonth()
     }
 }
 
@@ -208,6 +213,11 @@ public struct TimerangeDt {
             return "\(range.lowerBound.iso8601_YYYY_MM_dd_HH_mm) to \(end.iso8601_YYYY_MM_dd_HH_mm) (3-hourly)"
         }
         return "\(range.lowerBound.iso8601_YYYY_MM_dd_HH_mm) to \(end.iso8601_YYYY_MM_dd_HH_mm) (dt=\(dtSeconds))"
+    }
+    
+    /// Convert to a striable year month range
+    @inlinable public func toYearMonth() -> Range<YearMonth> {
+        return range.toYearMonth()
     }
 }
 
