@@ -70,3 +70,28 @@ struct TransferAmountTrackerStream<T: AsyncSequence>: AsyncSequence where T.Elem
         AsyncIterator(tracker: tracker, iterator: sequence.makeAsyncIterator())
     }
 }
+
+extension Int {
+    /// Format number of bytes to a human readable format like `5.5 MB`
+    var bytesHumanReadable: String {
+        if self > 5 * 1024*1024*1024 {
+            return "\((Double(self)/1024/1024/1024).round(digits: 1)) GB"
+        }
+        if self > 1 * 1024*1024*1024 {
+            return "\((Double(self)/1024/1024/1024).round(digits: 2)) GB"
+        }
+        if self > 5 * 1024*1024 {
+            return "\((Double(self)/1024/1024).round(digits: 1)) MB"
+        }
+        if self > 1 * 1024*1024 {
+            return "\((Double(self)/1024/1024).round(digits: 2)) MB"
+        }
+        if self > 5 * 1024 {
+            return "\((Double(self)/1024).round(digits: 1)) KB"
+        }
+        if self > 1 * 1024 {
+            return "\((Double(self)/1024).round(digits: 2)) KB"
+        }
+        return "\(self) bytes"
+    }
+}
