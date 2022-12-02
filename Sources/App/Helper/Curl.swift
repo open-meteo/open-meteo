@@ -308,6 +308,49 @@ final class Curl {
         }
     }
     
+    /// Download all grib files and return an array of grib messages
+    func downloadGribAll(url: String, client: HTTPClient, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil) async throws -> [GribMessage] {
+        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
+        while true {
+            // Start the download and wait for the header
+            let response = try await withRetriedDownload(url: url, range: range, minSize: minSize, client: client)
+            
+            // Retry failed file transfers after this point
+            do {
+                return try await withThrowingTaskGroup(of: Void.self) { group in
+                    var messages = [GribMessage]()
+                    let contentLength = try response.contentLength()
+                    if let contentLength {
+                        self.totalBytesTransfered += contentLength
+                    }
+                    if bzip2Decode {
+                        for try await m in response.body.decompressBzip2().decodeGrib(logger: logger, totalSize: contentLength) {
+                            try Task.checkCancellation()
+                            m.forEach({messages.append($0)})
+                            chelper_malloc_trim()
+                        }
+                    } else {
+                        for try await m in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
+                            try Task.checkCancellation()
+                            m.forEach({messages.append($0)})
+                            chelper_malloc_trim()
+                        }
+                    }
+                    if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                        let delta = waitAfterLastModified - lastModified.distance(to: Date())
+                        if delta > 1 {
+                            //logger.info("sleeping for \(delta) seconds")
+                            try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                        }
+                    }
+                    return messages
+                }
+            } catch {
+                try await timeout.check(error: error)
+            }
+        }
+    }
+    
     /// Download index file and match against curl variable
     func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: String, variables: [Variable], client: HTTPClient) async throws -> (matches: [Variable], range: String, minSize: Int)? {
         
@@ -371,28 +414,13 @@ final class Curl {
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
-            
-            let data = try await downloadInMemoryAsync(url: url, range: inventory.range, client: client, minSize: inventory.minSize)
-            //let data = try await withRetriedDownloadUrlSession(url: url, range: range)
-            //logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
-            //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/multipart2.grib"))
             do {
-                try data.withUnsafeReadableBytes {
-                    let messages = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)
-                    
-                    // memory allocations in libeccodes can case severe memory fragementation
-                    // This leads to 20GB+ usage while decoding gfs025 with upper level variables
-                    // malloc_trim() reduces this effect significantly
-                    chelper_malloc_trim()
-                    
-                    if messages.count != inventory.matches.count {
-                        logger.error("Grib reader did not get all matched variables. Matches count \(inventory.matches.count). Grib count \(messages.count). Grib size \(data.readableBytes)")
-                        throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: inventory.matches.count)
-                    }
-                    try callback(inventory.matches, messages)
-                    chelper_malloc_trim()
+                let messages = try await downloadGribAll(url: url, client: client, bzip2Decode: false, range: inventory.range, minSize: inventory.minSize)
+                if messages.count != inventory.matches.count {
+                    logger.error("Grib reader did not get all matched variables. Matches count \(inventory.matches.count). Grib count \(messages.count)")
+                    throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: inventory.matches.count)
                 }
-                //display_mallinfo2()
+                try callback(inventory.matches, messages)
                 return
             } catch {
                 retries += 1
@@ -415,17 +443,11 @@ final class Curl {
         let ranges = inventory.range.split(separator: ",")
         var matchesPos = 0
         for range in ranges {
-            let data = try await downloadInMemoryAsync(url: url, range: String(range), client: client, minSize: nil)
-            try data.withUnsafeReadableBytes { ptr in
-                try SwiftEccodes.iterateMessages(memory: ptr, multiSupport: true) { message in
-                    chelper_malloc_trim()
-                    //try! $0.dumpCoordinates()
-                    //fatalError("OK")
-                    let variable = inventory.matches[matchesPos]
-                    matchesPos += 1
-                    try callback(variable, message)
-                }
-                chelper_malloc_trim()
+            let messages = try await downloadGribAll(url: url, client: client, bzip2Decode: false, range: String(range))
+            for message in messages {
+                let variable = inventory.matches[matchesPos]
+                matchesPos += 1
+                try callback(variable, message)
             }
         }
     }
@@ -629,7 +651,7 @@ extension Sequence where Element == Substring {
 extension HTTPClientResponse {
     /// Content length in bytes forom the http header
     func contentLength() throws -> Int? {
-        guard let length = headers["Content-Length"].first.flatMap(Int.init) else {
+        guard let length = headers["Content-Length"].first.flatMap(Int.init), length >= 0 else {
             return nil
         }
         if length > 128*(1<<30) {

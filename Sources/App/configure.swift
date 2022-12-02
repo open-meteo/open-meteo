@@ -26,7 +26,7 @@ extension Application {
             return existing
         }
         // try again with very high timeouts, so only the curl internal timers are used
-        var configuration = HTTPClient.Configuration(
+        let configuration = HTTPClient.Configuration(
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
             connectionPool: .init(idleTimeout: .minutes(10)))
         
