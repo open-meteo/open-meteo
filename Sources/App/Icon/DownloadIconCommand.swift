@@ -120,9 +120,9 @@ struct DownloadIconCommand: AsyncCommandFix {
             } else {
                 file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_HSURF.grib2.bz2"
             }
-            try await curl.downloadBz2Decompress(
+            try await curl.download(
                 url: file,
-                toFile: "\(downloadDirectory)time-invariant_HSURF.grib2",
+                toFile: "\(downloadDirectory)time-invariant_HSURF.grib2", bzip2Decode: true,
                 client: application.dedicatedHttpClient
             )
         
@@ -133,9 +133,9 @@ struct DownloadIconCommand: AsyncCommandFix {
             } else {
                 file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_FR_LAND.grib2.bz2"
             }
-            try await curl.downloadBz2Decompress(
+            try await curl.download(
                 url: file2,
-                toFile: "\(downloadDirectory)time-invariant_FR_LAND.grib2",
+                toFile: "\(downloadDirectory)time-invariant_FR_LAND.grib2", bzip2Decode: true,
                 client: application.dedicatedHttpClient
             )
         }
@@ -202,9 +202,9 @@ struct DownloadIconCommand: AsyncCommandFix {
                 if domain == .icon {
                     // regrid from icosahedral to regular lat-lon
                     let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2"
-                    try await curl.downloadBz2Decompress(
+                    try await curl.download(
                         url: url,
-                        toFile: gribFile,
+                        toFile: gribFile, bzip2Decode: true,
                         client: application.dedicatedHttpClient
                     )
                     // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory

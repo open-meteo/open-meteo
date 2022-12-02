@@ -61,7 +61,7 @@ struct CdoIconGlobal {
 
         if !fm.fileExists(atPath: localUncompressed) {
             let curl = Curl(logger: logger)
-            try await curl.downloadBz2Decompress(url: remoteFile, toFile: localUncompressed, client: client)
+            try await curl.download(url: remoteFile, toFile: localUncompressed, bzip2Decode: true, client: client)
         }
 
         logger.info("Generating weights file \(weightsFile)")

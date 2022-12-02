@@ -237,7 +237,7 @@ struct SyncCommand: AsyncCommandFix {
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                 // TODO sha256 hash integration check
                 
-                try await curl.download(url: client.url.string, toFile: localFileTemp, client: context.application.dedicatedHttpClient)
+                try await curl.download(url: client.url.string, toFile: localFileTemp, bzip2Decode: false, client: context.application.dedicatedHttpClient)
                 try FileManager.default.moveFileOverwrite(from: localFileTemp, to: localFile)
             }
             

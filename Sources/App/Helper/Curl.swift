@@ -196,42 +196,9 @@ final class Curl {
         }
     }
     
-    /// Use http-async http client to download, decompress BZIP2 and store to file. If the file already exists, it will be deleted before
-    func downloadBz2Decompress(url: String, toFile: String, client: HTTPClient) async throws {
-        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            processVoid = Task {
-                let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
-                if let contentLength {
-                    self.totalBytesTransfered += contentLength
-                }
-                try FileManager.default.removeItemIfExists(at: toFile)
-                let lastModified = response.headers.lastModified?.value
-                try await response.body.decompressBzip2().saveTo(logger: self.logger, file: toFile, size: nil, modificationDate: lastModified)
-            }
-            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
-                self?.logger.error("Timeout reached, canceling download processing")
-                self?.processVoid?.cancel()
-            }
-            defer {
-                readTimeout.cancel()
-                processVoid = nil
-            }
-            try await processVoid!.value
-            processVoid = nil
-            readTimeout.cancel()
-            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                if delta > 1 {
-                    //logger.info("sleeping for \(delta) seconds")
-                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
-                }
-            }
-        }
-    }
-    
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     ///
-    func download(url: String, toFile: String, client: HTTPClient) async throws {
+    func download(url: String, toFile: String, bzip2Decode: Bool, client: HTTPClient) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             processVoid = Task {
                 let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
@@ -240,7 +207,11 @@ final class Curl {
                 }
                 let lastModified = response.headers.lastModified?.value
                 try FileManager.default.removeItemIfExists(at: toFile)
-                try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
+                if bzip2Decode {
+                    try await response.body.decompressBzip2().saveTo(logger: self.logger, file: toFile, size: nil, modificationDate: lastModified)
+                } else {
+                    try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
+                }
             }
             let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
                 self?.logger.error("Timeout reached, canceling download processing")
@@ -260,47 +231,6 @@ final class Curl {
                     try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
                 }
             }
-        }
-    }
-    
-    /// Use http-async http client to download and decompress as bzip2
-    func downloadBz2Decompress(url: String, client: HTTPClient) async throws -> ByteBuffer {
-        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            processByteBuffer = Task {
-                if !self.buffer.uniquelyOwned() {
-                    //fatalError("Download buffer is not uniquely owned!")
-                    logger.warning("Download buffer is not uniquely owned in downloadBz2Decompress!")
-                }
-                self.buffer.moveReaderIndex(to: 0)
-                self.buffer.moveWriterIndex(to: 0)
-                if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
-                    self.totalBytesTransfered += contentLength
-                }
-                for try await fragement in response.body.decompressBzip2() {
-                    try Task.checkCancellation()
-                    self.buffer.writeImmutableBuffer(fragement)
-                }
-                return self.buffer
-            }
-            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
-                self?.logger.error("Timeout reached, canceling download processing")
-                self?.processByteBuffer?.cancel()
-            }
-            defer {
-                readTimeout.cancel()
-                processByteBuffer = nil
-            }
-            let buffer = try await processByteBuffer!.value
-            processByteBuffer = nil
-            readTimeout.cancel()
-            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                if delta > 1 {
-                    //logger.info("sleeping for \(delta) seconds")
-                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
-                }
-            }
-            return buffer
         }
     }
     
@@ -361,11 +291,13 @@ final class Curl {
                     for try await message in response.body.decompressBzip2().decodeGrib(logger: logger, totalSize: contentLength) {
                         try Task.checkCancellation()
                         try message.forEach(callback)
+                        chelper_malloc_trim()
                     }
                 } else {
                     for try await message in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
                         try Task.checkCancellation()
                         try message.forEach(callback)
+                        chelper_malloc_trim()
                     }
                 }
             }
