@@ -529,4 +529,8 @@ enum GloFasVariable: String, Codable, GenericVariable {
     var isElevationCorrectable: Bool {
         return false
     }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
 }

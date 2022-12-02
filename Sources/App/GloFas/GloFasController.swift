@@ -4,12 +4,69 @@ import Vapor
 typealias GloFasVariableMember = VariableAndMemberAndControl<GloFasVariable>
 
 struct GloFasMixer: GenericReaderMixer {
-    var reader: [GenericReader<GloFasDomain, GloFasVariableMember>]
+    var reader: [GloFasReader]
 }
 
-extension GloFasVariable: GenericVariableMixable {
+enum GlofasDerivedVariable: String, Codable, CaseIterable, GenericVariableMixable {
+    case river_discharge_mean
+    case river_discharge_min
+    case river_discharge_max
+    case river_discharge_median
+    case river_discharge_p25
+    case river_discharge_p75
+    
     var requiresOffsetCorrectionForMixing: Bool {
         return false
+    }
+}
+
+typealias GloFasVariableOrDerived = VariableOrDerived<GloFasVariable, GlofasDerivedVariable>
+
+struct GloFasReader: GenericReaderDerivedSimple, GenericReaderMixable {
+    var reader: GenericReaderCached<GloFasDomain, GloFasVariableMember>
+    
+    typealias Domain = GloFasDomain
+    
+    typealias Variable = GloFasVariableMember
+    
+    typealias Derived = GlofasDerivedVariable
+    
+    func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDt) throws {
+        for member in 0..<51 {
+            try reader.prefetchData(variable: .init(.river_discharge, member), time: time)
+        }
+    }
+    
+    func get(derived: GlofasDerivedVariable, time: TimerangeDt) throws -> DataAndUnit {
+        let data = try (0..<51).map({
+            try reader.get(variable: .init(.river_discharge, $0), time: time).data
+        })
+        switch derived {
+        case .river_discharge_mean:
+            return DataAndUnit((0..<time.count).map { t in
+                data.reduce(0, {$0 + $1[t]}) / Float(data.count)
+            }, .qubicMeterPerSecond)
+        case .river_discharge_min:
+            return DataAndUnit((0..<time.count).map { t in
+                data.reduce(Float.nan, { $0.isNaN || $1[t] < $0 ? $1[t] : $0 })
+            }, .qubicMeterPerSecond)
+        case .river_discharge_max:
+            return DataAndUnit((0..<time.count).map { t in
+                data.reduce(Float.nan, { $0.isNaN || $1[t] > $0 ? $1[t] : $0 })
+            }, .qubicMeterPerSecond)
+        case .river_discharge_median:
+            return DataAndUnit((0..<time.count).map { t in
+                data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.5), (Float(data.count)*0.5).truncatingRemainder(dividingBy: 1) )
+            }, .qubicMeterPerSecond)
+        case .river_discharge_p25:
+            return DataAndUnit((0..<time.count).map { t in
+                data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.25), (Float(data.count)*0.25).truncatingRemainder(dividingBy: 1) )
+            }, .qubicMeterPerSecond)
+        case .river_discharge_p75:
+            return DataAndUnit((0..<time.count).map { t in
+                data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.75), (Float(data.count)*0.75).truncatingRemainder(dividingBy: 1) )
+            }, .qubicMeterPerSecond)
+        }
     }
 }
 
@@ -47,8 +104,17 @@ struct GloFasController {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
-            let nMember = params.ensemble ? 51 : 1
-            let variables: [GloFasVariableMember] = (0..<nMember).map({.init(.river_discharge, $0)})
+            /// convert variables
+            let variablesMember: [VariableOrDerived<GloFasReader.Variable, GloFasReader.Derived>] = params.daily.map {
+                switch $0 {
+                case .raw(let raw):
+                    return .raw(.init(raw, 0))
+                case .derived(let derived):
+                    return .derived(derived)
+                }
+            }
+            /// Variables wih 51 members if requested
+            let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
             
             
             // Start data prefetch to boooooooost API speed :D
@@ -110,7 +176,7 @@ enum GlofasDomainApi: String, Codable, CaseIterable {
 struct GloFasQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let daily: [GloFasVariable]
+    let daily: [GloFasVariableOrDerived]
     let timeformat: Timeformat?
     let past_days: Int?
     let forecast_days: Int?

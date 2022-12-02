@@ -46,7 +46,7 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
 
 /// Combine weather variable and member to be used in `GenericReader`
 /// For control (member=0) do not add a member number
-struct VariableAndMemberAndControl<Variable: GenericVariable>: GenericVariable {
+struct VariableAndMemberAndControl<Variable: GenericVariable & Hashable>: GenericVariable, Hashable {
     let variable: Variable
     let member: Int
     

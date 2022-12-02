@@ -81,7 +81,49 @@
           <input class="form-check-input" type="checkbox" value="river_discharge" id="river_discharge" name="daily"
             checked>
           <label class="form-check-label" for="river_discharge">
-            River discharge
+            River discharge Control
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="river_discharge_mean" id="river_discharge_mean" name="daily"
+            checked>
+          <label class="form-check-label" for="river_discharge_mean">
+            River discharge Mean
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="river_discharge_median" id="river_discharge_median" name="daily"
+            checked>
+          <label class="form-check-label" for="river_discharge_median">
+            River discharge Median
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="river_discharge_max" id="river_discharge_max" name="daily"
+            checked>
+          <label class="form-check-label" for="river_discharge_max">
+            River discharge Maximum
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="river_discharge_min" id="river_discharge_min" name="daily"
+            checked>
+          <label class="form-check-label" for="river_discharge_min">
+            River discharge Minimum
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="river_discharge_p25" id="river_discharge_p25" name="daily"
+            checked>
+          <label class="form-check-label" for="river_discharge_p25">
+            River discharge 25th Percentile
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="river_discharge_p75" id="river_discharge_p75" name="daily"
+            checked>
+          <label class="form-check-label" for="river_discharge_p75">
+            River discharge 75th Percentile
           </label>
         </div>
       </div>
