@@ -2,7 +2,6 @@ import Foundation
 import Vapor
 import SwiftEccodes
 import AsyncHTTPClient
-import SwiftPFor2D
 import CHelper
 
 
@@ -18,31 +17,7 @@ enum CurlError: Error {
     case contentLengthHeaderTooLarge(got: Int)
 }
 
-/// Helper to track timeouts and throw errors once a headline in reached
-struct TimeoutHelper {
-    let startTime = Date()
-    var lastPrint = Date(timeIntervalSince1970: 0)
-    let logger: Logger
-    let deadline: Date
-    
-    /// Wait time after each download
-    let retryDelaySeconds = 5
-    
-    /// Print statistics, throw if deadline reached, sleep backoff timer
-    mutating func check(error: Error) async throws {
-        let timeElapsed = Date().timeIntervalSince(startTime)
-        if Date().timeIntervalSince(lastPrint) > 60 {
-            logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
-            lastPrint = Date()
-        }
-        if Date() > deadline {
-            logger.error("Deadline reached. Last Error \(error)")
-            throw CurlError.timeoutReached
-        }
-        try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
-    }
-}
-
+/// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
 final class Curl {
     let logger: Logger
     
@@ -73,10 +48,6 @@ final class Curl {
         self.readTimeout = readTimeout
         self.waitAfterLastModified = waitAfterLastModified
         self.client = client
-        
-        /// Access this mutable static variable, to workaround a concurrency issue
-        _ = HTTPClientError.deadlineExceeded
-        //logger.info("Curl initialised. Accessed mutable static var \(error)")
     }
     
     /// Set new deadline
@@ -114,7 +85,7 @@ final class Curl {
             return request
         }()
         
-        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
+        let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         
         while true {
             do {
@@ -139,7 +110,7 @@ final class Curl {
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     ///
     func download(url: String, toFile: String, bzip2Decode: Bool) async throws {
-        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
+        let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
             let response = try await initiateDownload(url: url, range: nil, minSize: nil)
@@ -148,13 +119,15 @@ final class Curl {
             do {
                 let lastModified = response.headers.lastModified?.value
                 try FileManager.default.removeItemIfExists(at: toFile)
+                let contentLength = try response.contentLength()
+                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
-                    self.totalBytesTransfered += try await response.body.decompressBzip2().saveTo(logger: self.logger, file: toFile, size: nil, modificationDate: lastModified)
+                    try await response.body.tracker(tracker).decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified)
                 } else {
-                    let contentLength = try response.contentLength()
-                    self.totalBytesTransfered += try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
+                    try await response.body.tracker(tracker).saveTo(file: toFile, size: contentLength, modificationDate: lastModified)
                 }
-                try await response.waitAfterLastModified(wait: waitAfterLastModified)
+                self.totalBytesTransfered += tracker.transfered
+                try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return
             } catch {
                 try await timeout.check(error: error)
@@ -165,7 +138,7 @@ final class Curl {
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
     func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?) async throws -> ByteBuffer {
-        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
+        let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
             let response = try await initiateDownload(url: url, range: range, minSize: minSize)
@@ -184,7 +157,7 @@ final class Curl {
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
-                try await response.waitAfterLastModified(wait: waitAfterLastModified)
+                try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return buffer
             } catch {
                 try await timeout.check(error: error)
@@ -194,7 +167,7 @@ final class Curl {
     
     /// Download all grib files and return an array of grib messages
     func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil) async throws -> [GribMessage] {
-        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
+        let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
             let response = try await initiateDownload(url: url, range: range, minSize: minSize)
@@ -203,28 +176,26 @@ final class Curl {
             do {
                 return try await withThrowingTaskGroup(of: Void.self) { group in
                     var messages = [GribMessage]()
-                    var size = 0
                     let contentLength = try response.contentLength()
+                    let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                     if bzip2Decode {
-                        for try await m in response.body.decompressBzip2().decodeGrib(logger: logger, totalSize: contentLength) {
+                        for try await m in response.body.tracker(tracker).decompressBzip2().decodeGrib() {
                             try Task.checkCancellation()
-                            size += m.size
-                            m.messages.forEach({messages.append($0)})
+                            m.forEach({messages.append($0)})
                             chelper_malloc_trim()
                         }
                     } else {
-                        for try await m in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
+                        for try await m in response.body.tracker(tracker).decodeGrib() {
                             try Task.checkCancellation()
-                            size += m.size
-                            m.messages.forEach({messages.append($0)})
+                            m.forEach({messages.append($0)})
                             chelper_malloc_trim()
                         }
                     }
-                    self.totalBytesTransfered += size
-                    if let minSize = minSize, size < minSize {
+                    self.totalBytesTransfered += tracker.transfered
+                    if let minSize = minSize, tracker.transfered < minSize {
                         throw CurlError.sizeTooSmall
                     }
-                    try await response.waitAfterLastModified(wait: waitAfterLastModified)
+                    try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                     return messages
                 }
             } catch {
@@ -409,34 +380,19 @@ extension AsyncSequence where Element == ByteBuffer {
     /// Store incoming data to file. Buffers up to 150kb until flushed to disk.
     /// NOTE: File IO is blocking e.g. synchronous
     /// Returns total amount of bytes transfered
-    func saveTo(logger: Logger, file: String, size: Int?, modificationDate: Date?) async throws -> Int {
+    func saveTo(file: String, size: Int?, modificationDate: Date?) async throws {
         let fn = try FileHandle.createNewFile(file: file, size: size)
-        var transfered = 0
-        var transferedLastPrint = 0
-        let printDelta: Double = 10
-        let startTime = Date()
-        var lastPrint = Date()
         
-        /// Buffer up to 150kb and then write larger chunks
+        /// Buffer up to 64kb and then write larger chunks
         var buffer = ByteBuffer()
-        buffer.reserveCapacity(150*1024)
+        buffer.reserveCapacity(80*1024)
         for try await fragment in self {
             try Task.checkCancellation()
-            transfered += fragment.readableBytes
             buffer.writeImmutableBuffer(fragment)
-            if buffer.readableBytes > 128*1024 {
+            if buffer.readableBytes > 64*1024 {
                 try fn.write(contentsOf: buffer.readableBytesView)
                 buffer.moveReaderIndex(to: 0)
                 buffer.moveWriterIndex(to: 0)
-            }
-            
-            let deltaT = Date().timeIntervalSince(lastPrint)
-            if deltaT > printDelta {
-                let timeElapsed = Date().timeIntervalSince(startTime)
-                let rate = (transfered - transferedLastPrint) / Int(deltaT)
-                logger.info("Transferred \(transfered.bytesHumanReadable) / \(size?.bytesHumanReadable ?? "-") in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2)), \(rate.bytesHumanReadable)/s")
-                lastPrint = Date()
-                transferedLastPrint = transfered
             }
         }
         // write remaining data
@@ -449,7 +405,7 @@ extension AsyncSequence where Element == ByteBuffer {
                 throw CurlError.futimes(error: String(cString: strerror(errno)))
             }
         }
-        return transfered
+        return
     }
 }
 
@@ -529,15 +485,17 @@ extension HTTPClientResponse {
     }
     
     /// Optionally wait to stay delayed a fixed time amount after last modified header
-    func waitAfterLastModified(wait: TimeInterval?) async throws {
+    fileprivate func waitAfterLastModified(logger: Logger, wait: TimeInterval?) async throws {
         guard let wait, let lastModified = headers.lastModified?.value else {
             return
             
         }
         let delta = wait - lastModified.distance(to: Date())
         if delta > 1 {
-            //logger.info("sleeping for \(delta) seconds")
-            try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+            if delta > 10 {
+                logger.info("Last modified header is too jung. Target delay \(wait) seconds. Sleeping for \(delta.rounded()) seconds now.")
+            }
+            try await Task.sleep(nanoseconds:  UInt64(delta * 1_000_000_000))
         }
     }
 }

@@ -131,13 +131,14 @@ struct GloFasDownloader: AsyncCommandFix {
         // Read all GRIB messages and directly update OM file database
         // Database update is done in a second thread
         logger.info("Reading grib file")
-        var timeout = TimeoutHelper(logger: logger, deadline: curl.deadline)
+        let timeout = TimeoutTracker(logger: logger, deadline: curl.deadline)
         while true {
             let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil)
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
-                    for try await messages in response.body.decodeGrib(logger: logger, totalSize: try response.contentLength()) {
-                        for message in messages.messages {
+                    let tracker = TransferAmountTracker(logger: logger, totalSize: try response.contentLength())
+                    for try await messages in response.body.tracker(tracker).decodeGrib() {
+                        for message in messages {
                             let date = message.get(attribute: "validityDate")!
                             /// 0 = control
                             let member = Int(message.get(attribute: "number")!)!

@@ -7,8 +7,8 @@ import Logging
 
 extension AsyncSequence where Element == ByteBuffer {
     /// Decode incoming data to GRIB messges
-    func decodeGrib(logger: Logger, totalSize: Int?) -> GribAsyncStream<Self> {
-        return GribAsyncStream(sequence: self, logger: logger, totalSize: totalSize)
+    func decodeGrib() -> GribAsyncStream<Self> {
+        return GribAsyncStream(sequence: self)
     }
 }
 
@@ -57,45 +57,20 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
     public typealias Element = AsyncIterator.Element
     
     let sequence: T
-    let logger: Logger
-    let totalSize: Int?
 
     public final class AsyncIterator: AsyncIteratorProtocol {
         private var iterator: T.AsyncIterator
         
         /// Collect enough bytes to decompress a single message
         private var buffer: ByteBuffer
-        
-        var transfered = 0
-        var transferedLastPrint = 0
-        let printDelta: Double = 20
-        let startTime = Date()
-        var lastPrint = Date()
-        
-        let totalSize: Int?
-        let logger: Logger
 
-        fileprivate init(iterator: T.AsyncIterator, logger: Logger, totalSize: Int?) {
+        fileprivate init(iterator: T.AsyncIterator) {
             self.iterator = iterator
             self.buffer = ByteBuffer()
             buffer.reserveCapacity(minimumWritableBytes: 4096)
-            self.logger = logger
-            self.totalSize = totalSize
-        }
-        
-        /// Print status from time to time
-        private func printStatus() {
-            let deltaT = Date().timeIntervalSince(lastPrint)
-            if deltaT > printDelta {
-                let timeElapsed = Date().timeIntervalSince(startTime)
-                let rate = (transfered - transferedLastPrint) / Int(deltaT)
-                logger.info("Transferred \(transfered.bytesHumanReadable) / \(totalSize?.bytesHumanReadable ?? "-") in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2)), \(rate.bytesHumanReadable)/s")
-                lastPrint = Date()
-                transferedLastPrint = transfered
-            }
         }
 
-        public func next() async throws -> (messages: [GribMessage], size: Int)? {
+        public func next() async throws -> [GribMessage]? {
             while true {
                 // repeat until GRIB header is found
                 guard let seek = buffer.withUnsafeReadableBytes(seekGrib) else {
@@ -105,9 +80,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                     guard buffer.readableBytes < 4096 else {
                         fatalError("Did not find GRIB header")
                     }
-                    transfered += input.readableBytes
                     buffer.writeImmutableBuffer(input)
-                    printStatus()
                     continue
                 }
                 
@@ -116,9 +89,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                     guard let input = try await self.iterator.next() else {
                         return nil
                     }
-                    transfered += input.readableBytes
                     buffer.writeImmutableBuffer(input)
-                    printStatus()
                 }
                 
                 let messages = try buffer.readWithUnsafeReadableBytes({
@@ -127,12 +98,12 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                     return (seek.offset+seek.length, messages)
                 })
                 buffer.discardReadBytes()
-                return (messages, seek.offset+seek.length)
+                return messages
             }
         }
     }
 
     public func makeAsyncIterator() -> AsyncIterator {
-        AsyncIterator(iterator: sequence.makeAsyncIterator(), logger: logger, totalSize: totalSize)
+        AsyncIterator(iterator: sequence.makeAsyncIterator())
     }
 }
