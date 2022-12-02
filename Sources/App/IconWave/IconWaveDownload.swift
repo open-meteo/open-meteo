@@ -67,7 +67,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
-        let curl = Curl(logger: logger)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
@@ -88,9 +88,8 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                     continue
                 }
                 
-                try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient, bzip2Decode: true) { message in
-                    try grib2d.load(message: message)
-                }
+                let message = try await curl.downloadGrib(url: url, bzip2Decode: true)[0]
+                try grib2d.load(message: message)
                 if domain == .gwam {
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                 } else {

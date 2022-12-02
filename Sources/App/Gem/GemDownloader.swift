@@ -107,19 +107,19 @@ struct GemDownload: AsyncCommandFix {
         
         var height: Array2D? = nil
         var landmask: Array2D? = nil
-        let curl = Curl(logger: logger, deadLineHours: 4)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         let terrainUrl = "\(server)000/CMC_\(domain.gribFileDomainName)_HGT_SFC_0_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
-        try await curl.downloadGrib(url: terrainUrl, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
+        for message in try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false) {
             try grib2d.load(message: message)
             height = grib2d.array
             //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         }
         
         let landmaskUrl = "\(server)000/CMC_\(domain.gribFileDomainName)_LAND_SFC_0_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
-        try await curl.downloadGrib(url: landmaskUrl, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
+        for message in try await curl.downloadGrib(url: landmaskUrl, bzip2Decode: false) {
             try grib2d.load(message: message)
             landmask = grib2d.array
             //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
@@ -139,7 +139,7 @@ struct GemDownload: AsyncCommandFix {
     /// Download data and store as compressed files for each timestep
     func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
-        let curl = Curl(logger: logger, deadLineHours: 3)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 3)
         let downloadDirectory = domain.downloadDirectory
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
@@ -171,7 +171,7 @@ struct GemDownload: AsyncCommandFix {
                 let hhhmm = domain == .gem_hrdps_continental ? "\(h3)-00" : "\(h3)"
                 let gribName = variable.gribName(domain: domain)
                 let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
-                try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
+                for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                     //try message.debugGrid(grid: domain.grid)
                     //fatalError()
                     try grib2d.load(message: message)

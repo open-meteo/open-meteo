@@ -77,7 +77,7 @@ struct JmaDownload: AsyncCommandFix {
     /// MSM or GSM domain
     func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws {
         let logger = application.logger
-        let curl = Curl(logger: logger, deadLineHours: 3)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 3)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
         
@@ -104,10 +104,10 @@ struct JmaDownload: AsyncCommandFix {
         }
         
         for filename in filesToDownload {
-            try await curl.downloadGrib(url: "\(server)\(filename)", client: application.dedicatedHttpClient, bzip2Decode: false) { message in
+            for message in try await curl.downloadGrib(url: "\(server)\(filename)", bzip2Decode: false) {
                 guard let variable = message.toJmaVariable(),
                       let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
-                    return
+                    continue
                 }
                 try grib2d.load(message: message)
                 if domain.isGlobal {

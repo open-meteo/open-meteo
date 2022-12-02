@@ -110,7 +110,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-        let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .iconD2 ? 2 : 5)
         // surface elevation
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
         if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
@@ -122,8 +122,8 @@ struct DownloadIconCommand: AsyncCommandFix {
             }
             try await curl.download(
                 url: file,
-                toFile: "\(downloadDirectory)time-invariant_HSURF.grib2", bzip2Decode: true,
-                client: application.dedicatedHttpClient
+                toFile: "\(downloadDirectory)time-invariant_HSURF.grib2",
+                bzip2Decode: true
             )
         
             // land fraction
@@ -135,8 +135,8 @@ struct DownloadIconCommand: AsyncCommandFix {
             }
             try await curl.download(
                 url: file2,
-                toFile: "\(downloadDirectory)time-invariant_FR_LAND.grib2", bzip2Decode: true,
-                client: application.dedicatedHttpClient
+                toFile: "\(downloadDirectory)time-invariant_FR_LAND.grib2",
+                bzip2Decode: true
             )
         }
         
@@ -170,7 +170,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-        let curl = Curl(logger: logger, deadLineHours: domain == .iconD2 ? 2 : 5, waitAfterLastModified: 120)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .iconD2 ? 2 : 5, waitAfterLastModified: 120)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
         
@@ -204,8 +204,8 @@ struct DownloadIconCommand: AsyncCommandFix {
                     let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2"
                     try await curl.download(
                         url: url,
-                        toFile: gribFile, bzip2Decode: true,
-                        client: application.dedicatedHttpClient
+                        toFile: gribFile,
+                        bzip2Decode: true
                     )
                     // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
                     // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
@@ -213,9 +213,8 @@ struct DownloadIconCommand: AsyncCommandFix {
                     try FileManager.default.removeItem(atPath: gribFile)
                 } else {
                     // Use async in-memory download and decoding -> 4 times faster, but cannot regrid icosahedral data
-                    try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient, bzip2Decode: true) { message in
-                        try grib2d.load(message: message)
-                    }
+                    let message = try await curl.downloadGrib(url: url, bzip2Decode: true)[0]
+                    try grib2d.load(message: message)
                     data = grib2d.array.data
                 }
                 

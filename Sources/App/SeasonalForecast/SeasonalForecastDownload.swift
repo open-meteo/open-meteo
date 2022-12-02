@@ -87,7 +87,7 @@ struct SeasonalForecastDownload: AsyncCommandFix {
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
-        let curl = Curl(logger: logger)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         
         let gribVariables = ["tmp2m", "tmin", "soilt1", "dswsfc", "cprat", "q2m", "wnd10m", "tcdcclm", "prate", "soilm3", "pressfc", "soilm2", "soilm1", "soilm4", "tmax"]
         
@@ -102,7 +102,7 @@ struct SeasonalForecastDownload: AsyncCommandFix {
                     continue
                 }
                 
-                try await curl.download(url: url, toFile: fileDest, bzip2Decode: false, client: application.dedicatedHttpClient)
+                try await curl.download(url: url, toFile: fileDest, bzip2Decode: false)
             }
         }
         curl.printStatistics()

@@ -64,19 +64,15 @@ final class Curl {
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
     
-    /// Download buffer which is reused during downloads
-    private var buffer: ByteBuffer
+    let client: HTTPClient
 
-    public init(logger: Logger, deadLineHours: Int = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Int = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
         self.readTimeout = readTimeout
         self.waitAfterLastModified = waitAfterLastModified
-
-        buffer = ByteBuffer()
-        // Reserve 1MB buffer
-        buffer.reserveCapacity(1024*1024)
+        self.client = client
         
         /// Access this mutable static variable, to workaround a concurrency issue
         _ = HTTPClientError.deadlineExceeded
@@ -92,52 +88,8 @@ final class Curl {
         logger.info("Finished downloading \(totalBytesTransfered.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
     }
     
-    /*func download(url: String, to: String, range: String? = nil) throws {
-        // URL might contain password, strip them from logging
-        if url.contains("@") && url.contains(":") {
-            let urlSafe = url.split(separator: "/")[0] + "//" + url.split(separator: "@")[1]
-            logger.info("Downloading file \(urlSafe)")
-        } else {
-            logger.info("Downloading file \(url)")
-        }
-        
-        let startTime = Date()
-        let args = (range.map{["-r",$0]} ?? []) + [
-            "-s",
-            "--show-error",
-            "--fail", // also retry 404
-            "--insecure", // ignore expired or invalid SSL certs
-            "--retry-connrefused",
-            "--limit-rate", "10M", // Limit to 10 MB/s -> 80 Mbps
-            "--connect-timeout", "\(connectTimeout)",
-            "--max-time", "\(maxTimeSeconds)",
-            "-o", to,
-            url
-        ]
-        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
-        while true {
-            do {
-                try Process.spawn(cmd: "curl", args: args)
-                return
-            } catch {
-                let timeElapsed = Date().timeIntervalSince(startTime)
-                if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
-                    lastPrint = Date()
-                }
-                if Date() > deadline {
-                    logger.error("Deadline reached")
-                    throw error
-                }
-                sleep(UInt32(retryDelaySeconds))
-            }
-        }
-    }*/
-    
-
-    
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-    func withRetriedDownload(url _url: String, range: String?, minSize: Int?, client: HTTPClient) async throws -> HTTPClientResponse {
+    func initiateDownload(url _url: String, range: String?, minSize: Int?) async throws -> HTTPClientResponse {
         // URL might contain password, strip them from logging
         let url: String
         let auth: String?
@@ -186,11 +138,11 @@ final class Curl {
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     ///
-    func download(url: String, toFile: String, bzip2Decode: Bool, client: HTTPClient) async throws {
+    func download(url: String, toFile: String, bzip2Decode: Bool) async throws {
         var timeout = TimeoutHelper(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await withRetriedDownload(url: url, range: nil, minSize: nil, client: client)
+            let response = try await initiateDownload(url: url, range: nil, minSize: nil)
             
             // Retry failed file transfers after this point
             do {
@@ -202,13 +154,7 @@ final class Curl {
                     let contentLength = try response.contentLength()
                     self.totalBytesTransfered += try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
                 }
-                if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                    let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                    if delta > 1 {
-                        //logger.info("sleeping for \(delta) seconds")
-                        try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
-                    }
-                }
+                try await response.waitAfterLastModified(wait: waitAfterLastModified)
                 return
             } catch {
                 try await timeout.check(error: error)
@@ -218,90 +164,28 @@ final class Curl {
     
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
-    func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient, minSize: Int?) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?) async throws -> ByteBuffer {
         var timeout = TimeoutHelper(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await withRetriedDownload(url: url, range: range, minSize: minSize, client: client)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize)
             
             // Retry failed file transfers after this point
             do {
-                if !self.buffer.uniquelyOwned() {
-                    fatalError("Download buffer is not uniquely owned!")
-                }
-                self.buffer.moveReaderIndex(to: 0)
-                self.buffer.moveWriterIndex(to: 0)
-                
+                var buffer = ByteBuffer()
                 if let contentLength = try response.contentLength() {
-                    self.buffer.reserveCapacity(contentLength)
+                    buffer.reserveCapacity(contentLength)
                 }
                 for try await fragement in response.body {
                     try Task.checkCancellation()
                     self.totalBytesTransfered += fragement.readableBytes
-                    self.buffer.writeImmutableBuffer(fragement)
+                    buffer.writeImmutableBuffer(fragement)
                 }
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
-                if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                    let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                    if delta > 1 {
-                        //logger.info("sleeping for \(delta) seconds")
-                        try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
-                    }
-                }
-                return self.buffer
-            } catch {
-                try await timeout.check(error: error)
-            }
-        }
-    }
-    
-    /// Download a grib file and decode individual mesages directly while downloading. In case a download needs to be restarted, the close is called multiple times
-    /// Execution of closures is done on a second thread not to block the download
-    func downloadGrib(url: String, client: HTTPClient, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, callback: @escaping (GribMessage) throws -> ()) async throws {
-        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
-        while true {
-            // Start the download and wait for the header
-            let response = try await withRetriedDownload(url: url, range: range, minSize: minSize, client: client)
-            
-            // Retry failed file transfers after this point
-            do {
-                try await withThrowingTaskGroup(of: Void.self) { group in
-                    let contentLength = try response.contentLength()
-                    if let contentLength {
-                        self.totalBytesTransfered += contentLength
-                    }
-                    if bzip2Decode {
-                        for try await messages in response.body.decompressBzip2().decodeGrib(logger: logger, totalSize: contentLength) {
-                            try Task.checkCancellation()
-                            for message in messages {
-                                group.addTask {
-                                    try callback(message)
-                                }
-                            }
-                            chelper_malloc_trim()
-                        }
-                    } else {
-                        for try await messages in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
-                            try Task.checkCancellation()
-                            for message in messages {
-                                group.addTask {
-                                    try callback(message)
-                                }
-                            }
-                            chelper_malloc_trim()
-                        }
-                    }
-                    if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                        let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                        if delta > 1 {
-                            //logger.info("sleeping for \(delta) seconds")
-                            try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
-                        }
-                    }
-                }
-                return
+                try await response.waitAfterLastModified(wait: waitAfterLastModified)
+                return buffer
             } catch {
                 try await timeout.check(error: error)
             }
@@ -309,40 +193,38 @@ final class Curl {
     }
     
     /// Download all grib files and return an array of grib messages
-    func downloadGribAll(url: String, client: HTTPClient, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil) async throws -> [GribMessage] {
+    func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil) async throws -> [GribMessage] {
         var timeout = TimeoutHelper(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await withRetriedDownload(url: url, range: range, minSize: minSize, client: client)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize)
             
             // Retry failed file transfers after this point
             do {
                 return try await withThrowingTaskGroup(of: Void.self) { group in
                     var messages = [GribMessage]()
+                    var size = 0
                     let contentLength = try response.contentLength()
-                    if let contentLength {
-                        self.totalBytesTransfered += contentLength
-                    }
                     if bzip2Decode {
                         for try await m in response.body.decompressBzip2().decodeGrib(logger: logger, totalSize: contentLength) {
                             try Task.checkCancellation()
-                            m.forEach({messages.append($0)})
+                            size += m.size
+                            m.messages.forEach({messages.append($0)})
                             chelper_malloc_trim()
                         }
                     } else {
                         for try await m in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
                             try Task.checkCancellation()
-                            m.forEach({messages.append($0)})
+                            size += m.size
+                            m.messages.forEach({messages.append($0)})
                             chelper_malloc_trim()
                         }
                     }
-                    if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                        let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                        if delta > 1 {
-                            //logger.info("sleeping for \(delta) seconds")
-                            try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
-                        }
+                    self.totalBytesTransfered += size
+                    if let minSize = minSize, size < minSize {
+                        throw CurlError.sizeTooSmall
                     }
+                    try await response.waitAfterLastModified(wait: waitAfterLastModified)
                     return messages
                 }
             } catch {
@@ -352,14 +234,13 @@ final class Curl {
     }
     
     /// Download index file and match against curl variable
-    func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: String, variables: [Variable], client: HTTPClient) async throws -> (matches: [Variable], range: String, minSize: Int)? {
-        
+    func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) async throws -> (matches: [Variable], range: String, minSize: Int)? {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return nil
         }
         
-        guard let index = try await downloadInMemoryAsync(url: url, client: client, minSize: nil).readStringImmutable() else {
+        guard let index = try await downloadInMemoryAsync(url: url, minSize: nil).readStringImmutable() else {
             fatalError("Could not decode index to string")
         }
 
@@ -405,23 +286,22 @@ final class Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: ([Variable], [GribMessage]) throws -> ()) async throws {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") async throws -> [(variable: Variable, message: GribMessage)] {
         
-        guard let inventory = try await downloadIndexAndDecode(url: "\(url)\(`extension`)", variables: variables, client: client) else {
-            return
+        guard let inventory = try await downloadIndexAndDecode(url: "\(url)\(`extension`)", variables: variables) else {
+            return []
         }
         
         // Retry download 20 times with increasing retry delay to get the correct number of grib messages
         var retries = 0
         while true {
             do {
-                let messages = try await downloadGribAll(url: url, client: client, bzip2Decode: false, range: inventory.range, minSize: inventory.minSize)
+                let messages = try await downloadGrib(url: url, bzip2Decode: false, range: inventory.range, minSize: inventory.minSize)
                 if messages.count != inventory.matches.count {
                     logger.error("Grib reader did not get all matched variables. Matches count \(inventory.matches.count). Grib count \(messages.count)")
                     throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: inventory.matches.count)
                 }
-                try callback(inventory.matches, messages)
-                return
+                return zip(inventory.matches, messages).map({($0,$1)})
             } catch {
                 retries += 1
                 if retries >= 20 {
@@ -434,22 +314,25 @@ final class Curl {
     }
     
     /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
-    func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx", client: HTTPClient, callback: (Variable, GribMessage) throws -> ()) async throws {
+    func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") async throws -> [(variable: Variable, message: GribMessage)] {
         
-        guard let inventory = try await downloadIndexAndDecode(url: "\(url)\(`extension`)", variables: variables, client: client) else {
-            return
+        guard let inventory = try await downloadIndexAndDecode(url: "\(url)\(`extension`)", variables: variables) else {
+            return []
         }
         
         let ranges = inventory.range.split(separator: ",")
-        var matchesPos = 0
+        var messages = [GribMessage]()
+        messages.reserveCapacity(inventory.matches.count)
         for range in ranges {
-            let messages = try await downloadGribAll(url: url, client: client, bzip2Decode: false, range: String(range))
-            for message in messages {
-                let variable = inventory.matches[matchesPos]
-                matchesPos += 1
-                try callback(variable, message)
-            }
+            let m = try await downloadGrib(url: url, bzip2Decode: false, range: String(range))
+            m.forEach({messages.append($0)})
         }
+        if messages.count != inventory.matches.count {
+            logger.error("Grib reader did not get all matched variables. Matches count \(inventory.matches.count). Grib count \(messages.count)")
+            throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: inventory.matches.count)
+        }
+        
+        return zip(inventory.matches, messages).map({($0,$1)})
     }
 }
 
@@ -461,21 +344,6 @@ extension ByteBuffer {
     
     public mutating func uniquelyOwned() -> Bool {
         self.modifyIfUniquelyOwned { _ in } != nil
-    }
-}
-
-
-/// Small wrapper for GribMemory to keep a reference to bytebuffer
-struct GribByteBuffer {
-    let bytebuffer: ByteBuffer
-    let messages: [GribMessage]
-    
-    init(bytebuffer: ByteBuffer) throws {
-        self.bytebuffer = bytebuffer
-        self.messages = try bytebuffer.withUnsafeReadableBytes {
-            try SwiftEccodes.getMessages(memory: $0, multiSupport: true)
-        }
-        chelper_malloc_trim()
     }
 }
 
@@ -658,5 +526,18 @@ extension HTTPClientResponse {
             throw CurlError.contentLengthHeaderTooLarge(got: length)
         }
         return length
+    }
+    
+    /// Optionally wait to stay delayed a fixed time amount after last modified header
+    func waitAfterLastModified(wait: TimeInterval?) async throws {
+        guard let wait, let lastModified = headers.lastModified?.value else {
+            return
+            
+        }
+        let delta = wait - lastModified.distance(to: Date())
+        if delta > 1 {
+            //logger.info("sleeping for \(delta) seconds")
+            try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+        }
     }
 }

@@ -195,7 +195,7 @@ struct SyncCommand: AsyncCommandFix {
         let maxAgeDays = signature.maxAgeDays ?? 7
         var newerThan = Timestamp.now().add(-24 * 3600 * maxAgeDays).timeIntervalSince1970
         
-        let curl = Curl(logger: logger, retryError4xx: false)
+        let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, retryError4xx: false)
         
         while true {
             let domains = signature.domains.split(separator: ",").map(String.init)
@@ -215,7 +215,7 @@ struct SyncCommand: AsyncCommandFix {
             var request = ClientRequest(method: .GET, url: URI("\(server)sync/list"))
             let params = SyncController.ListParams(filenames: variables, directories: domains, newerThan: newerThan, apikey: apikey)
             try request.query.encode(params)
-            let response = try await curl.downloadInMemoryAsync(url: request.url.string, client: context.application.dedicatedHttpClient, minSize: nil)
+            let response = try await curl.downloadInMemoryAsync(url: request.url.string, minSize: nil)
             let decoder = try ContentConfiguration.global.requireDecoder(for: .jsonAPI)
             let remotes = try decoder.decode([SyncFileAttributes].self, from: response, headers: [:])
             logger.info("Found \(remotes.count) remote files (\(remotes.fileSize))")
@@ -237,7 +237,7 @@ struct SyncCommand: AsyncCommandFix {
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                 // TODO sha256 hash integration check
                 
-                try await curl.download(url: client.url.string, toFile: localFileTemp, bzip2Decode: false, client: context.application.dedicatedHttpClient)
+                try await curl.download(url: client.url.string, toFile: localFileTemp, bzip2Decode: false)
                 try FileManager.default.moveFileOverwrite(from: localFileTemp, to: localFile)
             }
             

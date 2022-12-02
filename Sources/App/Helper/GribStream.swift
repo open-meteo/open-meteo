@@ -95,7 +95,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
             }
         }
 
-        public func next() async throws -> [GribMessage]? {
+        public func next() async throws -> (messages: [GribMessage], size: Int)? {
             while true {
                 // repeat until GRIB header is found
                 guard let seek = buffer.withUnsafeReadableBytes(seekGrib) else {
@@ -127,7 +127,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                     return (seek.offset+seek.length, messages)
                 })
                 buffer.discardReadBytes()
-                return messages
+                return (messages, seek.offset+seek.length)
             }
         }
     }

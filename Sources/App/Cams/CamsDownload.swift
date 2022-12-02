@@ -91,7 +91,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
         
         let writer = OmFileWriter(dim0: nx, dim1: ny, chunk0: nx, chunk1: ny)
         
-        let curl = Curl(logger: logger)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         let dateRun = run.format_YYYYMMddHH
         let remoteDir = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CAMS_GLOBAL/\(dateRun)/"
         /// The surface level of multi-level files is available in the `CAMS_GLOBAL_ADDITIONAL` directory
@@ -118,7 +118,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
                 let dir = meta.isMultiLevel ? remoteDirAdditional : remoteDir
                 let remoteFile = "\(dir)z_cams_c_ecmf_\(dateRun)0000_prod_fc_\(levelType)_\(hour.zeroPadded(len: 3))_\(meta.gribname).nc"
                 let tempNc = "\(domain.downloadDirectory)/temp.nc"
-                try await curl.download(url: remoteFile, toFile: tempNc, bzip2Decode: false, client: application.dedicatedHttpClient)
+                try await curl.download(url: remoteFile, toFile: tempNc, bzip2Decode: false)
                 
                 guard let ncFile = try NetCDF.open(path: tempNc, allowUpdate: false) else {
                     fatalError("Could not open nc file for \(variable)")

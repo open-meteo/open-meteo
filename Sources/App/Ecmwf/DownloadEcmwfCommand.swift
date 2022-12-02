@@ -52,7 +52,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         
         
         let dateStr = run.format_YYYYMMdd
-        let curl = Curl(logger: logger)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
@@ -81,7 +81,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-12h-oper-fc.grib2
             let url = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
             
-            try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
+            for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                 let shortName = message.get(attribute: "shortName")!
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 

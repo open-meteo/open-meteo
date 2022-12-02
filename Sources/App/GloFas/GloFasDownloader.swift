@@ -120,7 +120,7 @@ struct GloFasDownloader: AsyncCommandFix {
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
         let downloadTimeHours = domain == .forecastv3 ? 3 : 9
-        let curl = Curl(logger: logger, deadLineHours: downloadTimeHours, readTimeout: 3600*downloadTimeHours)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: 3600*downloadTimeHours)
         let directory = domain == .forecastv3 ? "fc_grib" : "seasonal_fc_grib"
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
         
@@ -133,11 +133,11 @@ struct GloFasDownloader: AsyncCommandFix {
         logger.info("Reading grib file")
         var timeout = TimeoutHelper(logger: logger, deadline: curl.deadline)
         while true {
-            let response = try await curl.withRetriedDownload(url: remote, range: nil, minSize: nil, client: application.dedicatedHttpClient)
+            let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil)
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     for try await messages in response.body.decodeGrib(logger: logger, totalSize: try response.contentLength()) {
-                        for message in messages {
+                        for message in messages.messages {
                             let date = message.get(attribute: "validityDate")!
                             /// 0 = control
                             let member = Int(message.get(attribute: "number")!)!
