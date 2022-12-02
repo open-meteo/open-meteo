@@ -69,9 +69,6 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             logger.info("Downloading hour \(hour)")
             
             let variables = EcmwfVariable.allCases.filter { variable in
-                if hour == 0 && variable.skipHour0 {
-                    return false
-                }
                 let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
                 return !skipFilesIfExisting || FileManager.default.fileExists(atPath: file)
             }
@@ -84,35 +81,29 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-12h-oper-fc.grib2
             let url = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
             
-            let grib = try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient)
-            
-            logger.info("Compressing and writing data")
-            
-            for variable in variables {
-                guard let message = grib.messages.first(where: { message in
-                    let shortName = message.get(attribute: "shortName")!
-                    let levelhPa = Int(message.get(attribute: "level")!)!
-                    //let paramId = Int(message.get(attribute: "paramId")!)!
+            try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
+                let shortName = message.get(attribute: "shortName")!
+                let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
+                
+                guard let variable = variables.first(where: { variable in
                     if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
                         return true
                     }
                     return shortName == variable.gribName && levelhPa == (variable.level ?? 0)
                 }) else {
-                    grib.messages.forEach { message in
-                        print(
-                            message.get(attribute: "name")!,
-                            message.get(attribute: "shortName")!,
-                            message.get(attribute: "level")!,
-                            message.get(attribute: "paramId")!
-                        )
-                        if message.get(attribute: "name") == "unknown" {
-                            message.iterate(namespace: .ls).forEach({print($0)})
-                            message.iterate(namespace: .parameter).forEach({print($0)})
-                            message.iterate(namespace: .mars).forEach({print($0)})
-                            message.iterate(namespace: .all).forEach({print($0)})
-                        }
+                    print(
+                        message.get(attribute: "name")!,
+                        message.get(attribute: "shortName")!,
+                        message.get(attribute: "level")!,
+                        message.get(attribute: "paramId")!
+                    )
+                    if message.get(attribute: "name") == "unknown" {
+                        message.iterate(namespace: .ls).forEach({print($0)})
+                        message.iterate(namespace: .parameter).forEach({print($0)})
+                        message.iterate(namespace: .mars).forEach({print($0)})
+                        message.iterate(namespace: .all).forEach({print($0)})
                     }
-                    fatalError("could not find \(variable) \(variable.gribName)")
+                    fatalError("Got unknown variable \(shortName) \(levelhPa)")
                 }
                 
                 try grib2d.load(message: message)
@@ -159,9 +150,6 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
             
             for forecastHour in forecastSteps {
-                if forecastHour == 0 && variable.skipHour0 {
-                    continue
-                }
                 let file = "\(downloadDirectory)\(variable.omFileName)_\(forecastHour).om"
                 data2d[0..<nLocation, forecastHour / dtHours] = try OmFileReader(file: file).readAll()
             }
@@ -177,7 +165,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
             }
             
             //#if Xcode
@@ -187,8 +175,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
-            let skipFirst = variable.skipHour0 ? 1 : 0
-            try om.updateFromTimeOriented(variable: variable.nameInFiles, array2d: data2d, ringtime: ringtime, skipFirst: skipFirst, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            try om.updateFromTimeOriented(variable: variable.nameInFiles, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
         

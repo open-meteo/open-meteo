@@ -104,10 +104,10 @@ struct JmaDownload: AsyncCommandFix {
         }
         
         for filename in filesToDownload {
-            for message in try await curl.downloadGrib(url: "\(server)\(filename)", client: application.dedicatedHttpClient).messages {
+            try await curl.downloadGrib(url: "\(server)\(filename)", client: application.dedicatedHttpClient, bzip2Decode: false) { message in
                 guard let variable = message.toJmaVariable(),
                       let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
-                    continue
+                    return
                 }
                 try grib2d.load(message: message)
                 if domain.isGlobal {

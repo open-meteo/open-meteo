@@ -112,14 +112,14 @@ struct GemDownload: AsyncCommandFix {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         let terrainUrl = "\(server)000/CMC_\(domain.gribFileDomainName)_HGT_SFC_0_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
-        for message in try await curl.downloadGrib(url: terrainUrl, client: application.dedicatedHttpClient).messages {
+        try await curl.downloadGrib(url: terrainUrl, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
             try grib2d.load(message: message)
             height = grib2d.array
             //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         }
         
         let landmaskUrl = "\(server)000/CMC_\(domain.gribFileDomainName)_LAND_SFC_0_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
-        for message in try await curl.downloadGrib(url: landmaskUrl, client: application.dedicatedHttpClient).messages {
+        try await curl.downloadGrib(url: landmaskUrl, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
             try grib2d.load(message: message)
             landmask = grib2d.array
             //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
@@ -171,7 +171,7 @@ struct GemDownload: AsyncCommandFix {
                 let hhhmm = domain == .gem_hrdps_continental ? "\(h3)-00" : "\(h3)"
                 let gribName = variable.gribName(domain: domain)
                 let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
-                for message in try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient).messages {
+                try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
                     //try message.debugGrid(grid: domain.grid)
                     //fatalError()
                     try grib2d.load(message: message)

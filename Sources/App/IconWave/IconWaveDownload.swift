@@ -88,8 +88,9 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                     continue
                 }
                 
-                let message = try await curl.downloadBz2Grib(url: url, client: application.dedicatedHttpClient).messages[0]
-                try grib2d.load(message: message)
+                try await curl.downloadGrib(url: url, client: application.dedicatedHttpClient, bzip2Decode: true) { message in
+                    try grib2d.load(message: message)
+                }
                 if domain == .gwam {
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                 } else {

@@ -350,16 +350,23 @@ final class Curl {
     }
     
     /// Download a grib file and decode individual mesages directly while downloading
-    func downloadGribStreaming(url: String, client: HTTPClient, callback: @escaping (GribMessage) throws -> ()) async throws {
+    func downloadGrib(url: String, client: HTTPClient, bzip2Decode: Bool, callback: @escaping (GribMessage) throws -> ()) async throws {
         return try await withRetriedDownload(url: url, range: nil, client: client) { response in
             processVoid = Task {
                 let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
                 if let contentLength {
                     self.totalBytesTransfered += contentLength
                 }
-                for try await message in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
-                    try Task.checkCancellation()
-                    try message.forEach(callback)
+                if bzip2Decode {
+                    for try await message in response.body.decompressBzip2().decodeGrib(logger: logger, totalSize: contentLength) {
+                        try Task.checkCancellation()
+                        try message.forEach(callback)
+                    }
+                } else {
+                    for try await message in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
+                        try Task.checkCancellation()
+                        try message.forEach(callback)
+                    }
                 }
             }
             let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
@@ -379,47 +386,6 @@ final class Curl {
                     //logger.info("sleeping for \(delta) seconds")
                     try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
                 }
-            }
-        }
-    }
-    
-    /// Download an entire grib file
-    /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadGrib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
-        // Retry download 20 times with increasing retry delay to get the correct number of grib messages
-        var retries = 0
-        while true {
-            let data = try await downloadInMemoryAsync(url: url, client: client, minSize: nil)
-            //logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
-            do {
-                return try GribByteBuffer(bytebuffer: data)
-            } catch {
-                retries += 1
-                if retries >= 20 {
-                    throw error
-                }
-                logger.warning("Grib decoding failed, retry download")
-                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
-            }
-        }
-    }
-    
-    /// download a bz2 compressed grib
-    func downloadBz2Grib(url: String, client: HTTPClient) async throws -> GribByteBuffer {
-        // Retry download 20 times with increasing retry delay to get the correct number of grib messages
-        var retries = 0
-        while true {
-            let data = try await downloadBz2Decompress(url: url, client: client)
-            //logger.debug("Converting GRIB, size \(data.readableBytes) bytes")
-            do {
-                return try GribByteBuffer(bytebuffer: data)
-            } catch {
-                retries += 1
-                if retries >= 20 {
-                    throw error
-                }
-                logger.warning("Grib decoding failed, retry download")
-                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
             }
         }
     }

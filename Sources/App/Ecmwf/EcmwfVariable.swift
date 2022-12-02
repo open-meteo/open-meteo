@@ -487,15 +487,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable, Ge
             return nil
         }
     }
-    
-    var skipHour0: Bool {
-        switch self {
-        case .precipitation: return true
-        case .runoff: return true
-        default: return false
-        }
-    }
-    
+
     var isAccumulatedSinceModelStart: Bool {
         switch self {
         case .precipitation: fallthrough

@@ -135,7 +135,7 @@ struct GloFasDownloader: AsyncCommandFix {
         
         // Read all GRIB messages and directly update OM file database
         logger.info("Reading grib file")
-        try await curl.downloadGribStreaming(url: remote, client: application.dedicatedHttpClient) { message in
+        try await curl.downloadGrib(url: remote, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
         //try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
             /// Date in ISO timestamp string format `20210101`
             let date = message.get(attribute: "validityDate")!
