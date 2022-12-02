@@ -29,6 +29,9 @@ struct GloFasDownloader: AsyncCommandFix {
         @Option(name: "ftppassword", short: "p", help: "Password for the ECMWF CAMS FTP server")
         var ftppassword: String?
         
+        @Option(name: "date", short: "d", help: "Which run date to download like 2022-12-01")
+        var date: String?
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() -> TimerangeDt {
             if let timeinterval = timeinterval {
@@ -86,8 +89,12 @@ struct GloFasDownloader: AsyncCommandFix {
             
             let timeInterval = signature.getTimeinterval()
             try downloadTimeIntervalConsolidated(logger: logger, timeinterval: timeInterval, cdskey: cdskey, domain: domain)
+        case .seasonalv3:
+            fallthrough
         case .forecastv3:
-            let run = Timestamp.now().with(hour: 0)
+            let runAuto = domain == .forecastv3 ? Timestamp.now().with(hour: 0) : Timestamp.now().with(day: 1)
+            let run = try signature.date.map(IsoDate.init)?.toTimestamp() ?? runAuto
+            
             guard let ftpuser = signature.ftpuser else {
                 fatalError("ftpuser is required")
             }
@@ -95,16 +102,15 @@ struct GloFasDownloader: AsyncCommandFix {
                 fatalError("ftppassword is required")
             }
             
-            try await downloadEnsembleForecast(application: context.application, domain: GloFasDomain.forecastv3, run: run, skipFilesIfExisting: signature.skipExisting, createNetcdf: signature.createNetcdf, user: ftpuser, password: ftppassword)
+            try await downloadEnsembleForecast(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, createNetcdf: signature.createNetcdf, user: ftpuser, password: ftppassword)
         }
     }
     
     /// Download the single GRIB file containing 30 days with 50 members and update the database
     func downloadEnsembleForecast(application: Application, domain: GloFasDomain, run: Timestamp, skipFilesIfExisting: Bool, createNetcdf: Bool, user: String, password: String) async throws {
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let logger = application.logger
         
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        //try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let nx = domain.grid.nx
@@ -113,11 +119,14 @@ struct GloFasDownloader: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        let curl = Curl(logger: logger, readTimeout: 3600*3)
-        let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/fc_grib/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
+        let downloadTimeHours = domain == .forecastv3 ? 3 : 9
+        let curl = Curl(logger: logger, deadLineHours: downloadTimeHours, readTimeout: 3600*downloadTimeHours)
+        let directory = domain == .forecastv3 ? "fc_grib" : "seasonal_fc_grib"
+        let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
         //let file = "\(domain.downloadDirectory)dis.grib"
         
-        var data2d = Array2DFastTime(nLocations: nx*ny, nTime: 30)
+        let nTime = domain == .forecastv3 ? 30 : 215
+        var data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
         let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + data2d.nTime
         
         //if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: file) {
@@ -146,6 +155,9 @@ struct GloFasDownloader: AsyncCommandFix {
             data2d[0..<nx*ny, forecastDate] = grib2d.array.data
             
             // iterates from 0 to 29 forecast date and then updates om file
+            guard forecastDate <= data2d.nTime else {
+                fatalError("Got more data than expected \(forecastDate)")
+            }
             guard forecastDate == data2d.nTime-1 else {
                 return
             }
@@ -399,6 +411,7 @@ enum GloFasDomain: String, GenericDomain {
     case consolidated
     case forecastv3
     case consolidatedv3
+    case seasonalv3
     case intermediatev3
     
     var omfileDirectory: String {
@@ -419,6 +432,8 @@ enum GloFasDomain: String, GenericDomain {
             fallthrough
         case .intermediatev3:
             fallthrough
+        case .seasonalv3:
+            fallthrough
         case .forecastv3:
             return RegularGrid(nx: 3600, ny: 1500, latMin: -60, lonMin: -180, dx: 0.1, dy: 0.1)
         }
@@ -438,6 +453,8 @@ enum GloFasDomain: String, GenericDomain {
         case .consolidated:
             return "version_4_0"
         case .forecastv3:
+            fallthrough
+        case .seasonalv3:
             fatalError("should never be called")
         case.intermediatev3:
             fallthrough
@@ -453,6 +470,8 @@ enum GloFasDomain: String, GenericDomain {
             fallthrough
         case .consolidated:
             return "consolidated"
+        case .seasonalv3:
+            fallthrough
         case .forecastv3:
             fatalError("should never be called")
         case .intermediatev3:
@@ -470,6 +489,8 @@ enum GloFasDomain: String, GenericDomain {
             return 100 // 100 days per file
         case .forecastv3:
             return 60
+        case .seasonalv3:
+            return 215
         }
     }
 }

@@ -114,6 +114,12 @@ public struct Timestamp {
     func with(hour: Int) -> Timestamp {
         return Timestamp(timeIntervalSince1970 / 86400 * 86400 + hour * 3600)
     }
+    
+    /// Return a new timestamp with setting the day and hour
+    func with(year: Int? = nil, month: Int? = nil, day: Int? = nil) -> Timestamp {
+        let date = toComponents()
+        return Timestamp(year ?? date.year, month ?? date.month, day ?? date.day)
+    }
 }
 
 extension Timestamp: Comparable {
