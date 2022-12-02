@@ -123,54 +123,65 @@ struct GloFasDownloader: AsyncCommandFix {
         let curl = Curl(logger: logger, deadLineHours: downloadTimeHours, readTimeout: 3600*downloadTimeHours)
         let directory = domain == .forecastv3 ? "fc_grib" : "seasonal_fc_grib"
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
-        //let file = "\(domain.downloadDirectory)dis.grib"
         
         let nTime = domain == .forecastv3 ? 30 : 215
         var data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
         let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + data2d.nTime
         
-        //if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: file) {
-        //    try await curl.download(url: remote, toFile: file, client: application.dedicatedHttpClient)
-        //}
-        
         // Read all GRIB messages and directly update OM file database
+        // Database update is done in a second thread
         logger.info("Reading grib file")
-        try await curl.downloadGrib(url: remote, client: application.dedicatedHttpClient, bzip2Decode: false) { message in
-        //try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
-            /// Date in ISO timestamp string format `20210101`
-            let date = message.get(attribute: "validityDate")!
-            /// 0 = control
-            let member = Int(message.get(attribute: "number")!)!
-            /// Which forecast date... range from 0 to 29
-            let forecastDate = Int(message.get(attribute: "startStep")!)!/24
-            guard message.get(attribute: "shortName") == "dis24" else {
-                fatalError("Unknown variable")
+        var timeout = TimeoutHelper(logger: logger, deadline: curl.deadline)
+        while true {
+            let response = try await curl.withRetriedDownload(url: remote, range: nil, minSize: nil, client: application.dedicatedHttpClient)
+            do {
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    for try await messages in response.body.decodeGrib(logger: logger, totalSize: try response.contentLength()) {
+                        for message in messages {
+                            let date = message.get(attribute: "validityDate")!
+                            /// 0 = control
+                            let member = Int(message.get(attribute: "number")!)!
+                            /// Which forecast date... range from 0 to 29 or 214
+                            let forecastDate = Int(message.get(attribute: "startStep")!)!/24
+                            guard message.get(attribute: "shortName") == "dis24" else {
+                                fatalError("Unknown variable")
+                            }
+                            
+                            logger.info("Converting day \(date) Member \(member) forecastDate \(forecastDate)")
+                            //let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
+                            //try FileManager.default.removeItemIfExists(at: dailyFile)
+                            try grib2d.load(message: message)
+                            grib2d.array.flipLatitude()
+                            data2d[0..<nx*ny, forecastDate] = grib2d.array.data
+                            
+                            // iterates from 0 to 29 forecast date and then updates om file
+                            guard forecastDate <= data2d.nTime else {
+                                fatalError("Got more data than expected \(forecastDate)")
+                            }
+                            guard forecastDate == data2d.nTime-1 else {
+                                continue
+                            }
+                            // Process om file update in separat thread, otherwise the download stalls
+                            let data2dwrite = data2d
+                            data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
+                            group.addTask {
+                                let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
+                                if createNetcdf {
+                                    try data2dwrite.transpose().writeNetcdf(filename: "\(name).nc", nx: nx, ny: ny)
+                                }
+                                
+                                logger.info("Starting om file update")
+                                let startOm = DispatchTime.now()
+                                try om.updateFromTimeOriented(variable: name, array2d: data2dwrite, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+                                logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+                            }
+                        }
+                    }
+                }
+                break
+            } catch {
+                try await timeout.check(error: error)
             }
-            
-            logger.info("Converting day \(date) Member \(member) forecastDate \(forecastDate)")
-            //let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
-            //try FileManager.default.removeItemIfExists(at: dailyFile)
-            try grib2d.load(message: message)
-            grib2d.array.flipLatitude()
-            data2d[0..<nx*ny, forecastDate] = grib2d.array.data
-            
-            // iterates from 0 to 29 forecast date and then updates om file
-            guard forecastDate <= data2d.nTime else {
-                fatalError("Got more data than expected \(forecastDate)")
-            }
-            guard forecastDate == data2d.nTime-1 else {
-                return
-            }
-            
-            let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
-            if createNetcdf {
-                try data2d.transpose().writeNetcdf(filename: "\(name).nc", nx: nx, ny: ny)
-            }
-            
-            logger.info("Starting om file update")
-            let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
         curl.printStatistics()
     }

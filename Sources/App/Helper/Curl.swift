@@ -15,6 +15,7 @@ enum CurlError: Error {
     case downloadFailed(code: HTTPStatus)
     case timeoutReached
     case futimes(error: String)
+    case contentLengthHeaderTooLarge(got: Int)
 }
 
 /// Helper to track timeouts and throw errors once a headline in reached
@@ -169,7 +170,7 @@ final class Curl {
                 if response.status != .ok && response.status != .partialContent {
                     throw CurlError.downloadFailed(code: response.status)
                 }
-                if let minSize = minSize, let contentLength = response.headers["Content-Length"].first.flatMap(Int.init), contentLength < minSize {
+                if let minSize = minSize, let contentLength = try response.contentLength(), contentLength < minSize {
                     throw CurlError.sizeTooSmall
                 }
                 return response
@@ -198,7 +199,7 @@ final class Curl {
                 if bzip2Decode {
                     self.totalBytesTransfered += try await response.body.decompressBzip2().saveTo(logger: self.logger, file: toFile, size: nil, modificationDate: lastModified)
                 } else {
-                    let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
+                    let contentLength = try response.contentLength()
                     self.totalBytesTransfered += try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
                 }
                 if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
@@ -231,7 +232,7 @@ final class Curl {
                 self.buffer.moveReaderIndex(to: 0)
                 self.buffer.moveWriterIndex(to: 0)
                 
-                if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
+                if let contentLength = try response.contentLength() {
                     self.buffer.reserveCapacity(contentLength)
                 }
                 for try await fragement in response.body {
@@ -257,6 +258,7 @@ final class Curl {
     }
     
     /// Download a grib file and decode individual mesages directly while downloading. In case a download needs to be restarted, the close is called multiple times
+    /// Execution of closures is done on a second thread not to block the download
     func downloadGrib(url: String, client: HTTPClient, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, callback: @escaping (GribMessage) throws -> ()) async throws {
         var timeout = TimeoutHelper(logger: logger, deadline: deadline)
         while true {
@@ -265,28 +267,38 @@ final class Curl {
             
             // Retry failed file transfers after this point
             do {
-                let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
-                if let contentLength {
-                    self.totalBytesTransfered += contentLength
-                }
-                if bzip2Decode {
-                    for try await message in response.body.decompressBzip2().decodeGrib(logger: logger, totalSize: contentLength) {
-                        try Task.checkCancellation()
-                        try message.forEach(callback)
-                        chelper_malloc_trim()
+                try await withThrowingTaskGroup(of: Void.self) { group in
+                    let contentLength = try response.contentLength()
+                    if let contentLength {
+                        self.totalBytesTransfered += contentLength
                     }
-                } else {
-                    for try await message in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
-                        try Task.checkCancellation()
-                        try message.forEach(callback)
-                        chelper_malloc_trim()
+                    if bzip2Decode {
+                        for try await messages in response.body.decompressBzip2().decodeGrib(logger: logger, totalSize: contentLength) {
+                            try Task.checkCancellation()
+                            for message in messages {
+                                group.addTask {
+                                    try callback(message)
+                                }
+                            }
+                            chelper_malloc_trim()
+                        }
+                    } else {
+                        for try await messages in response.body.decodeGrib(logger: logger, totalSize: contentLength) {
+                            try Task.checkCancellation()
+                            for message in messages {
+                                group.addTask {
+                                    try callback(message)
+                                }
+                            }
+                            chelper_malloc_trim()
+                        }
                     }
-                }
-                if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                    let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                    if delta > 1 {
-                        //logger.info("sleeping for \(delta) seconds")
-                        try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                    if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                        let delta = waitAfterLastModified - lastModified.distance(to: Date())
+                        if delta > 1 {
+                            //logger.info("sleeping for \(delta) seconds")
+                            try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                        }
                     }
                 }
                 return
@@ -611,5 +623,18 @@ extension Sequence where Element == Substring {
             return nil
         }
         return (range, minSize)
+    }
+}
+
+extension HTTPClientResponse {
+    /// Content length in bytes forom the http header
+    func contentLength() throws -> Int? {
+        guard let length = headers["Content-Length"].first.flatMap(Int.init) else {
+            return nil
+        }
+        if length > 128*(1<<30) {
+            throw CurlError.contentLengthHeaderTooLarge(got: length)
+        }
+        return length
     }
 }
