@@ -76,13 +76,19 @@
     </div>
     <div class="row py-3 px-0">
       <h2>Daily Weather Variables</h2>
-      <div class="col-md-3">
+      <div class="col-md-6">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="river_discharge" id="river_discharge" name="daily"
             checked>
           <label class="form-check-label" for="river_discharge">
             River discharge
           </label>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="form-check form-switch debug-hidden">
+          <input class="form-check-input" type="checkbox" id="ensemble" name="ensemble" value="true">
+          <label class="form-check-label" for="ensemble">Ensemble members</label>
         </div>
       </div>
     </div>

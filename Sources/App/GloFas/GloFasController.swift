@@ -1,8 +1,10 @@
 import Foundation
 import Vapor
 
+typealias GloFasVariableMember = VariableAndMemberAndControl<GloFasVariable>
+
 struct GloFasMixer: GenericReaderMixer {
-    var reader: [GenericReader<GloFasDomain, GloFasVariable>]
+    var reader: [GenericReader<GloFasDomain, GloFasVariableMember>]
 }
 
 extension GloFasVariable: GenericVariableMixable {
@@ -27,7 +29,7 @@ struct GloFasController {
             //let domain = GloFasDomain.consolidated
             //let members = 1..<domain.nMembers+1
             
-            let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 32)
+            let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
             let timezone = try params.resolveTimezone()
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
@@ -35,25 +37,29 @@ struct GloFasController {
             let domains = params.models ?? [.consolidated_v4]
             
             let readers = try domains.compactMap {
-                try GenericReaderMulti<GloFasVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest)
+                guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                return reader
             }
             
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
+            let nMember = params.ensemble ? 51 : 1
+            let variables: [GloFasVariableMember] = (0..<nMember).map({.init(.river_discharge, $0)})
+            
             
             // Start data prefetch to boooooooost API speed :D
             for reader in readers {
-                try reader.prefetchData(variables: params.daily, time: dailyTime)
+                try reader.prefetchData(variables: variables, time: dailyTime)
             }
             
-            let daily = ApiSection(name: "daily", time: dailyTime, columns: try params.daily.flatMap { variable in
-                try readers.compactMap { reader in
-                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                    guard let d = try reader.get(variable: variable, time: dailyTime)?.convertAndRound(temperatureUnit: .celsius, windspeedUnit: .ms, precipitationUnit: .mm).toApi(name: name) else {
-                        return nil
-                    }
+            let daily = ApiSection(name: "daily", time: dailyTime, columns: try variables.flatMap { variable in
+                try zip(readers, domains).compactMap { (reader, domain) in
+                    let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                    let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(temperatureUnit: .celsius, windspeedUnit: .ms, precipitationUnit: .mm).toApi(name: name)
                     assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
                     return d
                 }
@@ -78,7 +84,7 @@ struct GloFasController {
     }
 }
 
-enum GlofasDomainApi: String, Codable, CaseIterable, MultiDomainMixerDomain {
+enum GlofasDomainApi: String, Codable, CaseIterable {
     case seamless_v3
     case forecast_v3
     case consolidated_v3
@@ -87,16 +93,16 @@ enum GlofasDomainApi: String, Codable, CaseIterable, MultiDomainMixerDomain {
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixable] {
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GloFasMixer? {
         switch self {
         case .seamless_v3:
-            return try GloFasMixer(domains: [.forecastv3, .intermediatev3, .consolidatedv3], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GloFasMixer(domains: [.forecastv3, .intermediatev3, .consolidatedv3, .seasonalv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .forecast_v3:
-            return try GloFasMixer(domains: [.forecastv3, .intermediatev3], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GloFasMixer(domains: [.forecastv3, .intermediatev3, .seasonalv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .consolidated_v3:
-            return try GenericReader<GloFasDomain, GloFasVariable>(domain: .consolidatedv3, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try GloFasMixer(domains: [.consolidatedv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .consolidated_v4:
-            return try GenericReader<GloFasDomain, GloFasVariable>(domain: .consolidated, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try GloFasMixer(domains: [.consolidated], lat: lat, lon: lon, elevation: elevation, mode: mode)
         }
     }
 }
@@ -111,6 +117,7 @@ struct GloFasQuery: Content, QueryWithStartEndDateTimeZone {
     let format: ForecastResultFormat?
     let timezone: String?
     let models: [GlofasDomainApi]?
+    let ensemble: Bool
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

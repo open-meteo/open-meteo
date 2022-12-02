@@ -44,6 +44,53 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
     }
 }
 
+/// Combine weather variable and member to be used in `GenericReader`
+/// For control (member=0) do not add a member number
+struct VariableAndMemberAndControl<Variable: GenericVariable>: GenericVariable {
+    let variable: Variable
+    let member: Int
+    
+    public init(_ variable: Variable, _ member: Int) {
+        self.variable = variable
+        self.member = member
+    }
+    
+    var omFileName: String {
+        return rawValue
+    }
+    
+    var scalefactor: Float {
+        variable.scalefactor
+    }
+    
+    var interpolation: ReaderInterpolation {
+        variable.interpolation
+    }
+    
+    var unit: SiUnit {
+        variable.unit
+    }
+    
+    var isElevationCorrectable: Bool {
+        variable.isElevationCorrectable
+    }
+    
+    init?(rawValue: String) {
+        fatalError()
+    }
+    
+    var rawValue: String {
+        if member == 0 {
+            return variable.omFileName
+        }
+        return "\(variable.omFileName)_member\(member.zeroPadded(len: 2))"
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return variable.requiresOffsetCorrectionForMixing
+    }
+}
+
 typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableDerived>
 
 typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, VariableAndMember<CfsVariable>>
