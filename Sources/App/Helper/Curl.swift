@@ -17,6 +17,31 @@ enum CurlError: Error {
     case futimes(error: String)
 }
 
+/// Helper to track timeouts and throw errors once a headline in reached
+struct TimeoutHelper {
+    let startTime = Date()
+    var lastPrint = Date(timeIntervalSince1970: 0)
+    let logger: Logger
+    let deadline: Date
+    
+    /// Wait time after each download
+    let retryDelaySeconds = 5
+    
+    /// Print statistics, throw if deadline reached, sleep backoff timer
+    mutating func check(error: Error) async throws {
+        let timeElapsed = Date().timeIntervalSince(startTime)
+        if Date().timeIntervalSince(lastPrint) > 60 {
+            logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
+            lastPrint = Date()
+        }
+        if Date() > deadline {
+            logger.error("Deadline reached. Last Error \(error)")
+            throw CurlError.timeoutReached
+        }
+        try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
+    }
+}
+
 final class Curl {
     let logger: Logger
     
@@ -25,15 +50,9 @@ final class Curl {
     
     /// start time of downloading
     let startTime = DispatchTime.now()
-
-    /// Time to connect. Default 9 seconds. 10 sconds is the http client default
-    let connectTimeout = 9
     
     /// Time to transfer a file. Default 5 minutes
     let readTimeout: Int
-
-    /// Wait time after each download
-    let retryDelaySeconds = 5
     
     /// Retry 4xx errors
     let retryError4xx: Bool
@@ -46,15 +65,6 @@ final class Curl {
     
     /// Download buffer which is reused during downloads
     private var buffer: ByteBuffer
-    
-    /// Running task is kept as a reference to cancel
-    private var downloadTask: Task<HTTPClientResponse, Error>? = nil
-    
-    /// Running task is kept as a reference to cancel
-    private var processByteBuffer: Task<ByteBuffer, Error>? = nil
-    
-    /// Running task is kept as a reference to cancel
-    private var processVoid: Task<(), Error>? = nil
 
     public init(logger: Logger, deadLineHours: Int = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil) {
         self.logger = logger
@@ -123,8 +133,10 @@ final class Curl {
         }
     }*/
     
-    /// Retry downloading as many times until deadline is reached. Exceptions in `callback` will also result in a retry. This is usefull to retry corrupted GRIB file download
-    func withRetriedDownload<T>(url _url: String, range: String?, client: HTTPClient, callback: (HTTPClientResponse) async throws -> (T)) async throws -> T {
+
+    
+    /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
+    func withRetriedDownload(url _url: String, range: String?, minSize: Int?, client: HTTPClient) async throws -> HTTPClientResponse {
         // URL might contain password, strip them from logging
         let url: String
         let auth: String?
@@ -138,9 +150,6 @@ final class Curl {
         }
         logger.info("Downloading\(range != nil ? " [ranged]" : "") file \(url)")
         
-        let startTime = Date()
-        var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
-        
         let request = {
             var request = HTTPClientRequest(url: url)
             if let range = range {
@@ -152,46 +161,24 @@ final class Curl {
             return request
         }()
         
-        let connectTimeout = self.connectTimeout
-        let retryError4xx = self.retryError4xx
+        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
         
         while true {
             do {
-                // All those timers are a workaround for https://github.com/swift-server/async-http-client/issues/642
-                self.downloadTask = Task {
-                    return try await client.execute(request, timeout: .seconds(3600*24))
-                }
-                let connectTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(connectTimeout))) { [weak self] in
-                    self?.logger.error("Timeout reached, canceling download")
-                    self?.downloadTask?.cancel()
-                }
-                let response = try await downloadTask!.value
-                defer {
-                    connectTimeout.cancel()
-                    downloadTask = nil
-                }
-                connectTimeout.cancel()
-                downloadTask = nil
-                
+                let response = try await client.execute(request, timeout: .seconds(Int64(readTimeout)))
                 if response.status != .ok && response.status != .partialContent {
                     throw CurlError.downloadFailed(code: response.status)
                 }
-                return try await callback(response)
+                if let minSize = minSize, let contentLength = response.headers["Content-Length"].first.flatMap(Int.init), contentLength < minSize {
+                    throw CurlError.sizeTooSmall
+                }
+                return response
             } catch {
-                if !retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code) {
+                if !self.retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code) {
                     logger.error("Download failed with 4xx error, \(error)")
                     throw error
                 }
-                let timeElapsed = Date().timeIntervalSince(startTime)
-                if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
-                    lastPrint = Date()
-                }
-                if Date() > deadline {
-                    logger.error("Deadline reached")
-                    throw error
-                }
-                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
+                try await timeout.check(error: error)
             }
         }
     }
@@ -199,37 +186,31 @@ final class Curl {
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     ///
     func download(url: String, toFile: String, bzip2Decode: Bool, client: HTTPClient) async throws {
-        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            processVoid = Task {
-                let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
-                if let contentLength {
-                    self.totalBytesTransfered += contentLength
-                }
+        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
+        while true {
+            // Start the download and wait for the header
+            let response = try await withRetriedDownload(url: url, range: nil, minSize: nil, client: client)
+            
+            // Retry failed file transfers after this point
+            do {
                 let lastModified = response.headers.lastModified?.value
                 try FileManager.default.removeItemIfExists(at: toFile)
                 if bzip2Decode {
-                    try await response.body.decompressBzip2().saveTo(logger: self.logger, file: toFile, size: nil, modificationDate: lastModified)
+                    self.totalBytesTransfered += try await response.body.decompressBzip2().saveTo(logger: self.logger, file: toFile, size: nil, modificationDate: lastModified)
                 } else {
-                    try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
+                    let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
+                    self.totalBytesTransfered += try await response.body.saveTo(logger: self.logger, file: toFile, size: contentLength, modificationDate: lastModified)
                 }
-            }
-            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
-                self?.logger.error("Timeout reached, canceling download processing")
-                self?.processVoid?.cancel()
-            }
-            defer {
-                readTimeout.cancel()
-                processVoid = nil
-            }
-            try await processVoid!.value
-            processVoid = nil
-            readTimeout.cancel()
-            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                if delta > 1 {
-                    //logger.info("sleeping for \(delta) seconds")
-                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                    let delta = waitAfterLastModified - lastModified.distance(to: Date())
+                    if delta > 1 {
+                        //logger.info("sleeping for \(delta) seconds")
+                        try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                    }
                 }
+                return
+            } catch {
+                try await timeout.check(error: error)
             }
         }
     }
@@ -237,13 +218,19 @@ final class Curl {
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
     func downloadInMemoryAsync(url: String, range: String? = nil, client: HTTPClient, minSize: Int?) async throws -> ByteBuffer {
-        return try await withRetriedDownload(url: url, range: range, client: client) { response in
-            processByteBuffer = Task {
+        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
+        while true {
+            // Start the download and wait for the header
+            let response = try await withRetriedDownload(url: url, range: range, minSize: minSize, client: client)
+            
+            // Retry failed file transfers after this point
+            do {
                 if !self.buffer.uniquelyOwned() {
                     fatalError("Download buffer is not uniquely owned!")
                 }
                 self.buffer.moveReaderIndex(to: 0)
                 self.buffer.moveWriterIndex(to: 0)
+                
                 if let contentLength = response.headers["Content-Length"].first.flatMap(Int.init) {
                     self.buffer.reserveCapacity(contentLength)
                 }
@@ -252,37 +239,32 @@ final class Curl {
                     self.totalBytesTransfered += fragement.readableBytes
                     self.buffer.writeImmutableBuffer(fragement)
                 }
-                return self.buffer
-            }
-            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
-                self?.logger.error("Timeout reached, canceling download processing")
-                self?.processByteBuffer?.cancel()
-            }
-            defer {
-                readTimeout.cancel()
-                processByteBuffer = nil
-            }
-            let buffer = try await processByteBuffer!.value
-            processByteBuffer = nil
-            readTimeout.cancel()
-            if let minSize = minSize, buffer.readableBytes < minSize {
-                throw CurlError.sizeTooSmall
-            }
-            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                if delta > 1 {
-                    //logger.info("sleeping for \(delta) seconds")
-                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                if let minSize = minSize, buffer.readableBytes < minSize {
+                    throw CurlError.sizeTooSmall
                 }
+                if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                    let delta = waitAfterLastModified - lastModified.distance(to: Date())
+                    if delta > 1 {
+                        //logger.info("sleeping for \(delta) seconds")
+                        try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                    }
+                }
+                return self.buffer
+            } catch {
+                try await timeout.check(error: error)
             }
-            return buffer
         }
     }
     
-    /// Download a grib file and decode individual mesages directly while downloading
-    func downloadGrib(url: String, client: HTTPClient, bzip2Decode: Bool, callback: @escaping (GribMessage) throws -> ()) async throws {
-        return try await withRetriedDownload(url: url, range: nil, client: client) { response in
-            processVoid = Task {
+    /// Download a grib file and decode individual mesages directly while downloading. In case a download needs to be restarted, the close is called multiple times
+    func downloadGrib(url: String, client: HTTPClient, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, callback: @escaping (GribMessage) throws -> ()) async throws {
+        var timeout = TimeoutHelper(logger: logger, deadline: deadline)
+        while true {
+            // Start the download and wait for the header
+            let response = try await withRetriedDownload(url: url, range: range, minSize: minSize, client: client)
+            
+            // Retry failed file transfers after this point
+            do {
                 let contentLength = response.headers["Content-Length"].first.flatMap(Int.init)
                 if let contentLength {
                     self.totalBytesTransfered += contentLength
@@ -300,24 +282,16 @@ final class Curl {
                         chelper_malloc_trim()
                     }
                 }
-            }
-            let readTimeout = client.eventLoopGroup.any().scheduleTask(in: .seconds(Int64(readTimeout))) { [weak self] in
-                self?.logger.error("Timeout reached, canceling download processing")
-                self?.processVoid?.cancel()
-            }
-            defer {
-                readTimeout.cancel()
-                processVoid = nil
-            }
-            try await processVoid!.value
-            processVoid = nil
-            readTimeout.cancel()
-            if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
-                let delta = waitAfterLastModified - lastModified.distance(to: Date())
-                if delta > 1 {
-                    //logger.info("sleeping for \(delta) seconds")
-                    try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                if let waitAfterLastModified, let lastModified = response.headers.lastModified?.value {
+                    let delta = waitAfterLastModified - lastModified.distance(to: Date())
+                    if delta > 1 {
+                        //logger.info("sleeping for \(delta) seconds")
+                        try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
+                    }
                 }
+                return
+            } catch {
+                try await timeout.check(error: error)
             }
         }
     }
@@ -414,7 +388,7 @@ final class Curl {
                     throw error
                 }
                 logger.warning("Grib decoding failed, retry download")
-                try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000 * min(10, retries)))
+                try await Task.sleep(nanoseconds: UInt64(5 * 1_000_000_000 * min(10, retries)))
             }
         }
     }
@@ -532,7 +506,8 @@ protocol CurlIndexedVariable {
 extension AsyncSequence where Element == ByteBuffer {
     /// Store incoming data to file. Buffers up to 150kb until flushed to disk.
     /// NOTE: File IO is blocking e.g. synchronous
-    func saveTo(logger: Logger, file: String, size: Int?, modificationDate: Date?) async throws {
+    /// Returns total amount of bytes transfered
+    func saveTo(logger: Logger, file: String, size: Int?, modificationDate: Date?) async throws -> Int {
         let fn = try FileHandle.createNewFile(file: file, size: size)
         var transfered = 0
         var transferedLastPrint = 0
@@ -572,6 +547,7 @@ extension AsyncSequence where Element == ByteBuffer {
                 throw CurlError.futimes(error: String(cString: strerror(errno)))
             }
         }
+        return transfered
     }
 }
 

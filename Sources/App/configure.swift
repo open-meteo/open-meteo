@@ -27,10 +27,8 @@ extension Application {
         }
         // try again with very high timeouts, so only the curl internal timers are used
         var configuration = HTTPClient.Configuration(
-            timeout: .init(connect: .hours(24), read: .hours(24)),
-            connectionPool: .init(idleTimeout: .hours(24)))
-        configuration.connectionPool.disableRetryConnectionEstablishment()
-        configuration.httpVersion = .http1Only
+            timeout: .init(connect: .seconds(30), read: .minutes(5)),
+            connectionPool: .init(idleTimeout: .minutes(10)))
         
         let new = HTTPClient(
             eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 1)),
@@ -128,59 +126,4 @@ extension Application {
 
     return app
   }
-}
-
-
-
-
-
-// Modify values with internal scope https://github.com/ikhvorost/KeyValueCoding/blob/44adb66264edf24fad97ed551a9ed1f9837ef0ed/Sources/KeyValueCoding/Metadata.swift
-fileprivate typealias NameFreeFunc = @convention(c) (UnsafePointer<CChar>?) -> Void
-
-fileprivate struct _FieldReflectionMetadata {
-    let name: UnsafePointer<CChar>? = nil
-    let freeFunc: NameFreeFunc? = nil
-    let isStrong: Bool = false
-    let isVar: Bool = false
-}
-
-@_silgen_name("swift_reflectionMirror_recursiveCount")
-fileprivate func swift_reflectionMirror_recursiveCount(_: Any.Type) -> Int
-
-@_silgen_name("swift_reflectionMirror_recursiveChildMetadata")
-fileprivate func swift_reflectionMirror_recursiveChildMetadata(
-    _: Any.Type
-    , index: Int
-    , fieldMetadata: UnsafeMutablePointer<_FieldReflectionMetadata>
-) -> Any.Type
-
-@_silgen_name("swift_reflectionMirror_recursiveChildOffset")
-fileprivate func swift_reflectionMirror_recursiveChildOffset(_: Any.Type, index: Int) -> Int
-
-@_silgen_name("swift_getMetadataKind")
-fileprivate func swift_getMetadataKind(_: Any.Type) -> UInt
-
-fileprivate extension HTTPClient.Configuration.ConnectionPool {
-    /// Disable automatic connection retry
-    mutating func disableRetryConnectionEstablishment() {
-        let count = swift_reflectionMirror_recursiveCount(Self.self)
-        var fieldMetadata = _FieldReflectionMetadata()
-        for i in 0..<count {
-            let propertyType = swift_reflectionMirror_recursiveChildMetadata(Self.self, index: i, fieldMetadata: &fieldMetadata)
-            defer { fieldMetadata.freeFunc?(fieldMetadata.name) }
-            let offset = swift_reflectionMirror_recursiveChildOffset(Self.self, index: i)
-            guard let name = fieldMetadata.name else {
-                continue
-            }
-            //print(fieldMetadata, name, propertyType, offset)
-            if strcmp(name, "retryConnectionEstablishment") == 0 {
-                withUnsafeMutableBytes(of: &self) { ptr in
-                    ptr.baseAddress?.advanced(by: offset).assumingMemoryBound(to: Bool.self).pointee = false
-                }
-                //print("Successfully set retryConnectionEstablishment \(self)")
-                return
-            }
-        }
-        print("WARNING: Could not set retryConnectionEstablishment \(self)")
-    }
 }
