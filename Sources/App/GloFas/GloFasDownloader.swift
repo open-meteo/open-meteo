@@ -178,6 +178,7 @@ struct GloFasDownloader: AsyncCommandFix {
                             }
                         }
                     }
+                    curl.totalBytesTransfered += tracker.transfered
                 }
                 break
             } catch {
