@@ -6,33 +6,20 @@ import SwiftEccodes
 
 final class MeteorologyTests: XCTestCase {
     func testAirQuality() {
-        XCTAssertEqual(AirQuality.europeanIndex(no2: 25), 12.5)
-        XCTAssertEqual(AirQuality.europeanIndex(no2: 75), 37.5)
-        XCTAssertEqual(AirQuality.europeanIndex(no2: 150), 62.5)
-        XCTAssertEqual(AirQuality.europeanIndex(no2: 300), 87.5)
-        XCTAssertEqual(AirQuality.europeanIndex(no2: 500), 112.5)
+        XCTAssertTrue(AirQuality.europeanIndex(no2: -1).isNaN)
+        XCTAssertEqual(AirQuality.europeanIndex(no2: 0), 0)
+        XCTAssertEqual(AirQuality.europeanIndex(no2: 20), 10)
+        XCTAssertEqual(AirQuality.europeanIndex(no2: 65), 30)
+        XCTAssertEqual(AirQuality.europeanIndex(no2: 105), 50)
+        XCTAssertEqual(AirQuality.europeanIndex(no2: 175), 70)
+        XCTAssertEqual(AirQuality.europeanIndex(no2: 285), 90)
+        XCTAssertEqual(AirQuality.europeanIndex(no2: 395), 110)
         
-        XCTAssertEqual(AirQuality.europeanIndex(pm10: 12), 12)
-        XCTAssertEqual(AirQuality.europeanIndex(pm10: 40), 40)
-        XCTAssertEqual(AirQuality.europeanIndex(pm10: 70), 62.5, accuracy: 0.001)
-        XCTAssertEqual(AirQuality.europeanIndex(pm10: 95), 76.3888, accuracy: 0.001)
-        XCTAssertEqual(AirQuality.europeanIndex(pm10: 130), 86.1111, accuracy: 0.001)
-        XCTAssertEqual(AirQuality.europeanIndex(pm10: 170), 97.222, accuracy: 0.001)
-        XCTAssertEqual(AirQuality.europeanIndex(pm10: 200), 105.555, accuracy: 0.001)
-        
-        XCTAssertEqual(AirQuality.europeanIndex(pm2_5: 10), 16.6666, accuracy: 0.001)
-        XCTAssertEqual(AirQuality.europeanIndex(pm2_5: 20), 33.3333, accuracy: 0.001)
-        XCTAssertEqual(AirQuality.europeanIndex(pm2_5: 40), 60)
-        XCTAssertEqual(AirQuality.europeanIndex(pm2_5: 70), 81.8181, accuracy: 0.001)
-        XCTAssertEqual(AirQuality.europeanIndex(pm2_5: 150), 118.1818, accuracy: 0.001)
-        
-        XCTAssertEqual(AirQuality.europeanIndex(o3: 30), 12.5)
-        XCTAssertEqual(AirQuality.europeanIndex(o3: 90), 37.5)
-        XCTAssertEqual(AirQuality.europeanIndex(o3: 150), 62.5)
-        XCTAssertEqual(AirQuality.europeanIndex(o3: 210), 87.5)
-        XCTAssertEqual(AirQuality.europeanIndex(o3: 260), 108.33333, accuracy: 0.001)
-        
-        
+        XCTAssertEqual(AirQuality.europeanIndex(o3: 30), 12.0)
+        XCTAssertEqual(AirQuality.europeanIndex(o3: 90), 36.0)
+        XCTAssertEqual(AirQuality.europeanIndex(o3: 150), 63.636364, accuracy: 0.001)
+        XCTAssertEqual(AirQuality.europeanIndex(o3: 210), 74.545456, accuracy: 0.001)
+        XCTAssertEqual(AirQuality.europeanIndex(o3: 260), 82.85714, accuracy: 0.001)
     }
     
     func testRelativeHumidity() {
