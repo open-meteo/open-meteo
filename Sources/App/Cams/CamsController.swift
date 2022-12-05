@@ -2,8 +2,7 @@ import Foundation
 import Vapor
 
 /**
- TODO:
- - air quality index (european)
+ API for Air quality data
  */
 struct CamsController {
     func query(_ req: Request) -> EventLoopFuture<Response> {
@@ -75,7 +74,12 @@ struct CamsController {
 
 /// TODO can later be used for air quality index
 enum CamsVariableDerived: String, Codable, GenericVariableMixable {
-    case none
+    case european_aqi
+    case european_aqi_pm2_5
+    case european_aqi_pm10
+    case european_aqi_no2
+    case european_aqi_o3
+    case european_aqi_so2
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -94,11 +98,58 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
     var reader: GenericReaderCached<CamsDomain, CamsVariable>
     
     func get(derived: CamsVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
-        fatalError()
+        switch derived {
+        case .european_aqi:
+            let pm2_5 = try get(derived: .european_aqi_pm2_5, time: time).data
+            let pm10 = try get(derived: .european_aqi_pm10, time: time).data
+            let no2 = try get(derived: .european_aqi_no2, time: time).data
+            let o3 = try get(derived: .european_aqi_o3, time: time).data
+            let so2 = try get(derived: .european_aqi_so2, time: time).data
+            let max = pm2_5.indices.map({ i -> Float in
+                return Swift.max(Swift.max(Swift.max(Swift.max(pm2_5[i], pm10[i]), no2[i]), o3[i]), so2[i])
+            })
+            return DataAndUnit(max, .eaqi)
+        case .european_aqi_pm2_5:
+            // TODO roling average over 24 hours
+            let pm2_5 = try get(raw: .pm2_5, time: time).data
+            return DataAndUnit(pm2_5.map(AirQuality.europeanIndexPm2_5), .eaqi)
+        case .european_aqi_pm10:
+            // TODO roling average over 24 hours
+            let pm10 = try get(raw: .pm10, time: time).data
+            return DataAndUnit(pm10.map(AirQuality.europeanIndexPm10), .eaqi)
+        case .european_aqi_no2:
+            let no2 = try get(raw: .nitrogen_dioxide, time: time).data
+            return DataAndUnit(no2.map(AirQuality.europeanIndexNo2), .eaqi)
+        case .european_aqi_o3:
+            let o3 = try get(raw: .ozone, time: time).data
+            return DataAndUnit(o3.map(AirQuality.europeanIndexO3), .eaqi)
+        case .european_aqi_so2:
+            let so2 = try get(raw: .sulphur_dioxide, time: time).data
+            return DataAndUnit(so2.map(AirQuality.europeanIndexSo2), .eaqi)
+        }
     }
     
     func prefetchData(derived: CamsVariableDerived, time: TimerangeDt) throws {
-        fatalError()
+        switch derived {
+        case .european_aqi:
+            try prefetchData(derived: .european_aqi_pm2_5, time: time)
+            try prefetchData(derived: .european_aqi_pm10, time: time)
+            try prefetchData(derived: .european_aqi_no2, time: time)
+            try prefetchData(derived: .european_aqi_o3, time: time)
+            try prefetchData(derived: .european_aqi_so2, time: time)
+        case .european_aqi_pm2_5:
+            // TODO roling average over 24 hours
+            try prefetchData(raw: .pm2_5, time: time)
+        case .european_aqi_pm10:
+            // TODO roling average over 24 hours
+            try prefetchData(raw: .pm10, time: time)
+        case .european_aqi_no2:
+            try prefetchData(raw: .nitrogen_dioxide, time: time)
+        case .european_aqi_o3:
+            try prefetchData(raw: .ozone, time: time)
+        case .european_aqi_so2:
+            try prefetchData(raw: .sulphur_dioxide, time: time)
+        }
     }
 }
 
