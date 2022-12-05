@@ -35,6 +35,7 @@ enum SiUnit: String, Codable {
     case microgramsPerQuibicMeter = "μg/m³"
     case grainsPerQuibicMeter = "grains/m³"
     case dimensionless = ""
+    case eaqi = "EAQI"
     
     var significantDigits: Int {
         switch self {
@@ -71,6 +72,7 @@ enum SiUnit: String, Codable {
         case .dimensionless: return 2
         case .joulesPerKilogram: return 0
         case .qubicMeterPerSecond: return 2
+        case .eaqi: return 0
         }
     }
 }
