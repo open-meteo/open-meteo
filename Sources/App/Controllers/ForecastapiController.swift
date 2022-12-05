@@ -415,6 +415,7 @@ enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
     case direct_radiation_instant
     case direct_normal_irradiance_instant
     case visibility
+    case cape
     
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
