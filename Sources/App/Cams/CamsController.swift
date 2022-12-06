@@ -110,13 +110,13 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
             })
             return DataAndUnit(max, .eaqi)
         case .european_aqi_pm2_5:
-            // TODO roling average over 24 hours
-            let pm2_5 = try get(raw: .pm2_5, time: time).data
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let pm2_5 = try get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(pm2_5.map(AirQuality.europeanIndexPm2_5), .eaqi)
         case .european_aqi_pm10:
-            // TODO roling average over 24 hours
-            let pm10 = try get(raw: .pm10, time: time).data
-            return DataAndUnit(pm10.map(AirQuality.europeanIndexPm10), .eaqi)
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let pm10avg = try get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
+            return DataAndUnit(pm10avg.map(AirQuality.europeanIndexPm10), .eaqi)
         case .european_aqi_no2:
             let no2 = try get(raw: .nitrogen_dioxide, time: time).data
             return DataAndUnit(no2.map(AirQuality.europeanIndexNo2), .eaqi)
@@ -138,17 +138,32 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
             try prefetchData(derived: .european_aqi_o3, time: time)
             try prefetchData(derived: .european_aqi_so2, time: time)
         case .european_aqi_pm2_5:
-            // TODO roling average over 24 hours
-            try prefetchData(raw: .pm2_5, time: time)
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            try prefetchData(raw: .pm2_5, time: timeAhead)
         case .european_aqi_pm10:
-            // TODO roling average over 24 hours
-            try prefetchData(raw: .pm10, time: time)
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            try prefetchData(raw: .pm10, time: timeAhead)
         case .european_aqi_no2:
             try prefetchData(raw: .nitrogen_dioxide, time: time)
         case .european_aqi_o3:
             try prefetchData(raw: .ozone, time: time)
         case .european_aqi_so2:
             try prefetchData(raw: .sulphur_dioxide, time: time)
+        }
+    }
+}
+
+extension TimerangeDt {
+    func with(start: Timestamp) -> TimerangeDt {
+        TimerangeDt(start: start, to: range.upperBound, dtSeconds: dtSeconds)
+    }
+}
+
+extension Array where Element == Float {
+    /// Resulting array will be `dt` elements shorter
+    func slidingAverageDroppingFirstDt(dt: Int) -> [Float] {
+        return (0 ..< self.count - dt).map { i in
+            return self[i..<i+dt].reduce(0, +) / 24
         }
     }
 }
