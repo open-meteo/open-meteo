@@ -274,7 +274,7 @@
               <div class="col-md-6">
                 <div class="table-responsive">
                   <table class="table" id="airquality_table">
-                    <caption>Pollutant thresholds based on <a href="https://www.eea.europa.eu/themes/air/air-quality-index">European Environment Agency (EAA)</a>. Particulate Mater (PM) is using a 24 hour roling average, while gases use hourly values.</caption>
+                    <caption>Pollutant thresholds based on <a href="https://www.eea.europa.eu/themes/air/air-quality-index">European Environment Agency (EAA)</a>. Particulate Matter (PM) is using a 24 hour roling average, while gases use hourly values.</caption>
                     <thead>
                       <tr>
                         <th scope="col">Pollutant</th>

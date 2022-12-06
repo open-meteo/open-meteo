@@ -112,20 +112,20 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .european_aqi_pm2_5:
             let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
             let pm2_5 = try get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
-            return DataAndUnit(pm2_5.map(AirQuality.europeanIndexPm2_5), .eaqi)
+            return DataAndUnit(pm2_5.map(EuropeanAirQuality.indexPm2_5), .eaqi)
         case .european_aqi_pm10:
             let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
             let pm10avg = try get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
-            return DataAndUnit(pm10avg.map(AirQuality.europeanIndexPm10), .eaqi)
+            return DataAndUnit(pm10avg.map(EuropeanAirQuality.indexPm10), .eaqi)
         case .european_aqi_no2:
             let no2 = try get(raw: .nitrogen_dioxide, time: time).data
-            return DataAndUnit(no2.map(AirQuality.europeanIndexNo2), .eaqi)
+            return DataAndUnit(no2.map(EuropeanAirQuality.indexNo2), .eaqi)
         case .european_aqi_o3:
             let o3 = try get(raw: .ozone, time: time).data
-            return DataAndUnit(o3.map(AirQuality.europeanIndexO3), .eaqi)
+            return DataAndUnit(o3.map(EuropeanAirQuality.indexO3), .eaqi)
         case .european_aqi_so2:
             let so2 = try get(raw: .sulphur_dioxide, time: time).data
-            return DataAndUnit(so2.map(AirQuality.europeanIndexSo2), .eaqi)
+            return DataAndUnit(so2.map(EuropeanAirQuality.indexSo2), .eaqi)
         }
     }
     
