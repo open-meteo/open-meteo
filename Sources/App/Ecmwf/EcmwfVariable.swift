@@ -454,6 +454,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, Codable, GenericVariable, Ge
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
+        case .skin_temperature: fallthrough
+        case .soil_temperature_0_to_7cm: fallthrough
         case .temperature_1000hPa: fallthrough
         case .temperature_925hPa: fallthrough
         case .temperature_850hPa: fallthrough
