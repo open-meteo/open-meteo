@@ -86,13 +86,13 @@ protocol QueryWithStartEndDateTimeZone: QueryWithTimezone {
 }
 
 extension QueryWithStartEndDateTimeZone {
-    func getTimerange(timezone: TimeZone, current: Timestamp, forecastDays: Int, allowedRange: Range<Timestamp>) throws -> TimerangeLocal {
+    func getTimerange(timezone: TimeZone, current: Timestamp, forecastDays: Int, allowedRange: Range<Timestamp>, past_days_max: Int = 92) throws -> TimerangeLocal {
         let utcOffset = (timezone.secondsFromGMT() / 3600) * 3600
         if let startEnd = try getStartEndDateLocal(allowedRange: allowedRange, utcOffsetSeconds: utcOffset) {
             return startEnd
         }
-        if let past_days = past_days, past_days < 0 || past_days > 92 {
-            throw ForecastapiError.pastDaysInvalid(given: past_days, allowed: 0...92)
+        if let past_days = past_days, past_days < 0 || past_days > past_days_max {
+            throw ForecastapiError.pastDaysInvalid(given: past_days, allowed: 0...past_days_max)
         }
         return Self.forecastTimeRange(currentTime: current, utcOffsetSeconds: utcOffset, pastDays: past_days, forecastDays: forecastDays)
     }

@@ -87,7 +87,7 @@ struct GloFasController {
             
             let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
             let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange, past_days_max: 360)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
             let domains = params.models ?? [.seamless_v3]
