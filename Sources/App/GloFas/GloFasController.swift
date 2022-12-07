@@ -41,6 +41,9 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderMixable {
         let data = try (0..<51).map({
             try reader.get(variable: .init(.river_discharge, $0), time: time).data
         })
+        if data[0].onlyNaN() {
+            return DataAndUnit(data[0], .qubicMeterPerSecond)
+        }
         switch derived {
         case .river_discharge_mean:
             return DataAndUnit((0..<time.count).map { t in
@@ -82,16 +85,12 @@ struct GloFasController {
             try params.validate()
             let currentTime = Timestamp.now()
             
-            /// Will be configurable by API later
-            //let domain = GloFasDomain.consolidated
-            //let members = 1..<domain.nMembers+1
-            
             let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
             let timezone = try params.resolveTimezone()
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            let domains = params.models ?? [.consolidated_v4]
+            let domains = params.models ?? [.seamless_v3]
             
             let readers = try domains.compactMap {
                 guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {

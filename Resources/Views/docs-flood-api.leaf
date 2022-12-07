@@ -21,7 +21,7 @@
   </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Global Flood API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Simulated river discharge at 5 km resolution, starting from 1984.</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Simulated river discharge at 5 km resolution from 1984 up to 7 months forecast</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -42,10 +42,6 @@
 
 <!-- http://127.0.0.1:8080/v1/forecast/query -->
 <div class="container px-4 py-0" id="featured-3">
-  <div class="alert alert-primary" role="alert">
-    This is a pre-release. Data from 1984 until July 2022 are integrated, but forecast data are not yet available. The forecast will provide 30 days forecast with 50 ensemble members. Additional variables like soil moisture and snow depth may follow aswell. Availability of forecast data is not yet known.
-  </div>
-
   <form id="api_form" method="get" action="https://flood-api.open-meteo.com/v1/flood">
     <div class="row py-3 px-0">
       <h2>Select Coordinates or City</h2>
@@ -81,69 +77,69 @@
           <input class="form-check-input" type="checkbox" value="river_discharge" id="river_discharge" name="daily"
             checked>
           <label class="form-check-label" for="river_discharge">
-            River discharge Control
+            River Discharge
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="river_discharge_mean" id="river_discharge_mean" name="daily"
-            checked>
+            >
           <label class="form-check-label" for="river_discharge_mean">
-            River discharge Mean
+            River Discharge Mean
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="river_discharge_median" id="river_discharge_median" name="daily"
-            checked>
+            >
           <label class="form-check-label" for="river_discharge_median">
-            River discharge Median
+            River Discharge Median
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="river_discharge_max" id="river_discharge_max" name="daily"
-            checked>
+            >
           <label class="form-check-label" for="river_discharge_max">
-            River discharge Maximum
+            River Discharge Maximum
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="river_discharge_min" id="river_discharge_min" name="daily"
-            checked>
+            >
           <label class="form-check-label" for="river_discharge_min">
-            River discharge Minimum
+            River Discharge Minimum
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="river_discharge_p25" id="river_discharge_p25" name="daily"
-            checked>
+            >
           <label class="form-check-label" for="river_discharge_p25">
-            River discharge 25th Percentile
+            River Discharge 25<sup>th</sup> Percentile
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="river_discharge_p75" id="river_discharge_p75" name="daily"
-            checked>
+            >
           <label class="form-check-label" for="river_discharge_p75">
-            River discharge 75th Percentile
+            River Discharge 75<sup>th</sup> Percentile
           </label>
         </div>
       </div>
       <div class="col-md-6">
-        <div class="form-check form-switch debug-hidden">
+        <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="ensemble" name="ensemble" value="true">
-          <label class="form-check-label" for="ensemble">Ensemble members</label>
+          <label class="form-check-label" for="ensemble">All 50 Ensemble Members</label>
         </div>
+        <p class="mt-2"><small class="text-muted">Note: Statistical and ensemble forecasts are only available for forecasts.</small></p>
       </div>
     </div>
 
-    <div class="row py-3 px-0 debug-hidden">
+    <div class="row py-3 px-0">
       <div class="accordion" id="accordionVariables">
         <div class="accordion-item">
           <h2 class="accordion-header" id="heading-models">
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-models" aria-expanded="false" aria-controls="collapse-models">
               Flood models&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
-                data-count-checkboxes-of="#collapse-models">0/x</span>&nbsp;<span
-                class="badge bg-primary">New</span>
+                data-count-checkboxes-of="#collapse-models">0/x</span>
             </button>
           </h2>
           <div id="collapse-models" class="accordion-collapse collapse"
@@ -154,35 +150,49 @@
                   <input class="form-check-input" type="checkbox" value="seamless_v3" id="seamless_v3"
                     name="models">
                   <label class="form-check-label" for="seamless_v3">
-                    Seamless v3
+                    GloFAS v3 Seamless
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="forecast_v3"
                     id="forecast_v3" name="models">
                   <label class="form-check-label" for="forecast_v3">
-                    Forecast v3
+                    GloFAS v3 Forecast
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="consolidated_v3"
                     id="consolidated_v3" name="models">
                   <label class="form-check-label" for="consolidated_v3">
-                    Consolidated v3
+                    GloFAS v3 Consolidated
                   </label>
                 </div>
               </div>
               <div class="col-md-4">
                 <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="seamless_v4"
+                    id="seamless_v4" name="models" disabled>
+                  <label class="form-check-label" for="seamless_v4">
+                    GloFAS v4 Seamless
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="forecast_v4"
+                    id="forecast_v3" name="models" disabled>
+                  <label class="form-check-label" for="forecast_v4">
+                    GloFAS v4 Forecast
+                  </label>
+                </div>
+                <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="consolidated_v4"
                     id="consolidated_v4" name="models">
                   <label class="form-check-label" for="consolidated_v4">
-                    Consolidated v4
+                    GloFAS v4 Consolidated
                   </label>
                 </div>
               </div>
               <div class="col-md-12">
-                <small class="text-muted">Note: <mark>Seamless</mark> combines forecast and consolidated data. For Version 4, no forecast is available yet.</small>
+                <p class="mt-2"><small class="text-muted">Note: <mark>Seamless</mark> combines forecast and consolidated historical data. Per default, GloFAS version 3 with seamless data from 1984 until 7 months of forecast is used. For Version 4, no forecast is available yet.</small></p>
               </div>
             </div>
           </div>
@@ -195,7 +205,7 @@
       <div class="col-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="1984-01-01" value="2021-01-01" data-default="" name="start_date" id="start_date"><span
+            data-date-start-date="1984-01-01" data-default="" name="start_date" id="start_date"><span
             class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
           <label for="start_date">Start date</label>
         </div>
@@ -203,9 +213,37 @@
       <div class="col-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="1984-01-01" value="2022-07-31" data-default="" name="end_date" id="end_date"><span
+            data-date-start-date="1984-01-01" data-default="" name="end_date" id="end_date"><span
             class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
           <label for="end_date">End date</label>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="form-floating mb-3">
+          <select class="form-select" name="past_days" id="past_days" aria-label="Past days" data-default="0">
+            <option selected value="0">0</option>
+            <option value="1">1 day</option>
+            <option value="7">1 week</option>
+            <option value="31">1 month</option>
+            <option value="92">3 months</option>
+            <option value="183">6 months</option>
+            <option value="356">1 year</option>
+          </select>
+          <label for="past_days">Past days</label>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="form-floating mb-3">
+          <select class="form-select" name="forecast_days" id="forecast_days" aria-label="Forecast days"
+            data-default="92">
+            <option value="1">1 day</option>
+            <option value="7">7 days</option>
+            <option value="14">2 weeks</option>
+            <option value="31">1 month</option>
+            <option selected value="92">3 months</option>
+            <option value="183">6 months</option>
+          </select>
+          <label for="forecast_days">Forecast days</label>
         </div>
       </div>
       <div class="col-3">
@@ -234,7 +272,7 @@
           <label for="past_days">Past days</label>
         </div>
       </div>-->
-      <div class="col-12 pb-3 debug-hidden">
+      <div class="col-12 pb-3">
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="localhost" name="localhost" value="true">
           <label class="form-check-label" for="localhost">Use localhost server</label>
@@ -265,8 +303,8 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses reanalysis and forecast data from the <a href="https://www.globalfloods.eu" target="_blank">Global Flood Awareness System (GloFAS)</a>. Data have been available since 16. November 2022.</p>
-    <p>Please note: Due to the 5 km resolution the closest river might not be selected correctly. Varying coordiantes by 0.05° can help to get a more representable discharge rate. The GloFAS website provides additional maps to help understand how rivers are covered in this dataset.</p>
+    <p>This API uses reanalysis and forecast data from the <a href="https://www.globalfloods.eu" target="_blank">Global Flood Awareness System (GloFAS)</a>. Per default, GloFAS version 3 with seamless data from 1984 until 7 months of forecast is used. Data from version 4 have been available since 16. November 2022, but only as historical reanalysis data.</p>
+    <p>Please note: Due to the 5-10 km resolution the closest river might not be selected correctly. Varying coordiantes by 0.1° can help to get a more representable discharge rate. The GloFAS website provides additional maps to help understand how rivers are covered in this dataset.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -281,6 +319,30 @@
         </thead>
         <tbody>
           <tr>
+            <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-historical?tab=overview" target="_blank">GloFAS v3 Reanalysis</a></th>
+            <td>Global</td>
+            <td>0.1° (~11 km)</td>
+            <td>Daily</td>
+            <td>1984 - July 2022</td>
+            <td>-</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-forecast?tab=overview" target="_blank">GloFAS v3 Forecast</a></th>
+            <td>Global</td>
+            <td>0.1° (~11 km)</td>
+            <td>Daily</td>
+            <td>30 days forecast</td>
+            <td>Daily</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-seasonal?tab=overview" target="_blank">GloFAS v3 Seasonal Forecast</a></th>
+            <td>Global</td>
+            <td>0.1° (~11 km)</td>
+            <td>Daily</td>
+            <td>7 months forecast</td>
+            <td>Monthly</td>
+          </tr>
+          <tr>
             <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-historical?tab=overview" target="_blank">GloFAS v4 Reanalysis</a></th>
             <td>Global</td>
             <td>0.05° (~5 km)</td>
@@ -289,7 +351,7 @@
             <td>-</td>
           </tr>
           <tr>
-            <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-historical?tab=overview" target="_blank">GloFAS v4 Forecast</a> *</th>
+            <th scope="row">GloFAS v4 Forecast *</th>
             <td>Global</td>
             <td>0.05° (~5 km)</td>
             <td>Daily</td>
@@ -297,17 +359,16 @@
             <td>Daily</td>
           </tr>
           <tr>
-            <th scope="row"><a href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/cems-glofas-historical?tab=overview" target="_blank">GloFAS v4 Seasonal Forecast</a> *</th>
+            <th scope="row">GloFAS v4 Seasonal Forecast *</th>
             <td>Global</td>
             <td>0.05° (~5 km)</td>
             <td>Daily</td>
-            <td>90 days forecast</td>
+            <td>7 months forecast</td>
             <td>Monthly</td>
           </tr>
         </tbody>
       </table>
-
-      <small class="text-muted">* Forecasts are not yet available</small>
+      <small class="text-muted">* Forecasts of version 4 are not yet available</small>
     </div>
 
     <h2 id="api-documentation" class="mt-5">API Documentation</h2>
@@ -337,7 +398,7 @@
             <td>String array</td>
             <td>No</td>
             <td></td>
-            <td>A list of weather variables which should be returned. Currently only "river_discharge" is available. Values can be comma separated, or multiple
+            <td>A list of weather variables which should be returned. Values can be comma separated, or multiple
               <mark>&daily=</mark> parameter in the URL can be used.
             </td>
           </tr>
@@ -350,21 +411,35 @@
               Please note that all time is then in GMT+0!
             </td>
           </tr>
-          <!--<tr>
+          <tr>
             <th scope="row">past_days</th>
-            <td>Integer (0-2)</td>
+            <td>Integer</td>
             <td>No</td>
             <td><mark>0</mark></td>
-            <td>If <mark>past_days</mark> is set, yesterday or the day before yesterday data are also returned.</td>
-          </tr>-->
+            <td>If <mark>past_days</mark> is set, past data can be returned.</td>
+          </tr>
+          <tr>
+            <th scope="row">forecast_days</th>
+            <td>Integer (0-16)</td>
+            <td>No</td>
+            <td><mark>92</mark></td>
+            <td>Per default, only 92 days are returned. Up to 210 days of forecast are possible.</td>
+          </tr>
           <tr>
             <th scope="row">start_date<br />end_date</th>
             <td>String (yyyy-mm-dd)</td>
             <td>No</td>
             <td></td>
-            <td>The time interval to get weather data. A day must be specified as an ISO8601 date (e.g.
-              <mark>2022-06-30</mark>). Data are available from 1984-01-01 until 2022-07-31.
+            <td>The time interval to get data. A day must be specified as an ISO8601 date (e.g.
+              <mark>2022-06-30</mark>). Data are available from 1984-01-01 until 7 month forecast.
             </td>
+          </tr>
+          <tr>
+            <th scope="row">ensemble</th>
+            <td>Boolean</td>
+            <td>No</td>
+            <td></td>
+            <td>If <mark>True</mark> all forecast ensemble members will be returned</td>
           </tr>
         </tbody>
       </table>
@@ -390,6 +465,11 @@
               <th scope="row">river_discharge</th>
               <td>m³/s</td>
               <td>Daily river discharge rate in m³/s</td>
+            </tr>
+            <tr>
+              <th scope="row">river_discharge_mean<br/>river_discharge_median<br/>river_discharge_max<br/>river_discharge_min<br/>river_discharge_p25<br/>river_discharge_p75</th>
+              <td>m³/s</td>
+              <td>Statistical analysis from ensemble members for river discharge rate in m³/s. Only available for forecasts and not for consolidated historical data.</td>
             </tr>
           </tbody>
         </table>

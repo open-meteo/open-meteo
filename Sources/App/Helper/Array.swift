@@ -48,6 +48,10 @@ extension Array where Element == Float {
     func containsNaN() -> Bool {
         return first(where: {$0.isNaN}) != nil
     }
+    
+    func onlyNaN() -> Bool {
+        return first(where: {!$0.isNaN}) == nil
+    }
 }
 
 extension Array where Element == Float {

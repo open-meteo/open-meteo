@@ -65,11 +65,9 @@
               <li><a class="dropdown-item #if(title == "JMA API"): active #endif"
                     href="/en/docs/jma-api">JMA API</a></li>
               <li><a class="dropdown-item #if(title == "MET Norway API"): active #endif"
-                    href="/en/docs/metno-api">MET Norway API&nbsp;&nbsp;<span
-                    class="badge bg-secondary">New</span></a></li>
+                    href="/en/docs/metno-api">MET Norway API</a></li>
               <li><a class="dropdown-item #if(title == "GEM API"): active #endif"
-                href="/en/docs/gem-api">GEM API&nbsp;&nbsp;<span
-                class="badge bg-secondary">New</span></a></li>
+                href="/en/docs/gem-api">GEM API</a></li>
             </ul>
           </li>
           <li class="nav-item dropdown">
@@ -87,7 +85,8 @@
               <li><a class="dropdown-item #if(title == "Elevation API"): active #endif"
                   href="/en/docs/elevation-api">Elevation API</a></li>
               <li><a class="dropdown-item #if(title == "Flood API"): active #endif"
-                    href="/en/docs/flood-api">Flood API</a></li>
+                    href="/en/docs/flood-api">Flood API&nbsp;&nbsp;<span
+                    class="badge bg-secondary">New</span></a></li>
               <li class="debug-hidden"><a class="dropdown-item #if(title == "Seasonal Forecast API"): active #endif"
                   href="/en/docs/seasonal-forecast-api">Seasonal Forecast API</a></li>
             </ul>
