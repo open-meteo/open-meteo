@@ -411,8 +411,8 @@ struct DownloadCerraCommand: Command {
         //var hourlyFiles: Bool
         
         /// Get the specified timerange in the command, or use the last 7 days as range
-        /*func getTimeinterval() -> TimerangeDt {
-            let dt = hourlyFiles ? 3600 : 86400
+        func getTimeinterval() -> TimerangeDt {
+            let dt = 86400 // hourlyFiles ? 3600 : 86400
             if let timeinterval = timeinterval {
                 guard timeinterval.count == 17, timeinterval.contains("-") else {
                     fatalError("format looks wrong")
@@ -426,7 +426,7 @@ struct DownloadCerraCommand: Command {
             let lastDays = 14
             let time0z = Timestamp.now().with(hour: 0)
             return TimerangeDt(start: time0z.add(lastDays * -86400), to: time0z, dtSeconds: dt)
-        }*/
+        }
     }
 
     var help: String {
@@ -672,7 +672,7 @@ struct DownloadCerraCommand: Command {
     }
     
     /// Convert daily compressed files to longer compressed files specified by `Cerra.omFileLength`. E.g. 14 days in one file.
-    /*func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt) throws {
+    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt) throws {
         let domain = CdsDomain.cerra
         if timeinterval.count == 0 {
             logger.info("No new timesteps could be downloaded. Nothing to do. Existing")
@@ -720,7 +720,7 @@ struct DownloadCerraCommand: Command {
             let ringtime = timeinterval.range.lowerBound.timeIntervalSince1970 / 3600 ..< timeinterval.range.upperBound.timeIntervalSince1970 / 3600
             try om.updateFromTimeOriented(variable: variable.rawValue, array2d: fasttime, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
         }
-    }*/
+    }
     
     func downloadElevation(logger: Logger, cdskey: String, domain: CdsDomain) throws {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
@@ -828,12 +828,10 @@ struct DownloadCerraCommand: Command {
             return
         }
         
-        fatalError("only yearlt download supported")
-        
         /// Select the desired timerange, or use last 14 day
-        //let timeinterval = signature.getTimeinterval()
-        //try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
-        //try convertDailyFiles(logger: logger, timeinterval: timeinterval)
+        let timeinterval = signature.getTimeinterval()
+        try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
+        try convertDailyFiles(logger: logger, timeinterval: timeinterval)
     }
 }
 
