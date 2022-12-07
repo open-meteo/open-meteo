@@ -66,6 +66,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         let baseUrl = "http://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         let nx = domain.grid.nx
