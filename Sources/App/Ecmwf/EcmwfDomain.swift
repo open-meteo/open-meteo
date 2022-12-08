@@ -173,6 +173,70 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderMixable {
             return DataAndUnit(direction, .degreeDirection)
         case .soil_temperature_0_7cm:
             return try get(raw: .soil_temperature_0_to_7cm, time: time)
+        case .weathercode:
+            let cloudcover = try get(derived: .cloudcover, time: time).data
+            let precipitation = try get(raw: .precipitation, time: time).data
+            let snowfall = try get(derived: .snowfall, time: time).data
+            return DataAndUnit(WeatherCode.calculate(
+                cloudcover: cloudcover,
+                precipitation: precipitation,
+                convectivePrecipitation: nil,
+                snowfallCentimeters: snowfall,
+                gusts: nil,
+                cape: nil,
+                liftedIndex: nil,
+                modelDtHours: time.dtSeconds / 3600), .wmoCode
+            )
+        case .cloudcover:
+            let low = try get(derived: .cloudcover_low, time: time).data
+            let mid = try get(derived: .cloudcover_mid, time: time).data
+            let high = try get(derived: .cloudcover_high, time: time).data
+            return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percent)
+        case .cloudcover_low:
+            let cl0 = try get(derived: .cloudcover_1000hPa, time: time)
+            let cl1 = try get(derived: .cloudcover_925hPa, time: time)
+            let cl2 = try get(derived: .cloudcover_850hPa, time: time)
+            return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
+        case .cloudcover_mid:
+            let cl0 = try get(derived: .cloudcover_700hPa, time: time)
+            let cl1 = try get(derived: .cloudcover_500hPa, time: time)
+            return DataAndUnit(zip(cl0.data, cl1.data).map(max), .percent)
+        case .cloudcover_high:
+            let cl0 = try get(derived: .cloudcover_300hPa, time: time)
+            let cl1 = try get(derived: .cloudcover_250hPa, time: time)
+            let cl2 = try get(derived: .cloudcover_200hPa, time: time)
+            return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
+        case .cloudcover_1000hPa:
+            let rh = try get(raw: .relative_humidity_1000hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .cloudcover_925hPa:
+            let rh = try get(raw: .relative_humidity_925hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .cloudcover_850hPa:
+            let rh = try get(raw: .relative_humidity_850hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .cloudcover_700hPa:
+            let rh = try get(raw: .relative_humidity_700hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .cloudcover_500hPa:
+            let rh = try get(raw: .relative_humidity_500hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .cloudcover_300hPa:
+            let rh = try get(raw: .relative_humidity_300hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .cloudcover_250hPa:
+            let rh = try get(raw: .relative_humidity_250hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .cloudcover_200hPa:
+            let rh = try get(raw: .relative_humidity_200hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .cloudcover_50hPa:
+            let rh = try get(raw: .relative_humidity_50hPa, time: time)
+            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+        case .snowfall:
+            let temperature = try get(raw: .temperature_2m, time: time)
+            let precipitation = try get(raw: .precipitation, time: time)
+            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
         }
     }
     
@@ -240,6 +304,46 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderMixable {
             try prefetchData(raw: .eastward_wind_50hPa, time: time)
         case .soil_temperature_0_7cm:
             try prefetchData(raw: .soil_temperature_0_to_7cm, time: time)
+        case .cloudcover_1000hPa:
+            try prefetchData(raw: .relative_humidity_1000hPa, time: time)
+        case .cloudcover_925hPa:
+            try prefetchData(raw: .relative_humidity_925hPa, time: time)
+        case .cloudcover_850hPa:
+            try prefetchData(raw: .relative_humidity_850hPa, time: time)
+        case .cloudcover_700hPa:
+            try prefetchData(raw: .relative_humidity_700hPa, time: time)
+        case .cloudcover_500hPa:
+            try prefetchData(raw: .relative_humidity_500hPa, time: time)
+        case .cloudcover_300hPa:
+            try prefetchData(raw: .relative_humidity_300hPa, time: time)
+        case .cloudcover_250hPa:
+            try prefetchData(raw: .relative_humidity_250hPa, time: time)
+        case .cloudcover_200hPa:
+            try prefetchData(raw: .relative_humidity_200hPa, time: time)
+        case .cloudcover_50hPa:
+            try prefetchData(raw: .relative_humidity_50hPa, time: time)
+        case .weathercode:
+            try prefetchData(derived: .cloudcover, time: time)
+            try prefetchData(derived: .snowfall, time: time)
+            try prefetchData(raw: .precipitation, time: time)
+        case .cloudcover:
+            try prefetchData(derived: .cloudcover_low, time: time)
+            try prefetchData(derived: .cloudcover_mid, time: time)
+            try prefetchData(derived: .cloudcover_high, time: time)
+        case .cloudcover_low:
+            try prefetchData(derived: .cloudcover_1000hPa, time: time)
+            try prefetchData(derived: .cloudcover_925hPa, time: time)
+            try prefetchData(derived: .cloudcover_850hPa, time: time)
+        case .cloudcover_mid:
+            try prefetchData(derived: .cloudcover_700hPa, time: time)
+            try prefetchData(derived: .cloudcover_500hPa, time: time)
+        case .cloudcover_high:
+            try prefetchData(derived: .cloudcover_300hPa, time: time)
+            try prefetchData(derived: .cloudcover_250hPa, time: time)
+            try prefetchData(derived: .cloudcover_200hPa, time: time)
+        case .snowfall:
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .precipitation, time: time)
         }
     }
 }

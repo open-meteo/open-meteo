@@ -80,7 +80,7 @@ struct WebsiteController: RouteCollection {
             //ContextWithLevels.PressureVariable(label: "Dewpoint", name: "dewpoint"),
             ContextWithLevels.PressureVariable(label: "Relative Humidity", name: "relative_humidity"), // NOTE underscore here!
             ContextWithLevels.PressureVariable(label: "Specific Humidity", name: "specific_humidity"),
-            //ContextWithLevels.PressureVariable(label: "Cloudcover", name: "cloudcover"),
+            ContextWithLevels.PressureVariable(label: "Cloudcover", name: "cloudcover"),
             ContextWithLevels.PressureVariable(label: "Wind Speed", name: "windspeed"),
             ContextWithLevels.PressureVariable(label: "Wind Direction", name: "winddirection"),
             ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),

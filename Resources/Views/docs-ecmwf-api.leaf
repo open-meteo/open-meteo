@@ -108,9 +108,22 @@
 
       <div class="col-md-3">
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode" name="hourly">
+          <label class="form-check-label" for="weathercode">
+            Weathercode
+          </label>
+        </div>
+        
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="precipitation" id="precipitation" name="hourly">
           <label class="form-check-label" for="precipitation">
             Precipitation (rain + showers + snow)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall" id="snowfall" name="hourly">
+          <label class="form-check-label" for="snowfall">
+            Snowfall
           </label>
         </div>
         <div class="form-check">
@@ -130,6 +143,31 @@
       </div>
 
       <div class="col-md-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover" name="hourly">
+          <label class="form-check-label" for="cloudcover">
+            Cloudcover Total
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cloudcover_low" id="cloudcover_low" name="hourly">
+          <label class="form-check-label" for="cloudcover_low">
+            Cloudcover Low
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cloudcover_mid" id="cloudcover_mid" name="hourly">
+          <label class="form-check-label" for="cloudcover_mid">
+            Cloudcover Mid
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cloudcover_high" id="cloudcover_high" name="hourly">
+          <label class="form-check-label" for="cloudcover_high">
+            Cloudcover High
+          </label>
+        </div>
+
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="windspeed_10m" id="windspeed_10m" name="hourly">
           <label class="form-check-label" for="windspeed_10m">
@@ -436,10 +474,49 @@
             <td>Total precipitation (rain, showers, snow) sum of the preceding hour</td>
           </tr>
           <tr>
+            <th scope="row">snowfall</th>
+            <td>Preceding hour sum</td>
+            <td>cm (inch)</td>
+            <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by
+              7. E.g. 7 cm snow = 10 mm precipitation water equivalent. Snowfall amount is not provided by ECMWF directly, instead it is approximated based on total precipitation and temperature</td>
+          </tr>
+          <tr>
             <th scope="row">runoff</th>
             <td>Preceding hour sum</td>
             <td>mm (inch)</td>
             <td>Execess rain that is not absorbed by the soil</td>
+          </tr>
+          <tr>
+            <th scope="row">weathercode</th>
+            <td>Instant</td>
+            <td>WMO code</td>
+            <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for
+              details. Weather code is calculated from cloud cover analysis, precipitation and snowfall. 
+              As ECMWF IFS has barely no information about atmospheric stability, estimation about thunderstorms is not possible.</td>
+          </tr>
+          <tr>
+            <th scope="row">cloudcover</th>
+            <td>Instant</td>
+            <td>%</td>
+            <td>Total cloud cover as an area fraction. Calculated as a weighted function from low, mid and high level clouds.</td>
+          </tr>
+          <tr>
+            <th scope="row">cloudcover_low</th>
+            <td>Instant</td>
+            <td>%</td>
+            <td>Low level clouds and fog up to 3 km altitude. In case of ECMWF IFS it is based on relative humidity on pressure levels 1000, 925 and 850 hPa.</td>
+          </tr>
+          <tr>
+            <th scope="row">cloudcover_mid</th>
+            <td>Instant</td>
+            <td>%</td>
+            <td>Mid level clouds from 3 to 8 km altitude.  In case of ECMWF IFS it is based on relative humidity on pressure levels 700 and 500 hPa.</td>
+          </tr>
+          <tr>
+            <th scope="row">cloudcover_high</th>
+            <td>Instant</td>
+            <td>%</td>
+            <td>High level clouds from 8 km altitude. In case of ECMWF IFS it is based on relative humidity on pressure levels 300, 250 and 200 hPa.</td>
           </tr>
           <tr>
             <th scope="row">pressure_msl<br>surface_air_pressure</th>
@@ -497,6 +574,15 @@
             <td>Instant</td>
             <td>%</td>
             <td>Relative humidity at atmospheric pressure levels. Unfortunately, 2 meter relative humidity is unavailable.</td>
+          </tr>
+          <tr>
+            <th scope="row">cloudcover_1000hPa, ...</th>
+            <td>Instant</td>
+            <td>%</td>
+            <td>Cloud cover at the specified pressure level. Cloud cover is approximated based on relative humidity
+              using <a
+                href="https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf"
+                target="_blank">Sundqvist et al. (1989)</a></td>
           </tr>
           <tr>
             <th scope="row">specific_humidity_1000hPa, ...</th>
@@ -600,9 +686,82 @@
     </pre>
   </div>
 
-  This service is based on data and products of the European Centre for Medium-Range Weather Forecasts (ECMWF). Source
+  <div class="col-12 py-5">
+    <h2 id="weathervariables">Weather variable documentation</h2>
+  </div>
+
+  <div class="col-6">
+    <h3>WMO Weather interpretation codes (WW)</h3>
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Code</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">0</th>
+            <td>Clear sky</td>
+          </tr>
+          <tr>
+            <th scope="row">1, 2, 3</th>
+            <td>Mainly clear, partly cloudy, and overcast</td>
+          </tr>
+          <tr>
+            <th scope="row">45, 48</th>
+            <td>Fog and depositing rime fog</td>
+          </tr>
+          <tr>
+            <th scope="row">51, 53, 55</th>
+            <td>Drizzle: Light, moderate, and dense intensity</td>
+          </tr>
+          <tr>
+            <th scope="row">56, 57</th>
+            <td>Freezing Drizzle: Light and dense intensity</td>
+          </tr>
+          <tr>
+            <th scope="row">61, 63, 65</th>
+            <td>Rain: Slight, moderate and heavy intensity</td>
+          </tr>
+          <tr>
+            <th scope="row">66, 67</th>
+            <td>Freezing Rain: Light and heavy intensity</td>
+          </tr>
+          <tr>
+            <th scope="row">71, 73, 75</th>
+            <td>Snow fall: Slight, moderate, and heavy intensity</td>
+          </tr>
+          <tr>
+            <th scope="row">77 *</th>
+            <td>Snow grains</td>
+          </tr>
+          <tr>
+            <th scope="row">80, 81, 82 *</th>
+            <td>Rain showers: Slight, moderate, and violent</td>
+          </tr>
+          <tr>
+            <th scope="row">85, 86 *</th>
+            <td>Snow showers slight and heavy</td>
+          </tr>
+          <tr>
+            <th scope="row">95 *</th>
+            <td>Thunderstorm: Slight or moderate</td>
+          </tr>
+          <tr>
+            <th scope="row">96, 99 *</th>
+            <td>Thunderstorm with slight and heavy hail</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p>(*) Showers and thunderstorm forecast not available with ECMWF IFS</p>
+
+
+  <p>This service is based on data and products of the European Centre for Medium-Range Weather Forecasts (ECMWF). Source
   www.ecmwf.int. ECMWF does not accept any liability whatsoever for any error or omission in the data, their
-  availability, or for any loss or damage arising from their use.
+  availability, or for any loss or damage arising from their use.</p>
 
   <!--<div class=col-12>
       <h1>Docs</h1>

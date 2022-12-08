@@ -537,7 +537,22 @@ enum EcmwfVariableDerived: String, Codable, GenericVariableMixable {
     case winddirection_250hPa
     case winddirection_200hPa
     case winddirection_50hPa
+    case cloudcover_1000hPa
+    case cloudcover_925hPa
+    case cloudcover_850hPa
+    case cloudcover_700hPa
+    case cloudcover_500hPa
+    case cloudcover_300hPa
+    case cloudcover_250hPa
+    case cloudcover_200hPa
+    case cloudcover_50hPa
     case soil_temperature_0_7cm
+    case weathercode
+    case cloudcover
+    case cloudcover_low
+    case cloudcover_mid
+    case cloudcover_high
+    case snowfall
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
