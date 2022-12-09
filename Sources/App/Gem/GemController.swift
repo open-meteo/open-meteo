@@ -198,6 +198,7 @@ enum GemVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMi
     case terrestrial_radiation_instant
     case snowfall
     case rain
+    case weathercode
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -305,6 +306,13 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 400))), time: time)
                 try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 300))), time: time)
                 try prefetchData(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 200))), time: time)
+            case .weathercode:
+                try prefetchData(raw: .cloudcover, time: time)
+                try prefetchData(raw: .precipitation, time: time)
+                try prefetchData(derived: .surface(.snowfall), time: time)
+                try prefetchData(raw: .showers, time: time)
+                try prefetchData(raw: .cape, time: time)
+                try prefetchData(raw: .windgusts_10m, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -414,6 +422,23 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 let cl1 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 300))), time: time)
                 let cl2 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 200))), time: time)
                 return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
+            case .weathercode:
+                let cloudcover = try get(raw: .cloudcover, time: time).data
+                let precipitation = try get(raw: .precipitation, time: time).data
+                let snowfall = try get(derived: .surface(.snowfall), time: time).data
+                let showers = try get(raw: .showers, time: time).data
+                let cape = try get(raw: .cape, time: time).data
+                let gusts = try get(raw: .windgusts_10m, time: time).data
+                return DataAndUnit(WeatherCode.calculate(
+                    cloudcover: cloudcover,
+                    precipitation: precipitation,
+                    convectivePrecipitation: showers,
+                    snowfallCentimeters: snowfall,
+                    gusts: gusts,
+                    cape: cape,
+                    liftedIndex: nil,
+                    modelDtHours: time.dtSeconds / 3600), .wmoCode
+                )
             }
         case .pressure(let v):
             switch v.variable {

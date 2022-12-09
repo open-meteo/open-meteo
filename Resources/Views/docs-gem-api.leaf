@@ -130,6 +130,12 @@
             Snowfall
           </label>
         </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode" name="hourly">
+          <label class="form-check-label" for="weathercode">
+            Weathercode
+          </label>
+        </div>
       </div>
       <div class="col-md-3">
         <div class="form-check">
@@ -965,6 +971,14 @@
                 href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations</a> ET₀
                   is calculated from temperature, wind speed, humidity and solar radiation. Unlimited soil water is
                   assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
+          </tr>
+          <tr>
+            <th scope="row">weathercode</th>
+            <td>Instant</td>
+            <td>WMO code</td>
+            <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for
+              details. Weather code is calculated from cloud cover analysis, precipitation and snowfall. 
+              As ECMWF IFS has barely no information about atmospheric stability, estimation about thunderstorms is not possible.</td>
           </tr>
           <tr>
             <th scope="row">precipitation</th>
