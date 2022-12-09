@@ -40,7 +40,7 @@ public struct GemController {
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).conertAndRound(params: params).toApi(name: variable.name)
+                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
                     assert(hourlyTime.count == d.data.count)
                     res.append(d)
                 }
@@ -51,22 +51,19 @@ public struct GemController {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                guard let reader = try GemMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
-                }
-                let temperature = try reader.get(variable: .temperature_2m, time: time).conertAndRound(params: params)
-                let winddirection = try reader.get(variable: .winddirection_10m, time: time).conertAndRound(params: params)
-                let windspeed = try reader.get(variable: .windspeed_10m, time: time).conertAndRound(params: params)
-                //let weathercode = try reader.get(variable: .weathercode).conertAndRound(params: params)
+                let temperature = try reader.get(variable: .temperature_2m, time: time).convertAndRound(params: params)
+                let winddirection = try reader.get(variable: .winddirection_10m, time: time).convertAndRound(params: params)
+                let windspeed = try reader.get(variable: .windspeed_10m, time: time).convertAndRound(params: params)
+                let weathercode = try reader.get(variable: .weathercode, time: time).convertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],
                     winddirection: winddirection.data[0],
-                    weathercode: .nan, //weathercode.data[0],
+                    weathercode: weathercode.data[0],
                     temperature_unit: temperature.unit,
                     windspeed_unit: windspeed.unit,
                     winddirection_unit: winddirection.unit,
-                    weathercode_unit: .dimensionless, //weathercode.unit,
+                    weathercode_unit: weathercode.unit,
                     time: starttime
                 )
             } else {
@@ -480,30 +477,30 @@ extension GemMixer {
         let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
         case .temperature_2m_max:
-            let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
+            let data = try get(variable: .temperature_2m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .temperature_2m_min:
-            let data = try get(variable: .temperature_2m, time: time).conertAndRound(params: params)
+            let data = try get(variable: .temperature_2m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .apparent_temperature_max:
-            let data = try get(variable: .apparent_temperature, time: time).conertAndRound(params: params)
+            let data = try get(variable: .apparent_temperature, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .apparent_temperature_min:
-            let data = try get(variable: .apparent_temperature, time: time).conertAndRound(params: params)
+            let data = try get(variable: .apparent_temperature, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .precipitation_sum:
             // rounding is required, becuse floating point addition results in uneven numbers
-            let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
+            let data = try get(variable: .precipitation, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .shortwave_radiation_sum:
-            let data = try get(variable: .shortwave_radiation, time: time).conertAndRound(params: params)
+            let data = try get(variable: .shortwave_radiation, time: time).convertAndRound(params: params)
             // 3600s only for hourly data of source
             return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megaJoulesPerSquareMeter)
         case .windspeed_10m_max:
-            let data = try get(variable: .windspeed_10m, time: time).conertAndRound(params: params)
+            let data = try get(variable: .windspeed_10m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .windgusts_10m_max:
-            let data = try get(variable: .windgusts_10m, time: time).conertAndRound(params: params)
+            let data = try get(variable: .windgusts_10m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .winddirection_10m_dominant:
             // vector addition
@@ -513,26 +510,26 @@ extension GemMixer {
             let v = zip(speed, direction).map(Meteorology.vWind).sum(by: 24)
             return DataAndUnit(Meteorology.windirectionFast(u: u, v: v), .degreeDirection)
         case .precipitation_hours:
-            let data = try get(variable: .precipitation, time: time).conertAndRound(params: params)
+            let data = try get(variable: .precipitation, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
         case .sunrise:
             return DataAndUnit([],.hours)
         case .sunset:
             return DataAndUnit([],.hours)
         case .et0_fao_evapotranspiration:
-            let data = try get(variable: .et0_fao_evapotranspiration, time: time).conertAndRound(params: params)
+            let data = try get(variable: .et0_fao_evapotranspiration, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .snowfall_sum:
-            let data = try get(variable: .snowfall, time: time).conertAndRound(params: params)
+            let data = try get(variable: .snowfall, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .rain_sum:
-            let data = try get(variable: .rain, time: time).conertAndRound(params: params)
+            let data = try get(variable: .rain, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .showers_sum:
-            let data = try get(variable: .showers, time: time).conertAndRound(params: params)
+            let data = try get(variable: .showers, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .weathercode:
-            let data = try get(variable: .weathercode, time: time).conertAndRound(params: params)
+            let data = try get(variable: .weathercode, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         }
     }

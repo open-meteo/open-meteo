@@ -32,10 +32,33 @@ struct MetNoController {
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: variable.name)
+                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
                     res.append(d)
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            }
+            
+            let currentWeather: ForecastapiResult.CurrentWeather?
+            if params.current_weather == true {
+                let starttime = currentTime.floor(toNearest: 3600)
+                let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
+                let temperature = try reader.get(raw: .temperature_2m, time: time).convertAndRound(params: params)
+                let winddirection = try reader.get(raw: .winddirection_10m, time: time).convertAndRound(params: params)
+                let windspeed = try reader.get(raw: .windspeed_10m, time: time).convertAndRound(params: params)
+                let weathercode = try reader.get(derived: .weathercode, time: time).convertAndRound(params: params)
+                currentWeather = ForecastapiResult.CurrentWeather(
+                    temperature: temperature.data[0],
+                    windspeed: windspeed.data[0],
+                    winddirection: winddirection.data[0],
+                    weathercode: weathercode.data[0],
+                    temperature_unit: temperature.unit,
+                    windspeed_unit: windspeed.unit,
+                    winddirection_unit: winddirection.unit,
+                    weathercode_unit: weathercode.unit,
+                    time: starttime
+                )
+            } else {
+                currentWeather = nil
             }
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
@@ -46,7 +69,7 @@ struct MetNoController {
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,
-                current_weather: nil,
+                current_weather: currentWeather,
                 sections: [hourly].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
             )
@@ -59,11 +82,11 @@ struct MetNoController {
 
 typealias MetNoHourlyVariable = VariableOrDerived<MetNoVariable, MetNoVariableDerived>
 
-struct MetNoQuery: Content, QueryWithStartEndDateTimeZone {
+struct MetNoQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
     let hourly: [MetNoHourlyVariable]?
-    //let current_weather: Bool?
+    let current_weather: Bool?
     let elevation: Float?
     //let timezone: String?
     let temperature_unit: TemperatureUnit?

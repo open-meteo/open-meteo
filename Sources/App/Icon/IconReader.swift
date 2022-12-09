@@ -368,33 +368,33 @@ extension IconMixer {
         let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
         case .temperature_2m_max:
-            let data = try get(raw: .temperature_2m, time: time).conertAndRound(params: params)
+            let data = try get(raw: .temperature_2m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .temperature_2m_min:
-            let data = try get(raw: .temperature_2m, time: time).conertAndRound(params: params)
+            let data = try get(raw: .temperature_2m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .apparent_temperature_max:
-            let data = try get(derived: .apparent_temperature, time: time).conertAndRound(params: params)
+            let data = try get(derived: .apparent_temperature, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .apparent_temperature_min:
-            let data = try get(derived: .apparent_temperature, time: time).conertAndRound(params: params)
+            let data = try get(derived: .apparent_temperature, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .precipitation_sum:
             // rounding is required, becuse floating point addition results in uneven numbers
-            let data = try get(raw: .precipitation, time: time).conertAndRound(params: params)
+            let data = try get(raw: .precipitation, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .weathercode:
-            let data = try get(raw: .weathercode, time: time).conertAndRound(params: params)
+            let data = try get(raw: .weathercode, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .shortwave_radiation_sum:
-            let data = try get(derived: .shortwave_radiation, time: time).conertAndRound(params: params)
+            let data = try get(derived: .shortwave_radiation, time: time).convertAndRound(params: params)
             // 3600s only for hourly data of source
             return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megaJoulesPerSquareMeter)
         case .windspeed_10m_max:
-            let data = try get(derived: .windspeed_10m, time: time).conertAndRound(params: params)
+            let data = try get(derived: .windspeed_10m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .windgusts_10m_max:
-            let data = try get(raw: .windgusts_10m, time: time).conertAndRound(params: params)
+            let data = try get(raw: .windgusts_10m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .winddirection_10m_dominant:
             // vector addition
@@ -406,23 +406,23 @@ extension IconMixer {
             /// TODO need sunrise and set time for correct numbers
             //fatalError()
         case .precipitation_hours:
-            let data = try get(raw: .precipitation, time: time).conertAndRound(params: params)
+            let data = try get(raw: .precipitation, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
         case .sunrise:
             return DataAndUnit([],.hours)
         case .sunset:
             return DataAndUnit([],.hours)
         case .et0_fao_evapotranspiration:
-            let data = try get(derived: .et0_fao_evapotranspiration, time: time).conertAndRound(params: params)
+            let data = try get(derived: .et0_fao_evapotranspiration, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .snowfall_sum:
-            let data = try get(derived: .snowfall, time: time).conertAndRound(params: params)
+            let data = try get(derived: .snowfall, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .rain_sum:
-            let data = try get(raw: .rain, time: time).conertAndRound(params: params)
+            let data = try get(raw: .rain, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .showers_sum:
-            let data = try get(raw: .showers, time: time).conertAndRound(params: params)
+            let data = try get(raw: .showers, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         }
     }

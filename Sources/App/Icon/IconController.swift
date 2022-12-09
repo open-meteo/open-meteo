@@ -39,7 +39,7 @@ public struct IconController {
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count)
                 for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).conertAndRound(params: params).toApi(name: variable.name)
+                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
                     assert(hourlyTime.count == d.data.count)
                     res.append(d)
                 }
@@ -50,13 +50,10 @@ public struct IconController {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
-                }
-                let temperature = try reader.get(raw: .temperature_2m, time: time).conertAndRound(params: params)
-                let winddirection = try reader.get(derived: .winddirection_10m, time: time).conertAndRound(params: params)
-                let windspeed = try reader.get(derived: .windspeed_10m, time: time).conertAndRound(params: params)
-                let weathercode = try reader.get(raw: .weathercode, time: time).conertAndRound(params: params)
+                let temperature = try reader.get(raw: .temperature_2m, time: time).convertAndRound(params: params)
+                let winddirection = try reader.get(derived: .winddirection_10m, time: time).convertAndRound(params: params)
+                let windspeed = try reader.get(derived: .windspeed_10m, time: time).convertAndRound(params: params)
+                let weathercode = try reader.get(raw: .weathercode, time: time).convertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],

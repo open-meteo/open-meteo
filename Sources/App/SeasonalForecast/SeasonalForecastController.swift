@@ -176,23 +176,23 @@ extension SeasonalForecastReader {
         let time = timeDaily.with(dtSeconds: domain.dtSeconds)
         switch variable {
         case .temperature_2m_max:
-            let data = try get(variable: VariableAndMember(.temperature_2m_max, member), time: time).conertAndRound(params: params)
+            let data = try get(variable: VariableAndMember(.temperature_2m_max, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 4), data.unit)
         case .temperature_2m_min:
-            let data = try get(variable: VariableAndMember(.temperature_2m_min, member), time: time).conertAndRound(params: params)
+            let data = try get(variable: VariableAndMember(.temperature_2m_min, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 4), data.unit)
         case .precipitation_sum:
-            let data = try get(variable: VariableAndMember(.precipitation, member), time: time).conertAndRound(params: params)
+            let data = try get(variable: VariableAndMember(.precipitation, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 4), data.unit)
         case .showers_sum:
-            let data = try get(variable: VariableAndMember(.showers, member), time: time).conertAndRound(params: params)
+            let data = try get(variable: VariableAndMember(.showers, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 4), data.unit)
         case .shortwave_radiation_sum:
-            let data = try get(variable: VariableAndMember(.shortwave_radiation, member), time: time).conertAndRound(params: params)
+            let data = try get(variable: VariableAndMember(.shortwave_radiation, member), time: time).convertAndRound(params: params)
             // for 6h data
             return DataAndUnit(data.data.sum(by: 4).map({$0*0.0036 * 6}).round(digits: 2), .megaJoulesPerSquareMeter)
         case .windspeed_10m_max:
-            let data = try get(variable: .derived(.windspeed_10m), member: member, time: time).conertAndRound(params: params)
+            let data = try get(variable: .derived(.windspeed_10m), member: member, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 4), data.unit)
         case .winddirection_10m_dominant:
             let u = try get(variable: VariableAndMember(.wind_u_component_10m, member), time: time).data.sum(by: 4)
@@ -200,7 +200,7 @@ extension SeasonalForecastReader {
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .precipitation_hours:
-            let data = try get(variable: VariableAndMember(.precipitation, member), time: time).conertAndRound(params: params)
+            let data = try get(variable: VariableAndMember(.precipitation, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 4), .hours)
         }
     }
@@ -260,7 +260,7 @@ struct SeasonalForecastController {
             let hourly: ApiSection? = try params.six_hourly.map { variables in
                 return ApiSection(name: "six_hourly", time: hourlyTime, columns: try variables.flatMap { variable in
                     try members.map { member in
-                        let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
+                        let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(params: params).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
                         assert(hourlyTime.count == d.data.count, "hours \(hourlyTime.count), values \(d.data.count)")
                         return d
                     }
@@ -270,7 +270,7 @@ struct SeasonalForecastController {
             let daily: ApiSection? = try params.daily.map { dailyVariables in
                 return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.flatMap { variable in
                     try members.map { member in
-                        let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
+                        let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(params: params).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
                         assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
                         return d
                     }
