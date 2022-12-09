@@ -49,16 +49,19 @@ struct UnitedStatesAirQuality {
     
     static let no2_HourlyThresholds: [Float] = [0, 54, 100, 360, 650, 1250, 1650, 2050]
     
+    /// Scale class value 0...7 to AQI index 0...500
+    @inlinable static func scale(_ val: Float) -> Float {
+        return val <= 4 ? (val*50) : (val*100 - 200)
+    }
+    
     /// Accept hourly values
     @inlinable static func indexNo2(no2: Float) -> Float {
-        let x = no2_HourlyThresholds.positionExtrapolated(of: no2)
-        return x <= 3 ? (x*50) : (x*100 - 100)
+        return scale(no2_HourlyThresholds.positionExtrapolated(of: no2))
     }
     
     /// Accept 8h avg
     @inlinable static func indexCo(co_8h_mean: Float) -> Float {
-        let x = co_8HourlyThresholds.positionExtrapolated(of: co_8h_mean)
-        return x <= 3 ? (x*50) : (x*100 - 100)
+        return scale(co_8HourlyThresholds.positionExtrapolated(of: co_8h_mean))
     }
     
     /// Accept hourly values and 8h avg
@@ -66,35 +69,29 @@ struct UnitedStatesAirQuality {
         let x1 = o3_HourlyThresholds.positionExtrapolated(of: o3)
         let x2 = o3_8HourlyThresholds.positionExtrapolated(of: o3_8h_mean)
         if x1.isNaN {
-            return x2 <= 3 ? (x2*50) : (x2*100 - 100)
+            return scale(x2)
         }
         if x2.isNaN {
-            return x1 <= 3 ? (x1*50) : (x1*100 - 100)
+            return scale(x1)
         }
-        let x = max(x1, x2)
-        return x <= 3 ? (x*50) : (x*100 - 100)
+        return scale(max(x1, x2))
     }
     
     /// Accept hourly values and 24h avg
     @inlinable static func indexSo2(so2: Float, so2_24h_mean: Float) -> Float {
         let x1 = so2_HourlyThresholds.positionExtrapolated(of: so2)
         let x2 = so2_24HourlyThresholds.positionExtrapolated(of: so2_24h_mean)
-        if x1.isNaN {
-            return x2 <= 3 ? (x2*50) : (x2*100 - 100)
-        }
-        return x1 <= 3 ? (x1*50) : (x1*100 - 100)
+        return x1.isNaN ? scale(x2) : scale(x1)
     }
     
     /// Accept 24h running mean
     @inlinable static func indexPm10(pm10_24h_mean: Float) -> Float {
-        let x = pm10_24HourlyMeanThresholds.positionExtrapolated(of: pm10_24h_mean) * 20
-        return x <= 3 ? (x*50) : (x*100 - 100)
+        return scale(pm10_24HourlyMeanThresholds.positionExtrapolated(of: pm10_24h_mean))
     }
     
     /// Accept 24h running mean
     @inlinable static func indexPm2_5(pm2_5_24h_mean: Float) -> Float {
-        let x = pm2_5_24HourlyMeanThresholds.positionExtrapolated(of: pm2_5_24h_mean) * 20
-        return x <= 3 ? (x*50) : (x*100 - 100)
+        return scale(pm2_5_24HourlyMeanThresholds.positionExtrapolated(of: pm2_5_24h_mean))
     }
 }
 

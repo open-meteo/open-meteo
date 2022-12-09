@@ -7,7 +7,7 @@ public enum TimeError: Error {
 }
 
 
-public struct Timestamp {
+public struct Timestamp: Hashable {
     public let timeIntervalSince1970: Int
     
     /// Hour in 0-23
@@ -169,7 +169,7 @@ public struct TimerangeLocal {
 }
 
 
-public struct TimerangeDt {
+public struct TimerangeDt: Hashable {
     public let range: Range<Timestamp>
     public let dtSeconds: Int
     

@@ -139,7 +139,7 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
             let no2 = try get(derived: .us_aqi_no2, time: time).data
             let o3 = try get(derived: .us_aqi_o3, time: time).data
             let so2 = try get(derived: .us_aqi_so2, time: time).data
-            let co = try get(derived: .us_aqi_so2, time: time).data
+            let co = try get(derived: .us_aqi_co, time: time).data
             let max = pm2_5.indices.map({ i -> Float in
                 return Swift.max(Swift.max(Swift.max(Swift.max(pm2_5[i], Swift.max(pm10[i], co[i])), no2[i]), o3[i]), so2[i])
             })
@@ -157,17 +157,17 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
             return DataAndUnit(no2.map(UnitedStatesAirQuality.indexNo2), .usaqi)
         case .us_aqi_o3:
             let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
-            let o3 = try get(raw: .pm10, time: timeAhead).data
+            let o3 = try get(raw: .ozone, time: timeAhead).data
             let o3avg = o3.slidingAverageDroppingFirstDt(dt: 8)
             return DataAndUnit(zip(o3.dropFirst(8), o3avg).map(UnitedStatesAirQuality.indexO3), .usaqi)
         case .us_aqi_so2:
             let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
-            let so2 = try get(raw: .pm10, time: timeAhead).data
+            let so2 = try get(raw: .sulphur_dioxide, time: timeAhead).data
             let so2avg = so2.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(zip(so2.dropFirst(24), so2avg).map(UnitedStatesAirQuality.indexSo2), .usaqi)
         case .us_aqi_co:
             let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
-            let co = try get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
+            let co = try get(raw: .carbon_monoxide, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
             return DataAndUnit(co.map(UnitedStatesAirQuality.indexCo), .usaqi)
         }
     }
