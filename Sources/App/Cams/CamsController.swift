@@ -153,22 +153,26 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
             let pm10avg = try get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(pm10avg.map(UnitedStatesAirQuality.indexPm10), .usaqi)
         case .us_aqi_no2:
+            // need to convert from ugm3 to ppb
             let no2 = try get(raw: .nitrogen_dioxide, time: time).data
-            return DataAndUnit(no2.map(UnitedStatesAirQuality.indexNo2), .usaqi)
+            return DataAndUnit(no2.map({UnitedStatesAirQuality.indexNo2(no2: $0 / 1.88) }), .usaqi)
         case .us_aqi_o3:
+            // need to convert from ugm3 to ppb
             let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
             let o3 = try get(raw: .ozone, time: timeAhead).data
             let o3avg = o3.slidingAverageDroppingFirstDt(dt: 8)
-            return DataAndUnit(zip(o3.dropFirst(8), o3avg).map(UnitedStatesAirQuality.indexO3), .usaqi)
+            return DataAndUnit(zip(o3.dropFirst(8), o3avg).map({UnitedStatesAirQuality.indexO3(o3: $0.0 / 1.96, o3_8h_mean: $0.1 / 1.96)}), .usaqi)
         case .us_aqi_so2:
+            // need to convert from ugm3 to ppb
             let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
             let so2 = try get(raw: .sulphur_dioxide, time: timeAhead).data
             let so2avg = so2.slidingAverageDroppingFirstDt(dt: 24)
-            return DataAndUnit(zip(so2.dropFirst(24), so2avg).map(UnitedStatesAirQuality.indexSo2), .usaqi)
+            return DataAndUnit(zip(so2.dropFirst(24), so2avg).map({UnitedStatesAirQuality.indexSo2(so2: $0.0 / 2.62, so2_24h_mean: $0.1 / 2.62)}), .usaqi)
         case .us_aqi_co:
+            // need to convert from ugm3 to ppm
             let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
             let co = try get(raw: .carbon_monoxide, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
-            return DataAndUnit(co.map(UnitedStatesAirQuality.indexCo), .usaqi)
+            return DataAndUnit(co.map({UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000)}), .usaqi)
         }
     }
     

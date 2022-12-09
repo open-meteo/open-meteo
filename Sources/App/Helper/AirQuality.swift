@@ -55,16 +55,19 @@ struct UnitedStatesAirQuality {
     }
     
     /// Accept hourly values
+    /// IMPORTANT: input unit is PPM
     @inlinable static func indexNo2(no2: Float) -> Float {
         return scale(no2_HourlyThresholds.positionExtrapolated(of: no2))
     }
     
     /// Accept 8h avg
+    /// IMPORTANT: input unit is PPB
     @inlinable static func indexCo(co_8h_mean: Float) -> Float {
         return scale(co_8HourlyThresholds.positionExtrapolated(of: co_8h_mean))
     }
     
     /// Accept hourly values and 8h avg
+    /// IMPORTANT: input unit is PPM
     @inlinable static func indexO3(o3: Float, o3_8h_mean: Float) -> Float {
         let x1 = o3_HourlyThresholds.positionExtrapolated(of: o3)
         let x2 = o3_8HourlyThresholds.positionExtrapolated(of: o3_8h_mean)
@@ -78,6 +81,7 @@ struct UnitedStatesAirQuality {
     }
     
     /// Accept hourly values and 24h avg
+    /// IMPORTANT: input unit is PPM
     @inlinable static func indexSo2(so2: Float, so2_24h_mean: Float) -> Float {
         let x1 = so2_HourlyThresholds.positionExtrapolated(of: so2)
         let x2 = so2_24HourlyThresholds.positionExtrapolated(of: so2_24h_mean)

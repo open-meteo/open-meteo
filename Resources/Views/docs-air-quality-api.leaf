@@ -310,7 +310,7 @@
                   <table class="table" id="airquality_table">
                     <thead>
                       <tr>
-                        <th scope="col">Pollutant <small>(μg/m³)</small></th>
+                        <th scope="col">Pollutant <small class="text-muted">(μg/m³)</small></th>
                         <th scope="col">Timespan</th>
                         <th scope="col">Good</th>
                         <th scope="col">Fair</th>
@@ -444,14 +444,14 @@
               </div>
               <div class="col-md-6">
                 <p><small class="text-muted">Note: The United States Air Quality Index (AQI) ranges from 0-50 (good), 51-100 (moderate), 101-150 (unhealthy for sensitive groups), 151-200 (unhealthy), 201-300 (very unhealthy) and 301-500 (hazardous).</small></p>
-                <p><small class="text-muted">Pollutant thresholds in μg/m³ from the <a href="https://en.wikipedia.org/wiki/Air_quality_index#United_States">United States Environmental Protection Agency (EPA)</a> are given below. Particulate Matter (PM) is using a 24 hour roling average, ozone and carbon monoxide use 8 hour averages, other gases use hourly values.</small></p>
+                <p><small class="text-muted">Pollutant thresholds from the <a href="https://en.wikipedia.org/wiki/Air_quality_index#United_States">United States Environmental Protection Agency (EPA)</a> are given below. Some thresholds are in parts per billion (ppb) instead of μg/m³. Conversion explained <a href="https://www.breeze-technologies.de/blog/air-pollution-how-to-convert-between-mgm3-µgm3-ppm-ppb/">here</a>. Particulate Matter (PM) is using a 24 hour roling average, ozone and carbon monoxide use 8 hour averages, other gases use hourly values.</small></p>
               </div>
               <div class="col-md-12">
                 <div class="table-responsive">
                   <table class="table" id="airquality_table_us">
                     <thead>
                       <tr>
-                        <th scope="col">Pollutant <small>(μg/m³)</small></th>
+                        <th scope="col">Pollutant</th>
                         <th scope="col">Timespan</th>
                         <th scope="col">Good</th>
                         <th scope="col">Moderate</th>
@@ -463,7 +463,7 @@
                     </thead>
                     <tbody>
                       <tr>
-                        <th scope="row">O<sub>3</sub></th>
+                        <th scope="row">O<sub>3</sub> <small class="text-muted">(ppb)</small></th>
                         <td>8h</td>
                         <td>0-55</td>
                         <td>55-70</td>
@@ -474,7 +474,7 @@
                         <td>-</td>
                       </tr>
                       <tr>
-                        <th scope="row">O<sub>3</sub></th>
+                        <th scope="row">O<sub>3</sub> <small class="text-muted">(ppb)</small></th>
                         <td>1h</td>
                         <td>-</td>
                         <td>-</td>
@@ -485,7 +485,7 @@
                         <td>505-605</td>
                       </tr>
                       <tr>
-                        <th scope="row">PM<sub>2.5</sub></th>
+                        <th scope="row">PM<sub>2.5</sub> <small class="text-muted">(μg/m³)</small></th>
                         <td>24h</td>
                         <td>0-12</td>
                         <td>12-35.5</td>
@@ -496,7 +496,7 @@
                         <td>350.5-500.5</td>
                       </tr>
                       <tr>
-                        <th scope="row">PM<sub>10</sub></th>
+                        <th scope="row">PM<sub>10</sub> <small class="text-muted">(μg/m³)</small></th>
                         <td>24h</td>
                         <td>0-55</td>
                         <td>55-155</td>
@@ -507,7 +507,7 @@
                         <td>505-605</td>
                       </tr>
                       <tr>
-                        <th scope="row">CO</th>
+                        <th scope="row">CO <small class="text-muted">(ppm)</small></th>
                         <td>8h</td>
                         <td>0-4.5</td>
                         <td>4.5-9.5</td>
@@ -518,7 +518,7 @@
                         <td>40.5-50.5</td>
                       </tr>
                       <tr>
-                        <th scope="row">SO<sub>2</sub></th>
+                        <th scope="row">SO<sub>2</sub> <small class="text-muted">(ppb)</small></th>
                         <td>1h</td>
                         <td>0-35</td>
                         <td>35-75</td>
@@ -529,7 +529,7 @@
                         <td>-</td>
                       </tr>
                       <tr>
-                        <th scope="row">SO<sub>2</sub></th>
+                        <th scope="row">SO<sub>2</sub> <small class="text-muted">(ppb)</small></th>
                         <td>24h</td>
                         <td>-</td>
                         <td>-</td>
@@ -540,7 +540,7 @@
                         <td>805-1005</td>
                       </tr>
                       <tr>
-                        <th scope="row">NO<sub>2</sub></th>
+                        <th scope="row">NO<sub>2</sub> <small class="text-muted">(ppb)</small></th>
                         <td>1h</td>
                         <td>0-54</td>
                         <td>54-100</td>
