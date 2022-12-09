@@ -815,6 +815,22 @@
             <td>Pollen for various plants. Only available in Europe as provided by CAMS European Air Quality forecast.
             </td>
           </tr>
+          <tr>
+            <th scope="row">
+              european_aqi<br />european_aqi_pm2_5<br />european_aqi_pm10<br />european_aqi_no2<br />european_aqi_o3<br />european_aqi_so2
+            </th>
+            <td>Instant</td>
+            <td>European AQI</td>
+            <td>European Air Quality Index (AQI) calculated for differnet particulate matter and gases indivdually. The consolidated <mark>european_aqi</mark> returns the maximum of all individual indices. Ranges from 0-20 (good), 20-40 (fair), 40-60 (moderate), 60-80 (poor), 80-100 (very poor) and exceeds 100 for extremely poor conditions.</td>
+          </tr>
+          <tr>
+            <th scope="row">
+              us_aqi<br />us_aqi_pm2_5<br />us_aqi_pm10<br />us_aqi_no2<br />us_aqi_o3<br />us_aqi_so2<br />us_aqi_co
+            </th>
+            <td>Instant</td>
+            <td>U.S. AQI</td>
+            <td>United States Air Quality Index (AQI) calculated for differnet particulate matter and gases indivdually. The consolidated <mark>us_aqi</mark> returns the maximum of all individual indices. Ranges from 0-50 (good), 51-100 (moderate), 101-150 (unhealthy for sensitive groups), 151-200 (unhealthy), 201-300 (very unhealthy) and 301-500 (hazardous).</td>
+          </tr>
         </tbody>
       </table>
     </div>
