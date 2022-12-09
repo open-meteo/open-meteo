@@ -40,7 +40,7 @@ enum WeatherCode: Int {
     /// http://www.cosmo-model.org/content/model/documentation/newsLetters/newsLetter06/cnl6_hoffmann.pdf
     /// https://www.dwd.de/DE/leistungen/pbfb_verlag_promet/pdf_promethefte/28_1_2_pdf.pdf?__blob=publicationFile&v=8
     public static func calculate(cloudcover: Float, precipitation: Float, convectivePrecipitation: Float?, snowfallCentimeters: Float, gusts: Float?, cape: Float?, liftedIndex: Float?, modelDtHours: Int) -> WeatherCode? {
-        print(cloudcover)
+        
         let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / Float(modelDtHours)) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / Float(modelDtHours)) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
         
         if let liftedIndex, liftedIndex <= -2 {

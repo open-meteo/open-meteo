@@ -4,7 +4,6 @@ import Vapor
 /**
  TODO:
  - No convective precip in NAM/HRRR
- - weather code
  - No 120/180m wind
  - Soil temp/moisture on different levels
  - DONE No cloudcover in NAM/HRRR on pressure levels -> RH to clouds implemented
@@ -177,7 +176,7 @@ enum GfsDailyWeatherVariable: String, Codable {
     case snowfall_sum
     //case rain_sum
     //case showers_sum
-    //case weathercode
+    case weathercode
     case shortwave_radiation_sum
     // cloudcover_total_max?
     case windspeed_10m_max
@@ -216,6 +215,7 @@ enum GfsVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMi
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
+    case weathercode
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -351,6 +351,14 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
                 try prefetchData(raw: .surface(.diffuse_radiation), time: time)
             case .shortwave_radiation_instant:
                 try prefetchData(raw: .surface(.shortwave_radiation), time: time)
+            case .weathercode:
+                try prefetchData(raw: .surface(.cloudcover), time: time)
+                try prefetchData(raw: .surface(.precipitation), time: time)
+                try prefetchData(derived: .surface(.snowfall), time: time)
+                try prefetchData(raw: .surface(.showers), time: time)
+                try prefetchData(raw: .surface(.cape), time: time)
+                try prefetchData(raw: .surface(.windgusts_10m), time: time)
+                try prefetchData(raw: .surface(.lifted_index), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -466,6 +474,24 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
                 let diff = try get(raw: .surface(.diffuse_radiation), time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
+            case .weathercode:
+                let cloudcover = try get(raw: .surface(.cloudcover), time: time).data
+                let precipitation = try get(raw: .surface(.precipitation), time: time).data
+                let snowfall = try get(derived: .surface(.snowfall), time: time).data
+                let showers = try get(raw: .surface(.showers), time: time).data
+                let cape = try get(raw: .surface(.cape), time: time).data
+                let gusts = try get(raw: .surface(.windgusts_10m), time: time).data
+                let liftedIndex = try get(raw: .surface(.lifted_index), time: time).data
+                return DataAndUnit(WeatherCode.calculate(
+                    cloudcover: cloudcover,
+                    precipitation: precipitation,
+                    convectivePrecipitation: showers,
+                    snowfallCentimeters: snowfall,
+                    gusts: gusts,
+                    cape: cape,
+                    liftedIndex: liftedIndex,
+                    modelDtHours: time.dtSeconds / 3600), .wmoCode
+                )
             }
         case .pressure(let v):
             switch v.variable {
@@ -513,10 +539,9 @@ extension GfsMixer {
             // rounding is required, becuse floating point addition results in uneven numbers
             let data = try get(raw: .precipitation, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        /*case .weathercode:
-            // not 100% corrct
-            let data = try get(variable: .weathercode).conertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 24), data.unit)*/
+        case .weathercode:
+            let data = try get(derived: .weathercode, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
         case .shortwave_radiation_sum:
             let data = try get(raw: .shortwave_radiation, time: time).conertAndRound(params: params)
             // 3600s only for hourly data of source
@@ -576,8 +601,8 @@ extension GfsMixer {
                 try prefetchData(raw: .shortwave_radiation, time: time)
             case .precipitation_sum:
                 try prefetchData(raw: .precipitation, time: time)
-            //case .weathercode:
-            //    try prefetchData(variable: .weathercode)
+            case .weathercode:
+                try prefetchData(variable: .derived(.surface(.weathercode)), time: time)
             case .shortwave_radiation_sum:
                 try prefetchData(raw: .shortwave_radiation, time: time)
             case .windspeed_10m_max:

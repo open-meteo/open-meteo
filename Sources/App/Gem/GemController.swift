@@ -176,6 +176,7 @@ enum GemDailyWeatherVariable: String, Codable {
     case sunrise
     case sunset
     case et0_fao_evapotranspiration
+    case weathercode
 }
 
 enum GemVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixable {
@@ -530,6 +531,9 @@ extension GemMixer {
         case .showers_sum:
             let data = try get(variable: .showers, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .weathercode:
+            let data = try get(variable: .weathercode, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
         }
     }
     
@@ -575,6 +579,8 @@ extension GemMixer {
             case .rain_sum:
                 try prefetchData(variable: .precipitation, time: time)
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
+            case .weathercode:
+                try prefetchData(variable: .derived(.surface(.weathercode)), time: time)
             case .showers_sum:
                 try prefetchData(variable: .showers, time: time)
             }

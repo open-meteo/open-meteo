@@ -384,7 +384,6 @@ extension IconMixer {
             let data = try get(raw: .precipitation, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         case .weathercode:
-            // not 100% corrct
             let data = try get(raw: .weathercode, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .shortwave_radiation_sum:
