@@ -219,7 +219,7 @@
           <h2 class="accordion-header" id="heading-solar-variables">
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-solar-variables" aria-expanded="false" aria-controls="collapse-solar-variables">
-              European Air Quality Index&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+              European Air Quality Index (AQI)&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
                 data-count-checkboxes-of="#collapse-solar-variables">0/x</span>
             </button>
           </h2>
@@ -231,115 +231,107 @@
                   <input class="form-check-input" type="checkbox" value="european_aqi" id="european_aqi"
                     name="hourly">
                   <label class="form-check-label" for="european_aqi">
-                    European Air Quality Index
+                    European AQI
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_pm2_5" id="european_aqi_pm2_5"
                     name="hourly">
                   <label class="form-check-label" for="european_aqi_pm2_5">
-                    European Air Quality Index PM2.5
+                    European AQI PM2.5
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_pm10" id="european_aqi_pm10"
                     name="hourly">
                   <label class="form-check-label" for="european_aqi_pm10">
-                    European Air Quality Index PM10
+                    European AQI PM10
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_no2"
                     id="european_aqi_no2" name="hourly">
                   <label class="form-check-label" for="european_aqi_no2">
-                    European Air Quality Index NO2
+                    European AQI NO2
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_o3"
                     id="european_aqi_o3" name="hourly">
                   <label class="form-check-label" for="european_aqi_o3">
-                    European Air Quality Index O3
+                    European AQI O3
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_so2"
                     id="european_aqi_so2" name="hourly">
                   <label class="form-check-label" for="european_aqi_so2">
-                    European Air Quality Index SO2
+                    European AQI SO2
                   </label>
                 </div>
-                <p><small class="text-muted">Note: The Air Quality Index ranges from 0 (good) to 100 (very poor), but may exceed 100.</small></p>
+                <p></p>
+                <p><small class="text-muted">Note: The European AQI ranges from 0-20 (good), 20-40 (fair), 40-60 (moderate), 60-80 (poor), 80-100 (very poor) and exceeds 100 for extremely poor conditions.</small></p>
+                <p><small class="text-muted">Pollutant thresholds in μg/m³ from the <a href="https://www.eea.europa.eu/themes/air/air-quality-index">European Environment Agency (EAA)</a> are given on the right. Particulate Matter (PM) is using a 24 hour roling average, while gases use hourly values.</small></p>
               </div>
               <div class="col-md-6">
                 <div class="table-responsive">
                   <table class="table" id="airquality_table">
-                    <caption>Pollutant thresholds based on <a href="https://www.eea.europa.eu/themes/air/air-quality-index">European Environment Agency (EAA)</a>. Particulate Matter (PM) is using a 24 hour roling average, while gases use hourly values.</caption>
                     <thead>
                       <tr>
-                        <th scope="col">Pollutant</th>
+                        <th scope="col">Pollutant <small>(μg/m³)</small></th>
                         <th scope="col">Good</th>
                         <th scope="col">Fair</th>
                         <th scope="col">Moderate</th>
                         <th scope="col">Poor</th>
-                        <th scope="col">Very&nbsp;poor</th>
-                        <th scope="col">Extremely&nbsp;poor</th>
-                      </tr>
-                      <tr>
-                        <th scope="row">Index</th>
-                        <td>0-20</td>
-                        <td>20-40</td>
-                        <td>40-60</td>
-                        <td>60-80</td>
-                        <td>80-100</td>
-                        <td>&gt;100</td>
+                        <th scope="col">Very<br/>poor</th>
+                        <th scope="col">Extremely<br/>poor</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
                         <th scope="row">PM<sub>2.5</sub></th>
-                        <td>0-10</td>
-                        <td>10-20</td>
-                        <td>20-25</td>
-                        <td>25-50</td>
-                        <td>50-75</td>
-                        <td>75-800</td>
+                        <td>0-<br/>10</td>
+                        <td>10-<br/>20</td>
+                        <td>20-<br/>25</td>
+                        <td>25-<br/>50</td>
+                        <td>50-<br/>75</td>
+                        <td>75-<br/>800</td>
                       </tr>
                       <tr>
                         <th scope="row">PM<sub>10</sub></th>
-                        <td>0-20</td>
-                        <td>20-40</td>
-                        <td>40-50</td>
-                        <td>50-100</td>
-                        <td>100-150</td>
-                        <td>150-1200</td>
+                        <td>0-<br/>20</td>
+                        <td>20-<br/>40</td>
+                        <td>40-<br/>50</td>
+                        <td>50-<br/>100</td>
+                        <td>100-<br/>150</td>
+                        <td>150-<br/>1200</td>
                       </tr>
                       <tr>
                         <th scope="row">NO<sub>2</sub></th>
-                        <td>0-40</td>
-                        <td>40-90</td>
-                        <td>90-120</td>
-                        <td>120-230</td>
-                        <td>230-340</td>
-                        <td>340-1000</td>
+                        <td>0-<br/>40</td>
+                        <td>40-<br/>90</td>
+                        <td>90-<br/>120</td>
+                        <td>120-<br/>230</td>
+                        <td>230-<br/>340</td>
+                        <td>340-<br/>1000</td>
                       </tr>
                       <tr>
                         <th scope="row">O<sub>3</sub></th>
-                        <td>0-50</td>
-                        <td>50-100</td>
-                        <td>100-130</td>
-                        <td>130-240</td>
-                        <td>240-380</td>
-                        <td>380-800</td>
+                        <td>0-<br/>50</td>
+                        <td>50-<br/>100</td>
+                        <td>100-<br/>130</td>
+                        <td>130-<br/>240</td>
+                        <td>240-<br/>380</td>
+                        <td>380-<br/>800</td>
                       </tr>
                       <tr>
                         <th scope="row">SO<sub>2</sub></th>
-                        <td>0-100</td>
-                        <td>100-200</td>
-                        <td>200-350</td>
-                        <td>350-500</td>
-                        <td>500-750</td>
-                        <td>750-1250</td>
+                        <td>0-<br/>100</td>
+                        <td>100-<br/>200</td>
+                        <td>200-<br/>350</td>
+                        <td>350-<br/>500</td>
+                        <td>500-<br/>750</td>
+                        <td>750-<br/>1250</td>
                       </tr>
                     </tbody>
                   </table>
