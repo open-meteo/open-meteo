@@ -159,6 +159,7 @@ enum CdsVariable: String, Codable, GenericVariableMixable {
     case precipitation
     case direct_radiation
     
+    case weathercode
     case apparent_temperature
     case relativehumidity_2m
     case windspeed_10m
@@ -207,6 +208,7 @@ enum Era5VariableDerived: String, Codable, RawRepresentableString, GenericVariab
     case et0_fao_evapotranspiration
     case cloudcover
     case direct_normal_irradiance
+    case weathercode
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -214,6 +216,7 @@ enum Era5VariableDerived: String, Codable, RawRepresentableString, GenericVariab
 }
 
 enum Era5DailyWeatherVariable: String, Codable {
+    case weathercode
     case temperature_2m_max
     case temperature_2m_min
     case apparent_temperature_max
@@ -380,6 +383,10 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .rain:
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
+        case .weathercode:
+            try prefetchData(derived: .cloudcover, time: time)
+            try prefetchData(raw: .precipitation, time: time)
+            try prefetchData(derived: .snowfall, time: time)
         }
     }
     
@@ -469,11 +476,22 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
                 return max($0.0-$0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
+        case .weathercode:
+            let cloudcover = try get(derived: .cloudcover, time: time).data
+            let precipitation = try get(raw: .precipitation, time: time).data
+            let snowfall = try get(derived: .snowfall, time: time).data
+            return DataAndUnit(WeatherCode.calculate(
+                cloudcover: cloudcover,
+                precipitation: precipitation,
+                convectivePrecipitation: nil,
+                snowfallCentimeters: snowfall,
+                gusts: nil,
+                cape: nil,
+                liftedIndex: nil,
+                modelDtHours: time.dtSeconds / 3600), .wmoCode
+           )
         }
     }
-    
-    
-    
 }
 
 
@@ -520,6 +538,8 @@ extension GenericReaderMulti where Variable == CdsVariable {
             case .rain_sum:
                 try prefetchData(variable: .precipitation, time: time)
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
+            case .weathercode:
+                try prefetchData(variable: .weathercode, time: time)
             }
         }
     }
@@ -602,6 +622,11 @@ extension GenericReaderMulti where Variable == CdsVariable {
                 return nil
             }
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .weathercode:
+            guard let data = try get(variable: .weathercode, time: time)?.conertAndRound(params: params) else {
+                return nil
+            }
+            return DataAndUnit(data.data.max(by: 24), data.unit)
         }
     }
 }

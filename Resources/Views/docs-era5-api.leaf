@@ -164,6 +164,12 @@
       </div>
       <div class="col-md-3">
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode" name="hourly">
+          <label class="form-check-label" for="weathercode">
+            Weathercode
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover" name="hourly">
           <label class="form-check-label" for="cloudcover">
             Cloudcover Total
@@ -375,6 +381,12 @@
     <div class="row py-3 px-0">
       <h2>Daily Weather Variables <small class="text-muted">(*)</small></h2>
       <div class="col-md-6">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode_daily" name="daily">
+          <label class="form-check-label" for="weathercode_daily">
+            Weathercode
+          </label>
+        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max"
             name="daily">
@@ -818,6 +830,13 @@
                   assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
           </tr>
           <tr>
+            <th scope="row">weathercode</th>
+            <td>Instant</td>
+            <td>WMO code</td>
+            <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for
+              details. Weather code is calculated from cloud cover analysis, precipitation and snowfall. As barely no information about atmospheric stability is available, estimation about thunderstorms is not possible.</td>
+          </tr>
+          <tr>
             <th scope="row">vapor_pressure_deficit</th>
             <td>Instant</td>
             <td>kPa</td>
@@ -857,6 +876,11 @@
           </tr>
         </thead>
         <tbody>
+          <tr>
+            <th scope="row">weathercode</th>
+            <td>WMO code</td>
+            <td>The most severe weather condition on a given day</td>
+          </tr>
           <tr>
             <th scope="row">temperature_2m_max<br>temperature_2m_min</th>
             <td>°C (°F)</td>

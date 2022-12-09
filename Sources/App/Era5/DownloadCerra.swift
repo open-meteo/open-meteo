@@ -22,6 +22,7 @@ enum CerraVariableDerived: String, Codable, RawRepresentableString, GenericVaria
     case et0_fao_evapotranspiration
     case cloudcover
     case direct_normal_irradiance
+    case weathercode
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -99,6 +100,10 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .rain:
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
+        case .weathercode:
+            try prefetchData(derived: .cloudcover, time: time)
+            try prefetchData(raw: .precipitation, time: time)
+            try prefetchData(derived: .snowfall, time: time)
         }
     }
     
@@ -193,6 +198,20 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 return max($0.0-$0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
+        case .weathercode:
+            let cloudcover = try get(derived: .cloudcover, time: time).data
+            let precipitation = try get(raw: .precipitation, time: time).data
+            let snowfall = try get(derived: .snowfall, time: time).data
+            return DataAndUnit(WeatherCode.calculate(
+                cloudcover: cloudcover,
+                precipitation: precipitation,
+                convectivePrecipitation: nil,
+                snowfallCentimeters: snowfall,
+                gusts: nil,
+                cape: nil,
+                liftedIndex: nil,
+                modelDtHours: time.dtSeconds / 3600), .wmoCode
+           )
         }
     }
 }
