@@ -821,7 +821,7 @@
             </th>
             <td>Instant</td>
             <td>European AQI</td>
-            <td>European Air Quality Index (AQI) calculated for differnet particulate matter and gases indivdually. The consolidated <mark>european_aqi</mark> returns the maximum of all individual indices. Ranges from 0-20 (good), 20-40 (fair), 40-60 (moderate), 60-80 (poor), 80-100 (very poor) and exceeds 100 for extremely poor conditions.</td>
+            <td>European Air Quality Index (AQI) calculated for different particulate matter and gases individually. The consolidated <mark>european_aqi</mark> returns the maximum of all individual indices. Ranges from 0-20 (good), 20-40 (fair), 40-60 (moderate), 60-80 (poor), 80-100 (very poor) and exceeds 100 for extremely poor conditions.</td>
           </tr>
           <tr>
             <th scope="row">
@@ -829,7 +829,7 @@
             </th>
             <td>Instant</td>
             <td>U.S. AQI</td>
-            <td>United States Air Quality Index (AQI) calculated for differnet particulate matter and gases indivdually. The consolidated <mark>us_aqi</mark> returns the maximum of all individual indices. Ranges from 0-50 (good), 51-100 (moderate), 101-150 (unhealthy for sensitive groups), 151-200 (unhealthy), 201-300 (very unhealthy) and 301-500 (hazardous).</td>
+            <td>United States Air Quality Index (AQI) calculated for different particulate matter and gases individually. The consolidated <mark>us_aqi</mark> returns the maximum of all individual indices. Ranges from 0-50 (good), 51-100 (moderate), 101-150 (unhealthy for sensitive groups), 151-200 (unhealthy), 201-300 (very unhealthy) and 301-500 (hazardous).</td>
           </tr>
         </tbody>
       </table>
