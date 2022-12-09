@@ -7,35 +7,66 @@
 <link rel="canonical" href="https://open-meteo.com/en/docs/air-quality-api" />
 
 <style>
-  #airquality_table tbody td:nth-child(2) {
-    background-color: rgba(80,240,230, 1);
-    color: #333;
-  }
+#airquality_table tbody td:nth-child(3) {
+  background-color: rgba(80,240,230, 1);
+  color: #333;
+}
 
-  #airquality_table tbody td:nth-child(3) {
-    background-color: rgba(80,204,170, 1);
-    color: white;
-  }
+#airquality_table tbody td:nth-child(4) {
+  background-color: rgba(80,204,170, 1);
+  color: white;
+}
 
-  #airquality_table tbody td:nth-child(4) {
-    background-color: rgba(240,230,65, 1);
-    color: #333;
-  }
+#airquality_table tbody td:nth-child(5) {
+  background-color: rgba(240,230,65, 1);
+  color: #333;
+}
 
-  #airquality_table tbody td:nth-child(5) {
-    background-color: rgba(255,80,80, 1);
-    color: white;
-  }
+#airquality_table tbody td:nth-child(6) {
+  background-color: rgba(255,80,80, 1);
+  color: white;
+}
 
-  #airquality_table tbody td:nth-child(6) {
-    background-color: rgba(150,0,50, 1);
-    color: white;
-  }
+#airquality_table tbody td:nth-child(7) {
+  background-color: rgba(150,0,50, 1);
+  color: white;
+}
 
-  #airquality_table tbody td:nth-child(7) {
-    background-color: rgba(125, 33, 129, 1);
-    color: white;
-  }
+#airquality_table tbody td:nth-child(8) {
+  background-color: rgba(125, 33, 129, 1);
+  color: white;
+}
+
+
+#airquality_table_us tbody td:nth-child(3) {
+  background-color: rgba(80,204,170, 1);
+  color: white;
+}
+
+#airquality_table_us tbody td:nth-child(4) {
+  background-color: rgba(240,230,65, 1);
+  color: #333;
+}
+
+#airquality_table_us tbody td:nth-child(5) {
+  background-color: rgb(240, 167, 65);
+  color: #333;
+}
+
+#airquality_table_us tbody td:nth-child(6) {
+  background-color: rgba(255,80,80, 1);
+  color: white;
+}
+
+#airquality_table_us tbody td:nth-child(7) {
+  background-color: rgba(150,0,50, 1);
+  color: white;
+}
+
+#airquality_table_us tbody td:nth-child(8), #airquality_table_us tbody td:nth-child(9) {
+  background-color: rgba(125, 33, 129, 1);
+  color: white;
+}
 </style>
 #endexport
 
@@ -216,15 +247,15 @@
     <div class="row py-3 px-0">
       <div class="accordion" id="accordionVariables">
         <div class="accordion-item">
-          <h2 class="accordion-header" id="heading-solar-variables">
+          <h2 class="accordion-header" id="heading-european-aqi">
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
-              data-bs-target="#collapse-solar-variables" aria-expanded="false" aria-controls="collapse-solar-variables">
-              European Air Quality Index (AQI)&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
-                data-count-checkboxes-of="#collapse-solar-variables">0/x</span>
+              data-bs-target="#collapse-european-aqi" aria-expanded="false" aria-controls="collapse-european-aqi">
+              European Air Quality Index&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+                data-count-checkboxes-of="#collapse-european-aqi">0/x</span>
             </button>
           </h2>
-          <div id="collapse-solar-variables" class="accordion-collapse collapse"
-            aria-labelledby="heading-solar-variables" data-bs-parent="#accordionVariables">
+          <div id="collapse-european-aqi" class="accordion-collapse collapse"
+            aria-labelledby="heading-european-aqi" data-bs-parent="#accordionVariables">
             <div class="accordion-body row">
               <div class="col-md-6">
                 <div class="form-check">
@@ -269,69 +300,255 @@
                     European AQI SO2
                   </label>
                 </div>
-                <p></p>
-                <p><small class="text-muted">Note: The European AQI ranges from 0-20 (good), 20-40 (fair), 40-60 (moderate), 60-80 (poor), 80-100 (very poor) and exceeds 100 for extremely poor conditions.</small></p>
-                <p><small class="text-muted">Pollutant thresholds in μg/m³ from the <a href="https://www.eea.europa.eu/themes/air/air-quality-index">European Environment Agency (EAA)</a> are given on the right. Particulate Matter (PM) is using a 24 hour roling average, while gases use hourly values.</small></p>
               </div>
               <div class="col-md-6">
+                <p><small class="text-muted">Note: The European Air Quality Index (AQI) ranges from 0-20 (good), 20-40 (fair), 40-60 (moderate), 60-80 (poor), 80-100 (very poor) and exceeds 100 for extremely poor conditions.</small></p>
+                <p><small class="text-muted">Pollutant thresholds in μg/m³ from the <a href="https://www.eea.europa.eu/themes/air/air-quality-index">European Environment Agency (EAA)</a> are given on the right. Particulate Matter (PM) is using a 24 hour roling average, while gases use hourly values.</small></p>
+              </div>
+              <div class="col-md-12">
                 <div class="table-responsive">
                   <table class="table" id="airquality_table">
                     <thead>
                       <tr>
                         <th scope="col">Pollutant <small>(μg/m³)</small></th>
+                        <th scope="col">Timespan</th>
                         <th scope="col">Good</th>
                         <th scope="col">Fair</th>
                         <th scope="col">Moderate</th>
                         <th scope="col">Poor</th>
-                        <th scope="col">Very<br/>poor</th>
-                        <th scope="col">Extremely<br/>poor</th>
+                        <th scope="col">Very poor</th>
+                        <th scope="col">Extremely poor</th>
                       </tr>
                     </thead>
                     <tbody>
                       <tr>
                         <th scope="row">PM<sub>2.5</sub></th>
-                        <td>0-<br/>10</td>
-                        <td>10-<br/>20</td>
-                        <td>20-<br/>25</td>
-                        <td>25-<br/>50</td>
-                        <td>50-<br/>75</td>
-                        <td>75-<br/>800</td>
+                        <td>24h</td>
+                        <td>0-10</td>
+                        <td>10-20</td>
+                        <td>20-25</td>
+                        <td>25-50</td>
+                        <td>50-75</td>
+                        <td>75-800</td>
                       </tr>
                       <tr>
                         <th scope="row">PM<sub>10</sub></th>
-                        <td>0-<br/>20</td>
-                        <td>20-<br/>40</td>
-                        <td>40-<br/>50</td>
-                        <td>50-<br/>100</td>
-                        <td>100-<br/>150</td>
-                        <td>150-<br/>1200</td>
+                        <td>24h</td>
+                        <td>0-20</td>
+                        <td>20-40</td>
+                        <td>40-50</td>
+                        <td>50-100</td>
+                        <td>100-150</td>
+                        <td>150-1200</td>
                       </tr>
                       <tr>
                         <th scope="row">NO<sub>2</sub></th>
-                        <td>0-<br/>40</td>
-                        <td>40-<br/>90</td>
-                        <td>90-<br/>120</td>
-                        <td>120-<br/>230</td>
-                        <td>230-<br/>340</td>
-                        <td>340-<br/>1000</td>
+                        <td>1h</td>
+                        <td>0-40</td>
+                        <td>40-90</td>
+                        <td>90-120</td>
+                        <td>120-230</td>
+                        <td>230-340</td>
+                        <td>340-1000</td>
                       </tr>
                       <tr>
                         <th scope="row">O<sub>3</sub></th>
-                        <td>0-<br/>50</td>
-                        <td>50-<br/>100</td>
-                        <td>100-<br/>130</td>
-                        <td>130-<br/>240</td>
-                        <td>240-<br/>380</td>
-                        <td>380-<br/>800</td>
+                        <td>1h</td>
+                        <td>0-50</td>
+                        <td>50-100</td>
+                        <td>100-130</td>
+                        <td>130-240</td>
+                        <td>240-380</td>
+                        <td>380-800</td>
                       </tr>
                       <tr>
                         <th scope="row">SO<sub>2</sub></th>
-                        <td>0-<br/>100</td>
-                        <td>100-<br/>200</td>
-                        <td>200-<br/>350</td>
-                        <td>350-<br/>500</td>
-                        <td>500-<br/>750</td>
-                        <td>750-<br/>1250</td>
+                        <td>1h</td>
+                        <td>0-100</td>
+                        <td>100-200</td>
+                        <td>200-350</td>
+                        <td>350-500</td>
+                        <td>500-750</td>
+                        <td>750-1250</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading-us-aqi">
+            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapse-us-aqi" aria-expanded="false" aria-controls="collapse-us-aqi">
+              United States Air Quality Index&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+                data-count-checkboxes-of="#collapse-us-aqi">0/x</span>
+            </button>
+          </h2>
+          <div id="collapse-us-aqi" class="accordion-collapse collapse"
+            aria-labelledby="heading-us-aqi" data-bs-parent="#accordionVariables">
+            <div class="accordion-body row">
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="us_aqi" id="us_aqi"
+                    name="hourly">
+                  <label class="form-check-label" for="us_aqi">
+                    United States AQI
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="us_aqi_pm2_5" id="us_aqi_pm2_5"
+                    name="hourly">
+                  <label class="form-check-label" for="us_aqi_pm2_5">
+                    United States AQI PM2.5
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="us_aqi_pm10" id="us_aqi_pm10"
+                    name="hourly">
+                  <label class="form-check-label" for="us_aqi_pm10">
+                    United States AQI PM10
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="us_aqi_no2"
+                    id="us_aqi_no2" name="hourly">
+                  <label class="form-check-label" for="us_aqi_no2">
+                    United States AQI NO2
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="us_aqi_co"
+                    id="us_aqi_co" name="hourly">
+                  <label class="form-check-label" for="us_aqi_co">
+                    United States AQI CO
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="us_aqi_o3"
+                    id="us_aqi_o3" name="hourly">
+                  <label class="form-check-label" for="us_aqi_o3">
+                    United States AQI O3
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="us_aqi_so2"
+                    id="us_aqi_so2" name="hourly">
+                  <label class="form-check-label" for="us_aqi_so2">
+                    United States AQI SO2
+                  </label>
+                </div>
+                <p></p>
+              </div>
+              <div class="col-md-6">
+                <p><small class="text-muted">Note: The United States Air Quality Index (AQI) ranges from 0-50 (good), 51-100 (moderate), 101-150 (unhealthy for sensitive groups), 151-200 (unhealthy), 201-300 (very unhealthy) and 301-500 (hazardous).</small></p>
+                <p><small class="text-muted">Pollutant thresholds in μg/m³ from the <a href="https://en.wikipedia.org/wiki/Air_quality_index#United_States">United States Environmental Protection Agency (EPA)</a> are given below. Particulate Matter (PM) is using a 24 hour roling average, ozone and carbon monoxide use 8 hour averages, other gases use hourly values.</small></p>
+              </div>
+              <div class="col-md-12">
+                <div class="table-responsive">
+                  <table class="table" id="airquality_table_us">
+                    <thead>
+                      <tr>
+                        <th scope="col">Pollutant <small>(μg/m³)</small></th>
+                        <th scope="col">Timespan</th>
+                        <th scope="col">Good</th>
+                        <th scope="col">Moderate</th>
+                        <th scope="col">Unhealthy for<br/>Sensitive Groups</th>
+                        <th scope="col">Unhealthy</th>
+                        <th scope="col">Very Unhealthy</th>
+                        <th scope="col" colspan="2">Hazardous</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">O<sub>3</sub></th>
+                        <td>8h</td>
+                        <td>0-55</td>
+                        <td>55-70</td>
+                        <td>70-85</td>
+                        <td>85-105</td>
+                        <td>105-200</td>
+                        <td>-</td>
+                        <td>-</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">O<sub>3</sub></th>
+                        <td>1h</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>125-165</td>
+                        <td>165-205</td>
+                        <td>205-405</td>
+                        <td>405-505</td>
+                        <td>505-605</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">PM<sub>2.5</sub></th>
+                        <td>24h</td>
+                        <td>0-12</td>
+                        <td>12-35.5</td>
+                        <td>35.5-55.5</td>
+                        <td>55.5-150.5</td>
+                        <td>150.5-250.5</td>
+                        <td>250.5-350.5</td>
+                        <td>350.5-500.5</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">PM<sub>10</sub></th>
+                        <td>24h</td>
+                        <td>0-55</td>
+                        <td>55-155</td>
+                        <td>155-255</td>
+                        <td>255-355</td>
+                        <td>355-425</td>
+                        <td>425-505</td>
+                        <td>505-605</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">CO</th>
+                        <td>8h</td>
+                        <td>0-4.5</td>
+                        <td>4.5-9.5</td>
+                        <td>9.5-12.5</td>
+                        <td>12.5-15.5</td>
+                        <td>15.5-30.5</td>
+                        <td>30.5-40.5</td>
+                        <td>40.5-50.5</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">SO<sub>2</sub></th>
+                        <td>1h</td>
+                        <td>0-35</td>
+                        <td>35-75</td>
+                        <td>75-185</td>
+                        <td>185-305</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">SO<sub>2</sub></th>
+                        <td>24h</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>305-605</td>
+                        <td>605-805</td>
+                        <td>805-1005</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">NO<sub>2</sub></th>
+                        <td>1h</td>
+                        <td>0-54</td>
+                        <td>54-100</td>
+                        <td>100-360</td>
+                        <td>360-650</td>
+                        <td>650-1250</td>
+                        <td>1250-1650</td>
+                        <td>1650-2050</td>
                       </tr>
                     </tbody>
                   </table>
