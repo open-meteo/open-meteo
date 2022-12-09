@@ -102,6 +102,12 @@
       </div>
       <div class="col-md-3">
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode" name="hourly">
+          <label class="form-check-label" for="weathercode">
+            Weathercode
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover" name="hourly">
           <label class="form-check-label" for="cloudcover">
             Cloud Cover
@@ -125,7 +131,13 @@
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="precipitation" id="precipitation" name="hourly">
           <label class="form-check-label" for="precipitation">
-            Precipitation (rain + showers + snow)
+            Precipitation (rain + snow)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall" id="snowfall" name="hourly">
+          <label class="form-check-label" for="snowfall">
+            Snowfall
           </label>
         </div>
         <div class="form-check">
@@ -631,6 +643,20 @@
                 href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations</a> ET₀
                   is calculated from temperature, wind speed, humidity and solar radiation. Unlimited soil water is
                   assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
+          </tr>
+          <tr>
+            <th scope="row">weathercode</th>
+            <td>Instant</td>
+            <td>WMO code</td>
+            <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for
+              details. Weather code is calculated from cloud cover analysis, precipitation, snowfall and gusts. As MET Nordic has barely no information about atmospheric stability, estimation about thunderstorms is not possible.</td>
+          </tr>
+          <tr>
+            <th scope="row">snowfall</th>
+            <td>Preceding hour sum</td>
+            <td>cm (inch)</td>
+            <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by
+              7. E.g. 7 cm snow = 10 mm precipitation water equivalent. Snowfall amount is not provided by MET Nordic directly, instead it is approximated based on total precipitation and temperature</td>
           </tr>
         </tbody>
       </table>

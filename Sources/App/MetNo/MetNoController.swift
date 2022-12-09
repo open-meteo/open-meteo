@@ -151,6 +151,14 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
             fallthrough
         case .cloudcover_high:
             try prefetchData(raw: .cloudcover, time: time)*/
+        case .snowfall:
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .precipitation, time: time)
+        case .weathercode:
+            try prefetchData(raw: .cloudcover, time: time)
+            try prefetchData(variable: .derived(.snowfall), time: time)
+            try prefetchData(raw: .precipitation, time: time)
+            try prefetchData(raw: .windgusts_10m, time: time)
         }
     }
     
@@ -229,6 +237,25 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
             return try get(raw: .cloudcover, time: time)
         case .cloudcover_high:
             return try get(raw: .cloudcover, time: time)*/
+        case .snowfall:
+            let temperature = try get(raw: .temperature_2m, time: time)
+            let precipitation = try get(raw: .precipitation, time: time)
+            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
+        case .weathercode:
+            let cloudcover = try get(raw: .cloudcover, time: time).data
+            let precipitation = try get(raw: .precipitation, time: time).data
+            let snowfall = try get(derived: .snowfall, time: time).data
+            let gusts = try get(raw: .windgusts_10m, time: time).data
+            return DataAndUnit(WeatherCode.calculate(
+                cloudcover: cloudcover,
+                precipitation: precipitation,
+                convectivePrecipitation: nil,
+                snowfallCentimeters: snowfall,
+                gusts: gusts,
+                cape: nil,
+                liftedIndex: nil,
+                modelDtHours: time.dtSeconds / 3600), .wmoCode
+           )
         }
     }
 }
@@ -253,6 +280,8 @@ enum MetNoVariableDerived: String, Codable, GenericVariableMixable {
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
+    case snowfall
+    case weathercode
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
