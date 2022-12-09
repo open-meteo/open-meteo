@@ -72,7 +72,6 @@ struct CamsController {
     }
 }
 
-/// TODO can later be used for air quality index
 enum CamsVariableDerived: String, Codable, GenericVariableMixable {
     case european_aqi
     case european_aqi_pm2_5
@@ -80,6 +79,14 @@ enum CamsVariableDerived: String, Codable, GenericVariableMixable {
     case european_aqi_no2
     case european_aqi_o3
     case european_aqi_so2
+    
+    case us_aqi
+    case us_aqi_pm2_5
+    case us_aqi_pm10
+    case us_aqi_no2
+    case us_aqi_o3
+    case us_aqi_so2
+    case us_aqi_co
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -126,6 +133,42 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .european_aqi_so2:
             let so2 = try get(raw: .sulphur_dioxide, time: time).data
             return DataAndUnit(so2.map(EuropeanAirQuality.indexSo2), .eaqi)
+        case .us_aqi:
+            let pm2_5 = try get(derived: .us_aqi_pm2_5, time: time).data
+            let pm10 = try get(derived: .us_aqi_pm10, time: time).data
+            let no2 = try get(derived: .us_aqi_no2, time: time).data
+            let o3 = try get(derived: .us_aqi_o3, time: time).data
+            let so2 = try get(derived: .us_aqi_so2, time: time).data
+            let co = try get(derived: .us_aqi_so2, time: time).data
+            let max = pm2_5.indices.map({ i -> Float in
+                return Swift.max(Swift.max(Swift.max(Swift.max(pm2_5[i], Swift.max(pm10[i], co[i])), no2[i]), o3[i]), so2[i])
+            })
+            return DataAndUnit(max, .usaqi)
+        case .us_aqi_pm2_5:
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let pm2_5 = try get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
+            return DataAndUnit(pm2_5.map(UnitedStatesAirQuality.indexPm2_5), .usaqi)
+        case .us_aqi_pm10:
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let pm10avg = try get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
+            return DataAndUnit(pm10avg.map(UnitedStatesAirQuality.indexPm10), .usaqi)
+        case .us_aqi_no2:
+            let no2 = try get(raw: .nitrogen_dioxide, time: time).data
+            return DataAndUnit(no2.map(UnitedStatesAirQuality.indexNo2), .usaqi)
+        case .us_aqi_o3:
+            let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
+            let o3 = try get(raw: .pm10, time: timeAhead).data
+            let o3avg = o3.slidingAverageDroppingFirstDt(dt: 8)
+            return DataAndUnit(zip(o3.dropFirst(8), o3avg).map(UnitedStatesAirQuality.indexO3), .usaqi)
+        case .us_aqi_so2:
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let so2 = try get(raw: .pm10, time: timeAhead).data
+            let so2avg = so2.slidingAverageDroppingFirstDt(dt: 24)
+            return DataAndUnit(zip(so2.dropFirst(24), so2avg).map(UnitedStatesAirQuality.indexSo2), .usaqi)
+        case .us_aqi_co:
+            let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
+            let co = try get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
+            return DataAndUnit(co.map(UnitedStatesAirQuality.indexCo), .usaqi)
         }
     }
     
@@ -138,17 +181,34 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
             try prefetchData(derived: .european_aqi_o3, time: time)
             try prefetchData(derived: .european_aqi_so2, time: time)
         case .european_aqi_pm2_5:
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
-            try prefetchData(raw: .pm2_5, time: timeAhead)
+            try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24*3600)))
         case .european_aqi_pm10:
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
-            try prefetchData(raw: .pm10, time: timeAhead)
+            try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24*3600)))
         case .european_aqi_no2:
             try prefetchData(raw: .nitrogen_dioxide, time: time)
         case .european_aqi_o3:
             try prefetchData(raw: .ozone, time: time)
         case .european_aqi_so2:
             try prefetchData(raw: .sulphur_dioxide, time: time)
+        case .us_aqi:
+            try prefetchData(derived: .us_aqi_pm2_5, time: time)
+            try prefetchData(derived: .us_aqi_pm10, time: time)
+            try prefetchData(derived: .us_aqi_no2, time: time)
+            try prefetchData(derived: .us_aqi_o3, time: time)
+            try prefetchData(derived: .us_aqi_so2, time: time)
+            try prefetchData(derived: .us_aqi_co, time: time)
+        case .us_aqi_pm2_5:
+            try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24*3600)))
+        case .us_aqi_pm10:
+            try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24*3600)))
+        case .us_aqi_no2:
+            try prefetchData(raw: .nitrogen_dioxide, time: time)
+        case .us_aqi_o3:
+            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8*3600)))
+        case .us_aqi_so2:
+            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-24*3600)))
+        case .us_aqi_co:
+            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8*3600)))
         }
     }
 }

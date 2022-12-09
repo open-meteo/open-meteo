@@ -34,6 +34,70 @@ struct EuropeanAirQuality {
     }
 }
 
+/// https://en.wikipedia.org/wiki/Air_quality_index#United_States
+struct UnitedStatesAirQuality {
+    static let o3_HourlyThresholds: [Float] = [.nan , .nan, 125, 165, 205, 405, 505, 605]
+    static let o3_8HourlyThresholds: [Float] = [0, 55, 70, 85, 105, 200, .nan, .nan]
+    
+    static let pm2_5_24HourlyMeanThresholds: [Float] = [0, 12, 35.5, 55.5, 150.5, 250.5, 350.1, 500.5]
+    static let pm10_24HourlyMeanThresholds: [Float] = [0, 55, 155, 255, 355, 425, 505, 605]
+    
+    static let co_8HourlyThresholds: [Float] = [0, 4.5, 9.5, 12.5, 15.5, 30.5, 40.5, 50.5]
+    
+    static let so2_HourlyThresholds: [Float] = [0, 35, 75, 185, 305, .nan, .nan, .nan]
+    static let so2_24HourlyThresholds: [Float] = [.nan, .nan, .nan, .nan, 305, 605, 805, 1005]
+    
+    static let no2_HourlyThresholds: [Float] = [0, 54, 100, 360, 650, 1250, 1650, 2050]
+    
+    /// Accept hourly values
+    @inlinable static func indexNo2(no2: Float) -> Float {
+        let x = no2_HourlyThresholds.positionExtrapolated(of: no2)
+        return x <= 3 ? (x*50) : (x*100 - 100)
+    }
+    
+    /// Accept 8h avg
+    @inlinable static func indexCo(co_8h_mean: Float) -> Float {
+        let x = co_8HourlyThresholds.positionExtrapolated(of: co_8h_mean)
+        return x <= 3 ? (x*50) : (x*100 - 100)
+    }
+    
+    /// Accept hourly values and 8h avg
+    @inlinable static func indexO3(o3: Float, o3_8h_mean: Float) -> Float {
+        let x1 = o3_HourlyThresholds.positionExtrapolated(of: o3)
+        let x2 = o3_8HourlyThresholds.positionExtrapolated(of: o3_8h_mean)
+        if x1.isNaN {
+            return x2 <= 3 ? (x2*50) : (x2*100 - 100)
+        }
+        if x2.isNaN {
+            return x1 <= 3 ? (x1*50) : (x1*100 - 100)
+        }
+        let x = max(x1, x2)
+        return x <= 3 ? (x*50) : (x*100 - 100)
+    }
+    
+    /// Accept hourly values and 24h avg
+    @inlinable static func indexSo2(so2: Float, so2_24h_mean: Float) -> Float {
+        let x1 = so2_HourlyThresholds.positionExtrapolated(of: so2)
+        let x2 = so2_24HourlyThresholds.positionExtrapolated(of: so2_24h_mean)
+        if x1.isNaN {
+            return x2 <= 3 ? (x2*50) : (x2*100 - 100)
+        }
+        return x1 <= 3 ? (x1*50) : (x1*100 - 100)
+    }
+    
+    /// Accept 24h running mean
+    @inlinable static func indexPm10(pm10_24h_mean: Float) -> Float {
+        let x = pm10_24HourlyMeanThresholds.positionExtrapolated(of: pm10_24h_mean) * 20
+        return x <= 3 ? (x*50) : (x*100 - 100)
+    }
+    
+    /// Accept 24h running mean
+    @inlinable static func indexPm2_5(pm2_5_24h_mean: Float) -> Float {
+        let x = pm2_5_24HourlyMeanThresholds.positionExtrapolated(of: pm2_5_24h_mean) * 20
+        return x <= 3 ? (x*50) : (x*100 - 100)
+    }
+}
+
 extension Array where Element == Float {
     // Find the postion in an array and return a linear interpolated position in case it is between 2 values
     // If the search values is larger then the maximum, an extrapolated value will be returned
