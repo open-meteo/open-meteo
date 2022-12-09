@@ -3,8 +3,14 @@ import Foundation
 
 /// A generic reader that caches all file system reads
 final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable> where Variable: Hashable {
-    private var cache: [Variable: DataAndUnit]
+    private var cache: [VariableAndTime: DataAndUnit]
     let reader: GenericReader<Domain, Variable>
+    
+    /// Used as key for cache
+    struct VariableAndTime: Hashable {
+        let variable: Variable
+        let time: TimerangeDt
+    }
     
     /// Elevation of the grid point
     var modelElevation: Float {
@@ -40,11 +46,11 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
     }
     
     func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        if let value = cache[variable] {
+        if let value = cache[VariableAndTime(variable: variable, time: time)] {
             return value
         }
         let data = try reader.get(variable: variable, time: time)
-        cache[variable] = data
+        cache[VariableAndTime(variable: variable, time: time)] = data
         return data
     }
     
