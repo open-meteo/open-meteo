@@ -141,37 +141,37 @@
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="pm10" id="pm10" name="hourly" checked>
           <label class="form-check-label" for="pm10">
-            Particulate Matter PM10
+            Particulate Matter PM<sub>10</sub>
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="pm2_5" id="pm2_5" name="hourly" checked>
           <label class="form-check-label" for="pm2_5">
-            Particulate Matter PM2.5
+            Particulate Matter PM<sub>2.5</sub>
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="carbon_monoxide" id="carbon_monoxide" name="hourly">
           <label class="form-check-label" for="carbon_monoxide">
-            Carbon Monoxide
+            Carbon Monoxide NO
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="nitrogen_dioxide" id="nitrogen_dioxide" name="hourly">
           <label class="form-check-label" for="nitrogen_dioxide">
-            Nitrogen Dioxide
+            Nitrogen Dioxide NO<sub>2</sub>
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="sulphur_dioxide" id="sulphur_dioxide" name="hourly">
           <label class="form-check-label" for="sulphur_dioxide">
-            Sulphur Dioxide
+            Sulphur Dioxide SO<sub>2</sub>
           </label>
         </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="ozone" id="ozone" name="hourly">
           <label class="form-check-label" for="ozone">
-            Ozone
+            Ozone O<sub>3</sub>
           </label>
         </div>
       </div>
@@ -269,35 +269,35 @@
                   <input class="form-check-input" type="checkbox" value="european_aqi_pm2_5" id="european_aqi_pm2_5"
                     name="hourly">
                   <label class="form-check-label" for="european_aqi_pm2_5">
-                    European AQI PM2.5
+                    European AQI PM<sub>2.5</sub>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_pm10" id="european_aqi_pm10"
                     name="hourly">
                   <label class="form-check-label" for="european_aqi_pm10">
-                    European AQI PM10
+                    European AQI PM<sub>10</sub>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_no2"
                     id="european_aqi_no2" name="hourly">
                   <label class="form-check-label" for="european_aqi_no2">
-                    European AQI NO2
+                    European AQI NO<sub>2</sub>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_o3"
                     id="european_aqi_o3" name="hourly">
                   <label class="form-check-label" for="european_aqi_o3">
-                    European AQI O3
+                    European AQI O<sub>3</sub>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="european_aqi_so2"
                     id="european_aqi_so2" name="hourly">
                   <label class="form-check-label" for="european_aqi_so2">
-                    European AQI SO2
+                    European AQI SO<sub>2</sub>
                   </label>
                 </div>
               </div>
@@ -402,21 +402,21 @@
                   <input class="form-check-input" type="checkbox" value="us_aqi_pm2_5" id="us_aqi_pm2_5"
                     name="hourly">
                   <label class="form-check-label" for="us_aqi_pm2_5">
-                    United States AQI PM2.5
+                    United States AQI PM<sub>2.5</sub>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="us_aqi_pm10" id="us_aqi_pm10"
                     name="hourly">
                   <label class="form-check-label" for="us_aqi_pm10">
-                    United States AQI PM10
+                    United States AQI PM<sub>10</sub>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="us_aqi_no2"
                     id="us_aqi_no2" name="hourly">
                   <label class="form-check-label" for="us_aqi_no2">
-                    United States AQI NO2
+                    United States AQI NO<sub>2</sub>
                   </label>
                 </div>
                 <div class="form-check">
@@ -430,14 +430,14 @@
                   <input class="form-check-input" type="checkbox" value="us_aqi_o3"
                     id="us_aqi_o3" name="hourly">
                   <label class="form-check-label" for="us_aqi_o3">
-                    United States AQI O3
+                    United States AQI O<sub>3</sub>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="us_aqi_so2"
                     id="us_aqi_so2" name="hourly">
                   <label class="form-check-label" for="us_aqi_so2">
-                    United States AQI SO2
+                    United States AQI SO<sub>2</sub>
                   </label>
                 </div>
                 <p></p>
@@ -777,7 +777,7 @@
             <th scope="row">pm10<br />pm2_5</th>
             <td>Instant</td>
             <td>μg/m³</td>
-            <td>Particulate matter with diameter smaller than 10 µm (PM10) and smaller than 2.5 µm (PM2.5) close to
+            <td>Particulate matter with diameter smaller than 10 µm (PM<sub>10</sub>) and smaller than 2.5 µm (PM<sub>2.5</sub>) close to
               surface (10 meter above ground)</td>
           </tr>
           <tr>
