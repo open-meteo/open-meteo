@@ -1119,6 +1119,11 @@
         </thead>
         <tbody>
           <tr>
+            <th scope="row">weathercode</th>
+            <td>WMO code</td>
+            <td>The most severe weather condition on a given day</td>
+          </tr>
+          <tr>
             <th scope="row">temperature_2m_max<br>temperature_2m_min</th>
             <td>°C (°F)</td>
             <td>Maximum and minimum daily air temperature at 2 meters above ground</td>

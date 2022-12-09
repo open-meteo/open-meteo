@@ -172,6 +172,8 @@ enum JmaDailyWeatherVariable: String, Codable {
     case sunrise
     case sunset
     case et0_fao_evapotranspiration
+    case weathercode
+    case snowfall_sum
 }
 
 enum JmaVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixable {
@@ -192,6 +194,8 @@ enum JmaVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMi
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
+    case weathercode
+    case snowfall
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -294,6 +298,13 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 fallthrough
             case .shortwave_radiation_instant:
                 try prefetchData(raw: .shortwave_radiation, time: time)
+            case .weathercode:
+                try prefetchData(raw: .cloudcover, time: time)
+                try prefetchData(variable: .derived(.surface(.snowfall)), time: time)
+                try prefetchData(raw: .precipitation, time: time)
+            case .snowfall:
+                try prefetchData(raw: .temperature_2m, time: time)
+                try prefetchData(raw: .precipitation, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -394,7 +405,24 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 let diff = try get(derived: .surface(.diffuse_radiation), time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
-
+            case .weathercode:
+                let cloudcover = try get(raw: .cloudcover, time: time).data
+                let precipitation = try get(raw: .precipitation, time: time).data
+                let snowfall = try get(derived: .surface(.snowfall), time: time).data
+                return DataAndUnit(WeatherCode.calculate(
+                    cloudcover: cloudcover,
+                    precipitation: precipitation,
+                    convectivePrecipitation: nil,
+                    snowfallCentimeters: snowfall,
+                    gusts: nil,
+                    cape: nil,
+                    liftedIndex: nil,
+                    modelDtHours: time.dtSeconds / 3600), .wmoCode
+                )
+            case .snowfall:
+                let temperature = try get(raw: .temperature_2m, time: time)
+                let precipitation = try get(raw: .precipitation, time: time)
+                return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
             }
         case .pressure(let v):
             switch v.variable {
@@ -479,6 +507,12 @@ extension JmaMixer {
         case .et0_fao_evapotranspiration:
             let data = try get(variable: .et0_fao_evapotranspiration, time: time).conertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .weathercode:
+            let data = try get(variable: .weathercode, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .snowfall_sum:
+            let data = try get(variable: .snowfall, time: time).conertAndRound(params: params)
+            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         }
     }
     
@@ -520,6 +554,10 @@ extension JmaMixer {
                 try prefetchData(variable: .relativehumidity_2m, time: time)
                 try prefetchData(variable: .wind_u_component_10m, time: time)
                 try prefetchData(variable: .wind_v_component_10m, time: time)
+            case .weathercode:
+                try prefetchData(variable: .derived(.surface(.weathercode)), time: time)
+            case .snowfall_sum:
+                try prefetchData(variable: .derived(.surface(.snowfall)), time: time)
             }
         }
     }

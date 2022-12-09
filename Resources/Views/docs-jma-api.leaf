@@ -124,8 +124,20 @@
             Precipitation (rain + snow)
           </label>
         </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall" id="snowfall" name="hourly">
+          <label class="form-check-label" for="snowfall">
+            Snowfall
+          </label>
+        </div>
       </div>
       <div class="col-md-3">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode" name="hourly">
+          <label class="form-check-label" for="weathercode">
+            Weathercode
+          </label>
+        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover" name="hourly">
           <label class="form-check-label" for="cloudcover">
@@ -336,6 +348,12 @@
       <h2>Daily Weather Variables <small class="text-muted">(*)</small></h2>
       <div class="col-md-6">
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode_daily" name="daily">
+          <label class="form-check-label" for="weathercode_daily">
+            Weathercode
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max"
             name="daily">
           <label class="form-check-label" for="temperature_2m_max">
@@ -388,6 +406,12 @@
             name="daily">
           <label class="form-check-label" for="precipitation_hours">
             Precipitation Hours
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall_sum" id="snowfall_sum" name="daily">
+          <label class="form-check-label" for="snowfall_sum">
+            Snowfall Sum
           </label>
         </div>
         <div class="form-check">
@@ -827,10 +851,24 @@
                   assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
           </tr>
           <tr>
+            <th scope="row">weathercode</th>
+            <td>Instant</td>
+            <td>WMO code</td>
+            <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for
+              details. Weather code is calculated from cloud cover analysis, precipitation and snowfall. As JMA has barely no information about atmospheric stability, estimation about thunderstorms is not possible.</td>
+          </tr>
+          <tr>
             <th scope="row">precipitation</th>
             <td>Preceding hour sum</td>
             <td>mm (inch)</td>
             <td>Total precipitation (rain, showers, snow) sum of the preceding hour</td>
+          </tr>
+          <tr>
+            <th scope="row">snowfall</th>
+            <td>Preceding hour sum</td>
+            <td>cm (inch)</td>
+            <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by
+              7. E.g. 7 cm snow = 10 mm precipitation water equivalent. Snowfall amount is not provided by JMA directly, instead it is approximated based on total precipitation and temperature</td>
           </tr>
         </tbody>
       </table>
@@ -923,6 +961,11 @@
         </thead>
         <tbody>
           <tr>
+            <th scope="row">weathercode</th>
+            <td>WMO code</td>
+            <td>The most severe weather condition on a given day</td>
+          </tr>
+          <tr>
             <th scope="row">temperature_2m_max<br>temperature_2m_min</th>
             <td>°C (°F)</td>
             <td>Maximum and minimum daily air temperature at 2 meters above ground</td>
@@ -941,6 +984,11 @@
             <th scope="row">precipitation_hours</th>
             <td>hours</td>
             <td>The number of hours with rain</td>
+          </tr>
+          <tr>
+            <th scope="row">snowfall_sum</th>
+            <td>cm</td>
+            <td>Sum of daily snowfall</td>
           </tr>
           <tr>
             <th scope="row">sunrise<br>sunset</th>
