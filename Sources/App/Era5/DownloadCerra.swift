@@ -672,7 +672,7 @@ struct DownloadCerraCommand: Command {
         }
         
         let months = timeinterval.toYearMonth()
-        if months.count >= 6 {
+        if months.count >= 3 {
             /// Download one month at once
             for date in months {
                 logger.info("Downloading year \(date.year) month \(date.month)")
@@ -850,7 +850,9 @@ struct DownloadCerraCommand: Command {
         /// Select the desired timerange, or use last 14 day
         let timeinterval = signature.getTimeinterval()
         try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
-        try convertDailyFiles(logger: logger, timeinterval: timeinterval)
+        /// cerra is using hourly downloaded files
+        let timeintervalHourly = timeinterval.with(dtSeconds: 3600)
+        try convertDailyFiles(logger: logger, timeinterval: timeintervalHourly)
     }
 }
 
