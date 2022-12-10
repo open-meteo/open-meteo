@@ -816,8 +816,58 @@ struct DownloadCerraCommand: Command {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
     }
     
+    /*func convertWindSpeedDirectionToComponents(logger: Logger, speedFile: String, directionFile: String, destinationUWind: String, destinationVWind: String) throws {
+        let read = try OmFileReader(file: speedFile)
+        let directionDriection = try OmFileReader(file: directionFile)
+        let writer = OmFileWriter(dim0: read.dim0, dim1: read.dim1, chunk0: read.chunk0, chunk1: read.chunk1)
+
+        var percent = 0
+        try OmFileWriter(dim0: read.dim0, dim1: read.dim1, chunk0: read.chunk0, chunk1: read.chunk1).write(file: destinationUWind, compressionType: .p4nzdec256, scalefactor: read.scalefactor) { dim0 in
+            let ratio = Int(Float(dim0) / (Float(read.dim0)) * 100)
+            if percent != ratio {
+                logger.info("\(ratio) %")
+                percent = ratio
+            }
+            
+            let nLocations = 1000 * read.chunk0
+            let locationRange = dim0..<min(dim0+nLocations, read.dim0)
+            try read.willNeed(dim0Slow: locationRange, dim1: 0..<read.dim1)
+            let speed = try read.read(dim0Slow: locationRange, dim1: nil)
+            let direction = try directionDriection.read(dim0Slow: locationRange, dim1: nil)
+            return ArraySlice(zip(speed, direction).map(Meteorology.uWind))
+        }
+        
+        percent = 0
+        try OmFileWriter(dim0: read.dim0, dim1: read.dim1, chunk0: read.chunk0, chunk1: read.chunk1).write(file: destinationVWind, compressionType: .p4nzdec256, scalefactor: read.scalefactor) { dim0 in
+            let ratio = Int(Float(dim0) / (Float(read.dim0)) * 100)
+            if percent != ratio {
+                logger.info("\(ratio) %")
+                percent = ratio
+            }
+            
+            let nLocations = 1000 * read.chunk0
+            let locationRange = dim0..<min(dim0+nLocations, read.dim0)
+            try read.willNeed(dim0Slow: locationRange, dim1: 0..<read.dim1)
+            let speed = try read.read(dim0Slow: locationRange, dim1: nil)
+            let direction = try directionDriection.read(dim0Slow: locationRange, dim1: nil)
+            return ArraySlice(zip(speed, direction).map(Meteorology.vWind))
+        }
+    }*/
+    
     func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
+        
+        /*let dir = "/Volumes/2TB_1GBs/data/yearly-cerra/"
+        let year = 2000
+        try convertWindSpeedDirectionToComponents(
+            logger: logger, speedFile: "\(dir)windspeed_10m_\(year).om",
+            directionFile: "\(dir)winddirection_10m_\(year).om",
+            destinationUWind: "\(dir)wind_u_component_10m_\(year).om",
+            destinationVWind: "\(dir)wind_v_component_10m_\(year).om")
+        
+        fatalError()*/
+        
+        
         if let stripseaYear = signature.stripseaYear {
             try runStripSea(logger: logger, year: Int(stripseaYear)!)
             return
