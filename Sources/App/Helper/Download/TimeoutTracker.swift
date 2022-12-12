@@ -30,3 +30,37 @@ final class TimeoutTracker {
         try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
     }
 }
+
+/// Track the progress of some work
+final class ProgressTracker {
+    var done = 0
+    var doneLastPrint = 0
+    var total: Int
+    
+    let printDelta: Double = 20
+    let startTime = Date()
+    var lastPrint = Date()
+    
+    let logger: Logger
+    let label: String
+    
+    public init(logger: Logger, total: Int, label: String) {
+        self.logger = logger
+        self.total = total
+        self.label = label
+    }
+    
+    /// Print status from time to time
+    func add(_ work: Int) {
+        done += work
+        let deltaT = Date().timeIntervalSince(lastPrint)
+        if deltaT > printDelta {
+            let timeElapsed = Date().timeIntervalSince(startTime)
+            let ratio = Int(Float(done) / (Float(total)) * 100)
+            let rate = Double(done - doneLastPrint) / deltaT
+            logger.info("[ \(label) ] Completed \(ratio)% \(work) / \(total) in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2)), \(rate.rounded()) per second")
+            lastPrint = Date()
+            doneLastPrint = done
+        }
+    }
+}

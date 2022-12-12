@@ -119,7 +119,7 @@ struct GloFasDownloader: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        let downloadTimeHours = domain == .forecastv3 ? 3 : 9
+        let downloadTimeHours = domain == .forecastv3 ? 5 : 14
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: 3600*downloadTimeHours)
         let directory = domain == .forecastv3 ? "fc_grib" : "seasonal_fc_grib"
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
@@ -133,14 +133,28 @@ struct GloFasDownloader: AsyncCommandFix {
         
         // Read all GRIB messages and directly update OM file database
         // Database update is done in a second thread
-        logger.info("Reading grib file")
+        logger.info("Starting grib streaming. nLocationsPerChunk=\(nLocationsPerChunk) nTime=\(nTime)")
         let timeout = TimeoutTracker(logger: logger, deadline: curl.deadline)
+        
+        actor Counter {
+            var count = 0
+            
+            func inc() {
+                count += 1
+            }
+            
+            func dec() {
+                count -= 1
+            }
+        }
+        
         while true {
             let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil)
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
+                    let counter = Counter()
                     let tracker = TransferAmountTracker(logger: logger, totalSize: try response.contentLength())
-                    var dataPerTimestep = [Data]()
+                    var dataPerTimestep = [OmFileReader<DataAsClass>]()
                     dataPerTimestep.reserveCapacity(nTime)
                     for try await messages in response.body.tracker(tracker).decodeGrib() {
                         for message in messages {
@@ -164,9 +178,14 @@ struct GloFasDownloader: AsyncCommandFix {
                                 fatalError("Got more data than expected \(forecastDate)")
                             }
                             
+                            // If conversion is running, reduce download speed
+                            if await counter.count > 0 {
+                                try await Task.sleep(nanoseconds: 5_000_000_000)
+                            }
+                            
                             /// Use compressed memory to store each downloaded step
                             /// Roughly 2.5 MB memory per step (uncompressed 20.6 MB)
-                            dataPerTimestep.append(try writer.writeInMemory(compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data))
+                            dataPerTimestep.append(try OmFileReader(fn: DataAsClass(data: try writer.writeInMemory(compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data))))
                             
                             guard forecastDate == nTime-1 else {
                                 continue
@@ -176,16 +195,28 @@ struct GloFasDownloader: AsyncCommandFix {
                             dataPerTimestep.removeAll()
                             
                             group.addTask {
+                                await counter.inc()
                                 logger.info("Starting om file update for member \(member)")
+                                let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Conversion member \(member)")
                                 let startOm = DispatchTime.now()
                                 let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
                                 var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+                                /// Reused read buffer
+                                var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
                                 try om.updateFromTimeOrientedStreaming(variable: name, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic) { d0offset in
+                                    
+                                    try Task.checkCancellation()
                                     
                                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nx*ny)
                                     for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
-                                        data2d[0..<data2d.nLocations, forecastDate] = try OmFileReader(fn: DataAsClass(data: data)).read(dim0Slow: 0..<1, dim1: locationRange)
+                                        try readTemp.withUnsafeMutableBufferPointer {
+                                            try data.read(into: $0.baseAddress!, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                                        }
+                                        data2d[0..<data2d.nLocations, forecastDate] = readTemp
                                     }
+                                    
+                                    progress.add(locationRange.count)
+                                    
                                     return data2d.data[0..<locationRange.count * nTime]
                                 }
                                 
@@ -195,6 +226,7 @@ struct GloFasDownloader: AsyncCommandFix {
 
                                 try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)*/
                                 logger.info("Update om for member \(member) finished in \(startOm.timeElapsedPretty())")
+                                await counter.dec()
                             }
                         }
                     }
