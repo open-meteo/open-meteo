@@ -128,7 +128,8 @@ struct GloFasDownloader: AsyncCommandFix {
         
         let timerange = TimerangeDt(start: run, nTime: nTime, dtSeconds: 24*3600)
         let ringtime = timerange.toIndexTime()
-        let writer = OmFileWriter(dim0: ny, dim1: nx, chunk0: ny, chunk1: nx)
+        let nLocationsPerChunk = om.nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: nx*ny, chunk0: 1, chunk1: nLocationsPerChunk)
         
         // Read all GRIB messages and directly update OM file database
         // Database update is done in a second thread
@@ -175,23 +176,25 @@ struct GloFasDownloader: AsyncCommandFix {
                             dataPerTimestep.removeAll()
                             
                             group.addTask {
-                                logger.info("Starting time series conversion")
-                                // 4.5 GB memory for seasonal v3 forecast
-                                var data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
-                                for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
-                                    data2d[0..<nx*ny, forecastDate] = try OmFileReader(fn: DataAsClass(data: data)).readAll()
+                                logger.info("Starting om file update for member \(member)")
+                                let startOm = DispatchTime.now()
+                                let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
+                                var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+                                try om.updateFromTimeOrientedStreaming(variable: name, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic) { d0offset in
+                                    
+                                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nx*ny)
+                                    for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
+                                        data2d[0..<data2d.nLocations, forecastDate] = try OmFileReader(fn: DataAsClass(data: data)).read(dim0Slow: 0..<1, dim1: locationRange)
+                                    }
+                                    return data2d.data[0..<locationRange.count * nTime]
                                 }
                                 
-                                let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
-                                if createNetcdf {
+                                /*if createNetcdf {
                                     try data2d.transpose().writeNetcdf(filename: "\(name).nc", nx: nx, ny: ny)
                                 }
 
-                                
-                                logger.info("Starting om file update")
-                                let startOm = DispatchTime.now()
-                                try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
-                                logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+                                try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)*/
+                                logger.info("Update om for member \(member) finished in \(startOm.timeElapsedPretty())")
                             }
                         }
                     }

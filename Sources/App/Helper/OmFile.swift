@@ -47,6 +47,11 @@ struct OmFileSplitter {
         self.nTimePerFile = nTimePerFile
         self.yearlyArchivePath = yearlyArchivePath
     }
+    
+    // optimise to use 8 MB memory, but aligned to even `chunknLocations`
+    var nLocationsPerChunk: Int {
+        8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / chunknLocations * chunknLocations
+    }
 
     /// Prefetch all required data into memory
     func willNeed(variable: String, location: Int, time: TimerangeDt) throws {
@@ -156,7 +161,7 @@ struct OmFileSplitter {
     func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, ringtime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
         
         // optimise to use 8 MB memory, but aligned to even `chunknLocations`
-        let locationsChunk = 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / chunknLocations * chunknLocations
+        let locationsChunk = nLocationsPerChunk
         
         // Allocate buffers to uncompress existing data
         var fileData = [Float](repeating: .nan, count: nTimePerFile * locationsChunk)
@@ -259,6 +264,7 @@ struct OmFileSplitter {
         while dim0Offset < nLocations {
             let data = try supplyChunk(dim0Offset)
             let nLocInChunk = data.count / nRingtime
+            //print("nLocaInChunk \(nLocInChunk) dim0Offset \(dim0Offset) total \(nLocations) \(Float(dim0Offset)/Float(nLocations))%")
             if fileData.count < nLocInChunk * nTimePerFile {
                 fileData = [Float](repeating: .nan, count: nLocInChunk * nTimePerFile)
             }
