@@ -161,9 +161,9 @@ enum GlofasDomainApi: String, Codable, CaseIterable {
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GloFasMixer? {
         switch self {
         case .seamless_v3:
-            return try GloFasMixer(domains: [.forecastv3, .intermediatev3, .consolidatedv3, .seasonalv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return try GloFasMixer(domains: [.seasonalv3, .consolidatedv3, .intermediatev3, .forecastv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .forecast_v3:
-            return try GloFasMixer(domains: [.forecastv3, .intermediatev3, .seasonalv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return try GloFasMixer(domains: [.seasonalv3, .intermediatev3, .forecastv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .consolidated_v3:
             return try GloFasMixer(domains: [.consolidatedv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .consolidated_v4:

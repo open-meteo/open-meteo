@@ -126,7 +126,8 @@ struct GloFasDownloader: AsyncCommandFix {
         
         let nTime = domain == .forecastv3 ? 30 : 215
         
-        let timerange = TimerangeDt(start: run, nTime: nTime, dtSeconds: 24*3600)
+        // forecast day 0 is valid for the next day
+        let timerange = TimerangeDt(start: run.add(24*3600), nTime: nTime, dtSeconds: 24*3600)
         let ringtime = timerange.toIndexTime()
         let nLocationsPerChunk = om.nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: nx*ny, chunk0: 1, chunk1: nLocationsPerChunk)
