@@ -8,6 +8,14 @@ final class SwiftPFor2DTests: XCTestCase {
         try! FileManager.default.removeItemIfExists(at: "writetest.om")
     }
     
+    func testInMemory() throws {
+        let data: [Float] = [0.0, 5.0, 2.0, 3.0, 2.0, 5.0, 6.0, 2.0, 8.0, 3.0, 10.0, 14.0, 12.0, 15.0, 14.0, 15.0, 66.0, 17.0, 12.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
+        let compressed = try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: 10).writeInMemory(compressionType: .p4nzdec256, scalefactor: 1, all: data)
+        XCTAssertEqual(compressed.count, 168)
+        let uncompressed = try OmFileReader(fn: compressed).readAll()
+        XCTAssertEqualArray(data, uncompressed, accuracy: 0.001)
+    }
+    
     /// Crashes on linux, but fine on macos
     func testALinuxCrash(){
         //let s = String(cString: cpustr(0))

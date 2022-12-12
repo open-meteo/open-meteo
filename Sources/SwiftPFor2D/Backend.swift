@@ -9,9 +9,12 @@ public protocol OmFileWriterBackend {
 
 /// OmFileReader can read data from this backend
 public protocol OmFileReaderBackend {
-    var data: UnsafeBufferPointer<UInt8> { get }
+    /// Length in bytes
+    var count: Int { get }
     var needsPrefetch: Bool { get }
     func prefetchData(offset: Int, count: Int)
+    
+    func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType
 }
 
 /// Make `Data` work as writer
@@ -25,7 +28,7 @@ extension Data: OmFileWriterBackend {
     }
     
     public mutating func write<T>(contentsOf data: T, atOffset: Int) throws where T : DataProtocol {
-        self.insert(contentsOf: data, at: Int(atOffset))
+        self.insert(contentsOf: data, at: atOffset)
     }
 }
 
@@ -39,6 +42,14 @@ extension FileHandle: OmFileWriterBackend {
 
 /// Make `FileHandle` work as reader
 extension MmapFile: OmFileReaderBackend {
+    public var count: Int {
+        return data.count
+    }
+    
+    public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
+        try data.withUnsafeBytes(body)
+    }
+    
     public var needsPrefetch: Bool {
         return true
     }
@@ -46,10 +57,6 @@ extension MmapFile: OmFileReaderBackend {
 
 /// Make `Data` work as reader
 extension Data: OmFileReaderBackend {
-    public var data: UnsafeBufferPointer<UInt8> {
-        return self.withUnsafeBytes({return $0.assumingMemoryBound(to: UInt8.self)})
-    }
-    
     public var needsPrefetch: Bool {
         return false
     }
