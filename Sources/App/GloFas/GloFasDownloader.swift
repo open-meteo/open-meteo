@@ -137,8 +137,10 @@ struct GloFasDownloader: AsyncCommandFix {
         while true {
             let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil)
             do {
-                //try await withThrowingTaskGroup(of: Void.self) { group in
+                try await withThrowingTaskGroup(of: Void.self) { group in
                     let tracker = TransferAmountTracker(logger: logger, totalSize: try response.contentLength())
+                    var dataPerTimestep = [Data]()
+                    dataPerTimestep.reserveCapacity(nTime)
                     for try await messages in response.body.tracker(tracker).decodeGrib() {
                         for message in messages {
                             let date = message.get(attribute: "validityDate")!
@@ -156,60 +158,51 @@ struct GloFasDownloader: AsyncCommandFix {
                             try grib2d.load(message: message)
                             grib2d.array.flipLatitude()
                             
-                            try writer.write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
-                            
-                            /*data2d[0..<nx*ny, forecastDate] = grib2d.array.data
-                            
-                            
                             // iterates from 0 to 29 forecast date and then updates om file
-                            guard forecastDate <= data2d.nTime else {
+                            guard forecastDate <= nTime else {
                                 fatalError("Got more data than expected \(forecastDate)")
                             }
-                            guard forecastDate == data2d.nTime-1 else {
+                            
+                            /// Use compressed memory to store each downloaded step
+                            /// Roughly 2.5 MB memory per step (uncompressed 20.6 MB)
+                            dataPerTimestep.append(try writer.writeInMemory(compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data))
+                            
+                            guard forecastDate == nTime-1 else {
                                 continue
                             }
                             // Process om file update in separat thread, otherwise the download stalls
-                            let data2dwrite = data2d
-                            data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
+                            let dataPerTimestepCopy = dataPerTimestep
+                            dataPerTimestep.removeAll()
+                            
                             group.addTask {
+                                logger.info("Starting time series conversion")
+                                // 4.5 GB memory for seasonal v3 forecast
+                                var data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
+                                for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
+                                    data2d[0..<nx*ny, forecastDate] = try OmFileReader(fn: data).readAll()
+                                }
+                                
                                 let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
                                 if createNetcdf {
-                                    try data2dwrite.transpose().writeNetcdf(filename: "\(name).nc", nx: nx, ny: ny)
+                                    try data2d.transpose().writeNetcdf(filename: "\(name).nc", nx: nx, ny: ny)
                                 }
+
                                 
                                 logger.info("Starting om file update")
                                 let startOm = DispatchTime.now()
-                                try om.updateFromTimeOriented(variable: name, array2d: data2dwrite, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+                                try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
                                 logger.info("Update om finished in \(startOm.timeElapsedPretty())")
-                            }*/
+                            }
                         }
                     }
                     curl.totalBytesTransfered += tracker.transfered
-                //}
+                }
                 break
             } catch {
                 try await timeout.check(error: error)
             }
         }
         curl.printStatistics()
-        
-        logger.info("Converting to timeseries database")
-        var data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
-        for member in 0...50 {
-            for (i, time) in timerange.enumerated() {
-                let date = time.format_YYYYMMdd
-                let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
-                
-                let data = try OmFileReader(file: dailyFile).readAll()
-                data2d[0..<nx*ny, i] = data
-            }
-            logger.info("Starting om file update")
-            let startOm = DispatchTime.now()
-            let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
-            try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
-        }
-        
     }
     
     /// Download timeinterval and convert to omfile database
