@@ -747,7 +747,7 @@ enum GemDomain: String, GenericDomain {
     private static var gemRegionalElevationFile = try? OmFileReader(file: Self.gem_regional.surfaceElevationFileOm)
     private static var gemHrdpsContinentalElevationFile = try? OmFileReader(file: Self.gem_hrdps_continental.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .gem_global:
             return Self.gemGlobalElevationFile

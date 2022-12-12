@@ -28,7 +28,7 @@ enum SeasonalForecastDomain: String, GenericDomain {
     
     static var ncepElevation = try? OmFileReader(file: Self.ncep.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .ecmwf:
             fatalError()

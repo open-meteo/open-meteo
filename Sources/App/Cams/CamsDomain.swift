@@ -37,7 +37,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         return 3600
     }
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         return nil
     }
     

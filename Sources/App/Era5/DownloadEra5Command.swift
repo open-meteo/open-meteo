@@ -12,7 +12,7 @@ enum CdsDomain: String, GenericDomain {
         return 3600
     }
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .era5:
             return Self.era5ElevationFile

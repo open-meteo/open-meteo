@@ -67,7 +67,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         return 3600
     }
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .icon:
             return Self.iconElevataion

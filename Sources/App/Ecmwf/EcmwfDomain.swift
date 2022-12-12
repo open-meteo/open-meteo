@@ -7,7 +7,7 @@ enum EcmwfDomain: String, GenericDomain {
     case ifs04
     
     /// There is no elevation file for ECMWF
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         return nil
     }
     

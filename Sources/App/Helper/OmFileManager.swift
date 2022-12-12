@@ -10,7 +10,7 @@ import NIO
 final class OmFileManager: LifecycleHandler {
     /// A file might exist and is open, or it is missing
     enum OmFileState {
-        case exists(file: OmFileReader)
+        case exists(file: OmFileReader<MmapFile>)
         case missing(path: String)
     }
     
@@ -72,12 +72,12 @@ final class OmFileManager: LifecycleHandler {
     }
     
     /// Get cached file or return nil, if the files does not exist
-    public static func get(basePath: String, variable: String, timeChunk: Int) throws -> OmFileReader? {
+    public static func get(basePath: String, variable: String, timeChunk: Int) throws -> OmFileReader<MmapFile>? {
         try instance.get(basePath: basePath, variable: variable, timeChunk: timeChunk)
     }
 
     /// Get cached file or return nil, if the files does not exist
-    public func get(basePath: String, variable: String, timeChunk: Int) throws -> OmFileReader? {
+    public func get(basePath: String, variable: String, timeChunk: Int) throws -> OmFileReader<MmapFile>? {
         var hasher = Hasher()
         basePath.hash(into: &hasher)
         variable.hash(into: &hasher)
@@ -107,13 +107,13 @@ final class OmFileManager: LifecycleHandler {
     }
 }
 
+/// Keep one buffer per thread
+fileprivate var buffers = [Thread: UnsafeMutableRawBufferPointer]()
+
+/// Thread safe access to buffers
+fileprivate let lockBuffers = NIOLock()
+
 extension OmFileReader {
-    /// Keep one buffer per thread
-    fileprivate static var buffers = [Thread: UnsafeMutableRawBufferPointer]()
-    
-    /// Thread safe access to buffers
-    fileprivate static let lockBuffers = NIOLock()
-    
     /// Thread safe buffer provider that automatically reallocates buffers
     fileprivate static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
         return lockBuffers.withLock {

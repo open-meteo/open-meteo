@@ -16,7 +16,7 @@ extension Gridable {
         return nx * ny
     }
     
-    func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader?, mode: GridSelectionMode) throws -> (gridpoint: Int, gridElevation: Float)? {
+    func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader<MmapFile>?, mode: GridSelectionMode) throws -> (gridpoint: Int, gridElevation: Float)? {
         guard let elevationFile = elevationFile else {
             guard let point = findPoint(lat: lat, lon: lon) else {
                 return nil
@@ -36,7 +36,7 @@ extension Gridable {
     }
     
     /// Get nearest grid point
-    func findPointNearest(lat: Float, lon: Float, elevationFile: OmFileReader) throws -> (gridpoint: Int, gridElevation: Float)? {
+    func findPointNearest(lat: Float, lon: Float, elevationFile: OmFileReader<MmapFile>) throws -> (gridpoint: Int, gridElevation: Float)? {
         guard let center = findPoint(lat: lat, lon: lon) else {
             return nil
         }
@@ -55,7 +55,7 @@ extension Gridable {
     }
     
     /// Find point, perferably in sea
-    func findPointInSea(lat: Float, lon: Float, elevationFile: OmFileReader) throws -> (gridpoint: Int, gridElevation: Float)? {
+    func findPointInSea(lat: Float, lon: Float, elevationFile: OmFileReader<MmapFile>) throws -> (gridpoint: Int, gridElevation: Float)? {
         guard let center = findPoint(lat: lat, lon: lon) else {
             return nil
         }
@@ -93,7 +93,7 @@ extension Gridable {
     }
     
     /// Analyse 3x3 locations around the desired coordinate and return the best elevation match
-    func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader) throws -> (gridpoint: Int, gridElevation: Float)? {
+    func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader<MmapFile>) throws -> (gridpoint: Int, gridElevation: Float)? {
         guard let center = findPoint(lat: lat, lon: lon) else {
             return nil
         }

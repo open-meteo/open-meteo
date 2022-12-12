@@ -32,7 +32,7 @@ enum GfsDomain: String, GenericDomain {
         return self == .gfs025
     }
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .gfs025:
             return Self.gfs025ElevationFile

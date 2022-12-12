@@ -110,7 +110,7 @@ struct GloFasDownloader: AsyncCommandFix {
     func downloadEnsembleForecast(application: Application, domain: GloFasDomain, run: Timestamp, skipFilesIfExisting: Bool, createNetcdf: Bool, user: String, password: String) async throws {
         let logger = application.logger
         
-        //try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let nx = domain.grid.nx
@@ -125,8 +125,10 @@ struct GloFasDownloader: AsyncCommandFix {
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
         
         let nTime = domain == .forecastv3 ? 30 : 215
-        var data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + data2d.nTime
+        
+        let timerange = TimerangeDt(start: run, nTime: nTime, dtSeconds: 24*3600)
+        let ringtime = timerange.toIndexTime()
+        let writer = OmFileWriter(dim0: ny, dim1: nx, chunk0: ny, chunk1: nx)
         
         // Read all GRIB messages and directly update OM file database
         // Database update is done in a second thread
@@ -135,7 +137,7 @@ struct GloFasDownloader: AsyncCommandFix {
         while true {
             let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil)
             do {
-                try await withThrowingTaskGroup(of: Void.self) { group in
+                //try await withThrowingTaskGroup(of: Void.self) { group in
                     let tracker = TransferAmountTracker(logger: logger, totalSize: try response.contentLength())
                     for try await messages in response.body.tracker(tracker).decodeGrib() {
                         for message in messages {
@@ -149,11 +151,15 @@ struct GloFasDownloader: AsyncCommandFix {
                             }
                             
                             logger.info("Converting day \(date) Member \(member) forecastDate \(forecastDate)")
-                            //let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
-                            //try FileManager.default.removeItemIfExists(at: dailyFile)
+                            let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
+                            try FileManager.default.removeItemIfExists(at: dailyFile)
                             try grib2d.load(message: message)
                             grib2d.array.flipLatitude()
-                            data2d[0..<nx*ny, forecastDate] = grib2d.array.data
+                            
+                            try writer.write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
+                            
+                            /*data2d[0..<nx*ny, forecastDate] = grib2d.array.data
+                            
                             
                             // iterates from 0 to 29 forecast date and then updates om file
                             guard forecastDate <= data2d.nTime else {
@@ -175,17 +181,35 @@ struct GloFasDownloader: AsyncCommandFix {
                                 let startOm = DispatchTime.now()
                                 try om.updateFromTimeOriented(variable: name, array2d: data2dwrite, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
                                 logger.info("Update om finished in \(startOm.timeElapsedPretty())")
-                            }
+                            }*/
                         }
                     }
                     curl.totalBytesTransfered += tracker.transfered
-                }
+                //}
                 break
             } catch {
                 try await timeout.check(error: error)
             }
         }
         curl.printStatistics()
+        
+        logger.info("Converting to timeseries database")
+        var data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
+        for member in 0...50 {
+            for (i, time) in timerange.enumerated() {
+                let date = time.format_YYYYMMdd
+                let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
+                
+                let data = try OmFileReader(file: dailyFile).readAll()
+                data2d[0..<nx*ny, i] = data
+            }
+            logger.info("Starting om file update")
+            let startOm = DispatchTime.now()
+            let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
+            try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+        }
+        
     }
     
     /// Download timeinterval and convert to omfile database
@@ -456,7 +480,7 @@ enum GloFasDomain: String, GenericDomain {
         return 3600*24
     }
     
-    var elevationFile: SwiftPFor2D.OmFileReader? {
+    var elevationFile: SwiftPFor2D.OmFileReader<MmapFile>? {
         return nil
     }
     

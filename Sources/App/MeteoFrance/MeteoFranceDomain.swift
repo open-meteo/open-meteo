@@ -55,7 +55,7 @@ enum MeteoFranceDomain: String, GenericDomain {
     private static var aromeFranceElevationFile = try? OmFileReader(file: Self.arome_france.surfaceElevationFileOm)
     private static var aromeFranceHdElevationFile = try? OmFileReader(file: Self.arome_france_hd.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .arpege_europe:
             return Self.arpegeEuropeElevationFile

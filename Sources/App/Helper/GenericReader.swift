@@ -12,7 +12,7 @@ protocol GenericDomain {
     var dtSeconds: Int { get }
     
     /// An instance to read elevation and sea mask information
-    var elevationFile: OmFileReader? { get }
+    var elevationFile: OmFileReader<MmapFile>? { get }
     
     /// Where compressed time series files are stroed
     var omfileDirectory: String { get }

@@ -498,7 +498,7 @@ enum JmaDomain: String, GenericDomain {
     private static var gsmElevationFile = try? OmFileReader(file: Self.gsm.surfaceElevationFileOm)
     private static var msmElevationFile = try? OmFileReader(file: Self.msm.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .gsm:
             return Self.gsmElevationFile

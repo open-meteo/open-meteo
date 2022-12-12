@@ -26,7 +26,7 @@ enum IconWaveDomain: String, Codable, CaseIterable, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .gwam:
             return Self.gwamElevation

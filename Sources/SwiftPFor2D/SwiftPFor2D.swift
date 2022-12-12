@@ -9,7 +9,7 @@ public enum SwiftPFor2DError: Error {
     case dimensionOutOfBounds(range: Range<Int>, allowed: Int)
     case chunkDimensionIsSmallerThenOverallDim
     case dimensionMustBeLargerThan0
-    case notAOmFile(filename: String)
+    case notAOmFile
     case fileExistsAlready(filename: String)
     case posixFallocateFailed(error: Int32)
     case ftruncateFailed(error: Int32)
@@ -91,11 +91,7 @@ public final class OmFileWriter {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public func write(file: String, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
-        
-        if FileManager.default.fileExists(atPath: file) {
-            throw SwiftPFor2DError.fileExistsAlready(filename: file)
-        }
+    public func write<Backend: OmFileWriterBackend>(fn: inout Backend, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         
         let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
         let nDim1Chunks = dim1.divideRoundedUp(divisor: chunk1)
@@ -117,7 +113,7 @@ public final class OmFileWriter {
             chunk0: chunk0,
             chunk1: chunk1)
         
-        let fn = try FileHandle.createNewFile(file: file)
+        
         try withUnsafeBytes(of: header) { ptr in
             assert(ptr.count == OmHeader.length)
             try fn.write(contentsOf: ptr)
@@ -295,13 +291,35 @@ public final class OmFileWriter {
         try fn.write(contentsOf: Data(repeating: 0, count: trailingBytes))
         
         // write dictionary
-        try fn.seek(toOffset: UInt64(OmHeader.length))
         try chunkOffsetBytes.withUnsafeBufferPointer { ptr in
-            try fn.write(contentsOf: ptr.toUnsafeRawBufferPointer())
+            try fn.write(contentsOf: ptr.toUnsafeRawBufferPointer(), atOffset: OmHeader.length)
         }
         
         // ensure data is written to disk
         try fn.synchronize()
+    }
+    
+    /// Write new. Throw error is file exists
+    public func write(file: String, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+        if FileManager.default.fileExists(atPath: file) {
+            throw SwiftPFor2DError.fileExistsAlready(filename: file)
+        }
+        var fn = try FileHandle.createNewFile(file: file)
+        try write(fn: &fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
+    }
+    
+    /// Write to memory
+    public func writeInMemory(compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws -> Data {
+        var data = Data()
+        try write(fn: &data, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
+        return data
+    }
+    
+    /// Write all data at once without any streaming
+    public func writeInMemory(compressionType: CompressionType, scalefactor: Float, all: [Float]) throws -> Data {
+        return try writeInMemory(compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { range in
+            return ArraySlice(all)
+        })
     }
     
     /// Write all data at once without any streaming
@@ -353,8 +371,8 @@ struct OmHeader {
     static var length: Int { 40 }
 }
 
-public final class OmFileReader {
-    public let fn: MmapFile
+public final class OmFileReader<Backend: OmFileReaderBackend> {
+    public let fn: Backend
     
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
@@ -374,18 +392,15 @@ public final class OmFileReader {
     /// Number of elements to chunk in dimension 1. Must be lower or equals `chunk1`
     public let chunk1: Int
     
-    
-    public init(file: String) throws {
-        let fn = try FileHandle.openFileReading(file: file)
-        let mmap = try MmapFile(fn: fn)
-        let header = mmap.data.baseAddress!.withMemoryRebound(to: OmHeader.self, capacity: 1) { ptr in
+    public init(fn: Backend) throws {
+        let header = fn.data.baseAddress!.withMemoryRebound(to: OmHeader.self, capacity: 1) { ptr in
             ptr.pointee
         }
         guard header.magicNumber1 == OmHeader.magicNumber1 && header.magicNumber2 == OmHeader.magicNumber2 else {
-            throw SwiftPFor2DError.notAOmFile(filename: file)
+            throw SwiftPFor2DError.notAOmFile
         }
         
-        self.fn = mmap
+        self.fn = fn
         dim0 = header.dim0
         dim1 = header.dim1
         chunk0 = header.chunk0
@@ -395,13 +410,12 @@ public final class OmFileReader {
         compression = header.version == 1 ? .p4nzdec256 : CompressionType(rawValue: header.compression)!
     }
     
-    /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
-    public func wasDeleted() -> Bool {
-        fn.wasDeleted()
-    }
-    
     /// Prefetch fhe required data regions into memory
     public func willNeed(dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+        guard fn.needsPrefetch else {
+            return
+        }
+        
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
             throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
         }
@@ -577,5 +591,18 @@ public final class OmFileReader {
                 }
             }
         }
+    }
+}
+
+extension OmFileReader where Backend == MmapFile {
+    public convenience init(file: String) throws {
+        let fn = try FileHandle.openFileReading(file: file)
+        let mmap = try MmapFile(fn: fn)
+        try self.init(fn: mmap)
+    }
+    
+    /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
+    public func wasDeleted() -> Bool {
+        fn.wasDeleted()
     }
 }

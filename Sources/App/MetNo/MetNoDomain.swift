@@ -23,7 +23,7 @@ enum MetNoDomain: String, GenericDomain {
 
     private static var nordicPpElevationFile = try? OmFileReader(file: Self.nordic_pp.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader? {
+    var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .nordic_pp:
             return Self.nordicPpElevationFile
