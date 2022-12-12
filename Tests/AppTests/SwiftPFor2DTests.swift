@@ -11,8 +11,10 @@ final class SwiftPFor2DTests: XCTestCase {
     func testInMemory() throws {
         let data: [Float] = [0.0, 5.0, 2.0, 3.0, 2.0, 5.0, 6.0, 2.0, 8.0, 3.0, 10.0, 14.0, 12.0, 15.0, 14.0, 15.0, 66.0, 17.0, 12.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         let compressed = try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: 10).writeInMemory(compressionType: .p4nzdec256, scalefactor: 1, all: data)
-        XCTAssertEqual(compressed.count, 168)
-        let uncompressed = try OmFileReader(fn: compressed).readAll()
+        XCTAssertEqual(compressed.count, 212)
+        //print(compressed.hex)
+        let uncompressed = try OmFileReader(fn: compressed).readAll() // .read(dim0Slow: 0..<1, dim1: 10..<20)
+        //print(uncompressed)
         XCTAssertEqualArray(data, uncompressed, accuracy: 0.001)
     }
     
@@ -21,7 +23,7 @@ final class SwiftPFor2DTests: XCTestCase {
         //let s = String(cString: cpustr(0))
         //print(s)
         
-        let writeBuffer: UnsafeMutablePointer<UInt8> = .allocate(capacity: (4*2).P4NENC256_BOUND())
+        let writeBuffer: UnsafeMutablePointer<UInt8> = .allocate(capacity: P4NENC256_BOUND(n: 4, bytesPerElement: 2))
         defer { writeBuffer.deallocate() }
         
         var data: [Int16] = [0,1,5,6]

@@ -72,11 +72,12 @@ public final class OmFileWriter {
         self.chunk0 = chunk0
         self.chunk1 = chunk1
 
+        let bufferSize = P4NENC256_BOUND(n: chunk0*chunk1, bytesPerElement: 4)
         
         // Read buffer needs to be a bit larger for AVX 256 bit alignment
-        self.readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: (chunk0 * chunk1 * 4).P4NENC256_BOUND(), alignment: 4)
+        self.readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
         
-        self.writeBuffer = .allocate(capacity: max(1024 * 1024 * 8, (chunk0 * chunk1 * 4).P4NENC256_BOUND()))
+        self.writeBuffer = .allocate(capacity: max(1024 * 1024 * 8, bufferSize))
     }
     
     deinit {
@@ -127,7 +128,7 @@ public final class OmFileWriter {
         chunkOffsetBytes.reserveCapacity(nChunks)
         
         /// Size a compressed chunk might
-        let minBufferSize = (chunk0 * chunk1 * compressionType.bytesPerElement).P4NENC256_BOUND()
+        let minBufferSize = P4NENC256_BOUND(n: chunk0*chunk1, bytesPerElement: compressionType.bytesPerElement)
         var writeBufferPos = 0
                 
         /// itterate over all chunks
@@ -287,11 +288,10 @@ public final class OmFileWriter {
         //print("avg chunk size bytes", (chunkOffsetBytes.last ?? 0) / (nDim0Chunks*nDim1Chunks))
         
         // write trailing byte to allow the encoder to read with 256 bit alignment
-        let trailingBytes = (chunk0 * chunk1 * compressionType.bytesPerElement).P4NENC256_BOUND() - (chunk0 * chunk1 * compressionType.bytesPerElement)
+        let trailingBytes = P4NDEC256_BOUND(n: 0, bytesPerElement: 4)
         try fn.write(contentsOf: Data(repeating: 0, count: trailingBytes))
         
         // write dictionary
-        print(chunkOffsetBytes)
         try chunkOffsetBytes.withUnsafeBufferPointer { ptr in
             try fn.write(contentsOf: ptr.toUnsafeRawBufferPointer(), atOffset: OmHeader.length)
         }
@@ -450,7 +450,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     
                     if newfetchStart != fetchEnd {
                         if fetchEnd != 0 {
-                            print("fetching from \(fetchStart) to \(fetchEnd)... count \(fetchEnd-fetchStart)")
+                            //print("fetching from \(fetchStart) to \(fetchEnd)... count \(fetchEnd-fetchStart)")
                             fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)
                         }
                         fetchStart = newfetchStart
@@ -461,7 +461,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             }
         }
         
-        print("fetching from \(fetchStart) to \(fetchEnd)... count \(fetchEnd-fetchStart)")
+        //print("fetching from \(fetchStart) to \(fetchEnd)... count \(fetchEnd-fetchStart)")
         fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)
     }
     

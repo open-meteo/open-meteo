@@ -28,7 +28,10 @@ extension Data: OmFileWriterBackend {
     }
     
     public mutating func write<T>(contentsOf data: T, atOffset: Int) throws where T : DataProtocol {
-        self.insert(contentsOf: data, at: atOffset)
+        self.reserveCapacity(atOffset + data.count)
+        let _ = self.withUnsafeMutableBytes {
+            data.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: $0[atOffset ..< atOffset+data.count]))
+        }
     }
 }
 
