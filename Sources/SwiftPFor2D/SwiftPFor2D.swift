@@ -40,41 +40,43 @@ public enum CompressionType: UInt8 {
 
 /// Write an om file and write multiple chunks of data
 public final class OmFileWriterState<Backend: OmFileWriterBackend> {
-    let dim0: Int
-    let dim1: Int
+    public let fn: Backend
     
-    let chunk0: Int
-    let chunk1: Int
+    public let dim0: Int
+    public let dim1: Int
     
-    let compression: CompressionType
-    let scalefactor: Float
+    public let chunk0: Int
+    public let chunk1: Int
+    
+    public let compression: CompressionType
+    public let scalefactor: Float
     
     /// Buffer where chunks are moved to, before compression them. => input for compression call
-    var readBuffer: UnsafeMutableRawBufferPointer
+    public var readBuffer: UnsafeMutableRawBufferPointer
     
     /// Compressed chunks are written into this buffer
     /// 1 MB write buffer or larger if chunks are very large
-    var writeBuffer: UnsafeMutableBufferPointer<UInt8>
+    public var writeBuffer: UnsafeMutableBufferPointer<UInt8>
     
-    var writeBufferPos = 0
+    public var writeBufferPos = 0
     
     /// Position of last chunk that has been written
-    var c0: Int = 0
+    public var c0: Int = 0
     
-    var nDim0Chunks: Int {
+    public var nDim0Chunks: Int {
         dim0.divideRoundedUp(divisor: chunk0)
     }
     
-    var nDim1Chunks: Int {
+    public var nDim1Chunks: Int {
         dim1.divideRoundedUp(divisor: chunk1)
     }
     
-    var nChunks: Int {
+    public var nChunks: Int {
         nDim0Chunks * nDim1Chunks
     }
     
     /// Store all byte offsets where our compressed chunks start. Later, we want to decompress chunk 1234 and know it starts at byte offset 5346545
-    var chunkOffsetBytes = [Int]()
+    public var chunkOffsetBytes = [Int]()
     
     /**
      Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
@@ -83,7 +85,8 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public init(dim0: Int, dim1: Int, chunk0: Int, chunk1: Int, compression: CompressionType, scalefactor: Float, readBuffer: UnsafeMutableRawBufferPointer, writeBuffer: UnsafeMutableBufferPointer<UInt8>) throws {
+    public init(fn: Backend, dim0: Int, dim1: Int, chunk0: Int, chunk1: Int, compression: CompressionType, scalefactor: Float, readBuffer: UnsafeMutableRawBufferPointer, writeBuffer: UnsafeMutableBufferPointer<UInt8>) throws {
+        self.fn = fn
         self.dim0 = dim0
         self.dim1 = dim1
         self.chunk0 = chunk0
@@ -103,7 +106,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
         chunkOffsetBytes.reserveCapacity(nChunks)
     }
     
-    public func writeHeader(fn: inout Backend) throws {
+    public func writeHeader() throws {
         /// Create header and write to file
         let header = OmHeader(
             compression: compression.rawValue,
@@ -122,7 +125,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
         try fn.write(contentsOf: Data(repeating: 0, count: nChunks * MemoryLayout<Int>.size))
     }
     
-    public func writeTail(fn: inout Backend) throws {
+    public func writeTail() throws {
         // Write remainind data from buffer
         try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer.baseAddress, count: writeBufferPos))
         
@@ -141,7 +144,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
         try fn.synchronize()
     }
     
-    public func write(fn: inout Backend, _ uncompressedInput: ArraySlice<Float>) throws {
+    public func write(_ uncompressedInput: ArraySlice<Float>) throws {
         switch compression {
         case .p4nzdec256:
             fallthrough
@@ -339,16 +342,16 @@ public final class OmFileWriter {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public func write<Backend: OmFileWriterBackend>(fn: inout Backend, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+    public func write<Backend: OmFileWriterBackend>(fn: Backend, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         
-        let state = try OmFileWriterState<Backend>(dim0: dim0, dim1: dim1, chunk0: chunk0, chunk1: chunk1, compression: compressionType, scalefactor: scalefactor, readBuffer: readBuffer, writeBuffer: writeBuffer)
+        let state = try OmFileWriterState<Backend>(fn: fn, dim0: dim0, dim1: dim1, chunk0: chunk0, chunk1: chunk1, compression: compressionType, scalefactor: scalefactor, readBuffer: readBuffer, writeBuffer: writeBuffer)
         
-        try state.writeHeader(fn: &fn)
+        try state.writeHeader()
         while state.c0 < state.nDim0Chunks {
             let uncompressedInput = try supplyChunk(state.c0 * state.chunk0)
-            try state.write(fn: &fn, uncompressedInput)
+            try state.write(uncompressedInput)
         }
-        try state.writeTail(fn: &fn)
+        try state.writeTail()
     }
     
     /// Write new. Throw error is file exists
@@ -356,15 +359,15 @@ public final class OmFileWriter {
         if FileManager.default.fileExists(atPath: file) {
             throw SwiftPFor2DError.fileExistsAlready(filename: file)
         }
-        var fn = try FileHandle.createNewFile(file: file)
-        try write(fn: &fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
+        let fn = try FileHandle.createNewFile(file: file)
+        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
     }
     
     /// Write to memory
     public func writeInMemory(compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws -> Data {
-        var data = Data()
-        try write(fn: &data, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
-        return data
+        let data = DataAsClass(data: Data())
+        try write(fn: data, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
+        return data.data
     }
     
     /// Write all data at once without any streaming

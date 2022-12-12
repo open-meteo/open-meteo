@@ -179,7 +179,7 @@ struct GloFasDownloader: AsyncCommandFix {
                                 // 4.5 GB memory for seasonal v3 forecast
                                 var data2d = Array2DFastTime(nLocations: nx*ny, nTime: nTime)
                                 for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
-                                    data2d[0..<nx*ny, forecastDate] = try OmFileReader(fn: data).readAll()
+                                    data2d[0..<nx*ny, forecastDate] = try OmFileReader(fn: DataAsClass(data: data)).readAll()
                                 }
                                 
                                 let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"

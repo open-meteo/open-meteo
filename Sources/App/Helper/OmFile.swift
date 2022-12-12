@@ -215,4 +215,96 @@ struct OmFileSplitter {
             try FileManager.default.moveFileOverwrite(from: tempFile, to: readFile)
         }
     }
+    
+    /**
+     Write new data to the archived storage and combine it with existint data.
+     `supplyChunk` should provide data for a couple of thousands locations at once. Upates are done streamlingly to low memory usage
+     
+     TODO: smoothing is not implemented
+     */
+    func updateFromTimeOrientedStreaming(variable: String, ringtime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+        
+        // open all files for all timeranges and write a header
+        let writers: [(read: OmFileReader<MmapFile>?, write: OmFileWriterState<FileHandle>, offsets: (file: CountableRange<Int>, array: CountableRange<Int>), fileName: String)] = try (ringtime.lowerBound / nTimePerFile ..< ringtime.upperBound.divideRoundedUp(divisor: nTimePerFile)).compactMap { timeChunk in
+            let fileTime = timeChunk * nTimePerFile ..< (timeChunk+1) * nTimePerFile
+            
+            guard let offsets = ringtime.intersect(fileTime: fileTime) else {
+                return nil
+            }
+            
+            let readFile = basePath + variable + "_\(timeChunk).om"
+            let tempFile = readFile + "~"
+            let omRead = FileManager.default.fileExists(atPath: readFile) ? try OmFileReader(file: readFile) : nil
+            
+            try FileManager.default.removeItemIfExists(at: tempFile)
+            
+            let bufferSize = P4NENC256_BOUND(n: nLocations * nTimePerFile, bytesPerElement: compression.bytesPerElement)
+            let readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
+            let writeBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: max(1024 * 1024 * 8, bufferSize))
+            
+            let fn = try FileHandle.createNewFile(file: tempFile)
+            
+            let omWrite = try OmFileWriterState<FileHandle>(fn: fn, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, compression: compression, scalefactor: scalefactor, readBuffer: readBuffer, writeBuffer: writeBuffer)
+            
+            try omWrite.writeHeader()
+            
+            return (omRead, omWrite, offsets, readFile)
+        }
+        
+        let nRingtime = ringtime.count
+        var fileData = [Float]()
+        
+        // loop chunks of locations
+        var dim0Offset = 0
+        while dim0Offset < nLocations {
+            let data = try supplyChunk(dim0Offset)
+            let nLocInChunk = data.count / nRingtime
+            if fileData.count < nLocInChunk * nTimePerFile {
+                fileData = [Float](repeating: .nan, count: nLocInChunk * nTimePerFile)
+            }
+            
+            for writer in writers {
+                // Read existing data for a chunk of locations
+                let locationRange = dim0Offset ..< min(dim0Offset+nLocInChunk, nLocations)
+                if let omRead = writer.read, omRead.dim0 == nLocations, omRead.dim1 == nTimePerFile {
+                    try omRead.read(into: &fileData, arrayRange: fileData.indices, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
+                } else {
+                    /// If the old file does not exist, just make sure it is filled with NaNs
+                    for i in fileData.indices {
+                        fileData[i] = .nan
+                    }
+                }
+                
+                // write "new" data into existing data
+                for l in 0..<locationRange.count {
+                    for (tFile,tArray) in zip(writer.offsets.file, writer.offsets.array) {
+                        if tArray < skipFirst {
+                            continue
+                        }
+                        if nRingtime - tArray <= skipLast {
+                            continue
+                        }
+                        fileData[nTimePerFile * l + tFile] = data[l * nRingtime + tArray]
+                    }
+                }
+                
+                // Write data
+                try writer.write.write(fileData[0..<locationRange.count * nTimePerFile])
+            }
+            
+            dim0Offset += nLocInChunk
+        }
+        
+        /// Write end of file and move it in position
+        for writer in writers {
+            try writer.write.writeTail()
+            writer.write.readBuffer.deallocate()
+            writer.write.writeBuffer.deallocate()
+            
+            try writer.write.fn.close()
+            
+            // Overwrite existing file, with newly created
+            try FileManager.default.moveFileOverwrite(from: "\(writer.fileName)~", to: writer.fileName)
+        }
+    }
 }

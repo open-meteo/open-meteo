@@ -13,7 +13,7 @@ final class SwiftPFor2DTests: XCTestCase {
         let compressed = try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: 10).writeInMemory(compressionType: .p4nzdec256, scalefactor: 1, all: data)
         XCTAssertEqual(compressed.count, 212)
         //print(compressed.hex)
-        let uncompressed = try OmFileReader(fn: compressed).readAll() // .read(dim0Slow: 0..<1, dim1: 10..<20)
+        let uncompressed = try OmFileReader(fn: DataAsClass(data: compressed)).readAll() // .read(dim0Slow: 0..<1, dim1: 10..<20)
         //print(uncompressed)
         XCTAssertEqualArray(data, uncompressed, accuracy: 0.001)
     }

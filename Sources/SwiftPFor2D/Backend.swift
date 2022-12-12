@@ -2,8 +2,8 @@ import Foundation
 
 /// OmFileWriter can write data to this backend
 public protocol OmFileWriterBackend {
-    mutating func write<T>(contentsOf data: T) throws where T : DataProtocol
-    mutating func write<T>(contentsOf data: T, atOffset: Int) throws where T : DataProtocol
+    func write<T>(contentsOf data: T) throws where T : DataProtocol
+    func write<T>(contentsOf data: T, atOffset: Int) throws where T : DataProtocol
     func synchronize() throws
 }
 
@@ -17,19 +17,28 @@ public protocol OmFileReaderBackend {
     func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType
 }
 
+/// Need to maintain a strong reference
+public final class DataAsClass {
+    public var data: Data
+    
+    public init(data: Data) {
+        self.data = data
+    }
+}
+
 /// Make `Data` work as writer
-extension Data: OmFileWriterBackend {
+extension DataAsClass: OmFileWriterBackend {
     public func synchronize() throws {
         
     }
     
-    public mutating func write<T>(contentsOf data: T) throws where T : DataProtocol {
-        self.append(contentsOf: data)
+    public func write<T>(contentsOf data: T) throws where T : DataProtocol {
+        self.data.append(contentsOf: data)
     }
     
-    public mutating func write<T>(contentsOf data: T, atOffset: Int) throws where T : DataProtocol {
-        self.reserveCapacity(atOffset + data.count)
-        let _ = self.withUnsafeMutableBytes {
+    public func write<T>(contentsOf data: T, atOffset: Int) throws where T : DataProtocol {
+        self.data.reserveCapacity(atOffset + data.count)
+        let _ = self.data.withUnsafeMutableBytes {
             data.copyBytes(to: UnsafeMutableRawBufferPointer(rebasing: $0[atOffset ..< atOffset+data.count]))
         }
     }
@@ -59,7 +68,15 @@ extension MmapFile: OmFileReaderBackend {
 }
 
 /// Make `Data` work as reader
-extension Data: OmFileReaderBackend {
+extension DataAsClass: OmFileReaderBackend {
+    public var count: Int {
+        return data.count
+    }
+    
+    public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
+        return try data.withUnsafeBytes(body)
+    }
+    
     public var needsPrefetch: Bool {
         return false
     }
