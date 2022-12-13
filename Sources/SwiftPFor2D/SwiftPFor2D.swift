@@ -469,10 +469,12 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     }
     
     /// Prefetch fhe required data regions into memory
-    public func willNeed(dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+    public func willNeed(dim0Slow dim0Read: Range<Int>? = nil, dim1 dim1Read: Range<Int>? = nil) throws {
         guard fn.needsPrefetch else {
             return
         }
+        let dim0Read = dim0Read ?? 0..<dim0
+        let dim1Read = dim1Read ?? 0..<dim1
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
             throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)

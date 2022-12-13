@@ -219,7 +219,9 @@ struct GfsDownload: AsyncCommandFix {
                 /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
                 let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
                 let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(hour)\(prefix).fpg"
-                return (hour, try OmFileReader(file: file))
+                let reader = try OmFileReader(file: file)
+                try reader.willNeed()
+                return (hour, reader)
             })
             
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in

@@ -240,6 +240,7 @@ struct OmFileSplitter {
             let readFile = basePath + variable + "_\(timeChunk).om"
             let tempFile = readFile + "~"
             let omRead = FileManager.default.fileExists(atPath: readFile) ? try OmFileReader(file: readFile) : nil
+            try omRead?.willNeed()
             
             try FileManager.default.removeItemIfExists(at: tempFile)
             

@@ -238,7 +238,9 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 if hour == 0 && skipHour0 {
                     return nil
                 }
-                return (hour, try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om"))
+                let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om")
+                try reader.willNeed()
+                return (hour, reader)
             })
             
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in

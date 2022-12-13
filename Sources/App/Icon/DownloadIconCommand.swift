@@ -271,7 +271,9 @@ struct DownloadIconCommand: AsyncCommandFix {
                 if hour == 0 && variable.skipHour0 {
                     return nil
                 }
-                return (hour, try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v).fpg"))
+                let reader = try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v).fpg")
+                try reader.willNeed()
+                return (hour, reader)
             })
             
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
