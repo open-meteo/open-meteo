@@ -142,7 +142,8 @@ struct GemDownload: AsyncCommandFix {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
         let downloadDirectory = domain.downloadDirectory
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
@@ -204,50 +205,58 @@ struct GemDownload: AsyncCommandFix {
         let grid = domain.grid
         
         let forecastHours = domain.forecastHours
-        let nForecastHours = forecastHours.max()! / domain.dtHours + 1
-        let nLocation = grid.nx * grid.ny
+        let nTime = forecastHours.max()! / domain.dtHours + 1
+        let nLocations = grid.nx * grid.ny
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocation, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let nLocationsPerChunk = om.nLocationsPerChunk
+        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
+        
+        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
 
         for variable in variables {
             if !variable.availableFor(domain: domain) {
                 continue
             }
-            let startConvert = DispatchTime.now()
-            logger.info("Converting \(variable)")
-            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
+            let skip = variable.skipHour0 ? 1 : 0
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
 
-            for hour in forecastHours {
+            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
                 if hour == 0 && variable.skipHour0 {
-                    continue
+                    return nil
                 }
                 if !variable.includedFor(hour: hour) {
-                    continue
+                    return nil
                 }
                 let h3 = hour.zeroPadded(len: 3)
-                let data = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(h3).om").readAll()
-                data2d[0..<nLocation, hour/domain.dtHours] = data
-            }
+                let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(h3).om")
+                try reader.willNeed()
+                return (hour, reader)
+            })
             
-            // De-accumulate precipitation
-            if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                for reader in readers {
+                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                }
+                
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+                }
+                
+                if createNetcdf {
+                    try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
+                }
+                
+                progress.add(locationRange.count)
+                return data2d.data[0..<locationRange.count * nTime]
             }
-            
-            if createNetcdf {
-                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
-            }
-            let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
-            let skip = variable.skipHour0 ? 1 : 0
-            /// the last hour in D2 is broken for latent heat flux and sensible heatflux -> 2022-06-07: fluxes are ok in D2, actually skipLast feature was buggy
-            //let skipLast = (variable == .ashfl_s || variable == .alhfl_s) && domain == .iconD2 ? 1 : 0
-            let skipLast = 0
-            
-            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
-            let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: skipLast, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+            progress.finish()
         }
     }
 }
