@@ -79,7 +79,8 @@ struct JmaDownload: AsyncCommandFix {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 3)
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
@@ -136,39 +137,42 @@ struct JmaDownload: AsyncCommandFix {
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: JmaDomain, variables: [JmaVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour)
-        let nForecastHours = forecastHours.max()! / domain.dtHours + 1
+        let nTime = forecastHours.max()! / domain.dtHours + 1
+        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
         
         let grid = domain.grid
-        let nLocation = grid.count
+        let nLocations = grid.count
+        
+        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for variable in variables {
-            let startConvert = DispatchTime.now()
-            
-            logger.info("Converting \(variable)")
-            
-            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
-
-            for forecastHour in forecastHours {
-                if forecastHour == 0 && variable.skipHour0 {
-                    continue
-                }
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).om"
-                data2d[0..<nLocation, forecastHour / domain.dtHours] = try OmFileReader(file: file).readAll()
-            }
-            
             let skip = variable.skipHour0 ? 1 : 0
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
-            let time = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
+            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
+                if hour == 0 && variable.skipHour0 {
+                    return nil
+                }
+                let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om")
+                try reader.willNeed()
+                return (hour, reader)
+            })
             
-            if createNetcdf {
-                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                for reader in readers {
+                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                }
+                
+                progress.add(locationRange.count)
+                return data2d.data[0..<locationRange.count * nTime]
             }
-            
-            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
-            let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: time, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+            progress.finish()
         }
     }
 }

@@ -249,10 +249,6 @@ struct GemDownload: AsyncCommandFix {
                     data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
                 }
                 
-                if createNetcdf {
-                    try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
-                }
-                
                 progress.add(locationRange.count)
                 return data2d.data[0..<locationRange.count * nTime]
             }
