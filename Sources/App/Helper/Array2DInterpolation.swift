@@ -37,7 +37,7 @@ extension Array2DFastTime {
                 var prev = self[l, start].isNaN ? 0 : self[l, start]
                 var prevH = 1
                 var skipped = 0
-                for hour in start+1 ..< start+slidingWidth {
+                for hour in start+1 ..< min(start+slidingWidth, nTime) {
                     let d = self[l, hour]
                     let h = hour-start+1
                     if d.isNaN {
@@ -166,7 +166,7 @@ extension Array2DFastTime {
         let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
         
         /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
-        for i in locationRange.indices {
+        for i in 0..<locationRange.count {
             for hour in positions {
                 let sHour = hour - solarHours.lowerBound
                 // point C and D are still 3 h averages

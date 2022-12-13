@@ -49,6 +49,12 @@ extension Array where Element == Float {
         return first(where: {$0.isNaN}) != nil
     }
     
+    mutating func fillWithNaNs() {
+        for i in self.indices {
+            self[i] = .nan
+        }
+    }
+    
     func onlyNaN() -> Bool {
         return first(where: {!$0.isNaN}) == nil
     }

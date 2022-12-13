@@ -171,6 +171,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 }
                 
                 data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid)
+                fatalError()
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {

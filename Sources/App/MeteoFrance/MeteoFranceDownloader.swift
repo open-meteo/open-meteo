@@ -271,6 +271,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                         return hour
                     }
                     data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid)
+                    fatalError()
                     
                     // interpolate missing timesteps. We always fill 2 timesteps at once
                     // data looks like: DDDDDDDDDD--D--D--D--D--D
