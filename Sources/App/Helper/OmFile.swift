@@ -156,68 +156,15 @@ struct OmFileSplitter {
      Updates are done in chunks of 8 MB to keep memory size low. Otherwise ICON update would take 4+ GB memory for just this function.
      
      TODO: smoothing is not implemented
-     TODO: a data callback would be possible to reduce memory every further -> issue with itterating over time, have to completely change OmFileWriter
      */
     func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, ringtime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
         
-        // optimise to use 8 MB memory, but aligned to even `chunknLocations`
-        let locationsChunk = nLocationsPerChunk
-        
-        // Allocate buffers to uncompress existing data
-        var fileData = [Float](repeating: .nan, count: nTimePerFile * locationsChunk)
-        
-        let writer = OmFileWriter(dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile)
-        
-        /// icon global, one file has 4GB uncompressed floats inside....
-        /// Therefore we only read 12 locations from each file at once and then write them to the new file
-        /// This greatly reduced memory... Otherwise the icon downloader takes 8GB memory
-        for timeChunk in ringtime.lowerBound / nTimePerFile ..< ringtime.upperBound.divideRoundedUp(divisor: nTimePerFile) {
-            let fileTime = timeChunk * nTimePerFile ..< (timeChunk+1) * nTimePerFile
+        // Process at most 8 MB at once
+        try updateFromTimeOrientedStreaming(variable: variable, ringtime: ringtime, skipFirst: skipFirst, smooth: smooth, skipLast: skipLast, scalefactor: scalefactor, compression: compression) { d0offset in
             
-            guard let offsets = ringtime.intersect(fileTime: fileTime) else {
-                continue
-            }
-            
-            let readFile = basePath + variable + "_\(timeChunk).om"
-            let tempFile = readFile + "~"
-            let omRead = FileManager.default.fileExists(atPath: readFile) ? try OmFileReader(file: readFile) : nil
-            
-            try FileManager.default.removeItemIfExists(at: tempFile)
-            
-            // generate new file, while filling it step by step
-            try writer.write(file: tempFile, compressionType: compression, scalefactor: scalefactor, supplyChunk: {
-                d0offset in
-                
-                // Read existing data for a chunk of locations.. Around 8MB data
-                let locationRange = d0offset ..< min(d0offset+locationsChunk, nLocations)
-                if let omRead = omRead, omRead.dim0 == nLocations, omRead.dim1 == nTimePerFile {
-                    try omRead.read(into: &fileData, arrayRange: fileData.indices, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
-                } else {
-                    /// If the old file does not exist, just make sure it is filled with NaNs
-                    for i in fileData.indices {
-                        fileData[i] = .nan
-                    }
-                }
-                
-                // write "new" data into existing data
-                for l in 0..<locationRange.count {
-                    for (tFile,tArray) in zip(offsets.file, offsets.array) {
-                        if tArray < skipFirst {
-                            continue
-                        }
-                        if array2d.nTime - tArray <= skipLast {
-                            continue
-                        }
-                        fileData[nTimePerFile * l + tFile] = array2d.data[(l + d0offset) * array2d.nTime + tArray]
-                    }
-                }
-                
-                // Return data to writer and write chunk to file
-                return fileData[0..<locationRange.count * nTimePerFile]
-            })
-            
-            // Overwrite existing file, with newly created
-            try FileManager.default.moveFileOverwrite(from: tempFile, to: readFile)
+            let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+            let dataRange = locationRange.multiply(array2d.nTime)
+            return array2d.data[dataRange]
         }
     }
     

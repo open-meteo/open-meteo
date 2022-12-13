@@ -61,6 +61,10 @@ extension Range where Element == Int {
     @inlinable public func add(_ offset: Int) -> Range<Int> {
         return lowerBound + offset ..< upperBound + offset
     }
+    
+    @inlinable public func multiply(_ by: Int) -> Range<Int> {
+        return lowerBound * by ..< upperBound * by
+    }
 }
 
 extension Range where Bound == Float {
