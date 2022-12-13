@@ -148,7 +148,8 @@ struct MeteoFranceDownload: AsyncCommandFix {
         let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)
         let fileTimesHourly = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: true)
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
@@ -209,94 +210,96 @@ struct MeteoFranceDownload: AsyncCommandFix {
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: MeteoFranceDomain, variables: [MeteoFranceVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: false)
         let forecastHoursHourly = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: true)
         let dtHours = domain.dtHours
         
-        let nForecastHours = forecastHours.max()! / dtHours + 1
+        let nTime = forecastHours.max()! / dtHours + 1
         
-        let time = TimerangeDt(start: run, nTime: nForecastHours * domain.dtHours, dtSeconds: domain.dtSeconds)
+        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
+        
+        let time = TimerangeDt(start: run, nTime: nTime * domain.dtHours, dtSeconds: domain.dtSeconds)
         
         let grid = domain.grid
-        let nLocation = grid.count
+        let nLocations = grid.count
+        
+        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for variable in variables {
-            let startConvert = DispatchTime.now()
             let forecastHours = (variable.isAlwaysHourlyInArgegeEurope && domain == .arpege_europe) ? forecastHoursHourly : forecastHours
             
-            logger.info("Converting \(variable)")
-            
-            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
             let skipHour0 = variable.skipHour0(domain: domain)
-
-            for forecastHour in forecastHours {
-                if forecastHour == 0 && skipHour0 {
-                    continue
-                }
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).om"
-                data2d[0..<nLocation, forecastHour / dtHours] = try OmFileReader(file: file).readAll()
-            }
-            
             let skip = skipHour0 ? 1 : 0
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
-            // Deaverage radiation. Not really correct for 3h or 6h data, but solar interpolation will correct it afterwards
-            // radiation in meteofrance is aggregated and not averaged!
-            if variable.interpolation.isSolarInterpolation {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-            }
-            
-            /// somehow radiation for ARPEGE EUROPE and AROME FRANCE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?
-            if let variable = variable as? MeteoFranceSurfaceVariable, variable == .shortwave_radiation, domain != .arpege_world {
-                data2d.data.multiplyAdd(multiply: 3, add: 0)
-            }
-            
-            if dtHours == 1 {
-                // Interpolate 6h steps to 3h steps before 1h
-                let forecastStepsToInterpolate6h = (0..<nForecastHours).compactMap { hour -> Int? in
-                    if forecastHours.contains(hour) || hour % 3 != 0 {
-                        return nil
-                    }
-                    return hour
+            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
+                if hour == 0 && skipHour0 {
+                    return nil
                 }
-                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid)
+                return (hour, try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om"))
+            })
+            
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
-                // interpolate missing timesteps. We always fill 2 timesteps at once
-                // data looks like: DDDDDDDDDD--D--D--D--D--D
-                let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
-                    if forecastHours.contains(hour) || hour % 3 != 1 {
-                        // process 2 timesteps at once
-                        return nil
-                    }
-                    return hour
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                for reader in readers {
+                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                    data2d[0..<data2d.nLocations, reader.hour] = readTemp
                 }
                 
-                // Fill in missing hourly values after switching to 3h
-                data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: 0..<0, run: run, dtSeconds: domain.dtSeconds)
-                fatalError()
-            } else {
-                // Arpege world with dtHours=3. Interpolate 6h to 3h values (actually only the last timestep)
-                let forecastStepsToInterpolate6h = stride(from: 0, to: nForecastHours * dtHours, by: dtHours).compactMap { hour -> Int? in
-                    return forecastHours.contains(hour) ? nil : hour / dtHours
+                // Deaverage radiation. Not really correct for 3h or 6h data, but solar interpolation will correct it afterwards
+                // radiation in meteofrance is aggregated and not averaged!
+                if variable.interpolation.isSolarInterpolation {
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                 }
+                
+                /// somehow radiation for ARPEGE EUROPE and AROME FRANCE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?
+                if let variable = variable as? MeteoFranceSurfaceVariable, variable == .shortwave_radiation, domain != .arpege_world {
+                    data2d.data.multiplyAdd(multiply: 3, add: 0)
+                }
+                
+                if dtHours == 1 {
+                    // Interpolate 6h steps to 3h steps before 1h
+                    let forecastStepsToInterpolate6h = (0..<nTime).compactMap { hour -> Int? in
+                        if forecastHours.contains(hour) || hour % 3 != 0 {
+                            return nil
+                        }
+                        return hour
+                    }
+                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid)
+                    
+                    // interpolate missing timesteps. We always fill 2 timesteps at once
+                    // data looks like: DDDDDDDDDD--D--D--D--D--D
+                    let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
+                        if forecastHours.contains(hour) || hour % 3 != 1 {
+                            // process 2 timesteps at once
+                            return nil
+                        }
+                        return hour
+                    }
+                    
+                    // Fill in missing hourly values after switching to 3h
+                    data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                } else {
+                    // Arpege world with dtHours=3. Interpolate 6h to 3h values (actually only the last timestep)
+                    let forecastStepsToInterpolate6h = stride(from: 0, to: nTime * dtHours, by: dtHours).compactMap { hour -> Int? in
+                        return forecastHours.contains(hour) ? nil : hour / dtHours
+                    }
 
-                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 1, time: time, grid: grid)
+                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 1, time: time, grid: grid)
+                }
+                
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart, !variable.interpolation.isSolarInterpolation {
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                }
+                
+                progress.add(locationRange.count)
+                return data2d.data[0..<locationRange.count * nTime]
             }
-            
-            // De-accumulate precipitation
-            if variable.isAccumulatedSinceModelStart, !variable.interpolation.isSolarInterpolation {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-            }
-            
-            let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
-            
-            if createNetcdf {
-                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
-            }
-            
-            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
-            let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+            progress.finish()
         }
     }
 }
