@@ -48,6 +48,8 @@ final class ProgressTracker {
         self.logger = logger
         self.total = total
         self.label = label
+        
+        logger.info("[ \(label) ] Starting")
     }
     
     /// Print status from time to time
@@ -58,9 +60,15 @@ final class ProgressTracker {
             let timeElapsed = Date().timeIntervalSince(startTime)
             let ratio = Int(Float(done) / (Float(total)) * 100)
             let rate = Double(done - doneLastPrint) / deltaT
-            logger.info("[ \(label) ] Completed \(ratio)% \(work) / \(total) in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2)), \(rate.rounded()) per second")
+            logger.info("[ \(label) ] \(ratio)% \(work) / \(total) in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2)), \(rate.rounded()) per second")
             lastPrint = Date()
             doneLastPrint = done
         }
+    }
+    
+    /// Print end statistics
+    func finish() {
+        let timeElapsed = Date().timeIntervalSince(startTime)
+        logger.info("[ \(label) ] Completed in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2))")
     }
 }

@@ -271,7 +271,8 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 }
                 
                 // Fill in missing hourly values after switching to 3h
-                data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
+                data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: 0..<0, run: run, dtSeconds: domain.dtSeconds)
+                fatalError()
             } else {
                 // Arpege world with dtHours=3. Interpolate 6h to 3h values (actually only the last timestep)
                 let forecastStepsToInterpolate6h = stride(from: 0, to: nForecastHours * dtHours, by: dtHours).compactMap { hour -> Int? in

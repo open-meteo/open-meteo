@@ -210,9 +210,7 @@ struct GloFasDownloader: AsyncCommandFix {
                                     
                                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nx*ny)
                                     for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
-                                        try readTemp.withUnsafeMutableBufferPointer {
-                                            try data.read(into: $0.baseAddress!, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                                        }
+                                        try data.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
                                         data2d[0..<data2d.nLocations, forecastDate] = readTemp
                                     }
                                     

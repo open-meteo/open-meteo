@@ -132,8 +132,17 @@ extension OmFileReader {
     }
     /// Read data into existing output float buffer
     public func read(into: UnsafeMutablePointer<Float>, arrayRange: Range<Int>, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+        assert(arrayRange.count == dim0Read.count * dim1Read.count)
         let chunkBuffer = OmFileReader.getBuffer(minBytes: P4NDEC256_BOUND(n: chunk0*chunk1, bytesPerElement: compression.bytesPerElement)).baseAddress!
         try read(into: into, arrayRange: arrayRange, chunkBuffer: chunkBuffer, dim0Slow: dim0Read, dim1: dim1Read)
+    }
+    
+    /// Read data into existing output float buffer
+    public func read(into: inout [Float], arrayRange: Range<Int>, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+        try into.withUnsafeMutableBufferPointer {
+            let chunkBuffer = OmFileReader.getBuffer(minBytes: P4NDEC256_BOUND(n: chunk0*chunk1, bytesPerElement: compression.bytesPerElement)).baseAddress!
+            try read(into: $0.baseAddress!, arrayRange: arrayRange, chunkBuffer: chunkBuffer, dim0Slow: dim0Read, dim1: dim1Read)
+        }
     }
     
     /// Read data. This version is a bit slower, because it is allocating the output buffer

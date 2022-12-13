@@ -140,6 +140,72 @@ public struct Zensun {
         return out
     }
     
+    /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
+    /// This function is performance critical for updates. This explains redundant code.
+    public static func calculateRadiationBackwardsAveraged(grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt) -> Array2DFastTime {
+        var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
+                
+        for (t, timestamp) in timerange.enumerated() {
+            /// fractional day number with 12am 1jan = 1
+            let tt = timestamp.fractionalDay
+
+            let (eqtime, decang) = timestamp.getSunDeclination()
+            
+            /// earth-sun distance in AU
+            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            
+            /// solar disk half-angle
+            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
+            
+            let latsun=decang
+            /// universal time
+            let ut = timestamp.hourWithFraction
+            let t1 = (90-latsun).degreesToRadians
+            
+            let lonsun = -15.0*(ut-12.0+eqtime)
+            
+            /// longitude of sun
+            let p1 = lonsun.degreesToRadians
+            
+            let ut0 = ut - (Float(timerange.dtSeconds)/3600)
+            let lonsun0 = -15.0*(ut0-12.0+eqtime)
+            
+            let p10 = lonsun0.degreesToRadians
+            
+            for (i, gridpoint) in locationRange.enumerated() {
+                let (lat,lon) = grid.getCoordinates(gridpoint: gridpoint)
+                let t0=(90-lat).degreesToRadians                     // colatitude of point
+
+                /// longitude of point
+                var p0 = lon.degreesToRadians
+                if p0 < p1 - .pi {
+                    p0 += 2 * .pi
+                }
+                if p0 > p1 + .pi {
+                    p0 -= 2 * .pi
+                }
+                
+                // limit p1 and p10 to sunrise/set
+                let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+                let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                let sunrise = p0 + carg
+                let sunset = p0 - carg
+                let p1_l = min(sunrise, p10)
+                let p10_l = max(sunset, p1)
+                
+                // solve integral to get sun elevation dt
+                // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+                let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+                let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                /// sun elevation (`zz = sin(alpha)`)
+                let zz = (left-right) / (p1_l - p10_l)
+                
+                out[i, t] = zz <= 0 ? 0 : zz / (rsun*rsun)
+            }
+        }
+        return out
+    }
+    
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
     /// To get zenith angle, use `acos`

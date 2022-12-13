@@ -171,8 +171,10 @@ struct DownloadIconCommand: AsyncCommandFix {
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .iconD2 ? 2 : 5, waitAfterLastModified: 120)
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        print("nLocationsPerChunk \(nLocationsPerChunk)")
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
@@ -244,74 +246,72 @@ struct DownloadIconCommand: AsyncCommandFix {
         let grid = domain.grid
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        let nForecastHours = domain.nForecastHours(run: run.hour)
-        let nLocation = grid.nx * grid.ny
+        let nTime = domain.nForecastHours(run: run.hour)
+        let nLocations = grid.count
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocation, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let nLocationsPerChunk = om.nLocationsPerChunk
+        print("nLocationsPerChunk \(nLocationsPerChunk)... \(nLocations/nLocationsPerChunk) iterations")
+        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
 
         // ICON global + eu only have 3h data after 78 hours
         // ICON global 6z and 18z have 120 instead of 180 forecast hours
         // Stategy: Read each variable in a spatial array and interpolate missing values
         // Afterwards merge into temporal data files
+        
+        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
 
         for variable in variables {
-            let startConvert = DispatchTime.now()
-            logger.info("Converting \(variable)")
-            
             let v = variable.omFileName.uppercased()
-
-            /// time oriented, but after 72 hours only 3 hour values are filled.
-            /// 2.86GB high water for this array
-            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
-
-            for hour in forecastSteps {
+            let skip = variable.skipHour0 ? 1 : 0
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
+            
+            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
                 if hour == 0 && variable.skipHour0 {
-                    continue
-                }
-                let h3 = hour.zeroPadded(len: 3)
-                data2d[0..<nLocation, hour] = try OmFileReader(file: "\(downloadDirectory)single-level_\(h3)_\(v).fpg").readAll()
-            }
-            
-            
-            // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
-            if variable.isAveragedOverForecastTime {
-                data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
-            }
-            
-            // interpolate missing timesteps. We always fill 2 timesteps at once
-            // data looks like: DDDDDDDDDD--D--D--D--D--D
-            let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
-                if forecastSteps.contains(hour) || hour % 3 != 1 {
-                    // process 2 timesteps at once
                     return nil
                 }
-                return hour
+                return (hour, try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v).fpg"))
+            })
+            
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                for reader in readers {
+                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                    data2d[0..<data2d.nLocations, reader.hour] = readTemp
+                }
+                
+                // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
+                if variable.isAveragedOverForecastTime {
+                    data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+                }
+                
+                // interpolate missing timesteps. We always fill 2 timesteps at once
+                // data looks like: DDDDDDDDDD--D--D--D--D--D
+                let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
+                    if forecastSteps.contains(hour) || hour % 3 != 1 {
+                        // process 2 timesteps at once
+                        return nil
+                    }
+                    return hour
+                }
+                
+                // Fill in missing hourly values after switching to 3h
+                data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+                }
+                
+                progress.add(locationRange.count)
+                return data2d.data[0..<locationRange.count * nTime]
             }
-            
-            // Fill in missing hourly values after switching to 3h
-            data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
-            
-            // De-accumulate precipitation
-            if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
-            }
-            
-            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(v).nc", nx: grid.nx, ny: grid.ny)
-            
-            let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
-            let skip = variable.skipHour0 ? 1 : 0
-            /// the last hour in D2 is broken for latent heat flux and sensible heatflux -> 2022-06-07: fluxes are ok in D2, actually skipLast feature was buggy
-            //let skipLast = (variable == .ashfl_s || variable == .alhfl_s) && domain == .iconD2 ? 1 : 0
-            let skipLast = 0
-            
-            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
-            let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: skipLast, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+            progress.finish()
         }
         logger.info("write init.txt")
-        // TODO write also valid until date range
         try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)
     }
 

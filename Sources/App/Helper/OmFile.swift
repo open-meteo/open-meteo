@@ -243,10 +243,11 @@ struct OmFileSplitter {
             
             try FileManager.default.removeItemIfExists(at: tempFile)
             
-            let bufferSize = P4NENC256_BOUND(n: nLocations * nTimePerFile, bytesPerElement: compression.bytesPerElement)
+            let bufferSize = P4NENC256_BOUND(n: chunknLocations * nTimePerFile, bytesPerElement: compression.bytesPerElement)
             let readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
-            let writeBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: max(1024 * 1024 * 8, bufferSize))
-            
+            /// 1MB write cache
+            let writeBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: max(1024 * 1024, bufferSize))
+            //print("readBuffer \(readBuffer.count.bytesHumanReadable) writeBuffer \(writeBuffer.count.bytesHumanReadable)")
             let fn = try FileHandle.createNewFile(file: tempFile)
             
             let omWrite = try OmFileWriterState<FileHandle>(fn: fn, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, compression: compression, scalefactor: scalefactor, readBuffer: readBuffer, writeBuffer: writeBuffer)
@@ -273,7 +274,7 @@ struct OmFileSplitter {
                 // Read existing data for a chunk of locations
                 let locationRange = dim0Offset ..< min(dim0Offset+nLocInChunk, nLocations)
                 if let omRead = writer.read, omRead.dim0 == nLocations, omRead.dim1 == nTimePerFile {
-                    try omRead.read(into: &fileData, arrayRange: fileData.indices, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
+                    try omRead.read(into: &fileData, arrayRange: 0..<locationRange.count * nTimePerFile, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
                 } else {
                     /// If the old file does not exist, just make sure it is filled with NaNs
                     for i in fileData.indices {

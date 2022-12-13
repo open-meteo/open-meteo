@@ -16,14 +16,14 @@ enum Interpolation2StepType {
 
 extension Array2DFastTime {
     /// Interpolate missing values for 1 hourly data that only has 3 hourly data at `positions`.
-    mutating func interpolate2Steps(type: Interpolation2StepType, positions: [Int], grid: Gridable, run: Timestamp, dtSeconds: Int) {
+    mutating func interpolate2Steps(type: Interpolation2StepType, positions: [Int], grid: Gridable, locationRange: Range<Int>, run: Timestamp, dtSeconds: Int) {
         switch type {
         case .linear:
             interpolate2StepsLinear(positions: positions)
         case .nearest:
             interpolate2StepsNearest(positions: positions)
         case .solar_backwards_averaged:
-            interpolate2StepsSolarBackwards(positions: positions, grid: grid, run: run, dtSeconds: dtSeconds)
+            interpolate2StepsSolarBackwards(positions: positions, grid: grid, locationRange: locationRange, run: run, dtSeconds: dtSeconds)
         case .hermite(let bounds):
             interpolate2StepsHermite(positions: positions, bounds: bounds)
         case .hermite_backwards_averaged(let bounds):
@@ -153,7 +153,7 @@ extension Array2DFastTime {
     }
     
     /// 2 poisitions are interpolated in one step. Steps should align to `hour % 3 == 1`
-    mutating func interpolate2StepsSolarBackwards(positions: [Int], grid: Gridable, run: Timestamp, dtSeconds: Int) {
+    mutating func interpolate2StepsSolarBackwards(positions: [Int], grid: Gridable, locationRange: Range<Int>, run: Timestamp, dtSeconds: Int) {
         // Solar backwards averages data. Data needs to be deaveraged before
         // First the clear sky index KT is calaculated (KT based on extraterrestrial radiation)
         // clearsky index is hermite interpolated and then back to actual radiation
@@ -162,48 +162,41 @@ extension Array2DFastTime {
         let solarHours = positions.minAndMax().map { $0.min - 4 ..< $0.max + 7 } ?? 0..<0
         let solarTime = TimerangeDt(start: run.add(solarHours.lowerBound * dtSeconds), nTime: solarHours.count, dtSeconds: dtSeconds)
         
+        /// solar factor, backwards averaged over dt
+        let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
+        
         /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
-        let nx = grid.nx
-        let byY = 1
-        for cy in 0..<grid.ny/byY+1 {
-            let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
-            let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
-            /// solar factor, backwards averaged over dt
-            let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange)
-            
-            for l in locationRange {
-                for hour in positions {
-                    let sHour = hour - solarHours.lowerBound
-                    let sLocation = l - locationRange.lowerBound
-                    // point C and D are still 3 h averages
-                    let solC1 = solar2d[sLocation, sHour + 0]
-                    let solC2 = solar2d[sLocation, sHour + 1]
-                    let solC3 = solar2d[sLocation, sHour + 2]
-                    let solC = (solC1 + solC2 + solC3) / 3
-                    // At low radiaiton levels it is impossible to estimate KT indices
-                    let C = solC <= 0.005 ? 0 : min(self[l, hour+2] / solC, 1100)
-                    
-                    let solB = solar2d[sLocation, sHour - 1]
-                    let B = solB <= 0.005 ? 0 : min(self[l, hour-1] / solB, 1100)
-                    
-                    let solA = solar2d[sLocation, sHour - 4]
-                    let A = solA <= 0.005 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
-                    
-                    let solD1 = solar2d[sLocation, sHour + 3]
-                    let solD2 = solar2d[sLocation, sHour + 4]
-                    let solD3 = solar2d[sLocation, sHour + 5]
-                    let solD = (solD1 + solD2 + solD3) / 3
-                    let D = solD <= 0.005 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
-                    
-                    let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                    let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                    let c = -A/2.0 + C/2.0
-                    let d = B
-                    
-                    self[l, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
-                    self[l, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
-                    self[l, hour+2] = C * solC3
-                }
+        for i in locationRange.indices {
+            for hour in positions {
+                let sHour = hour - solarHours.lowerBound
+                // point C and D are still 3 h averages
+                let solC1 = solar2d[i, sHour + 0]
+                let solC2 = solar2d[i, sHour + 1]
+                let solC3 = solar2d[i, sHour + 2]
+                let solC = (solC1 + solC2 + solC3) / 3
+                // At low radiaiton levels it is impossible to estimate KT indices
+                let C = solC <= 0.005 ? 0 : min(self[i, hour+2] / solC, 1100)
+                
+                let solB = solar2d[i, sHour - 1]
+                let B = solB <= 0.005 ? 0 : min(self[i, hour-1] / solB, 1100)
+                
+                let solA = solar2d[i, sHour - 4]
+                let A = solA <= 0.005 ? 0 : hour-4 < 0 ? B : min((self[i, hour-4] / solA), 1100)
+                
+                let solD1 = solar2d[i, sHour + 3]
+                let solD2 = solar2d[i, sHour + 4]
+                let solD3 = solar2d[i, sHour + 5]
+                let solD = (solD1 + solD2 + solD3) / 3
+                let D = solD <= 0.005 ? 0 : hour+4 >= nTime ? C : min((self[i, hour+5] / solD), 1100)
+                
+                let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+                let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+                let c = -A/2.0 + C/2.0
+                let d = B
+                
+                self[i, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
+                self[i, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
+                self[i, hour+2] = C * solC3
             }
         }
     }

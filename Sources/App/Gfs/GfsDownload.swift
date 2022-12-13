@@ -244,7 +244,8 @@ struct GfsDownload: AsyncCommandFix {
             }
             
             // Fill in missing hourly values after switching to 3h
-            data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, run: run, dtSeconds: domain.dtSeconds)
+            data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: 0..<0, run: run, dtSeconds: domain.dtSeconds)
+            fatalError()
             
             // De-accumulate precipitation
             if variable.isAccumulatedSinceModelStart {

@@ -71,7 +71,7 @@ final class ArrayTests: XCTestCase {
         
         // this location is exactly at a point where sofac is diverging to 0 on the first step to interpolate
         let coords = IconDomains.icon.grid.getCoordinates(gridpoint: 1256 + 2879 * 1132)
-        data.interpolate2StepsSolarBackwards(positions: interpolationPositions, grid: RegularGrid(nx: 1, ny: 1, latMin: coords.latitude, lonMin: coords.longitude, dx: 1, dy: 1), run: run, dtSeconds: 3600)
+        data.interpolate2StepsSolarBackwards(positions: interpolationPositions, grid: RegularGrid(nx: 1, ny: 1, latMin: coords.latitude, lonMin: coords.longitude, dx: 1, dy: 1), locationRange: 0..<1, run: run, dtSeconds: 3600)
         
         //print(data.data[79..<181])
         // first values should be very low
@@ -86,7 +86,7 @@ final class ArrayTests: XCTestCase {
         // this position goes haywire if the time is wrong
         let coords = IconDomains.icon.grid.getCoordinates(gridpoint: 1460 + 2879 * 939)
         print(coords)
-        data.interpolate2StepsSolarBackwards(positions: interpolationPositions, grid: RegularGrid(nx: 1, ny: 1, latMin: coords.latitude, lonMin: coords.longitude, dx: 1, dy: 1), run: run, dtSeconds: 3600)
+        data.interpolate2StepsSolarBackwards(positions: interpolationPositions, grid: RegularGrid(nx: 1, ny: 1, latMin: coords.latitude, lonMin: coords.longitude, dx: 1, dy: 1), locationRange: 0..<1, run: run, dtSeconds: 3600)
         
         //print(data.data[79..<181])
         // first value should be less than 123 watts
