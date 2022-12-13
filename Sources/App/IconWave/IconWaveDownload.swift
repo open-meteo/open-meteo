@@ -69,10 +69,11 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let writer = OmFileWriter(dim0: nx, dim1: ny, chunk0: nx, chunk1: ny)
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
@@ -120,28 +121,39 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable]) throws {        
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        let nLocations = domain.grid.count
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let nLocationsPerChunk = om.nLocationsPerChunk
+        let nTime = domain.countForecastHours
+        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
+        
+        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
+        
+        let forecastHours = stride(from: 0, to: domain.countForecastHours * domain.dtHours, by: domain.dtHours)
         
         for variable in variables {
-            logger.info("Converting \(variable)")
-            
-            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
-            var data2d = Array2DFastTime(nLocations: domain.grid.count, nTime: domain.countForecastHours)
-                
-            for forecastStep in 0..<domain.countForecastHours {
-                let forecastHour = forecastStep * domain.dtSeconds / 3600
-                let d = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.rawValue)_\(forecastHour).om").readAll()
-                data2d[0..<data2d.nLocations, forecastStep] = d
-            }
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
+            let skip = 0
 
+            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
+                let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.rawValue)_\(hour).om")
+                try reader.willNeed()
+                return (hour, reader)
+            })
             
-            logger.info("Create om file")
-            let startOm = DispatchTime.now()
-            let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
-            let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
-            //try data2d.writeNetcdf(filename: "\(downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, ringtime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                for reader in readers {
+                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                }
+
+                progress.add(locationRange.count)
+                return data2d.data[0..<locationRange.count * nTime]
+            }
+            progress.finish()
         }
     }
 }
