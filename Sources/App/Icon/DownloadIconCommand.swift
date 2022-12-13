@@ -172,7 +172,6 @@ struct DownloadIconCommand: AsyncCommandFix {
         let dateStr = run.format_YYYYMMddHH
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .iconD2 ? 2 : 5, waitAfterLastModified: 120)
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
-        print("nLocationsPerChunk \(nLocationsPerChunk)")
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
@@ -252,7 +251,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
-        print("nLocationsPerChunk \(nLocationsPerChunk)... \(nLocations/nLocationsPerChunk) iterations")
+        //print("nLocationsPerChunk \(nLocationsPerChunk)... \(nLocations/nLocationsPerChunk) iterations")
         let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
 
         // ICON global + eu only have 3h data after 78 hours

@@ -147,7 +147,8 @@ struct GfsDownload: AsyncCommandFix {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
         let forecastHours = domain.forecastHours(run: run.hour)
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
@@ -191,78 +192,79 @@ struct GfsDownload: AsyncCommandFix {
     /// Process each variable and update time-series optimised files
     func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour)
-        let nForecastHours = forecastHours.max()!+1
+        let nTime = forecastHours.max()!+1
         
         let grid = domain.grid
-        let nLocation = grid.count
+        let nLocations = grid.count
         
+        let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nTime
         
-        for variable in variables {
-            let startConvert = DispatchTime.now()
-            
+        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
+        
+        for variable in variables {            
             if GfsVariableAndDomain(variable: variable, domain: domain).gribIndexName == nil {
                 continue
             }
             
-            logger.info("Converting \(variable)")
+            let skip = variable.skipHour0 ? 1 : 0
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
-            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
-
-            for forecastHour in forecastHours {
-                if forecastHour == 0 && variable.skipHour0 {
-                    continue
+            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
+                if hour == 0 && variable.skipHour0 {
+                    return nil
                 }
                 /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
                 let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour)\(prefix).fpg"
-                data2d[0..<nLocation, forecastHour] = try OmFileReader(file: file).readAll()
-            }
+                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(hour)\(prefix).fpg"
+                return (hour, try OmFileReader(file: file))
+            })
             
-            let skip = variable.skipHour0 ? 1 : 0
-            
-            // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
-            if variable.isAveragedOverForecastTime {
-                switch domain {
-                case .gfs025:
-                    data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
-                //case .nam_conus:
-                //    data2d.deavergeOverTime(slidingWidth: 3, slidingOffset: skip)
-                case .hrrr_conus:
-                    break
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                for reader in readers {
+                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                    data2d[0..<data2d.nLocations, reader.hour] = readTemp
                 }
-            }
-            
-            // interpolate missing timesteps. We always fill 2 timesteps at once
-            // data looks like: DDDDDDDDDD--D--D--D--D--D
-            let forecastStepsToInterpolate = (0..<nForecastHours).compactMap { hour -> Int? in
-                if forecastHours.contains(hour) || hour % 3 != 1 {
-                    // process 2 timesteps at once
-                    return nil
+                
+                // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
+                if variable.isAveragedOverForecastTime {
+                    switch domain {
+                    case .gfs025:
+                        data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
+                    //case .nam_conus:
+                    //    data2d.deavergeOverTime(slidingWidth: 3, slidingOffset: skip)
+                    case .hrrr_conus:
+                        break
+                    }
                 }
-                return hour
+                
+                // interpolate missing timesteps. We always fill 2 timesteps at once
+                // data looks like: DDDDDDDDDD--D--D--D--D--D
+                let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
+                    if forecastHours.contains(hour) || hour % 3 != 1 {
+                        // process 2 timesteps at once
+                        return nil
+                    }
+                    return hour
+                }
+                
+                // Fill in missing hourly values after switching to 3h
+                data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
+                    //data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                }
+                
+                progress.add(locationRange.count)
+                return data2d.data[0..<locationRange.count * nTime]
             }
-            
-            // Fill in missing hourly values after switching to 3h
-            data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: 0..<0, run: run, dtSeconds: domain.dtSeconds)
-            fatalError()
-            
-            // De-accumulate precipitation
-            if variable.isAccumulatedSinceModelStart {
-                //data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-            }
-            
-            let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nForecastHours
-            
-            if createNetcdf {
-                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: grid.nx, ny: grid.ny)
-            }
-            
-            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
-            let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+            progress.finish()
         }
     }
 }
