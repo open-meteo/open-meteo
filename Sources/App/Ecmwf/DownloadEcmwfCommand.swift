@@ -63,7 +63,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 8*1024)
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
@@ -130,53 +131,56 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let downloadDirectory = domain.downloadDirectory
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        let nForecastHours = forecastSteps.max()! / domain.dtHours + 1
+        let nTime = forecastSteps.max()! / domain.dtHours + 1
         
-        let time = TimerangeDt(start: run, nTime: nForecastHours * domain.dtHours, dtSeconds: domain.dtSeconds)
+        let time = TimerangeDt(start: run, nTime: nTime * domain.dtHours, dtSeconds: domain.dtSeconds)
         
-        let nLocation = domain.grid.nx * domain.grid.ny
-        let dtHours = domain.dtHours
-        
-        /// The time data is placed in the ring
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nForecastHours
+        let nLocations = domain.grid.nx * domain.grid.ny
+        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocation, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let nLocationsPerChunk = om.nLocationsPerChunk
+        
+        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for variable in EcmwfVariable.allCases {
-            logger.debug("Converting \(variable)")
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
+            let skip = 0
             
-            /// Prepare data as time series optimisied array
-            var data2d = Array2DFastTime(nLocations: nLocation, nTime: nForecastHours)
+            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
+                let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(hour).om")
+                try reader.willNeed()
+                return (hour, reader)
+            })
             
-            for forecastHour in forecastSteps {
-                let file = "\(downloadDirectory)\(variable.omFileName)_\(forecastHour).om"
-                data2d[0..<nLocation, forecastHour / dtHours] = try OmFileReader(file: file).readAll()
-            }
-            
-            let interpolationHours = (0..<nForecastHours).compactMap { hour -> Int? in
+            let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
                 if forecastSteps.contains(hour * domain.dtHours) {
                     return nil
                 }
                 return hour
             }
             
-            data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid)
-            
-            // De-accumulate precipitation
-            if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                for reader in readers {
+                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                }
+                
+                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid)
+                
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
+                }
+                
+                progress.add(locationRange.count)
+                return data2d.data[0..<locationRange.count * nTime]
             }
-            
-            //#if Xcode
-            //try! data2d.transpose().writeNetcdf(filename: "\(domain.omfileDirectory)\(variable).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            //return
-            //#endif
-            
-            logger.info("Create om file")
-            let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.nameInFiles, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+            progress.finish()
         }
         
         var indexTimeEnd = run.timeIntervalSince1970 + 241 * 3600

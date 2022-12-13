@@ -187,9 +187,9 @@ fileprivate extension NetCDF {
         
         while true {
             guard let nc = try openCatchMssing(path: path, allowUpdate: false) else {
-                let timeElapsed = Date().timeIntervalSince(startTime)
+                let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
                 if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("NetCDF open failed, retry every \(retySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed")
+                    logger.info("NetCDF open failed, retry every \(retySeconds) seconds, (\(timeElapsed) elapsed")
                     lastPrint = Date()
                 }
                 if Date() > deadline {

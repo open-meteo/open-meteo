@@ -27,9 +27,9 @@ final class TransferAmountTracker {
         transfered += bytes
         let deltaT = Date().timeIntervalSince(lastPrint)
         if deltaT > printDelta {
-            let timeElapsed = Date().timeIntervalSince(startTime)
+            let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
             let rate = (transfered - transferedLastPrint) / Int(deltaT)
-            logger.info("Transferred \(transfered.bytesHumanReadable) / \(totalSize?.bytesHumanReadable ?? "-") in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2)), \(rate.bytesHumanReadable)/s")
+            logger.info("Transferred \(transfered.bytesHumanReadable) / \(totalSize?.bytesHumanReadable ?? "-") in \(timeElapsed), \(rate.bytesHumanReadable)/s")
             lastPrint = Date()
             transferedLastPrint = transfered
         }

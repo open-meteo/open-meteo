@@ -57,10 +57,10 @@ final class ProgressTracker {
         done += work
         let deltaT = Date().timeIntervalSince(lastPrint)
         if deltaT > printDelta {
-            let timeElapsed = Date().timeIntervalSince(startTime)
+            let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
             let ratio = Int(Float(done) / (Float(total)) * 100)
             let rate = Double(done - doneLastPrint) / deltaT
-            logger.info("[ \(label) ] \(ratio)% \(work) / \(total) in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2)), \(rate.rounded()) per second")
+            logger.info("[ \(label) ] \(ratio)% \(work) / \(total) in \(timeElapsed), \(rate.rounded()) per second")
             lastPrint = Date()
             doneLastPrint = done
         }
@@ -68,7 +68,7 @@ final class ProgressTracker {
     
     /// Print end statistics
     func finish() {
-        let timeElapsed = Date().timeIntervalSince(startTime)
-        logger.info("[ \(label) ] Completed in \(Int(timeElapsed/60)):\((Int(timeElapsed) % 60).zeroPadded(len: 2))")
+        let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
+        logger.info("[ \(label) ] Completed in \(timeElapsed)")
     }
 }
