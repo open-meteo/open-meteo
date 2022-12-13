@@ -218,13 +218,7 @@ struct GloFasDownloader: AsyncCommandFix {
                                     
                                     return data2d.data[0..<locationRange.count * nTime]
                                 }
-                                
-                                /*if createNetcdf {
-                                    try data2d.transpose().writeNetcdf(filename: "\(name).nc", nx: nx, ny: ny)
-                                }
-
-                                try om.updateFromTimeOriented(variable: name, array2d: data2d, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)*/
-                                logger.info("Update om for member \(member) finished in \(startOm.timeElapsedPretty())")
+                                progress.finish()
                                 await counter.dec()
                             }
                         }
