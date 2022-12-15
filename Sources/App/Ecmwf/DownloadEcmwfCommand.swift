@@ -171,8 +171,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
                 }
                 
-                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid)
-                fatalError()
+                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {

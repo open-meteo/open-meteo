@@ -163,7 +163,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
                     continue // multi level variables are only 3 hour
                 }
                 let d = try OmFileReader(file: "\(domain.downloadDirectory)\(variable)_\(hour).om").readAll()
-                data2d[0..<data2d.nLocations, hour] = d
+                data2d[0..<data2d.nLocations / domain.dtHours, hour] = d
             }
             
             // Multi level has only 3h data, interpolate to 1h using hermite interpolation

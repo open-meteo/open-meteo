@@ -249,7 +249,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 data2d.data.fillWithNaNs()
                 for reader in readers {
                     try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                    data2d[0..<data2d.nLocations, reader.hour] = readTemp
+                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
                 }
                 
                 // Deaverage radiation. Not really correct for 3h or 6h data, but solar interpolation will correct it afterwards
@@ -271,8 +271,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                         }
                         return hour
                     }
-                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid)
-                    fatalError()
+                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid, locationRange: locationRange)
                     
                     // interpolate missing timesteps. We always fill 2 timesteps at once
                     // data looks like: DDDDDDDDDD--D--D--D--D--D
@@ -292,7 +291,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                         return forecastHours.contains(hour) ? nil : hour / dtHours
                     }
 
-                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 1, time: time, grid: grid)
+                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 1, time: time, grid: grid, locationRange: locationRange)
                 }
                 
                 // De-accumulate precipitation

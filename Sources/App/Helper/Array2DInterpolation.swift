@@ -207,7 +207,7 @@ extension Array2DFastTime {
     /// Used in ECMWF and MeteoFrance
     /// interpolate 1 missing step.. E.g. `DDDDDD-D-D-D-D-D`
     /// `dt` can be used to set element spacing E.g. `DxDxDxDxDxDx-xDx-xDx-xDx-xDx-xD` whith dt=1 all `x` positions will be ignored
-    mutating func interpolate1Step(interpolation: ReaderInterpolation, interpolationHours: [Int], width: Int, time: TimerangeDt, grid: Gridable) {
+    mutating func interpolate1Step(interpolation: ReaderInterpolation, interpolationHours: [Int], width: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
         switch interpolation {
         case .linear:
             for l in 0..<nLocations {
@@ -247,45 +247,38 @@ extension Array2DFastTime {
             let solarHours = interpolationHours.minAndMax().map { $0.min - 3 ..< $0.max + 5 } ?? 0..<0
             let solarTime = TimerangeDt(start: time.range.lowerBound.add(solarHours.lowerBound * time.dtSeconds), nTime: solarHours.count, dtSeconds: time.dtSeconds)
             
+            /// solar factor, backwards averaged over dt
+            let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
+            
             /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
-            let nx = grid.nx
-            let byY = 1
-            for cy in 0..<grid.ny/byY+1 {
-                let yrange = cy*byY ..< min((cy+1)*byY, grid.ny)
-                let locationRange = yrange.lowerBound * nx ..< yrange.upperBound * nx
-                /// solar factor, backwards averaged over dt
-                let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, timerange: solarTime, yrange: yrange)
-                
-                for l in locationRange {
-                    for hour in interpolationHours {
-                        let sHour = hour - solarHours.lowerBound
-                        let sLocation = l - locationRange.lowerBound
-                        // point C and D are still 2 step averages
-                        let solC1 = solar2d[sLocation, sHour + 0]
-                        let solC2 = solar2d[sLocation, sHour + 1]
-                        let solC = (solC1 + solC2) / 3
-                        // At low radiaiton levels it is impossible to estimate KT indices
-                        let C = solC <= 0.005 ? 0 : min(self[l, hour+1] / solC, 1100)
-                        
-                        let solB = solar2d[sLocation, sHour - 1]
-                        let B = solB <= 0.005 ? 0 : min(self[l, hour-1] / solB, 1100)
-                        
-                        let solA = solar2d[sLocation, sHour - 3]
-                        let A = solA <= 0.005 ? 0 : hour-3 < 0 ? B : min((self[l, hour-3] / solA), 1100)
-                        
-                        let solD1 = solar2d[sLocation, sHour + 2]
-                        let solD2 = solar2d[sLocation, sHour + 3]
-                        let solD = (solD1 + solD2) / 2
-                        let D = solD <= 0.005 ? 0 : hour+3 > nTime ? C : min((self[l, hour+3] / solD), 1100)
-                        
-                        let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-                        let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-                        let c = -A/2.0 + C/2.0
-                        let d = B
-                        
-                        self[l, hour] = (a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d) * solC1
-                        self[l, hour+1] = C * solC2
-                    }
+            for i in 0..<locationRange.count {
+                for hour in interpolationHours {
+                    let sHour = hour - solarHours.lowerBound
+                    // point C and D are still 2 step averages
+                    let solC1 = solar2d[i, sHour + 0]
+                    let solC2 = solar2d[i, sHour + 1]
+                    let solC = (solC1 + solC2) / 3
+                    // At low radiaiton levels it is impossible to estimate KT indices
+                    let C = solC <= 0.005 ? 0 : min(self[i, hour+1] / solC, 1100)
+                    
+                    let solB = solar2d[i, sHour - 1]
+                    let B = solB <= 0.005 ? 0 : min(self[i, hour-1] / solB, 1100)
+                    
+                    let solA = solar2d[i, sHour - 3]
+                    let A = solA <= 0.005 ? 0 : hour-3 < 0 ? B : min((self[i, hour-3] / solA), 1100)
+                    
+                    let solD1 = solar2d[i, sHour + 2]
+                    let solD2 = solar2d[i, sHour + 3]
+                    let solD = (solD1 + solD2) / 2
+                    let D = solD <= 0.005 ? 0 : hour+3 > nTime ? C : min((self[i, hour+3] / solD), 1100)
+                    
+                    let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+                    let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+                    let c = -A/2.0 + C/2.0
+                    let d = B
+                    
+                    self[i, hour] = (a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d) * solC1
+                    self[i, hour+1] = C * solC2
                 }
             }
         }
