@@ -4,7 +4,7 @@ import Foundation
 extension DispatchTime {
     /// Nicely format elapsed time
     func timeElapsedPretty() -> String {
-        let seconds = Double((DispatchTime.now().uptimeNanoseconds - uptimeNanoseconds)) / 1_000_000_1000
+        let seconds = Double((DispatchTime.now().uptimeNanoseconds - uptimeNanoseconds)) / 1_000_000_000
         return seconds.asSecondsPrettyPrint
     }
 }
