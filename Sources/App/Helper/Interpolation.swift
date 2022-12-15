@@ -17,8 +17,8 @@ extension Array where Element == Float {
     func interpolateSolarBackwards(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
         /// Like regular hermite, but interpolated via clearsky index kt derived with solar factor
         let position = RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1)
-        let solarLow = Zensun.calculateRadiationBackwardsAveraged(grid: position, timerange: timeLow).data
-        let solar = Zensun.calculateRadiationBackwardsAveraged(grid: position, timerange: time).data
+        let solarLow = Zensun.calculateRadiationBackwardsAveraged(grid: position, locationRange: 0..<1, timerange: timeLow).data
+        let solar = Zensun.calculateRadiationBackwardsAveraged(grid: position, locationRange: 0..<1, timerange: time).data
         return time.enumerated().map { (i, t) in
             let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
             let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
