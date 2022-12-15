@@ -279,6 +279,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                data2d.data.fillWithNaNs()
                 for reader in readers {
                     try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
                     data2d[0..<data2d.nLocations, reader.hour] = readTemp

@@ -199,7 +199,6 @@ struct GloFasDownloader: AsyncCommandFix {
                                 await counter.inc()
                                 logger.info("Starting om file update for member \(member)")
                                 let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Conversion member \(member)")
-                                let startOm = DispatchTime.now()
                                 let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
                                 var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
                                 /// Reused read buffer
