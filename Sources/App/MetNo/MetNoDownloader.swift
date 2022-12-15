@@ -150,6 +150,7 @@ struct MetNoDownloader: AsyncCommandFix {
                 guard let data = try ncVar.asType(Float.self)?.read() else {
                     fatalError("Could not get float data from \(variable)")
                 }
+                // Array is roughly 1GB. Could use chunked processing
                 return Array2DFastSpace(data: data, nLocations: nx*ny, nTime: nTime).transpose()
             }()
             

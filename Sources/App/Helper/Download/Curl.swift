@@ -50,6 +50,12 @@ final class Curl {
         self.client = client
     }
     
+    deinit {
+        // after downloads completed, memory might be a mess
+        // trim it, before starting to convert data
+        chelper_malloc_trim()
+    }
+    
     /// Set new deadline
     public func setDeadlineIn(minutes: Int) {
         self.deadline = Date().addingTimeInterval(TimeInterval(minutes * 60))
