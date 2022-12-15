@@ -57,6 +57,8 @@ enum ReaderInterpolation {
     
     case solar_backwards_averaged
     
+    case backwards_sum
+    
     /// How many timesteps on the left and right side are used for interpolation
     var padding: Int {
         switch self {
@@ -66,6 +68,8 @@ enum ReaderInterpolation {
             return 2
         case .solar_backwards_averaged:
             return 2
+        case .backwards_sum:
+            return 1
         }
     }
     

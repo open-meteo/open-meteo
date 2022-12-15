@@ -318,7 +318,7 @@ enum JmaSurfaceVariable: String, CaseIterable, Codable, JmaVariableDownloadable,
         case .wind_u_component_10m:
             return .hermite(bounds: nil)
         case .precipitation:
-            return .linear
+            return .backwards_sum
         case .shortwave_radiation:
             return .solar_backwards_averaged
         }

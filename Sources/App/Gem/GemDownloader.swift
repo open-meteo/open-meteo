@@ -511,9 +511,9 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         case .windgusts_10m:
             return .hermite(bounds: nil)
         case .showers:
-            return .linear
+            return .backwards_sum
         case .snowfall_water_equivalent:
-            return .linear
+            return .backwards_sum
         case .soil_temperature_0_to_10cm:
             return .hermite(bounds: nil)
         case .soil_moisture_0_to_10cm:

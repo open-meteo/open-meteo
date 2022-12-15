@@ -11,6 +11,8 @@ extension Array where Element == Float {
             return interpolateHermite(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor, bounds: bounds)
         case .solar_backwards_averaged:
             return interpolateSolarBackwards(timeOld: timeOld, timeNew: timeNew, latitude: latitude, longitude: longitude, scalefactor: scalefactor)
+        case .backwards_sum:
+            return backwardsSum(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         }
     }
     
@@ -51,6 +53,19 @@ extension Array where Element == Float {
             let h = (a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d) * solar[i]
             /// adjust it to scalefactor, otherwise interpolated values show more level of detail
             return roundf(h * scalefactor) / scalefactor
+        }
+    }
+    
+    func backwardsSum(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
+        let multiply = Float(time.dtSeconds) / Float(timeLow.dtSeconds)
+        return time.map { t in
+            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
+            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
+            let A = self[index]
+            let B = index+1 >= self.count ? A : self[index+1]
+            let h = A * (1-fraction) + B * fraction
+            /// adjust it to scalefactor, otherwise interpolated values show more level of detail
+            return roundf(h * multiply * scalefactor) / scalefactor
         }
     }
     

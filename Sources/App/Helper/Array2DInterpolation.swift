@@ -209,6 +209,9 @@ extension Array2DFastTime {
     /// `dt` can be used to set element spacing E.g. `DxDxDxDxDxDx-xDx-xDx-xDx-xDx-xD` whith dt=1 all `x` positions will be ignored
     mutating func interpolate1Step(interpolation: ReaderInterpolation, interpolationHours: [Int], width: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
         switch interpolation {
+        case .backwards_sum:
+            // do not divide precip amount, because data is still averaged at this point
+            fallthrough
         case .linear:
             for l in 0..<nLocations {
                 for hour in interpolationHours {

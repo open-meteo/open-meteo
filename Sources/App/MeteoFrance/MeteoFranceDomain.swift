@@ -282,9 +282,9 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariable,
         case .wind_u_component_10m:
             return .hermite(bounds: nil)
         case .precipitation:
-            return .linear
+            return .backwards_sum
         case .snowfall_water_equivalent:
-            return .linear
+            return .backwards_sum
         case .windgusts_10m:
             return .hermite(bounds: nil)
         case .shortwave_radiation:
