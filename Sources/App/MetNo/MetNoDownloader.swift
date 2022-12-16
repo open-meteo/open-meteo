@@ -137,42 +137,52 @@ struct MetNoDownloader: AsyncCommandFix {
         }*/
         
         let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
+        let nLocations = nx*ny
+        let nLocationsPerChunk = om.nLocationsPerChunk
         
         for variable in variables {
             logger.info("Converting \(variable)")
             let startConvert = DispatchTime.now()
-            
-            // Transpose to fast time. Closure is used to free up some memory.
-            var data2d = try {
-                guard let ncVar = ncFile.getVariable(name: variable.netCdfName) else {
-                    fatalError("Could not open nc variable \(variable) \(variable.netCdfName)")
-                }
-                guard let data = try ncVar.asType(Float.self)?.read() else {
-                    fatalError("Could not get float data from \(variable)")
-                }
-                // Array is roughly 1GB. Could use chunked processing
-                return Array2DFastSpace(data: data, nLocations: nx*ny, nTime: nTime).transpose()
-            }()
-            
-            // Scaling
-            if let fma = variable.multiplyAdd {
-                data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-            }
-            
             let skip = variable.skipHour0 ? 1 : 0
             
-            if variable.isAccumulatedSinceModelStart {
-                data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+            
+            guard let ncVar = ncFile.getVariable(name: variable.netCdfName) else {
+                fatalError("Could not open nc variable \(variable) \(variable.netCdfName)")
             }
+            guard let data = try ncVar.asType(Float.self)?.read() else {
+                fatalError("Could not get float data from \(variable)")
+            }
+            /// 1GB spatial oriented file. In total 2.7 GB memory used while running
+            let spatial = Array2DFastSpace(data: data, nLocations: nx*ny, nTime: nTime)
+            
+            /// Create chunked time-series arrays instead of transposing the entire array
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
+                for (i,l) in locationRange.enumerated() {
+                    for h in 0..<nTime {
+                        data2d[i, h] = data2d[h, l]
+                    }
+                }
+                
+                // Scaling
+                if let fma = variable.multiplyAdd {
+                    data2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                if variable.isAccumulatedSinceModelStart {
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                }
+                progress.add(locationRange.count)
+                return data2d.data[0..<locationRange.count * nTime]
+            }
+            progress.finish()
             
             if createNetcdf {
-                try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: nx, ny: ny)
+                try spatial.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: nx, ny: ny)
             }
-            
-            logger.info("Reading and interpolation done in \(startConvert.timeElapsedPretty()). Starting om file update")
-            let startOm = DispatchTime.now()
-            try om.updateFromTimeOriented(variable: variable.omFileName, array2d: data2d, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
     }
 }

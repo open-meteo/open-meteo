@@ -109,6 +109,53 @@ struct Array2DFastSpace {
     }
 }
 
+
+/*extension Array {
+    /// Calculate start positions for cycles
+    static func transposeCalculateCycles(rows: Int, cols: Int) -> [Int] {
+        var cycles = [Int]()
+        let size = rows * cols - 1
+        var b = [Bool](repeating: false, count: rows*cols)
+        b[0] = true
+        b[size] = true
+        var i = 1
+        while i < size {
+            let cycleBegin = i
+            cycles.append(i)
+            repeat {
+                b[i] = true
+                i = (i*rows)%size
+            } while i != cycleBegin
+     
+            i = 1
+            while i < size && b[i] == true {
+                i += 1
+            }
+        }
+        return cycles
+    }
+    
+    /// Perform inplace transposition using `following cycles algorithm`. This is 10 slower than double buffer transpose, exclusing the cycle calculation
+    /// See: https://en.wikipedia.org/wiki/In-place_matrix_transposition
+    /// See: https://www.geeksforgeeks.org/inplace-m-x-n-size-matrix-transpose/
+    mutating func transpose(rows: Int, cols: Int, cycles: [Int]? = nil) {
+        precondition(count == rows * cols)
+        let cycles = cycles ?? Self.transposeCalculateCycles(rows: rows, cols: cols)
+        self.withUnsafeMutableBufferPointer { ptr in
+            let size = rows * cols - 1
+            for cycleBegin in cycles {
+                var i = cycleBegin
+                var t = ptr[i]
+                repeat {
+                    i = (i*rows)%size
+                    swap(&ptr[i], &t)
+                } while i != cycleBegin
+            }
+        }
+    }
+}*/
+
+
 public struct Array2DFastTime {
     public var data: [Float]
     public let nLocations: Int
