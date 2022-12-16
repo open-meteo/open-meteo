@@ -58,6 +58,8 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
     /// 1 MB write buffer or larger if chunks are very large
     public var writeBuffer: UnsafeMutableBufferPointer<UInt8>
     
+    public var bytesWrittenSinceLastFlush = 0
+    
     public var writeBufferPos = 0
     
     /// Position of last chunk that has been written
@@ -205,8 +207,12 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
                     writeBufferPos += writeLength
                     if (writeBuffer.count - writeBufferPos) < readBuffer.count {
                         try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer.baseAddress, count: writeBufferPos))
-                        // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
-                        try fn.synchronize()
+                        bytesWrittenSinceLastFlush += writeBufferPos
+                        if bytesWrittenSinceLastFlush >= 32 * 1024 * 1024 {
+                            // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
+                            try fn.synchronize()
+                            bytesWrittenSinceLastFlush = 0
+                        }
                         writeBufferPos = 0
                     }
                     
@@ -270,8 +276,12 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
                     writeBufferPos += writeLength
                     if (writeBuffer.count - writeBufferPos) < readBuffer.count {
                         try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer.baseAddress, count: writeBufferPos))
-                        // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
-                        try fn.synchronize()
+                        bytesWrittenSinceLastFlush += writeBufferPos
+                        if bytesWrittenSinceLastFlush >= 32 * 1024 * 1024 {
+                            // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
+                            try fn.synchronize()
+                            bytesWrittenSinceLastFlush = 0
+                        }
                         writeBufferPos = 0
                     }
                     
