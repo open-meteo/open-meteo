@@ -142,9 +142,7 @@ struct MetNoDownloader: AsyncCommandFix {
         
         for variable in variables {
             logger.info("Converting \(variable)")
-            let startConvert = DispatchTime.now()
             let skip = variable.skipHour0 ? 1 : 0
-            
             
             guard let ncVar = ncFile.getVariable(name: variable.netCdfName) else {
                 fatalError("Could not open nc variable \(variable) \(variable.netCdfName)")
@@ -163,7 +161,7 @@ struct MetNoDownloader: AsyncCommandFix {
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
                 for (i,l) in locationRange.enumerated() {
                     for h in 0..<nTime {
-                        data2d[i, h] = data2d[h, l]
+                        data2d[i, h] = spatial[h, l]
                     }
                 }
                 
