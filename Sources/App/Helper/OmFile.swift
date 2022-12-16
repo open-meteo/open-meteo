@@ -159,6 +159,8 @@ struct OmFileSplitter {
      */
     func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, ringtime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
         
+        precondition(array2d.nTime == ringtime.count)
+        
         // Process at most 8 MB at once
         try updateFromTimeOrientedStreaming(variable: variable, ringtime: ringtime, skipFirst: skipFirst, smooth: smooth, skipLast: skipLast, scalefactor: scalefactor, compression: compression) { d0offset in
             
@@ -217,10 +219,10 @@ struct OmFileSplitter {
             if fileData.count < nLocInChunk * nTimePerFile {
                 fileData = [Float](repeating: .nan, count: nLocInChunk * nTimePerFile)
             }
+            let locationRange = dim0Offset ..< min(dim0Offset+nLocInChunk, nLocations)
             
             for writer in writers {
                 // Read existing data for a chunk of locations
-                let locationRange = dim0Offset ..< min(dim0Offset+nLocInChunk, nLocations)
                 if let omRead = writer.read, omRead.dim0 == nLocations, omRead.dim1 == nTimePerFile {
                     try omRead.read(into: &fileData, arrayRange: 0..<locationRange.count * nTimePerFile, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
                 } else {
@@ -239,7 +241,7 @@ struct OmFileSplitter {
                         if nRingtime - tArray <= skipLast {
                             continue
                         }
-                        fileData[nTimePerFile * l + tFile] = data[l * nRingtime + tArray]
+                        fileData[nTimePerFile * l + tFile] = data[data.startIndex + l * nRingtime + tArray]
                     }
                 }
                 
