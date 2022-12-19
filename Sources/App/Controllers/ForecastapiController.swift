@@ -417,6 +417,9 @@ enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
     case visibility
     case cape
     
+    /// Currently only from icon-d2
+    case lightning_potential
+    
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
