@@ -49,7 +49,7 @@
               Weather APIs
             </a>
             <ul class="dropdown-menu" aria-labelledby="navbarDropdownWeatherApis">
-              <li><a class="dropdown-item #if(title==" Weather Forecast API"): active #endif" href="/en/docs">Weather
+              <li><a class="dropdown-item #if(title=="Weather Forecast API"): active #endif" href="/en/docs">Weather
                   Forecast API</a>
               </li>
               <li><a class="dropdown-item #if(title == "Historical Weather API"): active #endif"
