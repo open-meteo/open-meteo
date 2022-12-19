@@ -185,7 +185,9 @@ struct DownloadIconCommand: AsyncCommandFix {
                 if hour == 0 && variable.skipHour0 {
                     continue
                 }
-                let v = variable.getVarAndLevel(domain: domain)
+                guard let v = variable.getVarAndLevel(domain: domain) else {
+                    continue
+                }
                 let level = v.level.map({"_\($0)"}) ?? ""
                 let leveld2 = v.level.map({"_\($0)"}) ?? "_2d"
                 let filenameFrom = domain != .iconD2 ?
@@ -263,6 +265,9 @@ struct DownloadIconCommand: AsyncCommandFix {
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
 
         for variable in variables {
+            guard variable.getVarAndLevel(domain: domain) != nil else {
+                continue
+            }
             let v = variable.omFileName.uppercased()
             let skip = variable.skipHour0 ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
@@ -363,11 +368,11 @@ struct DownloadIconCommand: AsyncCommandFix {
             }
         case .surface:
             groupVariables = IconSurfaceVariable.allCases.filter {
-                $0.getVarAndLevel(domain: domain).cat != "model-level"
+                !($0.getVarAndLevel(domain: domain)?.cat == "model-level")
             }
         case .modelLevel:
             groupVariables = IconSurfaceVariable.allCases.filter {
-                $0.getVarAndLevel(domain: domain).cat == "model-level"
+                $0.getVarAndLevel(domain: domain)?.cat == "model-level"
             }
         case .pressureLevel:
             groupVariables = domain.levels.reversed().flatMap { level in

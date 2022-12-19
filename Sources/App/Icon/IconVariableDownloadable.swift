@@ -6,7 +6,7 @@ protocol IconVariableDownloadable: GenericVariable {
     var isAccumulatedSinceModelStart: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var interpolationType: Interpolation2StepType { get }
-    func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)
+    func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)?
 }
 
 extension IconSurfaceVariable: IconVariableDownloadable {
@@ -80,6 +80,12 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             return .hermite(bounds: nil)
         case .temperature_180m:
             return .hermite(bounds: nil)
+        case .cape:
+            return .hermite(bounds: nil)
+        case .ligthning_potential:
+            return .hermite(bounds: nil)
+        case .snowfall_height:
+            return .hermite(bounds: nil)
         }
     }
     
@@ -94,7 +100,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         }
     }
     
-    func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?) {
+    func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)? {
         switch self {
         case .soil_temperature_0cm: return ("t_so", "soil-level", 0)
         case .soil_temperature_6cm: return ("t_so", "soil-level", 6)
@@ -137,6 +143,11 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .direct_radiation: return ("aswdir_s", "single-level", nil)
         case .snowfall_convective_water_equivalent: return ("snow_con", "single-level", nil)
         case .snowfall_water_equivalent: return ("snow_gsp", "single-level", nil)
+        case .cape: return ("cape_ml", "single-level", nil)
+        case .ligthning_potential:
+            return domain == .iconD2 ? ("lpi", "single-level", nil) : nil // only in icon d2
+        case .snowfall_height:
+            return domain == .icon ? nil : ("snowlmt", "single-level", nil) // not in icon global
         }
     }
     
@@ -202,7 +213,7 @@ extension IconPressureVariable: IconVariableDownloadable {
         }
     }
     
-    func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?) {
+    func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)? {
         switch variable {
         case .temperature:
         return ("t", "pressure-level", level)

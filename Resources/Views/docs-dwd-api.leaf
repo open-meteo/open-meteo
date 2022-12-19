@@ -131,6 +131,12 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall_height" id="snowfall_height" name="hourly">
+          <label class="form-check-label" for="snowfall_height">
+            Snowfall Height <span class="text-muted"><sup>(1)</sup></span>
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="freezinglevel_height" id="freezinglevel_height"
             name="hourly">
           <label class="form-check-label" for="freezinglevel_height">
@@ -200,6 +206,20 @@
             name="hourly">
           <label class="form-check-label" for="vapor_pressure_deficit">
             Vapor Pressure Deficit
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cape" id="cape"
+            name="hourly">
+          <label class="form-check-label" for="cape">
+            CAPE
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="ligthning_potential" id="ligthning_potential"
+            name="hourly">
+          <label class="form-check-label" for="ligthning_potential">
+            Ligthning Potential LPI <span class="text-muted"><sup>(2)</sup></span>
           </label>
         </div>
         <!---<div class="form-check">
@@ -510,6 +530,8 @@
           </div>
         </div>
       </div>
+
+      <small class="text-muted mt-3">(1) Europe only, (2) Central Europe only</small>
     </div>
 
     <div class="row py-3 px-0">
@@ -1042,6 +1064,18 @@
               increases. For low VPD (&lt;0.4), transpiration decreases</td>
           </tr>
           <tr>
+            <th scope="row">cape</th>
+            <td>Instant</td>
+            <td>J/kg</td>
+            <td>Convective available potential energy. See <a href="https://en.wikipedia.org/wiki/Convective_available_potential_energy" target="_blank">Wikipedia</a>.</td>
+          </tr>
+          <tr>
+            <th scope="row">ligthning_potential</th>
+            <td>Instant</td>
+            <td>J/kg</td>
+            <td>The Lightning Potential Index after <a href="https://adgeo.copernicus.org/articles/23/11/2010/adgeo-23-11-2010.pdf">Lynn and Yair (2010)</a>. It is calculated as a vertical integral of the squared updraft velocity weighted by a function that essentially contains the graupel concentration</td>
+          </tr>
+          <tr>
             <th scope="row">evapotranspiration</th>
             <td>Preceding hour sum</td>
             <td>mm (inch)</td>
@@ -1094,6 +1128,12 @@
             <td>Instant</td>
             <td>meters</td>
             <td>Snow depth on the ground</td>
+          </tr>
+          <tr>
+            <th scope="row">snowfall_height</th>
+            <td>Instant</td>
+            <td>meters</td>
+            <td>Height of snowfall limit above mean sea level. It is defined as the height where the wet bulb temperature first exceeds 1.3◦C.</td>
           </tr>
           <tr>
             <th scope="row">freezinglevel_height</th>

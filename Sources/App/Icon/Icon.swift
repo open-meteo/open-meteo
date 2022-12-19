@@ -310,9 +310,6 @@ enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable 
     /// snow depth in meters
     case snow_depth
     
-    /// TODO add support for only icon-eu/d2 variables. https://github.com/open-meteo/open-meteo/issues/50 
-    //case SNOWLMT
-    
     /// Ceiling is that height above MSL (in m), where the large scale cloud coverage (more precise: scale and sub-scale, but without the convective contribution) first exceeds 50% when starting from ground.
     //case ceiling // not in global
     
@@ -335,8 +332,11 @@ enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable 
     case snowfall_water_equivalent
     
     /// Convective available potential energy
-    //case cape_con
+    case cape
     //case tke
+    
+    /// LPI Lightning Potential Index . Only available in icon-d2. Scales form 0 to ~120
+    case ligthning_potential
 
     /// vmax has no timstep 0
     /// Maximum wind gust at 10m above ground. It is diagnosed from the turbulence state in the atmospheric boundary layer, including a potential enhancement by the SSO parameterization over mountainous terrain.
@@ -345,8 +345,8 @@ enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable 
     case windgusts_10m
     
     /// Height of snow fall limit above MSL. It is defined as the height where the wet bulb temperature Tw first exceeds 1.3◦C (scanning mode from top to bottom).
-    /// If this threshold is never reached within the entire atmospheric column, SNOWLMT is undefined (GRIB2 bitmap).
-    // case snowlmt not in icon global
+    /// If this threshold is never reached within the entire atmospheric column, SNOWLMT is undefined (GRIB2 bitmap). Only icon-eu + d2
+    case snowfall_height
     
     /// Height of the 0◦ C isotherm above MSL. In case of multiple 0◦ C isotherms, HZEROCL contains the uppermost one.
     /// If the temperature is below 0◦ C throughout the entire atmospheric column, HZEROCL is set equal to the topography height (fill value).
@@ -409,6 +409,12 @@ enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable 
             fallthrough
         case .temperature_180m:
             return 10
+        case .cape:
+            return 0.1
+        case .ligthning_potential:
+            return 10
+        case .snowfall_height:
+            return 0.1
         }
     }
     
@@ -459,6 +465,12 @@ enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable 
             return .celsius
         case .temperature_180m:
             return .celsius
+        case .cape:
+            return .joulesPerKilogram
+        case .ligthning_potential:
+            return .joulesPerKilogram
+        case .snowfall_height:
+            return .meter
         }
     }
     
