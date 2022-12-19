@@ -210,19 +210,13 @@
             Vapor Pressure Deficit
           </label>
         </div>
-        <!---<div class="form-check">
-            <input class="form-check-input" type="checkbox" value="latent_heatflux" id="latent_heatflux" name="hourly">
-            <label class="form-check-label" for="latent_heatflux">
-              Latent heat flux
-            </label>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" value="sensible_heatflux" id="sensible_heatflux" name="hourly">
-            <label class="form-check-label" for="sensible_heatflux">
-              Sensible heat flux
-            </label>
-          </div>-->
-
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cape" id="cape"
+            name="hourly">
+          <label class="form-check-label" for="cape">
+            CAPE
+          </label>
+        </div>
       </div>
       <div class="col-md-3">
         <div class="form-check">
@@ -1272,6 +1266,12 @@
             <td>kPa</td>
             <td>Vapor Pressure Deificit (VPD) in kilopascal (kPa). For high VPD (&gt;1.6), water transpiration of plants
               increases. For low VPD (&lt;0.4), transpiration decreases</td>
+          </tr>
+          <tr>
+            <th scope="row">cape</th>
+            <td>Instant</td>
+            <td>J/kg</td>
+            <td>Convective available potential energy. See <a href="https://en.wikipedia.org/wiki/Convective_available_potential_energy" target="_blank">Wikipedia</a>.</td>
           </tr>
           <tr>
             <th scope="row">evapotranspiration</th>
