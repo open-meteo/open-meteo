@@ -82,7 +82,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             return .hermite(bounds: nil)
         case .cape:
             return .hermite(bounds: nil)
-        case .ligthning_potential:
+        case .lightning_potential:
             return .hermite(bounds: nil)
         case .snowfall_height:
             return .hermite(bounds: nil)
@@ -144,7 +144,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .snowfall_convective_water_equivalent: return ("snow_con", "single-level", nil)
         case .snowfall_water_equivalent: return ("snow_gsp", "single-level", nil)
         case .cape: return ("cape_ml", "single-level", nil)
-        case .ligthning_potential:
+        case .lightning_potential:
             return domain == .iconD2 ? ("lpi", "single-level", nil) : nil // only in icon d2
         case .snowfall_height:
             return domain == .icon ? nil : ("snowlmt", "single-level", nil) // not in icon global

@@ -336,7 +336,7 @@ enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable 
     //case tke
     
     /// LPI Lightning Potential Index . Only available in icon-d2. Scales form 0 to ~120
-    case ligthning_potential
+    case lightning_potential
 
     /// vmax has no timstep 0
     /// Maximum wind gust at 10m above ground. It is diagnosed from the turbulence state in the atmospheric boundary layer, including a potential enhancement by the SSO parameterization over mountainous terrain.
@@ -411,7 +411,7 @@ enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable 
             return 10
         case .cape:
             return 0.1
-        case .ligthning_potential:
+        case .lightning_potential:
             return 10
         case .snowfall_height:
             return 0.1
@@ -467,7 +467,7 @@ enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable 
             return .celsius
         case .cape:
             return .joulesPerKilogram
-        case .ligthning_potential:
+        case .lightning_potential:
             return .joulesPerKilogram
         case .snowfall_height:
             return .meter
