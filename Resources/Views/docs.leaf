@@ -955,7 +955,7 @@
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
     <p>Open-Meteo weather forecast APIs use weather models from multiple national weather providers. For each location worldwide, the best models will be combined to provide the best possible forecast.</p>
-    <p>Weather models cover different geographic areas at diffent resolutions and provide different weather variables. Depending on the model, not all data is available. With the drop down <mark>Weather models</mark> (just below the hourly variables), you can select and compare individual weather models.</p>
+    <p>Weather models cover different geographic areas at different resolutions and provide different weather variables. Depending on the model, data have been interpolated to hourly values or not all weather variables are available. With the drop down <mark>Weather models</mark> (just below the hourly variables), you can select and compare individual weather models.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -1264,7 +1264,7 @@
             <th scope="row">vapor_pressure_deficit</th>
             <td>Instant</td>
             <td>kPa</td>
-            <td>Vapor Pressure Deificit (VPD) in kilopascal (kPa). For high VPD (&gt;1.6), water transpiration of plants
+            <td>Vapor Pressure Deficit (VPD) in kilopascal (kPa). For high VPD (&gt;1.6), water transpiration of plants
               increases. For low VPD (&lt;0.4), transpiration decreases</td>
           </tr>
           <tr>
