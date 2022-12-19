@@ -71,7 +71,7 @@ enum SiUnit: String, Codable {
         case .microgramsPerQuibicMeter: return 0
         case .grainsPerQuibicMeter: return 1
         case .dimensionless: return 2
-        case .joulesPerKilogram: return 0
+        case .joulesPerKilogram: return 1
         case .qubicMeterPerSecond: return 2
         case .eaqi: return 0
         case .usaqi: return 0
