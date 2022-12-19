@@ -216,10 +216,10 @@
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="ligthning_potential" id="ligthning_potential"
+          <input class="form-check-input" type="checkbox" value="lightning_potential" id="lightning_potential"
             name="hourly">
-          <label class="form-check-label" for="ligthning_potential">
-            Ligthning Potential LPI <span class="text-muted"><sup>(2)</sup></span>
+          <label class="form-check-label" for="lightning_potential">
+            Ligthning Potential Index LPI <span class="text-muted"><sup>(2)</sup></span>
           </label>
         </div>
         <!---<div class="form-check">
@@ -1070,7 +1070,7 @@
             <td>Convective available potential energy. See <a href="https://en.wikipedia.org/wiki/Convective_available_potential_energy" target="_blank">Wikipedia</a>.</td>
           </tr>
           <tr>
-            <th scope="row">ligthning_potential</th>
+            <th scope="row">lightning_potential</th>
             <td>Instant</td>
             <td>J/kg</td>
             <td>The Lightning Potential Index after <a href="https://adgeo.copernicus.org/articles/23/11/2010/adgeo-23-11-2010.pdf">Lynn and Yair (2010)</a>. It is calculated as a vertical integral of the squared updraft velocity weighted by a function that essentially contains the graupel concentration</td>
