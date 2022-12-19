@@ -790,7 +790,7 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses global DWD ICON weather forecast and combines them with high-resolution ICON Europe and Central Europe forecasts. Information about DWD wearther models is available <a href="https://www.dwd.de/EN/ourservices/nwp_forecast_data/nwp_forecast_data.html" target="_blank">here</a>.</p>
+    <p>This API uses global DWD ICON weather forecast and combines them with high-resolution ICON Europe and Central Europe forecasts. Information about DWD wearther models is available <a href="https://www.dwd.de/EN/ourservices/nwp_forecast_data/nwp_forecast_data.html" target="_blank">here</a>. For ICON Global and Europe, values are interpolated from 3-hourly to 1-hourly after 78 hours.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>

@@ -697,7 +697,7 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses <a href="https://en.wikipedia.org/wiki/Global_Environmental_Multiscale_Model" target="_new">Global Environmental Multiscale Model (GEM)</a> from the Canadian weather service. Global and regional weather models are combined into a seamless prediction.</p>
+    <p>This API uses <a href="https://en.wikipedia.org/wiki/Global_Environmental_Multiscale_Model" target="_new">Global Environmental Multiscale Model (GEM)</a> from the Canadian weather service. Global and regional weather models are combined into a seamless prediction. For GEM Global, values are interpolated from 3-hourly to 1-hourly values.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>

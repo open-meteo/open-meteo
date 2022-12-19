@@ -43,13 +43,6 @@
 
 <!-- http://127.0.0.1:8080/v1/forecast/query -->
 <div class="container px-4 py-0" id="featured-3">
-  <div class="alert alert-primary" role="alert">
-    This API provides <a href="https://www.ecmwf.int/en/forecasts/datasets/open-data" target="_blank">open-data ECMWF IFS</a> weather forecasts for 10 days. 
-    ECMWF IFS models run every 6 hours at 9 km resolution, but only 0.4° grid spacing (~44 km) is available as open data with a limited number of 
-    weather variables at 3-hourly intervals. As soon as ECWMF includes additional data, they will be made
-    available in this API.<br><br> For hourly and high-resolution data (up to 1 km) try our <a href="/en/docs">forecast API</a> which combines multiple models.
-  </div>
-
   <form id="api_form" method="get" action="https://api.open-meteo.com/v1/ecmwf">
     <div class="row py-3 px-0">
       <h2>Select Coordinates or City</h2>
@@ -366,9 +359,37 @@
   </div>
 
   <div class="col-12 py-5">
-    <h2 id="api-documentation">API Documentation</h2>
+    <h2 id="data-sources">Data Source</h2>
+    <p>This API uses <a href="https://www.ecmwf.int/en/forecasts/datasets/open-data">open-data ECMWF Integrated Forecast System IFS</a>. ECMWF IFS models run every 6 hours at 9 km resolution, but only 0.4° grid spacing (~44 km) is available as open data with a limited number of weather variables at 3-hourly intervals. As soon as ECWMF includes additional data, they will be made available in this API.</p>
+    <p>For hourly and high-resolution data (up to 1 km) try our <a href="/en/docs">forecast API</a> which combines multiple models.</p>
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Weather Model</th>
+            <th scope="col">Region</th>
+            <th scope="col">Spatial Resolution</th>
+            <th scope="col">Temporal Resolution</th>
+            <th scope="col">Forecast Length</th>
+            <th scope="col">Update frequency</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row"><a href="https://www.ecmwf.int/en/forecasts/datasets/open-data" target="_blank">IFS</a></th>
+            <td>Global</td>
+            <td>0.4° (~44 km)</td>
+            <td>3-Hourly</td>
+            <td>10 days</td>
+            <td>Every 6 hours</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 id="api-documentation" class="mt-5">API Documentation</h2>
     <p>The API endpoint <mark>/v1/ecmwf</mark> accepts a geographical coordinate, a list of weather variables and
-      responds with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours.
+      responds with a JSON 3-hourly weather forecast for 10 days. Time always starts at 0:00 today.
       All URL parameters are listed below:</p>
     <div class="table-responsive">
       <table class="table">

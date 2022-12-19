@@ -778,7 +778,7 @@
     <h2 id="data-sources">Data Source</h2>
     <p>This API uses global NOAA GFS weather forecast and combines them with high-resolution HRRR forecasts. HRRR is a
       rapid-refresh model and updates every hour. High-resolution data are only available for the United States. For
-      other locations, only GFS is used.</p>
+      other locations, only GFS is used. For GFS, values are interpolated from 3-hourly to 1-hourly after 120 hours.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>

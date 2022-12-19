@@ -582,7 +582,7 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses global and local weather models from the Japan Meteorological Agency JMA. Due to data license restrictions only a limited version of data is available. A list of official JMA data is available on the <a target="_blank" href="https://www.jma.go.jp/jma/en/Activities/nwp.html">JMA website</a>.</p>
+    <p>This API uses global and local weather models from the Japan Meteorological Agency JMA. Due to data license restrictions only a limited version of data is available. A list of official JMA data is available on the <a target="_blank" href="https://www.jma.go.jp/jma/en/Activities/nwp.html">JMA website</a>. For GSM, values are interpolated from 6-hourly to 1-hourly values.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>

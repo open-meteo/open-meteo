@@ -764,8 +764,8 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses global MeteoFrance ARPEGE weather forecast and combines them with high-resolution AROME forecasts. AROME is a 1.5 km high resolution model covering France and neighbouring areas. For
-      other locations, only ARPEGE is used.</p>
+    <p>This API uses global MeteoFrance ARPEGE weather forecast and combines them with high-resolution AROME forecasts. AROME is a 1.5 km high resolution model covering France and neighboring areas. For
+      other locations, only ARPEGE is used. For ARPEGE, values are interpolated from 3 or 6-hourly to 1-hourly values after 72 or 96 hours respectively.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
