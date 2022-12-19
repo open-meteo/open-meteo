@@ -6,6 +6,7 @@ import SwiftPFor2D
 
 enum CdsDomain: String, GenericDomain {
     case era5
+    case era5_land
     case cerra
     
     var dtSeconds: Int {
@@ -16,6 +17,8 @@ enum CdsDomain: String, GenericDomain {
         switch self {
         case .era5:
             return Self.era5ElevationFile
+        case .era5_land:
+            return Self.era5LandElevationFile
         case .cerra:
             return Self.cerraElevationFile
         }
@@ -26,12 +29,15 @@ enum CdsDomain: String, GenericDomain {
         switch self {
         case .era5:
             return "reanalysis-era5-single-levels"
+        case .era5_land:
+            return "reanalysis-era5-land"
         case .cerra:
             return "reanalysis-cerra-single-levels"
         }
     }
     
     private static var era5ElevationFile = try? OmFileReader(file: Self.era5.surfaceElevationFileOm)
+    private static var era5LandElevationFile = try? OmFileReader(file: Self.era5.surfaceElevationFileOm)
     private static var cerraElevationFile = try? OmFileReader(file: Self.cerra.surfaceElevationFileOm)
     
     /// Filename of the surface elevation file
@@ -64,8 +70,9 @@ enum CdsDomain: String, GenericDomain {
         switch self {
         case .era5:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+        case .era5_land:
+            return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
-            // TODO projection does not seem to fit perfectly
             return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
         }
     }
@@ -111,6 +118,57 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     
     var interpolation: ReaderInterpolation {
         fatalError("Interpolation not required for era5")
+    }
+    
+    func availableForDomain(domain: CdsDomain) -> Bool {
+        switch self {
+        case .temperature_2m:
+            return true
+        case .wind_u_component_100m:
+            fallthrough
+        case .wind_v_component_100m:
+            return domain == .era5
+        case .wind_u_component_10m:
+            return true
+        case .wind_v_component_10m:
+            return true
+        case .windgusts_10m:
+            return domain == .era5
+        case .dewpoint_2m:
+            return true
+        case .cloudcover_low:
+            fallthrough
+        case .cloudcover_mid:
+            fallthrough
+        case .cloudcover_high:
+            fallthrough
+        case .pressure_msl:
+            return domain == .era5
+        case .snowfall_water_equivalent:
+            return true
+        case .soil_temperature_0_to_7cm:
+            fallthrough
+        case .soil_temperature_7_to_28cm:
+            fallthrough
+        case .soil_temperature_28_to_100cm:
+            fallthrough
+        case .soil_temperature_100_to_255cm:
+            fallthrough
+        case .soil_moisture_0_to_7cm:
+            fallthrough
+        case .soil_moisture_7_to_28cm:
+            fallthrough
+        case .soil_moisture_28_to_100cm:
+            fallthrough
+        case .soil_moisture_100_to_255cm:
+            return true
+        case .shortwave_radiation:
+            return true
+        case .precipitation:
+            return true
+        case .direct_radiation:
+            return domain == .era5
+        }
     }
     
     /// Name used to query the ECMWF CDS API via python
@@ -266,6 +324,9 @@ struct DownloadEra5Command: Command {
         @Option(name: "year", short: "y", help: "Download one year")
         var year: String?
         
+        @Option(name: "domain", short: "d", help: "Which domain to use")
+        var domain: String?
+        
         @Option(name: "stripseaYear", short: "s", help: "strip sea of converted files")
         var stripseaYear: String?
         
@@ -376,14 +437,14 @@ struct DownloadEra5Command: Command {
         logger.info("Converting elevation and sea mask")
         let ncfile = try NetCDF.open(path: tempDownloadNetcdfFile, allowUpdate: false)!
 
-        guard var elevation = try ncfile.getVariable(name: "z")?.readWithScalefactorAndOffset(scalefactor: 0.1, offset: 0) else {
+        guard var elevation = try ncfile.getVariable(name: "z")?.readWithScalefactorAndOffset(scalefactor: 0.1, offset: 0, grid: domain.grid) else {
             fatalError("No variable named z available")
         }
-        guard var landmask = try ncfile.getVariable(name: "lsm")?.readWithScalefactorAndOffset(scalefactor: 1, offset: 0) else {
+        guard var landmask = try ncfile.getVariable(name: "lsm")?.readWithScalefactorAndOffset(scalefactor: 1, offset: 0, grid: domain.grid) else {
             fatalError("No variable named lsm available")
         }
-        elevation.shift180LongitudeAndFlipLatitude(nt: 24, ny: 721, nx: 1440)
-        landmask.shift180LongitudeAndFlipLatitude(nt: 24, ny: 721, nx: 1440)
+        elevation.shift180LongitudeAndFlipLatitude(nt: 24, ny:  domain.grid.ny, nx: domain.grid.nx)
+        landmask.shift180LongitudeAndFlipLatitude(nt: 24, ny:  domain.grid.ny, nx: domain.grid.nx)
         
         /*let a1 = Array2DFastSpace(data: elevation, nLocations: 1440*721, nTime: 1)
         try a1.writeNetcdf(filename: "\(downloadDir)/elevation_converted.nc", nx: 1440, ny: 721)
@@ -415,10 +476,9 @@ struct DownloadEra5Command: Command {
         }
     }
     
-    func runYear(logger: Logger, year: Int, cdskey: String) throws {
-        let domain = CdsDomain.era5
+    func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain) throws {
         let timeinterval = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
-        let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
+        let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain)
         
         let nx = domain.grid.nx // 721
         let ny = domain.grid.ny // 1440
@@ -440,7 +500,8 @@ struct DownloadEra5Command: Command {
             }
             var percent = 0
             var looptime = DispatchTime.now()
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: nt/8).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor) { dim0 in
+            // old /8 now /27
+            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: nt/27).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor) { dim0 in
                 let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
                 if percent != ratio {
                     /// time ~4.5 seconds
@@ -469,15 +530,14 @@ struct DownloadEra5Command: Command {
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt) throws -> TimerangeDt {
-        let domain = CdsDomain.era5
+    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain) throws -> TimerangeDt {
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
         /// Directory dir, where to place temporary downloaded files
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
                 
-        let variables = Era5Variable.allCases // [Era5Variable.wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m]
+        let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         
         /// loop over each day, download data and convert it
         let tempDownloadNetcdfFile = "\(downloadDir)era5download_\(ProcessInfo.processInfo.processIdentifier).nc"
@@ -515,7 +575,7 @@ struct DownloadEra5Command: Command {
                 c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
                 try:
                     c.retrieve(
-                        'reanalysis-era5-single-levels',
+                        '\(domain.cdsDatasetName)',
                         {
                             'product_type': 'reanalysis',
                             'format': 'netcdf',
@@ -561,11 +621,11 @@ struct DownloadEra5Command: Command {
                     break timeLoop
                 }
                 let scaling = variable.netCdfScaling
-                var data = try ncVariable.readWithScalefactorAndOffset(scalefactor: scaling.scalefactor, offset: scaling.offest)
+                var data = try ncVariable.readWithScalefactorAndOffset(scalefactor: scaling.scalefactor, offset: scaling.offest, grid: domain.grid)
                 
-                data.shift180LongitudeAndFlipLatitude(nt: nt, ny: 721, nx: 1440)
+                data.shift180LongitudeAndFlipLatitude(nt: nt, ny: domain.grid.ny, nx: domain.grid.nx)
                 
-                let fastTime = Array2DFastSpace(data: data, nLocations: 721*1440, nTime: nt).transpose()
+                let fastTime = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: nt).transpose()
                 
                 guard !fastTime[0, 0..<nt].contains(.nan) else {
                     // For realtime updates, the latest day could only contain partial data. Skip it.
@@ -599,8 +659,7 @@ struct DownloadEra5Command: Command {
     }
     
     /// Convert daily compressed files to longer compressed files specified by `Era5.omFileLength`. E.g. 14 days in one file.
-    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt) throws {
-        let domain = CdsDomain.era5
+    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain) throws {
         if timeinterval.count == 0 {
             logger.info("No new timesteps could be downloaded. Nothing to do. Existing")
             return
@@ -614,7 +673,7 @@ struct DownloadEra5Command: Command {
         
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         
-        let variables = Era5Variable.allCases // [Era5Variable.wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m]
+        let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         
         let ntPerFile = timeinterval.dtSeconds == 3600 ? 1 : 24
         
@@ -651,6 +710,9 @@ struct DownloadEra5Command: Command {
     
     func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
+        
+        let domain = signature.domain.flatMap(CdsDomain.init) ?? .era5
+        
         if let stripseaYear = signature.stripseaYear {
             try runStripSea(logger: logger, year: Int(stripseaYear)!)
             return
@@ -658,29 +720,41 @@ struct DownloadEra5Command: Command {
         guard let cdskey = signature.cdskey else {
             fatalError("cds key is required")
         }
-        let domain = CdsDomain.era5
         /// Make sure elevation information is present. Otherwise download it
-        try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
+        if domain != .era5_land {
+            // TODO land/sea mask for era5 land
+            try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
+        }
         
         /// Only download one specified year
         if let yearStr = signature.year {
-            guard let year = Int(yearStr) else {
-                fatalError("Could not convert year to integer")
+            if yearStr.contains("-") {
+                let split = yearStr.split(separator: "-")
+                guard split.count == 2 else {
+                    fatalError("year invalid")
+                }
+                for year in Int(split[0])! ... Int(split[1])! {
+                    try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+                }
+            } else {
+                guard let year = Int(yearStr) else {
+                    fatalError("Could not convert year to integer")
+                }
+                try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
             }
-            try runYear(logger: logger, year: year, cdskey: cdskey)
             return
         }
         
         /// Select the desired timerange, or use last 14 day
         let timeinterval = signature.getTimeinterval()
-        let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
-        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned)
+        let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain)
+        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain)
     }
 }
 
 extension Variable {
     /// Assume the variable has attributes scalefactor and offsets and apply all those to get a float array
-    fileprivate func readWithScalefactorAndOffset(scalefactor: Double, offset: Double) throws -> [Float] {
+    fileprivate func readWithScalefactorAndOffset(scalefactor: Double, offset: Double, grid: Gridable) throws -> [Float] {
         guard let ncVariableInt16 = asType(Int16.self) else {
             fatalError("Not Int16")
         }
@@ -706,15 +780,15 @@ extension Variable {
             // In case we get 2 experiments, merge them
             // https://confluence.ecmwf.int/display/CUSF/ERA5+CDS+requests+which+return+a+mixture+of+ERA5+and+ERA5T+data
             var dataMerged = [Float]()
-            dataMerged.reserveCapacity(24*1440*721)
+            dataMerged.reserveCapacity(24*grid.nx*grid.ny)
             for t in 0..<24 {
                 /// Era5 starts eastwards at 0°E... rotate to start at -180°E
-                for y in 0..<721 {
-                    for x in 0..<1440 {
+                for y in 0..<grid.ny {
+                    for x in 0..<grid.nx {
                         /// prelimnary ERA5T data
-                        let exp1 = data[t*2*1440*721 + (0)*1440*721 + y*1440 + x]
+                        let exp1 = data[t*2*grid.nx*grid.ny + (0)*grid.nx*grid.ny + y*grid.nx + x]
                         /// final era5 data
-                        let exp5 = data[t*2*1440*721 + (1)*1440*721 + y*1440 + x]
+                        let exp5 = data[t*2*grid.nx*grid.ny + (1)*grid.nx*grid.ny + y*grid.nx + x]
                         
                         if !exp5.isNaN {
                             dataMerged.append(exp5)
