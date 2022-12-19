@@ -219,7 +219,7 @@
           <input class="form-check-input" type="checkbox" value="lightning_potential" id="lightning_potential"
             name="hourly">
           <label class="form-check-label" for="lightning_potential">
-            Ligthning Potential Index LPI <span class="text-muted"><sup>(2)</sup></span>
+            Lightning Potential Index LPI <span class="text-muted"><sup>(2)</sup></span>
           </label>
         </div>
         <!---<div class="form-check">
