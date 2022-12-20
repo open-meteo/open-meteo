@@ -16,6 +16,10 @@ enum CdsDomain: String, GenericDomain {
         return 3600
     }
     
+    var isGlobal: Bool {
+        self != .cerra
+    }
+    
     var elevationFile: OmFileReader<MmapFile>? {
         switch self {
         case .era5:
@@ -105,233 +109,16 @@ protocol CdsVariableDownloadable: GenericVariable {
     var hasAnalysis: Bool { get }
 }
 
-/// Might be used to decode API queries later
-enum Era5Variable: String, CaseIterable, Codable, CdsVariableDownloadable {
-    case temperature_2m
-    case wind_u_component_100m
-    case wind_v_component_100m
-    case wind_u_component_10m
-    case wind_v_component_10m
-    case windgusts_10m
-    case dewpoint_2m
-    case cloudcover_low
-    case cloudcover_mid
-    case cloudcover_high
-    case pressure_msl
-    case snowfall_water_equivalent
-    case soil_temperature_0_to_7cm
-    case soil_temperature_7_to_28cm
-    case soil_temperature_28_to_100cm
-    case soil_temperature_100_to_255cm
-    case soil_moisture_0_to_7cm
-    case soil_moisture_7_to_28cm
-    case soil_moisture_28_to_100cm
-    case soil_moisture_100_to_255cm
-    case shortwave_radiation
-    case precipitation
-    case direct_radiation
-    
-    var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .dewpoint_2m
-    }
-    
-    var omFileName: String {
-        return rawValue
-    }
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-         return false
-    }
-    
-    var interpolation: ReaderInterpolation {
-        fatalError("Interpolation not required for era5")
-    }
-    
-    func availableForDomain(domain: CdsDomain) -> Bool {
-        // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
-        if domain == .era5_land || domain == .era5t_land {
-            switch self {
-            case .temperature_2m:
-                fallthrough
-            case .dewpoint_2m:
-                fallthrough
-            case .soil_temperature_0_to_7cm:
-                fallthrough
-            case .soil_temperature_7_to_28cm:
-                fallthrough
-            case .soil_temperature_28_to_100cm:
-                fallthrough
-            case .soil_temperature_100_to_255cm:
-                fallthrough
-            case .soil_moisture_0_to_7cm:
-                fallthrough
-            case .soil_moisture_7_to_28cm:
-                fallthrough
-            case .soil_moisture_28_to_100cm:
-                fallthrough
-            case .soil_moisture_100_to_255cm:
-                return true
-            default: return false
-            }
-        }
-        return true
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        return false
-    }
-    
-    var hasAnalysis: Bool {
-        return false
-    }
-    
-    /// Name used to query the ECMWF CDS API via python
-    var cdsApiName: String {
-        switch self {
-        case .wind_u_component_100m: return "100m_u_component_of_wind"
-        case .wind_v_component_100m: return "100m_v_component_of_wind"
-        case .wind_u_component_10m: return "10m_u_component_of_wind"
-        case .wind_v_component_10m: return "10m_v_component_of_wind"
-        case .windgusts_10m: return "instantaneous_10m_wind_gust"
-        case .dewpoint_2m: return "2m_dewpoint_temperature"
-        case .temperature_2m: return "2m_temperature"
-        case .cloudcover_low: return "low_cloud_cover"
-        case .cloudcover_mid: return "medium_cloud_cover"
-        case .cloudcover_high: return "high_cloud_cover"
-        case .pressure_msl: return "mean_sea_level_pressure"
-        case .snowfall_water_equivalent: return "snowfall"
-        case .soil_temperature_0_to_7cm: return "soil_temperature_level_1"
-        case .soil_temperature_7_to_28cm: return "soil_temperature_level_2"
-        case .soil_temperature_28_to_100cm: return "soil_temperature_level_3"
-        case .soil_temperature_100_to_255cm: return "soil_temperature_level_4"
-        case .shortwave_radiation: return "surface_solar_radiation_downwards"
-        case .precipitation: return "total_precipitation"
-        case .direct_radiation: return "total_sky_direct_solar_radiation_at_surface"
-        case .soil_moisture_0_to_7cm: return "volumetric_soil_water_layer_1"
-        case .soil_moisture_7_to_28cm: return "volumetric_soil_water_layer_2"
-        case .soil_moisture_28_to_100cm: return "volumetric_soil_water_layer_3"
-        case .soil_moisture_100_to_255cm: return "volumetric_soil_water_layer_4"
-        }
-    }
-    
-    /// Applied to the netcdf file after reading
-    var netCdfScaling: (offest: Double, scalefactor: Double)? {
-        switch self {
-        case .temperature_2m: return (-273.15, 1) // kelvin to celsius
-        case .dewpoint_2m: return (-273.15, 1)
-        case .cloudcover_low: return (0, 100) // fraction to percent
-        case .cloudcover_mid: return (0, 100)
-        case .cloudcover_high: return (0, 100)
-        case .pressure_msl: return (0, 1) // keep in Pa (not hPa)
-        case .snowfall_water_equivalent: return (0, 1000) // meter to millimeter
-        case .soil_temperature_0_to_7cm: return (-273.15, 1) // kelvin to celsius
-        case .soil_temperature_7_to_28cm: return (-273.15, 1)
-        case .soil_temperature_28_to_100cm: return (-273.15, 1)
-        case .soil_temperature_100_to_255cm: return (-273.15, 1)
-        case .shortwave_radiation: return (0, 1/3600) // joules to watt
-        case .precipitation: return (0, 1000) // meter to millimeter
-        case .direct_radiation: return (0, 1/3600)
-        default: return nil
-        }
-    }
-    
-    /// shortName attribute in GRIB
-    var gribShortName: [String] {
-        switch self {
-        case .windgusts_10m: return ["10fg", "gust"] // or "gust" on ubuntu 22.04
-        case .temperature_2m: return ["2t"]
-        case .cloudcover_low: return ["lcc"]
-        case .cloudcover_mid: return ["mcc"]
-        case .cloudcover_high: return ["hcc"]
-        case .pressure_msl: return ["msl"]
-        case .snowfall_water_equivalent: return ["sf"]
-        case .shortwave_radiation: return ["ssrd"]
-        case .precipitation: return ["tp"]
-        case .direct_radiation: return ["tidirswrf"]
-        case .wind_u_component_100m: return ["100u"]
-        case .wind_v_component_100m: return ["100v"]
-        case .wind_u_component_10m: return ["10u"]
-        case .wind_v_component_10m: return ["10v"]
-        case .dewpoint_2m: return ["2d"]
-        case .soil_temperature_0_to_7cm: return ["stl1"]
-        case .soil_temperature_7_to_28cm: return ["stl2"]
-        case .soil_temperature_28_to_100cm: return ["stl3"]
-        case .soil_temperature_100_to_255cm: return ["stl4"]
-        case .soil_moisture_0_to_7cm: return ["swvl1"]
-        case .soil_moisture_7_to_28cm: return ["swvl2"]
-        case .soil_moisture_28_to_100cm: return ["swvl3"]
-        case .soil_moisture_100_to_255cm: return ["swvl4"]
-        }
-    }
-    
-    /// Scalefactor to compress data
-    var scalefactor: Float {
-        switch self {
-        case .wind_u_component_100m: return 10
-        case .wind_v_component_100m: return 10
-        case .wind_u_component_10m: return 10
-        case .wind_v_component_10m: return 10
-        case .cloudcover_low: return 1
-        case .cloudcover_mid: return 1
-        case .cloudcover_high: return 1
-        case .windgusts_10m: return 10
-        case .dewpoint_2m: return 20
-        case .temperature_2m: return 20
-        case .pressure_msl: return 0.1
-        case .snowfall_water_equivalent: return 10
-        case .soil_temperature_0_to_7cm: return 20
-        case .soil_temperature_7_to_28cm: return 20
-        case .soil_temperature_28_to_100cm: return 20
-        case .soil_temperature_100_to_255cm: return 20
-        case .shortwave_radiation: return 1
-        case .precipitation: return 10
-        case .direct_radiation: return 1
-        case .soil_moisture_0_to_7cm: return 1000
-        case .soil_moisture_7_to_28cm: return 1000
-        case .soil_moisture_28_to_100cm: return 1000
-        case .soil_moisture_100_to_255cm: return 1000
-        }
-    }
-    
-    var unit: SiUnit {
-        switch self {
-        case .wind_u_component_100m: fallthrough
-        case .wind_v_component_100m: fallthrough
-        case .wind_u_component_10m: fallthrough
-        case .wind_v_component_10m: fallthrough
-        case .windgusts_10m: return .ms
-        case .dewpoint_2m: return .celsius
-        case .temperature_2m: return .celsius
-        case .cloudcover_low: return .percent
-        case .cloudcover_mid: return .percent
-        case .cloudcover_high: return .percent
-        case .pressure_msl: return .pascal
-        case .snowfall_water_equivalent: return .millimeter
-        case .soil_temperature_0_to_7cm: return .celsius
-        case .soil_temperature_7_to_28cm: return .celsius
-        case .soil_temperature_28_to_100cm: return .celsius
-        case .soil_temperature_100_to_255cm: return .celsius
-        case .shortwave_radiation: return .wattPerSquareMeter
-        case .precipitation: return .millimeter
-        case .direct_radiation: return .wattPerSquareMeter
-        case .soil_moisture_0_to_7cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_7_to_28cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_28_to_100cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_100_to_255cm: return .qubicMeterPerQubicMeter
-        }
-    }
-}
-
 struct DownloadEra5Command: Command {
     struct Signature: CommandSignature {
+        @Argument(name: "domain")
+        var domain: String
+        
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download with format 20220101-20220131")
         var timeinterval: String?
         
         @Option(name: "year", short: "y", help: "Download one year")
         var year: String?
-        
-        @Option(name: "domain", short: "d", help: "Which domain to use")
-        var domain: String?
         
         @Option(name: "stripseaYear", short: "s", help: "strip sea of converted files")
         var stripseaYear: String?
@@ -342,12 +129,9 @@ struct DownloadEra5Command: Command {
         @Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless if files could be downloaded")
         var force: Bool
         
-        @Flag(name: "hourlyfiles", help: "Download hourly files instead of daily files")
-        var hourlyFiles: Bool
-        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() -> TimerangeDt {
-            let dt = hourlyFiles ? 3600 : 86400
+            let dt = 3600*24
             if let timeinterval = timeinterval {
                 guard timeinterval.count == 17, timeinterval.contains("-") else {
                     fatalError("format looks wrong")
@@ -359,7 +143,7 @@ struct DownloadEra5Command: Command {
             // Era5 has a typical delay of 5 days
             // Per default, check last 14 days for new data. If data is already downloaded, downloading is skipped
             let lastDays = 14
-            let time0z = Timestamp.now().with(hour: 0)
+            let time0z = Timestamp.now().add(5 * -86400).with(hour: 0)
             return TimerangeDt(start: time0z.add(lastDays * -86400), to: time0z, dtSeconds: dt)
         }
     }
@@ -371,21 +155,21 @@ struct DownloadEra5Command: Command {
     func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
         
-        let domain = signature.domain.flatMap(CdsDomain.init) ?? .era5
-        let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
+        guard let domain = CdsDomain.init(rawValue: signature.domain) else {
+            fatalError("Invalid domain '\(signature.domain)'")
+        }
+        
+        let variables: [CdsVariableDownloadable] = domain == .cerra ? CerraVariable.allCases : Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         
         if let stripseaYear = signature.stripseaYear {
-            try runStripSea(logger: logger, year: Int(stripseaYear)!)
+            try runStripSea(logger: logger, year: Int(stripseaYear)!, domain: domain, variables: variables)
             return
         }
         guard let cdskey = signature.cdskey else {
             fatalError("cds key is required")
         }
         /// Make sure elevation information is present. Otherwise download it
-        if domain != .era5_land && domain != .era5t_land {
-            // TODO land/sea mask for era5 land
-            try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
-        }
+        try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
         
         /// Only download one specified year
         if let yearStr = signature.year {
@@ -449,6 +233,11 @@ struct DownloadEra5Command: Command {
     }
     
     func downloadElevation(logger: Logger, cdskey: String, domain: CdsDomain) throws {
+        if domain == .era5t_land || domain == .era5_land {
+            logger.warning("No elevation file support yet for ERA5T")
+            return
+        }
+        
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             return
         }
@@ -459,20 +248,40 @@ struct DownloadEra5Command: Command {
         
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
-            struct Query: Encodable {
-                let product_type = "reanalysis"
-                let format = "grib"
-                let variable = ["geopotential", "land_sea_mask"]
-                let time = "00:00"
-                let day = "01"
-                let month = "01"
-                let year = "2022"
+            if domain == .cerra {
+                struct Query: Encodable {
+                    let product_type = "reanalysis"
+                    let data_type = "reanalysis"
+                    let level_type = "surface_or_atmosphere"
+                    let format = "grib"
+                    let variable = ["land_sea_mask", "orography"]
+                    let time = "00:00"
+                    let day = "21"
+                    let month = "12"
+                    let year = "2019"
+                }
+                try Process.cdsApi(
+                    dataset: domain.cdsDatasetName,
+                    key: cdskey,
+                    query: Query(),
+                    destinationFile: tempDownloadGribFile)
+            } else {
+                struct Query: Encodable {
+                    let product_type = "reanalysis"
+                    let format = "grib"
+                    let variable = ["geopotential", "land_sea_mask"]
+                    let time = "00:00"
+                    let day = "01"
+                    let month = "01"
+                    let year = "2022"
+                }
+                try Process.cdsApi(
+                    dataset: domain.cdsDatasetName,
+                    key: cdskey,
+                    query: Query(),
+                    destinationFile: tempDownloadGribFile
+                )
             }
-            try Process.cdsApi(
-                dataset: domain.cdsDatasetName,
-                key: cdskey,
-                query: Query(),
-                destinationFile: tempDownloadGribFile)
         }
         
         var landmask: [Float]? = nil
@@ -480,8 +289,12 @@ struct DownloadEra5Command: Command {
         try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
             let shortName = message.get(attribute: "shortName")!
             var data = try message.getDouble().map(Float.init)
-            data.shift180LongitudeAndFlipLatitude(nt: 1, ny:  domain.grid.ny, nx: domain.grid.nx)
+            if domain.isGlobal {
+                data.shift180LongitudeAndFlipLatitude(nt: 1, ny:  domain.grid.ny, nx: domain.grid.nx)
+            }
             switch shortName {
+            case "orog":
+                elevation = data
             case "z":
                 data.multiplyAdd(multiply: 0.1, add: 0)
                 elevation = data
@@ -514,38 +327,41 @@ struct DownloadEra5Command: Command {
         fatalError()
     }
     
-    func runStripSea(logger: Logger, year: Int) throws {
+    func runStripSea(logger: Logger, year: Int, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
         let domain = CdsDomain.era5
-        try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDictionary)era5-no-sea", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: "\(domain.omfileArchive!)-no-sea", withIntermediateDirectories: true)
         logger.info("Read elevation")
         let elevation = try OmFileReader(file: domain.surfaceElevationFileOm).readAll()
         
-        for variable in Era5Variable.allCases {
+        for variable in variables {
             logger.info("Converting variable \(variable)")
             let fullFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
-            let strippedFile = "\(OpenMeteo.dataDictionary)era5-no-sea/\(variable)_\(year).om"
+            let strippedFile = "\(domain.omfileArchive!)-no-sea/\(variable)_\(year).om"
             try stripSea(logger: logger, readFilePath: fullFile, writeFilePath: strippedFile, elevation: elevation)
         }
     }
     
-    func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain, variables: [Era5Variable]) throws {
+    func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
         let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
         let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily, domain: domain, variables: variables)
         try convertYear(logger: logger, year: year, domain: domain, variables: variables)
     }
     
-    struct CdsQuery: Encodable {
-        let product_type = "reanalysis"
-        let format = "grib"
-        let year: String
-        let month: String
-        let day: String
-        let time: [String]
-        let variable: [String]
+    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws -> TimerangeDt {
+        switch domain {
+        case .era5:
+            fallthrough
+        case .era5_land:
+            fallthrough
+        case .era5t_land:
+            return try downloadDailyEra5Files(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
+        case .cerra:
+            return try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable])
+        }
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) throws -> TimerangeDt {
+    func downloadDailyEra5Files(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) throws -> TimerangeDt {
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
         guard timeinterval.dtSeconds == 86400 else {
@@ -569,6 +385,16 @@ struct DownloadEra5Command: Command {
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 600)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
+        struct CdsQuery: Encodable {
+            let product_type = "reanalysis"
+            let format = "grib"
+            let year: String
+            let month: String
+            let day: String
+            let time: [String]
+            let variable: [String]
+        }
         
         timeLoop: for timestamp in timeinterval {
             logger.info("Downloading timestamp \(timestamp.format_YYYYMMdd)")
@@ -611,7 +437,8 @@ struct DownloadEra5Command: Command {
                         fatalError("Grib does not contain expver field")
                     }
                     guard expver == version else {
-                        fatalError("Expected version \(version), does not match downloaded version \(expver)")
+                        logger.warning("Expected version \(version), does not match downloaded version \(expver). Skipping")
+                        return
                     }
                 }
                 
@@ -647,6 +474,120 @@ struct DownloadEra5Command: Command {
         try FileManager.default.removeItemIfExists(at: tempDownloadNetcdfFile)
         try FileManager.default.removeItemIfExists(at: tempPythonFile)
         return downloadedRange.range(dtSeconds: timeinterval.dtSeconds)
+    }
+    
+    /// Dowload CERRA data, use analysis if available, otherwise use forecast
+    func downloadDailyFilesCerra(logger: Logger, cdskey: String, timeinterval: TimerangeDt, variables: [CerraVariable]) throws -> TimerangeDt {
+        let domain = CdsDomain.cerra
+        logger.info("Downloading timerange \(timeinterval.prettyString())")
+        
+        /// Directory dir, where to place temporary downloaded files
+        let downloadDir = domain.downloadDirectory
+        try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
+        
+        /// loop over each day, download data and convert it
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let tempDownloadGribFile = "\(downloadDir)cerradownload_\(pid).grib"
+        let tempPythonFile = "\(downloadDir)cerradownload_\(pid).py"
+        
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 600)
+        
+        
+        struct CdsQuery: Encodable {
+            let product_type: [String]
+            let format = "grib"
+            let level_type: String?
+            let data_type = "reanalysis"
+            let height_level: String?
+            let year: String
+            let month: String
+            let day: [String]
+            let leadtime_hour: [String]
+            let time: [String] = ["00:00", "03:00", "06:00", "09:00", "12:00", "15:00", "18:00", "21:00"]
+            let variable: [String]
+        }
+        
+        func downloadAndConvert(datasetName: String, productType: [String], variables: [CerraVariable], height_level: String?, level_type: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
+            let lastDayInMonth = Timestamp(year, month % 12 + 1, 1).add(-86400).toComponents().day
+            let days = day.map{[$0.zeroPadded(len: 2)]} ?? (1...lastDayInMonth).map{$0.zeroPadded(len: 2)}
+            
+            let YYYYMMdd = "\(year)\(month.zeroPadded(len: 2))\(days[0])"
+            if FileManager.default.fileExists(atPath: "\(downloadDir)\(YYYYMMdd)/\(variables[0].rawValue)_\(YYYYMMdd)01.om") {
+                logger.info("Already exists \(YYYYMMdd) variable \(variables[0]). Skipping.")
+                return
+            }
+            
+            let query = CdsQuery(
+                product_type: productType,
+                level_type: level_type,
+                height_level: height_level,
+                year: year.zeroPadded(len: 2),
+                month: month.zeroPadded(len: 2),
+                day: days,
+                leadtime_hour: leadtime_hours.map(String.init),
+                variable: variables.map {$0.cdsApiName}
+            )
+            try Process.cdsApi(dataset: datasetName, key: cdskey, query: query, destinationFile: tempDownloadGribFile)
+            
+            try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
+                let shortName = message.get(attribute: "shortName")!
+                guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
+                    fatalError("Could not find \(shortName) in grib")
+                }
+                
+                /// (key: "validityTime", value: "1700")
+                let hour = Int(message.get(attribute: "validityTime")!)!/100
+                let date = message.get(attribute: "validityDate")!
+                logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                //try message.debugGrid(grid: domain.grid)
+                
+                try grib2d.load(message: message)
+                if let scaling = variable.netCdfScaling {
+                    grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                }
+                
+                try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
+                let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
+                try FileManager.default.removeItemIfExists(at: omFile)
+                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+            }
+        }
+        
+        func downloadAndConvertAll(datasetName: String, productType: [String], height_level: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
+         
+            // download analysis + forecast hour 1,2
+            let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
+            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2])
+            
+            // download forecast hour 1,2,3 for variables without analysis
+            let variablesForecastHour3 = variables.filter { !$0.hasAnalysis && !$0.isHeightLevel }
+            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2,3])
+            
+            // download analysis + 2 forecast steps from level 100m
+            let variablesHeightLevel = variables.filter { $0.isHeightLevel }
+            try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", level_type: nil, year: year, month: month, day: day, leadtime_hours: [1,2])
+        }
+        
+        let months = timeinterval.toYearMonth()
+        if months.count >= 3 {
+            /// Download one month at once
+            for date in months {
+                logger.info("Downloading year \(date.year) month \(date.month)")
+                try downloadAndConvertAll(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], height_level: nil, year: date.year, month: date.month, day: nil, leadtime_hours: [1,2])
+            }
+        } else {
+            for timestamp in timeinterval {
+                logger.info("Downloading day \(timestamp.format_YYYYMMdd)")
+                let date = timestamp.toComponents()
+                try downloadAndConvertAll(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], height_level: nil, year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2])
+            }
+        }
+            
+        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
+        try FileManager.default.removeItemIfExists(at: tempPythonFile)
+        return timeinterval
     }
     
     /// Convert daily compressed files to longer compressed files specified by `Era5.omFileLength`. E.g. 14 days in one file.
@@ -791,56 +732,3 @@ extension Process {
         try Process.spawn(cmd: "python3", args: ["\(destinationFile).py"])
     }
 }
-
-/*extension Variable {
-    /// Assume the variable has attributes scalefactor and offsets and apply all those to get a float array
-    fileprivate func readWithScalefactorAndOffset(scalefactor: Double, offset: Double, grid: Gridable) throws -> [Float] {
-        guard let ncVariableInt16 = asType(Int16.self) else {
-            fatalError("Not Int16")
-        }
-        guard let ncScalefactor: Double = try getAttribute("scale_factor")?.read() else {
-            fatalError("No scale_factor")
-        }
-        guard let ncOffset: Double = try getAttribute("add_offset")?.read() else {
-            fatalError("No add_offset")
-        }
-        guard let fillValue: Int16 = try getAttribute("_FillValue")?.read() else {
-            fatalError("No _FillValue")
-        }
-        guard let missingValue: Int16 = try getAttribute("missing_value")?.read() else {
-            fatalError("No missing_value")
-        }
-        let data = try ncVariableInt16.read().map { val -> Float in
-            if val == missingValue || val == fillValue {
-                return Float.nan
-            }
-            return Float((Double(val) * ncScalefactor + ncOffset) * scalefactor + offset)
-        }
-        if dimensions[1].name == "expver" && dimensions[1].length == 2 {
-            // In case we get 2 experiments, merge them
-            // https://confluence.ecmwf.int/display/CUSF/ERA5+CDS+requests+which+return+a+mixture+of+ERA5+and+ERA5T+data
-            var dataMerged = [Float]()
-            dataMerged.reserveCapacity(24*grid.nx*grid.ny)
-            for t in 0..<24 {
-                /// Era5 starts eastwards at 0°E... rotate to start at -180°E
-                for y in 0..<grid.ny {
-                    for x in 0..<grid.nx {
-                        /// prelimnary ERA5T data
-                        let exp1 = data[t*2*grid.nx*grid.ny + (0)*grid.nx*grid.ny + y*grid.nx + x]
-                        /// final era5 data
-                        let exp5 = data[t*2*grid.nx*grid.ny + (1)*grid.nx*grid.ny + y*grid.nx + x]
-                        
-                        if !exp5.isNaN {
-                            dataMerged.append(exp5)
-                        } else {
-                            dataMerged.append(exp1)
-                        }
-                    }
-                }
-            }
-            return dataMerged
-            // merge experiments
-        }
-        return data
-    }
-}*/

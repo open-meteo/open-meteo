@@ -368,6 +368,13 @@
                   </label>
                 </div>
                 <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="era5t_land"
+                    id="era5t_land" name="models">
+                  <label class="form-check-label" for="era5t_land">
+                    ERA5-T Land realtime
+                  </label>
+                </div>
+                <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="cerra"
                     id="cerra" name="models">
                   <label class="form-check-label" for="cerra">
