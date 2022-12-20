@@ -324,7 +324,7 @@ struct DownloadEra5Command: Command {
         
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
         
-        fatalError()
+        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
     }
     
     func runStripSea(logger: Logger, year: Int, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
@@ -374,7 +374,6 @@ struct DownloadEra5Command: Command {
         
         /// loop over each day, download data and convert it
         let pid = ProcessInfo.processInfo.processIdentifier
-        let tempDownloadNetcdfFile = "\(downloadDir)era5download_\(pid).nc"
         let tempDownloadGribFile = "\(downloadDir)era5download_\(pid).grib"
         let tempPythonFile = "\(downloadDir)era5download_\(pid).py"
         
@@ -471,7 +470,7 @@ struct DownloadEra5Command: Command {
             }
         }
         
-        try FileManager.default.removeItemIfExists(at: tempDownloadNetcdfFile)
+        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         try FileManager.default.removeItemIfExists(at: tempPythonFile)
         return downloadedRange.range(dtSeconds: timeinterval.dtSeconds)
     }
