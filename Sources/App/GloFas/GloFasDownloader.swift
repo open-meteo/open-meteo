@@ -232,6 +232,17 @@ struct GloFasDownloader: AsyncCommandFix {
         curl.printStatistics()
     }
     
+    struct GlofasQuery: Encodable {
+        let system_version: String
+        let format = "grib"
+        let variable = "river_discharge_in_the_last_24_hours"
+        let hyear: String
+        let hmonth: [String]
+        let hday: [String]
+        let hydrological_model = "lisflood"
+        let product_type: String
+    }
+    
     /// Download timeinterval and convert to omfile database
     func downloadTimeIntervalConsolidated(logger: Logger, timeinterval: TimerangeDt, cdskey: String, domain: GloFasDomain) throws {
         let downloadDir = domain.downloadDirectory
@@ -249,36 +260,21 @@ struct GloFasDownloader: AsyncCommandFix {
             let year = months.lowerBound.year
             let months = months.lowerBound.month ... months.upperBound.advanced(by: -1).month
             let monthNames = ["", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
-            let monthsJson = String(data: try JSONEncoder().encode(Array(monthNames[months])), encoding: .utf8)!
             
-            logger.info("Downloading year \(year) months \(monthsJson)")
-            
-            let pyCode = """
-                import cdsapi
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                
-                c.retrieve(
-                    'cems-glofas-historical',
-                    {
-                        'system_version': '\(domain.version)',
-                        'variable': 'river_discharge_in_the_last_24_hours',
-                        'format': 'grib',
-                        'hyear': '\(year)',
-                        'hmonth': \(monthsJson),
-                        'hday': [
-                            '01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12', '13', '14', '15',
-                             '16', '17', '18', '19', '20', '21', '22', '23', '24', '25', '26', '27', '28', '29', '30', '31'
-                        ],
-                        'hydrological_model': 'lisflood',
-                        'product_type': '\(domain.productType)',
-                    },
-                    '\(gribFile)')
-                """
-            let tempPythonFile = "\(downloadDir)glofasdownload_interval.py"
-            
-            try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            try Process.spawn(cmd: "python3", args: [tempPythonFile])
-            
+            logger.info("Downloading year \(year) months \(months)")
+            let query = GlofasQuery(
+                system_version: domain.version,
+                hyear: "\(year)",
+                hmonth: Array(monthNames[months]),
+                hday: (0...31).map{$0.zeroPadded(len: 2)},
+                product_type: domain.productType
+            )
+            try Process.cdsApi(
+                dataset: "cems-glofas-historical",
+                key: cdskey,
+                query: query,
+                destinationFile: gribFile
+            )
             try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
         } else {
             // download day by day
@@ -291,33 +287,20 @@ struct GloFasDownloader: AsyncCommandFix {
                 }
                 
                 let day = date.toComponents()
-                let pyCode = """
-                    import cdsapi
-                    c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                    
-                    c.retrieve(
-                        'cems-glofas-historical',
-                        {
-                            'system_version': '\(domain.version)',
-                            'variable': 'river_discharge_in_the_last_24_hours',
-                            'format': 'grib',
-                            'hyear': '\(day.year)',
-                            'hmonth': [
-                                '\(day.month.zeroPadded(len: 2))',
-                            ],
-                            'hday': [
-                                '\(day.day.zeroPadded(len: 2))',
-                            ],
-                            'hydrological_model': 'lisflood',
-                            'product_type': '\(domain.productType)',
-                        },
-                        '\(gribFile)')
-                    """
-                let tempPythonFile = "\(downloadDir)glofasdownload_interval.py"
                 
-                try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-                try Process.spawn(cmd: "python3", args: [tempPythonFile])
-                
+                let query = GlofasQuery(
+                    system_version: domain.version,
+                    hyear: "\(day.year)",
+                    hmonth: ["\(day.month.zeroPadded(len: 2))"],
+                    hday: ["\(day.day.zeroPadded(len: 2))"],
+                    product_type: domain.productType
+                )
+                try Process.cdsApi(
+                    dataset: "cems-glofas-historical",
+                    key: cdskey,
+                    query: query,
+                    destinationFile: gribFile
+                )
                 try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
             }
         }
@@ -373,45 +356,20 @@ struct GloFasDownloader: AsyncCommandFix {
         
         if !FileManager.default.fileExists(atPath: gribFile) {
             logger.info("Downloading year \(year)")
-            let pyCode = """
-                import cdsapi
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                
-                c.retrieve(
-                    'cems-glofas-historical',
-                    {
-                        'system_version': '\(domain.version)',
-                        'variable': 'river_discharge_in_the_last_24_hours',
-                        'format': 'grib',
-                        'hyear': '\(year)',
-                        'hmonth': [
-                            'april', 'august', 'december',
-                            'february', 'january', 'july',
-                            'june', 'march', 'may',
-                            'november', 'october', 'september',
-                        ],
-                        'hday': [
-                            '01', '02', '03',
-                            '04', '05', '06',
-                            '07', '08', '09',
-                            '10', '11', '12',
-                            '13', '14', '15',
-                            '16', '17', '18',
-                            '19', '20', '21',
-                            '22', '23', '24',
-                            '25', '26', '27',
-                            '28', '29', '30',
-                            '31',
-                        ],
-                        'hydrological_model': 'lisflood',
-                        'product_type': '\(domain.productType)',
-                    },
-                    '\(gribFile)')
-                """
-            let tempPythonFile = "\(downloadDir)glofasdownload.py"
-            
-            try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            try Process.spawn(cmd: "python3", args: [tempPythonFile])
+            let query = GlofasQuery(
+                system_version: domain.version,
+                hyear: "\(year)",
+                hmonth: ["april", "august", "december", "february", "january", "july",
+                          "june", "march", "may", "november", "october", "september"],
+                hday: (0...31).map{$0.zeroPadded(len: 2)},
+                product_type: domain.productType
+            )
+            try Process.cdsApi(
+                dataset: "cems-glofas-historical",
+                key: cdskey,
+                query: query,
+                destinationFile: gribFile
+            )
         }
         
         logger.info("Converting year \(year) to daily files")

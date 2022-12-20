@@ -436,29 +436,20 @@ struct DownloadEra5Command: Command {
         
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
-            let pyCode = """
-                import cdsapi
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-
-                c.retrieve(
-                    '\(domain.cdsDatasetName)',
-                    {
-                        'product_type': 'reanalysis',
-                        'format': 'grib',
-                        'variable': [
-                            'geopotential', 'land_sea_mask',
-                        ],
-                        'time': '00:00',
-                        'day': '01',
-                        'month': '01',
-                        'year': '2022',
-                    },
-                    '\(tempDownloadGribFile)')
-                """
-            let tempPythonFile = "\(downloadDir)elevation.py"
-
-            try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            try Process.spawn(cmd: "python3", args: [tempPythonFile])
+            struct Query: Encodable {
+                let product_type = "reanalysis"
+                let format = "grib"
+                let variable = ["geopotential", "land_sea_mask"]
+                let time = "00:00"
+                let day = "01"
+                let month = "01"
+                let year = "2022"
+            }
+            try Process.cdsApi(
+                dataset: domain.cdsDatasetName,
+                key: cdskey,
+                query: Query(),
+                destinationFile: tempDownloadGribFile)
         }
         
         var landmask: [Float]? = nil
@@ -515,7 +506,6 @@ struct DownloadEra5Command: Command {
     }
     
     func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain) throws {
-        let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
         let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
         let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily, domain: domain)
         let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
@@ -568,7 +558,6 @@ struct DownloadEra5Command: Command {
             if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd)00.om") {
                 continue
             }
-            let ncvariables = variables.map { $0.cdsApiName }
             // Download 1 hour or 24 hours
             let hours = timeinterval.dtSeconds == 3600 ? [timestamp.hour] : Array(0..<24)
             
@@ -579,25 +568,8 @@ struct DownloadEra5Command: Command {
                 time: hours.map({"'\($0.zeroPadded(len: 2)):00'"}),
                 variable: variables.map {$0.cdsApiName}
             )
-            let queryEncoded = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
-            
-            let pyCode = """
-                import cdsapi
-
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                try:
-                    c.retrieve('\(domain.cdsDatasetName)',\(queryEncoded),'\(tempDownloadGribFile)')
-                except Exception as e:
-                    if "Please, check that your date selection is valid" in str(e):
-                        exit(70)
-                    if "the request you have submitted is not valid" in str(e):
-                        exit(70)
-                    raise e
-                """
-            
-            try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
             do {
-                try Process.spawn(cmd: "python3", args: [tempPythonFile])
+                try Process.cdsApi(dataset: domain.cdsDatasetName, key: cdskey, query: query, destinationFile: tempDownloadGribFile)
             } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
                 if code == 70 {
                     logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
@@ -756,6 +728,30 @@ struct DownloadEra5Command: Command {
             })
             progress.finish()
         }
+    }
+}
+
+
+extension Process {
+    /// Spawn python CDS API and download to a specified file
+    static func cdsApi(dataset: String, key: String, query: Encodable, destinationFile: String, url: String = "https://cds.climate.copernicus.eu/api/v2") throws {
+        let queryEncoded = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
+        let pyCode = """
+            import cdsapi
+
+            c = cdsapi.Client(url="\(url)", key="\(key)", verify=True)
+            try:
+                c.retrieve('\(dataset)',\(queryEncoded),'\(destinationFile)')
+            except Exception as e:
+                if "Please, check that your date selection is valid" in str(e):
+                    exit(70)
+                if "the request you have submitted is not valid" in str(e):
+                    exit(70)
+                raise e
+            """
+        
+        try pyCode.write(toFile: "\(destinationFile).py", atomically: true, encoding: .utf8)
+        try Process.spawn(cmd: "python3", args: ["\(destinationFile).py"])
     }
 }
 

@@ -562,18 +562,8 @@ struct DownloadCerraCommand: Command {
                 leadtime_hour: leadtime_hours.map(String.init),
                 variable: variables.map {$0.cdsApiName}
             )
+            try Process.cdsApi(dataset: datasetName, key: cdskey, query: query, destinationFile: tempDownloadGribFile)
             
-            let queryEncoded = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
-            
-            let json = """
-                import cdsapi
-
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-                c.retrieve('\(datasetName)',\(queryEncoded),'\(tempDownloadGribFile)')
-                """
-            
-            try json.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            try Process.spawn(cmd: "python3", args: [tempPythonFile])
             try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
                 let shortName = message.get(attribute: "shortName")!
                 guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
@@ -694,32 +684,22 @@ struct DownloadCerraCommand: Command {
         let tempDownloadGribFile = "\(downloadDir)elevation.grib"
                 
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
-            logger.info("Downloading elevation and sea mask")
-            let pyCode = """
-                import cdsapi
-                c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-
-                c.retrieve(
-                    '\(domain.cdsDatasetName)',
-                    {
-                        'format': 'grib',
-                        'variable': [
-                            'land_sea_mask', 'orography',
-                        ],
-                        'data_type': 'reanalysis',
-                        'product_type': 'analysis',
-                        'level_type': 'surface_or_atmosphere',
-                        'year': '2019',
-                        'month': '12',
-                        'day': '23',
-                        'time': '00:00',
-                    },
-                    '\(tempDownloadGribFile)')
-                """
-            let tempPythonFile = "\(downloadDir)elevation.py"
-
-            try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
-            try Process.spawn(cmd: "python3", args: [tempPythonFile])
+            struct Query: Encodable {
+                let product_type = "reanalysis"
+                let data_type = "reanalysis"
+                let level_type = "surface_or_atmosphere"
+                let format = "grib"
+                let variable = ["land_sea_mask", "orography"]
+                let time = "00:00"
+                let day = "21"
+                let month = "12"
+                let year = "2019"
+            }
+            try Process.cdsApi(
+                dataset: domain.cdsDatasetName,
+                key: cdskey,
+                query: Query(),
+                destinationFile: tempDownloadGribFile)
         }
         
         logger.info("Converting elevation and sea mask")

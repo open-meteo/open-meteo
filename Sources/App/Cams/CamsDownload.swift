@@ -185,12 +185,21 @@ struct DownloadCamsCommand: AsyncCommandFix {
         
     }
     
+    struct CamsEuropeQuery: Encodable {
+        let model = "ensemble"
+        let date: String
+        let type = "forecast"
+        let format = "netcdf"
+        let variable: [String]
+        let level = "0"
+        let time: String
+        let leadtime_hour: [String]
+    }
+    
     /// Download all timesteps and preliminarily covnert it to compressed files
     func downloadCamsEurope(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) throws {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        
-        let tempPythonFile = "\(domain.downloadDirectory)download.py"
         let downloadFile = "\(domain.downloadDirectory)download.nc"
         
         if skipFilesIfExisting && FileManager.default.fileExists(atPath: downloadFile) {
@@ -198,35 +207,21 @@ struct DownloadCamsCommand: AsyncCommandFix {
         }
         
         let date = run.iso8601_YYYY_MM_dd
-        let variableNames = variables.compactMap { $0.getCamsEuMeta()?.apiName }.map{"'\($0)'"}.joined(separator: ",")
-        let leadtimeHours = (0..<domain.forecastHours).map{"'\($0)'"}.joined(separator: ",")
+        let query = CamsEuropeQuery(
+            date: "\(date)/\(date)",
+            variable: variables.compactMap { $0.getCamsEuMeta()?.apiName },
+            time: "\(run.hour.zeroPadded(len: 2)):00",
+            leadtime_hour: (0..<domain.forecastHours).map{"'\($0)'"}
+        )
         
-        let pyCode = """
-            import cdsapi
-
-            c = cdsapi.Client(url="https://ads.atmosphere.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
-            try:
-                c.retrieve('cams-europe-air-quality-forecasts',
-                {
-                    'model': 'ensemble',
-                    'date': '\(date)/\(date)',
-                    'type': 'forecast',
-                    'format': 'netcdf',
-                    'variable': [\(variableNames)],
-                    'level': '0',
-                    'time': '\(run.hour.zeroPadded(len: 2)):00',
-                    'leadtime_hour': [\(leadtimeHours)],
-                },
-                '\(downloadFile)')
-            except Exception as e:
-                if "Please, check that your date selection is valid" in str(e):
-                    exit(70)
-                raise e
-            """
-        
-        try pyCode.write(toFile: tempPythonFile, atomically: true, encoding: .utf8)
         do {
-            try Process.spawn(cmd: "python3", args: [tempPythonFile])
+            try Process.cdsApi(
+                dataset: "cams-europe-air-quality-forecasts",
+                key: cdskey,
+                query: query,
+                destinationFile: downloadFile,
+                url: "https://ads.atmosphere.copernicus.eu/api/v2"
+            )
         } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
             if code == 70 {
                 logger.info("Timestep \(run.iso8601_YYYY_MM_dd) seems to be unavailable")
