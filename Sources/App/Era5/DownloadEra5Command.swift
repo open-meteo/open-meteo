@@ -38,7 +38,7 @@ enum CdsDomain: String, GenericDomain {
     }
     
     private static var era5ElevationFile = try? OmFileReader(file: Self.era5.surfaceElevationFileOm)
-    private static var era5LandElevationFile = try? OmFileReader(file: Self.era5.surfaceElevationFileOm)
+    private static var era5LandElevationFile = try? OmFileReader(file: Self.era5_land.surfaceElevationFileOm)
     private static var cerraElevationFile = try? OmFileReader(file: Self.cerra.surfaceElevationFileOm)
     
     /// Filename of the surface elevation file
@@ -127,54 +127,33 @@ enum Era5Variable: String, CaseIterable, Codable, CdsVariableDownloadable {
     }
     
     func availableForDomain(domain: CdsDomain) -> Bool {
-        switch self {
-        case .temperature_2m:
-            return true
-        case .wind_u_component_100m:
-            fallthrough
-        case .wind_v_component_100m:
-            return domain == .era5
-        case .wind_u_component_10m:
-            return true
-        case .wind_v_component_10m:
-            return true
-        case .windgusts_10m:
-            return domain == .era5
-        case .dewpoint_2m:
-            return true
-        case .cloudcover_low:
-            fallthrough
-        case .cloudcover_mid:
-            fallthrough
-        case .cloudcover_high:
-            fallthrough
-        case .pressure_msl:
-            return domain == .era5
-        case .snowfall_water_equivalent:
-            return true
-        case .soil_temperature_0_to_7cm:
-            fallthrough
-        case .soil_temperature_7_to_28cm:
-            fallthrough
-        case .soil_temperature_28_to_100cm:
-            fallthrough
-        case .soil_temperature_100_to_255cm:
-            fallthrough
-        case .soil_moisture_0_to_7cm:
-            fallthrough
-        case .soil_moisture_7_to_28cm:
-            fallthrough
-        case .soil_moisture_28_to_100cm:
-            fallthrough
-        case .soil_moisture_100_to_255cm:
-            return true
-        case .shortwave_radiation:
-            return true
-        case .precipitation:
-            return true
-        case .direct_radiation:
-            return domain == .era5
+        // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
+        if domain == .era5_land {
+            switch self {
+            case .temperature_2m:
+                fallthrough
+            case .dewpoint_2m:
+                fallthrough
+            case .soil_temperature_0_to_7cm:
+                fallthrough
+            case .soil_temperature_7_to_28cm:
+                fallthrough
+            case .soil_temperature_28_to_100cm:
+                fallthrough
+            case .soil_temperature_100_to_255cm:
+                fallthrough
+            case .soil_moisture_0_to_7cm:
+                fallthrough
+            case .soil_moisture_7_to_28cm:
+                fallthrough
+            case .soil_moisture_28_to_100cm:
+                fallthrough
+            case .soil_moisture_100_to_255cm:
+                return true
+            default: return false
+            }
         }
+        return true
     }
     
     var isAccumulatedSinceModelStart: Bool {
@@ -791,7 +770,7 @@ struct DownloadEra5Command: Command {
                         fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: variable.hasAnalysis ? 0 : 1)
                     }
                 }
-                progress.add(fasttime.data.count)
+                progress.add(locationRange.count)
                 return ArraySlice(fasttime.data)
             })
             progress.finish()
