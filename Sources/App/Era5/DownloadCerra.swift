@@ -216,9 +216,8 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderMixable {
     }
 }
 
-
 /// Might be used to decode API queries later
-enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
+enum CerraVariable: String, CaseIterable, Codable, CdsVariableDownloadable {
     case temperature_2m
     case windspeed_10m
     case winddirection_10m
@@ -502,68 +501,11 @@ struct DownloadCerraCommand: Command {
         }
     }
     
-    // Data is stored in one file per hour
     func runYear(logger: Logger, year: Int, cdskey: String) throws {
-        let domain = CdsDomain.cerra
-        let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
+        //let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
         let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
         try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily)
-        
-        let nx = domain.grid.nx // 721
-        let ny = domain.grid.ny // 1440
-        let nt = timeintervalHourly.count // 8784
-        
-        try FileManager.default.createDirectory(atPath: domain.omfileArchive!, withIntermediateDirectories: true)
-        
-        // convert to yearly file
-        for variable in CerraVariable.allCases {
-            logger.info("Converting variable \(variable)")
-            let writeFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
-            if FileManager.default.fileExists(atPath: writeFile) {
-                continue
-            }
-            let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
-                let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
-                if !FileManager.default.fileExists(atPath: omFile) {
-                    return nil
-                }
-                return try OmFileReader(file: omFile)
-            }
-            var percent = 0
-            var looptime = DispatchTime.now()
-            // chunk1 must be multiple of 24 hours for deaccumulation
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 45*24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor) { dim0 in
-                let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
-                if percent != ratio {
-                    /// time ~4.5 seconds
-                    logger.info("\(ratio) %, time per step \(looptime.timeElapsedPretty())")
-                    looptime = DispatchTime.now()
-                    percent = ratio
-                }
-                
-                /// Process around 20 MB memory at once
-                let nLoc = 6 * 100
-                let locationRange = dim0..<min(dim0+nLoc, nx*ny)
-                
-                var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
-                
-                for (i, omfile) in omFiles.enumerated() {
-                    guard let omfile else {
-                        continue
-                    }
-                    try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
-                    let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
-                    for l in 0..<locationRange.count {
-                        fasttime[l, i] = read[l]
-                    }
-                }
-                if variable.isAccumulatedSinceModelStart {
-                    fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: variable.hasAnalysis ? 0 : 1)
-                }
-                return ArraySlice(fasttime.data)
-            }
-        }
+        try DownloadEra5Command().convertYear(logger: logger, year: year, domain: CdsDomain.cerra, variables: CerraVariable.allCases)
     }
     
     struct CdsQuery: Encodable {

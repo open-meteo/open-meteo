@@ -1,4 +1,5 @@
 import Foundation
+import SwiftEccodes
 import Vapor
 import SwiftNetCDF
 import SwiftPFor2D
@@ -78,8 +79,13 @@ enum CdsDomain: String, GenericDomain {
     }
 }
 
+protocol CdsVariableDownloadable: GenericVariable {
+    var isAccumulatedSinceModelStart: Bool { get }
+    var hasAnalysis: Bool { get }
+}
+
 /// Might be used to decode API queries later
-enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
+enum Era5Variable: String, CaseIterable, Codable, CdsVariableDownloadable {
     case temperature_2m
     case wind_u_component_100m
     case wind_v_component_100m
@@ -171,6 +177,14 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
         }
     }
     
+    var isAccumulatedSinceModelStart: Bool {
+        return false
+    }
+    
+    var hasAnalysis: Bool {
+        return false
+    }
+    
     /// Name used to query the ECMWF CDS API via python
     var cdsApiName: String {
         switch self {
@@ -201,13 +215,8 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     }
     
     /// Applied to the netcdf file after reading
-    var netCdfScaling: (offest: Double, scalefactor: Double) {
+    var netCdfScaling: (offest: Double, scalefactor: Double)? {
         switch self {
-        case .wind_u_component_100m: return (0, 1)
-        case .wind_v_component_100m: return (0, 1)
-        case .wind_u_component_10m: return (0, 1)
-        case .wind_v_component_10m: return (0, 1)
-        case .windgusts_10m: return (0, 1)
         case .temperature_2m: return (-273.15, 1) // kelvin to celsius
         case .dewpoint_2m: return (-273.15, 1)
         case .cloudcover_low: return (0, 100) // fraction to percent
@@ -219,13 +228,39 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
         case .soil_temperature_7_to_28cm: return (-273.15, 1)
         case .soil_temperature_28_to_100cm: return (-273.15, 1)
         case .soil_temperature_100_to_255cm: return (-273.15, 1)
-        case .soil_moisture_0_to_7cm: return (0, 1)
-        case .soil_moisture_7_to_28cm: return (0, 1)
-        case .soil_moisture_28_to_100cm: return (0, 1)
-        case .soil_moisture_100_to_255cm: return (0, 1)
         case .shortwave_radiation: return (0, 1/3600) // joules to watt
         case .precipitation: return (0, 1000) // meter to millimeter
         case .direct_radiation: return (0, 1/3600)
+        default: return nil
+        }
+    }
+    
+    /// shortName attribute in GRIB
+    var gribShortName: [String] {
+        switch self {
+        case .windgusts_10m: return ["10fg", "gust"] // or "gust" on ubuntu 22.04
+        case .temperature_2m: return ["2t"]
+        case .cloudcover_low: return ["lcc"]
+        case .cloudcover_mid: return ["mcc"]
+        case .cloudcover_high: return ["hcc"]
+        case .pressure_msl: return ["msl"]
+        case .snowfall_water_equivalent: return ["sf"]
+        case .shortwave_radiation: return ["ssrd"]
+        case .precipitation: return ["tp"]
+        case .direct_radiation: return ["tidirswrf"]
+        case .wind_u_component_100m: return ["100u"]
+        case .wind_v_component_100m: return ["100v"]
+        case .wind_u_component_10m: return ["10u"]
+        case .wind_v_component_10m: return ["10v"]
+        case .dewpoint_2m: return ["2d"]
+        case .soil_temperature_0_to_7cm: return ["stl1"]
+        case .soil_temperature_7_to_28cm: return ["stl2"]
+        case .soil_temperature_28_to_100cm: return ["stl3"]
+        case .soil_temperature_100_to_255cm: return ["stl4"]
+        case .soil_moisture_0_to_7cm: return ["swvl1"]
+        case .soil_moisture_7_to_28cm: return ["swvl2"]
+        case .soil_moisture_28_to_100cm: return ["swvl3"]
+        case .soil_moisture_100_to_255cm: return ["swvl4"]
         }
     }
     
@@ -362,6 +397,49 @@ struct DownloadEra5Command: Command {
         "Download ERA5 from the ECMWF climate data store and convert"
     }
     
+    func run(using context: CommandContext, signature: Signature) throws {
+        let logger = context.application.logger
+        
+        let domain = signature.domain.flatMap(CdsDomain.init) ?? .era5
+        
+        if let stripseaYear = signature.stripseaYear {
+            try runStripSea(logger: logger, year: Int(stripseaYear)!)
+            return
+        }
+        guard let cdskey = signature.cdskey else {
+            fatalError("cds key is required")
+        }
+        /// Make sure elevation information is present. Otherwise download it
+        if domain != .era5_land {
+            // TODO land/sea mask for era5 land
+            try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
+        }
+        
+        /// Only download one specified year
+        if let yearStr = signature.year {
+            if yearStr.contains("-") {
+                let split = yearStr.split(separator: "-")
+                guard split.count == 2 else {
+                    fatalError("year invalid")
+                }
+                for year in Int(split[0])! ... Int(split[1])! {
+                    try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+                }
+            } else {
+                guard let year = Int(yearStr) else {
+                    fatalError("Could not convert year to integer")
+                }
+                try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+            }
+            return
+        }
+        
+        /// Select the desired timerange, or use last 14 day
+        let timeinterval = signature.getTimeinterval()
+        let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain)
+        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain)
+    }
+    
     func stripSea(logger: Logger, readFilePath: String, writeFilePath: String, elevation: [Float]) throws {
         let domain = CdsDomain.era5
         if FileManager.default.fileExists(atPath: writeFilePath) {
@@ -477,61 +555,30 @@ struct DownloadEra5Command: Command {
     }
     
     func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain) throws {
-        let timeinterval = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
-        let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain)
-        
-        let nx = domain.grid.nx // 721
-        let ny = domain.grid.ny // 1440
-        let nt = timeinterval.count * 24 // 8784
-        
-        let variables = Era5Variable.allCases
-        
-        // convert to yearly file
-        for variable in variables {
-            logger.info("Converting variable \(variable)")
-            let writeFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
-            if FileManager.default.fileExists(atPath: writeFile) {
-                continue
-            }
-            let omFiles = try timeinterval.map { timeinterval -> OmFileReader in
-                let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMdd).om"
-                return try OmFileReader(file: omFile)
-            }
-            var percent = 0
-            var looptime = DispatchTime.now()
-            // old /8 now /27
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: nt/27).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor) { dim0 in
-                let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
-                if percent != ratio {
-                    /// time ~4.5 seconds
-                    logger.info("\(ratio) %, time per step \(looptime.timeElapsedPretty())")
-                    looptime = DispatchTime.now()
-                    percent = ratio
-                }
-                
-                /// Process around 20 MB memory at once
-                let nLoc = 6 * 100
-                let locationRange = dim0..<min(dim0+nLoc, nx*ny)
-                
-                var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
-                
-                for (i, omfile) in omFiles.enumerated() {
-                    try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<24)
-                    let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<24)
-                    let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: 24)
-                    for l in 0..<locationRange.count {
-                        fasttime[l, i*24 ..< (i+1)*24] = read2d[l, 0..<24]
-                    }
-                }
-                return ArraySlice(fasttime.data)
-            }
-        }
+        let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
+        let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
+        let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily, domain: domain)
+        let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
+        try convertYear(logger: logger, year: year, domain: domain, variables: variables)
+    }
+    
+    struct CdsQuery: Encodable {
+        let product_type = "reanalysis"
+        let format = "grib"
+        let year: String
+        let month: String
+        let day: String
+        let time: [String]
+        let variable: [String]
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
     func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain) throws -> TimerangeDt {
         logger.info("Downloading timerange \(timeinterval.prettyString())")
+        
+        guard timeinterval.dtSeconds == 86400 else {
+            fatalError("need daily time axis")
+        }
         
         /// Directory dir, where to place temporary downloaded files
         let downloadDir = domain.downloadDirectory
@@ -540,52 +587,46 @@ struct DownloadEra5Command: Command {
         let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         
         /// loop over each day, download data and convert it
-        let tempDownloadNetcdfFile = "\(downloadDir)era5download_\(ProcessInfo.processInfo.processIdentifier).nc"
-        let tempPythonFile = "\(downloadDir)era5download_\(ProcessInfo.processInfo.processIdentifier).py"
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let tempDownloadNetcdfFile = "\(downloadDir)era5download_\(pid).nc"
+        let tempDownloadGribFile = "\(downloadDir)era5download_\(pid).grib"
+        let tempPythonFile = "\(downloadDir)era5download_\(pid).py"
         
         /// The effective range of downloaded steps
         /// The lower bound will be adapted if timesteps already exist
         /// The upper bound will be reduced if the files are not yet on the remote server
         var downloadedRange = timeinterval.range.upperBound ..< timeinterval.range.upperBound
         
-        /// Number of timestamps per file
-        let nt = timeinterval.dtSeconds == 3600 ? 1 : 24
-        let writer = OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 600, chunk1: nt)
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: 600)
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         timeLoop: for timestamp in timeinterval {
-            let timestampDailyHourly = timeinterval.dtSeconds == 3600 ? timestamp.format_YYYYMMddHH : timestamp.format_YYYYMMdd
-            logger.info("Downloading timestamp \(timestampDailyHourly)")
+            logger.info("Downloading timestamp \(timestamp.format_YYYYMMdd)")
             let date = timestamp.toComponents()
             let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
             
-            if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestampDailyHourly).om") {
+            if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd)00.om") {
                 continue
             }
-            
             let ncvariables = variables.map { $0.cdsApiName }
-            let variablesEncoded = String(data: try JSONEncoder().encode(ncvariables), encoding: .utf8)!
-            
             // Download 1 hour or 24 hours
             let hours = timeinterval.dtSeconds == 3600 ? [timestamp.hour] : Array(0..<24)
-            let hoursString = hours.map({"'\($0.zeroPadded(len: 2)):00'"}).joined(separator: ",")
+            
+            let query = CdsQuery(
+                year: "\(date.year)",
+                month: date.month.zeroPadded(len: 2),
+                day: date.day.zeroPadded(len: 2),
+                time: hours.map({"'\($0.zeroPadded(len: 2)):00'"}),
+                variable: variables.map {$0.cdsApiName}
+            )
+            let queryEncoded = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
             
             let pyCode = """
                 import cdsapi
 
                 c = cdsapi.Client(url="https://cds.climate.copernicus.eu/api/v2", key="\(cdskey)", verify=True)
                 try:
-                    c.retrieve(
-                        '\(domain.cdsDatasetName)',
-                        {
-                            'product_type': 'reanalysis',
-                            'format': 'netcdf',
-                            'variable': \(variablesEncoded),
-                            'year': '\(date.year)',
-                            'month': '\(date.month.zeroPadded(len: 2))',
-                            'day': '\(date.day.zeroPadded(len: 2))',
-                            'time': [\(hoursString)],
-                        },
-                        '\(tempDownloadNetcdfFile)')
+                    c.retrieve('\(domain.cdsDatasetName)',\(queryEncoded),'\(tempDownloadGribFile)')
                 except Exception as e:
                     if "Please, check that your date selection is valid" in str(e):
                         exit(70)
@@ -607,44 +648,36 @@ struct DownloadEra5Command: Command {
                 }
             }
             
-            let ncfile = try NetCDF.open(path: tempDownloadNetcdfFile, allowUpdate: false)!
-            
-            try FileManager.default.createDirectory(atPath: timestampDir, withIntermediateDirectories: true)
-            
-            for variable in variables {
-                logger.info("Converting variable \(variable)")
-                guard let ncVariable = ncfile.getVariable(name: variable.netCdfName) else {
-                    fatalError("No variable named MyData available")
+            try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
+                let shortName = message.get(attribute: "shortName")!
+                guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
+                    fatalError("Could not find \(shortName) in grib")
                 }
-                guard ncVariable.dimensionsFlat[0] == nt else {
-                    logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) has only \(ncVariable.dimensionsFlat[0]) timesteps. Skipping.")
-                    break timeLoop
+                
+                let hour = Int(message.get(attribute: "validityTime")!)!/100
+                let date = message.get(attribute: "validityDate")!
+                logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                
+                try grib2d.load(message: message)
+                if let scaling = variable.netCdfScaling {
+                    grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
                 }
-                let scaling = variable.netCdfScaling
-                var data = try ncVariable.readWithScalefactorAndOffset(scalefactor: scaling.scalefactor, offset: scaling.offest, grid: domain.grid)
+                grib2d.array.shift180LongitudeAndFlipLatitude()
                 
-                data.shift180LongitudeAndFlipLatitude(nt: nt, ny: domain.grid.ny, nx: domain.grid.nx)
+                // For GRIB format, ERA5-Land-T data can be identified by the key expver=0005 in the GRIB header. Consolidated ERA5-Land data is identified by the key expver=0001.
+                // TODO switch between consolidated and realtime
                 
-                let fastTime = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: nt).transpose()
-                
-                guard !fastTime[0, 0..<nt].contains(.nan) else {
+                //let fastTime = Array2DFastSpace(data: grib2d.array.data, nLocations: domain.grid.count, nTime: nt).transpose()
+                /*guard !fastTime[0, 0..<nt].contains(.nan) else {
                     // For realtime updates, the latest day could only contain partial data. Skip it.
                     logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) contains missing data. Skipping.")
                     break timeLoop
-                }
+                }*/
                 
-                //let a2 = Array2DFastSpace(data: data, nLocations: 1440*721, nTime: 24)
-                //try a2.writeNetcdf(filename: "\(timestampDir)/\(variable.rawValue)_\(timestamp.format_YYYYMMdd).nc", nx: 1440, ny: 721)
-                
-                /// around 47.37°N/0°E latitude, at 12:00 UTC
-                //let basel = Era5.grid.findPoint(lat: 47.56, lon: 7.57)!
-                //let start = (0*1440*721) + basel
-                //print(data[start..<start+100])
-                
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timestampDailyHourly).om"
+                try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
+                let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
                 try FileManager.default.removeItemIfExists(at: omFile)
-                // Write time oriented file
-                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: fastTime.data)
+                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
             
             // Update downloaded range if download successfull
@@ -708,47 +741,61 @@ struct DownloadEra5Command: Command {
         }
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
-        let logger = context.application.logger
+    // Data is stored in one file per hour
+    func convertYear(logger: Logger, year: Int, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
+        let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
         
-        let domain = signature.domain.flatMap(CdsDomain.init) ?? .era5
+        let nx = domain.grid.nx // 721
+        let ny = domain.grid.ny // 1440
+        let nt = timeintervalHourly.count // 8784
         
-        if let stripseaYear = signature.stripseaYear {
-            try runStripSea(logger: logger, year: Int(stripseaYear)!)
-            return
-        }
-        guard let cdskey = signature.cdskey else {
-            fatalError("cds key is required")
-        }
-        /// Make sure elevation information is present. Otherwise download it
-        if domain != .era5_land {
-            // TODO land/sea mask for era5 land
-            try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
-        }
+        try FileManager.default.createDirectory(atPath: domain.omfileArchive!, withIntermediateDirectories: true)
         
-        /// Only download one specified year
-        if let yearStr = signature.year {
-            if yearStr.contains("-") {
-                let split = yearStr.split(separator: "-")
-                guard split.count == 2 else {
-                    fatalError("year invalid")
-                }
-                for year in Int(split[0])! ... Int(split[1])! {
-                    try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
-                }
-            } else {
-                guard let year = Int(yearStr) else {
-                    fatalError("Could not convert year to integer")
-                }
-                try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+        // convert to yearly file
+        for variable in variables {
+            let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Converting variable \(variable)")
+            let writeFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
+            if FileManager.default.fileExists(atPath: writeFile) {
+                continue
             }
-            return
+            let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
+                let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
+                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
+                if !FileManager.default.fileExists(atPath: omFile) {
+                    return nil
+                }
+                return try OmFileReader(file: omFile)
+            }
+            
+            // chunk1 must be multiple of 24 hours for deaccumulation
+            // chunk 6 locations and 21 days of data
+            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
+                /// Process around 20 MB memory at once
+                let nLoc = 6 * 100
+                let locationRange = dim0..<min(dim0+nLoc, nx*ny)
+                
+                var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
+                
+                for (i, omfile) in omFiles.enumerated() {
+                    guard let omfile else {
+                        continue
+                    }
+                    try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
+                    let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
+                    for l in 0..<locationRange.count {
+                        fasttime[l, i] = read[l]
+                    }
+                }
+                if domain == .cerra {
+                    if variable.isAccumulatedSinceModelStart {
+                        fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: variable.hasAnalysis ? 0 : 1)
+                    }
+                }
+                progress.add(fasttime.data.count)
+                return ArraySlice(fasttime.data)
+            })
+            progress.finish()
         }
-        
-        /// Select the desired timerange, or use last 14 day
-        let timeinterval = signature.getTimeinterval()
-        let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain)
-        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain)
     }
 }
 
