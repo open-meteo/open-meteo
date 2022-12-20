@@ -1,7 +1,6 @@
 import Foundation
 import SwiftEccodes
 import Vapor
-import SwiftNetCDF
 import SwiftPFor2D
 
 
@@ -243,35 +242,6 @@ enum Era5Variable: String, CaseIterable, Codable, CdsVariableDownloadable {
         }
     }
     
-    /// Name in the resulting netCdf file from CDS API
-    var netCdfName: String {
-        switch self {
-        case .wind_u_component_100m: return "v100"
-        case .wind_v_component_100m: return "u100"
-        case .wind_u_component_10m: return "v10"
-        case .wind_v_component_10m: return "u10"
-        case .windgusts_10m: return "i10fg"
-        case .dewpoint_2m: return "d2m"
-        case .temperature_2m: return "t2m"
-        case .cloudcover_low: return "lcc"
-        case .cloudcover_mid: return "mcc"
-        case .cloudcover_high: return "hcc"
-        case .pressure_msl: return "msl"
-        case .snowfall_water_equivalent: return "sf"
-        case .soil_temperature_0_to_7cm: return "stl1"
-        case .soil_temperature_7_to_28cm: return "stl2"
-        case .soil_temperature_28_to_100cm: return "stl3"
-        case .soil_temperature_100_to_255cm: return "stl4"
-        case .shortwave_radiation: return "ssrd"
-        case .precipitation: return "tp"
-        case .direct_radiation: return "fdir"
-        case .soil_moisture_0_to_7cm: return "swvl1"
-        case .soil_moisture_7_to_28cm: return "swvl2"
-        case .soil_moisture_28_to_100cm: return "swvl3"
-        case .soil_moisture_100_to_255cm: return "swvl4"
-        }
-    }
-    
     /// Scalefactor to compress data
     var scalefactor: Float {
         switch self {
@@ -462,9 +432,9 @@ struct DownloadEra5Command: Command {
         
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-        let tempDownloadNetcdfFile = "\(downloadDir)elevation.nc"
+        let tempDownloadGribFile = "\(downloadDir)elevation.grib"
         
-        if !FileManager.default.fileExists(atPath: "\(downloadDir)elevation.nc") {
+        if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
             let pyCode = """
                 import cdsapi
@@ -474,7 +444,7 @@ struct DownloadEra5Command: Command {
                     '\(domain.cdsDatasetName)',
                     {
                         'product_type': 'reanalysis',
-                        'format': 'netcdf',
+                        'format': 'grib',
                         'variable': [
                             'geopotential', 'land_sea_mask',
                         ],
@@ -483,7 +453,7 @@ struct DownloadEra5Command: Command {
                         'month': '01',
                         'year': '2022',
                     },
-                    '\(tempDownloadNetcdfFile)')
+                    '\(tempDownloadGribFile)')
                 """
             let tempPythonFile = "\(downloadDir)elevation.py"
 
@@ -491,22 +461,31 @@ struct DownloadEra5Command: Command {
             try Process.spawn(cmd: "python3", args: [tempPythonFile])
         }
         
-        logger.info("Converting elevation and sea mask")
-        let ncfile = try NetCDF.open(path: tempDownloadNetcdfFile, allowUpdate: false)!
-
-        guard var elevation = try ncfile.getVariable(name: "z")?.readWithScalefactorAndOffset(scalefactor: 0.1, offset: 0, grid: domain.grid) else {
-            fatalError("No variable named z available")
+        var landmask: [Float]? = nil
+        var elevation: [Float]? = nil
+        try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
+            let shortName = message.get(attribute: "shortName")!
+            var data = try message.getDouble().map(Float.init)
+            data.shift180LongitudeAndFlipLatitude(nt: 1, ny:  domain.grid.ny, nx: domain.grid.nx)
+            switch shortName {
+            case "z":
+                data.multiplyAdd(multiply: 0.1, add: 0)
+                elevation = data
+            case "lsm":
+                landmask = data
+            default:
+                fatalError("Found \(shortName) in grib")
+            }
         }
-        guard var landmask = try ncfile.getVariable(name: "lsm")?.readWithScalefactorAndOffset(scalefactor: 1, offset: 0, grid: domain.grid) else {
-            fatalError("No variable named lsm available")
+    
+        guard var elevation, let landmask else {
+            fatalError("missing elevation in grib")
         }
-        elevation.shift180LongitudeAndFlipLatitude(nt: 24, ny:  domain.grid.ny, nx: domain.grid.nx)
-        landmask.shift180LongitudeAndFlipLatitude(nt: 24, ny:  domain.grid.ny, nx: domain.grid.nx)
         
-        /*let a1 = Array2DFastSpace(data: elevation, nLocations: 1440*721, nTime: 1)
-        try a1.writeNetcdf(filename: "\(downloadDir)/elevation_converted.nc", nx: 1440, ny: 721)
-        let a2 = Array2DFastSpace(data: landmask, nLocations: 1440*721, nTime: 1)
-        try a2.writeNetcdf(filename: "\(downloadDir)/landmask_converted.nc", nx: 1440, ny: 721)*/
+        /*let a1 = Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1)
+        try a1.writeNetcdf(filename: "\(downloadDir)/elevation_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)
+        let a2 = Array2DFastSpace(data: landmask, nLocations: domain.grid.count, nTime: 1)
+        try a2.writeNetcdf(filename: "\(downloadDir)/landmask_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)*/
         
         // Set all sea grid points to -999
         precondition(elevation.count == landmask.count)
@@ -517,6 +496,8 @@ struct DownloadEra5Command: Command {
         }
         
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        
+        fatalError()
     }
     
     func runStripSea(logger: Logger, year: Int) throws {
@@ -778,7 +759,7 @@ struct DownloadEra5Command: Command {
     }
 }
 
-extension Variable {
+/*extension Variable {
     /// Assume the variable has attributes scalefactor and offsets and apply all those to get a float array
     fileprivate func readWithScalefactorAndOffset(scalefactor: Double, offset: Double, grid: Gridable) throws -> [Float] {
         guard let ncVariableInt16 = asType(Int16.self) else {
@@ -829,4 +810,4 @@ extension Variable {
         }
         return data
     }
-}
+}*/
