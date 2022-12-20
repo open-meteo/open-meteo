@@ -501,11 +501,11 @@ struct DownloadCerraCommand: Command {
         }
     }
     
-    func runYear(logger: Logger, year: Int, cdskey: String) throws {
+    func runYear(logger: Logger, year: Int, cdskey: String, variables: [CerraVariable]) throws {
         //let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
         let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
-        try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily)
-        try DownloadEra5Command().convertYear(logger: logger, year: year, domain: CdsDomain.cerra, variables: CerraVariable.allCases)
+        try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily, variables: variables)
+        try DownloadEra5Command().convertYear(logger: logger, year: year, domain: CdsDomain.cerra, variables: variables)
     }
     
     struct CdsQuery: Encodable {
@@ -523,15 +523,13 @@ struct DownloadCerraCommand: Command {
     }
     
     /// Dowload CERRA data, use analysis if available, otherwise use forecast
-    func downloadDailyFilesCerra(logger: Logger, cdskey: String, timeinterval: TimerangeDt) throws {
+    func downloadDailyFilesCerra(logger: Logger, cdskey: String, timeinterval: TimerangeDt, variables: [CerraVariable]) throws {
         let domain = CdsDomain.cerra
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
         /// Directory dir, where to place temporary downloaded files
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-                
-        let variables = CerraVariable.allCases
         
         /// loop over each day, download data and convert it
         let pid = ProcessInfo.processInfo.processIdentifier
@@ -620,57 +618,6 @@ struct DownloadCerraCommand: Command {
             
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         try FileManager.default.removeItemIfExists(at: tempPythonFile)
-    }
-    
-    /// Convert daily compressed files to longer compressed files specified by `Cerra.omFileLength`. E.g. 14 days in one file.
-    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt) throws {
-        let domain = CdsDomain.cerra
-        if timeinterval.count == 0 {
-            logger.info("No new timesteps could be downloaded. Nothing to do. Existing")
-            return
-        }
-        
-        logger.info("Converting timerange \(timeinterval.prettyString())")
-       
-        /// Directory dir, where to place temporary downloaded files
-        let downloadDir = domain.downloadDirectory
-        try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-        
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        
-        let variables = CerraVariable.allCases // [CerraVariable.wind_u_component_10m, .wind_v_component_10m, .wind_u_component_100m, .wind_v_component_100m]
-        
-        let ntPerFile = timeinterval.dtSeconds == 3600 ? 1 : 24
-        
-        /// loop over each day convert it
-        for variable in variables {
-            logger.info("Converting variable \(variable)")
-            
-            let nt = timeinterval.count * ntPerFile
-            let nLoc = domain.grid.count
-            
-            var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt*nLoc), nLocations: nLoc, nTime: nt)
-            
-            for (i,timestamp) in timeinterval.enumerated() {
-                let timestampDailyHourly = timeinterval.dtSeconds == 3600 ? timestamp.format_YYYYMMddHH : timestamp.format_YYYYMMdd
-                logger.info("Reading timestamp \(timestampDailyHourly)")
-                let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
-                let omFile =  "\(timestampDir)/\(variable.rawValue)_\(timestampDailyHourly).om"
-                
-                guard FileManager.default.fileExists(atPath: omFile) else {
-                    continue
-                }
-                let data = try OmFileReader(file: omFile).readAll()
-                let read2d = Array2DFastTime(data: data, nLocations: nLoc, nTime: ntPerFile)
-                for l in 0..<nLoc {
-                    fasttime[l, i*ntPerFile ..< (i+1)*ntPerFile] = read2d[l, 0..<ntPerFile]
-                }
-            }
-            
-            logger.info("Writing \(variable)")
-            let ringtime = timeinterval.range.lowerBound.timeIntervalSince1970 / 3600 ..< timeinterval.range.upperBound.timeIntervalSince1970 / 3600
-            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: fasttime, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
-        }
     }
     
     func downloadElevation(logger: Logger, cdskey: String, domain: CdsDomain) throws {
@@ -778,7 +725,8 @@ struct DownloadCerraCommand: Command {
     
     func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
-        
+        let domain = CdsDomain.cerra
+        let variables = CerraVariable.allCases
         /*let dir = "/Volumes/2TB_1GBs/data/yearly-cerra/"
         let year = 2000
         try convertWindSpeedDirectionToComponents(
@@ -798,7 +746,7 @@ struct DownloadCerraCommand: Command {
             fatalError("cds key is required")
         }
         //let domain = CdsDomain.cerra
-        try downloadElevation(logger: logger, cdskey: cdskey, domain: .cerra)
+        try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
         
         /// Only download one specified year
         if let yearStr = signature.year {
@@ -808,23 +756,23 @@ struct DownloadCerraCommand: Command {
                     fatalError("year invalid")
                 }
                 for year in Int(split[0])! ... Int(split[1])! {
-                    try runYear(logger: logger, year: year, cdskey: cdskey)
+                    try runYear(logger: logger, year: year, cdskey: cdskey, variables: variables)
                 }
             } else {
                 guard let year = Int(yearStr) else {
                     fatalError("Could not convert year to integer")
                 }
-                try runYear(logger: logger, year: year, cdskey: cdskey)
+                try runYear(logger: logger, year: year, cdskey: cdskey, variables: variables)
             }
             return
         }
         
         /// Select the desired timerange, or use last 14 day
         let timeinterval = signature.getTimeinterval()
-        try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval)
+        try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval, variables: variables)
         /// cerra is using hourly downloaded files
         let timeintervalHourly = timeinterval.with(dtSeconds: 3600)
-        try convertDailyFiles(logger: logger, timeinterval: timeintervalHourly)
+        try DownloadEra5Command().convertDailyFiles(logger: logger, timeinterval: timeintervalHourly, domain: domain, variables: variables)
     }
 }
 

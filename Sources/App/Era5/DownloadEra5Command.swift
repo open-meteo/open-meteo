@@ -7,6 +7,9 @@ import SwiftPFor2D
 enum CdsDomain: String, GenericDomain {
     case era5
     case era5_land
+    
+    /// not yet consolidated data
+    case era5t_land
     case cerra
     
     var dtSeconds: Int {
@@ -17,18 +20,35 @@ enum CdsDomain: String, GenericDomain {
         switch self {
         case .era5:
             return Self.era5ElevationFile
+        case .era5t_land:
+            fallthrough
         case .era5_land:
             return Self.era5LandElevationFile
         case .cerra:
             return Self.cerraElevationFile
         }
-        
+    }
+    
+    /// The expected version to download. 1=consolidated, 5=realtime
+    var gribExprVersion: Int? {
+        switch self {
+        case .era5:
+            return nil
+        case .era5_land:
+            return 1
+        case .era5t_land:
+            return 5
+        case .cerra:
+            return nil
+        }
     }
     
     var cdsDatasetName: String {
         switch self {
         case .era5:
             return "reanalysis-era5-single-levels"
+        case .era5t_land:
+            fallthrough
         case .era5_land:
             return "reanalysis-era5-land"
         case .cerra:
@@ -70,6 +90,8 @@ enum CdsDomain: String, GenericDomain {
         switch self {
         case .era5:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+        case .era5t_land:
+            fallthrough
         case .era5_land:
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
@@ -127,7 +149,7 @@ enum Era5Variable: String, CaseIterable, Codable, CdsVariableDownloadable {
     
     func availableForDomain(domain: CdsDomain) -> Bool {
         // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
-        if domain == .era5_land {
+        if domain == .era5_land || domain == .era5t_land {
             switch self {
             case .temperature_2m:
                 fallthrough
@@ -350,6 +372,7 @@ struct DownloadEra5Command: Command {
         let logger = context.application.logger
         
         let domain = signature.domain.flatMap(CdsDomain.init) ?? .era5
+        let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         
         if let stripseaYear = signature.stripseaYear {
             try runStripSea(logger: logger, year: Int(stripseaYear)!)
@@ -359,7 +382,7 @@ struct DownloadEra5Command: Command {
             fatalError("cds key is required")
         }
         /// Make sure elevation information is present. Otherwise download it
-        if domain != .era5_land {
+        if domain != .era5_land && domain != .era5t_land {
             // TODO land/sea mask for era5 land
             try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
         }
@@ -372,21 +395,21 @@ struct DownloadEra5Command: Command {
                     fatalError("year invalid")
                 }
                 for year in Int(split[0])! ... Int(split[1])! {
-                    try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+                    try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain, variables: variables)
                 }
             } else {
                 guard let year = Int(yearStr) else {
                     fatalError("Could not convert year to integer")
                 }
-                try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+                try runYear(logger: logger, year: year, cdskey: cdskey, domain: domain, variables: variables)
             }
             return
         }
         
         /// Select the desired timerange, or use last 14 day
         let timeinterval = signature.getTimeinterval()
-        let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain)
-        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain)
+        let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables)
+        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain, variables: variables)
     }
     
     func stripSea(logger: Logger, readFilePath: String, writeFilePath: String, elevation: [Float]) throws {
@@ -505,10 +528,9 @@ struct DownloadEra5Command: Command {
         }
     }
     
-    func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain) throws {
+    func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain, variables: [Era5Variable]) throws {
         let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
-        let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily, domain: domain)
-        let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
+        let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily, domain: domain, variables: variables)
         try convertYear(logger: logger, year: year, domain: domain, variables: variables)
     }
     
@@ -523,7 +545,7 @@ struct DownloadEra5Command: Command {
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain) throws -> TimerangeDt {
+    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) throws -> TimerangeDt {
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
         guard timeinterval.dtSeconds == 86400 else {
@@ -533,8 +555,6 @@ struct DownloadEra5Command: Command {
         /// Directory dir, where to place temporary downloaded files
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-                
-        let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         
         /// loop over each day, download data and convert it
         let pid = ProcessInfo.processInfo.processIdentifier
@@ -565,7 +585,7 @@ struct DownloadEra5Command: Command {
                 year: "\(date.year)",
                 month: date.month.zeroPadded(len: 2),
                 day: date.day.zeroPadded(len: 2),
-                time: hours.map({"'\($0.zeroPadded(len: 2)):00'"}),
+                time: hours.map({"\($0.zeroPadded(len: 2)):00"}),
                 variable: variables.map {$0.cdsApiName}
             )
             do {
@@ -586,6 +606,15 @@ struct DownloadEra5Command: Command {
                     fatalError("Could not find \(shortName) in grib")
                 }
                 
+                if let version = domain.gribExprVersion {
+                    guard let expver = message.get(attribute: "experimentVersionNumber").flatMap(Int.init) else {
+                        fatalError("Grib does not contain expver field")
+                    }
+                    guard expver == version else {
+                        fatalError("Expected version \(version), does not match downloaded version \(expver)")
+                    }
+                }
+                
                 let hour = Int(message.get(attribute: "validityTime")!)!/100
                 let date = message.get(attribute: "validityDate")!
                 logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
@@ -595,9 +624,6 @@ struct DownloadEra5Command: Command {
                     grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
                 }
                 grib2d.array.shift180LongitudeAndFlipLatitude()
-                
-                // For GRIB format, ERA5-Land-T data can be identified by the key expver=0005 in the GRIB header. Consolidated ERA5-Land data is identified by the key expver=0001.
-                // TODO switch between consolidated and realtime
                 
                 //let fastTime = Array2DFastSpace(data: grib2d.array.data, nLocations: domain.grid.count, nTime: nt).transpose()
                 /*guard !fastTime[0, 0..<nt].contains(.nan) else {
@@ -624,7 +650,9 @@ struct DownloadEra5Command: Command {
     }
     
     /// Convert daily compressed files to longer compressed files specified by `Era5.omFileLength`. E.g. 14 days in one file.
-    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain) throws {
+    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
+        
+        let timeintervalHourly = timeinterval.with(dtSeconds: 3600)
         if timeinterval.count == 0 {
             logger.info("No new timesteps could be downloaded. Nothing to do. Existing")
             return
@@ -632,44 +660,53 @@ struct DownloadEra5Command: Command {
         
         logger.info("Converting timerange \(timeinterval.prettyString())")
        
-        /// Directory dir, where to place temporary downloaded files
-        let downloadDir = domain.downloadDirectory
-        try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-        
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
-        
-        let variables = Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
-        
-        let ntPerFile = timeinterval.dtSeconds == 3600 ? 1 : 24
+                
+        let ringtime = timeintervalHourly.toIndexTime()
+        let nt = timeintervalHourly.count
         
         /// loop over each day convert it
         for variable in variables {
-            logger.info("Converting variable \(variable)")
+            let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(variable.rawValue)")
             
-            let nt = timeinterval.count * ntPerFile
-            let nLoc = domain.grid.count
-            
-            var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt*nLoc), nLocations: nLoc, nTime: nt)
-            
-            for (i,timestamp) in timeinterval.enumerated() {
-                let timestampDailyHourly = timeinterval.dtSeconds == 3600 ? timestamp.format_YYYYMMddHH : timestamp.format_YYYYMMdd
-                logger.info("Reading timestamp \(timestampDailyHourly)")
-                let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
-                let omFile =  "\(timestampDir)/\(variable.rawValue)_\(timestampDailyHourly).om"
-                
-                guard FileManager.default.fileExists(atPath: omFile) else {
-                    continue
+            let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
+                let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
+                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
+                if !FileManager.default.fileExists(atPath: omFile) {
+                    return nil
                 }
-                let data = try OmFileReader(file: omFile).readAll()
-                let read2d = Array2DFastTime(data: data, nLocations: nLoc, nTime: ntPerFile)
-                for l in 0..<nLoc {
-                    fasttime[l, i*ntPerFile ..< (i+1)*ntPerFile] = read2d[l, 0..<ntPerFile]
-                }
+                return try OmFileReader(file: omFile)
             }
             
-            logger.info("Writing \(variable)")
-            let ringtime = timeinterval.range.lowerBound.timeIntervalSince1970 / 3600 ..< timeinterval.range.upperBound.timeIntervalSince1970 / 3600
-            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: fasttime, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            // chunk1 must be multiple of 24 hours for deaccumulation
+            // chunk 6 locations and 21 days of data
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { dim0 in
+                /// Process around 20 MB memory at once
+                let nLoc = 6 * 100
+                let locationRange = dim0..<min(dim0+nLoc, domain.grid.count)
+                
+                var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
+                
+                for (i, omfile) in omFiles.enumerated() {
+                    guard let omfile else {
+                        continue
+                    }
+                    try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
+                    let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
+                    for l in 0..<locationRange.count {
+                        fasttime[l, i] = read[l]
+                    }
+                }
+                if domain == .cerra {
+                    if variable.isAccumulatedSinceModelStart {
+                        fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: variable.hasAnalysis ? 0 : 1)
+                    }
+                }
+                progress.add(locationRange.count)
+                return ArraySlice(fasttime.data)
+            }
+            progress.finish()
         }
     }
     
