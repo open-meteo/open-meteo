@@ -254,6 +254,6 @@ struct SyncCommand: AsyncCommandFix {
 extension Array where Element == SyncFileAttributes {
     var fileSize: String {
         let totalSize = reduce(0, {$0 + $1.size}) / 1024 / 1024
-        return "\(totalSize) MB"
+        return totalSize.bytesHumanReadable
     }
 }
