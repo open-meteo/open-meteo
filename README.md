@@ -35,6 +35,7 @@ Open-Meteo fills this gap and offers free weather forecast APIs for non-commerci
 ## Who is using Open-Meteo?
 Apps:
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
+- [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
