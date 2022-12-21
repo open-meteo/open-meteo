@@ -272,7 +272,7 @@
           <label for="past_days">Past days</label>
         </div>
       </div>-->
-      <div class="col-12 pb-3">
+      <div class="col-12 pb-3 debug-hidden">
         <div class="form-check form-switch">
           <input class="form-check-input" type="checkbox" id="localhost" name="localhost" value="true">
           <label class="form-check-label" for="localhost">Use localhost server</label>
