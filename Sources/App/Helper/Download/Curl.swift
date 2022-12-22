@@ -264,23 +264,30 @@ struct GribArray2D {
 }
 
 extension AsyncSequence where Element == ByteBuffer {
-    /// Store incoming data to file. Buffers up to 64kb until flushed to disk.
+    /// Store incoming data to file. Buffers up to 128kb until flushed to disk.
+    /// Optimised for ZFS recordsize of 128kb
     /// NOTE: File IO is blocking e.g. synchronous
     /// If `size` is set, the required file size will be prealiocated
     /// If `modificationDate` is set, the files modification date will be set to it
     func saveTo(file: String, size: Int?, modificationDate: Date?) async throws {
         let fn = try FileHandle.createNewFile(file: file, size: size)
         
-        /// Buffer up to 64kb and then write larger chunks
+        /// Buffer up to 128kb and then write larger chunks
         var buffer = ByteBuffer()
-        buffer.reserveCapacity(80*1024)
+        buffer.reserveCapacity(128*1024)
         for try await fragment in self {
             try Task.checkCancellation()
-            buffer.writeImmutableBuffer(fragment)
-            if buffer.readableBytes > 64*1024 {
-                try fn.write(contentsOf: buffer.readableBytesView)
-                buffer.moveReaderIndex(to: 0)
-                buffer.moveWriterIndex(to: 0)
+            var fragment = fragment
+            while fragment.readableBytes > 0 {
+                fragment.readWithUnsafeReadableBytes({
+                    let chunkBytes = Swift.min($0.count, 128*1024)
+                    return buffer.writeBytes(UnsafeRawBufferPointer(rebasing: $0[0..<chunkBytes]))
+                })
+                if buffer.readableBytes >= 128*1024 {
+                    try fn.write(contentsOf: buffer.readableBytesView)
+                    buffer.moveReaderIndex(to: 0)
+                    buffer.moveWriterIndex(to: 0)
+                }
             }
         }
         // write remaining data
