@@ -104,10 +104,6 @@ enum CdsDomain: String, GenericDomain {
     }
 }
 
-protocol CdsVariableDownloadable: GenericVariable {
-    var isAccumulatedSinceModelStart: Bool { get }
-}
-
 struct DownloadEra5Command: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
@@ -158,7 +154,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             fatalError("Invalid domain '\(signature.domain)'")
         }
         
-        let variables: [CdsVariableDownloadable] = domain == .cerra ? CerraVariable.allCases : Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
+        let variables: [GenericVariable] = domain == .cerra ? CerraVariable.allCases : Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         
         if let stripseaYear = signature.stripseaYear {
             try runStripSea(logger: logger, year: Int(stripseaYear)!, domain: domain, variables: variables)
@@ -273,7 +269,7 @@ struct DownloadEra5Command: AsyncCommandFix {
                 return
             case .cerra:
                 struct Query: Encodable {
-                    let product_type = "reanalysis"
+                    let product_type = "analysis"
                     let data_type = "reanalysis"
                     let level_type = "surface_or_atmosphere"
                     let format = "grib"
@@ -336,7 +332,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
     }
     
-    func runStripSea(logger: Logger, year: Int, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
+    func runStripSea(logger: Logger, year: Int, domain: CdsDomain, variables: [GenericVariable]) throws {
         let domain = CdsDomain.era5
         try FileManager.default.createDirectory(atPath: "\(domain.omfileArchive!)-no-sea", withIntermediateDirectories: true)
         logger.info("Read elevation")
@@ -350,13 +346,13 @@ struct DownloadEra5Command: AsyncCommandFix {
         }
     }
     
-    func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
+    func runYear(logger: Logger, year: Int, cdskey: String, domain: CdsDomain, variables: [GenericVariable]) throws {
         let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
         let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeintervalDaily, domain: domain, variables: variables)
         try convertYear(logger: logger, year: year, domain: domain, variables: variables)
     }
     
-    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws -> TimerangeDt {
+    func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) throws -> TimerangeDt {
         switch domain {
         case .era5:
             fallthrough
@@ -539,6 +535,9 @@ struct DownloadEra5Command: AsyncCommandFix {
             )
             try Process.cdsApi(dataset: datasetName, key: cdskey, query: query, destinationFile: tempDownloadGribFile)
             
+            // Deaccumulate data on the fly. Keep previous timestep in memory
+            var accumulated = [CerraVariable: [Float]]()
+            
             try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
                 let shortName = message.get(attribute: "shortName")!
                 guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
@@ -554,6 +553,17 @@ struct DownloadEra5Command: AsyncCommandFix {
                 try grib2d.load(message: message)
                 if let scaling = variable.netCdfScaling {
                     grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                }
+                
+                // Deaccumulate data for forecast hours 1,2,3
+                if variable.isAccumulatedSinceModelStart {
+                    let previous = accumulated[variable]
+                    accumulated[variable] = hour % 3 == 3 ? nil : grib2d.array.data
+                    if let previous {
+                        for i in grib2d.array.data.indices {
+                            grib2d.array.data[i] -= previous[i]
+                        }
+                    }
                 }
                 
                 try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
@@ -595,7 +605,7 @@ struct DownloadEra5Command: AsyncCommandFix {
     }
     
     /// Convert daily compressed files to longer compressed files specified by `Era5.omFileLength`. E.g. 14 days in one file.
-    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
+    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) throws {
         
         let timeintervalHourly = timeinterval.with(dtSeconds: 3600)
         if timeinterval.count == 0 {
@@ -624,7 +634,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                 return try OmFileReader(file: omFile)
             }
             
-            // chunk1 must be multiple of 24 hours for deaccumulation
             // chunk 6 locations and 21 days of data
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { dim0 in
                 /// Process around 20 MB memory at once
@@ -643,11 +652,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                         fasttime[l, i] = read[l]
                     }
                 }
-                if domain == .cerra {
-                    if variable.isAccumulatedSinceModelStart {
-                        fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 1)
-                    }
-                }
                 progress.add(locationRange.count)
                 return ArraySlice(fasttime.data)
             }
@@ -656,7 +660,7 @@ struct DownloadEra5Command: AsyncCommandFix {
     }
     
     // Data is stored in one file per hour
-    func convertYear(logger: Logger, year: Int, domain: CdsDomain, variables: [CdsVariableDownloadable]) throws {
+    func convertYear(logger: Logger, year: Int, domain: CdsDomain, variables: [GenericVariable]) throws {
         let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
         
         let nx = domain.grid.nx // 721
@@ -681,7 +685,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                 return try OmFileReader(file: omFile)
             }
             
-            // chunk1 must be multiple of 24 hours for deaccumulation
             // chunk 6 locations and 21 days of data
             try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
                 /// Process around 20 MB memory at once
@@ -698,11 +701,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                     let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
                     for l in 0..<locationRange.count {
                         fasttime[l, i] = read[l]
-                    }
-                }
-                if domain == .cerra {
-                    if variable.isAccumulatedSinceModelStart {
-                        fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 1)
                     }
                 }
                 progress.add(locationRange.count)

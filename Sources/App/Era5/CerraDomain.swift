@@ -222,7 +222,7 @@ Sources:
  - https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-cerra-single-levels?tab=form
  - https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-cerra-height-levels?tab=overview
  */
-enum CerraVariable: String, CaseIterable, Codable, CdsVariableDownloadable {
+enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
     case temperature_2m
     case windspeed_10m
     case winddirection_10m

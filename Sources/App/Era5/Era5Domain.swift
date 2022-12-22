@@ -2,7 +2,7 @@ import SwiftPFor2D
 
 
 /// Might be used to decode API queries later
-enum Era5Variable: String, CaseIterable, Codable, CdsVariableDownloadable {
+enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     case temperature_2m
     case wind_u_component_100m
     case wind_v_component_100m
@@ -71,10 +71,6 @@ enum Era5Variable: String, CaseIterable, Codable, CdsVariableDownloadable {
             }
         }
         return true
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        return false
     }
     
     /// Name used to query the ECMWF CDS API via python
