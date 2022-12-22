@@ -109,7 +109,7 @@ protocol CdsVariableDownloadable: GenericVariable {
     var hasAnalysis: Bool { get }
 }
 
-struct DownloadEra5Command: Command {
+struct DownloadEra5Command: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
@@ -152,7 +152,7 @@ struct DownloadEra5Command: Command {
         "Download ERA5 from the ECMWF climate data store and convert"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         
         guard let domain = CdsDomain.init(rawValue: signature.domain) else {
@@ -169,7 +169,7 @@ struct DownloadEra5Command: Command {
             fatalError("cds key is required")
         }
         /// Make sure elevation information is present. Otherwise download it
-        try downloadElevation(logger: logger, cdskey: cdskey, domain: domain)
+        try await downloadElevation(application: context.application, cdskey: cdskey, domain: domain)
         
         /// Only download one specified year
         if let yearStr = signature.year {
@@ -232,23 +232,47 @@ struct DownloadEra5Command: Command {
         }
     }
     
-    func downloadElevation(logger: Logger, cdskey: String, domain: CdsDomain) throws {
-        if domain == .era5t_land || domain == .era5_land {
-            logger.warning("No elevation file support yet for ERA5T")
-            return
-        }
-        
+    func downloadElevation(application: Application, cdskey: String, domain: CdsDomain) async throws {
+        let logger = application.logger
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             return
         }
         
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let tempDownloadGribFile = "\(downloadDir)elevation.grib"
+        var tempDownloadGribFile2 = domain == .era5_land ? "\(downloadDir)lsm.grib" : nil
         
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
-            if domain == .cerra {
+            switch domain {
+            case .era5:
+                struct Query: Encodable {
+                    let product_type = "reanalysis"
+                    let format = "grib"
+                    let variable = ["geopotential", "land_sea_mask"]
+                    let time = "00:00"
+                    let day = "01"
+                    let month = "01"
+                    let year = "2022"
+                }
+                try Process.cdsApi(
+                    dataset: domain.cdsDatasetName,
+                    key: cdskey,
+                    query: Query(),
+                    destinationFile: tempDownloadGribFile
+                )
+            case .era5_land:
+                let z = "https://confluence.ecmwf.int/download/attachments/140385202/geo_1279l4_0.1x0.1.grb?version=1&modificationDate=1570448352562&api=v2&download=true"
+                let lsm = "https://confluence.ecmwf.int/download/attachments/140385202/lsm_1279l4_0.1x0.1.grb?version=1&modificationDate=1567525024201&api=v2&download=true"
+                let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+                try await curl.download(url: z, toFile: tempDownloadGribFile, bzip2Decode: false)
+                try await curl.download(url: lsm, toFile: tempDownloadGribFile2!, bzip2Decode: false)
+            case .era5t_land:
+                // uses era5 land file
+                return
+            case .cerra:
                 struct Query: Encodable {
                     let product_type = "reanalysis"
                     let data_type = "reanalysis"
@@ -265,43 +289,29 @@ struct DownloadEra5Command: Command {
                     key: cdskey,
                     query: Query(),
                     destinationFile: tempDownloadGribFile)
-            } else {
-                struct Query: Encodable {
-                    let product_type = "reanalysis"
-                    let format = "grib"
-                    let variable = ["geopotential", "land_sea_mask"]
-                    let time = "00:00"
-                    let day = "01"
-                    let month = "01"
-                    let year = "2022"
-                }
-                try Process.cdsApi(
-                    dataset: domain.cdsDatasetName,
-                    key: cdskey,
-                    query: Query(),
-                    destinationFile: tempDownloadGribFile
-                )
             }
         }
         
         var landmask: [Float]? = nil
         var elevation: [Float]? = nil
-        try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
-            let shortName = message.get(attribute: "shortName")!
-            var data = try message.getDouble().map(Float.init)
-            if domain.isGlobal {
-                data.shift180LongitudeAndFlipLatitude(nt: 1, ny:  domain.grid.ny, nx: domain.grid.nx)
-            }
-            switch shortName {
-            case "orog":
-                elevation = data
-            case "z":
-                data.multiplyAdd(multiply: 0.1, add: 0)
-                elevation = data
-            case "lsm":
-                landmask = data
-            default:
-                fatalError("Found \(shortName) in grib")
+        for file in [tempDownloadGribFile, tempDownloadGribFile2].compacted() {
+            try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
+                let shortName = message.get(attribute: "shortName")!
+                var data = try message.getDouble().map(Float.init)
+                if domain.isGlobal {
+                    data.shift180LongitudeAndFlipLatitude(nt: 1, ny:  domain.grid.ny, nx: domain.grid.nx)
+                }
+                switch shortName {
+                case "orog":
+                    elevation = data
+                case "z":
+                    data.multiplyAdd(multiply: 1/9.80665, add: 0)
+                    elevation = data
+                case "lsm":
+                    landmask = data
+                default:
+                    fatalError("Found \(shortName) in grib")
+                }
             }
         }
     
