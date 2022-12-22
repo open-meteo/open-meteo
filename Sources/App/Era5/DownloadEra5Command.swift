@@ -106,7 +106,6 @@ enum CdsDomain: String, GenericDomain {
 
 protocol CdsVariableDownloadable: GenericVariable {
     var isAccumulatedSinceModelStart: Bool { get }
-    var hasAnalysis: Bool { get }
 }
 
 struct DownloadEra5Command: AsyncCommandFix {
@@ -565,18 +564,14 @@ struct DownloadEra5Command: AsyncCommandFix {
         }
         
         func downloadAndConvertAll(datasetName: String, productType: [String], height_level: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
-         
-            // download analysis + forecast hour 1,2
-            let variablesAnalysis = variables.filter { $0.hasAnalysis && !$0.isHeightLevel }
-            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], variables: variablesAnalysis, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2])
             
-            // download forecast hour 1,2,3 for variables without analysis
-            let variablesForecastHour3 = variables.filter { !$0.hasAnalysis && !$0.isHeightLevel }
+            // download forecast hour 1,2,3 for variables without analysis. Analysis is zick zacking around like crazy
+            let variablesForecastHour3 = variables.filter { !$0.isHeightLevel }
             try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2,3])
             
-            // download analysis + 2 forecast steps from level 100m
+            // download 3 forecast steps from level 100m
             let variablesHeightLevel = variables.filter { $0.isHeightLevel }
-            try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast", "analysis"], variables: variablesHeightLevel, height_level: "100_m", level_type: nil, year: year, month: month, day: day, leadtime_hours: [1,2])
+            try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast"], variables: variablesHeightLevel, height_level: "100_m", level_type: nil, year: year, month: month, day: day, leadtime_hours: [1,2,3])
         }
         
         let months = timeinterval.toYearMonth()
@@ -650,7 +645,7 @@ struct DownloadEra5Command: AsyncCommandFix {
                 }
                 if domain == .cerra {
                     if variable.isAccumulatedSinceModelStart {
-                        fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: variable.hasAnalysis ? 0 : 1)
+                        fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 1)
                     }
                 }
                 progress.add(locationRange.count)
@@ -707,7 +702,7 @@ struct DownloadEra5Command: AsyncCommandFix {
                 }
                 if domain == .cerra {
                     if variable.isAccumulatedSinceModelStart {
-                        fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: variable.hasAnalysis ? 0 : 1)
+                        fasttime.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 1)
                     }
                 }
                 progress.add(locationRange.count)

@@ -77,10 +77,6 @@ enum Era5Variable: String, CaseIterable, Codable, CdsVariableDownloadable {
         return false
     }
     
-    var hasAnalysis: Bool {
-        return false
-    }
-    
     /// Name used to query the ECMWF CDS API via python
     var cdsApiName: String {
         switch self {

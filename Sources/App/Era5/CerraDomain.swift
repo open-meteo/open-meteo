@@ -299,33 +299,6 @@ enum CerraVariable: String, CaseIterable, Codable, CdsVariableDownloadable {
         }
     }
     
-    var hasAnalysis: Bool {
-        switch self {
-        case .temperature_2m:
-            return true
-        case .windspeed_10m:
-            return true
-        case .winddirection_10m:
-            return true
-        case .windspeed_100m:
-            return true
-        case .winddirection_100m:
-            return true
-        case .relativehumidity_2m:
-            return true
-        case .cloudcover_low:
-            return true
-        case .cloudcover_mid:
-            return true
-        case .cloudcover_high:
-            return true
-        case .pressure_msl:
-            return true
-        default:
-            return false
-        }
-    }
-    
     var isHeightLevel: Bool {
         switch self {
         case .windspeed_100m: fallthrough
