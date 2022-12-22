@@ -237,7 +237,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let tempDownloadGribFile = "\(downloadDir)elevation.grib"
-        var tempDownloadGribFile2 = domain == .era5_land ? "\(downloadDir)lsm.grib" : nil
+        let tempDownloadGribFile2 = domain == .era5_land ? "\(downloadDir)lsm.grib" : nil
         
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
@@ -558,7 +558,7 @@ struct DownloadEra5Command: AsyncCommandFix {
                 // Deaccumulate data for forecast hours 1,2,3
                 if variable.isAccumulatedSinceModelStart {
                     let previous = accumulated[variable]
-                    accumulated[variable] = hour % 3 == 3 ? nil : grib2d.array.data
+                    accumulated[variable] = hour % 3 == 0 ? nil : grib2d.array.data
                     if let previous {
                         for i in grib2d.array.data.indices {
                             grib2d.array.data[i] -= previous[i]
@@ -573,8 +573,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             }
         }
         
-        func downloadAndConvertAll(datasetName: String, productType: [String], height_level: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
-            
+        func downloadAndConvertAll(year: Int, month: Int, day: Int?) throws {
             // download forecast hour 1,2,3 for variables without analysis. Analysis is zick zacking around like crazy
             let variablesForecastHour3 = variables.filter { !$0.isHeightLevel }
             try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2,3])
@@ -584,18 +583,22 @@ struct DownloadEra5Command: AsyncCommandFix {
             try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast"], variables: variablesHeightLevel, height_level: "100_m", level_type: nil, year: year, month: month, day: day, leadtime_hours: [1,2,3])
         }
         
+        /// Make sure data of the day ahead is available
+        let dayBefore = timeinterval.range.lowerBound.add(-24*3600).toComponents()
+        try downloadAndConvertAll(year: dayBefore.year, month: dayBefore.month, day: dayBefore.day)
+        
         let months = timeinterval.toYearMonth()
         if months.count >= 3 {
             /// Download one month at once
             for date in months {
                 logger.info("Downloading year \(date.year) month \(date.month)")
-                try downloadAndConvertAll(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], height_level: nil, year: date.year, month: date.month, day: nil, leadtime_hours: [1,2])
+                try downloadAndConvertAll(year: date.year, month: date.month, day: nil)
             }
         } else {
             for timestamp in timeinterval {
                 logger.info("Downloading day \(timestamp.format_YYYYMMdd)")
                 let date = timestamp.toComponents()
-                try downloadAndConvertAll(datasetName: domain.cdsDatasetName, productType: ["analysis", "forecast"], height_level: nil, year: date.year, month: date.month, day: date.day, leadtime_hours: [1,2])
+                try downloadAndConvertAll(year: date.year, month: date.month, day: date.day)
             }
         }
             
