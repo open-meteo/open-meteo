@@ -4,6 +4,7 @@ import Vapor
 import SwiftPFor2D
 
 
+///  ERA5: https://rmets.onlinelibrary.wiley.com/doi/10.1002/qj.3803
 enum CdsDomain: String, GenericDomain {
     case era5
     case era5_land
