@@ -8,8 +8,12 @@ enum CdsDomain: String, GenericDomain {
     case era5
     case era5_land
     
-    /// not yet consolidated data
+    /// T=Realtime version with 5 days delay. Not yet consolidated data
+    case era5t
+    
+    /// T=Realtime version with 5 days delay. Not yet consolidated data
     case era5t_land
+    
     case cerra
     
     var dtSeconds: Int {
@@ -22,6 +26,8 @@ enum CdsDomain: String, GenericDomain {
     
     var elevationFile: OmFileReader<MmapFile>? {
         switch self {
+        case .era5t:
+            fallthrough
         case .era5:
             return Self.era5ElevationFile
         case .era5t_land:
@@ -37,9 +43,11 @@ enum CdsDomain: String, GenericDomain {
     var gribExprVersion: Int? {
         switch self {
         case .era5:
-            return nil
+            return 1
         case .era5_land:
             return 1
+        case.era5t:
+            return 5
         case .era5t_land:
             return 5
         case .cerra:
@@ -49,6 +57,8 @@ enum CdsDomain: String, GenericDomain {
     
     var cdsDatasetName: String {
         switch self {
+        case .era5t:
+            fallthrough
         case .era5:
             return "reanalysis-era5-single-levels"
         case .era5t_land:
@@ -92,6 +102,8 @@ enum CdsDomain: String, GenericDomain {
     
     var grid: Gridable {
         switch self {
+        case .era5t:
+            fallthrough
         case .era5:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .era5t_land:
@@ -267,6 +279,8 @@ struct DownloadEra5Command: AsyncCommandFix {
                 let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
                 try await curl.download(url: z, toFile: tempDownloadGribFile, bzip2Decode: false)
                 try await curl.download(url: lsm, toFile: tempDownloadGribFile2!, bzip2Decode: false)
+            case .era5t:
+                fallthrough
             case .era5t_land:
                 // uses era5 land file
                 return
@@ -357,6 +371,8 @@ struct DownloadEra5Command: AsyncCommandFix {
     
     func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) throws -> TimerangeDt {
         switch domain {
+        case .era5t:
+            fallthrough
         case .era5:
             fallthrough
         case .era5_land:
