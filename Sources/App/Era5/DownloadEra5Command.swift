@@ -7,13 +7,6 @@ import SwiftPFor2D
 enum CdsDomain: String, GenericDomain {
     case era5
     case era5_land
-    
-    /// T=Realtime version with 5 days delay. Not yet consolidated data
-    case era5t
-    
-    /// T=Realtime version with 5 days delay. Not yet consolidated data
-    case era5t_land
-    
     case cerra
     
     var dtSeconds: Int {
@@ -26,12 +19,8 @@ enum CdsDomain: String, GenericDomain {
     
     var elevationFile: OmFileReader<MmapFile>? {
         switch self {
-        case .era5t:
-            fallthrough
         case .era5:
             return Self.era5ElevationFile
-        case .era5t_land:
-            fallthrough
         case .era5_land:
             return Self.era5LandElevationFile
         case .cerra:
@@ -39,30 +28,10 @@ enum CdsDomain: String, GenericDomain {
         }
     }
     
-    /// The expected version to download. 1=consolidated, 5=realtime
-    var gribExprVersion: Int? {
-        switch self {
-        case .era5:
-            return 1
-        case .era5_land:
-            return 1
-        case.era5t:
-            return 5
-        case .era5t_land:
-            return 5
-        case .cerra:
-            return nil
-        }
-    }
-    
     var cdsDatasetName: String {
         switch self {
-        case .era5t:
-            fallthrough
         case .era5:
             return "reanalysis-era5-single-levels"
-        case .era5t_land:
-            fallthrough
         case .era5_land:
             return "reanalysis-era5-land"
         case .cerra:
@@ -102,12 +71,8 @@ enum CdsDomain: String, GenericDomain {
     
     var grid: Gridable {
         switch self {
-        case .era5t:
-            fallthrough
         case .era5:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .era5t_land:
-            fallthrough
         case .era5_land:
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
@@ -279,11 +244,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                 let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
                 try await curl.download(url: z, toFile: tempDownloadGribFile, bzip2Decode: false)
                 try await curl.download(url: lsm, toFile: tempDownloadGribFile2!, bzip2Decode: false)
-            case .era5t:
-                fallthrough
-            case .era5t_land:
-                // uses era5 land file
-                return
             case .cerra:
                 struct Query: Encodable {
                     let product_type = "analysis"
@@ -371,13 +331,9 @@ struct DownloadEra5Command: AsyncCommandFix {
     
     func downloadDailyFiles(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) throws -> TimerangeDt {
         switch domain {
-        case .era5t:
-            fallthrough
         case .era5:
             fallthrough
         case .era5_land:
-            fallthrough
-        case .era5t_land:
             return try downloadDailyEra5Files(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
         case .cerra:
             return try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable])
@@ -439,45 +395,6 @@ struct DownloadEra5Command: AsyncCommandFix {
             )
             do {
                 try Process.cdsApi(dataset: domain.cdsDatasetName, key: cdskey, query: query, destinationFile: tempDownloadGribFile)
-                
-                try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
-                    let shortName = message.get(attribute: "shortName")!
-                    guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
-                        fatalError("Could not find \(shortName) in grib")
-                    }
-                    
-                    if let version = domain.gribExprVersion {
-                        guard let expver = message.get(attribute: "experimentVersionNumber").flatMap(Int.init) else {
-                            fatalError("Grib does not contain expver field")
-                        }
-                        guard expver == version else {
-                            logger.warning("Expected version \(version), does not match downloaded version \(expver). Skipping")
-                            throw SpawnError.commandFailed(cmd: "", returnCode: 70, args: nil)
-                        }
-                    }
-                    
-                    let hour = Int(message.get(attribute: "validityTime")!)!/100
-                    let date = message.get(attribute: "validityDate")!
-                    logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
-                    
-                    try grib2d.load(message: message)
-                    if let scaling = variable.netCdfScaling {
-                        grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
-                    }
-                    grib2d.array.shift180LongitudeAndFlipLatitude()
-                    
-                    //let fastTime = Array2DFastSpace(data: grib2d.array.data, nLocations: domain.grid.count, nTime: nt).transpose()
-                    /*guard !fastTime[0, 0..<nt].contains(.nan) else {
-                        // For realtime updates, the latest day could only contain partial data. Skip it.
-                        logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) contains missing data. Skipping.")
-                        break timeLoop
-                    }*/
-                    
-                    try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
-                    let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
-                    try FileManager.default.removeItemIfExists(at: omFile)
-                    try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                }
             } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
                 if code == 70 {
                     logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
@@ -486,6 +403,35 @@ struct DownloadEra5Command: AsyncCommandFix {
                 } else {
                     throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args)
                 }
+            }
+            
+            try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
+                let shortName = message.get(attribute: "shortName")!
+                guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
+                    fatalError("Could not find \(shortName) in grib")
+                }
+                
+                let hour = Int(message.get(attribute: "validityTime")!)!/100
+                let date = message.get(attribute: "validityDate")!
+                logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                
+                try grib2d.load(message: message)
+                if let scaling = variable.netCdfScaling {
+                    grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                }
+                grib2d.array.shift180LongitudeAndFlipLatitude()
+                
+                //let fastTime = Array2DFastSpace(data: grib2d.array.data, nLocations: domain.grid.count, nTime: nt).transpose()
+                /*guard !fastTime[0, 0..<nt].contains(.nan) else {
+                    // For realtime updates, the latest day could only contain partial data. Skip it.
+                    logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) contains missing data. Skipping.")
+                    break timeLoop
+                }*/
+                
+                try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
+                let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
+                try FileManager.default.removeItemIfExists(at: omFile)
+                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
             
             // Update downloaded range if download successfull

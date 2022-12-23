@@ -45,7 +45,7 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     
     func availableForDomain(domain: CdsDomain) -> Bool {
         // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
-        if domain == .era5_land || domain == .era5t_land {
+        if domain == .era5_land {
             switch self {
             case .temperature_2m:
                 fallthrough
