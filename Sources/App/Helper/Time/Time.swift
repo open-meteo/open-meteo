@@ -1,9 +1,25 @@
 import Foundation
+import Vapor
 
 
 public enum TimeError: Error {
     case InvalidDateFromat
     case InvalidDate
+}
+
+extension TimeError: AbortError {
+    public var status: NIOHTTP1.HTTPResponseStatus {
+        return .badRequest
+    }
+    
+    public var reason: String {
+        switch self {
+        case .InvalidDateFromat:
+            return "Invalid date format. Make sure to use 'YYYY-MM-DD'"
+        case .InvalidDate:
+            return "Invalid date"
+        }
+    }
 }
 
 
