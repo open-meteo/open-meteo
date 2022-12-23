@@ -227,8 +227,10 @@ struct SyncCommand: AsyncCommandFix {
             }
             
             logger.info("Downloading \(toDownload.count) files (\(toDownload.fileSize))")
+            let progress = TransferAmountTracker(logger: logger, totalSize: toDownload.reduce(0, {$0 + $1.size}))
             for download in toDownload {
                 curl.setDeadlineIn(minutes: 30)
+                let startBytes = curl.totalBytesTransfered
                 var client = ClientRequest(url: URI("\(server)sync/download"))
                 try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey))
                 let localFile = "\(OpenMeteo.dataDictionary)/\(download.file)"
@@ -239,6 +241,7 @@ struct SyncCommand: AsyncCommandFix {
                 
                 try await curl.download(url: client.url.string, toFile: localFileTemp, bzip2Decode: false)
                 try FileManager.default.moveFileOverwrite(from: localFileTemp, to: localFile)
+                progress.add(curl.totalBytesTransfered - startBytes)
             }
             
             newerThan = toDownload.max(by: { $0.time > $1.time })?.time ?? newerThan
