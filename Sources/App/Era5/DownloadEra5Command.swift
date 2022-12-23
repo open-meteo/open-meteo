@@ -82,8 +82,8 @@ enum CdsDomain: String, GenericDomain {
 }
 
 struct DownloadEra5Command: AsyncCommandFix {
-    /// 5k locations require around 167 MB memory for a yearly time-series
-    static var nLocationsPerChunk = 5_000
+    /// 6k locations require around 200 MB memory for a yearly time-series
+    static var nLocationsPerChunk = 6_000
     
     struct Signature: CommandSignature {
         @Argument(name: "domain")
