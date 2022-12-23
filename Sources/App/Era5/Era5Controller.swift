@@ -95,7 +95,7 @@ struct Era5Controller {
             let out = ForecastapiResult(
                 latitude: readers[0].modelLat,
                 longitude: readers[0].modelLon,
-                elevation: readers[0].modelElevation,
+                elevation: readers[0].targetElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,
