@@ -113,14 +113,14 @@ struct DownloadEra5Command: AsyncCommandFix {
                     fatalError("format looks wrong")
                 }
                 let start = Timestamp(Int(timeinterval[0..<4])!, Int(timeinterval[4..<6])!, Int(timeinterval[6..<8])!)
-                let end = Timestamp(Int(timeinterval[9..<13])!, Int(timeinterval[13..<15])!, Int(timeinterval[15..<17])!).add(86400)
+                let end = Timestamp(Int(timeinterval[9..<13])!, Int(timeinterval[13..<15])!, Int(timeinterval[15..<17])!).add(days: 1)
                 return TimerangeDt(start: start, to: end, dtSeconds: dt)
             }
             // Era5 has a typical delay of 5 days
             // Per default, check last 14 days for new data. If data is already downloaded, downloading is skipped
             let lastDays = 14
-            let time0z = Timestamp.now().add(5 * -86400).with(hour: 0)
-            return TimerangeDt(start: time0z.add(lastDays * -86400), to: time0z, dtSeconds: dt)
+            let time0z = Timestamp.now().add(days: -5).with(hour: 0)
+            return TimerangeDt(start: time0z.add(days: -1 * lastDays), to: time0z.add(days: 1), dtSeconds: dt)
         }
     }
 

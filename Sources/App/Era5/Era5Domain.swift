@@ -126,7 +126,7 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     /// shortName attribute in GRIB
     var gribShortName: [String] {
         switch self {
-        case .windgusts_10m: return ["10fg", "gust"] // or "gust" on ubuntu 22.04
+        case .windgusts_10m: return ["10fg", "gust", "i10fg"] // or "gust" on ubuntu 22.04
         case .temperature_2m: return ["2t"]
         case .cloudcover_low: return ["lcc"]
         case .cloudcover_mid: return ["mcc"]

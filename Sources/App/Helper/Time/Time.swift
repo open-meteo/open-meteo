@@ -62,6 +62,14 @@ public struct Timestamp: Hashable {
         Timestamp(timeIntervalSince1970 + secounds)
     }
     
+    public func add(days: Int) -> Timestamp {
+        Timestamp(timeIntervalSince1970 + days * 86400)
+    }
+    
+    public func add(hours: Int) -> Timestamp {
+        Timestamp(timeIntervalSince1970 + hours * 3600)
+    }
+    
     public func floor(toNearest: Int) -> Timestamp {
         Timestamp(timeIntervalSince1970 - timeIntervalSince1970 % toNearest)
     }
