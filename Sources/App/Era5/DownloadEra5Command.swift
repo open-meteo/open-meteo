@@ -639,7 +639,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         
         // convert to yearly file
         for variable in variables {
-            let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Converting variable \(variable)")
+            let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Convert \(variable) year \(year)")
             let writeFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
             if FileManager.default.fileExists(atPath: writeFile) {
                 continue
