@@ -135,7 +135,7 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
         case .snowfall_water_equivalent: return ["sf"]
         case .shortwave_radiation: return ["ssrd"]
         case .precipitation: return ["tp"]
-        case .direct_radiation: return ["tidirswrf"]
+        case .direct_radiation: return ["tidirswrf", "fdir"]
         case .wind_u_component_100m: return ["100u"]
         case .wind_v_component_100m: return ["100v"]
         case .wind_u_component_10m: return ["10u"]
