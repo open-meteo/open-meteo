@@ -192,6 +192,9 @@ struct SyncCommand: AsyncCommandFix {
         let logger = context.application.logger
         
         let server = signature.server ?? "http://api.open-meteo.com/"
+        guard server.last == "/" else {
+            fatalError("Server URL must end with a '/'.")
+        }
         let maxAgeDays = signature.maxAgeDays ?? 7
         var newerThan = Timestamp.now().add(-24 * 3600 * maxAgeDays).timeIntervalSince1970
         
