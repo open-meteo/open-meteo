@@ -2,12 +2,12 @@ import Foundation
 import FluentMySQLDriver
 import Fluent
 import Vapor
-import NIOConcurrencyHelpers
 import NIO
+
 
 final class ApiKey: Model {
     @ID(key: .id)
-    var id: Int?
+    var id: UUID?
     
     @Field(key: "apikey")
     var apikey: String
@@ -47,16 +47,28 @@ final class ApiKey: Model {
     init() { }
 }
 
+/// Keeps all API keys in memory. Thread safe.
+final actor ApikeyContainer {
+    var apikeys = [UUID: ApiKey]()
+    
+    var last_updated = Date(timeIntervalSince1970: 0)
+    
+    func update(updated: [ApiKey]) {
+        for apikey in updated {
+            apikeys[apikey.id!] = apikey
+            last_updated = max(last_updated, apikey.last_modified)
+        }
+    }
+}
+
 /// Request counting and API key protection
 final class ApiMiddleware: LifecycleHandler {
-    private var apikeys = [String: ApiKey]()
+    private var apikeys = ApikeyContainer()
     
     private var backgroundWatcher: RepeatedTask?
     
     static var instance = ApiMiddleware()
-    
-    private let lock = NIOLock()
-    
+        
     private init() {}
     
     func didBoot(_ application: Application) throws {
@@ -68,17 +80,12 @@ final class ApiMiddleware: LifecycleHandler {
         }
         
         logger.debug("Starting API key manager")
-        backgroundWatcher = eventloop.scheduleRepeatedAsyncTask(initialDelay: .seconds(2), delay: .seconds(2), {
+        backgroundWatcher = eventloop.scheduleRepeatedAsyncTask(initialDelay: .seconds(0), delay: .seconds(2), {
             task in
-            
             let promise = eventloop.makePromise(of: Void.self)
             promise.completeWithTask {
-                var last_update = Date(timeIntervalSince1970: 0)
-                let updated = await try ApiKey.query(on: database).filter(\.$last_modified > last_update).all()
-                
-                let copy = self.lock.withLock {
-                    fatalError()
-                }
+                let updated = try await ApiKey.query(on: database).filter(\.$last_modified > self.apikeys.last_updated).all()
+                await self.apikeys.update(updated: updated)
             }
             return promise.futureResult
         })
