@@ -51,20 +51,21 @@ extension ApiKey: AsyncMigration {
     func prepare(on database: Database) async throws {
         try await database.schema(Self.schema)
             .field(.id, .uuid, .identifier(auto: false))
-            .field(self.$apikey.key, .string, .required)
-            .field(self.$apikey2.key, .string, .required)
-            .field(self.$valid_until.key, .datetime, .required)
-            .field(self.$last_modified.key, .datetime, .required)
-            .field(self.$active.key, .bool, .required)
-            .field(self.$has_histroy_access.key, .bool, .required)
-            .field(self.$has_raw_data_access.key, .bool, .required)
-            .field(self.$limit_daily.key, .int64, .required)
-            .field(self.$limit_minutely.key, .int64, .required)
-            .field(self.$limit_monthly.key, .int64, .required)
-            .field(self.$subscription_id.key, .string, .required)
+            .field($apikey.key, .string, .required)
+            .field($apikey2.key, .string, .required)
+            .field($valid_until.key, .datetime, .required)
+            .field($last_modified.key, .datetime, .required)
+            .field($active.key, .bool, .required)
+            .field($has_histroy_access.key, .bool, .required)
+            .field($has_raw_data_access.key, .bool, .required)
+            .field($limit_daily.key, .int64, .required)
+            .field($limit_minutely.key, .int64, .required)
+            .field($limit_monthly.key, .int64, .required)
+            .field($subscription_id.key, .string, .required)
             .ignoreExisting()
             .create()
     }
+    
     func revert(on database: Database) async throws {
         try await database.schema(Self.schema).delete()
     }
