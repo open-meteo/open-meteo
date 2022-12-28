@@ -100,6 +100,8 @@ public func configure(_ app: Application) throws {
             database: Environment.get("DATABASE_DATABASE"),
             tlsConfiguration: tls
         ), as: .mysql)
+        
+        app.migrations.add(ApiKey(), to: .mysql)
     }
 
     

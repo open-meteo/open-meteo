@@ -24,8 +24,8 @@ final class ApiKey: Model {
     @Field(key: "active")
     var active: Bool
     
-    @Field(key: "has_histrocal_access")
-    var has_histrocal_access: Bool
+    @Field(key: "has_histroy_access")
+    var has_histroy_access: Bool
     
     @Field(key: "has_raw_data_access")
     var has_raw_data_access: Bool
@@ -46,6 +46,30 @@ final class ApiKey: Model {
     
     init() { }
 }
+
+extension ApiKey: AsyncMigration {
+    func prepare(on database: Database) async throws {
+        try await database.schema(Self.schema)
+            .field(.id, .uuid, .identifier(auto: false))
+            .field(self.$apikey.key, .string, .required)
+            .field(self.$apikey2.key, .string, .required)
+            .field(self.$valid_until.key, .datetime, .required)
+            .field(self.$last_modified.key, .datetime, .required)
+            .field(self.$active.key, .bool, .required)
+            .field(self.$has_histroy_access.key, .bool, .required)
+            .field(self.$has_raw_data_access.key, .bool, .required)
+            .field(self.$limit_daily.key, .int64, .required)
+            .field(self.$limit_minutely.key, .int64, .required)
+            .field(self.$limit_monthly.key, .int64, .required)
+            .field(self.$subscription_id.key, .string, .required)
+            .ignoreExisting()
+            .create()
+    }
+    func revert(on database: Database) async throws {
+        try await database.schema(Self.schema).delete()
+    }
+}
+    
 
 /// Keeps all API keys in memory. Thread safe.
 final actor ApikeyContainer {
@@ -84,8 +108,12 @@ final class ApiMiddleware: LifecycleHandler {
             task in
             let promise = eventloop.makePromise(of: Void.self)
             promise.completeWithTask {
-                let updated = try await ApiKey.query(on: database).filter(\.$last_modified > self.apikeys.last_updated).all()
-                await self.apikeys.update(updated: updated)
+                do {
+                    let updated = try await ApiKey.query(on: database).filter(\.$last_modified > self.apikeys.last_updated).all()
+                    await self.apikeys.update(updated: updated)
+                } catch {
+                    logger.error("API key manager error: \(error)")
+                }
             }
             return promise.futureResult
         })
