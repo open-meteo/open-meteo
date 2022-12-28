@@ -23,6 +23,8 @@ let package = Package(
     .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.1"),
     .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "0.1.5"),
     .package(url: "https://github.com/orlandos-nl/IkigaJSON.git", from: "2.0.0"),
+    .package(url: "https://github.com/vapor/fluent.git", from: "4.6.0"),
+    .package(url: "https://github.com/vapor/fluent-mysql-driver.git", from: "4.2.0"),
     //.package(name: "SwiftPFor2D", path: "/Users/om/Documents/SwiftPFor2D"),
     // NOTE: taged releases do not work, because of unsafe flags....
     //.package(url: "git@gitlab.com:open-meteo/SwiftPFor2D.git", .branch("main"))
@@ -36,6 +38,8 @@ let package = Package(
         .product(name: "SwiftNetCDF", package: "SwiftNetCDF"),
         .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),
         .product(name: "SwiftEccodes", package: "SwiftEccodes"),
+        .product(name: "Fluent", package: "fluent"),
+        .product(name: "FluentMySQLDriver", package: "fluent-mysql-driver"),
         "CHelper",
         "SwiftPFor2D",
         "IkigaJSON",

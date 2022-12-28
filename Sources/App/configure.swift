@@ -85,7 +85,26 @@ public func configure(_ app: Application) throws {
 
     app.views.use(.leaf)
     
+    // setup mysql database if specified
+    if let hostname = Environment.get("DATABASE_HOSTNAME"),
+          let username = Environment.get("DATABASE_USER"),
+          let password = Environment.get("DATABASE_PASSWORD")
+    {
+        var tls = TLSConfiguration.makeClientConfiguration()
+        tls.certificateVerification = .none
+        app.databases.use(.mysql(
+            hostname: hostname,
+            port: Environment.get("DATABASE_PORT").flatMap(Int.init) ?? 3306,
+            username: username,
+            password: password,
+            database: Environment.get("DATABASE_DATABASE"),
+            tlsConfiguration: tls
+        ), as: .mysql)
+    }
+
+    
     app.lifecycle.use(OmFileManager.instance)
+    app.lifecycle.use(ApiMiddleware.instance)
 
     // register routes
     try routes(app)
