@@ -137,7 +137,7 @@ final class ApiMiddleware: LifecycleHandler {
         }
         
         logger.debug("Starting API key manager")
-        backgroundWatcher = eventloop.scheduleRepeatedAsyncTask(initialDelay: .seconds(0), delay: .seconds(2), {
+        backgroundWatcher = eventloop.scheduleRepeatedAsyncTask(initialDelay: .seconds(0), delay: .seconds(20), {
             task in
             let promise = eventloop.makePromise(of: Void.self)
             promise.completeWithTask {

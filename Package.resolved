@@ -127,6 +127,24 @@
       }
     },
     {
+      "identity" : "stripe",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/vapor-community/stripe.git",
+      "state" : {
+        "revision" : "5613cd2c9e7a65bcfaa58ed069c66f621bb6617e",
+        "version" : "14.0.0"
+      }
+    },
+    {
+      "identity" : "stripe-kit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/vapor-community/stripe-kit.git",
+      "state" : {
+        "revision" : "9454cd52739e6a1d92ac17015bf68cd418894247",
+        "version" : "16.2.2"
+      }
+    },
+    {
       "identity" : "swift-algorithms",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-algorithms.git",
