@@ -5,6 +5,35 @@ import Vapor
 import NIO
 
 
+enum ApiMiddlewareError: AbortError {
+    case invalidApiKey
+    case apikeyRequired
+    case apikeyCannotBeUsedOnPublicApi
+    
+    var status: NIOHTTP1.HTTPResponseStatus {
+        switch self {
+        case .invalidApiKey:
+            return .unauthorized
+        case .apikeyRequired:
+            return .unauthorized
+        case .apikeyCannotBeUsedOnPublicApi:
+            return .forbidden
+        }
+    }
+    
+    var reason: String {
+        switch self {
+        case .invalidApiKey:
+            return "Invalid API key"
+        case .apikeyRequired:
+            return "API key required"
+        case .apikeyCannotBeUsedOnPublicApi:
+            return "API key cannot be used on free API"
+        }
+    }
+}
+
+
 final class ApiKey: Model {
     @ID(key: .id)
     var id: UUID?
@@ -78,6 +107,11 @@ final actor ApikeyContainer {
     
     var last_updated = Date(timeIntervalSince1970: 0)
     
+    /// True if API keys have been loaded
+    var ready: Bool {
+        apikeys.count > 0
+    }
+    
     func update(updated: [ApiKey]) {
         for apikey in updated {
             apikeys[apikey.id!] = apikey
@@ -88,13 +122,11 @@ final actor ApikeyContainer {
 
 /// Request counting and API key protection
 final class ApiMiddleware: LifecycleHandler {
-    private var apikeys = ApikeyContainer()
+    fileprivate var apikeys = ApikeyContainer()
     
     private var backgroundWatcher: RepeatedTask?
     
     static var instance = ApiMiddleware()
-        
-    private init() {}
     
     func didBoot(_ application: Application) throws {
         let logger = application.logger
@@ -120,7 +152,37 @@ final class ApiMiddleware: LifecycleHandler {
         })
     }
     
+    public func authorise(apikey: UUID?, calls: Float) throws {
+        // TODO: check available call per minute/day/month
+    }
+    
+    public func settle(apikey: UUID?, calls: Float) {
+        // TODO: account used calls
+    }
+    
     func shutdown(_ application: Application) {
         backgroundWatcher?.cancel()
+    }
+}
+
+extension Request {
+    /// Find the API key or throw an error
+    func checkApiKey() async throws {
+        let isCustomerApi = headers[.host].contains(where: { $0.contains("open-meteo.com") && $0.starts(with: "customer-") })
+        
+        guard let apikey: String = try query.get(at: "apikey") else {
+            if await ApiMiddleware.instance.apikeys.ready && isCustomerApi {
+                throw ApiMiddlewareError.apikeyRequired
+            }
+            // TODO: IP rate limiting
+            return
+        }
+        // API key used in public API
+        if isCustomerApi == false {
+            throw ApiMiddlewareError.apikeyCannotBeUsedOnPublicApi
+        }
+        guard await ApiMiddleware.instance.apikeys.apikeys.contains(where: { $0.value.apikey == apikey || $0.value.apikey2 == apikey }) else {
+            throw ApiMiddlewareError.invalidApiKey
+        }
     }
 }
