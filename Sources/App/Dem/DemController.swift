@@ -32,10 +32,11 @@ struct DemController {
         }
     }
 
-    func query(_ req: Request) throws -> Result {
+    func query(_ req: Request) async throws -> Result {
         if req.headers[.host].contains(where: { $0 == "open-meteo.com"}) {
             throw Abort.init(.notFound)
         }
+        try await req.checkApiKey()
         let params = try req.query.decode(Query.self)
         try params.validate()
         let elevation = try zip(params.latitude, params.longitude).map { (latitude, longitude) in
