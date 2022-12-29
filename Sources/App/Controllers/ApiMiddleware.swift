@@ -184,5 +184,6 @@ extension Request {
         guard await ApiMiddleware.instance.apikeys.apikeys.contains(where: { $0.value.apikey == apikey || $0.value.apikey2 == apikey }) else {
             throw ApiMiddlewareError.invalidApiKey
         }
+        // TODO: check active flag and expiration date
     }
 }
