@@ -16,6 +16,7 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.get("ecmwf", use: EcmwfController().query)
         categoriesRoute.get("marine", use: IconWaveController().query)
         categoriesRoute.get("era5", use: Era5Controller().query)
+        categoriesRoute.get("archive", use: Era5Controller().query)
         categoriesRoute.get("elevation", use: DemController().query)
         categoriesRoute.get("air-quality", use: CamsController().query)
         categoriesRoute.get("seasonal", use: SeasonalForecastController().query)

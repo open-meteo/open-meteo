@@ -23,7 +23,7 @@ struct Era5Controller {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            let domains = params.models ?? [.era5]
+            let domains = params.models ?? [.best_match]
             
             let readers = try domains.compactMap {
                 try GenericReaderMulti<CdsVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised)
@@ -124,13 +124,7 @@ enum CdsDomainApi: String, Codable, CaseIterable, MultiDomainMixerDomain {
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixable] {
         switch self {
         case .best_match:
-            guard let era5: any GenericReaderMixable = try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                throw ModelError.domainInitFailed(domain: CdsDomain.era5.rawValue)
-            }
-            if let cerra: any GenericReaderMixable = try Era5Reader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [era5, cerra]
-            }
-            return [era5]
+            return try Era5Mixer(domains: [.era5, .era5_land], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .era5:
             return try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .era5_land:

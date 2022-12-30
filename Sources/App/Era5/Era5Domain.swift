@@ -210,6 +210,10 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
     }
 }
 
+struct Era5Mixer: GenericReaderMixer {
+    let reader: [Era5Reader]
+}
+
 struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     var reader: GenericReaderCached<CdsDomain, Era5Variable>
     

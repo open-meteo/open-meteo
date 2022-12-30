@@ -21,8 +21,8 @@
   </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Historical Weather API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">60 years global archive with hourly values
-      at 0.25° resolution</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">60 years of accurate weather,
+      anywhere with up to 5 km resolution</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -45,12 +45,12 @@
 <!-- http://127.0.0.1:8080/v1/era5 -->
 <div class="container px-4 py-0" id="featured-3">
 
-  <div class="alert alert-primary" role="alert">
+  <!--<div class="alert alert-primary" role="alert">
     The free Open-Meteo Historical Weather API has just been released! Read the <a
       href="https://openmeteo.substack.com/p/60-years-of-historical-weather-as" target="_blank">blog article</a>.
-  </div>
+  </div>-->
 
-  <form id="api_form" method="get" action="https://archive-api.open-meteo.com/v1/era5">
+  <form id="api_form" method="get" action="https://archive-api.open-meteo.com/v1/archive">
     <div class="row py-3 px-0">
       <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
@@ -68,7 +68,8 @@
       <div class="col-md-6">
         <div class="input-group mb-3">
           <div class="form-floating dropdown">
-            <input type="text" class="form-control" id="select_city" autocomplete="off" spellcheck="false" aria-label="Select city" data-bs-toggle="dropdown"/>
+            <input type="text" class="form-control" id="select_city" autocomplete="off" spellcheck="false"
+              aria-label="Select city" data-bs-toggle="dropdown" />
             <ul id="select_city_results" class="dropdown-menu" aria-labelledby="select_city">
               <li><span class="dropdown-item">Start typing to search for locations</span></li>
             </ul>
@@ -84,7 +85,8 @@
       <div class="col-md-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="#(date_start)" data-date-end-date="#(date_end)" data-date-today-highlight="1" value="#(date_start_default)" name="start_date" id="start_date"><span class="input-group-addon"><i
+            data-date-start-date="#(date_start)" data-date-end-date="#(date_end)" data-date-today-highlight="1"
+            value="#(date_start_default)" name="start_date" id="start_date"><span class="input-group-addon"><i
               class="glyphicon glyphicon-th"></i></span>
           <label for="start_date">Start date</label>
         </div>
@@ -92,7 +94,8 @@
       <div class="col-md-3">
         <div class="form-floating">
           <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="#(date_start)" data-date-end-date="#(date_end)" data-date-today-highlight="1" value="#(date_end_default)" name="end_date" id="end_date"><span class="input-group-addon"><i
+            data-date-start-date="#(date_start)" data-date-end-date="#(date_end)" data-date-today-highlight="1"
+            value="#(date_end_default)" name="end_date" id="end_date"><span class="input-group-addon"><i
               class="glyphicon glyphicon-th"></i></span>
           <label for="end_date">End date</label>
         </div>
@@ -338,45 +341,42 @@
             <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
               data-bs-target="#collapse-models" aria-expanded="false" aria-controls="collapse-models">
               Reanalysis models&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
-                data-count-checkboxes-of="#collapse-models">0/x</span>&nbsp;<span
-                class="badge bg-primary">New</span>
+                data-count-checkboxes-of="#collapse-models">0/x</span>&nbsp;<span class="badge bg-primary">New</span>
             </button>
           </h2>
-          <div id="collapse-models" class="accordion-collapse collapse"
-            aria-labelledby="heading-models" data-bs-parent="#accordionVariables">
+          <div id="collapse-models" class="accordion-collapse collapse" aria-labelledby="heading-models"
+            data-bs-parent="#accordionVariables">
             <div class="accordion-body row">
               <div class="col-md-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="best_match" id="best_match"
-                    name="models">
+                  <input class="form-check-input" type="checkbox" value="best_match" id="best_match" name="models">
                   <label class="form-check-label" for="best_match">
                     Best match
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="era5"
-                    id="era5" name="models">
+                  <input class="form-check-input" type="checkbox" value="era5" id="era5" name="models">
                   <label class="form-check-label" for="era5">
-                    ERA5 <span class="text-muted">(25 km, global)</span>
+                    ERA5 <span class="text-muted">(25 km, Global)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="era5_land"
-                    id="era5_land" name="models">
+                  <input class="form-check-input" type="checkbox" value="era5_land" id="era5_land" name="models">
                   <label class="form-check-label" for="era5_land">
-                    ERA5 Land <span class="text-muted">(10 km, global)</span>
+                    ERA5-Land <span class="text-muted">(10 km, Global)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="cerra"
-                    id="cerra" name="models">
+                  <input class="form-check-input" type="checkbox" value="cerra" id="cerra" name="models">
                   <label class="form-check-label" for="cerra">
-                    CERRA Europe <span class="text-muted">(5 km, Europe)</span>
+                    CERRA <span class="text-muted">(5 km, Europe)</span>
                   </label>
                 </div>
               </div>
               <div class="col-md-12">
-                <small class="text-muted">Note: The default <mark>Best Match</mark> provides the best data for any given location worldwide. For CERRA, soil moisture and temperature are not (yet) available.</small>
+                <small class="text-muted">Note: The default <mark>Best Match</mark> combines ERA5 and ERA5-Land
+                  seamlessly. The CERRA model will also be included in <mark>Best Match</mark> once real-time updates
+                  become available.</small>
               </div>
             </div>
           </div>
@@ -592,14 +592,86 @@
     <div id="emailHelp" class="form-text">You can copy this API URL into your application</div>
   </div>
 
+
+  <h2 id="data-sources" class="mt-5">Data Sources</h2>
+  <div class="row">
+    <div class="col-6">
+      <p>The Historical Weather API is based on reanalysis datasets and uses a combination of weather station,
+        aircraft, buoy, radar, and satellite observations to create a comprehensive record of past weather conditions.
+        These datasets are able to fill in gaps by using mathematical models to estimate the values of various weather
+        variables. As a result, reanalysis datasets are able to provide detailed historical weather information for
+        locations that may not have had weather stations nearby, such as rural areas or the open ocean.</p>
+    </div>
+    <div class="col-6">
+      <p>The spatial resolution of a weather reanalysis dataset refers to the size of the grid cells used to represent
+        the data. In the case of the reanalysis dataset described, the cells covering land have a resolution of 11 km,
+        while those covering the ocean have a resolution of 25 km. For the region of Europe, the resolution is
+        increased to 5 km, although this higher resolution is only available up until June 2021, with real-time
+        updates expected to be available sometime in 2023. In general, a higher spatial resolution means that the data
+        is more detailed and represents the weather conditions more accurately at smaller scales.</p>
+    </div>
+  </div>
+  <div class="table-responsive">
+    <table class="table">
+      <thead>
+        <tr>
+          <th scope="col">Reanalysis Model</th>
+          <th scope="col">Region</th>
+          <th scope="col">Spatial Resolution</th>
+          <th scope="col">Temporal Resolution</th>
+          <th scope="col">Data Availability</th>
+          <th scope="col">Update frequency</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row"><a
+              href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels?tab=overview">ERA5</a>
+          </th>
+          <td>Global</td>
+          <td>0.25° (~25 km)</td>
+          <td>Hourly</td>
+          <td>1959 to present</td>
+          <td>Daily with 5 days delay</td>
+        </tr>
+        <tr>
+          <th scope="row"><a
+              href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-land?tab=overview">ERA5-Land</a>
+          </th>
+          <td>Global</td>
+          <td>0.1° (~11 km)</td>
+          <td>Hourly</td>
+          <td>2000 to present</td>
+          <td>Daily with 5 days delay</td>
+        </tr>
+        <tr>
+          <th scope="row"><a
+              href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-cerra-single-levels?tab=overview">CERRA</a>
+          </th>
+          <td>Europe</td>
+          <td>5 km</td>
+          <td>Hourly</td>
+          <td>2000 to June 2021</td>
+          <td>-</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Different reanalysis models may include different sets of weather variables in their datasets. For example, the
+    ERA5 model includes all weather variables, while the ERA5-Land model only includes surface variables such as
+    temperature, humidity, soil temperature, and soil moisture. The CERRA model includes most weather variables, but
+    does not include soil temperature and moisture. It is important to be aware of the specific variables that are
+    included in a particular reanalysis model in order to understand the limitations and potential biases of the data.
+  </p>
+
   <div class="col-12 py-5">
     <h2 id="api-documentation">API Documentation</h2>
-    <p>The API endpoint <mark>/v1/era5</mark> accepts a geographical coordinate, a time interval, a list of weather
-      variables and returns
-      historical weather data. Data is based on <a
-        href="https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-era5-single-levels" target="_blank">ECMWF
-        ERA5</a> with hourly values and 0.25° global resolution. Data is updated daily with a delay of 5-7 days.</p>
-    <p>To keep data storage low, data for sea, far north areas and the poles are unavailable in the public API.</p>
+    <p>The API endpoint <mark>/v1/archive</mark> allows users to retrieve historical weather data for a specific
+      location and time
+      period. To use this endpoint, you can specify a geographical coordinate, a time interval, and a list of weather
+      variables that they are interested in. The endpoint will then return the requested data in a format that can be
+      easily accessed and used by applications or other software. This endpoint can be very useful for researchers and
+      other users who need to access detailed historical weather data for specific locations and time periods.</p>
     <p>All URL parameters are listed below:</p>
     <div class="table-responsive">
       <table class="table">
@@ -832,16 +904,18 @@
             <td>Preceding hour sum</td>
             <td>mm (inch)</td>
             <td>ET₀ Reference Evapotranspiration of a well watered grass field. Based on <a
-                href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations</a> ET₀
-                  is calculated from temperature, wind speed, humidity and solar radiation. Unlimited soil water is
-                  assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
+                href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations</a>
+              ET₀
+              is calculated from temperature, wind speed, humidity and solar radiation. Unlimited soil water is
+              assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
           </tr>
           <tr>
             <th scope="row">weathercode</th>
             <td>Instant</td>
             <td>WMO code</td>
             <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for
-              details. Weather code is calculated from cloud cover analysis, precipitation and snowfall. As barely no information about atmospheric stability is available, estimation about thunderstorms is not possible.</td>
+              details. Weather code is calculated from cloud cover analysis, precipitation and snowfall. As barely no
+              information about atmospheric stability is available, estimation about thunderstorms is not possible.</td>
           </tr>
           <tr>
             <th scope="row">vapor_pressure_deficit</th>
@@ -1038,13 +1112,20 @@
   </div>
 
   <h2 id="citation">Citation & Acknowledgement</h2>
-  <p>Generated using Copernicus Climate Change Service information 2022.</p>
+  <p>ERA5: Generated using Copernicus Climate Change Service information 2022.</p>
   <pre>
-    Hersbach, H., Bell, B., Berrisford, P., Biavati, G., Horányi, A., Muñoz Sabater, J., Nicolas, J., 
-    Peubey, C., Radu, R., Rozum, I., Schepers, D., Simmons, A., Soci, C., Dee, D., Thépaut, J-N. (2018): 
-    ERA5 hourly data on single levels from 1959 to present. 
-    Copernicus Climate Change Service (C3S) Climate Data Store (CDS). (Updated daily), 10.24381/cds.adbb2d47
+ERA5: Hersbach, H., Bell, B., Berrisford, P., Biavati, G., Horányi, A., Muñoz Sabater, J., Nicolas, J., 
+Peubey, C., Radu, R., Rozum, I., Schepers, D., Simmons, A., Soci, C., Dee, D., Thépaut, J-N. (2018): 
+ERA5 hourly data on single levels from 1959 to present. 
+Copernicus Climate Change Service (C3S) Climate Data Store (CDS). (Updated daily), 10.24381/cds.adbb2d47
+
+ERA5-Land: Muñoz Sabater, J., (2019): ERA5-Land hourly data from 1981 to present. (Accessed on daily), 10.24381/cds.e2161bac
+
+CERRA: Schimanke S., Ridal M., Le Moigne P., Berggren L., Undén P., Randriamampianina R., Andrea U., Bazile E., 
+Bertelsen A., Brousseau P., Dahlgren P., Edvinsson L., El Said A., Glinton M., Hopsch S., Isaksson L., Mladek R., 
+Olsson E., Verrelle A., Wang Z.Q., (accessed on 2022-12-31), doi: '10.24381/cds.622a565a'
   </pre>
+
   <p>All users of Open-Meteo data must provide a clear attribution to the Copernicus program as well as a reference to
     Open-Meteo.</p>
 
