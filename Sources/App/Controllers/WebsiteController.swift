@@ -3,11 +3,11 @@ import Vapor
 
 struct WebsiteController: RouteCollection {
     func boot(routes: RoutesBuilder) throws {
-        routes.get() { req in
-            req.redirect(to: "/en")
+        routes.get("en") { req in
+            req.redirect(to: "/")
         }
         routes.get("robots.txt", use: robotsTxtHandler)
-        routes.get("en", use: indexHandler)
+        routes.get(use: indexHandler)
         routes.get("en", "docs", use: docsHandler)
         routes.get("en", "docs", "geocoding-api", use: docsGeocodingHandler)
         routes.get("en", "docs", "ecmwf-api", use: ecmwfApiHandler)
