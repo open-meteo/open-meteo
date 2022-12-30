@@ -334,7 +334,7 @@
     </div>
 
 
-    <div class="row py-3 px-0 debug-hidden">
+    <div class="row py-3 px-0">
       <div class="accordion" id="accordionVariables">
         <div class="accordion-item">
           <h2 class="accordion-header" id="heading-models">
