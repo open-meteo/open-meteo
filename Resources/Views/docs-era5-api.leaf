@@ -45,10 +45,10 @@
 <!-- http://127.0.0.1:8080/v1/era5 -->
 <div class="container px-4 py-0" id="featured-3">
 
-  <!--<div class="alert alert-primary" role="alert">
-    The free Open-Meteo Historical Weather API has just been released! Read the <a
-      href="https://openmeteo.substack.com/p/60-years-of-historical-weather-as" target="_blank">blog article</a>.
-  </div>-->
+  <div class="alert alert-primary" role="alert">
+    The Open-Meteo Historical Weather API is now using 5 and 11 km reanalysis models! Read the <a
+      href="https://openmeteo.substack.com/p/historical-weather-api-with-high" target="_blank">blog article</a>.
+  </div>
 
   <form id="api_form" method="get" action="https://archive-api.open-meteo.com/v1/archive">
     <div class="row py-3 px-0">
