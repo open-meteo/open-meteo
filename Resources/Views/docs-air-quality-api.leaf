@@ -153,7 +153,7 @@
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="carbon_monoxide" id="carbon_monoxide" name="hourly">
           <label class="form-check-label" for="carbon_monoxide">
-            Carbon Monoxide NO
+            Carbon Monoxide CO
           </label>
         </div>
         <div class="form-check">
