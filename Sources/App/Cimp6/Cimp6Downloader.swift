@@ -456,10 +456,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 case .monthly:
                     fatalError("monthly")
                 case .yearly:
-                    
                     let ncFile = "\(domain.downloadDirectory)\(variable.rawValue)_\(year).nc"
                     let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
-                    if FileManager.default.fileExists(atPath: omFile){
+                    if FileManager.default.fileExists(atPath: omFile) {
                         continue
                     }
                     if !FileManager.default.fileExists(atPath: ncFile) {
@@ -467,25 +466,10 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         try await curl.download(servers: servers, uri: uri, toFile: "\(ncFile)~")
                         try FileManager.default.moveFileOverwrite(from: "\(ncFile)~", to: ncFile)
                     }
-                    
-                    guard let ncFile = try NetCDF.open(path: ncFile, allowUpdate: false) else {
-                        fatalError("Could not open nc file for \(variable)")
-                    }
-                    guard let ncVar = ncFile.getVariable(name: short) else {
-                        fatalError("Could not open nc variable for \(short)")
-                    }
-                    guard let ncFloat = ncVar.asType(Float.self) else {
-                        fatalError("Not a float nc variable")
-                    }
-                    /// 3d spatial oriented file
-                    let dim = ncVar.dimensionsFlat
-                    /// transpose to fast time
-                    var array = Array2DFastSpace(data: try ncFloat.read(), nLocations: dim[1]*dim[2], nTime: dim[0]).transpose()
-                    if let fma = variable.multiplyAdd {
-                        array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-                    
-                    try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                    let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
+                    try FileManager.default.removeItemIfExists(at: "\(omFile)~")
+                    try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: "\(omFile)~", compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                    try FileManager.default.moveFileOverwrite(from: "\(omFile)~", to: omFile)
                 case .tenYearly:
                     fatalError("ten yearly")
                 }
@@ -497,9 +481,33 @@ struct DownloadCmipCommand: AsyncCommandFix {
     }
 }
 
+extension NetCDF {
+    fileprivate static func read(path: String, short: String, fma: (multiply: Float, add: Float)?) throws -> Array2DFastTime {
+        guard let ncFile = try NetCDF.open(path: path, allowUpdate: false) else {
+            fatalError("Could not open nc file for \(short)")
+        }
+        guard let ncVar = ncFile.getVariable(name: short) else {
+            fatalError("Could not open nc variable for \(short)")
+        }
+        guard let ncFloat = ncVar.asType(Float.self) else {
+            fatalError("Not a float nc variable")
+        }
+        /// 3d spatial oriented file
+        let dim = ncVar.dimensionsFlat
+        /// transpose to fast time
+        var spatial = Array2DFastSpace(data: try ncFloat.read(), nLocations: dim[1]*dim[2], nTime: dim[0])
+        spatial.data.shift180Longitude(nt: dim[0], ny: dim[1], nx: dim[2])
+        if let fma {
+            spatial.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+        }
+        //try spatial.writeNetcdf(filename: "\(path)4", nx: dim[2], ny: dim[1])
+        return spatial.transpose()
+    }
+}
+
 extension Curl {
     /// Retry download from multiple servers
-    fileprivate func download(servers: [String], uri: String toFile: String) async throws {
+    fileprivate func download(servers: [String], uri: String, toFile: String) async throws {
         for (i,server) in servers.enumerated() {
             do {
                 let url = "\(server)\(uri)"
