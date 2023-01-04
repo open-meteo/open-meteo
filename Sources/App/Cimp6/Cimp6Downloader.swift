@@ -434,7 +434,11 @@ struct DownloadCmipCommand: AsyncCommandFix {
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, readTimeout: 3600*3, retryError4xx: false)
         
         // Automatically try all servers. From fastest to slowest
-        let servers = ["https://esgf3.dkrz.de/thredds/fileServer/cmip6/", "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/", "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/", "http://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"]
+        let servers = ["https://esgf3.dkrz.de/thredds/fileServer/cmip6/",
+                       "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/",
+                       "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/",
+                       "https://esgf-data04.diasjp.net/thredds/fileServer/esg_dataroot/CMIP6/",
+                       "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"]
         
         for variable in Cmip6Variable.allCases {
             guard let timeType = variable.domainTimeRange(for: domain) else {
@@ -459,18 +463,8 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         continue
                     }
                     if !FileManager.default.fileExists(atPath: ncFile) {
-                        for server in servers {
-                            do {
-                                let url = "\(server)HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
-                                try await curl.download(url: url, toFile: "\(ncFile)~", bzip2Decode: false)
-                                break
-                            } catch CurlError.downloadFailed(let code) {
-                                if code == .notFound {
-                                    continue
-                                }
-                                throw CurlError.downloadFailed(code: code)
-                            }
-                        }
+                        let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
+                        try await curl.download(servers: servers, uri: uri, toFile: "\(ncFile)~")
                         try FileManager.default.moveFileOverwrite(from: "\(ncFile)~", to: ncFile)
                     }
                     
@@ -499,6 +493,24 @@ struct DownloadCmipCommand: AsyncCommandFix {
 
             }
             
+        }
+    }
+}
+
+extension Curl {
+    /// Retry download from multiple servers
+    fileprivate func download(servers: [String], uri: String toFile: String) async throws {
+        for (i,server) in servers.enumerated() {
+            do {
+                let url = "\(server)\(uri)"
+                try await download(url: url, toFile: toFile, bzip2Decode: false)
+                break
+            } catch CurlError.downloadFailed(let code) {
+                if code == .notFound && i != servers.count-1 {
+                    continue
+                }
+                throw CurlError.downloadFailed(code: code)
+            }
         }
     }
 }
