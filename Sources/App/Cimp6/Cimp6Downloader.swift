@@ -71,7 +71,10 @@ import SwiftNetCDF
  day: 2m temp, clc, wind, soil moist, precip, runoff, snow, hum, swrad, (T pressure levels = only 1000hpa.. massive holes!)
  mon: 2m temp, surface temp, clc, wind, hum, swrad,
  
-
+ 
+ Sizes:
+ MRI: Raw 2.15TB, Compressed 413 GB
+ HiRAM_SIT_HR_daily: Raw 1.3TB, Compressed 210 GB
  */
 
 enum Cmip6Domain: String, GenericDomain {
@@ -100,7 +103,7 @@ enum Cmip6Domain: String, GenericDomain {
         case .FGOALS_f3_H_daily:
             return "gr"
         case .HiRAM_SIT_HR_daily:
-            return "gr"
+            return "gn"
         case .MRI_AGCM3_2_S_daily:
             return "gn"
         }
@@ -113,7 +116,7 @@ enum Cmip6Domain: String, GenericDomain {
         case .FGOALS_f3_H_daily:
             return "CAS"
         case .HiRAM_SIT_HR_daily:
-            return ""
+            return "AS-RCEC"
         case .MRI_AGCM3_2_S_daily:
             return "MRI"
         }
@@ -124,10 +127,12 @@ enum Cmip6Domain: String, GenericDomain {
         case .CMCC_CM2_VHR4_daily:
             return "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/"
         case .FGOALS_f3_H_daily:
-            return "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/"
+            // only some files are on the US server
+            //return "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/"
+            return "http://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"
         case .HiRAM_SIT_HR_daily:
             // or http://esgf-data04.diasjp.net/thredds/fileServer/esg_dataroot/
-            return "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/"
+            return "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/"
         case .MRI_AGCM3_2_S_daily:
             return "https://esgf3.dkrz.de/thredds/fileServer/cmip6/"
         }
@@ -207,9 +212,9 @@ enum Cmip6Variable: String, CaseIterable {
             }
             return "20190725"
         case .FGOALS_f3_H_daily:
-            return "20200417"
+            return "20190817"
         case .HiRAM_SIT_HR_daily:
-            return "20210707"
+            return "20210713" // "20210707"
         case .MRI_AGCM3_2_S_daily:
             return "20190711"
         }
