@@ -1,5 +1,7 @@
 import Foundation
 import Vapor
+import SwiftPFor2D
+import SwiftNetCDF
 
 
 /**
@@ -72,14 +74,103 @@ import Vapor
 
  */
 
-enum Cmip6Domain: String {
+enum Cmip6Domain: String, GenericDomain {
     case CMCC_CM2_VHR4_daily
     case FGOALS_f3_H_daily
     case HiRAM_SIT_HR_daily
     case MRI_AGCM3_2_S_daily
+    
+    var soureName: String {
+        switch self {
+        case .CMCC_CM2_VHR4_daily:
+            return "CMCC-CM2-VHR4"
+        case .FGOALS_f3_H_daily:
+            return "FGOALS-f3-H"
+        case .HiRAM_SIT_HR_daily:
+            return "HiRAM-SIT-HR"
+        case .MRI_AGCM3_2_S_daily:
+            return "MRI-AGCM3-2-S"
+        }
+    }
+    
+    var gridName: String {
+        switch self {
+        case .CMCC_CM2_VHR4_daily:
+            return "gr"
+        case .FGOALS_f3_H_daily:
+            return "gr"
+        case .HiRAM_SIT_HR_daily:
+            return "gr"
+        case .MRI_AGCM3_2_S_daily:
+            return "gn"
+        }
+    }
+    
+    var institute: String {
+        switch self {
+        case .CMCC_CM2_VHR4_daily:
+            return "CMC"
+        case .FGOALS_f3_H_daily:
+            return "CAS"
+        case .HiRAM_SIT_HR_daily:
+            return ""
+        case .MRI_AGCM3_2_S_daily:
+            return "MRI"
+        }
+    }
+    
+    var server: String {
+        switch self {
+        case .CMCC_CM2_VHR4_daily:
+            return "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/"
+        case .FGOALS_f3_H_daily:
+            return "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/"
+        case .HiRAM_SIT_HR_daily:
+            // or http://esgf-data04.diasjp.net/thredds/fileServer/esg_dataroot/
+            return "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/"
+        case .MRI_AGCM3_2_S_daily:
+            return "https://esgf3.dkrz.de/thredds/fileServer/cmip6/"
+        }
+    }
+    
+    var omfileDirectory: String {
+        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    }
+    var downloadDirectory: String {
+        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+    }
+    var omfileArchive: String? {
+        return "\(OpenMeteo.dataDictionary)archive-\(rawValue)/"
+    }
+    
+    var dtSeconds: Int {
+        return 3600
+    }
+    
+    var elevationFile: OmFileReader<MmapFile>? {
+        return nil
+    }
+    
+    var omFileLength: Int {
+        // has no realtime updates
+        return 0
+    }
+    
+    var grid: Gridable {
+        switch self {
+        case .CMCC_CM2_VHR4_daily:
+            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
+        case .FGOALS_f3_H_daily:
+            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
+        case .HiRAM_SIT_HR_daily:
+            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
+        case .MRI_AGCM3_2_S_daily:
+            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
+        }
+    }
 }
 
-enum Cmip6Variable: String {
+enum Cmip6Variable: String, CaseIterable {
     case pressure_msl
     case temperature_2m_min
     case temperature_2m_max
@@ -87,20 +178,17 @@ enum Cmip6Variable: String {
     case cloudcover
     case precipitation
     case runoff
-    case snowfall
+    case snowfall_water_equivalent
     case relative_humidity_min
     case relative_humidity_max
     case relative_humidity
     case windspeed_10m
-    /// Total Soil Moisture Content
-    case soil_moisture_total
     
     case surface_temperature
     
-    /// Moisture in Upper Portion of Soil Column
-    case soil_moisture_upper
-    case shortwave
-    case shortwave_clearsky
+    /// Moisture in Upper Portion of Soil Column.
+    case soil_moisture_0_to_10cm
+    case shortwave_radiation
     
     case specific_humidity
     
@@ -109,6 +197,59 @@ enum Cmip6Variable: String {
         case monthly
         case yearly
         case tenYearly
+    }
+    
+    func version(for domain: Cmip6Domain) -> String {
+        switch domain {
+        case .CMCC_CM2_VHR4_daily:
+            if self == .precipitation {
+                return "20210308"
+            }
+            return "20190725"
+        case .FGOALS_f3_H_daily:
+            return "20200417"
+        case .HiRAM_SIT_HR_daily:
+            return "20210707"
+        case .MRI_AGCM3_2_S_daily:
+            return "20190711"
+        }
+    }
+    
+    var scalefactor: Float {
+        switch self {
+        case .pressure_msl:
+            return 10
+        case .temperature_2m_min:
+            return 20
+        case .temperature_2m_max:
+            return 20
+        case .temperature_2m:
+            return 20
+        case .cloudcover:
+            return 1
+        case .precipitation:
+            return 10
+        case .runoff:
+            return 10
+        case .snowfall_water_equivalent:
+            return 10
+        case .relative_humidity_min:
+            return 1
+        case .relative_humidity_max:
+            return 1
+        case .relative_humidity:
+            return 1
+        case .windspeed_10m:
+            return 10
+        case .surface_temperature:
+            return 20
+        case .soil_moisture_0_to_10cm:
+            return 1000
+        case .shortwave_radiation:
+            return 1
+        case .specific_humidity:
+            return 100
+        }
     }
     
     func domainTimeRange(for domain: Cmip6Domain) -> TimeType? {
@@ -129,7 +270,7 @@ enum Cmip6Variable: String {
                 return .yearly
             case .runoff:
                 return .yearly
-            case .snowfall:
+            case .snowfall_water_equivalent:
                 return .yearly
             case .relative_humidity_min:
                 return .yearly
@@ -137,15 +278,11 @@ enum Cmip6Variable: String {
                 return .yearly
             case .relative_humidity:
                 return .yearly
-            case .soil_moisture_total:
-                return .yearly
             case .surface_temperature:
                 return .yearly
-            case .soil_moisture_upper:
+            case .soil_moisture_0_to_10cm:
                 return .yearly
-            case .shortwave:
-                return .yearly
-            case .shortwave_clearsky:
+            case .shortwave_radiation:
                 return .yearly
             case .specific_humidity:
                 return nil
@@ -177,9 +314,9 @@ enum Cmip6Variable: String {
                 return .yearly
             case .pressure_msl:
                 return .yearly
-            case .snowfall:
+            case .snowfall_water_equivalent:
                 return .yearly
-            case .shortwave:
+            case .shortwave_radiation:
                 return .yearly
             case .windspeed_10m:
                 return .yearly
@@ -201,11 +338,11 @@ enum Cmip6Variable: String {
                 return .yearly
             case .precipitation:
                 return .yearly
-            case .snowfall:
+            case .snowfall_water_equivalent:
                 return .yearly
             case .relative_humidity:
                 return .yearly
-            case .shortwave:
+            case .shortwave_radiation:
                 return .yearly
             case .windspeed_10m:
                 return .yearly
@@ -236,17 +373,13 @@ enum Cmip6Variable: String {
             return "hursmin"
         case .relative_humidity:
             return "hurs"
-        case .shortwave_clearsky:
-            return "rsdscs"
         case .runoff:
             return "mrro"
-        case .snowfall:
+        case .snowfall_water_equivalent:
             return "prsn" //kg m-2 s-1
-        case .soil_moisture_total:
-            return "mrso" // kg m-2
-        case .soil_moisture_upper: // Moisture in Upper Portion of Soil Column
+        case .soil_moisture_0_to_10cm: // Moisture in Upper Portion of Soil Column
             return "mrsos"
-        case .shortwave:
+        case .shortwave_radiation:
             return "rsds"
         case .surface_temperature:
             return "tslsi"
@@ -256,18 +389,36 @@ enum Cmip6Variable: String {
             return "sfcWind"
         }
     }
+    
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        switch self {
+        case .temperature_2m_min:
+            fallthrough
+        case .temperature_2m_max:
+            fallthrough
+        case .temperature_2m:
+            return (1, -273.15)
+        case .pressure_msl:
+            return (1/100, 0)
+        case .precipitation:
+            fallthrough
+        case .snowfall_water_equivalent:
+            fallthrough
+        case .runoff:
+            return (3600*24, 0)
+        default:
+            return nil
+        }
+    }
 }
 
-struct DownloadCimpCommand: AsyncCommandFix {
+struct DownloadCmipCommand: AsyncCommandFix {
     /// 6k locations require around 200 MB memory for a yearly time-series
     static var nLocationsPerChunk = 6_000
     
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
-        
-        @Option(name: "year", short: "y", help: "Download one year")
-        var year: String?
     }
     
     var help: String {
@@ -280,34 +431,73 @@ struct DownloadCimpCommand: AsyncCommandFix {
         guard let domain = Cmip6Domain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
-        
-        //let variables: [GenericVariable] = domain == .cerra ? CerraVariable.allCases : Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
-        
+
         /// Make sure elevation information is present. Otherwise download it
         //try await downloadElevation(application: context.application, cdskey: cdskey, domain: domain)
         
-        /// Only download one specified year
-        if let yearStr = signature.year {
-            if yearStr.contains("-") {
-                let split = yearStr.split(separator: "-")
-                guard split.count == 2 else {
-                    fatalError("year invalid")
-                }
-                for year in Int(split[0])! ... Int(split[1])! {
-                    try await runYear(application: context.application, year: year, domain: domain)
-                }
-            } else {
-                guard let year = Int(yearStr) else {
-                    fatalError("Could not convert year to integer")
-                }
-                try await runYear(application: context.application, year: year, domain: domain)
-            }
-            return
+        guard let yearlyPath = domain.omfileArchive else {
+            fatalError("yearly archive path not defined")
         }
-        fatalError("OK")
-    }
-    
-    func runYear(application: Application, year: Int, domain: Cmip6Domain) async throws {
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: yearlyPath, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
+        let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, readTimeout: 3600*3, waitAfterLastModified: nil)
+        
+        for variable in Cmip6Variable.allCases {
+            guard let timeType = variable.domainTimeRange(for: domain) else {
+                continue
+            }
+            
+            for year in 1950...1950 { // 2014
+                logger.info("Downloading \(variable) for year \(year)")
+                let source = domain.soureName
+                let version = variable.version(for: domain)
+                let short = variable.shortname
+                let server = domain.server
+                let grid = domain.gridName
+                
+                switch timeType {
+                case .monthly:
+                    fatalError("monthly")
+                case .yearly:
+                    let url = "\(server)HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
+                    
+                    let ncFile = "\(domain.downloadDirectory)\(variable.rawValue)_\(year).nc"
+                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
+                    if FileManager.default.fileExists(atPath: omFile){
+                        continue
+                    }
+                    if !FileManager.default.fileExists(atPath: ncFile) {
+                        try await curl.download(url: url, toFile: "\(ncFile)~", bzip2Decode: false)
+                        try FileManager.default.moveFileOverwrite(from: "\(ncFile)~", to: ncFile)
+                    }
+                    
+                    guard let ncFile = try NetCDF.open(path: ncFile, allowUpdate: false) else {
+                        fatalError("Could not open nc file for \(variable)")
+                    }
+                    guard let ncVar = ncFile.getVariable(name: short) else {
+                        fatalError("Could not open nc variable for \(short)")
+                    }
+                    guard let ncFloat = ncVar.asType(Float.self) else {
+                        fatalError("Not a float nc variable")
+                    }
+                    /// 3d spatial oriented file
+                    let dim = ncVar.dimensionsFlat
+                    /// transpose to fast time
+                    var array = Array2DFastSpace(data: try ncFloat.read(), nLocations: dim[1]*dim[2], nTime: dim[0]).transpose()
+                    if let fma = variable.multiplyAdd {
+                        array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                case .tenYearly:
+                    fatalError("ten yearly")
+                }
+                
+
+            }
+            
+        }
     }
 }
