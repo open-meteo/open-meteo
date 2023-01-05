@@ -100,7 +100,7 @@ enum Cmip6Domain: String, GenericDomain {
     var gridName: String {
         switch self {
         case .CMCC_CM2_VHR4_daily:
-            return "gr"
+            return "gn"
         case .FGOALS_f3_H_daily:
             return "gr"
         case .HiRAM_SIT_HR_daily:
@@ -113,7 +113,7 @@ enum Cmip6Domain: String, GenericDomain {
     var institute: String {
         switch self {
         case .CMCC_CM2_VHR4_daily:
-            return "CMC"
+            return "CMCC"
         case .FGOALS_f3_H_daily:
             return "CAS"
         case .HiRAM_SIT_HR_daily:
@@ -304,14 +304,16 @@ enum Cmip6Variable: String, CaseIterable {
                 return .yearly
             }
         case .CMCC_CM2_VHR4_daily:
+            // no near surface RH, only specific humidity
+            // also no near surface temp, only 1000 hPa temp
             switch self {
-            case .relative_humidity_2m:
-                return .monthly
+            //case .relative_humidity_2m:
+            //    return .monthly
             case .precipitation:
                 // only precip is in yearly files...
                 return .yearly
-            case .temperature_2m:
-                return .monthly
+            //case .temperature_2m:
+            //    return .monthly
             case .windspeed_10m:
                 return .monthly
             default:
@@ -446,7 +448,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
         
         // Automatically try all servers. From fastest to slowest
         let servers = ["https://esgf3.dkrz.de/thredds/fileServer/cmip6/",
-                       "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/",
+                       "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/CMIP6/",
                        "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/",
                        "https://esgf-data04.diasjp.net/thredds/fileServer/esg_dataroot/CMIP6/",
                        "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"]
@@ -506,18 +508,49 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     
                     // download month files and combine to yearly file
                     let short = variable.shortname
+                    
                     for month in 1...12 {
                         let ncFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).nc"
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
-                        if !FileManager.default.fileExists(atPath: ncFile) {
+                        if !FileManager.default.fileExists(atPath: monthlyOmFile) {
                             let endOfMonth = Timestamp(year, month, 1).add(hours: -1).format_YYYYMMdd
                             let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)\(month)01-\(endOfMonth).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
-                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: domain.grid.nx, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                            try FileManager.default.removeItem(atPath: ncFile)
+                            
+                            // TODO: support for specific humdity to relative humidity if required
+                            
+                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
                         }
                     }
                     
+                    let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(variable.rawValue)")
+                    
+                    let monthlyReader = try (1...12).map { month in
+                        let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
+                        return try OmFileReader(file: monthlyOmFile)
+                    }
+                    let nt = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: domain.dtSeconds).count
+                    
+                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
+                        /// Process around 200 MB memory at once
+                        let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, domain.grid.count)
+                        
+                        var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
+                        
+                        for (i, omfile) in monthlyReader.enumerated() {
+                            try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
+                            let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
+                            let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: omfile.dim1)
+                            for l in 0..<locationRange.count {
+                                fasttime[l, i ..< (i+1)] = read2d[l, 0..<omfile.dim1]
+                            }
+                        }
+                        progress.add(locationRange.count)
+                        return ArraySlice(fasttime.data)
+                    })
+                    progress.finish()
                     
                     
                     // TODO: delete temporary nc files
