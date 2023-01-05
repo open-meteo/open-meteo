@@ -223,6 +223,9 @@ enum Cmip6Variable: String, CaseIterable {
             if self == .precipitation {
                 return "20210308"
             }
+            if self == .windspeed_10m {
+                return "20170927"
+            }
             return "20190725"
         case .FGOALS_f3_H_daily:
             return "20190817"
@@ -501,7 +504,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 
                 switch timeType {
                 case .monthly:
-                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
+                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
                     if FileManager.default.fileExists(atPath: omFile) {
                         continue
                     }
@@ -513,8 +516,8 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let ncFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).nc"
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
                         if !FileManager.default.fileExists(atPath: monthlyOmFile) {
-                            let endOfMonth = Timestamp(year, month, 1).add(hours: -1).format_YYYYMMdd
-                            let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)\(month)01-\(endOfMonth).nc"
+                            let endOfMonth = YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).format_YYYYMMdd
+                            let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(endOfMonth).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
                             try FileManager.default.removeItem(atPath: ncFile)
@@ -539,23 +542,28 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         
                         var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
                         
-                        for (i, omfile) in monthlyReader.enumerated() {
+                        var timeOffest = 0
+                        for omfile in monthlyReader {
                             try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
                             let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
                             let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: omfile.dim1)
                             for l in 0..<locationRange.count {
-                                fasttime[l, i ..< (i+1)] = read2d[l, 0..<omfile.dim1]
+                                fasttime[l, timeOffest ..< timeOffest + omfile.dim1] = read2d[l, 0..<omfile.dim1]
                             }
+                            timeOffest += omfile.dim1
                         }
                         progress.add(locationRange.count)
                         return ArraySlice(fasttime.data)
                     })
                     progress.finish()
                     
+                    // TODO: disable
+                    try Array2DFastTime(data: try OmFileReader(file: omFile).readAll(), nLocations: domain.grid.count, nTime: nt).transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.shortname)_\(year)_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)
+                    
                     
                     // TODO: delete temporary nc files
                 case .yearly:
-                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
+                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
                     if FileManager.default.fileExists(atPath: omFile) {
                         continue
                     }

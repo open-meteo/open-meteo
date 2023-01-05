@@ -28,4 +28,8 @@ public struct YearMonth: Strideable, Comparable {
     public func advanced(by n: Int) -> YearMonth {
         YearMonth(monthSince1970: monthsSince1970 + n)
     }
+    
+    public var timestamp: Timestamp {
+        Timestamp(year, month, 1)
+    }
 }

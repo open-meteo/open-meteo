@@ -372,11 +372,14 @@ public final class OmFileWriter {
         }
         let fileTemp = "\(file)~"
         try FileManager.default.removeItemIfExists(at: fileTemp)
-        let fn = try FileHandle.createNewFile(file: file)
+        let fn = try FileHandle.createNewFile(file: fileTemp)
         try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
-        try fn.close()
         try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
     }
+    
+    //public func write(file: String, compressionType: CompressionType, scalefactor: Float, readers: [OmFileR]) throws {
+        
+    //}
     
     /// Write to memory
     public func writeInMemory(compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws -> Data {
