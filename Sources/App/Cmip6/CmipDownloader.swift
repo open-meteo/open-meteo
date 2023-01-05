@@ -606,61 +606,25 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 
                 switch timeType {
                 case .monthly:
-                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
+                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
                     if FileManager.default.fileExists(atPath: omFile) {
                         continue
                     }
                     
                     // download month files and combine to yearly file
                     let short = variable.shortname
-                    
                     for month in 1...12 {
                         let ncFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).nc"
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
-                        if !FileManager.default.fileExists(atPath: monthlyOmFile) {
-                            let endOfMonth = YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).format_YYYYMMdd
-                            let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(endOfMonth).nc"
+                        if !FileManager.default.fileExists(atPath: ncFile) {
+                            let endOfMonth = Timestamp(year, month, 1).add(hours: -1).format_YYYYMMdd
+                            let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)\(month)01-\(endOfMonth).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
-                            try FileManager.default.removeItem(atPath: ncFile)
-                            
-                            // TODO: support for specific humdity to relative humidity if required
-                            
-                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: domain.grid.nx, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
                         }
                     }
                     
-                    let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(variable.rawValue)")
-                    
-                    let monthlyReader = try (1...12).map { month in
-                        let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
-                        return try OmFileReader(file: monthlyOmFile)
-                    }
-                    let nt = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: domain.dtSeconds).count
-                    
-                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
-                        /// Process around 200 MB memory at once
-                        let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, domain.grid.count)
-                        
-                        var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
-                        
-                        var timeOffest = 0
-                        for omfile in monthlyReader {
-                            try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
-                            let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
-                            let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: omfile.dim1)
-                            for l in 0..<locationRange.count {
-                                fasttime[l, timeOffest ..< timeOffest + omfile.dim1] = read2d[l, 0..<omfile.dim1]
-                            }
-                            timeOffest += omfile.dim1
-                        }
-                        progress.add(locationRange.count)
-                        return ArraySlice(fasttime.data)
-                    })
-                    progress.finish()
-                    
-                    // TODO: disable
-                    try Array2DFastTime(data: try OmFileReader(file: omFile).readAll(), nLocations: domain.grid.count, nTime: nt).transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.shortname)_\(year)_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)
                     
                     
                     // TODO: delete temporary nc files
@@ -674,7 +638,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
-                        let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
+                        let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
                         try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                     }
                     var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
