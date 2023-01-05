@@ -467,14 +467,12 @@ struct DownloadCmipCommand: AsyncCommandFix {
             let ncFileAltitude = "\(domain.downloadDirectory)orog_fx.nc"
             if !FileManager.default.fileExists(atPath: ncFileAltitude) {
                 let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/fx/orog/\(grid)/v\(version.altitude)/orog_fx_\(source)_highresSST-present_r1i1p1f1_\(grid).nc"
-                try await curl.download(servers: servers, uri: uri, toFile: "\(ncFileAltitude)~")
-                try FileManager.default.moveFileOverwrite(from: "\(ncFileAltitude)~", to: ncFileAltitude)
+                try await curl.download(servers: servers, uri: uri, toFile: ncFileAltitude)
             }
             let ncFileLandFraction = "\(domain.downloadDirectory)sftlf_fx.nc"
             if !FileManager.default.fileExists(atPath: ncFileLandFraction) {
                 let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/fx/sftlf/\(grid)/v\(version.landmask)/sftlf_fx_\(source)_highresSST-present_r1i1p1f1_\(grid).nc"
-                try await curl.download(servers: servers, uri: uri, toFile: "\(ncFileLandFraction)~")
-                try FileManager.default.moveFileOverwrite(from: "\(ncFileLandFraction)~", to: ncFileLandFraction)
+                try await curl.download(servers: servers, uri: uri, toFile: ncFileLandFraction)
             }
             var altitude = try NetCDF.read(path: ncFileAltitude, short: "orog", fma: nil)
             let landFraction = try NetCDF.read(path: ncFileLandFraction, short: "sftlf", fma: nil)
@@ -486,6 +484,8 @@ struct DownloadCmipCommand: AsyncCommandFix {
             }
             //try altitude.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
             try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: altitude.data)
+            
+            // TODO: delete temporary nc files
         }
         
         for variable in Cmip6Variable.allCases {
@@ -499,7 +499,28 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 
                 switch timeType {
                 case .monthly:
-                    fatalError("monthly")
+                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
+                    if FileManager.default.fileExists(atPath: omFile) {
+                        continue
+                    }
+                    
+                    // download month files and combine to yearly file
+                    let short = variable.shortname
+                    for month in 1...12 {
+                        let ncFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).nc"
+                        let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
+                        if !FileManager.default.fileExists(atPath: ncFile) {
+                            let endOfMonth = Timestamp(year, month, 1).add(hours: -1).format_YYYYMMdd
+                            let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)\(month)01-\(endOfMonth).nc"
+                            try await curl.download(servers: servers, uri: uri, toFile: ncFile)
+                            let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
+                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: domain.grid.nx, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                        }
+                    }
+                    
+                    
+                    
+                    // TODO: delete temporary nc files
                 case .yearly:
                     let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
                     if FileManager.default.fileExists(atPath: omFile) {
@@ -511,8 +532,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
                         let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
-                        try await curl.download(servers: servers, uri: uri, toFile: "\(ncFile)~")
-                        try FileManager.default.moveFileOverwrite(from: "\(ncFile)~", to: ncFile)
+                        try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                     }
                     var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
                     if calculateRhFromSpecificHumidity {
@@ -523,9 +543,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         array.data = Meteorology.specificToRelativeHumidity(specificHumidity: array, temperature: temp, sealLevelPressure: pressure, elevation: elevation)
                         //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)rh.nc", nx: domain.grid.nx, ny: domain.grid.ny)
                     }
-                    try FileManager.default.removeItemIfExists(at: "\(omFile)~")
-                    try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: "\(omFile)~", compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
-                    try FileManager.default.moveFileOverwrite(from: "\(omFile)~", to: omFile)
+                    try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                    
+                    // TODO: delete temporary nc files
                 case .tenYearly:
                     fatalError("ten yearly")
                 }
@@ -566,6 +586,7 @@ extension NetCDF {
 
 extension Curl {
     /// Retry download from multiple servers
+    /// NOTE: retry 404 should be disabled!
     fileprivate func download(servers: [String], uri: String, toFile: String) async throws {
         for (i,server) in servers.enumerated() {
             do {
