@@ -629,6 +629,29 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     
                     // TODO: delete temporary nc files
                 case .yearly:
+                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
+                    if FileManager.default.fileExists(atPath: omFile) {
+                        continue
+                    }
+                    
+                    // download month files and combine to yearly file
+                    let short = variable.shortname
+                    for month in 1...12 {
+                        let ncFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).nc"
+                        let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
+                        if !FileManager.default.fileExists(atPath: ncFile) {
+                            let endOfMonth = Timestamp(year, month, 1).add(hours: -1).format_YYYYMMdd
+                            let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)\(month)01-\(endOfMonth).nc"
+                            try await curl.download(servers: servers, uri: uri, toFile: ncFile)
+                            let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
+                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: domain.grid.nx, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                        }
+                    }
+                    
+                    
+                    
+                    // TODO: delete temporary nc files
+                case .yearly:
                     let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
                     if FileManager.default.fileExists(atPath: omFile) {
                         continue
