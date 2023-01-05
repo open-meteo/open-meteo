@@ -138,7 +138,7 @@ enum Cmip6Domain: String, GenericDomain {
     }
     
     var dtSeconds: Int {
-        return 3600
+        return 24*3600
     }
     
     private static var elevationCMCC_CM2_VHR4 = try? OmFileReader(file: Self.CMCC_CM2_VHR4_daily.surfaceElevationFileOm)
@@ -177,16 +177,16 @@ enum Cmip6Domain: String, GenericDomain {
         }
     }
     
-    var versionOrography: (altitude: String, landmask: String) {
+    var versionOrography: (altitude: String, landmask: String)? {
         switch self {
         case .CMCC_CM2_VHR4_daily:
-            return ("20190725", "20190725")
+            return ("20210330", "20210330")
         case .FGOALS_f3_H_daily:
             return ("20201204", "20210121")
         case .HiRAM_SIT_HR_daily:
-            return ("20210713", "20210713")
+            return nil
         case .MRI_AGCM3_2_S_daily:
-            return ("20190711", "20190711")
+            return ("20200305", "20200305")
         }
     }
 }
@@ -463,8 +463,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
         let grid = domain.gridName
         
         /// Make sure elevation information is present. Otherwise download it
-        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
-            let version = domain.versionOrography
+        if let version = domain.versionOrography, !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             let ncFileAltitude = "\(domain.downloadDirectory)orog_fx.nc"
             if !FileManager.default.fileExists(atPath: ncFileAltitude) {
                 let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/fx/orog/\(grid)/v\(version.altitude)/orog_fx_\(source)_highresSST-present_r1i1p1f1_\(grid).nc"
