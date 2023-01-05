@@ -75,6 +75,7 @@ import SwiftNetCDF
  Sizes:
  MRI: Raw 2.15TB, Compressed 413 GB
  HiRAM_SIT_HR_daily: Raw 1.3TB, Compressed 210 GB
+ FGLOALS: Raw 1.2 TB, Compressed 120 GB
  */
 
 enum Cmip6Domain: String, GenericDomain {
@@ -131,13 +132,31 @@ enum Cmip6Domain: String, GenericDomain {
     var omfileArchive: String? {
         return "\(OpenMeteo.dataDictionary)archive-\(rawValue)/"
     }
+    /// Filename of the surface elevation file
+    var surfaceElevationFileOm: String {
+        "\(omfileDirectory)HSURF.om"
+    }
     
     var dtSeconds: Int {
         return 3600
     }
     
+    private static var elevationCMCC_CM2_VHR4 = try? OmFileReader(file: Self.CMCC_CM2_VHR4_daily.surfaceElevationFileOm)
+    private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H_daily.surfaceElevationFileOm)
+    private static var elevationHiRAM_SIT_HR = try? OmFileReader(file: Self.HiRAM_SIT_HR_daily.surfaceElevationFileOm)
+    private static var elevationMRI_AGCM3_2_S = try? OmFileReader(file: Self.MRI_AGCM3_2_S_daily.surfaceElevationFileOm)
+    
     var elevationFile: OmFileReader<MmapFile>? {
-        return nil
+        switch self {
+        case .CMCC_CM2_VHR4_daily:
+            return Self.elevationCMCC_CM2_VHR4
+        case .FGOALS_f3_H_daily:
+            return Self.elevationFGOALS_f3_H
+        case .HiRAM_SIT_HR_daily:
+            return Self.elevationHiRAM_SIT_HR
+        case .MRI_AGCM3_2_S_daily:
+            return Self.elevationMRI_AGCM3_2_S
+        }
     }
     
     var omFileLength: Int {
@@ -148,13 +167,26 @@ enum Cmip6Domain: String, GenericDomain {
     var grid: Gridable {
         switch self {
         case .CMCC_CM2_VHR4_daily:
-            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
+            return RegularGrid(nx: 1152, ny: 768, latMin: -90, lonMin: -180, dx: 0.3125, dy: 180/768)
         case .FGOALS_f3_H_daily:
-            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
+            return RegularGrid(nx: 1440, ny: 720, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .HiRAM_SIT_HR_daily:
-            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
+            return RegularGrid(nx: 1536, ny: 768, latMin: -90, lonMin: -180, dx: 360/1536, dy: 180/768)
         case .MRI_AGCM3_2_S_daily:
-            return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
+            return RegularGrid(nx: 1920, ny: 960, latMin: -90, lonMin: -180, dx: 0.1875, dy: 0.1875)
+        }
+    }
+    
+    var versionOrography: (altitude: String, landmask: String) {
+        switch self {
+        case .CMCC_CM2_VHR4_daily:
+            return ("20190725", "20190725")
+        case .FGOALS_f3_H_daily:
+            return ("20201204", "20210121")
+        case .HiRAM_SIT_HR_daily:
+            return ("20210713", "20210713")
+        case .MRI_AGCM3_2_S_daily:
+            return ("20190711", "20190711")
         }
     }
 }
@@ -168,9 +200,9 @@ enum Cmip6Variable: String, CaseIterable {
     case precipitation
     case runoff
     case snowfall_water_equivalent
-    case relative_humidity_min
-    case relative_humidity_max
-    case relative_humidity
+    case relative_humidity_2m_min
+    case relative_humidity_2m_max
+    case relative_humidity_2m
     case windspeed_10m
     
     case surface_temperature
@@ -178,9 +210,6 @@ enum Cmip6Variable: String, CaseIterable {
     /// Moisture in Upper Portion of Soil Column.
     case soil_moisture_0_to_10cm
     case shortwave_radiation
-    
-    case specific_humidity
-    
     
     enum TimeType {
         case monthly
@@ -222,11 +251,11 @@ enum Cmip6Variable: String, CaseIterable {
             return 10
         case .snowfall_water_equivalent:
             return 10
-        case .relative_humidity_min:
+        case .relative_humidity_2m_min:
             return 1
-        case .relative_humidity_max:
+        case .relative_humidity_2m_max:
             return 1
-        case .relative_humidity:
+        case .relative_humidity_2m:
             return 1
         case .windspeed_10m:
             return 10
@@ -236,8 +265,6 @@ enum Cmip6Variable: String, CaseIterable {
             return 1000
         case .shortwave_radiation:
             return 1
-        case .specific_humidity:
-            return 100
         }
     }
     
@@ -261,11 +288,11 @@ enum Cmip6Variable: String, CaseIterable {
                 return .yearly
             case .snowfall_water_equivalent:
                 return .yearly
-            case .relative_humidity_min:
+            case .relative_humidity_2m_min:
                 return .yearly
-            case .relative_humidity_max:
+            case .relative_humidity_2m_max:
                 return .yearly
-            case .relative_humidity:
+            case .relative_humidity_2m:
                 return .yearly
             case .surface_temperature:
                 return .yearly
@@ -273,14 +300,12 @@ enum Cmip6Variable: String, CaseIterable {
                 return .yearly
             case .shortwave_radiation:
                 return .yearly
-            case .specific_humidity:
-                return nil
             case .windspeed_10m:
                 return .yearly
             }
         case .CMCC_CM2_VHR4_daily:
             switch self {
-            case .relative_humidity:
+            case .relative_humidity_2m:
                 return .monthly
             case .precipitation:
                 // only precip is in yearly files...
@@ -295,7 +320,7 @@ enum Cmip6Variable: String, CaseIterable {
         case .FGOALS_f3_H_daily:
             // no near surface RH, only specific humidity
             switch self {
-            case .specific_humidity:
+            case .relative_humidity_2m:
                 return .yearly
             case .cloudcover:
                 return .yearly
@@ -329,7 +354,7 @@ enum Cmip6Variable: String, CaseIterable {
                 return .yearly
             case .snowfall_water_equivalent:
                 return .yearly
-            case .relative_humidity:
+            case .relative_humidity_2m:
                 return .yearly
             case .shortwave_radiation:
                 return .yearly
@@ -356,11 +381,11 @@ enum Cmip6Variable: String, CaseIterable {
             return "clt"
         case .precipitation:
             return "pr"
-        case .relative_humidity_min:
+        case .relative_humidity_2m_min:
             return "hursmax"
-        case .relative_humidity_max:
+        case .relative_humidity_2m_max:
             return "hursmin"
-        case .relative_humidity:
+        case .relative_humidity_2m:
             return "hurs"
         case .runoff:
             return "mrro"
@@ -372,8 +397,6 @@ enum Cmip6Variable: String, CaseIterable {
             return "rsds"
         case .surface_temperature:
             return "tslsi"
-        case .specific_humidity:
-            return "huss"
         case .windspeed_10m:
             return "sfcWind"
         }
@@ -420,9 +443,13 @@ struct DownloadCmipCommand: AsyncCommandFix {
         guard let domain = Cmip6Domain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
         }
-
-        /// Make sure elevation information is present. Otherwise download it
-        //try await downloadElevation(application: context.application, cdskey: cdskey, domain: domain)
+        
+        // Automatically try all servers. From fastest to slowest
+        let servers = ["https://esgf3.dkrz.de/thredds/fileServer/cmip6/",
+                       "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/",
+                       "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/",
+                       "https://esgf-data04.diasjp.net/thredds/fileServer/esg_dataroot/CMIP6/",
+                       "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"]
         
         guard let yearlyPath = domain.omfileArchive else {
             fatalError("yearly archive path not defined")
@@ -432,13 +459,35 @@ struct DownloadCmipCommand: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, readTimeout: 3600*3, retryError4xx: false)
+        let source = domain.soureName
+        let grid = domain.gridName
         
-        // Automatically try all servers. From fastest to slowest
-        let servers = ["https://esgf3.dkrz.de/thredds/fileServer/cmip6/",
-                       "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/",
-                       "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/",
-                       "https://esgf-data04.diasjp.net/thredds/fileServer/esg_dataroot/CMIP6/",
-                       "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"]
+        /// Make sure elevation information is present. Otherwise download it
+        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+            let version = domain.versionOrography
+            let ncFileAltitude = "\(domain.downloadDirectory)orog_fx.nc"
+            if !FileManager.default.fileExists(atPath: ncFileAltitude) {
+                let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/fx/orog/\(grid)/v\(version.altitude)/orog_fx_\(source)_highresSST-present_r1i1p1f1_\(grid).nc"
+                try await curl.download(servers: servers, uri: uri, toFile: "\(ncFileAltitude)~")
+                try FileManager.default.moveFileOverwrite(from: "\(ncFileAltitude)~", to: ncFileAltitude)
+            }
+            let ncFileLandFraction = "\(domain.downloadDirectory)sftlf_fx.nc"
+            if !FileManager.default.fileExists(atPath: ncFileLandFraction) {
+                let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/fx/sftlf/\(grid)/v\(version.landmask)/sftlf_fx_\(source)_highresSST-present_r1i1p1f1_\(grid).nc"
+                try await curl.download(servers: servers, uri: uri, toFile: "\(ncFileLandFraction)~")
+                try FileManager.default.moveFileOverwrite(from: "\(ncFileLandFraction)~", to: ncFileLandFraction)
+            }
+            var altitude = try NetCDF.read(path: ncFileAltitude, short: "orog", fma: nil)
+            let landFraction = try NetCDF.read(path: ncFileLandFraction, short: "sftlf", fma: nil)
+            
+            for i in altitude.data.indices {
+                if landFraction.data[i] < 0.5 {
+                    altitude.data[i] = -999
+                }
+            }
+            //try altitude.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: altitude.data)
+        }
         
         for variable in Cmip6Variable.allCases {
             guard let timeType = variable.domainTimeRange(for: domain) else {
@@ -447,26 +496,34 @@ struct DownloadCmipCommand: AsyncCommandFix {
             
             for year in 1950...1950 { // 2014
                 logger.info("Downloading \(variable) for year \(year)")
-                let source = domain.soureName
                 let version = variable.version(for: domain)
-                let short = variable.shortname
-                let grid = domain.gridName
                 
                 switch timeType {
                 case .monthly:
                     fatalError("monthly")
                 case .yearly:
-                    let ncFile = "\(domain.downloadDirectory)\(variable.rawValue)_\(year).nc"
                     let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).nc"
                     if FileManager.default.fileExists(atPath: omFile) {
                         continue
                     }
+                    /// `FGOALS_f3_H` has no near surface relative humidity, calculate from specific humidity
+                    let calculateRhFromSpecificHumidity = domain == .FGOALS_f3_H_daily && variable == .relative_humidity_2m
+                    let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
+                    let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
                         let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
                         try await curl.download(servers: servers, uri: uri, toFile: "\(ncFile)~")
                         try FileManager.default.moveFileOverwrite(from: "\(ncFile)~", to: ncFile)
                     }
-                    let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
+                    var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
+                    if calculateRhFromSpecificHumidity {
+                        let pressure = try NetCDF.read(path: "\(domain.downloadDirectory)psl_\(year).nc", short: "psl", fma: (1/100, 0))
+                        let elevation = try domain.elevationFile!.readAll()
+                        let temp = try NetCDF.read(path: "\(domain.downloadDirectory)tas_\(year).nc", short: "tas", fma: (1, -273.15))
+                        array.data.multiplyAdd(multiply: 1000, add: 0)
+                        array.data = Meteorology.specificToRelativeHumidity(specificHumidity: array, temperature: temp, sealLevelPressure: pressure, elevation: elevation)
+                        //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)rh.nc", nx: domain.grid.nx, ny: domain.grid.ny)
+                    }
                     try FileManager.default.removeItemIfExists(at: "\(omFile)~")
                     try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: "\(omFile)~", compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
                     try FileManager.default.moveFileOverwrite(from: "\(omFile)~", to: omFile)
@@ -494,9 +551,12 @@ extension NetCDF {
         }
         /// 3d spatial oriented file
         let dim = ncVar.dimensionsFlat
+        let nt = dim.count == 3 ? dim[0] : 1
+        let nx = dim[dim.count-1]
+        let ny = dim[dim.count-2]
         /// transpose to fast time
-        var spatial = Array2DFastSpace(data: try ncFloat.read(), nLocations: dim[1]*dim[2], nTime: dim[0])
-        spatial.data.shift180Longitude(nt: dim[0], ny: dim[1], nx: dim[2])
+        var spatial = Array2DFastSpace(data: try ncFloat.read(), nLocations: nx*ny, nTime: nt)
+        spatial.data.shift180Longitude(nt: nt, ny: ny, nx: nx)
         if let fma {
             spatial.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
         }
