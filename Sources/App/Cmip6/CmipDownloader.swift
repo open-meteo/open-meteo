@@ -78,7 +78,7 @@ import SwiftNetCDF
  FGLOALS: Raw 1.2 TB, Compressed 120 GB
  */
 
-enum Cmip6Domain: String, GenericDomain {
+enum Cmip6Domain: String, Codable, GenericDomain {
     case CMCC_CM2_VHR4
     case FGOALS_f3_H
     case HiRAM_SIT_HR
@@ -160,8 +160,8 @@ enum Cmip6Domain: String, GenericDomain {
     }
     
     var omFileLength: Int {
-        // has no realtime updates
-        return 0
+        // has no realtime updates -> large number takes only 1 file lookup
+        return 1000000000000000
     }
     
     var grid: Gridable {
@@ -191,7 +191,7 @@ enum Cmip6Domain: String, GenericDomain {
     }
 }
 
-enum Cmip6Variable: String, CaseIterable {
+enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVariableMixable {
     case pressure_msl
     case temperature_2m_min
     case temperature_2m_max
@@ -217,7 +217,86 @@ enum Cmip6Variable: String, CaseIterable {
         case tenYearly
     }
     
-    func version(for domain: Cmip6Domain) -> String {
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    var omFileName: String {
+        return rawValue
+    }
+    
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .temperature_2m_min:
+            return .hermite(bounds: nil)
+        case .temperature_2m_max:
+            return .hermite(bounds: nil)
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .cloudcover:
+            return .linear
+        case .precipitation:
+            return .backwards_sum
+        case .runoff:
+            return .backwards_sum
+        case .snowfall_water_equivalent:
+            return .backwards_sum
+        case .relative_humidity_2m_min:
+            return .hermite(bounds: 0...100)
+        case .relative_humidity_2m_max:
+            return .hermite(bounds: 0...100)
+        case .relative_humidity_2m:
+            return .hermite(bounds: 0...100)
+        case .windspeed_10m:
+            return .hermite(bounds: nil)
+        case .soil_moisture_0_to_10cm:
+            return .hermite(bounds: nil)
+        case .shortwave_radiation:
+            return .hermite(bounds: 0...1800*24)
+        }
+    }
+    
+    var unit: SiUnit {
+        switch self {
+        case .pressure_msl:
+            return .hectoPascal
+        case .temperature_2m_min:
+            return .celsius
+        case .temperature_2m_max:
+            return .celsius
+        case .temperature_2m:
+            return .celsius
+        case .cloudcover:
+            return .percent
+        case .precipitation:
+            return .millimeter
+        case .runoff:
+            return .millimeter
+        case .snowfall_water_equivalent:
+            return .millimeter
+        case .relative_humidity_2m_min:
+            return .percent
+        case .relative_humidity_2m_max:
+            return .percent
+        case .relative_humidity_2m:
+            return .percent
+        case .windspeed_10m:
+            return .ms
+        case .soil_moisture_0_to_10cm:
+            return .gramPerKilogram
+        case .shortwave_radiation:
+            return .wattPerSquareMeter
+        }
+    }
+    
+    var isElevationCorrectable: Bool {
+        return self == .temperature_2m_max || self == .temperature_2m_min || self == .temperature_2m
+    }
+    
+    
+    func version(for domain: Cmip6Domain, isFuture: Bool) -> String {
         switch domain {
         case .CMCC_CM2_VHR4:
             if self == .precipitation {
@@ -232,6 +311,9 @@ enum Cmip6Variable: String, CaseIterable {
         case .HiRAM_SIT_HR:
             return "20210713" // "20210707"
         case .MRI_AGCM3_2_S:
+            if isFuture {
+                return "20200619"
+            }
             return "20190711"
         }
     }
@@ -505,7 +587,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
             
             for year in 1950...2050 { // 2014
                 logger.info("Downloading \(variable) for year \(year)")
-                let version = variable.version(for: domain)
+                let version = variable.version(for: domain, isFuture: year >= 2015)
                 let experimentId = year >= 2015 ? "highresSST-future" : "highresSST-present"
                 
                 switch timeType {
@@ -578,7 +660,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
-                        let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
+                        let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
                         try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                     }
                     var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
