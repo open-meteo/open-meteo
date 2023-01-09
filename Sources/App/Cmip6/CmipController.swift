@@ -116,7 +116,8 @@ extension Cmip6Domain: MultiDomainMixerDomain {
 }
 
 enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
-    case snowfall
+    case snowfall_sum
+    case rain_sum
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -137,12 +138,29 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     var reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>
     
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
-        
-        fatalError()
+        switch derived {
+        case .snowfall_sum:
+            let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time).data
+            let snowfall = snowwater.map { $0 * 0.7 }
+            return DataAndUnit(snowfall, .centimeter)
+        case .rain_sum:
+            let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time)
+            let precip = try get(raw: .precipitation_sum, time: time)
+            let rain = zip(precip.data, snowwater.data).map({
+                return max($0.0-$0.1, 0)
+            })
+            return DataAndUnit(rain, precip.unit)
+        }
     }
     
     func prefetchData(derived: Cmip6VariableDerived, time: TimerangeDt) throws {
-        fatalError()
+        switch derived {
+        case .snowfall_sum:
+            try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
+        case .rain_sum:
+            try prefetchData(raw: .precipitation_sum, time: time)
+            try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
+        }
     }
 }
 

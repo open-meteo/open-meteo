@@ -209,7 +209,7 @@
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_10m_max" id="windspeed_10m_mean" name="daily">
+          <input class="form-check-input" type="checkbox" value="windspeed_10m_mean" id="windspeed_10m_mean" name="daily">
           <label class="form-check-label" for="windspeed_10m_mean">
             Mean Wind Speed (10 m)
           </label>

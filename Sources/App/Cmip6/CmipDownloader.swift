@@ -198,7 +198,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     case temperature_2m_mean
     case cloudcover_mean
     case precipitation_sum
-    case runoff_sum
+    // Note: runoff includes soil drainage -> not surface runoff
+    //case runoff_sum
     case snowfall_water_equivalent_sum
     case relative_humidity_2m_min
     case relative_humidity_2m_max
@@ -240,8 +241,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return .linear
         case .precipitation_sum:
             return .backwards_sum
-        case .runoff_sum:
-            return .backwards_sum
+        //case .runoff_sum:
+        //    return .backwards_sum
         case .snowfall_water_equivalent_sum:
             return .backwards_sum
         case .relative_humidity_2m_min:
@@ -275,8 +276,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return .percent
         case .precipitation_sum:
             return .millimeter
-        case .runoff_sum:
-            return .millimeter
+        //case .runoff_sum:
+        //    return .millimeter
         case .snowfall_water_equivalent_sum:
             return .millimeter
         case .relative_humidity_2m_min:
@@ -334,8 +335,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return 1
         case .precipitation_sum:
             return 10
-        case .runoff_sum:
-            return 10
+        //case .runoff_sum:
+        //    return 10
         case .snowfall_water_equivalent_sum:
             return 10
         case .relative_humidity_2m_min:
@@ -373,8 +374,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             case .precipitation_sum:
                 return .yearly
-            case .runoff_sum:
-                return .yearly
+            //case .runoff_sum:
+            //    return .yearly
             case .snowfall_water_equivalent_sum:
                 return .yearly
             case .relative_humidity_2m_min:
@@ -416,7 +417,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         case .FGOALS_f3_H:
             // no near surface RH, only specific humidity
             // temp min/max and rh/min max can only be calculated form 3h values
-            // has max wind
             switch self {
             case .relative_humidity_2m_mean:
                 return .yearly
@@ -484,13 +484,13 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         case .precipitation_sum:
             return "pr"
         case .relative_humidity_2m_min:
-            return "hursmax"
-        case .relative_humidity_2m_max:
             return "hursmin"
+        case .relative_humidity_2m_max:
+            return "hursmax"
         case .relative_humidity_2m_mean:
             return "hurs"
-        case .runoff_sum:
-            return "mrro"
+        //case .runoff_sum:
+        //    return "mrro"
         case .snowfall_water_equivalent_sum:
             return "prsn" //kg m-2 s-1
         case .soil_moisture_0_to_10cm: // Moisture in Upper Portion of Soil Column
@@ -519,9 +519,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         case .precipitation_sum:
             fallthrough
         case .snowfall_water_equivalent_sum:
-            fallthrough
-        case .runoff_sum:
             return (3600*24, 0)
+        //case .runoff_sum:
+        //    return (3600*24, 0)
         case .shortwave_radiation_sum:
             return (24*0.0036, 0) // mean w/m2 to MJ/m2 sum
         default:
