@@ -195,21 +195,22 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     case pressure_msl
     case temperature_2m_min
     case temperature_2m_max
-    case temperature_2m
-    case cloudcover
-    case precipitation
-    case runoff
-    case snowfall_water_equivalent
+    case temperature_2m_mean
+    case cloudcover_mean
+    case precipitation_sum
+    case runoff_sum
+    case snowfall_water_equivalent_sum
     case relative_humidity_2m_min
     case relative_humidity_2m_max
-    case relative_humidity_2m
-    case windspeed_10m
+    case relative_humidity_2m_mean
+    case windspeed_10m_mean
+    case windspeed_10m_max
     
     //case surface_temperature
     
     /// Moisture in Upper Portion of Soil Column.
     case soil_moisture_0_to_10cm
-    case shortwave_radiation
+    case shortwave_radiation_sum
     
     enum TimeType {
         case monthly
@@ -233,27 +234,29 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return .hermite(bounds: nil)
         case .temperature_2m_max:
             return .hermite(bounds: nil)
-        case .temperature_2m:
+        case .temperature_2m_mean:
             return .hermite(bounds: nil)
-        case .cloudcover:
+        case .cloudcover_mean:
             return .linear
-        case .precipitation:
+        case .precipitation_sum:
             return .backwards_sum
-        case .runoff:
+        case .runoff_sum:
             return .backwards_sum
-        case .snowfall_water_equivalent:
+        case .snowfall_water_equivalent_sum:
             return .backwards_sum
         case .relative_humidity_2m_min:
             return .hermite(bounds: 0...100)
         case .relative_humidity_2m_max:
             return .hermite(bounds: 0...100)
-        case .relative_humidity_2m:
+        case .relative_humidity_2m_mean:
             return .hermite(bounds: 0...100)
-        case .windspeed_10m:
+        case .windspeed_10m_mean:
+            return .hermite(bounds: nil)
+        case .windspeed_10m_max:
             return .hermite(bounds: nil)
         case .soil_moisture_0_to_10cm:
             return .hermite(bounds: nil)
-        case .shortwave_radiation:
+        case .shortwave_radiation_sum:
             return .hermite(bounds: 0...1800*24)
         }
     }
@@ -266,46 +269,45 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return .celsius
         case .temperature_2m_max:
             return .celsius
-        case .temperature_2m:
+        case .temperature_2m_mean:
             return .celsius
-        case .cloudcover:
+        case .cloudcover_mean:
             return .percent
-        case .precipitation:
+        case .precipitation_sum:
             return .millimeter
-        case .runoff:
+        case .runoff_sum:
             return .millimeter
-        case .snowfall_water_equivalent:
+        case .snowfall_water_equivalent_sum:
             return .millimeter
         case .relative_humidity_2m_min:
             return .percent
         case .relative_humidity_2m_max:
             return .percent
-        case .relative_humidity_2m:
+        case .relative_humidity_2m_mean:
             return .percent
-        case .windspeed_10m:
+        case .windspeed_10m_mean:
+            return .ms
+        case .windspeed_10m_max:
             return .ms
         case .soil_moisture_0_to_10cm:
             return .gramPerKilogram
-        case .shortwave_radiation:
-            return .wattPerSquareMeter
+        case .shortwave_radiation_sum:
+            return .megaJoulesPerSquareMeter
         }
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m_max || self == .temperature_2m_min || self == .temperature_2m
+        return self == .temperature_2m_max || self == .temperature_2m_min || self == .temperature_2m_mean
     }
     
     
     func version(for domain: Cmip6Domain, isFuture: Bool) -> String {
         switch domain {
         case .CMCC_CM2_VHR4:
-            if self == .precipitation {
+            if self == .precipitation_sum {
                 return "20210308"
             }
-            if self == .windspeed_10m {
-                return "20170927"
-            }
-            return "20190725"
+            return isFuture ? "20190725" : "20170927"
         case .FGOALS_f3_H:
             return "20190817"
         case .HiRAM_SIT_HR:
@@ -326,30 +328,32 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return 20
         case .temperature_2m_max:
             return 20
-        case .temperature_2m:
+        case .temperature_2m_mean:
             return 20
-        case .cloudcover:
+        case .cloudcover_mean:
             return 1
-        case .precipitation:
+        case .precipitation_sum:
             return 10
-        case .runoff:
+        case .runoff_sum:
             return 10
-        case .snowfall_water_equivalent:
+        case .snowfall_water_equivalent_sum:
             return 10
         case .relative_humidity_2m_min:
             return 1
         case .relative_humidity_2m_max:
             return 1
-        case .relative_humidity_2m:
+        case .relative_humidity_2m_mean:
             return 1
-        case .windspeed_10m:
+        case .windspeed_10m_mean:
+            return 10
+        case .windspeed_10m_max:
             return 10
         //case .surface_temperature:
         //    return 20
         case .soil_moisture_0_to_10cm:
             return 1000
-        case .shortwave_radiation:
-            return 1
+        case .shortwave_radiation_sum:
+            return 10
         }
     }
     
@@ -363,29 +367,31 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             case .temperature_2m_max:
                 return .yearly
-            case .temperature_2m:
+            case .temperature_2m_mean:
                 return .yearly
-            case .cloudcover:
+            case .cloudcover_mean:
                 return .yearly
-            case .precipitation:
+            case .precipitation_sum:
                 return .yearly
-            case .runoff:
+            case .runoff_sum:
                 return .yearly
-            case .snowfall_water_equivalent:
+            case .snowfall_water_equivalent_sum:
                 return .yearly
             case .relative_humidity_2m_min:
                 return .yearly
             case .relative_humidity_2m_max:
                 return .yearly
-            case .relative_humidity_2m:
+            case .relative_humidity_2m_mean:
                 return .yearly
             //case .surface_temperature:
             //    return .yearly
             case .soil_moisture_0_to_10cm:
                 return .yearly
-            case .shortwave_radiation:
+            case .shortwave_radiation_sum:
                 return .yearly
-            case .windspeed_10m:
+            case.windspeed_10m_max:
+                return .yearly
+            case .windspeed_10m_mean:
                 return .yearly
             }
         case .CMCC_CM2_VHR4:
@@ -395,12 +401,14 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             switch self {
             //case .relative_humidity_2m:
             //    return .monthly
-            case .precipitation:
+            case .precipitation_sum:
                 // only precip is in yearly files...
                 return .yearly
             //case .temperature_2m:
             //    return .monthly
-            case .windspeed_10m:
+            case .windspeed_10m_mean:
+                return .monthly
+            case .windspeed_10m_max:
                 return .monthly
             default:
                 return nil
@@ -410,21 +418,23 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             // temp min/max and rh/min max can only be calculated form 3h values
             // has max wind
             switch self {
-            case .relative_humidity_2m:
+            case .relative_humidity_2m_mean:
                 return .yearly
-            case .cloudcover:
+            case .cloudcover_mean:
                 return .yearly
-            case .temperature_2m:
+            case .temperature_2m_mean:
                 return .yearly
             case .pressure_msl:
                 return .yearly
-            case .snowfall_water_equivalent:
+            case .snowfall_water_equivalent_sum:
                 return .yearly
-            case .shortwave_radiation:
+            case .shortwave_radiation_sum:
                 return .yearly
-            case .windspeed_10m:
+            case .windspeed_10m_mean:
                 return .yearly
-            case .precipitation:
+            case .windspeed_10m_max:
+                return .yearly
+            case .precipitation_sum:
                 return .yearly
             default:
                 return nil
@@ -434,23 +444,23 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             // rh daily min/max impossible to get get
             // no wind daily max possible
             switch self {
-            case .temperature_2m:
+            case .temperature_2m_mean:
                 return .yearly
             case .temperature_2m_max:
                 return .yearly
             case .temperature_2m_min:
                 return .yearly
-            case .cloudcover:
+            case .cloudcover_mean:
                 return .yearly
-            case .precipitation:
+            case .precipitation_sum:
                 return .yearly
-            case .snowfall_water_equivalent:
+            case .snowfall_water_equivalent_sum:
                 return .yearly
-            case .relative_humidity_2m:
+            case .relative_humidity_2m_mean:
                 return .yearly
-            case .shortwave_radiation:
+            case .shortwave_radiation_sum:
                 return .yearly
-            case .windspeed_10m:
+            case .windspeed_10m_mean:
                 return .yearly
             default:
                 return nil
@@ -467,30 +477,32 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return "tasmin"
         case .temperature_2m_max:
             return "tasmax"
-        case .temperature_2m:
+        case .temperature_2m_mean:
             return "tas"
-        case .cloudcover:
+        case .cloudcover_mean:
             return "clt"
-        case .precipitation:
+        case .precipitation_sum:
             return "pr"
         case .relative_humidity_2m_min:
             return "hursmax"
         case .relative_humidity_2m_max:
             return "hursmin"
-        case .relative_humidity_2m:
+        case .relative_humidity_2m_mean:
             return "hurs"
-        case .runoff:
+        case .runoff_sum:
             return "mrro"
-        case .snowfall_water_equivalent:
+        case .snowfall_water_equivalent_sum:
             return "prsn" //kg m-2 s-1
         case .soil_moisture_0_to_10cm: // Moisture in Upper Portion of Soil Column
             return "mrsos"
-        case .shortwave_radiation:
+        case .shortwave_radiation_sum:
             return "rsds"
         //case .surface_temperature:
         //    return "tslsi"
-        case .windspeed_10m:
+        case .windspeed_10m_mean:
             return "sfcWind"
+        case .windspeed_10m_max:
+            return "sfcWindmax"
         }
     }
     
@@ -500,16 +512,18 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             fallthrough
         case .temperature_2m_max:
             fallthrough
-        case .temperature_2m:
+        case .temperature_2m_mean:
             return (1, -273.15)
         case .pressure_msl:
             return (1/100, 0)
-        case .precipitation:
+        case .precipitation_sum:
             fallthrough
-        case .snowfall_water_equivalent:
+        case .snowfall_water_equivalent_sum:
             fallthrough
-        case .runoff:
+        case .runoff_sum:
             return (3600*24, 0)
+        case .shortwave_radiation_sum:
+            return (24*0.0036, 0) // mean w/m2 to MJ/m2 sum
         default:
             return nil
         }
@@ -580,12 +594,12 @@ struct DownloadCmipCommand: AsyncCommandFix {
             // TODO: delete temporary nc files
         }
         
-        for variable in [Cmip6Variable.temperature_2m_max] { // Cmip6Variable.allCases {
+        for variable in Cmip6Variable.allCases { // [Cmip6Variable.precipitation_sum] { //
             guard let timeType = variable.domainTimeRange(for: domain) else {
                 continue
             }
             
-            for year in 1950...2050 { // 2014
+            for year in 1950...1950 { // 2014
                 logger.info("Downloading \(variable) for year \(year)")
                 let version = variable.version(for: domain, isFuture: year >= 2015)
                 let experimentId = year >= 2015 ? "highresSST-future" : "highresSST-present"
@@ -656,7 +670,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         continue
                     }
                     /// `FGOALS_f3_H` has no near surface relative humidity, calculate from specific humidity
-                    let calculateRhFromSpecificHumidity = domain == .FGOALS_f3_H && variable == .relative_humidity_2m
+                    let calculateRhFromSpecificHumidity = domain == .FGOALS_f3_H && variable == .relative_humidity_2m_mean
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
