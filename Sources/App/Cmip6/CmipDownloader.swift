@@ -79,46 +79,46 @@ import SwiftNetCDF
  */
 
 enum Cmip6Domain: String, GenericDomain {
-    case CMCC_CM2_VHR4_daily
-    case FGOALS_f3_H_daily
-    case HiRAM_SIT_HR_daily
-    case MRI_AGCM3_2_S_daily
+    case CMCC_CM2_VHR4
+    case FGOALS_f3_H
+    case HiRAM_SIT_HR
+    case MRI_AGCM3_2_S
     
     var soureName: String {
         switch self {
-        case .CMCC_CM2_VHR4_daily:
+        case .CMCC_CM2_VHR4:
             return "CMCC-CM2-VHR4"
-        case .FGOALS_f3_H_daily:
+        case .FGOALS_f3_H:
             return "FGOALS-f3-H"
-        case .HiRAM_SIT_HR_daily:
+        case .HiRAM_SIT_HR:
             return "HiRAM-SIT-HR"
-        case .MRI_AGCM3_2_S_daily:
+        case .MRI_AGCM3_2_S:
             return "MRI-AGCM3-2-S"
         }
     }
     
     var gridName: String {
         switch self {
-        case .CMCC_CM2_VHR4_daily:
+        case .CMCC_CM2_VHR4:
             return "gn"
-        case .FGOALS_f3_H_daily:
+        case .FGOALS_f3_H:
             return "gr"
-        case .HiRAM_SIT_HR_daily:
+        case .HiRAM_SIT_HR:
             return "gn"
-        case .MRI_AGCM3_2_S_daily:
+        case .MRI_AGCM3_2_S:
             return "gn"
         }
     }
     
     var institute: String {
         switch self {
-        case .CMCC_CM2_VHR4_daily:
+        case .CMCC_CM2_VHR4:
             return "CMCC"
-        case .FGOALS_f3_H_daily:
+        case .FGOALS_f3_H:
             return "CAS"
-        case .HiRAM_SIT_HR_daily:
+        case .HiRAM_SIT_HR:
             return "AS-RCEC"
-        case .MRI_AGCM3_2_S_daily:
+        case .MRI_AGCM3_2_S:
             return "MRI"
         }
     }
@@ -141,20 +141,20 @@ enum Cmip6Domain: String, GenericDomain {
         return 24*3600
     }
     
-    private static var elevationCMCC_CM2_VHR4 = try? OmFileReader(file: Self.CMCC_CM2_VHR4_daily.surfaceElevationFileOm)
-    private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H_daily.surfaceElevationFileOm)
-    private static var elevationHiRAM_SIT_HR = try? OmFileReader(file: Self.HiRAM_SIT_HR_daily.surfaceElevationFileOm)
-    private static var elevationMRI_AGCM3_2_S = try? OmFileReader(file: Self.MRI_AGCM3_2_S_daily.surfaceElevationFileOm)
+    private static var elevationCMCC_CM2_VHR4 = try? OmFileReader(file: Self.CMCC_CM2_VHR4.surfaceElevationFileOm)
+    private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H.surfaceElevationFileOm)
+    private static var elevationHiRAM_SIT_HR = try? OmFileReader(file: Self.HiRAM_SIT_HR.surfaceElevationFileOm)
+    private static var elevationMRI_AGCM3_2_S = try? OmFileReader(file: Self.MRI_AGCM3_2_S.surfaceElevationFileOm)
     
     var elevationFile: OmFileReader<MmapFile>? {
         switch self {
-        case .CMCC_CM2_VHR4_daily:
+        case .CMCC_CM2_VHR4:
             return Self.elevationCMCC_CM2_VHR4
-        case .FGOALS_f3_H_daily:
+        case .FGOALS_f3_H:
             return Self.elevationFGOALS_f3_H
-        case .HiRAM_SIT_HR_daily:
+        case .HiRAM_SIT_HR:
             return Self.elevationHiRAM_SIT_HR
-        case .MRI_AGCM3_2_S_daily:
+        case .MRI_AGCM3_2_S:
             return Self.elevationMRI_AGCM3_2_S
         }
     }
@@ -166,26 +166,26 @@ enum Cmip6Domain: String, GenericDomain {
     
     var grid: Gridable {
         switch self {
-        case .CMCC_CM2_VHR4_daily:
+        case .CMCC_CM2_VHR4:
             return RegularGrid(nx: 1152, ny: 768, latMin: -90, lonMin: -180, dx: 0.3125, dy: 180/768)
-        case .FGOALS_f3_H_daily:
+        case .FGOALS_f3_H:
             return RegularGrid(nx: 1440, ny: 720, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .HiRAM_SIT_HR_daily:
+        case .HiRAM_SIT_HR:
             return RegularGrid(nx: 1536, ny: 768, latMin: -90, lonMin: -180, dx: 360/1536, dy: 180/768)
-        case .MRI_AGCM3_2_S_daily:
+        case .MRI_AGCM3_2_S:
             return RegularGrid(nx: 1920, ny: 960, latMin: -90, lonMin: -180, dx: 0.1875, dy: 0.1875)
         }
     }
     
     var versionOrography: (altitude: String, landmask: String)? {
         switch self {
-        case .CMCC_CM2_VHR4_daily:
+        case .CMCC_CM2_VHR4:
             return ("20210330", "20210330")
-        case .FGOALS_f3_H_daily:
+        case .FGOALS_f3_H:
             return ("20201204", "20210121")
-        case .HiRAM_SIT_HR_daily:
+        case .HiRAM_SIT_HR:
             return nil
-        case .MRI_AGCM3_2_S_daily:
+        case .MRI_AGCM3_2_S:
             return ("20200305", "20200305")
         }
     }
@@ -219,7 +219,7 @@ enum Cmip6Variable: String, CaseIterable {
     
     func version(for domain: Cmip6Domain) -> String {
         switch domain {
-        case .CMCC_CM2_VHR4_daily:
+        case .CMCC_CM2_VHR4:
             if self == .precipitation {
                 return "20210308"
             }
@@ -227,11 +227,11 @@ enum Cmip6Variable: String, CaseIterable {
                 return "20170927"
             }
             return "20190725"
-        case .FGOALS_f3_H_daily:
+        case .FGOALS_f3_H:
             return "20190817"
-        case .HiRAM_SIT_HR_daily:
+        case .HiRAM_SIT_HR:
             return "20210713" // "20210707"
-        case .MRI_AGCM3_2_S_daily:
+        case .MRI_AGCM3_2_S:
             return "20190711"
         }
     }
@@ -273,7 +273,7 @@ enum Cmip6Variable: String, CaseIterable {
     
     func domainTimeRange(for domain: Cmip6Domain) -> TimeType? {
         switch domain {
-        case .MRI_AGCM3_2_S_daily:
+        case .MRI_AGCM3_2_S:
             switch self {
             case .pressure_msl:
                 return .yearly
@@ -306,7 +306,7 @@ enum Cmip6Variable: String, CaseIterable {
             case .windspeed_10m:
                 return .yearly
             }
-        case .CMCC_CM2_VHR4_daily:
+        case .CMCC_CM2_VHR4:
             // no near surface RH, only specific humidity
             // also no near surface temp, only 1000 hPa temp
             // temp, rh, pressure can only be calcuated with 6h values
@@ -323,7 +323,7 @@ enum Cmip6Variable: String, CaseIterable {
             default:
                 return nil
             }
-        case .FGOALS_f3_H_daily:
+        case .FGOALS_f3_H:
             // no near surface RH, only specific humidity
             // temp min/max and rh/min max can only be calculated form 3h values
             // has max wind
@@ -347,7 +347,7 @@ enum Cmip6Variable: String, CaseIterable {
             default:
                 return nil
             }
-        case .HiRAM_SIT_HR_daily:
+        case .HiRAM_SIT_HR:
             // no u/v wind components near surface
             // rh daily min/max impossible to get get
             // no wind daily max possible
@@ -498,14 +498,15 @@ struct DownloadCmipCommand: AsyncCommandFix {
             // TODO: delete temporary nc files
         }
         
-        for variable in Cmip6Variable.allCases {
+        for variable in [Cmip6Variable.temperature_2m_max] { // Cmip6Variable.allCases {
             guard let timeType = variable.domainTimeRange(for: domain) else {
                 continue
             }
             
-            for year in 1950...1950 { // 2014
+            for year in 1950...2050 { // 2014
                 logger.info("Downloading \(variable) for year \(year)")
                 let version = variable.version(for: domain)
+                let experimentId = year >= 2015 ? "highresSST-future" : "highresSST-present"
                 
                 switch timeType {
                 case .monthly:
@@ -522,7 +523,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
                         if !FileManager.default.fileExists(atPath: monthlyOmFile) {
                             let endOfMonth = YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).format_YYYYMMdd
-                            let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(endOfMonth).nc"
+                            let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(endOfMonth).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
                             try FileManager.default.removeItem(atPath: ncFile)
@@ -573,11 +574,11 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         continue
                     }
                     /// `FGOALS_f3_H` has no near surface relative humidity, calculate from specific humidity
-                    let calculateRhFromSpecificHumidity = domain == .FGOALS_f3_H_daily && variable == .relative_humidity_2m
+                    let calculateRhFromSpecificHumidity = domain == .FGOALS_f3_H && variable == .relative_humidity_2m
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
-                        let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_highresSST-present_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
+                        let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
                         try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                     }
                     var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
