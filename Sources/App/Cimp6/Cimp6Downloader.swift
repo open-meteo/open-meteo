@@ -205,7 +205,7 @@ enum Cmip6Variable: String, CaseIterable {
     case relative_humidity_2m
     case windspeed_10m
     
-    case surface_temperature
+    //case surface_temperature
     
     /// Moisture in Upper Portion of Soil Column.
     case soil_moisture_0_to_10cm
@@ -262,8 +262,8 @@ enum Cmip6Variable: String, CaseIterable {
             return 1
         case .windspeed_10m:
             return 10
-        case .surface_temperature:
-            return 20
+        //case .surface_temperature:
+        //    return 20
         case .soil_moisture_0_to_10cm:
             return 1000
         case .shortwave_radiation:
@@ -297,8 +297,8 @@ enum Cmip6Variable: String, CaseIterable {
                 return .yearly
             case .relative_humidity_2m:
                 return .yearly
-            case .surface_temperature:
-                return .yearly
+            //case .surface_temperature:
+            //    return .yearly
             case .soil_moisture_0_to_10cm:
                 return .yearly
             case .shortwave_radiation:
@@ -309,6 +309,7 @@ enum Cmip6Variable: String, CaseIterable {
         case .CMCC_CM2_VHR4_daily:
             // no near surface RH, only specific humidity
             // also no near surface temp, only 1000 hPa temp
+            // temp, rh, pressure can only be calcuated with 6h values
             switch self {
             //case .relative_humidity_2m:
             //    return .monthly
@@ -324,6 +325,8 @@ enum Cmip6Variable: String, CaseIterable {
             }
         case .FGOALS_f3_H_daily:
             // no near surface RH, only specific humidity
+            // temp min/max and rh/min max can only be calculated form 3h values
+            // has max wind
             switch self {
             case .relative_humidity_2m:
                 return .yearly
@@ -346,6 +349,8 @@ enum Cmip6Variable: String, CaseIterable {
             }
         case .HiRAM_SIT_HR_daily:
             // no u/v wind components near surface
+            // rh daily min/max impossible to get get
+            // no wind daily max possible
             switch self {
             case .temperature_2m:
                 return .yearly
@@ -400,8 +405,8 @@ enum Cmip6Variable: String, CaseIterable {
             return "mrsos"
         case .shortwave_radiation:
             return "rsds"
-        case .surface_temperature:
-            return "tslsi"
+        //case .surface_temperature:
+        //    return "tslsi"
         case .windspeed_10m:
             return "sfcWind"
         }
