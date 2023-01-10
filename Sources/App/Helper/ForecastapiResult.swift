@@ -287,19 +287,12 @@ struct ForecastapiResult {
                     b.buffer.writeString("{")
                     switch timeformat {
                     case .iso8601:
-                        b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.rawValue)\",")
+                        b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.rawValue)\"")
                     case .unixtime:
-                        b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.rawValue)\",")
+                        b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.rawValue)\"")
                     }
-                    
-                    var firstKey = true
                     for e in section.columns {
-                        if firstKey {
-                            firstKey = false
-                        } else {
-                            b.buffer.writeString(",")
-                        }
-                        b.buffer.writeString("\"\(e.variable)\":\"\(e.unit.rawValue)\"")
+                        b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.rawValue)\"")
                         try await b.flushIfRequired()
                     }
                     b.buffer.writeString("}")
