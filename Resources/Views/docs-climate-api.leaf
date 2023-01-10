@@ -202,12 +202,12 @@
             Snowfall Sum
           </label>
         </div>
-        <div class="form-check">
+        <!--<div class="form-check">
           <input class="form-check-input" type="checkbox" value="runoff_sum" id="runoff_sum" name="daily">
           <label class="form-check-label" for="runoff_sum">
             Runoff Sum
           </label>
-        </div>
+        </div>-->
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="windspeed_10m_mean" id="windspeed_10m_mean" name="daily">
           <label class="form-check-label" for="windspeed_10m_mean">

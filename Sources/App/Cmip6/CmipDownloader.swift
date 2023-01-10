@@ -54,10 +54,10 @@ import SwiftNetCDF
  
  HiRAM-SIT-LR: only present
  
- ACCESS-OM2-025 -> only ocean
- AWI-CM-1-1-HR: onlt oean
+ ACCESS-OM2-025: only ocean
+ AWI-CM-1-1-HR: only ocean
  
- ECMWF-IFS-HR:
+ ECMWF-IFS-HR: only present, not forecast
  0.5°
  6h: 2m temp, wind, hum, pres
  day: 2m temp, clouds, precip, wind, hum, snow, swrad, surface temp (min/max),
@@ -599,7 +599,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 continue
             }
             
-            for year in 1950...1950 { // 2014
+            for year in [1950, 2014] { //} 1950...1950 { // 2014
                 logger.info("Downloading \(variable) for year \(year)")
                 let version = variable.version(for: domain, isFuture: year >= 2015)
                 let experimentId = year >= 2015 ? "highresSST-future" : "highresSST-present"
