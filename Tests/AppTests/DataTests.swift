@@ -255,4 +255,15 @@ final class DataTests: XCTestCase {
          Coords(i: 1142760, x: 1068, y: 1068, latitude: 63.769516, longitude: 74.10509)
          */
     }
+    
+    func testCamsEurope() {
+        let grid = CamsDomain.cams_europe.grid
+        let pos = grid.getCoordinates(gridpoint: 0)
+        XCTAssertEqual(pos.latitude, 71.95)
+        XCTAssertEqual(pos.longitude, -24.95)
+        
+        let bologna = grid.findPoint(lat: 45.45, lon: 11.35)!
+        XCTAssertEqual(bologna % grid.nx, 363) // x
+        XCTAssertEqual(bologna / grid.nx, 265) // y        
+    }
 }

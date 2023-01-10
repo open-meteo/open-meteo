@@ -50,7 +50,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         case .cams_global:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
         case .cams_europe:
-            return RegularGrid(nx: 700, ny: 420, latMin: 30.05, lonMin: -24.95, dx: 0.1, dy: 0.1)
+            return RegularGrid(nx: 700, ny: 420, latMin: /*30.05*/ 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
         }
     }
 }
