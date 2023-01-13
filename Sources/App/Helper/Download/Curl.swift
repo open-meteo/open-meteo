@@ -266,26 +266,27 @@ struct GribArray2D {
 }
 
 extension AsyncSequence where Element == ByteBuffer {
-    /// Store incoming data to file. Buffers up to 128kb until flushed to disk.
-    /// Optimised for ZFS recordsize of 128kb
+    /// Store incoming data to file. Buffers up to 1024kb until flushed to disk.
+    /// Optimised for ZFS recordsize of 1024kb
     /// NOTE: File IO is blocking e.g. synchronous
     /// If `size` is set, the required file size will be prealiocated
     /// If `modificationDate` is set, the files modification date will be set to it
     func saveTo(file: String, size: Int?, modificationDate: Date?) async throws {
         let fn = try FileHandle.createNewFile(file: file, size: size)
+        let recordSize = 1024 * 1024 // 1mb
         
-        /// Buffer up to 128kb and then write larger chunks
+        /// Buffer up to 1024kb and then write larger chunks
         var buffer = ByteBuffer()
-        buffer.reserveCapacity(128*1024)
+        buffer.reserveCapacity(recordSize)
         for try await fragment in self {
             try Task.checkCancellation()
             var fragment = fragment
             while fragment.readableBytes > 0 {
                 fragment.readWithUnsafeReadableBytes({
-                    let chunkBytes = Swift.min($0.count, 128*1024)
+                    let chunkBytes = Swift.min($0.count, recordSize)
                     return buffer.writeBytes(UnsafeRawBufferPointer(rebasing: $0[0..<chunkBytes]))
                 })
-                if buffer.readableBytes >= 128*1024 {
+                if buffer.readableBytes >= recordSize {
                     try fn.write(contentsOf: buffer.readableBytesView)
                     buffer.moveReaderIndex(to: 0)
                     buffer.moveWriterIndex(to: 0)
