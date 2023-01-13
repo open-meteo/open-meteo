@@ -178,7 +178,7 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
     
     case showers
     
-    /// CPOFP Percent frozen precipitation
+    /// CSNOW categorical snow as percent (0-100)
     case frozen_precipitation_percent
     //case rain
     //case snowfall_convective_water_equivalent
