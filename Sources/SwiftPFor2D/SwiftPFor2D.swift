@@ -373,7 +373,7 @@ public final class OmFileWriter {
         let fileTemp = "\(file)~"
         try FileManager.default.removeItemIfExists(at: fileTemp)
         try {
-            let fn = try FileHandle.createNewFile(file: file)
+            let fn = try FileHandle.createNewFile(file: fileTemp)
             try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
         }()
         try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
