@@ -694,7 +694,7 @@ extension Process {
                 if "the request you have submitted is not valid" in str(e):
                     exit(70)
                 raise e
-            """
+            """ .replacingOccurrences(of: "\\/", with: "/")
         
         try pyCode.write(toFile: "\(destinationFile).py", atomically: true, encoding: .utf8)
         try Process.spawn(cmd: "python3", args: ["\(destinationFile).py"])

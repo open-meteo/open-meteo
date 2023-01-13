@@ -19,8 +19,13 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     
     /// Cams has delay of 8 hours
     var lastRun: Int {
-        let t = Timestamp.now()
-        return t.hour > 14 ? 12 : 0
+        switch self {
+        case .cams_global:
+            let t = Timestamp.now()
+            return t.hour > 14 ? 12 : 0
+        case .cams_europe:
+            return 0
+        }
     }
     
     var omfileDirectory: String {
