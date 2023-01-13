@@ -129,9 +129,9 @@ final class Curl {
                 let contentLength = try response.contentLength()
                 let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
-                    try await response.body.tracker(tracker).decompressBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified)
+                    try await response.body.tracker(tracker).decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified, logger: logger)
                 } else {
-                    try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified)
+                    try await response.body.tracker(tracker).saveTo(file: toFile, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
                 try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
                 self.totalBytesTransfered += tracker.transfered
@@ -271,12 +271,14 @@ extension AsyncSequence where Element == ByteBuffer {
     /// NOTE: File IO is blocking e.g. synchronous
     /// If `size` is set, the required file size will be prealiocated
     /// If `modificationDate` is set, the files modification date will be set to it
-    func saveTo(file: String, size: Int?, modificationDate: Date?) async throws {
+    func saveTo(file: String, size: Int?, modificationDate: Date?, logger: Logger) async throws {
         let fn = try FileHandle.createNewFile(file: file, size: size)
         let recordSize = 1024 * 1024 // 1mb
         
         /// Buffer up to 1024kb and then write larger chunks
         var buffer = ByteBuffer()
+        var timeActive: Double = 0
+        var transfered: Int = 0
         buffer.reserveCapacity(recordSize)
         for try await fragment in self {
             try Task.checkCancellation()
@@ -287,15 +289,28 @@ extension AsyncSequence where Element == ByteBuffer {
                     return buffer.writeBytes(UnsafeRawBufferPointer(rebasing: $0[0..<chunkBytes]))
                 })
                 if buffer.readableBytes >= recordSize {
-                    try fn.write(contentsOf: buffer.readableBytesView)
-                    buffer.moveReaderIndex(to: 0)
-                    buffer.moveWriterIndex(to: 0)
+                    let time = Date()
+                    try fn.write(contentsOf: buffer.readableBytesView[0..<recordSize])
+                    timeActive += Date().timeIntervalSince(time)
+                    transfered += buffer.readableBytes
+                    buffer.moveReaderIndex(forwardBy: recordSize)
+                    buffer.discardReadBytes()
                 }
             }
         }
         // write remaining data
+        let time = Date()
         try fn.write(contentsOf: buffer.readableBytesView)
+        timeActive += Date().timeIntervalSince(time)
+        transfered += buffer.readableBytes
         buffer.moveReaderIndex(forwardBy: buffer.readableBytes)
+        
+        if timeActive >= 0.01 {
+            let rate = Int(Double(transfered) / timeActive)
+            if rate < 80*1024*1024 {
+                logger.warning("Slow disk write speed \(rate.bytesHumanReadable)/s")
+            }
+        }
         
         if let modificationDate {
             let times = [timespec](repeating: timespec(tv_sec: Int(modificationDate.timeIntervalSince1970), tv_nsec: 0), count: 2)

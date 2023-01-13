@@ -191,6 +191,8 @@ struct SyncCommand: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         
+        disableIdleSleep()
+        
         let server = signature.server ?? "http://api.open-meteo.com/"
         guard server.last == "/" else {
             fatalError("Server URL must end with a '/'.")
