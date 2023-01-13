@@ -45,6 +45,10 @@ extension GenericReaderDerived {
         reader.targetElevation
     }
     
+    var domain: Domain {
+        reader.domain
+    }
+    
     init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         guard let reader = try GenericReaderCached<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil

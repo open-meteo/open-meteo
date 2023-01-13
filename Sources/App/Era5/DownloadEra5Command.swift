@@ -654,7 +654,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             }
             
             // chunk 6 locations and 21 days of data
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: "\(writeFile)~", compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
+            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, nx*ny)
                 
                 var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
@@ -673,7 +673,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                 return ArraySlice(fasttime.data)
             })
             progress.finish()
-            try FileManager.default.moveFileOverwrite(from: "\(writeFile)~", to: writeFile)
         }
     }
 }

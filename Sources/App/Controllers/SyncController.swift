@@ -239,13 +239,11 @@ struct SyncCommand: AsyncCommandFix {
                 var client = ClientRequest(url: URI("\(server)sync/download"))
                 try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey))
                 let localFile = "\(OpenMeteo.dataDictionary)/\(download.file)"
-                let localFileTemp = "\(localFile)~"
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                 // TODO sha256 hash integration check
                 
-                try await curl.download(url: client.url.string, toFile: localFileTemp, bzip2Decode: false)
-                try FileManager.default.moveFileOverwrite(from: localFileTemp, to: localFile)
+                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false)
                 progress.add(curl.totalBytesTransfered - startBytes)
             }
             

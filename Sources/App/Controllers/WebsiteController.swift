@@ -9,6 +9,7 @@ struct WebsiteController: RouteCollection {
         routes.get("robots.txt", use: robotsTxtHandler)
         routes.get(use: indexHandler)
         routes.get("en", "docs", use: docsHandler)
+        routes.get("en", "docs", "climate-api", use: climateApiHandler)
         routes.get("en", "docs", "geocoding-api", use: docsGeocodingHandler)
         routes.get("en", "docs", "ecmwf-api", use: ecmwfApiHandler)
         routes.get("en", "docs", "historical-weather-api", use: historicalWeatherApiHandler)
@@ -204,6 +205,14 @@ struct WebsiteController: RouteCollection {
         }
         let context = IndexContext(title: "Flood API")
         return req.view.render("docs-flood-api", context)
+    }
+    
+    func climateApiHandler(_ req: Request) -> EventLoopFuture<View> {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
+            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
+        }
+        let context = IndexContext(title: "Climate API")
+        return req.view.render("docs-climate-api", context)
     }
     
     func dwdApiHandler(_ req: Request) -> EventLoopFuture<View> {

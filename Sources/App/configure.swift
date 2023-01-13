@@ -72,6 +72,7 @@ public func configure(_ app: Application) throws {
     app.commands.use(MetNoDownloader(), as: "download-metno")
     app.commands.use(GloFasDownloader(), as: "download-glofas")
     app.commands.use(GemDownload(), as: "download-gem")
+    app.commands.use(DownloadCmipCommand(), as: "download-cmip6")
     app.commands.use(SyncCommand(), as: "sync")
 
     app.http.server.configuration.hostname = "0.0.0.0"

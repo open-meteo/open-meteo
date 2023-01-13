@@ -30,6 +30,7 @@ struct Meteorology {
     /// Calculate surface pressure, corrected by temperature.
     static func surfacePressure(temperature: [Float], pressure: [Float], elevation: Float) -> [Float] {
         precondition(temperature.count == pressure.count)
+        let elevation =  elevation.isNaN ? 0 : elevation
         
         return zip(temperature, pressure).map { (t, p) -> Float in
             /// Sea level temperature in kelvin
@@ -154,6 +155,31 @@ struct Meteorology {
     public static func specificToRelativeHumidity(specificHumidity: [Float], temperature: [Float], pressure: [Float]) -> [Float] {
         return zip(temperature, zip(specificHumidity, pressure)).map {
             let (temp, (qair, press)) = $0
+            
+            let β = Float(17.625)
+            let λ = Float(243.04)
+            
+            /// saturation vapor pressure at air temperature Thr. (kPa)
+            let es = 6.112 * exp((β * temp)/(temp + λ))
+            let e = qair / 1000 * press * 100 / (0.378 * qair / 1000 + 0.622)
+            let rh = e / es
+            return max(min(rh,100),0)
+        }
+    }
+    
+    /// Calculate relative humidity and correct sea level pressure to surface pressure.
+    public static func specificToRelativeHumidity(specificHumidity: Array2DFastTime, temperature: Array2DFastTime, sealLevelPressure: Array2DFastTime, elevation: [Float]) -> [Float] {
+        
+        return temperature.data.enumerated().map { (i, temp) in
+            let asl = sealLevelPressure.data[i % sealLevelPressure.nTime]
+            let qair = specificHumidity.data[i]
+            
+            let asl0 = asl.isNaN ? 0 : asl
+            /// Sea level temperature in kelvin
+            let t0 = (temp + 273.15 + 0.0065 * asl0)
+            let factor = powf(1 - (0.0065 * asl0) / t0, -5.25578129287)
+            let press = sealLevelPressure.data[i] / factor
+            
             
             let β = Float(17.625)
             let λ = Float(243.04)

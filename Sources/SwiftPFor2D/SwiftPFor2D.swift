@@ -364,14 +364,24 @@ public final class OmFileWriter {
         try state.writeTail()
     }
     
-    /// Write new. Throw error is file exists
+    /// Write new file. Throw error is file exists
+    /// Uses a temporary file and then atomic move
     public func write(file: String, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         if FileManager.default.fileExists(atPath: file) {
             throw SwiftPFor2DError.fileExistsAlready(filename: file)
         }
-        let fn = try FileHandle.createNewFile(file: file)
-        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
+        let fileTemp = "\(file)~"
+        try FileManager.default.removeItemIfExists(at: fileTemp)
+        try {
+            let fn = try FileHandle.createNewFile(file: file)
+            try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
+        }()
+        try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
     }
+    
+    //public func write(file: String, compressionType: CompressionType, scalefactor: Float, readers: [OmFileR]) throws {
+        
+    //}
     
     /// Write to memory
     public func writeInMemory(compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws -> Data {

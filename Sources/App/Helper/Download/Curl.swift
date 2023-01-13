@@ -114,9 +114,10 @@ final class Curl {
     }
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
-    ///
-    func download(url: String, toFile: String, bzip2Decode: Bool) async throws {
+    /// Data is first downloaded to a tempoary tilde file and then moved to its final location atomically
+    func download(url: String, toFile: String, bzip2Decode: Bool, atomic: Bool = false) async throws {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
+        let fileTemp = "\(toFile)~"
         while true {
             // Start the download and wait for the header
             let response = try await initiateDownload(url: url, range: nil, minSize: nil)
@@ -124,7 +125,7 @@ final class Curl {
             // Retry failed file transfers after this point
             do {
                 let lastModified = response.headers.lastModified?.value
-                try FileManager.default.removeItemIfExists(at: toFile)
+                try FileManager.default.removeItemIfExists(at: fileTemp)
                 let contentLength = try response.contentLength()
                 let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
@@ -132,6 +133,7 @@ final class Curl {
                 } else {
                     try await response.body.tracker(tracker).saveTo(file: toFile, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
+                try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
                 self.totalBytesTransfered += tracker.transfered
                 try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return
