@@ -211,7 +211,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
             date: "\(date)/\(date)",
             variable: variables.compactMap { $0.getCamsEuMeta()?.apiName },
             time: "\(run.hour.zeroPadded(len: 2)):00",
-            leadtime_hour: (0..<domain.forecastHours).map{"'\($0)'"}
+            leadtime_hour: (0..<domain.forecastHours).map(String.init)
         )
         
         do {
