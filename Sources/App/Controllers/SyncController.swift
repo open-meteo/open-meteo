@@ -39,6 +39,9 @@ struct SyncController: RouteCollection {
     struct DownloadParams: Content {
         let file: String
         let apikey: String
+        
+        /// in megabytes per second
+        let rate: Int?
     }
     
     func listHandler(_ req: Request) throws -> [SyncFileAttributes] {
@@ -71,7 +74,7 @@ struct SyncController: RouteCollection {
         }
         response.headers.add(name: "X-Accel-Redirect", value: "/data/\(params.file)")
         // Bytes per second download speed limit. Set to 50 MB/s.
-        response.headers.add(name: "X-Accel-Limit-Rate", value: "\(50*1024*1024)")
+        response.headers.add(name: "X-Accel-Limit-Rate", value: "\((params.rate ?? 50)*1024*1024)")
         return response
     }
 }
@@ -181,6 +184,9 @@ struct SyncCommand: AsyncCommandFix {
         @Option(name: "server", help: "Server base URL. Default http://api.open-meteo.com/")
         var server: String?
         
+        @Option(name: "rate", help: "Transferrate in megabytes per second")
+        var rate: Int?
+        
         @Option(name: "max-age-days", help: "Maximum age of synchronised files. Default 7 days.")
         var maxAgeDays: Int?
         
@@ -237,7 +243,7 @@ struct SyncCommand: AsyncCommandFix {
                 curl.setDeadlineIn(minutes: 30)
                 let startBytes = curl.totalBytesTransfered
                 var client = ClientRequest(url: URI("\(server)sync/download"))
-                try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey))
+                try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey, rate: signature.rate))
                 let localFile = "\(OpenMeteo.dataDictionary)/\(download.file)"
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
