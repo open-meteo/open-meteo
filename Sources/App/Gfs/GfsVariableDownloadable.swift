@@ -114,7 +114,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .shortwave_radiation:
             return ":DSWRF:surface:"
         case .frozen_precipitation_percent:
-            return ":CPOFP:surface:"
+            return ":CSNOW:surface:"
         case .cape:
             return ":CAPE:surface:"
         case .lifted_index:

@@ -209,6 +209,7 @@ enum GfsVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMi
     case et0_fao_evapotranspiration
     case vapor_pressure_deficit
     case snowfall
+    case rain
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
@@ -322,6 +323,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
                 try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
                 try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
                 try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+            case .rain:
+                fallthrough
             case .snowfall:
                 try prefetchData(raw: .surface(.frozen_precipitation_percent), time: time)
                 try prefetchData(raw: .surface(.precipitation), time: time)
@@ -429,6 +432,13 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
                     max($0/100 * $1 * 0.7, 0)
                 })
                 return DataAndUnit(snowfall, SiUnit.centimeter)
+            case .rain:
+                let frozen_precipitation_percent = try get(raw: .surface(.frozen_precipitation_percent), time: time).data
+                let precipitation = try get(raw: .surface(.precipitation), time: time).data
+                let rain = zip(frozen_precipitation_percent, precipitation).map({
+                    max((1-$0/100) * $1, 0)
+                })
+                return DataAndUnit(rain, .millimeter)
             case .relativehumitidy_2m:
                 return try get(raw: .surface(.relativehumidity_2m), time: time)
             case .surface_pressure:
