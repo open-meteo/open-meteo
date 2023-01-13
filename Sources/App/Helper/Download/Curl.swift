@@ -129,9 +129,9 @@ final class Curl {
                 let contentLength = try response.contentLength()
                 let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
-                    try await response.body.tracker(tracker).decompressBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
+                    try await response.body.tracker(tracker).decompressBzip2().saveTo(file: toFile, size: nil, modificationDate: lastModified, logger: logger)
                 } else {
-                    try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified, logger: logger)
+                    try await response.body.tracker(tracker).saveTo(file: toFile, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
                 try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
                 self.totalBytesTransfered += tracker.transfered
