@@ -18,3 +18,22 @@ extension Process {
         }
     }
 }
+
+
+#if os(Linux)
+/// Disable Idle sleep, Not supported for linux
+func disableIdleSleep() {
+    
+}
+#else
+import IOKit.pwr_mgt
+
+/// Disable Idle sleep, Not supported for linux
+func disableIdleSleep() {
+    let reason: String = "Disabling Screen Sleep"
+    var assertionID: IOPMAssertionID = 0
+    guard IOPMAssertionCreateWithName(kIOPMAssertPreventUserIdleSystemSleep as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn), reason as CFString, &assertionID) == kIOReturnSuccess else {
+        fatalError("Idle sleep disable failed")
+    }
+}
+#endif
