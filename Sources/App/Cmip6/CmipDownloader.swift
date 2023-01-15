@@ -83,6 +83,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
     case FGOALS_f3_H
     case HiRAM_SIT_HR
     case MRI_AGCM3_2_S
+    
+    /// https://gmd.copernicus.org/articles/12/4999/2019/gmd-12-4999-2019.pdf
     case HadGEM3_GC31_HM
     
     var soureName: String {
@@ -646,8 +648,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let ncFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).nc"
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
                         if !FileManager.default.fileExists(atPath: monthlyOmFile) {
-                            let endOfMonth = YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).format_YYYYMMdd
-                            let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(endOfMonth).nc"
+                            // Feb 29 is ignored.....
+                            let day = month == 2 ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
+                            let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(year)\(month.zeroPadded(len: 2))\(day).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             
                             // TODO: support for specific humdity to relative humidity if required
