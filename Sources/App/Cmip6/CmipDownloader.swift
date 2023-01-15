@@ -83,6 +83,7 @@ enum Cmip6Domain: String, Codable, GenericDomain {
     case FGOALS_f3_H
     case HiRAM_SIT_HR
     case MRI_AGCM3_2_S
+    case HadGEM3_GC31_HM
     
     var soureName: String {
         switch self {
@@ -94,6 +95,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return "HiRAM-SIT-HR"
         case .MRI_AGCM3_2_S:
             return "MRI-AGCM3-2-S"
+        case .HadGEM3_GC31_HM:
+            return "HadGEM3-GC31-HM"
         }
     }
     
@@ -106,6 +109,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         case .HiRAM_SIT_HR:
             return "gn"
         case .MRI_AGCM3_2_S:
+            return "gn"
+        case .HadGEM3_GC31_HM:
             return "gn"
         }
     }
@@ -120,6 +125,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return "AS-RCEC"
         case .MRI_AGCM3_2_S:
             return "MRI"
+        case .HadGEM3_GC31_HM:
+            return "MOHC"
         }
     }
     
@@ -145,6 +152,7 @@ enum Cmip6Domain: String, Codable, GenericDomain {
     private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H.surfaceElevationFileOm)
     private static var elevationHiRAM_SIT_HR = try? OmFileReader(file: Self.HiRAM_SIT_HR.surfaceElevationFileOm)
     private static var elevationMRI_AGCM3_2_S = try? OmFileReader(file: Self.MRI_AGCM3_2_S.surfaceElevationFileOm)
+    private static var elevationHadGEM3_GC31_HM = try? OmFileReader(file: Self.HadGEM3_GC31_HM.surfaceElevationFileOm)
     
     var elevationFile: OmFileReader<MmapFile>? {
         switch self {
@@ -156,6 +164,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return Self.elevationHiRAM_SIT_HR
         case .MRI_AGCM3_2_S:
             return Self.elevationMRI_AGCM3_2_S
+        case .HadGEM3_GC31_HM:
+            return Self.elevationHadGEM3_GC31_HM
         }
     }
     
@@ -174,6 +184,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return RegularGrid(nx: 1536, ny: 768, latMin: -90, lonMin: -180, dx: 360/1536, dy: 180/768)
         case .MRI_AGCM3_2_S:
             return RegularGrid(nx: 1920, ny: 960, latMin: -90, lonMin: -180, dx: 0.1875, dy: 0.1875)
+        case .HadGEM3_GC31_HM:
+            return RegularGrid(nx: 1024, ny: 768, latMin: -90, lonMin: -180, dx: 360/1024, dy: 180/768)
         }
     }
     
@@ -187,6 +199,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return nil
         case .MRI_AGCM3_2_S:
             return ("20200305", "20200305")
+        case .HadGEM3_GC31_HM:
+            return ("20200910", "20200910")
         }
     }
 }
@@ -321,6 +335,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return "20200619"
             }
             return "20190711"
+        case .HadGEM3_GC31_HM:
+            return isFuture ? "20190315" : "20170831"
         }
     }
     
@@ -398,6 +414,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             case .windspeed_10m_mean:
                 return .yearly
             }
+        case .HadGEM3_GC31_HM:
+            // Has all
+            return .yearly
         case .CMCC_CM2_VHR4:
             // no near surface RH, only specific humidity
             // also no near surface temp, only 1000 hPa temp
@@ -577,13 +596,14 @@ struct DownloadCmipCommand: AsyncCommandFix {
         /// Make sure elevation information is present. Otherwise download it
         if let version = domain.versionOrography, !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             let ncFileAltitude = "\(domain.downloadDirectory)orog_fx.nc"
+            let experimentId = domain == .HadGEM3_GC31_HM ? "hist-1950" : "highresSST-present"
             if !FileManager.default.fileExists(atPath: ncFileAltitude) {
-                let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/fx/orog/\(grid)/v\(version.altitude)/orog_fx_\(source)_highresSST-present_r1i1p1f1_\(grid).nc"
+                let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/fx/orog/\(grid)/v\(version.altitude)/orog_fx_\(source)_\(experimentId)_r1i1p1f1_\(grid).nc"
                 try await curl.download(servers: servers, uri: uri, toFile: ncFileAltitude)
             }
             let ncFileLandFraction = "\(domain.downloadDirectory)sftlf_fx.nc"
             if !FileManager.default.fileExists(atPath: ncFileLandFraction) {
-                let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/fx/sftlf/\(grid)/v\(version.landmask)/sftlf_fx_\(source)_highresSST-present_r1i1p1f1_\(grid).nc"
+                let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/fx/sftlf/\(grid)/v\(version.landmask)/sftlf_fx_\(source)_\(experimentId)_r1i1p1f1_\(grid).nc"
                 try await curl.download(servers: servers, uri: uri, toFile: ncFileLandFraction)
             }
             var altitude = try NetCDF.read(path: ncFileAltitude, short: "orog", fma: nil)
@@ -684,7 +704,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
-                        let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
+                        /// MetOffice is using 30th december....
+                        let lastday = domain == .HadGEM3_GC31_HM ? "1230" : "1231"
+                        let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)\(lastday).nc"
                         try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                     }
                     var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
@@ -696,6 +718,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         array.data = Meteorology.specificToRelativeHumidity(specificHumidity: array, temperature: temp, sealLevelPressure: pressure, elevation: elevation)
                         //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)rh.nc", nx: domain.grid.nx, ny: domain.grid.ny)
                     }
+                    //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(year).nc", nx: domain.grid.nx, ny: domain.grid.ny)
                     try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
                     if deleteNetCDF {
                         try FileManager.default.removeItem(atPath: ncFile)
