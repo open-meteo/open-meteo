@@ -546,6 +546,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         let deleteNetCDF = true
+        let years = 1950...2050 // [1950, 2014]
         
         guard let domain = Cmip6Domain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
@@ -603,7 +604,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 continue
             }
             
-            for year in [1950, 2014] { //} 1950...1950 { // 2014
+            for year in years {
                 logger.info("Downloading \(variable) for year \(year)")
                 let version = variable.version(for: domain, isFuture: year >= 2015)
                 let experimentId = year >= 2015 ? "highresSST-future" : "highresSST-present"
@@ -622,13 +623,13 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
                         if !FileManager.default.fileExists(atPath: monthlyOmFile) {
                             let endOfMonth = YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).format_YYYYMMdd
-                            let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month)01-\(endOfMonth).nc"
+                            let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(endOfMonth).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
-                            try FileManager.default.removeItem(atPath: ncFile)
                             
                             // TODO: support for specific humdity to relative humidity if required
                             
                             let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
+                            try FileManager.default.removeItem(atPath: ncFile)
                             try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
                         }
                     }
