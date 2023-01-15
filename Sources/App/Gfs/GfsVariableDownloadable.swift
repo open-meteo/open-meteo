@@ -193,6 +193,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (1, -273.15)
         case .soil_temperature_100_to_200cm:
             return (1, -273.15)
+        case .frozen_precipitation_percent:
+            return (100, 0)
         default:
             return nil
         }
