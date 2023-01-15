@@ -312,6 +312,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         case .FGOALS_f3_H:
             return "20190817"
         case .HiRAM_SIT_HR:
+            if isFuture {
+                return "20210707"
+            }
             return "20210713" // "20210707"
         case .MRI_AGCM3_2_S:
             if isFuture {
@@ -557,6 +560,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                        "https://esgf.ceda.ac.uk/thredds/fileServer/esg_cmip6/CMIP6/",
                        "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/",
                        "https://esgf-data04.diasjp.net/thredds/fileServer/esg_dataroot/CMIP6/",
+                       "https://esgf-data03.diasjp.net/thredds/fileServer/esg_dataroot/CMIP6/",
                        "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"]
         
         guard let yearlyPath = domain.omfileArchive else {
@@ -680,7 +684,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
-                        let uri = "HighResMIP/\(domain.institute)/\(source)/highresSST-present/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
+                        let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)1231.nc"
                         try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                     }
                     var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
