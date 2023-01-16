@@ -326,7 +326,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             }
             return isFuture ? "20190725" : "20170927"
         case .FGOALS_f3_H:
-            return "20190817"
+            return isFuture ? "20200417" : "20190817"
         case .HiRAM_SIT_HR:
             if isFuture {
                 return "20210707"
@@ -570,7 +570,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         let deleteNetCDF = true
-        let years = 1950...2050 // [1950, 2014]
+        let years = [2015] // 1950...2050 // [1950, 2014]
         
         guard let domain = Cmip6Domain.init(rawValue: signature.domain) else {
             fatalError("Invalid domain '\(signature.domain)'")
@@ -591,7 +591,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: yearlyPath, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
-        let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, readTimeout: 3600*3, retryError4xx: false)
+        let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, deadLineHours: 24*14, readTimeout: 3600*3, retryError4xx: false)
         let source = domain.soureName
         let grid = domain.gridName
         
