@@ -465,19 +465,23 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             // also no near surface temp, only 1000 hPa temp
             // temp, rh, pressure can only be calcuated with 6h values
             switch self {
-            //case .relative_humidity_2m:
-            //    return .monthly
-            case .precipitation_sum:
-                // only precip is in yearly files...
-                return .yearly
-            //case .temperature_2m:
-            //    return .monthly
+            case .relative_humidity_2m_min:
+                return .restoreFrom(dt: 6*3600, shortName: "hurs", aggregate: .min)
+            case .relative_humidity_2m_max:
+                return .restoreFrom(dt: 6*3600, shortName: "hurs", aggregate: .max)
+            case .relative_humidity_2m_mean:
+                return .restoreFrom(dt: 6*3600, shortName: "hurs", aggregate: .mean)
+            case .pressure_msl:
+                return .restoreFrom(dt: 6*3600, shortName: "psl", aggregate: .mean)
             case .temperature_2m_mean:
                 return .restoreFrom(dt: 6*3600, shortName: "tas", aggregate: .mean)
             case .temperature_2m_max:
                 return .restoreFrom(dt: 6*3600, shortName: "tas", aggregate: .max)
             case .temperature_2m_min:
                 return .restoreFrom(dt: 6*3600, shortName: "tas", aggregate: .min)
+            case .precipitation_sum:
+                // only precip is in yearly files...
+                return .yearly
             case .windspeed_10m_mean:
                 return .monthly
             case .windspeed_10m_max:
@@ -740,42 +744,51 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         }
                     }
                     
+                    /// number of days in this year
+                    let nt = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: domain.dtSeconds).count
+                    
                     let monthlyReader = try (1...12).map { month in
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
                         return try OmFileReader(file: monthlyOmFile)
                     }
                     
-                    let nt = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: domain.dtSeconds).count
-                    
-                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { hourlydata in
-                        
-                        let time6h = TimerangeDt(start: Timestamp(0), to: Timestamp(hourlydata.nTime*dt), dtSeconds: dt)
-                        let time1h = time6h.with(dtSeconds: 3600)
-                        
-                        // TODO relative humidity calc
-                        
-                        var out = Array2DFastTime(nLocations: hourlydata.nLocations, nTime: nt)
-                        for l in 0..<hourlydata.nLocations {
-                            let slice = Array(hourlydata[l, 0..<hourlydata.nTime])
-                            let data1h = slice.interpolate(type: variable.interpolation, timeOld: time6h, timeNew: time1h, latitude: Float.nan, longitude: Float .nan, scalefactor: variable.scalefactor)
-                            switch aggregate {
-                            case .min:
-                                out[l, 0..<out.nTime] = ArraySlice(data1h.min(by: 24))
-                            case .max:
-                                out[l, 0..<out.nTime] = ArraySlice(data1h.max(by: 24))
-                            case .mean:
-                                out[l, 0..<out.nTime] = ArraySlice(data1h.mean(by: 24))
-                            }
-                            
+                    if shortName == "hurs" {
+                        // Calculate relative humidity from specific humidity, temperature and pressure
+                        let monthlyTemperature = try (1...12).map { month in
+                            let monthlyOmFile = "\(domain.downloadDirectory)tas_\(year)\(month).om"
+                            return try OmFileReader(file: monthlyOmFile)
                         }
-                        hourlydata = out
-                    })
-                    
-                    // calculate rh from psl, tas, huss
-                    
-                    // interpolate to 30min data.... best to have 1y array -> in omwriter loop?
-                    
-                    // write min/max/mean file
+                        let monthlyPressure = try (1...12).map { month in
+                            let monthlyOmFile = "\(domain.downloadDirectory)psl_\(year)\(month).om"
+                            return try OmFileReader(file: monthlyOmFile)
+                        }
+                        let elevation = try domain.elevationFile!.readAll()
+                        
+                        let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(omFile)")
+                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
+                            let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, domain.grid.count)
+
+                            var specificHumidity = try monthlyReader.combine(locationRange: locationRange)
+                            let temperature = try monthlyTemperature.combine(locationRange: locationRange)
+                            let pressureMsl = try monthlyPressure.combine(locationRange: locationRange)
+                            specificHumidity.data.multiplyAdd(multiply: 1000, add: 0)
+                            specificHumidity.data = Meteorology.specificToRelativeHumidity(specificHumidity: specificHumidity, temperature: temperature, sealLevelPressure: pressureMsl, elevation: Array(elevation[locationRange]))
+                            
+                            specificHumidity.interpolateAndAggregate(dt6h: dt, variable: variable, aggregate: aggregate)
+                            
+                            guard specificHumidity.nTime == nt else {
+                                fatalError("chunked files did not contain all timesteps (fasttime.nTime=\(specificHumidity.nTime), dim1=\(nt))")
+                            }
+                            progress.add(locationRange.count)
+                            return ArraySlice(specificHumidity.data)
+                        })
+                        progress.finish()
+                    } else {
+                        // Interpolate and afterwards aggregate to get min/max values
+                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { data6h in
+                            data6h.interpolateAndAggregate(dt6h: dt, variable: variable, aggregate: aggregate)
+                        })
+                    }
                     
                 case .monthly:
                     // download month files and combine to yearly file
@@ -883,7 +896,47 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     fatalError("ten yearly")
                 }
             }
+            
+            for variable in variables {
+                let isFuture = year >= 2015
+                guard let timeType = variable.domainTimeRange(for: domain, isFuture: isFuture) else {
+                    continue
+                }
+                switch timeType {
+                case .restoreFrom(dt: _, shortName: let shortName, aggregate: _):
+                    let short = shortName == "hurs" ? "huss" : shortName
+                    if deleteNetCDF {
+                        for month in 1...12 {
+                            try FileManager.default.removeItem(atPath: "\(domain.downloadDirectory)\(short)_\(year)\(month).om")
+                        }
+                    }
+                default:
+                    break
+                }
+            }
         }
+    }
+}
+
+extension Array2DFastTime {
+    fileprivate mutating func interpolateAndAggregate(dt6h: Int, variable: Cmip6Variable, aggregate: Cmip6Variable.TimeTypeAggregate) {
+        let time6h = TimerangeDt(start: Timestamp(0), to: Timestamp(self.nTime * dt6h), dtSeconds: dt6h)
+        let time1h = time6h.with(dtSeconds: 3600)
+        var out = Array2DFastTime(nLocations: self.nLocations, nTime: time1h.count / 24)
+        
+        for l in 0..<self.nLocations {
+            let slice = Array(self[l, 0..<self.nTime])
+            let data1h = slice.interpolate(type: variable.interpolation, timeOld: time6h, timeNew: time1h, latitude: Float.nan, longitude: Float .nan, scalefactor: variable.scalefactor)
+            switch aggregate {
+            case .min:
+                out[l, 0..<out.nTime] = ArraySlice(data1h.min(by: 24))
+            case .max:
+                out[l, 0..<out.nTime] = ArraySlice(data1h.max(by: 24))
+            case .mean:
+                out[l, 0..<out.nTime] = ArraySlice(data1h.mean(by: 24))
+            }
+        }
+        self = out
     }
 }
 
@@ -897,19 +950,7 @@ extension OmFileWriter {
         try write(file: file, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { dim0 in
             let locationRange = dim0..<min(dim0+nLocationsPerChunk, self.dim0)
 
-            var ntChunks = chunkedFiles.reduce(0, {$0 + $1.dim1})
-            var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: ntChunks * locationRange.count), nLocations: locationRange.count, nTime: ntChunks)
-
-            var timeOffset = 0
-            for omfile in chunkedFiles {
-                try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
-                let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
-                let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: omfile.dim1)
-                for l in 0..<locationRange.count {
-                    fasttime[l, timeOffset ..< timeOffset + omfile.dim1] = read2d[l, 0..<omfile.dim1]
-                }
-                timeOffset += omfile.dim1
-            }
+            var fasttime = try chunkedFiles.combine(locationRange: locationRange)
             
             dataCallback?(&fasttime)
             
@@ -920,6 +961,26 @@ extension OmFileWriter {
             return ArraySlice(fasttime.data)
         })
         progress.finish()
+    }
+}
+
+extension Array where Element == OmFileReader<MmapFile> {
+    /// Read the same location range from multiple files and assemble a time series
+    fileprivate func combine(locationRange: Range<Int>) throws -> Array2DFastTime {
+        var ntChunks = self.reduce(0, {$0 + $1.dim1})
+        var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: ntChunks * locationRange.count), nLocations: locationRange.count, nTime: ntChunks)
+
+        var timeOffset = 0
+        for omfile in self {
+            try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
+            let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
+            let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: omfile.dim1)
+            for l in 0..<locationRange.count {
+                fasttime[l, timeOffset ..< timeOffset + omfile.dim1] = read2d[l, 0..<omfile.dim1]
+            }
+            timeOffset += omfile.dim1
+        }
+        return fasttime
     }
 }
 
