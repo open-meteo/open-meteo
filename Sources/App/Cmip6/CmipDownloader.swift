@@ -76,8 +76,15 @@ import SwiftNetCDF
  MRI: Raw 2.15TB, Compressed 413 GB
  HiRAM_SIT_HR_daily: Raw 1.3TB, Compressed 210 GB
  FGLOALS: Raw 1.2 TB, Compressed 120 GB
+ 
+ 
+ TODO:
+ - CMCC daily min/max from 6h data
+ - fgoals daily min/max from 3h data
+ - missing feb 29 in CMCC
+ - bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4
+ 
  */
-
 enum Cmip6Domain: String, Codable, GenericDomain {
     case CMCC_CM2_VHR4
     case FGOALS_f3_H
@@ -492,7 +499,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             }
         case .HiRAM_SIT_HR:
             // no u/v wind components near surface
-            // rh daily min/max impossible to get get
+            // rh daily min/max impossible to get
             // no wind daily max possible
             switch self {
             case .temperature_2m_mean:
@@ -598,6 +605,10 @@ struct DownloadCmipCommand: AsyncCommandFix {
         var years: ClosedRange<Int> {
             if let year, let yearInt = Int(year) {
                 return yearInt...yearInt
+            }
+            if domain == "EC_Earth3P_HR" {
+                // every single experiment is just doing something slightly different...
+                return 1950...2049
             }
             return 1950...2050
         }

@@ -49,7 +49,7 @@
       href="https://openmeteo.substack.com/p/historical-weather-api-with-high" target="_blank">blog article</a>.
   </div>-->
 
-  <form id="api_form" method="get" action="https://archive-api.open-meteo.com/v1/climate">
+  <form id="api_form" method="get" action="http://89.58.17.152/v1/climate">
     <div class="row py-3 px-0">
       <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
@@ -267,6 +267,12 @@
                   <input class="form-check-input" type="checkbox" value="MRI_AGCM3_2_S" id="MRI_AGCM3_2_S" name="models">
                   <label class="form-check-label" for="MRI_AGCM3_2_S">
                     MRI_AGCM3_2_S <span class="text-muted">(18 km)</span>
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="EC_Earth3P_HR" id="EC_Earth3P_HR" name="models">
+                  <label class="form-check-label" for="EC_Earth3P_HR">
+                    EC_Earth3P_HR <span class="text-muted">(35 km)</span>
                   </label>
                 </div>
               </div>
