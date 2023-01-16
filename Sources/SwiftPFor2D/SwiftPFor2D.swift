@@ -310,11 +310,11 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
  - Data block
  */
 public final class OmFileWriter {
-    let dim0: Int
-    let dim1: Int
+    public let dim0: Int
+    public let dim1: Int
     
-    let chunk0: Int
-    let chunk1: Int
+    public let chunk0: Int
+    public let chunk1: Int
     
     var readBuffer: UnsafeMutableRawBufferPointer
     
@@ -328,8 +328,9 @@ public final class OmFileWriter {
         self.chunk0 = chunk0
         self.chunk1 = chunk1
         
-        if chunk0 * chunk1 * 4 > 1024 * 1024 * 4 {
-            print("WARNING: Chunk size greater than 4 MB!")
+        let chunkSizeByte = chunk0 * chunk1 * 4
+        if chunkSizeByte > 1024 * 1024 * 4 {
+            print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
         }
 
         let bufferSize = P4NENC256_BOUND(n: chunk0*chunk1, bytesPerElement: 4)
