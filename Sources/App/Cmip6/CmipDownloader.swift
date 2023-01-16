@@ -83,6 +83,7 @@ enum Cmip6Domain: String, Codable, GenericDomain {
     case FGOALS_f3_H
     case HiRAM_SIT_HR
     case MRI_AGCM3_2_S
+    case EC_Earth3P_HR
     
     /// https://gmd.copernicus.org/articles/12/4999/2019/gmd-12-4999-2019.pdf
     /// Disabled bacause uses 360 days
@@ -100,6 +101,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return "MRI-AGCM3-2-S"
         //case .HadGEM3_GC31_HM:
             //return "HadGEM3-GC31-HM"
+        case .EC_Earth3P_HR:
+            return "EC-Earth3P-HR"
         }
     }
     
@@ -115,6 +118,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return "gn"
         //case .HadGEM3_GC31_HM:
             //return "gn"
+        case .EC_Earth3P_HR:
+            return "gr"
         }
     }
     
@@ -130,6 +135,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return "MRI"
         //case .HadGEM3_GC31_HM:
             //return "MOHC"
+        case .EC_Earth3P_HR:
+            return "EC-Earth-Consortium"
         }
     }
     
@@ -155,6 +162,7 @@ enum Cmip6Domain: String, Codable, GenericDomain {
     private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H.surfaceElevationFileOm)
     private static var elevationHiRAM_SIT_HR = try? OmFileReader(file: Self.HiRAM_SIT_HR.surfaceElevationFileOm)
     private static var elevationMRI_AGCM3_2_S = try? OmFileReader(file: Self.MRI_AGCM3_2_S.surfaceElevationFileOm)
+    private static var elevationEC_Earth3P_HR = try? OmFileReader(file: Self.EC_Earth3P_HR.surfaceElevationFileOm)
     //private static var elevationHadGEM3_GC31_HM = try? OmFileReader(file: Self.HadGEM3_GC31_HM.surfaceElevationFileOm)
     
     var elevationFile: OmFileReader<MmapFile>? {
@@ -167,6 +175,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return Self.elevationHiRAM_SIT_HR
         case .MRI_AGCM3_2_S:
             return Self.elevationMRI_AGCM3_2_S
+        case .EC_Earth3P_HR:
+            return Self.elevationEC_Earth3P_HR
         //case .HadGEM3_GC31_HM:
             //return Self.elevationHadGEM3_GC31_HM
         }
@@ -187,6 +197,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return RegularGrid(nx: 1536, ny: 768, latMin: -90, lonMin: -180, dx: 360/1536, dy: 180/768)
         case .MRI_AGCM3_2_S:
             return RegularGrid(nx: 1920, ny: 960, latMin: -90, lonMin: -180, dx: 0.1875, dy: 0.1875)
+        case .EC_Earth3P_HR:
+            return RegularGrid(nx: 1024, ny: 512, latMin: -90, lonMin: -180, dx: 360/1024, dy: 180/512)
         //case .HadGEM3_GC31_HM:
         //    return RegularGrid(nx: 1024, ny: 768, latMin: -90, lonMin: -180, dx: 360/1024, dy: 180/768)
         }
@@ -202,6 +214,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return nil
         case .MRI_AGCM3_2_S:
             return ("20200305", "20200305")
+        case .EC_Earth3P_HR:
+            return ("20210412", "20210412")
         //case .HadGEM3_GC31_HM:
         //    return ("20200910", "20200910")
         }
@@ -339,6 +353,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return "20200619"
             }
             return "20190711"
+        case .EC_Earth3P_HR:
+            return isFuture ? "20190514" : "20170811"
         //case .HadGEM3_GC31_HM:
         //    return isFuture ? "20190315" : "20170831"
         }
@@ -381,8 +397,10 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         }
     }
     
-    func domainTimeRange(for domain: Cmip6Domain) -> TimeType? {
+    func domainTimeRange(for domain: Cmip6Domain, isFuture: Bool) -> TimeType? {
         switch domain {
+        case .EC_Earth3P_HR:
+            return isFuture ? .yearly : .monthly
         case .MRI_AGCM3_2_S:
             switch self {
             case .pressure_msl:
@@ -631,12 +649,12 @@ struct DownloadCmipCommand: AsyncCommandFix {
             let ncFileAltitude = "\(domain.downloadDirectory)orog_fx.nc"
             let experimentId = "highresSST-present" //domain == .HadGEM3_GC31_HM ? "hist-1950" : "highresSST-present"
             if !FileManager.default.fileExists(atPath: ncFileAltitude) {
-                let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/fx/orog/\(grid)/v\(version.altitude)/orog_fx_\(source)_\(experimentId)_r1i1p1f1_\(grid).nc"
+                let uri = domain == .EC_Earth3P_HR ? "HighResMIP/EC-Earth-Consortium/EC-Earth3P-HR/highres-future/r2i1p2f1/fx/orog/gr/v20210412/orog_fx_EC-Earth3P-HR_highres-future_r2i1p2f1_gr.nc" : "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/fx/orog/\(grid)/v\(version.altitude)/orog_fx_\(source)_\(experimentId)_r1i1p1f1_\(grid).nc"
                 try await curl.download(servers: servers, uri: uri, toFile: ncFileAltitude)
             }
             let ncFileLandFraction = "\(domain.downloadDirectory)sftlf_fx.nc"
             if !FileManager.default.fileExists(atPath: ncFileLandFraction) {
-                let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/fx/sftlf/\(grid)/v\(version.landmask)/sftlf_fx_\(source)_\(experimentId)_r1i1p1f1_\(grid).nc"
+                let uri = domain == .EC_Earth3P_HR ? "HighResMIP/EC-Earth-Consortium/EC-Earth3P-HR/highres-future/r2i1p2f1/fx/sftlf/gr/v20210412/sftlf_fx_EC-Earth3P-HR_highres-future_r2i1p2f1_gr.nc" :  "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/fx/sftlf/\(grid)/v\(version.landmask)/sftlf_fx_\(source)_\(experimentId)_r1i1p1f1_\(grid).nc"
                 try await curl.download(servers: servers, uri: uri, toFile: ncFileLandFraction)
             }
             var altitude = try NetCDF.read(path: ncFileAltitude, short: "orog", fma: nil)
@@ -657,14 +675,14 @@ struct DownloadCmipCommand: AsyncCommandFix {
         }
         
         for variable in variables {
-            guard let timeType = variable.domainTimeRange(for: domain) else {
-                continue
-            }
-            
             for year in years {
+                let isFuture = year >= 2015
+                guard let timeType = variable.domainTimeRange(for: domain, isFuture: isFuture) else {
+                    continue
+                }
                 logger.info("Downloading \(variable) for year \(year)")
-                let version = variable.version(for: domain, isFuture: year >= 2015)
-                let experimentId = year >= 2015 ? "highresSST-future" : "highresSST-present"
+                let version = variable.version(for: domain, isFuture: isFuture)
+                let experimentId = isFuture ? "highresSST-future" : "highresSST-present"
                 
                 let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
                 if FileManager.default.fileExists(atPath: omFile) {
