@@ -738,9 +738,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             
                             let isLeapMonth = month == 2 && Timestamp(year, 2, 28).add(days: 1).toComponents().day == 29
                             let duplicateTimeStep = (domain == .CMCC_CM2_VHR4 && isLeapMonth) ? (27 * 86400/dt) ..< (28 * 86400/dt) : nil
-                            let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
+                            let array = try NetCDF.read(path: ncFile, short: short, fma: short == "huss" ? (1000,0) : variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
-                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: short == "huss" ? 100 : variable.scalefactor, all: array.data)
                         }
                     }
                     
@@ -771,7 +771,6 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             var specificHumidity = try monthlyReader.combine(locationRange: locationRange)
                             let temperature = try monthlyTemperature.combine(locationRange: locationRange)
                             let pressureMsl = try monthlyPressure.combine(locationRange: locationRange)
-                            specificHumidity.data.multiplyAdd(multiply: 1000, add: 0)
                             specificHumidity.data = Meteorology.specificToRelativeHumidity(specificHumidity: specificHumidity, temperature: temperature, sealLevelPressure: pressureMsl, elevation: Array(elevation[locationRange]))
                             
                             specificHumidity.interpolateAndAggregate(dt6h: dt, variable: variable, aggregate: aggregate)
