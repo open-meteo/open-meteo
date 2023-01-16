@@ -230,6 +230,7 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
     case jma_mix
     case jma_msm
     case jms_gsm
+    case jma_gsm
     
     case gem_seamless
     case gem_global
@@ -324,6 +325,8 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
         case .jma_msm:
             return try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .jms_gsm:
+            fallthrough
+        case .jma_gsm:
             return try JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .icon_seamless:
             fallthrough

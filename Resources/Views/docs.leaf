@@ -584,9 +584,9 @@
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="jms_gsm"
-                    id="jms_gsm" name="models">
-                  <label class="form-check-label" for="jms_gsm">
+                  <input class="form-check-input" type="checkbox" value="jma_gsm"
+                    id="jma_gsm" name="models">
+                  <label class="form-check-label" for="jma_gsm">
                     JMA GSM
                   </label>
                 </div>
