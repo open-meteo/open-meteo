@@ -493,14 +493,14 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             // no near surface RH, only specific humidity
             // temp min/max and rh/min max can only be calculated form 3h values
             switch self {
-            case .relative_humidity_2m_mean:
-                return .yearly
+            //case .relative_humidity_2m_mean:
+                //return .yearly
             case .cloudcover_mean:
                 return .yearly
-            case .temperature_2m_mean:
-                return .yearly
-            case .pressure_msl:
-                return .yearly
+            //case .temperature_2m_mean:
+                //return .yearly
+            //case .pressure_msl:
+                //return .yearly
             case .snowfall_water_equivalent_sum:
                 return .yearly
             case .shortwave_radiation_sum:
@@ -511,6 +511,20 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             case .precipitation_sum:
                 return .yearly
+            case .relative_humidity_2m_min:
+                return .restoreFrom(dt: 3*3600, shortName: "hurs", aggregate: .min)
+            case .relative_humidity_2m_max:
+                return .restoreFrom(dt: 3*3600, shortName: "hurs", aggregate: .max)
+            case .relative_humidity_2m_mean:
+                return .restoreFrom(dt: 3*3600, shortName: "hurs", aggregate: .mean)
+            case .pressure_msl:
+                return .restoreFrom(dt: 3*3600, shortName: "psl", aggregate: .mean)
+            case .temperature_2m_mean:
+                return .restoreFrom(dt: 3*3600, shortName: "tas", aggregate: .mean)
+            case .temperature_2m_max:
+                return .restoreFrom(dt: 3*3600, shortName: "tas", aggregate: .max)
+            case .temperature_2m_min:
+                return .restoreFrom(dt: 3*3600, shortName: "tas", aggregate: .min)
             default:
                 return nil
             }
@@ -878,6 +892,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     guard array.nTime == nDays else {
                         fatalError("Array length does not match nDays=\(nDays) array.nTime=\(array.nTime)")
                     }
+                    // NOTE: maybe note required if 3h data is used
                     if calculateRhFromSpecificHumidity {
                         let pressure = try OmFileReader(file: "\(yearlyPath)pressure_msl_\(year).om").readAll2D()
                         let elevation = try domain.elevationFile!.readAll()
@@ -906,7 +921,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     let short = shortName == "hurs" ? "huss" : shortName
                     if deleteNetCDF {
                         for month in 1...12 {
-                            try FileManager.default.removeItem(atPath: "\(domain.downloadDirectory)\(short)_\(year)\(month).om")
+                            try FileManager.default.removeItemIfExists(at: "\(domain.downloadDirectory)\(short)_\(year)\(month).om")
                         }
                     }
                 default:
