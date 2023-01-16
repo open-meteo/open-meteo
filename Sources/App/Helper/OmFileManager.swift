@@ -161,4 +161,9 @@ extension OmFileReader {
         fn.prefetchData(offset: 0, count: fn.count)
         return try read(dim0Slow: 0..<dim0, dim1: 0..<dim1)
     }
+    
+    // prefect and read all
+    public func readAll2D() throws -> Array2DFastTime {
+        return Array2DFastTime(data: try readAll(), nLocations: dim0, nTime: dim1)
+    }
 }

@@ -880,9 +880,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         fatalError("Array length does not match nDays=\(nDays) array.nTime=\(array.nTime)")
                     }
                     if calculateRhFromSpecificHumidity {
-                        let pressure = try NetCDF.read(path: "\(domain.downloadDirectory)psl_\(year).nc", short: "psl", fma: (1/100, 0), duplicateTimeStep: nil)
+                        let pressure = try OmFileReader(file: "\(yearlyPath)pressure_msl_\(year).om").readAll2D()
                         let elevation = try domain.elevationFile!.readAll()
-                        let temp = try NetCDF.read(path: "\(domain.downloadDirectory)tas_\(year).nc", short: "tas", fma: (1, -273.15), duplicateTimeStep: nil)
+                        let temp = try OmFileReader(file: "\(yearlyPath)temperature_2m_mean_\(year).om").readAll2D()
                         array.data.multiplyAdd(multiply: 1000, add: 0)
                         array.data = Meteorology.specificToRelativeHumidity(specificHumidity: array, temperature: temp, sealLevelPressure: pressure, elevation: elevation)
                         //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)rh.nc", nx: domain.grid.nx, ny: domain.grid.ny)
