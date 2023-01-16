@@ -697,8 +697,8 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let ncFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).nc"
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
                         if !FileManager.default.fileExists(atPath: monthlyOmFile) {
-                            // Feb 29 is ignored.....
-                            let day = month == 2 ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
+                            // Feb 29 is ignored in CMCC_CM2_VHR4.....
+                            let day = (domain == .CMCC_CM2_VHR4 && month == 2) ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
                             let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(year)\(month.zeroPadded(len: 2))\(day).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             
