@@ -81,7 +81,7 @@ import SwiftNetCDF
  TODO:
  - CMCC daily min/max from 6h data
  - fgoals daily min/max from 3h data
- - missing feb 29 in CMCC
+ - DONE missing feb 29 in CMCC
  - bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4
  
  */
@@ -668,8 +668,8 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 let uri = domain == .EC_Earth3P_HR ? "HighResMIP/EC-Earth-Consortium/EC-Earth3P-HR/highres-future/r2i1p2f1/fx/sftlf/gr/v20210412/sftlf_fx_EC-Earth3P-HR_highres-future_r2i1p2f1_gr.nc" :  "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/fx/sftlf/\(grid)/v\(version.landmask)/sftlf_fx_\(source)_\(experimentId)_r1i1p1f1_\(grid).nc"
                 try await curl.download(servers: servers, uri: uri, toFile: ncFileLandFraction)
             }
-            var altitude = try NetCDF.read(path: ncFileAltitude, short: "orog", fma: nil)
-            let landFraction = try NetCDF.read(path: ncFileLandFraction, short: "sftlf", fma: nil)
+            var altitude = try NetCDF.read(path: ncFileAltitude, short: "orog", fma: nil, duplicateTimeStep: nil)
+            let landFraction = try NetCDF.read(path: ncFileLandFraction, short: "sftlf", fma: nil, duplicateTimeStep: nil)
             
             for i in altitude.data.indices {
                 if landFraction.data[i] < 0.5 {
@@ -715,7 +715,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             
                             // TODO: support for specific humdity to relative humidity if required
                             
-                            let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
+                            let isLeapMonth = month == 2 && Timestamp(year, 2, 28).add(days: 1).toComponents().day == 29
+                            let duplicateTimeStep = (domain == .CMCC_CM2_VHR4 && isLeapMonth) ? 27..<28 : nil
+                            let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
                             try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
                         }
@@ -781,11 +783,17 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0101-\(year)\(lastday).nc"
                         try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                     }
-                    var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
+                    let nDays = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year+1,1,1), dtSeconds: 86400).count
+                    let isLeapYear = nDays == 366
+                    let duplicateTimeStep = (domain == .CMCC_CM2_VHR4 && isLeapYear) ? 30 + 28 ..< 30 + 29 : nil
+                    var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
+                    guard array.nTime == nDays else {
+                        fatalError("Array length does not match nDays=\(nDays) array.nTime=\(array.nTime)")
+                    }
                     if calculateRhFromSpecificHumidity {
-                        let pressure = try NetCDF.read(path: "\(domain.downloadDirectory)psl_\(year).nc", short: "psl", fma: (1/100, 0))
+                        let pressure = try NetCDF.read(path: "\(domain.downloadDirectory)psl_\(year).nc", short: "psl", fma: (1/100, 0), duplicateTimeStep: nil)
                         let elevation = try domain.elevationFile!.readAll()
-                        let temp = try NetCDF.read(path: "\(domain.downloadDirectory)tas_\(year).nc", short: "tas", fma: (1, -273.15))
+                        let temp = try NetCDF.read(path: "\(domain.downloadDirectory)tas_\(year).nc", short: "tas", fma: (1, -273.15), duplicateTimeStep: nil)
                         array.data.multiplyAdd(multiply: 1000, add: 0)
                         array.data = Meteorology.specificToRelativeHumidity(specificHumidity: array, temperature: temp, sealLevelPressure: pressure, elevation: elevation)
                         //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)rh.nc", nx: domain.grid.nx, ny: domain.grid.ny)
@@ -836,7 +844,8 @@ extension OmFileWriter {
 }
 
 extension NetCDF {
-    fileprivate static func read(path: String, short: String, fma: (multiply: Float, add: Float)?) throws -> Array2DFastTime {
+    /// duplicateTimeStep: For CMCC feb 29 is missing, we replicate data from feb 28
+    fileprivate static func read(path: String, short: String, fma: (multiply: Float, add: Float)?, duplicateTimeStep: Range<Int>?) throws -> Array2DFastTime {
         guard let ncFile = try NetCDF.open(path: path, allowUpdate: false) else {
             fatalError("Could not open nc file for \(short)")
         }
@@ -851,9 +860,15 @@ extension NetCDF {
         let nt = dim.count == 3 ? dim[0] : 1
         let nx = dim[dim.count-1]
         let ny = dim[dim.count-2]
-        /// transpose to fast time
-        var spatial = Array2DFastSpace(data: try ncFloat.read(), nLocations: nx*ny, nTime: nt)
-        spatial.data.shift180Longitude(nt: nt, ny: ny, nx: nx)
+        var ncarray = try ncFloat.read()
+        let ntNew = nt + (duplicateTimeStep?.count ?? 0)
+        if let duplicateTimeStep {
+            // could be at the end or in the first quarter of data
+            ncarray.append(contentsOf: [Float](repeating: .nan, count: duplicateTimeStep.count * nx * ny))
+            ncarray[duplicateTimeStep.upperBound * ny * nx ..< ncarray.count] = ncarray[duplicateTimeStep.lowerBound * ny * nx ..< ncarray.count - duplicateTimeStep.count * nx * ny]
+        }
+        var spatial = Array2DFastSpace(data: ncarray, nLocations: nx*ny, nTime: ntNew)
+        spatial.data.shift180Longitude(nt: ntNew, ny: ny, nx: nx)
         if let fma {
             spatial.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
         }
