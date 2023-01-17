@@ -82,7 +82,8 @@ import SwiftNetCDF
  - CMCC daily min/max from 6h data
  - fgoals daily min/max from 3h data
  - DONE missing feb 29 in CMCC
- - bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4
+ - bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4 -> Calculate and store BIAS coefficients (~203 floats) for each ERA5 grid-cell
+ - larger files than just 1 year
  
  */
 enum Cmip6Domain: String, Codable, GenericDomain {
@@ -492,6 +493,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         case .FGOALS_f3_H:
             // no near surface RH, only specific humidity
             // temp min/max and rh/min max can only be calculated form 3h values
+            // 3h values are only available for the non-SST version
+            // the non sst version has tasmax/min
+            // snow is only in SST version
             switch self {
             //case .relative_humidity_2m_mean:
                 //return .yearly
@@ -724,7 +728,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 }
                 logger.info("Downloading \(variable) for year \(year)")
                 let version = variable.version(for: domain, isFuture: isFuture)
-                let experimentId = isFuture ? "highresSST-future" : "highresSST-present"
+                let experimentId = domain == .FGOALS_f3_H ? (isFuture ? "highres-future" : "hist-1950") : (isFuture ? "highresSST-future" : "highresSST-present")
                 
                 let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
                 if FileManager.default.fileExists(atPath: omFile) {
@@ -959,8 +963,6 @@ extension OmFileWriter {
     func write(logger: Logger, file: String, compressionType: CompressionType, scalefactor: Float, nLocationsPerChunk: Int, chunkedFiles: [OmFileReader<MmapFile>], dataCallback: ((inout Array2DFastTime) -> ())?) throws {
         let progress = ProgressTracker(logger: logger, total: self.dim0, label: "Convert \(file)")
 
-        let nt = self.dim1
-
         try write(file: file, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { dim0 in
             let locationRange = dim0..<min(dim0+nLocationsPerChunk, self.dim0)
 
@@ -981,7 +983,7 @@ extension OmFileWriter {
 extension Array where Element == OmFileReader<MmapFile> {
     /// Read the same location range from multiple files and assemble a time series
     fileprivate func combine(locationRange: Range<Int>) throws -> Array2DFastTime {
-        var ntChunks = self.reduce(0, {$0 + $1.dim1})
+        let ntChunks = self.reduce(0, {$0 + $1.dim1})
         var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: ntChunks * locationRange.count), nLocations: locationRange.count, nTime: ntChunks)
 
         var timeOffset = 0
