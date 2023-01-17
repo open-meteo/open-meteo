@@ -3,14 +3,38 @@
 import Foundation
 
 /// QM and QDM based on https://link.springer.com/article/10.1007/s00382-020-05447-4
+/// Loosly based on https://github.com/btschwertfeger/BiasAdjustCXX/blob/master/src/CMethods.cxx
 /// Question: calculate CDF for each month? sliding doy? -> Distrubution based bias control does ot require this?
 struct BiasCorrection {
     
-    static func quantileMapping() {
-        // Get bins
-        // calculate CDF for reference and control data
-        // For preprocessing have to store bin definiton (min,max,steps), reference CDF (int array n_bins), control CDF (tn n_bins)
+    enum ChangeType {
+        /// Correct offset. E.g. temperature
+        case absoluteChage
+        
+        /// Scale. E.g. Precipitation
+        case relativeChange
+    }
+    
+    static func quantileMapping(reference: ArraySlice<Float>, control: ArraySlice<Float>, forecast: ArraySlice<Float>, type: ChangeType) -> [Float] {
+        // calculate CDF
+        let binsRefernce = calculateBins(reference)
+        let binsControl = calculateBins(control)
+        let cdfRefernce = calculateCdf(reference, bins: binsRefernce)
+        let cdfControl = calculateCdf(control, bins: binsControl)
+        
         // Apply
+        switch type {
+        case .absoluteChage:
+            return forecast.map {
+                let qm = interpolate(binsControl, cdfControl, x: $0, extrapolate: false)
+                return interpolate(cdfRefernce, binsRefernce, x: qm, extrapolate: false)
+            }
+        case .relativeChange:
+            return forecast.map {
+                let qm = max(interpolate(binsControl, cdfControl, x: $0, extrapolate: true), 0)
+                return max(interpolate(cdfRefernce, binsRefernce, x: qm, extrapolate: true), 0)
+            }
+        }
     }
     
     static func quantileDeltaMapping() {
@@ -21,28 +45,89 @@ struct BiasCorrection {
         // Apply
     }
     
+    /// Calcualte min/max from vector and return bins
     /// nQuantiles of 100 should be sufficient
-    static func calculateBins(_ vec1: ArraySlice<Float>, _ vec2: ArraySlice<Float>, nQuantiles: Int, startAtZero: Bool) -> Bins {
-        // calculate min/max of both vectors
-        // if startAtZero use 0 instead of minimum
-        // return range of float
-        fatalError()
+    static func calculateBins(_ vector: ArraySlice<Float>, nQuantiles: Int = 100, min: Float? = nil) -> Bins {
+        guard let minMax = vector.minAndMax() else {
+            return Bins(min: .nan, max: .nan, nQuantiles: nQuantiles)
+        }
+        return Bins(min: min ?? minMax.min, max: minMax.max, nQuantiles: nQuantiles)
     }
     
-    static func calculateCdf(_ vector: ArraySlice<Float>, bins: Bins) -> [Int] {
-        // caulate probability density and accumulate
-        // Technically integer, but could also use as Float
-        fatalError()
+    /// Calculate sumulative distribution function. First value is always 0.
+    static func calculateCdf(_ vector: ArraySlice<Float>, bins: Bins) -> [Float] {
+        // Technically integer, but uses float for calualtions later
+        let count = bins.count
+        var cdf = [Float](repeating: 0, count: count)
+        for value in vector {
+            for (i, bin) in bins.enumerated().reversed() {
+                if value < bin || i == count-1 { // Note sure if we need `i == pbf.count-1` -> count all larger than bin.max
+                    cdf[i] += 1
+                } else {
+                    break
+                }
+            }
+        }
+        return cdf
     }
     
-    /// Interpolate 2 vectors with binary search
-    static func interpolate(_ vec1: ArraySlice<Float>, _ vec2: ArraySlice<Float>, pos: Float) -> Float {
-        fatalError()
+    /// Find value `x` on first array, then interpolate on the second array to return the value
+    static func interpolate<A: RandomAccessCollection<Float>, B: RandomAccessCollection<Float>>(_ xData: A, _ yData: B, x: Float, extrapolate: Bool) -> Float {
+        assert(xData.count == yData.count)
+        let size = xData.count
+
+        var i = 0;  // find left end of interval for interpolation
+        if x >= xData[xData.index(xData.startIndex, offsetBy: size - 2)] {
+            i = size - 2;  // special case: beyond right end
+        } else {
+            while (x > xData[xData.index(xData.startIndex, offsetBy: i + 1)]) { i += 1 }
+        }
+        let xL = xData[xData.index(xData.startIndex, offsetBy: i)]
+        var yL = yData[yData.index(yData.startIndex, offsetBy: i)]
+        let xR = xData[xData.index(xData.startIndex, offsetBy: i + 1)]
+        var yR = yData[yData.index(yData.startIndex, offsetBy: i + 1)] // points on either side (unless beyond ends)
+
+        if !extrapolate {  // if beyond ends of array and not extrapolating
+            if (x < xL) { yR = yL }
+            if (x > xR) { yL = yR }
+        }
+        let dydx = xR - xL == 0 ? 0 : (yR - yL) / (xR - xL);  // gradient
+        return yL + dydx * (x - xL);       // linear interpolation
     }
 }
 
+
+/// Represent bin sizes. Iteratable like an array, but only stores min/max/nQuantiles
 struct Bins {
     let min: Float
     let max: Float
-    let by: Float
+    let nQuantiles: Int
+}
+
+extension Bins: RandomAccessCollection {
+    subscript(position: Int) -> Float {
+        get {
+            return min + (max - min) / Float(nQuantiles) * Float(position)
+        }
+    }
+    
+    var indices: Range<Int> {
+        return startIndex..<endIndex
+    }
+    
+    var startIndex: Int {
+        return 0
+    }
+    
+    var endIndex: Int {
+        return nQuantiles
+    }
+    
+    func index(before i: Int) -> Int {
+        i - 1
+    }
+    
+    func index(after i: Int) -> Int {
+        i + 1
+    }
 }
