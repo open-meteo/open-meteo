@@ -118,6 +118,8 @@ extension Cmip6Domain: MultiDomainMixerDomain {
 enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case snowfall_sum
     case rain_sum
+    case temperature_2m_max_qm
+    case temperature_2m_max_qdm
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -139,6 +141,24 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
         switch derived {
+        case .temperature_2m_max_qm:
+            let control = try get(raw: .temperature_2m_max, time: time).data
+            
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: .nan, mode: .nearest)!
+            let reference = try era5Reader.get(raw: .temperature_2m, time: time.with(dtSeconds: 3600)).data.max(by: 24)
+            
+            let corrected = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(control), type: .absoluteChage)
+            return DataAndUnit(corrected, .celsius)
+            
+        case .temperature_2m_max_qdm:
+            let control = try get(raw: .temperature_2m_max, time: time).data
+            
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: .nan, mode: .nearest)!
+            let reference = try era5Reader.get(raw: .temperature_2m, time: time.with(dtSeconds: 3600)).data.max(by: 24)
+            
+            let corrected = BiasCorrection.quantileDeltaMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(control), type: .absoluteChage)
+            return DataAndUnit(corrected, .celsius)
+            
         case .snowfall_sum:
             let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
@@ -155,6 +175,10 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     func prefetchData(derived: Cmip6VariableDerived, time: TimerangeDt) throws {
         switch derived {
+        case .temperature_2m_max_qm:
+            break
+        case .temperature_2m_max_qdm:
+            break
         case .snowfall_sum:
             try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
         case .rain_sum:

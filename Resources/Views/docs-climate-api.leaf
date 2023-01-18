@@ -118,6 +118,20 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_2m_max_qm" id="temperature_2m_max_qm"
+            name="daily">
+          <label class="form-check-label" for="temperature_2m_max_qm">
+            Maximum Temperature (2 m) Bias corrected QM
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_2m_max_qdm" id="temperature_2m_max_qdm"
+            name="daily">
+          <label class="form-check-label" for="temperature_2m_max_qdm">
+            Maximum Temperature (2 m) Bias corrected QDM
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min"
             name="daily">
           <label class="form-check-label" for="temperature_2m_min">
