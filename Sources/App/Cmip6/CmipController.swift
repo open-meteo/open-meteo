@@ -166,16 +166,25 @@ extension Sequence where Element == Float {
 }
 
 extension Sequence where Element == (Timestamp, Float) {
+    /// With weighted coorections:
+    /// Linear bias projected rmse: 0.42046037
+    /// Linear bias projected me: 0.0006844627
+    /// without
+    /// Linear bias projected rmse: 0.41812837
+    /// Linear bias projected me: 0.00029334115
     func meanPerMonth(binsPerYear: Int) -> [Float] {
         var sums = [Float](repeating: 0, count: binsPerYear)
-        var counts = [Int](repeating: 0, count: binsPerYear)
+        var weights = [Float](repeating: 0, count: binsPerYear)
         for (t, v) in self {
             let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
             let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
-            sums[monthBin] += v
-            counts[monthBin] += 1
+            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            sums[monthBin] += v * (1-fraction)
+            weights[monthBin] += (1-fraction)
+            sums[(monthBin+1) % binsPerYear] += v * fraction
+            weights[(monthBin+1) % binsPerYear] += fraction
         }
-        return zip(counts, sums).map({ $0.0 == 0 ? .nan : $0.1 / Float($0.0) })
+        return zip(weights, sums).map({ $0.0 <= 0.001 ? .nan : $0.1 / $0.0 })
     }
 }
 
@@ -209,14 +218,19 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let correctedForecast = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(forecast), type: .absoluteChage)
             print("QDM time \(start.timeElapsedPretty())")
             
-            print("QM control rmse: \(zip(reference, correctedControl).rmse())")
-            print("QM control me: \(zip(reference, correctedControl).meanError())")
-            
+            let corrected2 = (correctedControl + correctedForecast).map({ $0 < 10 ? Float(1) : 0 })
+            let reference2 = reference.map({ $0 < 10 ? Float(1) : 0 })
             let era5projectedTime = try era5Reader.get(raw: .temperature_2m, time: forecastTime.with(dtSeconds: 3600)).data.max(by: 24)
-            print("QM projected rmse: \(zip(era5projectedTime, correctedForecast).rmse())")
-            print("QM projected me: \(zip(era5projectedTime, correctedForecast).meanError())")
+            let era5projectedTime2 = era5projectedTime.map({ $0 < 10 ? Float(1) : 0 })
             
-            return DataAndUnit((correctedControl + correctedForecast), .celsius)
+            print("QM control rmse: \(zip(reference2, corrected2).rmse())")
+            print("QM control me: \(zip(reference2, corrected2).meanError())")
+            
+            
+            print("QM projected rmse: \(zip(era5projectedTime2, corrected2).rmse())")
+            print("QM projected me: \(zip(era5projectedTime2, corrected2).meanError())")
+            
+            return DataAndUnit(corrected2, .celsius)
             
         case .temperature_2m_max_trend:
             let temp = try get(raw: .temperature_2m_max, time: time).data
@@ -243,9 +257,6 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
-            print("Raw control rmse: \(zip(reference, control).rmse())")
-            print("Raw control me: \(zip(reference, control).meanError()) (positive = climate model too cold)")
-            
             /*let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
             let start = DispatchTime.now()
             let correctedControl = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(control), forecastTime: referenceTime, type: .absoluteChage)
@@ -266,10 +277,17 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let correctedForecast = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: time, type: .absoluteChage)
             print("QDM time \(start.timeElapsedPretty())")
             
-            print("QDM projected rmse: \(zip(reference, correctedForecast).rmse())")
-            print("QDM projected me: \(zip(reference, correctedForecast).meanError())")
+            let reference2 = reference.map({ $0 < 10 ? Float(1) : 0 })
+            let control2 = control.map({ $0 < 10 ? Float(1) : 0 })
+            let correctedForecast2 = correctedForecast.map({ $0 < 10 ? Float(1) : 0 })
             
-            return DataAndUnit(correctedForecast, .celsius)
+            print("Raw control rmse: \(zip(reference2, control2).rmse())")
+            print("Raw control me: \(zip(reference2, control2).meanError())")
+            
+            print("QDM projected rmse: \(zip(reference2, correctedForecast2).rmse())")
+            print("QDM projected me: \(zip(reference2, correctedForecast2).meanError())")
+            
+            return DataAndUnit(correctedForecast2, .celsius)
             
         case .temperature_2m_max_linear:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
@@ -280,7 +298,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let start = DispatchTime.now()
             let offset = control.reduce(0, +) / Float(control.count) - reference.reduce(0, +) / Float(reference.count)
             
-            let binsPerYear = 25
+            let binsPerYear = 12
             let mean = zip(zip(referenceTime, reference).meanPerMonth(binsPerYear: binsPerYear), zip(referenceTime, control).meanPerMonth(binsPerYear: binsPerYear)).map(-)
             print("Monthly offsets: \(mean)")
             
@@ -289,14 +307,18 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let correctedForecast = zip(time, forecast).map { (t,v) in
                 let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
                 let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
-                return v + mean[monthBin]
+                let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+                return v + mean[monthBin] * (1-fraction) + mean[(monthBin+1) % binsPerYear] * fraction
             }
             print("Linear bias time \(start.timeElapsedPretty())")
             
-            print("Linear bias projected rmse: \(zip(reference, correctedForecast).rmse())")
-            print("Linear bias projected me: \(zip(reference, correctedForecast).meanError())")
+            let reference2 = reference.map({ $0 < 10 ? Float(1) : 0 })
+            let correctedForecast2 = correctedForecast.map({ $0 < 10 ? Float(1) : 0 })
             
-            return DataAndUnit(correctedForecast, .celsius)
+            print("Linear bias projected rmse: \(zip(reference2, correctedForecast2).rmse())")
+            print("Linear bias projected me: \(zip(reference2, correctedForecast2).meanError())")
+            
+            return DataAndUnit(correctedForecast2, .celsius)
             
         case .snowfall_sum:
             let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time).data
