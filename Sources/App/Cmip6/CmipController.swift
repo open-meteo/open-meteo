@@ -163,39 +163,49 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     var reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>
     
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
-        let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)
+        let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
         switch derived {
         case .temperature_2m_max_qm:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
             let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: .nan, mode: .nearest)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
-            let forecast = try get(raw: .temperature_2m_max, time: time).data
+            let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)
+            let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
             let start = DispatchTime.now()
-            let corrected = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(forecast), type: .absoluteChage)
-            print("QM time \(start.timeElapsedPretty())")
+            let correctedControl = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(control), type: .absoluteChage)
+            let correctedForecast = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(forecast), type: .absoluteChage)
+            print("QDM time \(start.timeElapsedPretty())")
             
-            print("control rmse: \(zip(reference, control).rmse())")
-            print("control error: \(zip(reference, control).meanError())")
-            print("QM rmse: \(zip(reference, corrected).rmse())")
-            print("QM error: \(zip(reference, corrected).meanError())")
+            print("QM control rmse: \(zip(reference, correctedControl).rmse())")
+            print("QM control error: \(zip(reference, correctedControl).meanError())")
             
-            return DataAndUnit(corrected, .celsius)
+            let era5projectedTime = try era5Reader.get(raw: .temperature_2m, time: forecastTime.with(dtSeconds: 3600)).data.max(by: 24)
+            print("QM projected rmse: \(zip(era5projectedTime, correctedForecast).rmse())")
+            print("QM projected error: \(zip(era5projectedTime, correctedForecast).meanError())")
+            
+            return DataAndUnit(correctedControl + correctedForecast, .celsius)
             
         case .temperature_2m_max_qdm:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
             let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: .nan, mode: .nearest)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
-            let forecast = try get(raw: .temperature_2m_max, time: time).data
+            let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)
+            let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
             let start = DispatchTime.now()
-            let corrected = BiasCorrection.quantileDeltaMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(forecast), type: .absoluteChage)
+            let correctedControl = BiasCorrection.quantileDeltaMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(control), type: .absoluteChage)
+            let correctedForecast = BiasCorrection.quantileDeltaMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(forecast), type: .absoluteChage)
             print("QDM time \(start.timeElapsedPretty())")
             
-            print("QDM rmse: \(zip(reference, corrected).rmse())")
-            print("QDM error: \(zip(reference, corrected).meanError())")
+            print("QDM control rmse: \(zip(reference, correctedControl).rmse())")
+            print("QDM control error: \(zip(reference, correctedControl).meanError())")
             
-            return DataAndUnit(corrected, .celsius)
+            let era5projectedTime = try era5Reader.get(raw: .temperature_2m, time: forecastTime.with(dtSeconds: 3600)).data.max(by: 24)
+            print("QDM projected rmse: \(zip(era5projectedTime, correctedForecast).rmse())")
+            print("QDM projected error: \(zip(era5projectedTime, correctedForecast).meanError())")
+            
+            return DataAndUnit(correctedControl + correctedForecast, .celsius)
             
         case .snowfall_sum:
             let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time).data
