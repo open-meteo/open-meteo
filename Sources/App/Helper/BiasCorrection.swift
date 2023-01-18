@@ -51,6 +51,9 @@ struct BiasCorrection {
         // Apply
         let binsForecast = binsControl//calculateBins(forecast, min: type == .relativeChange ? 0 : nil)
         let cdfForecast = calculateCdf(forecast, bins: binsForecast)
+        
+        // TODO: forcast data CDF needs to be calculated on a sliding window of a couple of years
+        // TODO: do we need to correct for seasonal chang? For QM this is a huge issue.. Maybe QDM is less effected
 
         switch type {
         case .absoluteChage:

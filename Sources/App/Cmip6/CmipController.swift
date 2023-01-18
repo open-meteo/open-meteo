@@ -122,6 +122,7 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case temperature_2m_max_qm
     case temperature_2m_max_qdm
     case temperature_2m_max_reference
+    case temperature_2m_max_trend
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -163,14 +164,15 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     var reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>
     
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
-        let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
+        let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)
+        let forecastTime = TimerangeDt(start: Timestamp(2015,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
         switch derived {
         case .temperature_2m_max_qm:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: .nan, mode: .nearest)!
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
-            let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)
+            
             let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
             let start = DispatchTime.now()
             let correctedControl = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(control), type: .absoluteChage)
@@ -186,12 +188,31 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
             return DataAndUnit(correctedControl + correctedForecast, .celsius)
             
+        case .temperature_2m_max_trend:
+            let temp = try get(raw: .temperature_2m_max, time: time).data
+            
+            var sumx = 0
+            var sumxsq = 0
+            var sumy: Float = 0
+            var sumxy: Float = 0
+            
+            for (i, t) in temp.enumerated() {
+                sumx=sumx+i;
+                sumxsq=sumxsq+(i*i);
+                sumy=sumy+t;
+                sumxy=sumxy+Float(i)*t;
+            }
+            let d=Float(temp.count*sumxsq-sumx*sumx)
+            let m=(Float(temp.count)*sumxy-Float(sumx)*sumy)/d
+            let c=(sumy*Float(sumxsq)-Float(sumx)*sumxy)/d
+            
+            return DataAndUnit(temp.indices.map { Float($0) * m + c }, .celsius)
+            
         case .temperature_2m_max_qdm:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: .nan, mode: .nearest)!
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
-            let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)
             let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
             let start = DispatchTime.now()
             let correctedControl = BiasCorrection.quantileDeltaMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(control), type: .absoluteChage)
@@ -232,6 +253,8 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .temperature_2m_max_qm:
             break
         case .temperature_2m_max_qdm:
+            break
+        case .temperature_2m_max_trend:
             break
         case .snowfall_sum:
             try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
