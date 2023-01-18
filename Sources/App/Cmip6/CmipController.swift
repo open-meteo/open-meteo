@@ -164,8 +164,11 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     var reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>
     
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
-        let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)
-        let forecastTime = TimerangeDt(start: Timestamp(2015,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
+        /*let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
+        let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)*/
+        let breakyear = 2015
+        let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
+        let forecastTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
         switch derived {
         case .temperature_2m_max_qm:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
@@ -213,10 +216,10 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
-            let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
+            /*let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
             let start = DispatchTime.now()
-            let correctedControl = BiasCorrection.quantileDeltaMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(control), type: .absoluteChage)
-            let correctedForecast = BiasCorrection.quantileDeltaMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(forecast), type: .absoluteChage)
+            let correctedControl = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(control), forecastTime: referenceTime, type: .absoluteChage)
+            let correctedForecast = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: forecastTime, type: .absoluteChage)
             print("QDM time \(start.timeElapsedPretty())")
             
             print("QDM control rmse: \(zip(reference, correctedControl).rmse())")
@@ -225,8 +228,16 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let era5projectedTime = try era5Reader.get(raw: .temperature_2m, time: forecastTime.with(dtSeconds: 3600)).data.max(by: 24)
             print("QDM projected rmse: \(zip(era5projectedTime, correctedForecast).rmse())")
             print("QDM projected error: \(zip(era5projectedTime, correctedForecast).meanError())")
+             
+            return DataAndUnit(correctedControl + correctedForecast, .celsius)*/
             
-            return DataAndUnit(correctedControl + correctedForecast, .celsius)
+            let forecast = try get(raw: .temperature_2m_max, time: time).data
+            let correctedForecast = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: time, type: .absoluteChage)
+            
+            print("QDM projected rmse: \(zip(reference, correctedForecast).rmse())")
+            print("QDM projected error: \(zip(reference, correctedForecast).meanError())")
+            
+            return DataAndUnit(correctedForecast, .celsius)
             
         case .snowfall_sum:
             let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time).data
@@ -241,7 +252,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             return DataAndUnit(rain, precip.unit)
         case .temperature_2m_max_reference:
             let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: .nan, mode: .nearest)!
-            let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
+            let reference = try era5Reader.get(raw: .temperature_2m, time: time.with(dtSeconds: 3600)).data.max(by: 24)
             return DataAndUnit(reference, .celsius)
         }
     }

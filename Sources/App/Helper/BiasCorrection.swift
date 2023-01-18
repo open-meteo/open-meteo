@@ -73,6 +73,36 @@ struct BiasCorrection {
         }
     }
     
+    static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, control: ArraySlice<Float>, referenceTime: TimerangeDt, forecast: ArraySlice<Float>, forecastTime: TimerangeDt, type: ChangeType) -> [Float] {
+        // calculate CDF
+        //let binsControl = calculateBins(control, nQuantiles: 250, min: type == .relativeChange ? 0 : nil)
+        let bins = Bins(min: min(reference.min()!, control.min()!), max: max(reference.max()!, control.max()!), nQuantiles: 100)
+        print("Bins min=\(bins.min) max=\(bins.max) delta=\((bins.max-bins.min)/Float(bins.nQuantiles))")
+        
+        let cdfRefernce = CdfMonthly(vector: reference, time: referenceTime, bins: bins)
+        let cdfControl = CdfMonthly(vector: control, time: referenceTime, bins: bins)
+        
+        // Apply
+        let cdfForecast = CdfMonthly10YearSliding(vector: forecast, time: forecastTime, bins: bins)
+
+        switch type {
+        case .absoluteChage:
+            return zip(forecastTime, forecast).map { (time, forecast) in
+                let epsilon = interpolate(bins, cdfForecast.get(time: time), x: forecast, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce.get(time: time), bins, x: epsilon, extrapolate: false)
+                return qdm1 + forecast - interpolate(cdfControl.get(time: time), bins, x: epsilon, extrapolate: false)
+            }
+        case .relativeChange:
+            let maxScaleFactor: Float = 10
+            return zip(forecastTime, forecast).map { (time, forecast) in
+                let epsilon = interpolate(bins, cdfForecast.get(time: time), x: forecast, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce.get(time: time), bins, x: epsilon, extrapolate: false)
+                let scale = forecast / interpolate(cdfControl.get(time: time), bins, x: epsilon, extrapolate: false)
+                return qdm1 / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
+            }
+        }
+    }
+    
     /// Calcualte min/max from vector and return bins
     /// nQuantiles of 100 should be sufficient
     static func calculateBins(_ vector: ArraySlice<Float>, nQuantiles: Int = 100, min: Float? = nil) -> Bins {
@@ -121,6 +151,110 @@ struct BiasCorrection {
         }
         let dydx = xR - xL == 0 ? 0 : (yR - yL) / (xR - xL);  // gradient
         return yL + dydx * (x - xL);       // linear interpolation
+    }
+}
+
+
+/// Calculate CDF for each month individually
+struct CdfMonthly {
+    let cdf: [Float]
+    
+    /// input temperature and time axis
+    init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {
+        let binsPerYear = 12
+        
+        let count = bins.count
+        var cdf = [Float](repeating: 0, count: count * binsPerYear)
+        for (t, value) in zip(time, vector) {
+            let fractionalDayOfYear = Float(t.timeIntervalSince1970 / 3600) / 24
+            let monthBin = (Int(round(fractionalDayOfYear / Float(binsPerYear))) % binsPerYear + binsPerYear) % binsPerYear
+            for (i, bin) in bins.enumerated().reversed() {
+                if value < bin {
+                    cdf[monthBin * count + i] += 1
+                    
+                    cdf[((monthBin+1) % binsPerYear) * count + i] += 1
+                    cdf[((monthBin-1+binsPerYear) % binsPerYear) * count + i] += 1
+                } else {
+                    break
+                }
+            }
+        }
+        /// normalise to 1
+        for j in 0..<cdf.count / bins.count {
+            for i in j * bins.count ..< (j+1) * bins.count {
+                cdf[i] = cdf[i] / cdf[(j+1) * bins.count - 1]
+            }
+        }
+        self.cdf = cdf
+    }
+    
+    /// month starting at 0
+    func get(time t: Timestamp) -> ArraySlice<Float> {
+        let binsPerYear = 12
+        let fractionalDayOfYear = Float(t.timeIntervalSince1970 / 3600) / 24
+        let monthBin = (Int(round(fractionalDayOfYear / Float(binsPerYear))) % binsPerYear + binsPerYear) % binsPerYear
+        
+        let binLength = cdf.count / binsPerYear
+        return cdf[binLength * monthBin ..< binLength * (monthBin+1)]
+    }
+}
+
+/// Calculate CDF for each month individually, but over a sliding window of 10 years
+struct CdfMonthly10YearSliding {
+    let cdf: [Float]
+    let binLength: Int
+    let yearMin: Float
+    
+    /// input temperature and time axis
+    init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {
+        let binsPerYear = 12
+        
+        let yearMax = Float(time.range.upperBound.timeIntervalSince1970 / 3600) / 24 / 365.25
+        let yearMin = Float(time.range.lowerBound.timeIntervalSince1970 / 3600) / 24 / 365.25
+        let nYears = Int(yearMax - yearMin) + 2
+        
+        let count = bins.count
+        var cdf = [Float](repeating: 0, count: count * binsPerYear * nYears)
+        for (t, value) in zip(time, vector) {
+            let fractionalDayOfYear = Float(t.timeIntervalSince1970 / 3600) / 24
+            let monthBin = (Int(round(fractionalDayOfYear / Float(binsPerYear))) % binsPerYear + binsPerYear) % binsPerYear
+            
+            let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
+            let yearBin = Int(fractionalYear - yearMin)
+            
+            for (i, bin) in bins.enumerated().reversed() {
+                if value < bin {
+                    for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
+                        cdf[(monthBin * count + i) + count * binsPerYear * y] += 1
+                        cdf[(((monthBin+1) % binsPerYear) * count + i) + count * binsPerYear * y] += 1
+                        cdf[(((monthBin-1+binsPerYear) % binsPerYear) * count + i) + count * binsPerYear * y] += 1
+                    }
+                } else {
+                    break
+                }
+            }
+        }
+        /// normalise to 1
+        for j in 0..<cdf.count / bins.count {
+            for i in j * bins.count ..< (j+1) * bins.count {
+                cdf[i] = cdf[i] / cdf[(j+1) * bins.count - 1]
+            }
+        }
+        self.cdf = cdf
+        self.binLength = count
+        self.yearMin = yearMin
+    }
+    
+    /// month starting at 0
+    func get(time t: Timestamp) -> ArraySlice<Float> {
+        let binsPerYear = 12
+        let fractionalDayOfYear = Float(t.timeIntervalSince1970 / 3600) / 24
+        let monthBin = (Int(round(fractionalDayOfYear / Float(binsPerYear))) % binsPerYear + binsPerYear) % binsPerYear
+        
+        let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
+        let yearBin = Int(fractionalYear - yearMin)
+        
+        return cdf[binLength * monthBin + binLength * binsPerYear * yearBin ..< binLength * (monthBin+1)  + binLength * binsPerYear * yearBin]
     }
 }
 
