@@ -121,6 +121,7 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case rain_sum
     case temperature_2m_max_qm
     case temperature_2m_max_qdm
+    case temperature_2m_max_linear
     case temperature_2m_max_reference
     case temperature_2m_max_trend
     
@@ -149,6 +150,32 @@ extension Sequence where Element == (Float, Float) {
             count += 1
         }
         return sum / Float(count)
+    }
+}
+
+extension Sequence where Element == Float {
+    func accumulateCount(below threshold: Float) -> [Float] {
+        var count: Float = 0
+        return self.map( {
+            if $0 < threshold {
+                count += 1
+            }
+            return count
+        })
+    }
+}
+
+extension Sequence where Element == (Timestamp, Float) {
+    func meanPerMonth(binsPerYear: Int) -> [Float] {
+        var sums = [Float](repeating: 0, count: binsPerYear)
+        var counts = [Int](repeating: 0, count: binsPerYear)
+        for (t, v) in self {
+            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
+            let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
+            sums[monthBin] += v
+            counts[monthBin] += 1
+        }
+        return zip(counts, sums).map({ $0.0 == 0 ? .nan : $0.1 / Float($0.0) })
     }
 }
 
@@ -183,13 +210,13 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             print("QDM time \(start.timeElapsedPretty())")
             
             print("QM control rmse: \(zip(reference, correctedControl).rmse())")
-            print("QM control error: \(zip(reference, correctedControl).meanError())")
+            print("QM control me: \(zip(reference, correctedControl).meanError())")
             
             let era5projectedTime = try era5Reader.get(raw: .temperature_2m, time: forecastTime.with(dtSeconds: 3600)).data.max(by: 24)
             print("QM projected rmse: \(zip(era5projectedTime, correctedForecast).rmse())")
-            print("QM projected error: \(zip(era5projectedTime, correctedForecast).meanError())")
+            print("QM projected me: \(zip(era5projectedTime, correctedForecast).meanError())")
             
-            return DataAndUnit(correctedControl + correctedForecast, .celsius)
+            return DataAndUnit((correctedControl + correctedForecast), .celsius)
             
         case .temperature_2m_max_trend:
             let temp = try get(raw: .temperature_2m_max, time: time).data
@@ -216,6 +243,9 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
+            print("Raw control rmse: \(zip(reference, control).rmse())")
+            print("Raw control me: \(zip(reference, control).meanError()) (positive = climate model too cold)")
+            
             /*let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
             let start = DispatchTime.now()
             let correctedControl = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(control), forecastTime: referenceTime, type: .absoluteChage)
@@ -232,10 +262,39 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             return DataAndUnit(correctedControl + correctedForecast, .celsius)*/
             
             let forecast = try get(raw: .temperature_2m_max, time: time).data
+            let start = DispatchTime.now()
             let correctedForecast = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: time, type: .absoluteChage)
+            print("QDM time \(start.timeElapsedPretty())")
             
             print("QDM projected rmse: \(zip(reference, correctedForecast).rmse())")
-            print("QDM projected error: \(zip(reference, correctedForecast).meanError())")
+            print("QDM projected me: \(zip(reference, correctedForecast).meanError())")
+            
+            return DataAndUnit(correctedForecast, .celsius)
+            
+        case .temperature_2m_max_linear:
+            let control = try get(raw: .temperature_2m_max, time: referenceTime).data
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
+            let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
+            
+            let forecast = try get(raw: .temperature_2m_max, time: time).data
+            let start = DispatchTime.now()
+            let offset = control.reduce(0, +) / Float(control.count) - reference.reduce(0, +) / Float(reference.count)
+            
+            let binsPerYear = 25
+            let mean = zip(zip(referenceTime, reference).meanPerMonth(binsPerYear: binsPerYear), zip(referenceTime, control).meanPerMonth(binsPerYear: binsPerYear)).map(-)
+            print("Monthly offsets: \(mean)")
+            
+            print("Linear correction coef: \(offset)")
+            
+            let correctedForecast = zip(time, forecast).map { (t,v) in
+                let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
+                let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
+                return v + mean[monthBin]
+            }
+            print("Linear bias time \(start.timeElapsedPretty())")
+            
+            print("Linear bias projected rmse: \(zip(reference, correctedForecast).rmse())")
+            print("Linear bias projected me: \(zip(reference, correctedForecast).meanError())")
             
             return DataAndUnit(correctedForecast, .celsius)
             
@@ -259,6 +318,8 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     func prefetchData(derived: Cmip6VariableDerived, time: TimerangeDt) throws {
         switch derived {
+        case .temperature_2m_max_linear:
+            break
         case .temperature_2m_max_reference:
             break
         case .temperature_2m_max_qm:

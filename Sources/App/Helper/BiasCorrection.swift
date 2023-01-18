@@ -166,8 +166,8 @@ struct CdfMonthly {
         let count = bins.count
         var cdf = [Float](repeating: 0, count: count * binsPerYear)
         for (t, value) in zip(time, vector) {
-            let fractionalDayOfYear = Float(t.timeIntervalSince1970 / 3600) / 24
-            let monthBin = (Int(round(fractionalDayOfYear / Float(binsPerYear))) % binsPerYear + binsPerYear) % binsPerYear
+            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
+            let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
             for (i, bin) in bins.enumerated().reversed() {
                 if value < bin {
                     cdf[monthBin * count + i] += 1
@@ -191,8 +191,8 @@ struct CdfMonthly {
     /// month starting at 0
     func get(time t: Timestamp) -> ArraySlice<Float> {
         let binsPerYear = 12
-        let fractionalDayOfYear = Float(t.timeIntervalSince1970 / 3600) / 24
-        let monthBin = (Int(round(fractionalDayOfYear / Float(binsPerYear))) % binsPerYear + binsPerYear) % binsPerYear
+        let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
+        let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
         
         let binLength = cdf.count / binsPerYear
         return cdf[binLength * monthBin ..< binLength * (monthBin+1)]
@@ -216,8 +216,8 @@ struct CdfMonthly10YearSliding {
         let count = bins.count
         var cdf = [Float](repeating: 0, count: count * binsPerYear * nYears)
         for (t, value) in zip(time, vector) {
-            let fractionalDayOfYear = Float(t.timeIntervalSince1970 / 3600) / 24
-            let monthBin = (Int(round(fractionalDayOfYear / Float(binsPerYear))) % binsPerYear + binsPerYear) % binsPerYear
+            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
+            let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
             
             let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
             let yearBin = Int(fractionalYear - yearMin)
@@ -248,8 +248,8 @@ struct CdfMonthly10YearSliding {
     /// month starting at 0
     func get(time t: Timestamp) -> ArraySlice<Float> {
         let binsPerYear = 12
-        let fractionalDayOfYear = Float(t.timeIntervalSince1970 / 3600) / 24
-        let monthBin = (Int(round(fractionalDayOfYear / Float(binsPerYear))) % binsPerYear + binsPerYear) % binsPerYear
+        let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
+        let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
         
         let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
         let yearBin = Int(fractionalYear - yearMin)
