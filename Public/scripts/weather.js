@@ -66,9 +66,15 @@ function previewData(data, downloadTime) {
                 yAxis: axisId,
                 pointStart:hourly_starttime,
                 pointInterval: pointInterval,
+                type: (unit == 'mm' || unit == 'cm' || unit == 'inch' || unit == 'MJ/m²') ? 'column' : 'line',
                 tooltip: {
                     valueSuffix: " " + unit,
-                }
+                },
+                /*dataGrouping: {
+                    enabled: true,
+                    forced: true,
+                    units: [['year',[1]]]
+                }*/
             };
     
             if (k[0] == "weathercode") {

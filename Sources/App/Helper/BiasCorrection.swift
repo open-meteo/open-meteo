@@ -17,8 +17,8 @@ struct BiasCorrection {
     
     static func quantileMapping(reference: ArraySlice<Float>, control: ArraySlice<Float>, forecast: ArraySlice<Float>, type: ChangeType) -> [Float] {
         // calculate CDF
-        let binsRefernce = calculateBins(reference)
-        let binsControl = calculateBins(control)
+        let binsRefernce = calculateBins(reference, min: type == .relativeChange ? 0 : nil)
+        let binsControl = calculateBins(control, min: type == .relativeChange ? 0 : nil)
         let cdfRefernce = calculateCdf(reference, bins: binsRefernce)
         let cdfControl = calculateCdf(control, bins: binsControl)
         
@@ -37,12 +37,35 @@ struct BiasCorrection {
         }
     }
     
-    static func quantileDeltaMapping() {
-        // Get bins
-        // calculate CDF for reference and control data
-        // For preprocessing have to store bin definiton (min,max,steps), reference CDF (int array n_bins), control CDF (tn n_bins)
-        // Calulate CDF of future data, derive epsilon
+    static func quantileDeltaMapping(reference: ArraySlice<Float>, control: ArraySlice<Float>, forecast: ArraySlice<Float>, type: ChangeType) -> [Float] {
+        // calculate CDF
+        let binsControl = calculateBins(control, min: type == .relativeChange ? 0 : nil)
+        let binsRefernce = binsControl// calculateBins(reference, min: type == .relativeChange ? 0 : nil)
+        
+        let cdfRefernce = calculateCdf(reference, bins: binsRefernce)
+        let cdfControl = calculateCdf(control, bins: binsControl)
+        
         // Apply
+        let binsForecast = binsControl//calculateBins(forecast, min: type == .relativeChange ? 0 : nil)
+        let cdfForecast = calculateCdf(forecast, bins: binsForecast)
+        let epsilon = forecast.map {
+            return interpolate(binsForecast, cdfForecast, x: $0, extrapolate: false)
+        }
+        let qdm1 = epsilon.map {
+            return interpolate(cdfRefernce, binsRefernce, x: $0, extrapolate: false)
+        }
+        switch type {
+        case .absoluteChage:
+            return epsilon.enumerated().map { (i, epsilon) in
+                return qdm1[i] + forecast[i] - interpolate(cdfControl, binsControl, x: epsilon, extrapolate: false)
+            }
+        case .relativeChange:
+            let maxScaleFactor: Float = 10
+            return epsilon.enumerated().map { (i, epsilon) in
+                let scale = forecast[i] / interpolate(cdfControl, binsControl, x: epsilon, extrapolate: false)
+                return qdm1[i] / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
+            }
+        }
     }
     
     /// Calcualte min/max from vector and return bins
