@@ -132,6 +132,13 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_2m_max_reference" id="temperature_2m_max_reference"
+            name="daily">
+          <label class="form-check-label" for="temperature_2m_max_reference">
+            Maximum Temperature (2 m) Reference
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min"
             name="daily">
           <label class="form-check-label" for="temperature_2m_min">

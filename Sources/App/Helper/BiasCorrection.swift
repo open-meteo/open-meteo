@@ -3,6 +3,7 @@
 import Foundation
 
 /// QM and QDM based on https://link.springer.com/article/10.1007/s00382-020-05447-4
+/// QDM paper https://journals.ametsoc.org/view/journals/clim/28/17/jcli-d-14-00754.1.xml
 /// Loosly based on https://github.com/btschwertfeger/BiasAdjustCXX/blob/master/src/CMethods.cxx
 /// Question: calculate CDF for each month? sliding doy? -> Distrubution based bias control does ot require this?
 struct BiasCorrection {
@@ -39,7 +40,8 @@ struct BiasCorrection {
     
     static func quantileDeltaMapping(reference: ArraySlice<Float>, control: ArraySlice<Float>, forecast: ArraySlice<Float>, type: ChangeType) -> [Float] {
         // calculate CDF
-        let binsControl = calculateBins(control, min: type == .relativeChange ? 0 : nil)
+        //let binsControl = calculateBins(control, nQuantiles: 250, min: type == .relativeChange ? 0 : nil)
+        let binsControl = Bins(min: min(reference.min()!, control.min()!), max: max(reference.max()!, control.max()!), nQuantiles: 250)
         let binsRefernce = binsControl// calculateBins(reference, min: type == .relativeChange ? 0 : nil)
         
         let cdfRefernce = calculateCdf(reference, bins: binsRefernce)
@@ -48,22 +50,21 @@ struct BiasCorrection {
         // Apply
         let binsForecast = binsControl//calculateBins(forecast, min: type == .relativeChange ? 0 : nil)
         let cdfForecast = calculateCdf(forecast, bins: binsForecast)
-        let epsilon = forecast.map {
-            return interpolate(binsForecast, cdfForecast, x: $0, extrapolate: false)
-        }
-        let qdm1 = epsilon.map {
-            return interpolate(cdfRefernce, binsRefernce, x: $0, extrapolate: false)
-        }
+
         switch type {
         case .absoluteChage:
-            return epsilon.enumerated().map { (i, epsilon) in
-                return qdm1[i] + forecast[i] - interpolate(cdfControl, binsControl, x: epsilon, extrapolate: false)
+            return forecast.map { forecast in
+                let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, extrapolate: false)
+                return qdm1 + forecast - interpolate(cdfControl, binsControl, x: epsilon, extrapolate: false)
             }
         case .relativeChange:
             let maxScaleFactor: Float = 10
-            return epsilon.enumerated().map { (i, epsilon) in
-                let scale = forecast[i] / interpolate(cdfControl, binsControl, x: epsilon, extrapolate: false)
-                return qdm1[i] / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
+            return forecast.map { forecast in
+                let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, extrapolate: false)
+                let scale = forecast / interpolate(cdfControl, binsControl, x: epsilon, extrapolate: false)
+                return qdm1 / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
             }
         }
     }

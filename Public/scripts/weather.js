@@ -70,6 +70,7 @@ function previewData(data, downloadTime) {
                 tooltip: {
                     valueSuffix: " " + unit,
                 },
+                dataGrouping: {groupPixelWidth: 12}
                 /*dataGrouping: {
                     enabled: true,
                     forced: true,
