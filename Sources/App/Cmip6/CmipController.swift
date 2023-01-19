@@ -164,28 +164,7 @@ extension Sequence where Element == Float {
     }
 }
 
-extension Sequence where Element == (Timestamp, Float) {
-    /// With weighted coorections:
-    /// Linear bias projected rmse: 0.42046037
-    /// Linear bias projected me: 0.0006844627
-    /// without
-    /// Linear bias projected rmse: 0.41812837
-    /// Linear bias projected me: 0.00029334115
-    func meanPerMonth(binsPerYear: Int) -> [Float] {
-        var sums = [Float](repeating: 0, count: binsPerYear)
-        var weights = [Float](repeating: 0, count: binsPerYear)
-        for (t, v) in self {
-            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-            let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
-            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
-            sums[monthBin] += v * (1-fraction)
-            weights[monthBin] += (1-fraction)
-            sums[(monthBin+1) % binsPerYear] += v * fraction
-            weights[(monthBin+1) % binsPerYear] += fraction
-        }
-        return zip(weights, sums).map({ $0.0 <= 0.001 ? .nan : $0.1 / $0.0 })
-    }
-}
+
 
 struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     typealias MixingVar = Cmip6VariableOrDerived
@@ -281,21 +260,38 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
             let forecast = try get(raw: .temperature_2m_max, time: time).data
-            let start = DispatchTime.now()
-            let offset = control.reduce(0, +) / Float(control.count) - reference.reduce(0, +) / Float(reference.count)
+            let start = DispatchTime.now()            
+            let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 12)
+            let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 12)
             
-            let binsPerYear = 12
-            let mean = zip(zip(referenceTime, reference).meanPerMonth(binsPerYear: binsPerYear), zip(referenceTime, control).meanPerMonth(binsPerYear: binsPerYear)).map(-)
-            print("Monthly offsets: \(mean)")
+            print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(-))
             
-            print("Linear correction coef: \(offset)")
+            /**
+             12 months
+             Linear bias time 27.0ms
+             Linear bias projected rmse: 2.1713374
+             Linear bias projected me: -1.0727324e-06
+             Linear bias qctime rmse: 2.1964004
+             Linear bias qctime me: 0.23527382
+             >30°C Linear bias projected rmse: 0.008171778
+             >30°C Linear bias projected me: -6.677796e-05
+             >30°C Linear bias qctime rmse: 0.015775932
+             >30°C Linear bias qctime me: -0.00024888004
+             
+             1 bin:
+             Linear bias time 26.0ms
+             Linear bias projected rmse: 2.1834567
+             Linear bias projected me: -4.9951836e-06
+             Linear bias qctime rmse: 2.1981504
+             Linear bias qctime me: 0.23518859
+             >30°C Linear bias projected rmse: 0.008171778
+             >30°C Linear bias projected me: -6.677796e-05
+             >30°C Linear bias qctime rmse: 0.015775932
+             >30°C Linear bias qctime me: -0.00024888004
+             */
             
-            let correctedForecast = zip(time, forecast).map { (t,v) in
-                let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-                let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
-                let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
-                return v + mean[monthBin] * (1-fraction) + mean[(monthBin+1) % binsPerYear] * fraction
-            }
+            var correctedForecast = forecast
+            referenceWeights.applyOffset(on: &correctedForecast, otherWeights: controlWeights, time: time, type: .absoluteChage)
             print("Linear bias time \(start.timeElapsedPretty())")
             
             let reference2 = reference

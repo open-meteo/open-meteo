@@ -105,6 +105,50 @@ struct BiasCorrection {
     }
 }
 
+/// Calculate and/or apply a linear bias correction to correct a fixed offset
+struct BiasCorrectionSeasonalLinear {
+    /// Could be one mean value for each month
+    let meansPerYear: [Float]
+    
+    public init(_ data: ArraySlice<Float>, time: TimerangeDt, binsPerYear: Int = 12) {
+        var sums = [Float](repeating: 0, count: binsPerYear)
+        var weights = [Float](repeating: 0, count: binsPerYear)
+        for (t, v) in zip(time, data) {
+            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
+            let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
+            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            sums[monthBin] += v * (1-fraction)
+            weights[monthBin] += (1-fraction)
+            sums[(monthBin+1) % binsPerYear] += v * fraction
+            weights[(monthBin+1) % binsPerYear] += fraction
+        }
+        self.meansPerYear = zip(weights, sums).map({ $0.0 <= 0.001 ? .nan : $0.1 / $0.0 })
+    }
+    
+    func applyOffset(on data: inout [Float], otherWeights: BiasCorrectionSeasonalLinear, time: TimerangeDt, type: BiasCorrection.ChangeType, indices: Range<Int>? = nil) {
+        let indices = indices ?? data.indices
+        let binsPerYear = meansPerYear.count
+        assert(time.count == indices.count)
+        for (i ,t) in zip(indices, time) {
+            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
+            let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
+            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let m0 = meansPerYear[monthBin]
+            let m1 = meansPerYear[(monthBin+1) % binsPerYear]
+            let o0 = otherWeights.meansPerYear[monthBin]
+            let o1 = otherWeights.meansPerYear[(monthBin+1) % binsPerYear]
+            switch type {
+            case .absoluteChage:
+                data[i] += (m0 - o0) * (1-fraction) + (m1 - o1) * fraction
+            case .relativeChange:
+                data[i] *= (m0 / o0) * (1-fraction) + (m1 / o1) * fraction
+            }
+        }
+    }
+}
+
+
+
 
 protocol MonthlyBinable {
     func get(bin: Int, time t: Timestamp) -> Float
