@@ -81,13 +81,13 @@ struct BiasCorrection {
         //let bins = Bins(min: min(reference.min()!, control.min()!), max: max(reference.max()!, control.max()!), nQuantiles: 100)
         print("Bins min=\(binsControl.min) max=\(binsControl.max) delta=\((binsControl.max-binsControl.min)/Float(binsControl.nQuantiles))")
         let binsRefernce = Bins(min: reference.min()!, max: reference.max()!, nQuantiles: 100) //calculateBins(reference, min: type == .relativeChange ? 0 : reference.min()! - 10)
-        let binsForecast = binsControl // Bins(min: forecast.min()!, max: forecast.max()!, nQuantiles: 100)
+        let binsForecast = Bins(min: forecast.min()!, max: forecast.max()!, nQuantiles: 100)
         
         let cdfRefernce = CdfMonthly(vector: reference, time: referenceTime, bins: binsRefernce)
         let cdfControl = CdfMonthly(vector: control, time: referenceTime, bins: binsControl)
         
         // Apply
-        let cdfForecast = cdfControl// CdfMonthly10YearSliding(vector: forecast, time: forecastTime, bins: binsForecast)
+        let cdfForecast = CdfMonthly10YearSliding(vector: forecast, time: forecastTime, bins: binsForecast)
 
         switch type {
         case .absoluteChage:
@@ -232,12 +232,15 @@ struct CdfMonthly: MonthlyBinable {
             let monthBin = fractionalDayOfYear / (31_557_600 / Self.binsPerYear)
             let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
             for (i, bin) in bins.enumerated().reversed() {
-                if value < bin {
+                if value >= bin && value < bins[i+1] {
+                    // value exactly inside a bin, adjust weight
+                    let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
+                    assert(interBinFraction >= 0 && interBinFraction <= 1)
+                    cdf[monthBin * count + i] += (1-fraction) * interBinFraction
+                    cdf[((monthBin+1) % Self.binsPerYear) * count + i] += fraction * interBinFraction
+                } else if value < bin {
                     cdf[monthBin * count + i] += 1-fraction
                     cdf[((monthBin+1) % Self.binsPerYear) * count + i] += fraction
-                    //cdf[monthBin * count + i] += 1
-                    //cdf[((monthBin+1) % binsPerYear) * count + i] += 1
-                    //cdf[((monthBin-1+binsPerYear) % binsPerYear) * count + i] += 1
                 } else {
                     break
                 }
@@ -302,13 +305,18 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
             let yearBin = Int(fractionalYear - yearMin)
             
             for (i, bin) in bins.enumerated().reversed() {
-                if value < bin {
+                if value >= bin && value < bins[i+1] {
+                    // value exactly inside a bin, adjust weight
+                    let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
+                    assert(interBinFraction >= 0 && interBinFraction <= 1)
+                    for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
+                        cdf[(monthBin * count + i) + count * Self.binsPerYear * y] += (1-fraction) * interBinFraction
+                        cdf[(((monthBin+1) % Self.binsPerYear) * count + i) + count * Self.binsPerYear * y] += fraction * interBinFraction
+                    }
+                } else if value < bin {
                     for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
                         cdf[(monthBin * count + i) + count * Self.binsPerYear * y] += 1-fraction
                         cdf[(((monthBin+1) % Self.binsPerYear) * count + i) + count * Self.binsPerYear * y] += fraction
-                        //cdf[(monthBin * count + i) + count * binsPerYear * y] += 1
-                        //cdf[(((monthBin+1) % binsPerYear) * count + i) + count * binsPerYear * y] += 1
-                        //cdf[(((monthBin-1+binsPerYear) % binsPerYear) * count + i) + count * binsPerYear * y] += 1
                     }
                 } else {
                     break
