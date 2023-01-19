@@ -207,69 +207,6 @@ struct BiasCorrection {
 }
 
 
-/*
- Before
- QDM projected rmse: 2.1441827
- QDM projected me: -0.008521517
- QDM qctime rmse: 2.1524856
- QDM qctime me: 0.33143386
- 
- QDM projected rmse: 2.1441827
- QDM projected me: -0.008521517
- QDM qctime rmse: 2.1524856
- QDM qctime me: 0.33143386
- 
- with interpolation
- QDM projected rmse: 2.144915
- QDM projected me: -0.021453733
- QDM qctime rmse: 2.1539917
- QDM qctime me: 0.3202337
- 
- inverted factors
- QDM projected rmse: 2.1443715
- QDM projected me: -0.016594684
- QDM qctime rmse: 2.153304
- QDM qctime me: 0.3233069
- 
- inverted 4x bin:
- QDM projected rmse: 2.1475098
- QDM projected me: 0.027171426
- QDM qctime rmse: 2.155336
- QDM qctime me: 0.37284786
- 
- normal: 12x bin FIXED offset
- QDM projected rmse: 2.1433
- QDM projected me: 0.015121117
- QDM qctime rmse: 2.1498253
- QDM qctime me: 0.36447984
- 
- inverted: 12x bin FIXED offset
- QDM projected rmse: 2.14071
- QDM projected me: 0.002004539
- QDM qctime rmse: 2.1490934
- QDM qctime me: 0.3547897
- 
- normal...
- QDM projected rmse: 2.14162
- QDM projected me: 0.017507693
- QDM qctime rmse: 2.154178
- QDM qctime me: 0.36449537
- 
- 4 months normal:
- QDM projected rmse: 2.1469715
- QDM projected me: -0.00023381515
- QDM qctime rmse: 2.1521297
- QDM qctime me: 0.3463871
- 
- 4 month inverted:
- QDM projected rmse: 2.1462765
- QDM projected me: -0.007172498
- QDM qctime rmse: 2.1524358
- QDM qctime me: 0.33949688
- 
- QUESTION: only do 4 season split?
- */
-
 protocol MonthlyBinable {
     func get(bin: Int, time t: Timestamp) -> Float
     var nBins: Int { get }
@@ -280,7 +217,7 @@ struct CdfMonthly: MonthlyBinable {
     let cdf: [Float]
     let bins: Bins
     
-    static var binsPerYear: Int { 4 }
+    static var binsPerYear: Int { 6 }
     
     var nBins: Int {
         cdf.count / Self.binsPerYear
@@ -346,7 +283,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     let yearMin: Float
     let bins: Bins
     
-    static var binsPerYear: Int { 4 }
+    static var binsPerYear: Int { 6 }
     
     /// input temperature and time axis
     init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {
