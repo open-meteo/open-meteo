@@ -1,6 +1,5 @@
-
-
 import Foundation
+
 
 /// QM and QDM based on https://link.springer.com/article/10.1007/s00382-020-05447-4
 /// QDM paper https://journals.ametsoc.org/view/journals/clim/28/17/jcli-d-14-00754.1.xml
@@ -16,77 +15,18 @@ struct BiasCorrection {
         case relativeChange
     }
     
-    static func quantileMapping(reference: ArraySlice<Float>, control: ArraySlice<Float>, forecast: ArraySlice<Float>, type: ChangeType) -> [Float] {
-        // calculate CDF
-        let binsRefernce = calculateBins(reference, min: type == .relativeChange ? 0 : nil)
-        let binsControl = calculateBins(control, min: type == .relativeChange ? 0 : nil)
-        let cdfRefernce = calculateCdf(reference, bins: binsRefernce)
-        let cdfControl = calculateCdf(control, bins: binsControl)
-        
-        // Apply
-        switch type {
-        case .absoluteChage:
-            return forecast.map {
-                let qm = interpolate(binsControl, cdfControl, x: $0, extrapolate: false)
-                return interpolate(cdfRefernce, binsRefernce, x: qm, extrapolate: false)
-            }
-        case .relativeChange:
-            return forecast.map {
-                let qm = max(interpolate(binsControl, cdfControl, x: $0, extrapolate: true), 0)
-                return max(interpolate(cdfRefernce, binsRefernce, x: qm, extrapolate: true), 0)
-            }
-        }
-    }
-    
-    static func quantileDeltaMapping(reference: ArraySlice<Float>, control: ArraySlice<Float>, forecast: ArraySlice<Float>, type: ChangeType) -> [Float] {
-        // calculate CDF
-        //let binsControl = calculateBins(control, nQuantiles: 250, min: type == .relativeChange ? 0 : nil)
-        let binsControl = Bins(min: min(reference.min()!, control.min()!), max: max(reference.max()!, control.max()!), nQuantiles: 100)
-        print("Bins min=\(binsControl.min) max=\(binsControl.max) delta=\((binsControl.max-binsControl.min)/Float(binsControl.nQuantiles))")
-        let binsRefernce = binsControl// calculateBins(reference, min: type == .relativeChange ? 0 : nil)
-        
-        let cdfRefernce = calculateCdf(reference, bins: binsRefernce)
-        let cdfControl = calculateCdf(control, bins: binsControl)
-        
-        // Apply
-        let binsForecast = binsControl//calculateBins(forecast, min: type == .relativeChange ? 0 : nil)
-        let cdfForecast = calculateCdf(forecast, bins: binsForecast)
-        
-        // TODO: forcast data CDF needs to be calculated on a sliding window of a couple of years
-        // TODO: do we need to correct for seasonal chang? For QM this is a huge issue.. Maybe QDM is less effected
-
-        switch type {
-        case .absoluteChage:
-            return forecast.map { forecast in
-                let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, extrapolate: false)
-                let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, extrapolate: false)
-                return qdm1 + forecast - interpolate(cdfControl, binsControl, x: epsilon, extrapolate: false)
-            }
-        case .relativeChange:
-            let maxScaleFactor: Float = 10
-            return forecast.map { forecast in
-                let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, extrapolate: false)
-                let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, extrapolate: false)
-                let scale = forecast / interpolate(cdfControl, binsControl, x: epsilon, extrapolate: false)
-                return qdm1 / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
-            }
-        }
-    }
-    
     /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
     static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, control: ArraySlice<Float>, referenceTime: TimerangeDt, forecast: ArraySlice<Float>, forecastTime: TimerangeDt, type: ChangeType) -> [Float] {
-        // calculate CDF
-        //let binsControl = calculateBins(control, nQuantiles: 250, min: type == .relativeChange ? 0 : nil)
-        let binsControl = Bins(min: control.min()!, max: control.max()!, nQuantiles: 100)
-        //let bins = Bins(min: min(reference.min()!, control.min()!), max: max(reference.max()!, control.max()!), nQuantiles: 100)
-        print("Bins min=\(binsControl.min) max=\(binsControl.max) delta=\((binsControl.max-binsControl.min)/Float(binsControl.nQuantiles))")
-        let binsRefernce = Bins(min: reference.min()!, max: reference.max()!, nQuantiles: 100) //calculateBins(reference, min: type == .relativeChange ? 0 : reference.min()! - 10)
-        let binsForecast = Bins(min: forecast.min()!, max: forecast.max()!, nQuantiles: 100)
+        let nQuantiles = 100
         
+        // Compute reference distributions
+        let binsControl = calculateBins(control, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let binsRefernce = calculateBins(reference, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
         let cdfRefernce = CdfMonthly(vector: reference, time: referenceTime, bins: binsRefernce)
         let cdfControl = CdfMonthly(vector: control, time: referenceTime, bins: binsControl)
         
         // Apply
+        let binsForecast = calculateBins(forecast, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
         let cdfForecast = CdfMonthly10YearSliding(vector: forecast, time: forecastTime, bins: binsForecast)
 
         switch type {
@@ -114,47 +54,6 @@ struct BiasCorrection {
             return Bins(min: .nan, max: .nan, nQuantiles: nQuantiles)
         }
         return Bins(min: min ?? minMax.min, max: minMax.max, nQuantiles: nQuantiles)
-    }
-    
-    /// Calculate sumulative distribution function. First value is always 0.
-    static func calculateCdf(_ vector: ArraySlice<Float>, bins: Bins) -> [Float] {
-        // Technically integer, but uses float for calualtions later
-        let count = bins.count
-        var cdf = [Float](repeating: 0, count: count)
-        for value in vector {
-            for (i, bin) in bins.enumerated().reversed() {
-                if value < bin || i == count-1 { // Note sure if we need `i == pbf.count-1` -> count all larger than bin.max
-                    cdf[i] += 1
-                } else {
-                    break
-                }
-            }
-        }
-        return cdf
-    }
-    
-    /// Find value `x` on first array, then interpolate on the second array to return the value
-    static func interpolate<A: RandomAccessCollection<Float>, B: RandomAccessCollection<Float>>(_ xData: A, _ yData: B, x: Float, extrapolate: Bool) -> Float {
-        assert(xData.count == yData.count)
-        let size = xData.count
-
-        var i = 0;  // find left end of interval for interpolation
-        if x >= xData[xData.index(xData.startIndex, offsetBy: size - 2)] {
-            i = size - 2;  // special case: beyond right end
-        } else {
-            while (x > xData[xData.index(xData.startIndex, offsetBy: i + 1)]) { i += 1 }
-        }
-        let xL = xData[xData.index(xData.startIndex, offsetBy: i)]
-        var yL = yData[yData.index(yData.startIndex, offsetBy: i)]
-        let xR = xData[xData.index(xData.startIndex, offsetBy: i + 1)]
-        var yR = yData[yData.index(yData.startIndex, offsetBy: i + 1)] // points on either side (unless beyond ends)
-
-        if !extrapolate {  // if beyond ends of array and not extrapolating
-            if (x < xL) { yR = yL }
-            if (x > xR) { yL = yR }
-        }
-        let dydx = xR - xL == 0 ? 0 : (yR - yL) / (xR - xL);  // gradient
-        return yL + dydx * (x - xL);       // linear interpolation
     }
     
     /// Find value `x` on first array, then interpolate on the second array to return the value
@@ -261,15 +160,6 @@ struct CdfMonthly: MonthlyBinable {
         self.bins = bins
     }
     
-    /// month starting at 0
-    func get(time t: Timestamp) -> ArraySlice<Float> {
-        let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-        let monthBin = fractionalDayOfYear / (31_557_600 / Self.binsPerYear)
-        
-        let binLength = cdf.count / Self.binsPerYear
-        return cdf[binLength * monthBin ..< binLength * (monthBin+1)]
-    }
-    
     /// linear interpolate between 2 months CDF
     func get(bin: Int, time t: Timestamp) -> Float {
         let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
@@ -342,19 +232,6 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         self.yearMin = yearMin
     }
     
-    /// month starting at 0
-    func get(time t: Timestamp) -> ArraySlice<Float> {
-        // TODO: interpolate between two CDFs... maybe do it upstream to prevent array allocations
-        
-        let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-        let monthBin = fractionalDayOfYear / (31_557_600 / Self.binsPerYear)
-        
-        let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
-        let yearBin = Int(fractionalYear - yearMin)
-        
-        return cdf[nBins * monthBin + nBins * Self.binsPerYear * yearBin ..< nBins * (monthBin+1)  + nBins * Self.binsPerYear * yearBin]
-    }
-    
     /// linear interpolate between 2 months CDF
     func get(bin: Int, time t: Timestamp) -> Float {
         // TODO: interpolate between two CDFs... maybe do it upstream to prevent array allocations
@@ -369,21 +246,6 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         return cdf[nBins * monthBin + nBins * Self.binsPerYear * yearBin + bin] * (1-fraction) + cdf[nBins * ((monthBin+1) % Self.binsPerYear) + nBins * Self.binsPerYear * yearBin + bin + 1] * (fraction)
     }
 }
-
-/// Calculate differnet bins for each month
-/*struct BinsPerMonth {
-    let min: [Float]
-    let max: [Float]
-    let nQuantiles: Int
-    
-    init(_ vector: ArraySlice<Float>, time: TimerangeDt, nQuantiles: Int, binsPerYear: Int) {
-        var min = [Float](repeating: .nan, count: binsPerYear)
-        var max = [Float](repeating: .nan, count: binsPerYear)
-        for (t, value) in (time, vector) {
-            
-        }
-    }
-}*/
 
 /// Represent bin sizes. Iteratable like an array, but only stores min/max/nQuantiles
 struct Bins {

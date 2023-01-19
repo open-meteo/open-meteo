@@ -119,7 +119,6 @@ extension Cmip6Domain: MultiDomainMixerDomain {
 enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case snowfall_sum
     case rain_sum
-    case temperature_2m_max_qm
     case temperature_2m_max_qdm
     case temperature_2m_max_linear
     case temperature_2m_max_reference
@@ -208,32 +207,6 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         let qcTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2022,1,1), dtSeconds: 24*3600)
                 
         switch derived {
-        case .temperature_2m_max_qm:
-            let control = try get(raw: .temperature_2m_max, time: referenceTime).data
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .terrainOptimised)!
-            let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
-            
-            
-            let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
-            let start = DispatchTime.now()
-            let correctedControl = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(control), type: .absoluteChage)
-            let correctedForecast = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(forecast), type: .absoluteChage)
-            print("QDM time \(start.timeElapsedPretty())")
-            
-            let corrected2 = (correctedControl + correctedForecast)
-            let reference2 = reference
-            let era5projectedTime = try era5Reader.get(raw: .temperature_2m, time: forecastTime.with(dtSeconds: 3600)).data.max(by: 24)
-            let era5projectedTime2 = era5projectedTime
-            
-            print("QM control rmse: \(zip(reference2, corrected2).rmse())")
-            print("QM control me: \(zip(reference2, corrected2).meanError())")
-            
-            
-            print("QM projected rmse: \(zip(era5projectedTime2, corrected2).rmse())")
-            print("QM projected me: \(zip(era5projectedTime2, corrected2).meanError())")
-            
-            return DataAndUnit(corrected2, .celsius)
-            
         case .temperature_2m_max_trend:
             let temp = try get(raw: .temperature_2m_max, time: time).data
             
@@ -364,8 +337,6 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .temperature_2m_max_linear:
             break
         case .temperature_2m_max_reference:
-            break
-        case .temperature_2m_max_qm:
             break
         case .temperature_2m_max_qdm:
             break
