@@ -226,6 +226,18 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="precipitation_qdm" id="precipitation_qdm" name="daily">
+          <label class="form-check-label" for="precipitation_qdm">
+            Precipitation Sum qdm
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="precipitation_linear" id="precipitation_linear" name="daily">
+          <label class="form-check-label" for="precipitation_linear">
+            Precipitation Sum linear
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="rain_sum" id="rain_sum" name="daily">
           <label class="form-check-label" for="rain_sum">
             Rain Sum

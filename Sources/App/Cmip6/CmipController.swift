@@ -119,6 +119,10 @@ extension Cmip6Domain: MultiDomainMixerDomain {
 enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case snowfall_sum
     case rain_sum
+    
+    case precipitation_qdm
+    case precipitation_linear
+    
     case temperature_2m_max_qdm
     case temperature_2m_max_linear
     case temperature_2m_max_reference
@@ -181,11 +185,91 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         /*let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
         let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)*/
         let breakyear = 2000
-        let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
+        let referenceTime = TimerangeDt(start: Timestamp(1959,1,2), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
         let forecastTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
         let qcTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2022,1,1), dtSeconds: 24*3600)
                 
         switch derived {
+        case .precipitation_qdm:
+            let control = try get(raw: .precipitation_sum, time: referenceTime).data
+            let era5Reader = try Era5Reader(domain: .era5, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
+            let reference = try era5Reader.get(raw: .precipitation, time: referenceTime.with(dtSeconds: 3600)).data.sum(by: 24)
+            
+            /*let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
+            let start = DispatchTime.now()
+            let correctedControl = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(control), forecastTime: referenceTime, type: .absoluteChage)
+            let correctedForecast = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: forecastTime, type: .absoluteChage)
+            print("QDM time \(start.timeElapsedPretty())")
+            
+            print("QDM control rmse: \(zip(reference, correctedControl).rmse())")
+            print("QDM control error: \(zip(reference, correctedControl).meanError())")
+            
+            let era5projectedTime = try era5Reader.get(raw: .temperature_2m, time: forecastTime.with(dtSeconds: 3600)).data.max(by: 24)
+            print("QDM projected rmse: \(zip(era5projectedTime, correctedForecast).rmse())")
+            print("QDM projected error: \(zip(era5projectedTime, correctedForecast).meanError())")
+             
+            return DataAndUnit(correctedControl + correctedForecast, .celsius)*/
+            
+            let forecast = try get(raw: .precipitation_sum, time: time).data
+            let start = DispatchTime.now()
+            let correctedForecast = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: time, type: .relativeChange)
+            print("QDM time \(start.timeElapsedPretty())")
+            
+            let qc = try era5Reader.get(raw: .precipitation, time: qcTime.with(dtSeconds: 3600)).data.sum(by: 24)
+            let reference2 = reference
+            let control2 = control
+            let correctedForecast2 = correctedForecast
+            
+            print("Raw control rmse: \(zip(reference2, control2).rmse())")
+            print("Raw control me: \(zip(reference2, control2).meanError())")
+            
+            print("QDM projected rmse: \(zip(reference2, correctedForecast2).rmse())")
+            print("QDM projected me: \(zip(reference2, correctedForecast2).meanError())")
+            
+            print("QDM qctime rmse: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).rmse())")
+            print("QDM qctime me: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).meanError())")
+            
+            
+            print(">30°C QDM projected rmse: \(zip(reference2.map{$0 > 30 ? 1 : 0}, correctedForecast2.map{$0 > 30 ? 1 : 0}).rmse())")
+            print(">30°C QDM projected me: \(zip(reference2.map{$0 > 30 ? 1 : 0}, correctedForecast2.map{$0 > 30 ? 1 : 0}).meanError())")
+            
+            print(">30°C QDM qctime rmse: \(zip(qc.map{$0 > 30 ? 1 : 0}, correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > 30 ? 1 : 0}).rmse())")
+            print(">30°C QDM qctime me: \(zip(qc.map{$0 > 30 ? 1 : 0}, correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > 30 ? 1 : 0}).meanError())")
+            
+            return DataAndUnit(correctedForecast2, .millimeter)
+            
+        case .precipitation_linear:
+            let control = try get(raw: .precipitation_sum, time: referenceTime).data
+            let era5Reader = try Era5Reader(domain: .era5, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
+            let reference = try era5Reader.get(raw: .precipitation, time: referenceTime.with(dtSeconds: 3600)).data.sum(by: 24)
+            
+            let forecast = try get(raw: .precipitation_sum, time: time).data
+            let start = DispatchTime.now()
+            let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 12)
+            let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 12)
+            
+            print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(-))
+            
+            var correctedForecast = forecast
+            referenceWeights.applyOffset(on: &correctedForecast, otherWeights: controlWeights, time: time, type: .relativeChange)
+            print("Linear bias time \(start.timeElapsedPretty())")
+            
+            let reference2 = reference
+            let correctedForecast2 = correctedForecast
+            let qc = try era5Reader.get(raw: .precipitation, time: qcTime.with(dtSeconds: 3600)).data.sum(by: 24)
+            
+            print("Linear bias projected rmse: \(zip(reference2, correctedForecast2).rmse())")
+            print("Linear bias projected me: \(zip(reference2, correctedForecast2).meanError())")
+            print("Linear bias qctime rmse: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).rmse())")
+            print("Linear bias qctime me: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).meanError())")
+            
+            print(">30°C Linear bias projected rmse: \(zip(reference2.map{$0 > 30 ? 1 : 0}, correctedForecast2.map{$0 > 30 ? 1 : 0}).rmse())")
+            print(">30°C Linear bias projected me: \(zip(reference2.map{$0 > 30 ? 1 : 0}, correctedForecast2.map{$0 > 30 ? 1 : 0}).meanError())")
+            print(">30°C Linear bias qctime rmse: \(zip(qc.map{$0 > 30 ? 1 : 0}, correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > 30 ? 1 : 0}).rmse())")
+            print(">30°C Linear bias qctime me: \(zip(qc.map{$0 > 30 ? 1 : 0}, correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > 30 ? 1 : 0}).meanError())")
+            
+            return DataAndUnit(correctedForecast2, .millimeter)
+            
         case .temperature_2m_max_trend:
             let temp = try get(raw: .temperature_2m_max, time: time).data
             
@@ -266,30 +350,6 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
             print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(-))
             
-            /**
-             12 months
-             Linear bias time 27.0ms
-             Linear bias projected rmse: 2.1713374
-             Linear bias projected me: -1.0727324e-06
-             Linear bias qctime rmse: 2.1964004
-             Linear bias qctime me: 0.23527382
-             >30°C Linear bias projected rmse: 0.008171778
-             >30°C Linear bias projected me: -6.677796e-05
-             >30°C Linear bias qctime rmse: 0.015775932
-             >30°C Linear bias qctime me: -0.00024888004
-             
-             1 bin:
-             Linear bias time 26.0ms
-             Linear bias projected rmse: 2.1834567
-             Linear bias projected me: -4.9951836e-06
-             Linear bias qctime rmse: 2.1981504
-             Linear bias qctime me: 0.23518859
-             >30°C Linear bias projected rmse: 0.008171778
-             >30°C Linear bias projected me: -6.677796e-05
-             >30°C Linear bias qctime rmse: 0.015775932
-             >30°C Linear bias qctime me: -0.00024888004
-             */
-            
             var correctedForecast = forecast
             referenceWeights.applyOffset(on: &correctedForecast, otherWeights: controlWeights, time: time, type: .absoluteChage)
             print("Linear bias time \(start.timeElapsedPretty())")
@@ -330,19 +390,13 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     func prefetchData(derived: Cmip6VariableDerived, time: TimerangeDt) throws {
         switch derived {
-        case .temperature_2m_max_linear:
-            break
-        case .temperature_2m_max_reference:
-            break
-        case .temperature_2m_max_qdm:
-            break
-        case .temperature_2m_max_trend:
-            break
         case .snowfall_sum:
             try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
         case .rain_sum:
             try prefetchData(raw: .precipitation_sum, time: time)
             try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
+        default:
+            break
         }
     }
 }

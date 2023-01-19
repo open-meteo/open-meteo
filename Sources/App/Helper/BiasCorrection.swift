@@ -42,7 +42,7 @@ struct BiasCorrection {
                 let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
                 let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: time, extrapolate: false)
                 let scale = forecast / interpolate(cdfControl, binsControl, x: epsilon, time: time, extrapolate: false)
-                return qdm1 / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
+                return scale == 0 ? 0 : qdm1 / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
             }
         }
     }
@@ -141,7 +141,7 @@ struct BiasCorrectionSeasonalLinear {
             case .absoluteChage:
                 data[i] += (m0 - o0) * (1-fraction) + (m1 - o1) * fraction
             case .relativeChange:
-                data[i] *= (m0 / o0) * (1-fraction) + (m1 / o1) * fraction
+                data[i] *= (o0 / m0) * (1-fraction) + (o1 / m1) * fraction
             }
         }
     }
