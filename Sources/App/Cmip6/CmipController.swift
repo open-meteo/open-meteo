@@ -202,13 +202,17 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
         /*let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
         let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)*/
-        let breakyear = 2015
+        let breakyear = 2000
         let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
         let forecastTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
+        let qcTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2022,1,1), dtSeconds: 24*3600)
+        
+        let fn: (Float) -> (Float) = {$0} // { return $0 > 30 ? 1 : 0 } // { $0 < 10 ? Float(1) : 0 }
+        
         switch derived {
         case .temperature_2m_max_qm:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .terrainOptimised)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
             
@@ -218,10 +222,10 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let correctedForecast = BiasCorrection.quantileMapping(reference: ArraySlice(reference), control: ArraySlice(control), forecast: ArraySlice(forecast), type: .absoluteChage)
             print("QDM time \(start.timeElapsedPretty())")
             
-            let corrected2 = (correctedControl + correctedForecast).map({ $0 < 10 ? Float(1) : 0 })
-            let reference2 = reference.map({ $0 < 10 ? Float(1) : 0 })
+            let corrected2 = (correctedControl + correctedForecast).map(fn)
+            let reference2 = reference.map(fn)
             let era5projectedTime = try era5Reader.get(raw: .temperature_2m, time: forecastTime.with(dtSeconds: 3600)).data.max(by: 24)
-            let era5projectedTime2 = era5projectedTime.map({ $0 < 10 ? Float(1) : 0 })
+            let era5projectedTime2 = era5projectedTime.map(fn)
             
             print("QM control rmse: \(zip(reference2, corrected2).rmse())")
             print("QM control me: \(zip(reference2, corrected2).meanError())")
@@ -254,7 +258,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
         case .temperature_2m_max_qdm:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .terrainOptimised)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
             /*let forecast = try get(raw: .temperature_2m_max, time: forecastTime).data
@@ -277,15 +281,19 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let correctedForecast = BiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: time, type: .absoluteChage)
             print("QDM time \(start.timeElapsedPretty())")
             
-            let reference2 = reference.map({ $0 < 10 ? Float(1) : 0 })
-            let control2 = control.map({ $0 < 10 ? Float(1) : 0 })
-            let correctedForecast2 = correctedForecast.map({ $0 < 10 ? Float(1) : 0 })
+            let qc = try era5Reader.get(raw: .temperature_2m, time: qcTime.with(dtSeconds: 3600)).data.max(by: 24).map(fn)
+            let reference2 = reference.map(fn)
+            let control2 = control.map(fn)
+            let correctedForecast2 = correctedForecast.map(fn)
             
             print("Raw control rmse: \(zip(reference2, control2).rmse())")
             print("Raw control me: \(zip(reference2, control2).meanError())")
             
             print("QDM projected rmse: \(zip(reference2, correctedForecast2).rmse())")
             print("QDM projected me: \(zip(reference2, correctedForecast2).meanError())")
+            
+            print("QDM qctime rmse: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).rmse())")
+            print("QDM qctime me: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).meanError())")
             
             return DataAndUnit(correctedForecast2, .celsius)
             
@@ -312,11 +320,14 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             }
             print("Linear bias time \(start.timeElapsedPretty())")
             
-            let reference2 = reference.map({ $0 < 10 ? Float(1) : 0 })
-            let correctedForecast2 = correctedForecast.map({ $0 < 10 ? Float(1) : 0 })
+            let reference2 = reference.map(fn)
+            let correctedForecast2 = correctedForecast.map(fn)
+            let qc = try era5Reader.get(raw: .temperature_2m, time: qcTime.with(dtSeconds: 3600)).data.max(by: 24).map(fn)
             
             print("Linear bias projected rmse: \(zip(reference2, correctedForecast2).rmse())")
             print("Linear bias projected me: \(zip(reference2, correctedForecast2).meanError())")
+            print("Linear bias qctime rmse: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).rmse())")
+            print("Linear bias qctime me: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).meanError())")
             
             return DataAndUnit(correctedForecast2, .celsius)
             

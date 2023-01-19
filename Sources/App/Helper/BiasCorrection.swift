@@ -218,6 +218,7 @@ struct CdfMonthly10YearSliding {
         for (t, value) in zip(time, vector) {
             let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
             let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
+            // TODO: instead of 3 month window, transfer weight to 2 bins... Afterwards nBins could be 9 or so.
             
             let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
             let yearBin = Int(fractionalYear - yearMin)
@@ -247,6 +248,8 @@ struct CdfMonthly10YearSliding {
     
     /// month starting at 0
     func get(time t: Timestamp) -> ArraySlice<Float> {
+        // TODO: interpolate between two CDFs... maybe do it upstream to prevent array allocations
+        
         let binsPerYear = 12
         let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
         let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
