@@ -171,12 +171,14 @@ struct CdfMonthly {
         for (t, value) in zip(time, vector) {
             let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
             let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
+            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
             for (i, bin) in bins.enumerated().reversed() {
                 if value < bin {
-                    cdf[monthBin * count + i] += 1
-                    
-                    cdf[((monthBin+1) % binsPerYear) * count + i] += 1
-                    cdf[((monthBin-1+binsPerYear) % binsPerYear) * count + i] += 1
+                    cdf[monthBin * count + i] += 1-fraction
+                    cdf[((monthBin+1) % binsPerYear) * count + i] += fraction
+                    //cdf[monthBin * count + i] += 1
+                    //cdf[((monthBin+1) % binsPerYear) * count + i] += 1
+                    //cdf[((monthBin-1+binsPerYear) % binsPerYear) * count + i] += 1
                 } else {
                     break
                 }
@@ -221,7 +223,7 @@ struct CdfMonthly10YearSliding {
         for (t, value) in zip(time, vector) {
             let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
             let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
-            // TODO: instead of 3 month window, transfer weight to 2 bins... Afterwards nBins could be 9 or so.
+            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
             
             let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
             let yearBin = Int(fractionalYear - yearMin)
@@ -229,9 +231,11 @@ struct CdfMonthly10YearSliding {
             for (i, bin) in bins.enumerated().reversed() {
                 if value < bin {
                     for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
-                        cdf[(monthBin * count + i) + count * binsPerYear * y] += 1
-                        cdf[(((monthBin+1) % binsPerYear) * count + i) + count * binsPerYear * y] += 1
-                        cdf[(((monthBin-1+binsPerYear) % binsPerYear) * count + i) + count * binsPerYear * y] += 1
+                        cdf[(monthBin * count + i) + count * binsPerYear * y] += 1-fraction
+                        cdf[(((monthBin+1) % binsPerYear) * count + i) + count * binsPerYear * y] += fraction
+                        //cdf[(monthBin * count + i) + count * binsPerYear * y] += 1
+                        //cdf[(((monthBin+1) % binsPerYear) * count + i) + count * binsPerYear * y] += 1
+                        //cdf[(((monthBin-1+binsPerYear) % binsPerYear) * count + i) + count * binsPerYear * y] += 1
                     }
                 } else {
                     break
@@ -264,6 +268,20 @@ struct CdfMonthly10YearSliding {
     }
 }
 
+/// Calculate differnet bins for each month
+/*struct BinsPerMonth {
+    let min: [Float]
+    let max: [Float]
+    let nQuantiles: Int
+    
+    init(_ vector: ArraySlice<Float>, time: TimerangeDt, nQuantiles: Int, binsPerYear: Int) {
+        var min = [Float](repeating: .nan, count: binsPerYear)
+        var max = [Float](repeating: .nan, count: binsPerYear)
+        for (t, value) in (time, vector) {
+            
+        }
+    }
+}*/
 
 /// Represent bin sizes. Iteratable like an array, but only stores min/max/nQuantiles
 struct Bins {
