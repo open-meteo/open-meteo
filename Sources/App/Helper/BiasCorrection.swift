@@ -250,6 +250,9 @@ struct CdfMonthly: MonthlyBinable {
         for j in 0..<cdf.count / bins.count {
             // last value is always count... could also scale to something between bin min/max to make it compressible more easily
             let count = cdf[(j+1) * bins.count - 1]
+            guard count > 0 else {
+                continue
+            }
             for i in j * bins.count ..< (j+1) * bins.count {
                 cdf[i] = cdf[i] / count
             }
@@ -327,6 +330,9 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         for j in 0..<cdf.count / bins.count {
             // last value is always count... could also scale to something between bin min/max to make it compressible more easily
             let count = cdf[(j+1) * bins.count - 1]
+            guard count > 0 else {
+                continue
+            }
             for i in j * bins.count ..< (j+1) * bins.count {
                 cdf[i] = cdf[i] / count
             }
