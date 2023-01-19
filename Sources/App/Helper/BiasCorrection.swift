@@ -76,28 +76,31 @@ struct BiasCorrection {
     static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, control: ArraySlice<Float>, referenceTime: TimerangeDt, forecast: ArraySlice<Float>, forecastTime: TimerangeDt, type: ChangeType) -> [Float] {
         // calculate CDF
         //let binsControl = calculateBins(control, nQuantiles: 250, min: type == .relativeChange ? 0 : nil)
-        let bins = Bins(min: min(reference.min()!, control.min()!), max: max(reference.max()!, control.max()!), nQuantiles: 100)
-        print("Bins min=\(bins.min) max=\(bins.max) delta=\((bins.max-bins.min)/Float(bins.nQuantiles))")
+        let binsControl = Bins(min: control.min()!, max: control.max()!, nQuantiles: 100)
+        //let bins = Bins(min: min(reference.min()!, control.min()!), max: max(reference.max()!, control.max()!), nQuantiles: 100)
+        print("Bins min=\(binsControl.min) max=\(binsControl.max) delta=\((binsControl.max-binsControl.min)/Float(binsControl.nQuantiles))")
+        let binsRefernce = Bins(min: reference.min()!, max: reference.max()!, nQuantiles: 100) //calculateBins(reference, min: type == .relativeChange ? 0 : reference.min()! - 10)
+        let binsForecast = Bins(min: forecast.min()!, max: forecast.max()!, nQuantiles: 100)
         
-        let cdfRefernce = CdfMonthly(vector: reference, time: referenceTime, bins: bins)
-        let cdfControl = CdfMonthly(vector: control, time: referenceTime, bins: bins)
+        let cdfRefernce = CdfMonthly(vector: reference, time: referenceTime, bins: binsRefernce)
+        let cdfControl = CdfMonthly(vector: control, time: referenceTime, bins: binsControl)
         
         // Apply
-        let cdfForecast = CdfMonthly10YearSliding(vector: forecast, time: forecastTime, bins: bins)
+        let cdfForecast = CdfMonthly10YearSliding(vector: forecast, time: forecastTime, bins: binsForecast)
 
         switch type {
         case .absoluteChage:
             return zip(forecastTime, forecast).map { (time, forecast) in
-                let epsilon = interpolate(bins, cdfForecast.get(time: time), x: forecast, extrapolate: false)
-                let qdm1 = interpolate(cdfRefernce.get(time: time), bins, x: epsilon, extrapolate: false)
-                return qdm1 + forecast - interpolate(cdfControl.get(time: time), bins, x: epsilon, extrapolate: false)
+                let epsilon = interpolate(binsForecast, cdfForecast.get(time: time), x: forecast, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce.get(time: time), binsRefernce, x: epsilon, extrapolate: false)
+                return qdm1 + forecast - interpolate(cdfControl.get(time: time), binsControl, x: epsilon, extrapolate: false)
             }
         case .relativeChange:
             let maxScaleFactor: Float = 10
             return zip(forecastTime, forecast).map { (time, forecast) in
-                let epsilon = interpolate(bins, cdfForecast.get(time: time), x: forecast, extrapolate: false)
-                let qdm1 = interpolate(cdfRefernce.get(time: time), bins, x: epsilon, extrapolate: false)
-                let scale = forecast / interpolate(cdfControl.get(time: time), bins, x: epsilon, extrapolate: false)
+                let epsilon = interpolate(binsForecast, cdfForecast.get(time: time), x: forecast, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce.get(time: time), binsRefernce, x: epsilon, extrapolate: false)
+                let scale = forecast / interpolate(cdfControl.get(time: time), binsControl, x: epsilon, extrapolate: false)
                 return qdm1 / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
             }
         }

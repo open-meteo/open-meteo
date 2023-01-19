@@ -207,7 +207,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         let forecastTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
         let qcTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2022,1,1), dtSeconds: 24*3600)
         
-        let fn: (Float) -> (Float) = {$0} // { return $0 > 30 ? 1 : 0 } // { $0 < 10 ? Float(1) : 0 }
+        let fn: (Float) -> (Float) = { return $0 > 30 ? 1 : 0 } // { $0 < 10 ? Float(1) : 0 } {$0}
         
         switch derived {
         case .temperature_2m_max_qm:
