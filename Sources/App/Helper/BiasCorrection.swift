@@ -121,13 +121,13 @@ struct BiasCorrectionSeasonalLinear {
         var sums = [Float](repeating: 0, count: binsPerYear)
         var weights = [Float](repeating: 0, count: binsPerYear)
         for (t, v) in zip(time, data) {
-            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-            let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
-            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
-            sums[monthBin] += v * (1-fraction)
-            weights[monthBin] += (1-fraction)
-            sums[(monthBin+1) % binsPerYear] += v * fraction
-            weights[(monthBin+1) % binsPerYear] += fraction
+            let monthBin = t.secondInAverageYear / (31_557_600 / binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let weighted = Interpolations.linearWeighted(value: v, fraction: fraction)
+            sums[monthBin] += weighted.a
+            weights[monthBin] += weighted.weightA
+            sums[(monthBin+1) % binsPerYear] += weighted.b
+            weights[(monthBin+1) % binsPerYear] += weighted.weightB
         }
         self.meansPerYear = zip(weights, sums).map({ $0.0 <= 0.001 ? .nan : $0.1 / $0.0 })
     }
@@ -137,11 +137,10 @@ struct BiasCorrectionSeasonalLinear {
         let binsPerYear = meansPerYear.count
         assert(time.count == indices.count)
         for (i ,t) in zip(indices, time) {
-            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-            let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
-            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
-            let m = meansPerYear[monthBin] * (1-fraction) + meansPerYear[(monthBin+1) % binsPerYear] * fraction
-            let o = otherWeights.meansPerYear[monthBin] * (1-fraction) + otherWeights.meansPerYear[(monthBin+1) % binsPerYear] * fraction
+            let monthBin = t.secondInAverageYear / (31_557_600 / binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let m = Interpolations.linear(a: meansPerYear[monthBin], b: meansPerYear[(monthBin+1) % binsPerYear], fraction: fraction)
+            let o = Interpolations.linear(a: otherWeights.meansPerYear[monthBin], b: otherWeights.meansPerYear[(monthBin+1) % binsPerYear], fraction: fraction)
             switch type {
             case .absoluteChage:
                 data[i] += m - o
@@ -176,16 +175,16 @@ struct CdfMonthly: MonthlyBinable {
         let count = bins.nQuantiles
         var cdf = [Float](repeating: 0, count: count * Self.binsPerYear)
         for (t, value) in zip(time, vector) {
-            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-            let monthBin = fractionalDayOfYear / (31_557_600 / Self.binsPerYear)
-            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
+            let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
             for (i, bin) in bins.enumerated().reversed() {
                 if value >= bin && value < bins[i+1] {
                     // value exactly inside a bin, adjust weight
                     let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
+                    let weigthted = Interpolations.linearWeighted(value: interBinFraction, fraction: fraction)
                     assert(interBinFraction >= 0 && interBinFraction <= 1)
-                    cdf[monthBin * count + i] += (1-fraction) * interBinFraction
-                    cdf[((monthBin+1) % Self.binsPerYear) * count + i] += fraction * interBinFraction
+                    cdf[monthBin * count + i] += weigthted.a
+                    cdf[((monthBin+1) % Self.binsPerYear) * count + i] += weigthted.b
                 } else if value < bin {
                     cdf[monthBin * count + i] += 1-fraction
                     cdf[((monthBin+1) % Self.binsPerYear) * count + i] += fraction
@@ -211,12 +210,11 @@ struct CdfMonthly: MonthlyBinable {
     
     /// linear interpolate between 2 months CDF
     func get(bin: Int, time t: Timestamp) -> Float {
-        let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-        let monthBin = fractionalDayOfYear / (31_557_600 / Self.binsPerYear)
-        let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
+        let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
+        let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
         
         let binLength = cdf.count / Self.binsPerYear
-        return cdf[binLength * monthBin + bin] * (1-fraction) + cdf[binLength * ((monthBin+1) % Self.binsPerYear) + bin] * (fraction)
+        return Interpolations.linear(a: cdf[binLength * monthBin + bin], b: cdf[binLength * ((monthBin+1) % Self.binsPerYear) + bin], fraction: fraction)
     }
 }
 
@@ -239,9 +237,8 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         let count = bins.nQuantiles
         var cdf = [Float](repeating: 0, count: count * Self.binsPerYear * nYears)
         for (t, value) in zip(time, vector) {
-            let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-            let monthBin = fractionalDayOfYear / (31_557_600 / Self.binsPerYear)
-            let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
+            let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
             
             let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
             let yearBin = Int(fractionalYear - yearMin)
@@ -251,9 +248,10 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
                     // value exactly inside a bin, adjust weight
                     let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
                     assert(interBinFraction >= 0 && interBinFraction <= 1)
+                    let weigthted = Interpolations.linearWeighted(value: interBinFraction, fraction: fraction)
                     for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
-                        cdf[(monthBin * count + i) + count * Self.binsPerYear * y] += (1-fraction) * interBinFraction
-                        cdf[(((monthBin+1) % Self.binsPerYear) * count + i) + count * Self.binsPerYear * y] += fraction * interBinFraction
+                        cdf[(monthBin * count + i) + count * Self.binsPerYear * y] += weigthted.a
+                        cdf[(((monthBin+1) % Self.binsPerYear) * count + i) + count * Self.binsPerYear * y] += weigthted.b
                     }
                 } else if value < bin {
                     for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
@@ -283,14 +281,13 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     
     /// linear interpolate between 2 months CDF
     func get(bin: Int, time t: Timestamp) -> Float {
-        let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
-        let monthBin = fractionalDayOfYear / (31_557_600 / Self.binsPerYear)
-        let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
+        let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
+        let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
         
         let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
         let yearBin = Int(fractionalYear - yearMin)
         
-        return cdf[nBins * monthBin + nBins * Self.binsPerYear * yearBin + bin] * (1-fraction) + cdf[nBins * ((monthBin+1) % Self.binsPerYear) + nBins * Self.binsPerYear * yearBin + bin + 1] * (fraction)
+        return Interpolations.linear(a: cdf[nBins * monthBin + nBins * Self.binsPerYear * yearBin + bin], b: cdf[nBins * ((monthBin+1) % Self.binsPerYear) + nBins * Self.binsPerYear * yearBin + bin + 1], fraction: fraction)
     }
 }
 
@@ -326,5 +323,15 @@ extension Bins: RandomAccessCollection {
     
     func index(after i: Int) -> Int {
         i + 1
+    }
+}
+
+struct Interpolations {
+    @inlinable static func linear(a: Float, b: Float, fraction: Float) -> Float {
+        return a * (1-fraction) + b * fraction
+    }
+    
+    @inlinable static func linearWeighted(value: Float, fraction: Float) -> (a: Float, b: Float, weightA: Float, weightB: Float) {
+        return (value * (1-fraction), value * fraction, (1-fraction), fraction)
     }
 }

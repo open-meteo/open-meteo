@@ -15,6 +15,16 @@ final class BiasCorrectionTests: XCTestCase {
         
         let qdmRelative = QuantileDeltaMappingBiasCorrection.quantileDeltaMappingMonthly(reference: reference, control: control, referenceTime: TimerangeDt(start: Timestamp(2021,1,1), nTime: reference.count, dtSeconds: 86400), forecast: forecast, forecastTime: TimerangeDt(start: Timestamp(2021,1,1), nTime: forecast.count, dtSeconds: 86400), type: .relativeChange)
         print(qdmRelative)
-        XCTAssertEqualArray(qdmRelative, [0.663053, 1.9030098, 3.5860853, 4.774967, 5.8174477, 11.54507, 7.788539, 4.769123, 1.9050246, 11.579601], accuracy: 0.001)
+        XCTAssertEqualArray(qdmRelative, [0.0, 1.9981737, 2.443818, 3.3550663, 4.1394744, 6.2328215, 6.263566, 3.356181, 2.0023994, 6.937058], accuracy: 0.001)
+    }
+    
+    func testInterpolation() {
+        XCTAssertEqual(Interpolations.linear(a: 2, b: 4, fraction: 0.75), 3.5)
+        
+        let inverse = Interpolations.linearWeighted(value: 3.5, fraction: 0.75)
+        XCTAssertEqual(inverse.a, 0.875)
+        XCTAssertEqual(inverse.b, 2.625)
+        XCTAssertEqual(inverse.weightA, 0.25)
+        XCTAssertEqual(inverse.weightB, 0.75)
     }
 }

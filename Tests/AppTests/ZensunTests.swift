@@ -40,12 +40,12 @@ final class ZensunTests: XCTestCase {
         XCTAssertEqual(p3.decang, 23.066, accuracy: 0.001) // should be 23.06
         XCTAssertEqual(p3.eqtime * 60, -3.8260005, accuracy: 0.001) // should be -3.95
         
-        XCTAssertEqual(Timestamp(1970,1,1,12).fractionalDay, 2.0)
-        XCTAssertEqual(Timestamp(2022,1,1,12).fractionalDay, 2.0)
-        XCTAssertEqual(Timestamp(2023,1,1,12).fractionalDay, 1.75)
-        XCTAssertEqual(Timestamp(2024,1,1,12).fractionalDay, 1.5) // leap year
-        XCTAssertEqual(Timestamp(2025,1,1,12).fractionalDay, 2.25)
-        XCTAssertEqual(Timestamp(2026,1,1,12).fractionalDay, 2.0)
+        XCTAssertEqual(Timestamp(1970,1,1,12).fractionalDayMidday, 2.0)
+        XCTAssertEqual(Timestamp(2022,1,1,12).fractionalDayMidday, 2.0)
+        XCTAssertEqual(Timestamp(2023,1,1,12).fractionalDayMidday, 1.75)
+        XCTAssertEqual(Timestamp(2024,1,1,12).fractionalDayMidday, 1.5) // leap year
+        XCTAssertEqual(Timestamp(2025,1,1,12).fractionalDayMidday, 2.25)
+        XCTAssertEqual(Timestamp(2026,1,1,12).fractionalDayMidday, 2.0)
     }
     
     

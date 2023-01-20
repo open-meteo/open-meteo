@@ -397,6 +397,17 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             referenceWeights.applyOffset(on: &correctedForecast, otherWeights: controlWeights, time: time, type: .absoluteChage)
             print("Linear bias time \(start.timeElapsedPretty())")
             
+            print(referenceWeights.meansPerYear)
+            print(controlWeights.meansPerYear)
+            /*
+             linear
+             [4.1311784, 5.186135, 8.101518, 11.94863, 15.810508, 19.420513, 22.18354, 23.379496, 21.0573, 17.133945, 11.473729, 6.0574517]
+             [4.3314304, 4.6800265, 6.2581177, 8.855992, 13.0767975, 17.734823, 20.294538, 21.34319, 19.460024, 15.027111, 10.086617, 6.051094]
+             
+             [4.1456585, 6.3364034, 10.22601, 13.597799, 17.885447, 20.986559, 23.144682, 22.7392, 19.333, 14.63881, 8.201679, 4.643939]
+             [4.340705, 5.166131, 7.3429213, 10.7614355, 15.561608, 19.345089, 21.028107, 21.278543, 17.256548, 12.689892, 7.6430626, 4.7847576]
+             */
+            
             let reference2 = reference
             let correctedForecast2 = correctedForecast
             let qc = try era5Reader.get(raw: .temperature_2m, time: qcTime.with(dtSeconds: 3600)).data.max(by: 24)

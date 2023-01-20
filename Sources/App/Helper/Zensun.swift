@@ -22,7 +22,7 @@ public struct Zensun {
         set.reserveCapacity(nDays)
         for time in timeRange.stride(dtSeconds: 86400) {
             /// fractional day number with 12am 1jan = 1
-            let tt = time.add(12*3600).fractionalDay
+            let tt = time.add(12*3600).fractionalDayMidday
             
             let (eqtime, decang) = time.add(12*3600).getSunDeclination()
             let latsun = decang
@@ -77,7 +77,7 @@ public struct Zensun {
                 
         for (t, timestamp) in timerange.enumerated() {
             /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDay
+            let tt = timestamp.fractionalDayMidday
 
             let (eqtime, decang) = timestamp.getSunDeclination()
             
@@ -145,7 +145,7 @@ public struct Zensun {
                 
         for (t, timestamp) in timerange.enumerated() {
             /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDay
+            let tt = timestamp.fractionalDayMidday
 
             let (eqtime, decang) = timestamp.getSunDeclination()
             
@@ -217,7 +217,7 @@ public struct Zensun {
                 
         for timestamp in timerange {
             /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDay
+            let tt = timestamp.fractionalDayMidday
             let rsun=1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
             let rsun_square = rsun*rsun
 
@@ -285,7 +285,7 @@ public struct Zensun {
             }
             
             /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDay
+            let tt = timestamp.fractionalDayMidday
 
             let (eqtime, decang) = timestamp.getSunDeclination()
             
@@ -408,7 +408,7 @@ public struct Zensun {
     public static func backwardsAveragedToInstantFactor(time: TimerangeDt, latitude: Float, longitude: Float) -> [Float] {
         return time.map { timestamp in
             /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDay
+            let tt = timestamp.fractionalDayMidday
 
             let (eqtime, decang) = timestamp.getSunDeclination()
             
@@ -515,8 +515,19 @@ public struct Zensun {
 
 extension Timestamp {
     /// fractional day number with 12am 1jan = 1.
-    public var fractionalDay: Float {
-        Float(((timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600) / 86400 + 0.5 + 1.0
+    public var fractionalDayMidday: Float {
+        Float(secondInAverageYear) / 86400 + 0.5 + 1.0
+    }
+    
+    /// Second of year, assuming average of 365.25 days
+    /// Range `0 ..< 364.25 * 86400`
+    public var secondInAverageYear: Int {
+        ((timeIntervalSince1970 %  Self.secondsPerAverageYear) + Self.secondsPerAverageYear) % Self.secondsPerAverageYear
+    }
+    
+    /// Seconds per year if a year has 365.25 days
+    public static var secondsPerAverageYear: Int {
+        31_557_600
     }
     
     /// E.g. 2.5 for 2:30
@@ -525,7 +536,7 @@ extension Timestamp {
     }
     
     @inlinable public func getSunDeclination() -> (eqtime: Float, decang: Float) {
-        let tt = fractionalDay
+        let tt = fractionalDayMidday
         let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
         let eqtime = Zensun.eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
         let decang = Zensun.dec.interpolateLinear(Int(tt - 1)/5, fraction)
