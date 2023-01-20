@@ -277,22 +277,6 @@ struct CdfMonthly: MonthlyBinable {
     }
 }
 
-/*
- before
- 
- QDM projected rmse: 2.1693773
- QDM projected me: -0.015025523
- QDM qctime rmse: 2.1886868
- QDM qctime me: -0.15075563
- mean per year reference=[27.25] refForecast=[28.275] qc=[42.863636] qcForecast=[41.454544]
- >25.0°C QDM projected rmse: 3.5812008
- >25.0°C QDM projected me: -1.025
- >25.0°C QDM qctime rmse: 3.9254415
- >25.0°C QDM qctime me: 1.4090909
- 
- 
- */
-
 /// Calculate CDF sliding over 3 months and sliding 10 years
 struct CdfMonthly10YearSliding: MonthlyBinable {
     let cdf: [Float]
@@ -309,8 +293,9 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {
         let yearMinF = Float(time.range.lowerBound.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin) // -2.74
         let yearMaxF = Float(time.range.upperBound.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin) // 7.49
-        let yearMin = Int(yearMinF.rounded(.up)) // -2
-        let yearMax = Int(yearMaxF.rounded(.down)) // 7
+        // Remove first and last yearBin on purpose not to have bins with partial data
+        let yearMin = Int(ceil(yearMinF)) // -2
+        let yearMax = Int(floor(yearMaxF)) // 7
         
         let nYears = yearMax - yearMin + 1
         //print("n Years \(nYears) yearMin=\(yearMinF) yearMax=\(yearMaxF) yearMinIndex=\(yearMin) yearMaxIndex=\(yearMax)")
