@@ -21,6 +21,7 @@ struct QuantileDeltaMappingBiasCorrection {
     
     /// Calculate CDFs over the entire  control and forecast timespan using sliding windows
     /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
+    /// TODO: check if dry periods are still correct
     static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, referenceTime: TimerangeDt, controlAndForecast: ArraySlice<Float>, controlAndForecastTime: TimerangeDt, type: ChangeType) -> [Float] {
         let nQuantiles = 100
         
@@ -50,6 +51,9 @@ struct QuantileDeltaMappingBiasCorrection {
         case .relativeChange:
             let maxScaleFactor: Float = 10
             return zip(controlAndForecastTime, controlAndForecast).map { (time, forecast) in
+                guard forecast > 0 else {
+                    return 0
+                }
                 var timeReference = time
                 if time >= referenceTime.range.upperBound {
                     timeReference = referenceTime.range.upperBound.add(time.timeIntervalSince1970 % Timestamp.secondsPerAverageYear - Timestamp.secondsPerAverageYear)
@@ -57,13 +61,13 @@ struct QuantileDeltaMappingBiasCorrection {
                 let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
                 let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: timeReference, extrapolate: false)
                 let scale = forecast / interpolate(cdfControl, binsControl, x: epsilon, time: timeReference, extrapolate: false)
-                return scale == 0 ? 0 : qdm1 * min(max(scale, maxScaleFactor * -1), maxScaleFactor)
+                return qdm1 * min(max(scale, maxScaleFactor * -1), maxScaleFactor)
             }
         }
     }
     
     /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
-    static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, control: ArraySlice<Float>, referenceTime: TimerangeDt, forecast: ArraySlice<Float>, forecastTime: TimerangeDt, type: ChangeType) -> [Float] {
+    /*static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, control: ArraySlice<Float>, referenceTime: TimerangeDt, forecast: ArraySlice<Float>, forecastTime: TimerangeDt, type: ChangeType) -> [Float] {
         let nQuantiles = 100
         
         // Compute reference distributions
@@ -94,7 +98,7 @@ struct QuantileDeltaMappingBiasCorrection {
                 return scale == 0 ? 0 : qdm1 * min(max(scale, maxScaleFactor * -1), maxScaleFactor)
             }
         }
-    }
+    }*/
     
     /// Calcualte min/max from vector and return bins
     /// nQuantiles of 100 should be sufficient
@@ -340,10 +344,10 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         let yearMinF = Float(time.range.lowerBound.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin) // -2.74
         let yearMaxF = Float(time.range.upperBound.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin) // 7.49
         // Remove first and last yearBin on purpose not to have bins with partial data
-        let yearMin = Int(ceil(yearMinF)) // -2
-        let yearMax = Int(floor(yearMaxF)) // 7
+        let yearMin = Int(round(yearMinF)) // -2
+        let yearMax = Int(round(yearMaxF)) // 7
         
-        let nYears = yearMax - yearMin + 1
+        let nYears = yearMax - yearMin
         //print("n Years \(nYears) yearMin=\(yearMinF) yearMax=\(yearMaxF) yearMinIndex=\(yearMin) yearMaxIndex=\(yearMax)")
         
         let count = bins.nQuantiles
@@ -352,9 +356,9 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
             let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
             let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
             
-            let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin)
-            let yearFraction = abs(fractionalYear - Float(Int(fractionalYear)))
-            let yearBin = Int(floor(fractionalYear - Float(yearMin)))
+            let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / (24 * 365.25 * Float(Self.yearsPerBin)) - Float(yearMin)
+            let yearFraction = fractionalYear - floor(fractionalYear)
+            let yearBin = Int(floor(fractionalYear))
             
             for (i, bin) in bins.enumerated().reversed() {
                 if value >= bin && value < bins[i+1] {
@@ -388,7 +392,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         for j in 0..<cdf.count / bins.count {
             // last value is always count... could also scale to something between bin min/max to make it compressible more easily
             let count = cdf[(j+1) * bins.count - 1]
-            print("cdf count j=\(j) count=\(count) ")
+            //print("cdf count j=\(j) count=\(count) ")
             guard count > 0 else {
                 continue
             }
@@ -407,9 +411,9 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
         let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
         
-        let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin)
-        let yearFraction = abs(fractionalYear - Float(Int(fractionalYear)))
-        let yearBin = Int(floor(fractionalYear - Float(yearMin)))
+        let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / (24 * 365.25 * Float(Self.yearsPerBin)) - Float(yearMin)
+        let yearFraction = fractionalYear - floor(fractionalYear)
+        let yearBin = Int(floor(fractionalYear))
         
         if yearBin < 0 {
             return Interpolations.linear(
