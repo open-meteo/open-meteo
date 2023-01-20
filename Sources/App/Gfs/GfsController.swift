@@ -358,6 +358,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
                 try prefetchData(raw: .surface(.showers), time: time)
                 try prefetchData(raw: .surface(.cape), time: time)
                 try prefetchData(raw: .surface(.windgusts_10m), time: time)
+                try prefetchData(raw: .surface(.visibility), time: time)
                 try prefetchData(raw: .surface(.lifted_index), time: time)
             }
         case .pressure(let v):
@@ -488,6 +489,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
                 let showers = try get(raw: .surface(.showers), time: time).data
                 let cape = try get(raw: .surface(.cape), time: time).data
                 let gusts = try get(raw: .surface(.windgusts_10m), time: time).data
+                let visibility = try get(raw: .surface(.visibility), time: time).data
                 let liftedIndex = try get(raw: .surface(.lifted_index), time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
@@ -497,6 +499,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
                     gusts: gusts,
                     cape: cape,
                     liftedIndex: liftedIndex,
+                    visibilityMeters: visibility,
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
             }

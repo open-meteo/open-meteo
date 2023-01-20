@@ -506,6 +506,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderMixable {
                     gusts: gusts,
                     cape: cape,
                     liftedIndex: nil,
+                    visibilityMeters: nil,
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
             }

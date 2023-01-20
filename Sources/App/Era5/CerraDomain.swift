@@ -210,6 +210,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 gusts: nil,
                 cape: nil,
                 liftedIndex: nil,
+                visibilityMeters: nil,
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
            )
         }

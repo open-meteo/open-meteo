@@ -39,7 +39,7 @@ enum WeatherCode: Int {
     /// Calculate weather interpretation code
     /// http://www.cosmo-model.org/content/model/documentation/newsLetters/newsLetter06/cnl6_hoffmann.pdf
     /// https://www.dwd.de/DE/leistungen/pbfb_verlag_promet/pdf_promethefte/28_1_2_pdf.pdf?__blob=publicationFile&v=8
-    public static func calculate(cloudcover: Float, precipitation: Float, convectivePrecipitation: Float?, snowfallCentimeters: Float, gusts: Float?, cape: Float?, liftedIndex: Float?, modelDtHours: Int) -> WeatherCode? {
+    public static func calculate(cloudcover: Float, precipitation: Float, convectivePrecipitation: Float?, snowfallCentimeters: Float, gusts: Float?, cape: Float?, liftedIndex: Float?, visibilityMeters: Float?, modelDtHours: Int) -> WeatherCode? {
         
         let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / Float(modelDtHours)) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / Float(modelDtHours)) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
         
@@ -74,13 +74,17 @@ enum WeatherCode: Int {
         
         switch precipitation / Float(modelDtHours) {
         case 0.1..<0.5: return .lightDrizzle
-        case 0.5..<1.3: return .moderateDrizzle
+        case 0.5..<1.0: return .moderateDrizzle
+        case 1.0..<1.3: return .denseDrizzle
         case 1.3..<2.5: return .lightRain
         case 2.5..<7.6: return .moderateRain
         case 7.6...: return .heavyRain
         default: break
         }
         
+        if let visibilityMeters, visibilityMeters <= 1000 {
+            return .fog
+        }
         
         switch cloudcover {
         case 0..<20: return .clearSky
@@ -93,7 +97,7 @@ enum WeatherCode: Int {
         return nil
     }
     
-    public static func calculate(cloudcover: [Float], precipitation: [Float], convectivePrecipitation: [Float]?, snowfallCentimeters: [Float], gusts: [Float]?, cape: [Float]?, liftedIndex: [Float]?, modelDtHours: Int) -> [Float] {
+    public static func calculate(cloudcover: [Float], precipitation: [Float], convectivePrecipitation: [Float]?, snowfallCentimeters: [Float], gusts: [Float]?, cape: [Float]?, liftedIndex: [Float]?, visibilityMeters: [Float]?, modelDtHours: Int) -> [Float] {
         
         return cloudcover.indices.map { i in
             return calculate(
@@ -104,6 +108,7 @@ enum WeatherCode: Int {
                 gusts: gusts?[i],
                 cape: cape?[i],
                 liftedIndex: liftedIndex?[i],
+                visibilityMeters: visibilityMeters?[i],
                 modelDtHours: modelDtHours
             ).map({Float($0.rawValue)}) ?? .nan
         }

@@ -277,6 +277,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 gusts: gusts,
                 cape: nil,
                 liftedIndex: nil,
+                visibilityMeters: nil,
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
            )
         }
