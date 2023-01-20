@@ -17,6 +17,11 @@ extension Array where Element == Float {
             return self[i..<i+by].reduce(0, +)
         }
     }
+    func sum(by: Float) -> [Float] {
+        return stride(from: Float(0), through: Float(count)-by, by: by).map { (i: Float) -> Float in
+            return self[Int(roundf(i))..<Int(roundf(i+by))].reduce(0, +)
+        }
+    }
     func mean(by: Int) -> [Float] {
         return stride(from: 0, through: count-by, by: by).map { i in
             return self[i..<i+by].reduce(0, +) / Float(by)

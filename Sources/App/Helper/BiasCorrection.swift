@@ -1,11 +1,15 @@
 import Foundation
 
 
+/// QDM bias correction to preserve deltas in data. E.g. events of temperature > 20°C are better represented
+/// Calculates CDFs for reference and control data on a monthly basis.
+/// CDFs for forecast data are sliding averages over 10 years to preserve climat change signal.
+/// Without sliding CDF, it is a regular Quantile Mapping QM that reduces climage change signals.
+///
 /// QM and QDM based on https://link.springer.com/article/10.1007/s00382-020-05447-4
 /// QDM paper https://journals.ametsoc.org/view/journals/clim/28/17/jcli-d-14-00754.1.xml
 /// Loosly based on https://github.com/btschwertfeger/BiasAdjustCXX/blob/master/src/CMethods.cxx
-/// Question: calculate CDF for each month? sliding doy? -> Distrubution based bias control does ot require this?
-struct BiasCorrection {
+struct QuantileDeltaMappingBiasCorrection {
     
     enum ChangeType {
         /// Correct offset. E.g. temperature
@@ -42,7 +46,7 @@ struct BiasCorrection {
                 let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
                 let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: time, extrapolate: false)
                 let scale = forecast / interpolate(cdfControl, binsControl, x: epsilon, time: time, extrapolate: false)
-                return scale == 0 ? 0 : qdm1 / min(max(scale, maxScaleFactor * -1), maxScaleFactor)
+                return scale == 0 ? 0 : qdm1 * min(max(scale, maxScaleFactor * -1), maxScaleFactor)
             }
         }
     }
@@ -106,10 +110,13 @@ struct BiasCorrection {
 }
 
 /// Calculate and/or apply a linear bias correction to correct a fixed offset
+/// Deltas are calculated for each month individually and use linear interpolation
 struct BiasCorrectionSeasonalLinear {
-    /// Could be one mean value for each month
+    /// Could be one mean value for each month. Depends on `binsPerYear`
+    /// Values are a mean of input data
     let meansPerYear: [Float]
     
+    /// Calculate means using the inverse of linear interpolation
     public init(_ data: ArraySlice<Float>, time: TimerangeDt, binsPerYear: Int = 12) {
         var sums = [Float](repeating: 0, count: binsPerYear)
         var weights = [Float](repeating: 0, count: binsPerYear)
@@ -125,7 +132,7 @@ struct BiasCorrectionSeasonalLinear {
         self.meansPerYear = zip(weights, sums).map({ $0.0 <= 0.001 ? .nan : $0.1 / $0.0 })
     }
     
-    func applyOffset(on data: inout [Float], otherWeights: BiasCorrectionSeasonalLinear, time: TimerangeDt, type: BiasCorrection.ChangeType, indices: Range<Int>? = nil) {
+    func applyOffset(on data: inout [Float], otherWeights: BiasCorrectionSeasonalLinear, time: TimerangeDt, type: QuantileDeltaMappingBiasCorrection.ChangeType, indices: Range<Int>? = nil) {
         let indices = indices ?? data.indices
         let binsPerYear = meansPerYear.count
         assert(time.count == indices.count)
@@ -133,15 +140,13 @@ struct BiasCorrectionSeasonalLinear {
             let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
             let monthBin = fractionalDayOfYear / (31_557_600 / binsPerYear)
             let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
-            let m0 = meansPerYear[monthBin]
-            let m1 = meansPerYear[(monthBin+1) % binsPerYear]
-            let o0 = otherWeights.meansPerYear[monthBin]
-            let o1 = otherWeights.meansPerYear[(monthBin+1) % binsPerYear]
+            let m = meansPerYear[monthBin] * (1-fraction) + meansPerYear[(monthBin+1) % binsPerYear] * fraction
+            let o = otherWeights.meansPerYear[monthBin] * (1-fraction) + otherWeights.meansPerYear[(monthBin+1) % binsPerYear] * fraction
             switch type {
             case .absoluteChage:
-                data[i] += (m0 - o0) * (1-fraction) + (m1 - o1) * fraction
+                data[i] += m - o
             case .relativeChange:
-                data[i] *= (o0 / m0) * (1-fraction) + (o1 / m1) * fraction
+                data[i] *= m / o
             }
         }
     }
@@ -278,8 +283,6 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     
     /// linear interpolate between 2 months CDF
     func get(bin: Int, time t: Timestamp) -> Float {
-        // TODO: interpolate between two CDFs... maybe do it upstream to prevent array allocations
-        
         let fractionalDayOfYear = ((t.timeIntervalSince1970 % 31_557_600) + 31_557_600) % 31_557_600
         let monthBin = fractionalDayOfYear / (31_557_600 / Self.binsPerYear)
         let fraction = Float(fractionalDayOfYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
