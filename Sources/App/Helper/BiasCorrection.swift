@@ -26,8 +26,8 @@ struct QuantileDeltaMappingBiasCorrection {
         // Compute reference distributions
         let binsControl = calculateBins(control, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
         let binsRefernce = calculateBins(reference, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
-        let cdfRefernce = CdfMonthly(vector: reference, time: referenceTime, bins: binsRefernce)
-        let cdfControl = CdfMonthly(vector: control, time: referenceTime, bins: binsControl)
+        let cdfRefernce = CdfMonthly10YearSliding(vector: reference, time: referenceTime, bins: binsRefernce)
+        let cdfControl = CdfMonthly10YearSliding(vector: control, time: referenceTime, bins: binsControl)
         
         // Apply
         let binsForecast = calculateBins(forecast, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
@@ -283,6 +283,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     let cdf: [Float]
     var nBins: Int { bins.nQuantiles }
     let yearMin: Float
+    let yearMax: Float
     let bins: Bins
     
     static var binsPerYear: Int { 6 }
@@ -292,6 +293,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         let yearMax = Float(time.range.upperBound.timeIntervalSince1970 / 3600) / 24 / 365.25
         let yearMin = Float(time.range.lowerBound.timeIntervalSince1970 / 3600) / 24 / 365.25
         let nYears = Int(yearMax - yearMin) + 2
+        print("n Years \(nYears)")
         
         let count = bins.nQuantiles
         var cdf = [Float](repeating: 0, count: count * Self.binsPerYear * nYears)
@@ -302,18 +304,19 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
             let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
             let yearBin = Int(fractionalYear - yearMin)
             
+            let dYear = 4
             for (i, bin) in bins.enumerated().reversed() {
                 if value >= bin && value < bins[i+1] {
                     // value exactly inside a bin, adjust weight
                     let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
                     assert(interBinFraction >= 0 && interBinFraction <= 1)
                     let weigthted = Interpolations.linearWeighted(value: fraction, fraction: interBinFraction)
-                    for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
+                    for y in max(yearBin-dYear, 0) ..< min(yearBin+dYear+1, nYears) {
                         cdf[(monthBin * count + i) + count * Self.binsPerYear * y] += weigthted.a
                         cdf[(((monthBin+1) % Self.binsPerYear) * count + i) + count * Self.binsPerYear * y] += weigthted.b
                     }
                 } else if value < bin {
-                    for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
+                    for y in max(yearBin-dYear, 0) ..< min(yearBin+dYear+1, nYears) {
                         cdf[(monthBin * count + i) + count * Self.binsPerYear * y] += 1-fraction
                         cdf[(((monthBin+1) % Self.binsPerYear) * count + i) + count * Self.binsPerYear * y] += fraction
                     }
@@ -336,6 +339,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         self.cdf = cdf
         self.bins = bins
         self.yearMin = yearMin
+        self.yearMax = yearMax
     }
     
     /// linear interpolate between 2 months CDF
@@ -344,9 +348,14 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
         
         let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25
-        let yearBin = Int(fractionalYear - yearMin)
+        // Cut off 4 years... This was it is always using longer averages... The last year, might only have 3 year averages
+        let yearBin = Int(min(fractionalYear, yearMax-4) - yearMin)
         
-        return Interpolations.linear(a: cdf[nBins * monthBin + nBins * Self.binsPerYear * yearBin + bin], b: cdf[nBins * ((monthBin+1) % Self.binsPerYear) + nBins * Self.binsPerYear * yearBin + bin + 1], fraction: fraction)
+        
+        return Interpolations.linear(
+            a: cdf[nBins * Self.binsPerYear * yearBin + nBins * monthBin + bin],
+            b: cdf[nBins * Self.binsPerYear * yearBin + nBins * ((monthBin+1) % Self.binsPerYear) + bin],
+            fraction: fraction)
     }
 }
 
