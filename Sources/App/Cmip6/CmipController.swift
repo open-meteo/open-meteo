@@ -264,10 +264,10 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let forecastEventsQcLength = correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
             let forecastEventsReferenceTime = correctedForecast2[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
             print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
-            print(">\(thres)°C QDM projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
-            print(">\(thres)°C QDM projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
-            print(">\(thres)°C QDM qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
-            print(">\(thres)°C QDM qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
+            print(">\(thres)mm QDM projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
+            print(">\(thres)mm QDM projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
+            print(">\(thres)mm QDM qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
+            print(">\(thres)mm QDM qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
 
             return DataAndUnit(correctedForecast2, .millimeter)
             
