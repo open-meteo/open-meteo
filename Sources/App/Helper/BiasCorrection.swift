@@ -308,7 +308,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
             
             let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin)
             let yearFraction = abs(fractionalYear - Float(Int(fractionalYear)))
-            let yearBin = Int((fractionalYear - Float(yearMin)).rounded(.down))
+            let yearBin = Int(floor(fractionalYear - Float(yearMin)))
             
             for (i, bin) in bins.enumerated().reversed() {
                 if value >= bin && value < bins[i+1] {
@@ -362,7 +362,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         
         let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin)
         let yearFraction = abs(fractionalYear - Float(Int(fractionalYear)))
-        let yearBin = Int((fractionalYear - Float(yearMin)).rounded(.down))
+        let yearBin = Int(floor(fractionalYear - Float(yearMin)))
         
         if yearBin < 0 {
             return Interpolations.linear(
