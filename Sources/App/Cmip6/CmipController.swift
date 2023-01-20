@@ -258,13 +258,17 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             print("QDM qctime rmse: \(zip(qc.sum(by: qcBinsPerYearBy), Array(correctedForecast2[reference.count ..< reference.count + qc.count]).sum(by: qcBinsPerYearBy)).rmse())")
             print("QDM qctime me: \(zip(qc.sum(by: qcBinsPerYearBy), Array(correctedForecast2[reference.count ..< reference.count + qc.count]).sum(by: qcBinsPerYearBy)).meanError())")
             
-            let thres: Float = 10
-            print(">\(thres)mm QDM projected rmse: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
-            print(">\(thres)mm QDM projected me: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
-            
-            print(">\(thres)mm QDM qctime rmse: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
-            print(">\(thres)mm QDM qctime me: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
-            
+            let thres: Float = 15
+            let referenceEvents = reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let qcEvents = qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let forecastEventsQcLength = correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let forecastEventsReferenceTime = correctedForecast2[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
+            print(">\(thres)°C QDM projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
+            print(">\(thres)°C QDM projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
+            print(">\(thres)°C QDM qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
+            print(">\(thres)°C QDM qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
+
             return DataAndUnit(correctedForecast2, .millimeter)
             
         case .precipitation_linear:
@@ -305,11 +309,17 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             print("Linear bias qctime rmse: \(zip(qc.sum(by: qcBinsPerYearBy), Array(correctedForecast2[reference.count ..< reference.count + qc.count]).sum(by: qcBinsPerYearBy)).rmse())")
             print("Linear bias qctime me: \(zip(qc.sum(by: qcBinsPerYearBy), Array(correctedForecast2[reference.count ..< reference.count + qc.count]).sum(by: qcBinsPerYearBy)).meanError())")
             
-            let thres: Float = 10
-            print(">\(thres)mm Linear bias projected rmse: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
-            print(">\(thres)mm Linear bias projected me: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
-            print(">\(thres)mm Linear bias qctime rmse: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
-            print(">\(thres)mm Linear bias qctime me: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
+            let thres: Float = 15
+            let referenceEvents = reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let qcEvents = qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let forecastEventsQcLength = correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let forecastEventsReferenceTime = correctedForecast2[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
+            print(">\(thres)mm Linear bias projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
+            print(">\(thres)mm Linear bias projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
+            print(">\(thres)mm Linear bias qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
+            print(">\(thres)mm Linear bias qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
+            
             
             return DataAndUnit(correctedForecast2, .millimeter)
             
@@ -460,10 +470,10 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let forecastEventsQcLength = correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
             let forecastEventsReferenceTime = correctedForecast2[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
             print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
-            print(">\(thres)°C Linear bias projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
-            print(">\(thres)°C Linear bias projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
-            print(">\(thres)°C Linear bias qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
-            print(">\(thres)°C Linear bias qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
+            print(">\(thres)°C QDM projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
+            print(">\(thres)°C QDM projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
+            print(">\(thres)°C QDM qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
+            print(">\(thres)°C QDM qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
             
             return DataAndUnit(correctedForecast2, .celsius)
             
