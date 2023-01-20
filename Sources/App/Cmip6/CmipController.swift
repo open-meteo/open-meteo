@@ -401,15 +401,29 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             print(controlWeights.meansPerYear)
             /*
              linear
-             [4.1311784, 5.186135, 8.101518, 11.94863, 15.810508, 19.420513, 22.18354, 23.379496, 21.0573, 17.133945, 11.473729, 6.0574517]
-             [4.3314304, 4.6800265, 6.2581177, 8.855992, 13.0767975, 17.734823, 20.294538, 21.34319, 19.460024, 15.027111, 10.086617, 6.051094]
+             Linear bias projected rmse: 2.1612234
+             Linear bias projected me: -6.5577588e-06
+             Linear bias qctime rmse: 2.1605055
+             Linear bias qctime me: 0.31102046
+             >25.0°C Linear bias projected rmse: 3.733631
+             >25.0°C Linear bias projected me: -2.34
+             >25.0°C Linear bias qctime rmse: 4.1231055
+             >25.0°C Linear bias qctime me: 3.0
              
-             [4.1456585, 6.3364034, 10.22601, 13.597799, 17.885447, 20.986559, 23.144682, 22.7392, 19.333, 14.63881, 8.201679, 4.643939]
-             [4.340705, 5.166131, 7.3429213, 10.7614355, 15.561608, 19.345089, 21.028107, 21.278543, 17.256548, 12.689892, 7.6430626, 4.7847576]
+             hermite:
+             Linear bias projected rmse: 2.167415
+             Linear bias projected me: 0.008102741
+             Linear bias qctime rmse: 2.1688118
+             Linear bias qctime me: 0.31910688
+             >25.0°C Linear bias projected rmse: 3.7094474
+             >25.0°C Linear bias projected me: -3.44
+             >25.0°C Linear bias qctime rmse: 4.1129875
+             >25.0°C Linear bias qctime me: 1.5833334
+            
              */
             
             let reference2 = reference
-            let correctedForecast2 = correctedForecast
+            var correctedForecast2 = correctedForecast
             let qc = try era5Reader.get(raw: .temperature_2m, time: qcTime.with(dtSeconds: 3600)).data.max(by: 24)
             let qcBinsPerYearBy = Float(31_557_600) / 86400 / 1
             
@@ -423,6 +437,24 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             print(">\(thres)°C Linear bias projected me: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
             print(">\(thres)°C Linear bias qctime rmse: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
             print(">\(thres)°C Linear bias qctime me: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
+            
+            
+            let referenceWeights2 = BiasCorrectionSeasonalHermite(ArraySlice(reference), time: referenceTime, binsPerYear: 12)
+            let controlWeights2 = BiasCorrectionSeasonalHermite(ArraySlice(control), time: referenceTime, binsPerYear: 12)
+                        
+            correctedForecast = forecast
+            referenceWeights2.applyOffset(on: &correctedForecast, otherWeights: controlWeights2, time: time, type: .absoluteChage)
+            correctedForecast2 = correctedForecast
+            
+            print("Hermite bias projected rmse: \(zip(reference2, correctedForecast2).rmse())")
+            print("Hermite bias projected me: \(zip(reference2, correctedForecast2).meanError())")
+            print("Hermite bias qctime rmse: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).rmse())")
+            print("Hermite bias qctime me: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).meanError())")
+            
+            print(">\(thres)°C Hermite bias projected rmse: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
+            print(">\(thres)°C Hermite bias projected me: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
+            print(">\(thres)°C Hermite bias qctime rmse: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
+            print(">\(thres)°C Hermite bias qctime me: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
             
             return DataAndUnit(correctedForecast2, .celsius)
             

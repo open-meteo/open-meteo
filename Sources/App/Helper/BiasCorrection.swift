@@ -151,6 +151,65 @@ struct BiasCorrectionSeasonalLinear {
     }
 }
 
+/// Calculate and/or apply a linear bias correction to correct a fixed offset
+/// Deltas are calculated for each month individually and use linear interpolation
+struct BiasCorrectionSeasonalHermite {
+    /// Could be one mean value for each month. Depends on `binsPerYear`
+    /// Values are a mean of input data
+    let meansPerYear: [Float]
+    
+    /// Calculate means using the inverse of linear interpolation
+    public init(_ data: ArraySlice<Float>, time: TimerangeDt, binsPerYear: Int = 12) {
+        var sums = [Double](repeating: 0, count: binsPerYear)
+        var weights = [Double](repeating: 0, count: binsPerYear)
+        for (t, v) in zip(time, data) {
+            let monthBin = t.secondInAverageYear / (31_557_600 / binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let weighted = Interpolations.hermiteWeighted(value: v, fraction: fraction)
+            sums[(monthBin-1+binsPerYear) % binsPerYear] += Double(weighted.a)
+            weights[(monthBin-1+binsPerYear) % binsPerYear] +=  Double(weighted.weightA)
+            sums[monthBin] +=  Double(weighted.b)
+            weights[monthBin] +=  Double(weighted.weightB)
+            sums[(monthBin+1) % binsPerYear] +=  Double(weighted.c)
+            weights[(monthBin+1) % binsPerYear] +=  Double(weighted.weightC)
+            sums[(monthBin+2) % binsPerYear] +=  Double(weighted.d)
+            weights[(monthBin+2) % binsPerYear] +=  Double(weighted.weightD)
+
+        }
+        self.meansPerYear = zip(weights, sums).map({ $0.0 <= 0.001 ? .nan : Float($0.1 / $0.0) })
+    }
+    
+    func applyOffset(on data: inout [Float], otherWeights: BiasCorrectionSeasonalHermite, time: TimerangeDt, type: QuantileDeltaMappingBiasCorrection.ChangeType, indices: Range<Int>? = nil) {
+        let indices = indices ?? data.indices
+        let binsPerYear = meansPerYear.count
+        assert(time.count == indices.count)
+        for (i ,t) in zip(indices, time) {
+            let monthBin = t.secondInAverageYear / (31_557_600 / binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let m = Interpolations.hermite(
+                A: meansPerYear[(monthBin-1+binsPerYear) % binsPerYear],
+                B: meansPerYear[monthBin],
+                C: meansPerYear[(monthBin+1) % binsPerYear],
+                D: meansPerYear[(monthBin+2) % binsPerYear],
+                fraction: fraction
+            )
+            let o = Interpolations.hermite(
+                A: otherWeights.meansPerYear[(monthBin-1+binsPerYear) % binsPerYear],
+                B: otherWeights.meansPerYear[monthBin],
+                C: otherWeights.meansPerYear[(monthBin+1) % binsPerYear],
+                D: otherWeights.meansPerYear[(monthBin+2) % binsPerYear],
+                fraction: fraction
+            )
+            switch type {
+            case .absoluteChage:
+                data[i] += m - o
+            case .relativeChange:
+                data[i] *= m / o
+            }
+        }
+    }
+}
+
 
 
 
@@ -181,7 +240,7 @@ struct CdfMonthly: MonthlyBinable {
                 if value >= bin && value < bins[i+1] {
                     // value exactly inside a bin, adjust weight
                     let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
-                    let weigthted = Interpolations.linearWeighted(value: interBinFraction, fraction: fraction)
+                    let weigthted = Interpolations.linearWeighted(value: fraction, fraction: interBinFraction)
                     assert(interBinFraction >= 0 && interBinFraction <= 1)
                     cdf[monthBin * count + i] += weigthted.a
                     cdf[((monthBin+1) % Self.binsPerYear) * count + i] += weigthted.b
@@ -248,7 +307,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
                     // value exactly inside a bin, adjust weight
                     let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
                     assert(interBinFraction >= 0 && interBinFraction <= 1)
-                    let weigthted = Interpolations.linearWeighted(value: interBinFraction, fraction: fraction)
+                    let weigthted = Interpolations.linearWeighted(value: fraction, fraction: interBinFraction)
                     for y in max(yearBin-5, 0) ..< min(yearBin+5+1, nYears) {
                         cdf[(monthBin * count + i) + count * Self.binsPerYear * y] += weigthted.a
                         cdf[(((monthBin+1) % Self.binsPerYear) * count + i) + count * Self.binsPerYear * y] += weigthted.b
@@ -333,5 +392,18 @@ struct Interpolations {
     
     @inlinable static func linearWeighted(value: Float, fraction: Float) -> (a: Float, b: Float, weightA: Float, weightB: Float) {
         return (value * (1-fraction), value * fraction, (1-fraction), fraction)
+    }
+    
+    // Hermite interpolate between point B and C
+    @inlinable static func hermite(A: Float, B: Float, C: Float, D: Float, fraction: Float) -> Float {
+        let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+        let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+        let c = -A/2.0 + C/2.0
+        let d = B
+        return a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d
+    }
+    
+    @inlinable static func hermiteWeighted(value: Float, fraction: Float) -> (a: Float, b: Float, c: Float, d: Float, weightA: Float, weightB: Float, weightC: Float, weightD: Float) {
+        return (value*fraction*fraction*fraction, value*fraction*fraction, value*fraction, value, fraction*fraction*fraction, fraction*fraction, fraction, 1)
     }
 }
