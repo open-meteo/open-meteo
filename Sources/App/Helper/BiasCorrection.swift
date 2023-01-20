@@ -19,6 +19,49 @@ struct QuantileDeltaMappingBiasCorrection {
         case relativeChange
     }
     
+    /// Calculate CDFs over the entire  control and forecast timespan using sliding windows
+    /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
+    static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, referenceTime: TimerangeDt, controlAndForecast: ArraySlice<Float>, controlAndForecastTime: TimerangeDt, type: ChangeType) -> [Float] {
+        let nQuantiles = 100
+        
+        // Compute reference distributions
+        let binsRefernce = calculateBins(reference, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let cdfRefernce = CdfMonthly10YearSliding(vector: reference, time: referenceTime, bins: binsRefernce)
+        
+        let binsControl = calculateBins(controlAndForecast, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let cdfControl = CdfMonthly10YearSliding(vector: controlAndForecast, time: controlAndForecastTime, bins: binsControl)
+        
+        // Apply
+        let binsForecast = binsControl
+        let cdfForecast = cdfControl
+
+        switch type {
+        case .absoluteChage:
+            return zip(controlAndForecastTime, controlAndForecast).map { (time, forecast) in
+                /// Limit time to end of reference time, but keep day-of-year correct
+                var timeReference = time
+                if time >= referenceTime.range.upperBound {
+                    timeReference = referenceTime.range.upperBound.add(time.timeIntervalSince1970 % Timestamp.secondsPerAverageYear - Timestamp.secondsPerAverageYear)
+                }
+                let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: timeReference, extrapolate: false)
+                return qdm1 + forecast - interpolate(cdfControl, binsControl, x: epsilon, time: timeReference, extrapolate: false)
+            }
+        case .relativeChange:
+            let maxScaleFactor: Float = 10
+            return zip(controlAndForecastTime, controlAndForecast).map { (time, forecast) in
+                var timeReference = time
+                if time >= referenceTime.range.upperBound {
+                    timeReference = referenceTime.range.upperBound.add(time.timeIntervalSince1970 % Timestamp.secondsPerAverageYear - Timestamp.secondsPerAverageYear)
+                }
+                let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: timeReference, extrapolate: false)
+                let scale = forecast / interpolate(cdfControl, binsControl, x: epsilon, time: timeReference, extrapolate: false)
+                return scale == 0 ? 0 : qdm1 * min(max(scale, maxScaleFactor * -1), maxScaleFactor)
+            }
+        }
+    }
+    
     /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
     static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, control: ArraySlice<Float>, referenceTime: TimerangeDt, forecast: ArraySlice<Float>, forecastTime: TimerangeDt, type: ChangeType) -> [Float] {
         let nQuantiles = 100
@@ -28,6 +71,8 @@ struct QuantileDeltaMappingBiasCorrection {
         let binsRefernce = calculateBins(reference, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
         let cdfRefernce = CdfMonthly10YearSliding(vector: reference, time: referenceTime, bins: binsRefernce)
         let cdfControl = CdfMonthly10YearSliding(vector: control, time: referenceTime, bins: binsControl)
+        
+        // NOTE: cdf of forecast and control should use the same sliding CDFs!
         
         // Apply
         let binsForecast = calculateBins(forecast, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
@@ -285,6 +330,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     let nYears: Int
     let bins: Bins
     
+    /// 4 = aggregate 3 month together... 12 = keep each month seaparatly
     static var binsPerYear: Int { 4 }
     
     static var yearsPerBin: Int { 10 }
@@ -342,6 +388,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         for j in 0..<cdf.count / bins.count {
             // last value is always count... could also scale to something between bin min/max to make it compressible more easily
             let count = cdf[(j+1) * bins.count - 1]
+            print("cdf count j=\(j) count=\(count) ")
             guard count > 0 else {
                 continue
             }

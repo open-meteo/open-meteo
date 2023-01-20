@@ -344,7 +344,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             return DataAndUnit(temp.indices.map { Float($0) * m + c }, .celsius)
             
         case .temperature_2m_max_qdm:
-            let control = try get(raw: .temperature_2m_max, time: referenceTime).data
+            let controlAndForecast = try get(raw: .temperature_2m_max, time: time).data
             let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .terrainOptimised)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
@@ -444,38 +444,43 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
             let forecast = try get(raw: .temperature_2m_max, time: time).data
             let start = DispatchTime.now()
-            let correctedForecast = QuantileDeltaMappingBiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: time, type: .absoluteChage)
+            //let correctedForecast = QuantileDeltaMappingBiasCorrection.quantileDeltaMappingMonthly(reference: ArraySlice(reference), control: ArraySlice(control), referenceTime: referenceTime, forecast: ArraySlice(forecast), forecastTime: time, type: .absoluteChage)
+            
+            let corrected = QuantileDeltaMappingBiasCorrection.quantileDeltaMappingMonthly(
+                reference: ArraySlice(reference),
+                referenceTime: referenceTime,
+                controlAndForecast: ArraySlice(controlAndForecast),
+                controlAndForecastTime: time,
+                type: .absoluteChage
+            )
             print("QDM time \(start.timeElapsedPretty())")
             
             let qc = try era5Reader.get(raw: .temperature_2m, time: qcTime.with(dtSeconds: 3600)).data.max(by: 24)
-            let reference2 = reference
-            let control2 = control
-            let correctedForecast2 = correctedForecast
             let qcBinsPerYearBy = Float(31_557_600) / 86400 / 1
             
-            print("Raw control rmse: \(zip(reference2, control2).rmse())")
-            print("Raw control me: \(zip(reference2, control2).meanError())")
+            print("Raw control rmse: \(zip(reference, controlAndForecast).rmse())")
+            print("Raw control me: \(zip(reference, controlAndForecast).meanError())")
             
-            print("QDM projected rmse: \(zip(reference2, correctedForecast2).rmse())")
-            print("QDM projected me: \(zip(reference2, correctedForecast2).meanError())")
+            print("QDM projected rmse: \(zip(reference, corrected).rmse())")
+            print("QDM projected me: \(zip(reference, corrected).meanError())")
             
-            print("QDM qctime rmse: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).rmse())")
-            print("QDM qctime me: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).meanError())")
+            print("QDM qctime rmse: \(zip(qc, corrected[reference.count ..< reference.count + qc.count]).rmse())")
+            print("QDM qctime me: \(zip(qc, corrected[reference.count ..< reference.count + qc.count]).meanError())")
             
             
             
             let thres: Float = 25
-            let referenceEvents = reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let referenceEvents = reference.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
             let qcEvents = qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsQcLength = correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsReferenceTime = correctedForecast2[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let forecastEventsQcLength = corrected[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
+            let forecastEventsReferenceTime = corrected[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
             print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
             print(">\(thres)°C QDM projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
             print(">\(thres)°C QDM projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
             print(">\(thres)°C QDM qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
             print(">\(thres)°C QDM qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
             
-            return DataAndUnit(correctedForecast2, .celsius)
+            return DataAndUnit(corrected, .celsius)
             
         case .temperature_2m_max_linear:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
