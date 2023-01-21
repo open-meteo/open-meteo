@@ -35,15 +35,15 @@ struct QuantileDeltaMappingBiasCorrection {
         // Apply
         let binsForecast = binsControl
         let cdfForecast = cdfControl
+        
+        // Limit time to 5 years before end of reference time. CDFs are averaged over 10 years and this makes sure, that the forecast CDF does not take any future signals into the reference.
+        let maxReferenceTime = Timestamp(referenceTime.range.upperBound.timeIntervalSince1970 - Timestamp.secondsPerAverageYear * 5)
 
         switch type {
         case .absoluteChage:
             return zip(controlAndForecastTime, controlAndForecast).map { (time, forecast) in
                 /// Limit time to end of reference time, but keep day-of-year correct
-                var timeReference = time
-                if time >= referenceTime.range.upperBound {
-                    timeReference = referenceTime.range.upperBound.add(time.timeIntervalSince1970 % Timestamp.secondsPerAverageYear - Timestamp.secondsPerAverageYear)
-                }
+                let timeReference = time >= maxReferenceTime ? maxReferenceTime.add(time.timeIntervalSince1970 % Timestamp.secondsPerAverageYear - Timestamp.secondsPerAverageYear) : time
                 let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
                 let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: timeReference, extrapolate: false)
                 return qdm1 + forecast - interpolate(cdfControl, binsControl, x: epsilon, time: timeReference, extrapolate: false)
@@ -54,10 +54,8 @@ struct QuantileDeltaMappingBiasCorrection {
                 guard forecast > 0 else {
                     return 0
                 }
-                var timeReference = time
-                if time >= referenceTime.range.upperBound {
-                    timeReference = referenceTime.range.upperBound.add(time.timeIntervalSince1970 % Timestamp.secondsPerAverageYear - Timestamp.secondsPerAverageYear)
-                }
+                /// Limit time to end of reference time, but keep day-of-year correct
+                let timeReference = time >= maxReferenceTime ? maxReferenceTime.add(time.timeIntervalSince1970 % Timestamp.secondsPerAverageYear - Timestamp.secondsPerAverageYear) : time
                 let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
                 let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: timeReference, extrapolate: false)
                 let scale = forecast / interpolate(cdfControl, binsControl, x: epsilon, time: timeReference, extrapolate: false)
@@ -345,10 +343,10 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     /// input temperature and time axis
     init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {
         //print(time.prettyString())
-        let years = time.range.divide(Timestamp.secondsPerAverageYear)
-        self.yearMin = years.lowerBound
+        self.yearMin = Int(round(Float(time.range.lowerBound.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear)))
+        let yearMax = Int(round(Float(time.range.upperBound.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear)))
         
-        let nYears = (years.count+1) / Self.yearsToAggregate
+        let nYears = (yearMax - yearMin + 1) / Self.yearsToAggregate
         //print("n Years \(nYears) yearMin=\(years.lowerBound) yearMax=\(years.upperBound)")
         
         let nQuantiles = bins.nQuantiles
@@ -364,7 +362,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
             
             for (i, bin) in bins.enumerated().reversed() {
                 let binFraction = value < bin ? 1 : (bins[i+1]-value)/(bins[i+1]-bin)
-                assert(binFraction >= 0 && binFraction <= 1)
+                assert(binFraction >= -0.0001 && binFraction <= 1.0001)
                 
                 if yearBin >= 0 {
                     cdf[yearBin, monthBin, i] += (1-yearFraction) * (1-monthFraction) * binFraction
