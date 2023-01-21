@@ -363,28 +363,19 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
             let yearBin = Int(floor(fractionalYear))
             
             for (i, bin) in bins.enumerated().reversed() {
-                if value >= bin && value < bins[i+1] {
-                    // value exactly inside a bin, adjust weight
-                    let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
-                    assert(interBinFraction >= 0 && interBinFraction <= 1)
-                    if yearBin >= 0 {
-                        cdf[yearBin, monthBin, i] += (1-yearFraction) * (1-monthFraction) * interBinFraction
-                        cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * monthFraction * interBinFraction
-                    }
-                    if yearBin < nYears-1 {
-                        cdf[yearBin+1, monthBin, i] += yearFraction * (1-monthFraction) * interBinFraction
-                        cdf[yearBin+1, (monthBin+1) % Self.nMonths, i] += yearFraction * monthFraction * interBinFraction
-                    }
-                } else if value < bin {
-                    if yearBin >= 0 {
-                        cdf[yearBin, monthBin, i] += (1-yearFraction) * (1-monthFraction)
-                        cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * monthFraction
-                    }
-                    if yearBin < nYears-1 {
-                        cdf[yearBin+1, monthBin, i] += yearFraction * (1-monthFraction)
-                        cdf[yearBin+1, (monthBin+1) % Self.nMonths, i] += yearFraction * monthFraction
-                    }
-                } else {
+                let binFraction = value < bin ? 1 : (bins[i+1]-value)/(bins[i+1]-bin)
+                assert(binFraction >= 0 && binFraction <= 1)
+                
+                if yearBin >= 0 {
+                    cdf[yearBin, monthBin, i] += (1-yearFraction) * (1-monthFraction) * binFraction
+                    cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * monthFraction * binFraction
+                }
+                if yearBin < nYears-1 {
+                    cdf[yearBin+1, monthBin, i] += yearFraction * (1-monthFraction) * binFraction
+                    cdf[yearBin+1, (monthBin+1) % Self.nMonths, i] += yearFraction * monthFraction * binFraction
+                }
+                
+                if value >= bin {
                     break
                 }
             }
