@@ -355,7 +355,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         var cdf = Array3D(repeating: 0, dim0: nYears, dim1: Self.nMonths, dim2: nQuantiles)
         for (t, value) in zip(time, vector) {
             let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / Self.nMonths)
-            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / Self.nMonths)) / Float(Timestamp.secondsPerAverageYear / Self.nMonths)
+            let monthFraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / Self.nMonths)) / Float(Timestamp.secondsPerAverageYear / Self.nMonths)
             
             //let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / (24 * 365.25 * Float(Self.yearsPerBin)) - Float(yearMin)
             let fractionalYear = (Float(t.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear) - Float(yearMin) - Float(Self.yearsToAggregate)/2) / Float(Self.yearsToAggregate)
@@ -367,23 +367,22 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
                     // value exactly inside a bin, adjust weight
                     let interBinFraction = (bins[i+1]-value)/(bins[i+1]-bin)
                     assert(interBinFraction >= 0 && interBinFraction <= 1)
-                    let weigthted = Interpolations.linearWeighted(value: fraction, fraction: interBinFraction)
                     if yearBin >= 0 {
-                        cdf[yearBin, monthBin, i] += (1-yearFraction) * weigthted.a
-                        cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * weigthted.b
+                        cdf[yearBin, monthBin, i] += (1-yearFraction) * (1-monthFraction) * interBinFraction
+                        cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * monthFraction * interBinFraction
                     }
                     if yearBin < nYears-1 {
-                        cdf[yearBin+1, monthBin, i] += yearFraction * weigthted.a
-                        cdf[yearBin+1, (monthBin+1) % Self.nMonths, i] += yearFraction * weigthted.b
+                        cdf[yearBin+1, monthBin, i] += yearFraction * (1-monthFraction) * interBinFraction
+                        cdf[yearBin+1, (monthBin+1) % Self.nMonths, i] += yearFraction * monthFraction * interBinFraction
                     }
                 } else if value < bin {
                     if yearBin >= 0 {
-                        cdf[yearBin, monthBin, i] += (1-yearFraction) * (1-fraction)
-                        cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * fraction
+                        cdf[yearBin, monthBin, i] += (1-yearFraction) * (1-monthFraction)
+                        cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * monthFraction
                     }
                     if yearBin < nYears-1 {
-                        cdf[yearBin+1, monthBin, i] += yearFraction * (1-fraction)
-                        cdf[yearBin+1, (monthBin+1) % Self.nMonths, i] += yearFraction * fraction
+                        cdf[yearBin+1, monthBin, i] += yearFraction * (1-monthFraction)
+                        cdf[yearBin+1, (monthBin+1) % Self.nMonths, i] += yearFraction * monthFraction
                     }
                 } else {
                     break
