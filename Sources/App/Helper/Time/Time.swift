@@ -167,6 +167,10 @@ extension Range where Bound == Timestamp {
         return lowerBound.add(offset) ..< upperBound.add(offset)
     }
     
+    @inlinable public func divide(_ by: Int) -> Range<Int> {
+        return lowerBound.timeIntervalSince1970 / by ..< upperBound.timeIntervalSince1970 / by
+    }
+    
     @inlinable public func stride(dtSeconds: Int) -> StrideTo<Timestamp> {
         return Swift.stride(from: lowerBound, to: upperBound, by: dtSeconds)
     }

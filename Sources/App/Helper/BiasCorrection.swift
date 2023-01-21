@@ -334,29 +334,31 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     let nYears: Int
     let bins: Bins
     
-    /// 4 = aggregate 3 month together... 12 = keep each month seaparatly
-    static var binsPerYear: Int { 4 }
+    static var binsPerYear: Int { 12 / monthsToAggregate }
     
-    static var yearsPerBin: Int { 10 }
+    /// How many months to aggregate per year
+    static var monthsToAggregate: Int { 3 }
+    
+    /// How many years to aggreate
+    static var yearsToAggregate: Int { 10 }
     
     /// input temperature and time axis
     init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {
-        let yearMinF = Float(time.range.lowerBound.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin) // -2.74
-        let yearMaxF = Float(time.range.upperBound.timeIntervalSince1970 / 3600) / 24 / 365.25 / Float(Self.yearsPerBin) // 7.49
-        // Remove first and last yearBin on purpose not to have bins with partial data
-        let yearMin = Int(round(yearMinF)) // -2
-        let yearMax = Int(round(yearMaxF)) // 7
+        //print(time.prettyString())
+        let years = time.range.divide(Timestamp.secondsPerAverageYear)
+        self.yearMin = years.lowerBound
         
-        let nYears = yearMax - yearMin
-        //print("n Years \(nYears) yearMin=\(yearMinF) yearMax=\(yearMaxF) yearMinIndex=\(yearMin) yearMaxIndex=\(yearMax)")
+        let nYears = (years.count+1) / Self.yearsToAggregate
+        //print("n Years \(nYears) yearMin=\(years.lowerBound) yearMax=\(years.upperBound)")
         
         let count = bins.nQuantiles
         var cdf = [Float](repeating: 0, count: count * Self.binsPerYear * nYears)
         for (t, value) in zip(time, vector) {
-            let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
-            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
+            let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / Self.binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / Self.binsPerYear)) / Float(Timestamp.secondsPerAverageYear / Self.binsPerYear)
             
-            let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / (24 * 365.25 * Float(Self.yearsPerBin)) - Float(yearMin)
+            //let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / (24 * 365.25 * Float(Self.yearsPerBin)) - Float(yearMin)
+            let fractionalYear = (Float(t.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear) - Float(yearMin) - Float(Self.yearsToAggregate)/2) / Float(Self.yearsToAggregate)
             let yearFraction = fractionalYear - floor(fractionalYear)
             let yearBin = Int(floor(fractionalYear))
             
@@ -402,16 +404,15 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
         }
         self.cdf = cdf
         self.bins = bins
-        self.yearMin = yearMin
         self.nYears = nYears
     }
     
     /// linear interpolate between 2 months CDF
     func get(bin: Int, time t: Timestamp) -> Float {
-        let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
-        let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
+        let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / Self.binsPerYear)
+        let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / Self.binsPerYear)) / Float(Timestamp.secondsPerAverageYear / Self.binsPerYear)
         
-        let fractionalYear = Float(t.timeIntervalSince1970 / 3600) / (24 * 365.25 * Float(Self.yearsPerBin)) - Float(yearMin)
+        let fractionalYear = (Float(t.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear) - Float(yearMin) - Float(Self.yearsToAggregate)/2) / Float(Self.yearsToAggregate)
         let yearFraction = fractionalYear - floor(fractionalYear)
         let yearBin = Int(floor(fractionalYear))
         
