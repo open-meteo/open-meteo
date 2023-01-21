@@ -31,6 +31,52 @@ struct Array2D {
     }
 }
 
+struct Array3D {
+    var data: [Float]
+    
+    /// slowest
+    let dim0: Int
+    let dim1: Int
+    /// Fastest dim
+    let dim2: Int
+    
+    var count: Int {
+        return dim0 * dim1 * dim2
+    }
+    
+    public init(data: [Float], dim0: Int, dim1: Int, dim2: Int) {
+        if (data.count != dim0 * dim1 * dim2) {
+            fatalError("Wrong Array3D dimensions. dim0=\(dim0) dim1=\(dim1) dim2=\(dim2) count=\(data.count)")
+        }
+        self.data = data
+        self.dim0 = dim0
+        self.dim1 = dim1
+        self.dim2 = dim2
+    }
+    
+    public init(repeating: Float, dim0: Int, dim1: Int, dim2: Int) {
+        self.data = [Float](repeating: repeating, count: dim0 * dim1 * dim2)
+        self.dim0 = dim0
+        self.dim1 = dim1
+        self.dim2 = dim2
+    }
+    
+    @inlinable subscript(d0: Int, d1: Int, d2: Int) -> Float {
+        get {
+            assert(d0 < dim0, "dim0 subscript invalid: \(d0) with dim0=\(dim0)")
+            assert(d1 < dim1, "dim1 subscript invalid: \(d1) with dim1=\(dim1)")
+            assert(d2 < dim2, "dim2 subscript invalid: \(d2) with dim2=\(dim2)")
+            return data[d0 * dim1 * dim2 + d1 * dim2 + d2]
+        }
+        set {
+            assert(d0 < dim0, "dim0 subscript invalid: \(d0) with dim0=\(dim0)")
+            assert(d1 < dim1, "dim1 subscript invalid: \(d1) with dim1=\(dim1)")
+            assert(d2 < dim2, "dim2 subscript invalid: \(d2) with dim2=\(dim2)")
+            data[d0 * dim1 * dim2 + d1 * dim2 + d2] = newValue
+        }
+    }
+}
+
 struct Array2DFastSpace {
     var data: [Float]
     let nLocations: Int
