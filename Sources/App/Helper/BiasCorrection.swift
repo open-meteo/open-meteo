@@ -370,7 +370,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
                     let weigthted = Interpolations.linearWeighted(value: fraction, fraction: interBinFraction)
                     if yearBin >= 0 {
                         cdf[yearBin, monthBin, i] += (1-yearFraction) * weigthted.a
-                        cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * weigthted.a
+                        cdf[yearBin, (monthBin+1) % Self.nMonths, i] += (1-yearFraction) * weigthted.b
                     }
                     if yearBin < nYears-1 {
                         cdf[yearBin+1, monthBin, i] += yearFraction * weigthted.a
