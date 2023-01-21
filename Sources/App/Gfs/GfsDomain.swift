@@ -180,6 +180,10 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
     
     /// CSNOW categorical snow as percent (0-100)
     case frozen_precipitation_percent
+    
+    /// CRAIN
+    case categorical_rain
+    
     //case rain
     //case snowfall_convective_water_equivalent
     //case snowfall_water_equivalent
@@ -246,6 +250,7 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
         case .pressure_msl: return 10
         case .shortwave_radiation: return 1
         case .frozen_precipitation_percent: return 1
+        case .categorical_rain: return 1
         case .cape: return 0.1
         case .lifted_index: return 10
         case .visibility: return 0.05 // 50 meter
@@ -287,6 +292,7 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
         case .pressure_msl: return .hectoPascal
         case .shortwave_radiation: return .wattPerSquareMeter
         case .frozen_precipitation_percent: return .percent
+        case .categorical_rain: return .percent
         case .cape: return .joulesPerKilogram
         case .lifted_index: return .dimensionless
         case .visibility: return .meter

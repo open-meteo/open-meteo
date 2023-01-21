@@ -115,6 +115,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return ":DSWRF:surface:"
         case .frozen_precipitation_percent:
             return ":CSNOW:surface:"
+        case .categorical_rain:
+            return ":CRAIN:surface:"
         case .cape:
             return ":CAPE:surface:"
         case .lifted_index:
@@ -172,6 +174,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .showers: return .linear
         case .pressure_msl: return .hermite(bounds: nil)
         case .frozen_precipitation_percent: return .nearest
+        case .categorical_rain: return .nearest
         case .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...1e9)
         case .lifted_index: return .hermite(bounds: 0...1e9)
@@ -194,6 +197,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .soil_temperature_100_to_200cm:
             return (1, -273.15)
         case .frozen_precipitation_percent:
+            return (100, 0)
+        case .categorical_rain:
             return (100, 0)
         default:
             return nil
