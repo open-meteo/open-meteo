@@ -23,9 +23,11 @@ struct CmipController {
             let domains = params.models ?? [.MRI_AGCM3_2_S]
             
             let readers = try domains.map {
-                guard let reader = try Cmip6Reader(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+                guard var reader = try Cmip6Reader(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
+                reader.lat = params.latitude
+                reader.lon = params.longitude
                 return reader
             }
             
@@ -181,6 +183,13 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     var reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>
     
+    var lat: Float = 0
+    var lon: Float = 0
+    
+    init(reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>) {
+        self.reader = reader
+    }
+
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
         /*let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
         let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)*/
@@ -192,7 +201,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         switch derived {
         case .precipitation_qdm:
             let controlAndForecast = try get(raw: .precipitation_sum, time: time).data
-            let era5Reader = try Era5Reader(domain: .era5, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
+            let era5Reader = try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .terrainOptimised)!
             var reference = try era5Reader.get(raw: .precipitation, time: referenceTime.with(dtSeconds: 3600)).data.sum(by: 24)
             
             if reference.containsNaN() {
@@ -243,7 +252,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
         case .precipitation_linear:
             let control = try get(raw: .precipitation_sum, time: referenceTime).data
-            let era5Reader = try Era5Reader(domain: .era5, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
+            let era5Reader = try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .terrainOptimised)!
             var reference = try era5Reader.get(raw: .precipitation, time: referenceTime.with(dtSeconds: 3600)).data.sum(by: 24)
             
             if reference.containsNaN() {
@@ -315,7 +324,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
         case .temperature_2m_max_qdm:
             let controlAndForecast = try get(raw: .temperature_2m_max, time: time).data
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .terrainOptimised)!
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .terrainOptimised)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
             let start = DispatchTime.now()
@@ -355,7 +364,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
         case .temperature_2m_max_linear:
             let control = try get(raw: .temperature_2m_max, time: referenceTime).data
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: reader.modelLat, lon: reader.modelLon, elevation: reader.modelElevation, mode: .nearest)!
+            let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .terrainOptimised)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
             let forecast = try get(raw: .temperature_2m_max, time: time).data
