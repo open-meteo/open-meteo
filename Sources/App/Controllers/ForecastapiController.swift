@@ -502,6 +502,9 @@ enum ForecastVariableDaily: String, Codable {
     case cape_max
     case cape_min
     case cape_mean
+    case cloudcover_max
+    case cloudcover_min
+    case cloudcover_mean
     
     var aggregation: DailyAggregation<ForecastSurfaceVariable> {
         switch self {
@@ -575,6 +578,12 @@ enum ForecastVariableDaily: String, Codable {
             return .min(.cape)
         case .cape_mean:
             return .mean(.cape)
+        case .cloudcover_max:
+            return .max(.cloudcover)
+        case .cloudcover_min:
+            return .min(.cloudcover)
+        case .cloudcover_mean:
+            return .mean(.cloudcover)
         }
     }
 }
