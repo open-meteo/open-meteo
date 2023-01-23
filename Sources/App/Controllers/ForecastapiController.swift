@@ -484,111 +484,132 @@ enum ForecastVariableDaily: String, Codable {
     case sunrise
     case sunset
     case et0_fao_evapotranspiration
+    
+    var aggregation: DailyAggregation<ForecastSurfaceVariable> {
+        switch self {
+        case .temperature_2m_max:
+            return .max(.temperature_2m)
+        case .temperature_2m_min:
+            return .min(.temperature_2m)
+        case .apparent_temperature_max:
+            return .max(.apparent_temperature)
+        case .apparent_temperature_min:
+            return .min(.apparent_temperature)
+        case .precipitation_sum:
+            return .sum(.precipitation)
+        case .snowfall_sum:
+            return .sum(.snowfall)
+        case .rain_sum:
+            return .sum(.rain)
+        case .showers_sum:
+            return .sum(.showers)
+        case .weathercode:
+            return .max(.weathercode)
+        case .shortwave_radiation_sum:
+            return .radiationSum(.shortwave_radiation)
+        case .windspeed_10m_max:
+            return .max(.windspeed_10m)
+        case .windgusts_10m_max:
+            return .max(.windgusts_10m)
+        case .winddirection_10m_dominant:
+            return .dominantDirection(velocity: .windspeed_10m, direction: .winddirection_10m)
+        case .precipitation_hours:
+            return .precipitationHours(.precipitation)
+        case .sunrise:
+            return .none
+        case .sunset:
+            return .none
+        case .et0_fao_evapotranspiration:
+            return .sum(.evapotranspiration)
+        }
+    }
 }
 
+enum DailyAggregation<WeatherVariable> {
+    case none
+    case max(WeatherVariable)
+    case min(WeatherVariable)
+    case mean(WeatherVariable)
+    case sum(WeatherVariable)
+    case radiationSum(WeatherVariable)
+    case precipitationHours(WeatherVariable)
+    case dominantDirection(velocity: WeatherVariable, direction: WeatherVariable)
+    
+    /// Return 0, 1 or 2 weahter variables which should be prefetched
+    var variables: (WeatherVariable?, WeatherVariable?) {
+        switch self {
+        case .none:
+            return (nil, nil)
+        case .max(let weatherVariable):
+            return (weatherVariable, nil)
+        case .min(let weatherVariable):
+            return (weatherVariable, nil)
+        case .mean(let weatherVariable):
+            return (weatherVariable, nil)
+        case .sum(let weatherVariable):
+            return (weatherVariable, nil)
+        case .radiationSum(let weatherVariable):
+            return (weatherVariable, nil)
+        case .precipitationHours(let weatherVariable):
+            return (weatherVariable, nil)
+        case .dominantDirection(let velocity, let direction):
+            return (velocity, direction)
+        }
+    }
+}
 
 
 extension GenericReaderMulti where Variable == ForecastVariable {
     func get(variable: ForecastSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit? {
         return try get(variable: .surface(variable), time: time)
     }
-    func prefetchData(variable: ForecastSurfaceVariable, time: TimerangeDt) throws {
-        try prefetchData(variable: .surface(variable), time: time)
-    }
-    
     
     func getDaily(variable: ForecastVariableDaily, params: ForecastApiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit? {
         let time = timeDaily.with(dtSeconds: 3600)
-        switch variable {
-        case .temperature_2m_max:
-            guard let data = try get(variable: .temperature_2m, time: time)?.convertAndRound(params: params) else {
+        
+        switch variable.aggregation {
+        case .none:
+            return nil
+        case .max(let variable):
+            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .temperature_2m_min:
-            guard let data = try get(variable: .temperature_2m, time: time)?.convertAndRound(params: params) else {
+        case .min(let variable):
+            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             return DataAndUnit(data.data.min(by: 24), data.unit)
-        case .apparent_temperature_max:
-            guard let data = try get(variable: .apparent_temperature, time: time)?.convertAndRound(params: params) else {
+        case .mean(let variable):
+            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .apparent_temperature_min:
-            guard let data = try get(variable: .apparent_temperature, time: time)?.convertAndRound(params: params) else {
+            return DataAndUnit(data.data.mean(by: 24), data.unit)
+        case .sum(let variable):
+            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
-            return DataAndUnit(data.data.min(by: 24), data.unit)
-        case .precipitation_sum:
-            // rounding is required, becuse floating point addition results in uneven numbers
-            guard let data = try get(variable: .precipitation, time: time)?.convertAndRound(params: params) else {
-                return nil
-            }
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .weathercode:
-            // not 100% corrct
-            guard let data = try get(variable: .weathercode, time: time)?.convertAndRound(params: params) else {
-                return nil
-            }
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .shortwave_radiation_sum:
-            guard let data = try get(variable: .shortwave_radiation, time: time)?.convertAndRound(params: params) else {
+            return DataAndUnit(data.data.sum(by: 24), data.unit)
+        case .radiationSum(let variable):
+            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             // 3600s only for hourly data of source
             return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megaJoulesPerSquareMeter)
-        case .windspeed_10m_max:
-            guard let data = try get(variable: .windspeed_10m, time: time)?.convertAndRound(params: params) else {
+        case .precipitationHours(let variable):
+            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .windgusts_10m_max:
-            guard let data = try get(variable: .windgusts_10m, time: time)?.convertAndRound(params: params) else {
-                return nil
-            }
-            return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .winddirection_10m_dominant:
-            guard let speed = try get(variable: .windspeed_10m, time: time)?.data,
-                let direction = try get(variable: .winddirection_10m, time: time)?.data else {
+            return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
+        case .dominantDirection(velocity: let velocity, direction: let direction):
+            guard let speed = try get(variable: velocity, time: time)?.data,
+                let direction = try get(variable: direction, time: time)?.data else {
                 return nil
             }
             // vector addition
             let u = zip(speed, direction).map(Meteorology.uWind).sum(by: 24)
             let v = zip(speed, direction).map(Meteorology.vWind).sum(by: 24)
             return DataAndUnit(Meteorology.windirectionFast(u: u, v: v), .degreeDirection)
-        //case .sunshine_hours:
-            /// TODO need sunrise and set time for correct numbers
-            //fatalError()
-        case .precipitation_hours:
-            guard let data = try get(variable: .precipitation, time: time)?.convertAndRound(params: params) else {
-                return nil
-            }
-            return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
-        case .sunrise:
-            return DataAndUnit([],.hours)
-        case .sunset:
-            return DataAndUnit([],.hours)
-        case .et0_fao_evapotranspiration:
-            guard let data = try get(variable: .et0_fao_evapotranspiration, time: time)?.convertAndRound(params: params) else {
-                return nil
-            }
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .snowfall_sum:
-            guard let data = try get(variable: .snowfall, time: time)?.convertAndRound(params: params) else {
-                return nil
-            }
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .rain_sum:
-            guard let data = try get(variable: .rain, time: time)?.convertAndRound(params: params) else {
-                return nil
-            }
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
-        case .showers_sum:
-            guard let data = try get(variable: .showers, time: time)?.convertAndRound(params: params) else {
-                return nil
-            }
-            return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
         }
     }
     
@@ -596,53 +617,12 @@ extension GenericReaderMulti where Variable == ForecastVariable {
     func prefetchData(variables: [ForecastVariableDaily], time timeDaily: TimerangeDt) throws {
         let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
-            switch variable {
-            case .temperature_2m_max:
-                fallthrough
-            case .temperature_2m_min:
-                try prefetchData(variable: .temperature_2m, time: time)
-            case .apparent_temperature_max:
-                fallthrough
-            case .apparent_temperature_min:
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .windspeed_10m, time: time)
-                try prefetchData(variable: .relativehumidity_2m, time: time)
-                try prefetchData(variable: .direct_radiation, time: time)
-                try prefetchData(variable: .diffuse_radiation, time: time)
-            case .precipitation_sum:
-                try prefetchData(variable: .precipitation, time: time)
-            case .weathercode:
-                try prefetchData(variable: .weathercode, time: time)
-            case .shortwave_radiation_sum:
-                try prefetchData(variable: .direct_radiation, time: time)
-                try prefetchData(variable: .diffuse_radiation, time: time)
-            case .windspeed_10m_max:
-                try prefetchData(variable: .windspeed_10m, time: time)
-            case .windgusts_10m_max:
-                try prefetchData(variable: .windgusts_10m, time: time)
-            case .winddirection_10m_dominant:
-                try prefetchData(variable: .windspeed_10m, time: time)
-                try prefetchData(variable: .winddirection_10m, time: time)
-            case .precipitation_hours:
-                try prefetchData(variable: .precipitation, time: time)
-            case .sunrise:
-                break
-            case .sunset:
-                break
-            case .et0_fao_evapotranspiration:
-                try prefetchData(variable: .direct_radiation, time: time)
-                try prefetchData(variable: .diffuse_radiation, time: time)
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .relativehumidity_2m, time: time)
-                try prefetchData(variable: .windspeed_10m, time: time)
-            case .snowfall_sum:
-                try prefetchData(variable: .precipitation, time: time)
-                try prefetchData(variable: .showers, time: time)
-                try prefetchData(variable: .rain, time: time)
-            case .rain_sum:
-                try prefetchData(variable: .rain, time: time)
-            case .showers_sum:
-                try prefetchData(variable: .showers, time: time)
+            let v = variable.aggregation
+            if let v0 = variable.aggregation.variables.0 {
+                try prefetchData(variable: .surface(v0), time: time)
+            }
+            if let v1 = variable.aggregation.variables.1 {
+                try prefetchData(variable: .surface(v1), time: time)
             }
         }
     }
