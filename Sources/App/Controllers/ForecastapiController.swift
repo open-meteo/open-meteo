@@ -469,8 +469,10 @@ typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable,
 enum ForecastVariableDaily: String, Codable {
     case temperature_2m_max
     case temperature_2m_min
+    case temperature_2m_mean
     case apparent_temperature_max
     case apparent_temperature_min
+    case apparent_temperature_mean
     case precipitation_sum
     case snowfall_sum
     case rain_sum
@@ -478,12 +480,28 @@ enum ForecastVariableDaily: String, Codable {
     case weathercode
     case shortwave_radiation_sum
     case windspeed_10m_max
+    case windspeed_10m_min
+    case windspeed_10m_mean
     case windgusts_10m_max
+    case windgusts_10m_min
+    case windgusts_10m_mean
     case winddirection_10m_dominant
     case precipitation_hours
     case sunrise
     case sunset
     case et0_fao_evapotranspiration
+    case visibility_max
+    case visibility_min
+    case visibility_mean
+    case pressure_msl_max
+    case pressure_msl_min
+    case pressure_msl_mean
+    case surface_pressure_max
+    case surface_pressure_min
+    case surface_pressure_mean
+    case cape_max
+    case cape_min
+    case cape_mean
     
     var aggregation: DailyAggregation<ForecastSurfaceVariable> {
         switch self {
@@ -491,8 +509,12 @@ enum ForecastVariableDaily: String, Codable {
             return .max(.temperature_2m)
         case .temperature_2m_min:
             return .min(.temperature_2m)
+        case .temperature_2m_mean:
+            return .mean(.temperature_2m)
         case .apparent_temperature_max:
             return .max(.apparent_temperature)
+        case .apparent_temperature_mean:
+            return .mean(.apparent_temperature)
         case .apparent_temperature_min:
             return .min(.apparent_temperature)
         case .precipitation_sum:
@@ -509,8 +531,16 @@ enum ForecastVariableDaily: String, Codable {
             return .radiationSum(.shortwave_radiation)
         case .windspeed_10m_max:
             return .max(.windspeed_10m)
+        case .windspeed_10m_min:
+            return .min(.windspeed_10m)
+        case .windspeed_10m_mean:
+            return .mean(.windspeed_10m)
         case .windgusts_10m_max:
             return .max(.windgusts_10m)
+        case .windgusts_10m_min:
+            return .min(.windgusts_10m)
+        case .windgusts_10m_mean:
+            return .mean(.windgusts_10m)
         case .winddirection_10m_dominant:
             return .dominantDirection(velocity: .windspeed_10m, direction: .winddirection_10m)
         case .precipitation_hours:
@@ -521,6 +551,30 @@ enum ForecastVariableDaily: String, Codable {
             return .none
         case .et0_fao_evapotranspiration:
             return .sum(.evapotranspiration)
+        case .visibility_max:
+            return .max(.visibility)
+        case .visibility_min:
+            return .min(.visibility)
+        case .visibility_mean:
+            return .mean(.visibility)
+        case .pressure_msl_max:
+            return .max(.pressure_msl)
+        case .pressure_msl_min:
+            return .min(.pressure_msl)
+        case .pressure_msl_mean:
+            return .mean(.pressure_msl)
+        case .surface_pressure_max:
+            return .max(.surface_pressure)
+        case .surface_pressure_min:
+            return .min(.surface_pressure)
+        case .surface_pressure_mean:
+            return .mean(.surface_pressure)
+        case .cape_max:
+            return .max(.cape)
+        case .cape_min:
+            return .min(.cape)
+        case .cape_mean:
+            return .mean(.cape)
         }
     }
 }
