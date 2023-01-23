@@ -204,6 +204,11 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         return 1000000000000000
     }
     
+    /// true if feb 29 is missing
+    var needsLeapYearFix: Bool {
+        return self == .CMCC_CM2_VHR4 || self == .FGOALS_f3_H || self == .FGOALS_f3_H_highresSST
+    }
+    
     var grid: Gridable {
         switch self {
         case .CMCC_CM2_VHR4:
@@ -588,6 +593,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             case .relative_humidity_2m_mean:
                 return .restoreFrom(dt: 3*3600, shortName: "hurs", aggregate: .mean)
             case .pressure_msl:
+                // pressure is only surface and not MSL for 3h data....
                 return .restoreFrom(dt: 3*3600, shortName: "psl", aggregate: .mean)
             case .temperature_2m_mean:
                 return .restoreFrom(dt: 3*3600, shortName: "tas", aggregate: .mean)
@@ -827,7 +833,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             
                             let isLeapMonth = month == 2 && Timestamp(year, 2, 28).add(days: 1).toComponents().day == 29
-                            let duplicateTimeStep = (domain == .CMCC_CM2_VHR4 && isLeapMonth) ? (27 * 86400/dt) ..< (28 * 86400/dt) : nil
+                            let duplicateTimeStep = (domain.needsLeapYearFix && isLeapMonth) ? (27 * 86400/dt) ..< (28 * 86400/dt) : nil
                             let array = try NetCDF.read(path: ncFile, short: short, fma: short == "huss" ? (1000,0) : variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
                             try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: short == "huss" ? 100 : variable.scalefactor, all: array.data)
@@ -894,7 +900,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             // TODO: support for specific humdity to relative humidity if required
                             
                             let isLeapMonth = month == 2 && Timestamp(year, 2, 28).add(days: 1).toComponents().day == 29
-                            let duplicateTimeStep = (domain == .CMCC_CM2_VHR4 && isLeapMonth) ? 27..<28 : nil
+                            let duplicateTimeStep = (domain.needsLeapYearFix && isLeapMonth) ? 27..<28 : nil
                             let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
                             try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
@@ -963,7 +969,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     }
                     let nDays = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year+1,1,1), dtSeconds: 86400).count
                     let isLeapYear = nDays == 366
-                    let duplicateTimeStep = (domain == .CMCC_CM2_VHR4 && isLeapYear) ? 30 + 28 ..< 30 + 29 : nil
+                    let duplicateTimeStep = (domain.needsLeapYearFix && isLeapYear) ? 30 + 28 ..< 30 + 29 : nil
                     var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
                     guard array.nTime == nDays else {
                         fatalError("Array length does not match nDays=\(nDays) array.nTime=\(array.nTime)")
