@@ -1,0 +1,198 @@
+openapi: 3.0.0
+info:
+  title: Open-Meteo Historical Weather API
+  description: 'The Historical Weather API is based on reanalysis datasets and uses a combination of weather station, aircraft, buoy, radar, and satellite observations to create a comprehensive record of past weather conditions.'
+  version: '1.0'
+  contact:
+    name: Open-Meteo
+    url: https://open-meteo.com
+    email: info@open-meteo.com
+  license:
+    name: Attribution 4.0 International (CC BY 4.0)
+    url: https://creativecommons.org/licenses/by/4.0/
+  termsOfService: https://open-meteo.com/en/features#terms
+paths:
+  /v1/archive:
+    servers:
+      - url: https://archive-api.open-meteo.com
+    get:
+      tags:
+      - Historical Weather API
+      summary: 60 years of accurate weather, anywhere with up to 5 km resolution
+      description: 'The Historical Weather API is based on reanalysis datasets and uses a combination of weather station, aircraft, buoy, radar, and satellite observations to create a comprehensive record of past weather conditions.'
+      parameters:
+      - name: start_date
+        in: query
+        required: true
+        description: "The time interval to get weather data. A day must be specified as an ISO8601 date (e.g. 2022-01-01)."
+        schema:
+          type: string
+          format: date
+      - name: end_date
+        in: query
+        required: true
+        description: "The time interval to get weather data. A day must be specified as an ISO8601 date (e.g. 2022-12-31)."
+        schema:
+          type: string
+          format: date
+      - name: hourly
+        in: query
+        explode: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - temperature_2m
+            - relativehumidity_2m
+            - dewpoint_2m
+            - apparent_temperature
+            - pressure_msl
+            - cloudcover
+            - cloudcover_low
+            - cloudcover_mid
+            - cloudcover_high
+            - windspeed_10m
+            - windspeed_100m
+            - winddirection_10m
+            - winddirection_100m
+            - windgusts_10m
+            - shortwave_radiation
+            - direct_radiation
+            - direct_normal_irradiance
+            - diffuse_radiation
+            - vapor_pressure_deficit
+            - et0_fao_evapotranspiration
+            - precipitation
+            - rain
+            - weathercode
+            - snowfall
+            - soil_temperature_0_to_7cm
+            - soil_temperature_7_to_28cm
+            - soil_temperature_28_to_100cm
+            - soil_temperature_100_to_255cm
+            - soil_moisture_0_to_7cm
+            - soil_moisture_7_to_28cm
+            - soil_moisture_28_to_100cm
+            - soil_moisture_100_to_255cm
+      - name: daily
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - temperature_2m_max
+            - temperature_2m_min
+            - apparent_temperature_max
+            - apparent_temperature_min
+            - precipitation_sum
+            - precipitation_hours
+            - weathercode
+            - sunrise
+            - sunset
+            - windspeed_10m_max
+            - windgusts_10m_max
+            - winddirection_10m_dominant
+            - shortwave_radiation_sum
+            - et0_fao_evapotranspiration
+      - name: latitude
+        in: query
+        required: true
+        description: "WGS84 coordinate"
+        schema:
+          type: number
+          format: float
+      - name: longitude
+        in: query
+        required: true
+        description: "WGS84 coordinate"
+        schema:
+          type: number
+          format: float
+      - name: temperature_unit
+        in: query
+        schema:
+          type: string
+          default: celsius
+          enum:
+          - celsius
+          - fahrenheit
+      - name: windspeed_unit
+        in: query
+        schema:
+          type: string
+          default: kmh
+          enum:
+          - kmh
+          - ms
+          - mph
+          - kn
+      - name: timeformat
+        in: query
+        description: If format `unixtime` is selected, all time values are returned in UNIX epoch time in seconds. Please not that all time is then in GMT+0! For daily values with unix timestamp, please apply `utc_offset_seconds` again to get the correct date.
+        schema:
+          type: string
+          default: iso8601
+          enum:
+          - iso8601
+          - unixtime
+      - name: timezone
+        in: query
+        description: If `timezone` is set, all timestamps are returned as local-time and data is returned starting at 0:00 local-time. Any time zone name from the [time zone database](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones) is supported.
+        schema:
+          type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  latitude:
+                    type: number
+                    example: 52.52
+                    description: WGS84 of the center of the weather grid-cell which was used to generate this forecast. This coordinate might be up to 5 km away.
+                  longitude:
+                    type: number
+                    example: 13.419.52
+                    description: WGS84 of the center of the weather grid-cell which was used to generate this forecast. This coordinate might be up to 5 km away.
+                  elevation:
+                    type: number
+                    example: 44.812
+                    description: The elevation in meters of the selected weather grid-cell. In mountain terrain it might differ from the location you would expect.
+                  generationtime_ms:
+                    type: number
+                    example: 2.2119
+                    description: Generation time of the weather forecast in milli seconds. This is mainly used for performance monitoring and improvements.
+                  utc_offset_seconds:
+                    type: integer
+                    example: 3600
+                    description: Applied timezone offset from the &timezone= parameter.
+                  hourly:
+                    type: object
+                    description: For each selected weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
+                  hourly_units:
+                    type: object
+                    description: For each selected weather variable, the unit will be listed here.
+                  daily:
+                    type: object
+                    description: For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
+                  daily_units:
+                    type: object
+                    description: For each selected daily weather variable, the unit will be listed here.
+        400:
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: boolean
+                    description: Always set true for errors
+                  reason:
+                    type: string
+                    description: Description of the error
+                    example: "Latitude must be in range of -90 to 90°. Given: 300"
