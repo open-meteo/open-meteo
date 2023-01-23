@@ -305,6 +305,12 @@
                   </label>
                 </div>
                 <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="FGOALS_f3_H_highresSST" id="FGOALS_f3_H_highresSST" name="models">
+                  <label class="form-check-label" for="FGOALS_f3_H_highresSST">
+                    FGOALS_f3_H_highresSST <span class="text-muted">(25 km)</span>
+                  </label>
+                </div>
+                <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="HiRAM_SIT_HR" id="HiRAM_SIT_HR" name="models">
                   <label class="form-check-label" for="HiRAM_SIT_HR">
                     HiRAM_SIT_HR <span class="text-muted">(23 km)</span>
