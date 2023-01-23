@@ -89,6 +89,7 @@ import SwiftNetCDF
 enum Cmip6Domain: String, Codable, GenericDomain {
     case CMCC_CM2_VHR4
     case FGOALS_f3_H
+    case FGOALS_f3_H_normalSST
     case HiRAM_SIT_HR
     case MRI_AGCM3_2_S
     case EC_Earth3P_HR
@@ -101,6 +102,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         switch self {
         case .CMCC_CM2_VHR4:
             return "CMCC-CM2-VHR4"
+        case .FGOALS_f3_H_normalSST:
+            fallthrough
         case .FGOALS_f3_H:
             return "FGOALS-f3-H"
         case .HiRAM_SIT_HR:
@@ -118,6 +121,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         switch self {
         case .CMCC_CM2_VHR4:
             return "gn"
+        case .FGOALS_f3_H_normalSST:
+            fallthrough
         case .FGOALS_f3_H:
             return "gr"
         case .HiRAM_SIT_HR:
@@ -135,6 +140,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         switch self {
         case .CMCC_CM2_VHR4:
             return "CMCC"
+        case .FGOALS_f3_H_normalSST:
+            fallthrough
         case .FGOALS_f3_H:
             return "CAS"
         case .HiRAM_SIT_HR:
@@ -177,6 +184,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         switch self {
         case .CMCC_CM2_VHR4:
             return Self.elevationCMCC_CM2_VHR4
+        case .FGOALS_f3_H_normalSST:
+            fallthrough
         case .FGOALS_f3_H:
             return Self.elevationFGOALS_f3_H
         case .HiRAM_SIT_HR:
@@ -199,6 +208,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         switch self {
         case .CMCC_CM2_VHR4:
             return RegularGrid(nx: 1152, ny: 768, latMin: -90, lonMin: -180, dx: 0.3125, dy: 180/768)
+        case .FGOALS_f3_H_normalSST:
+            fallthrough
         case .FGOALS_f3_H:
             return RegularGrid(nx: 1440, ny: 720, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .HiRAM_SIT_HR:
@@ -216,6 +227,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         switch self {
         case .CMCC_CM2_VHR4:
             return ("20210330", "20210330")
+        case .FGOALS_f3_H_normalSST:
+            return nil
         case .FGOALS_f3_H:
             return ("20201204", "20210121")
         case .HiRAM_SIT_HR:
@@ -358,6 +371,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return isFuture ? "20190725" : "20170927"
         case .FGOALS_f3_H:
             return isFuture ? "20200417" : "20190817"
+        case .FGOALS_f3_H_normalSST:
+            return isFuture ? "20200417" : "20211117"
         case .HiRAM_SIT_HR:
             if isFuture {
                 return "20210707"
@@ -497,6 +512,29 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             // the non sst version has tasmax/min
             // snow is only in SST version
             switch self {
+            case .relative_humidity_2m_mean:
+                return .yearly
+            case .cloudcover_mean:
+                return .yearly
+            case .temperature_2m_mean:
+                return .yearly
+            case .pressure_msl:
+                return .yearly
+            case .snowfall_water_equivalent_sum:
+                return .yearly
+            case .shortwave_radiation_sum:
+                return .yearly
+            case .windspeed_10m_mean:
+                return .yearly
+            case .windspeed_10m_max:
+                return .yearly
+            case .precipitation_sum:
+                return .yearly
+            default:
+                return nil
+            }
+        case .FGOALS_f3_H_normalSST:
+            switch self {
             //case .relative_humidity_2m_mean:
                 //return .yearly
             case .cloudcover_mean:
@@ -505,8 +543,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 //return .yearly
             //case .pressure_msl:
                 //return .yearly
-            case .snowfall_water_equivalent_sum:
-                return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
             case .windspeed_10m_mean:
@@ -728,7 +764,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 }
                 logger.info("Downloading \(variable) for year \(year)")
                 let version = variable.version(for: domain, isFuture: isFuture)
-                let experimentId = domain == .FGOALS_f3_H ? (isFuture ? "highres-future" : "hist-1950") : (isFuture ? "highresSST-future" : "highresSST-present")
+                let experimentId = domain == .FGOALS_f3_H_normalSST ? (isFuture ? "highres-future" : "hist-1950") : (isFuture ? "highresSST-future" : "highresSST-present")
                 
                 let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
                 if FileManager.default.fileExists(atPath: omFile) {
@@ -738,7 +774,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 switch timeType {
                 case .restoreFrom(dt: let dt, shortName: let shortName, aggregate: let aggregate):
                     // download 6h for cmcc or 3h for fgoals
-                    let timeRes = dt == 3*3600 ? "3h" : "6hrPlevPt"
+                    let timeRes = dt == 3*3600 ? "3hr" : "6hrPlevPt"
                     
                     // download specific humidity instead of relative humidity
                     let short = shortName == "hurs" ? "huss" : shortName
@@ -750,8 +786,10 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         if !FileManager.default.fileExists(atPath: monthlyOmFile) {
                             // Feb 29 is ignored in CMCC_CM2_VHR4.....
                             let day = (domain == .CMCC_CM2_VHR4 && month == 2) ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
-                            let lastHour = dt == 3*3600 ? "2100" : "1800"
-                            let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/\(timeRes)/\(short)/\(grid)/v\(version)/\(short)_\(timeRes)_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))010000-\(year)\(month.zeroPadded(len: 2))\(day)\(lastHour).nc"
+                            // 3h data appears to be centered on 1:30
+                            let lastHour = dt == 3*3600 ? "2230" : "1800"
+                            let firstHour = dt == 3*3600 ? "0130" : "0000"
+                            let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/\(timeRes)/\(short)/\(grid)/v\(version)/\(short)_\(timeRes)_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01\(firstHour)-\(year)\(month.zeroPadded(len: 2))\(day)\(lastHour).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             
                             let isLeapMonth = month == 2 && Timestamp(year, 2, 28).add(days: 1).toComponents().day == 29
