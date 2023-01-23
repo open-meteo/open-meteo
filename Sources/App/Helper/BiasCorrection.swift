@@ -37,7 +37,7 @@ struct QuantileDeltaMappingBiasCorrection {
         let cdfForecast = cdfControl
         
         // Limit time to 5 years before end of reference time. CDFs are averaged over 10 years and this makes sure, that the forecast CDF does not take any future signals into the reference.
-        let maxReferenceTime = Timestamp(referenceTime.range.upperBound.timeIntervalSince1970 - Timestamp.secondsPerAverageYear * 5)
+        let maxReferenceTime = Timestamp(referenceTime.range.upperBound.timeIntervalSince1970 - Timestamp.secondsPerAverageYear * CdfMonthly10YearSliding.yearsToAggregate / 2)
 
         switch type {
         case .absoluteChage:
