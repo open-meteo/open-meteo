@@ -14,7 +14,7 @@ void windirectionFast(const size_t num_points, const float* ys, const float* xs,
     float y = ys[i];
     float x = xs[i];
     int swap = fabs(x) < fabs(y);
-    float atan_input = (swap ? x : y) / (swap ? y : x);
+    float atan_input = (swap ? y : x) == 0 ? ((swap ? x : y) / 0.00000001) : ((swap ? x : y) / (swap ? y : x));
 
     // Approximate atan
     float a1  =  0.99997726f;

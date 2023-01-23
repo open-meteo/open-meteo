@@ -680,7 +680,6 @@ extension GenericReaderMulti where Variable == ForecastVariable {
     func prefetchData(variables: [ForecastVariableDaily], time timeDaily: TimerangeDt) throws {
         let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
-            let v = variable.aggregation
             if let v0 = variable.aggregation.variables.0 {
                 try prefetchData(variable: .surface(v0), time: time)
             }
