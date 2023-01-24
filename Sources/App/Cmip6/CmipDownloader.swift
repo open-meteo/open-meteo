@@ -399,15 +399,15 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             case .temperature_2m_min:
                 fallthrough
             case .temperature_2m_mean:
-                fallthrough
-            /*case .pressure_msl:
+                /*fallthrough
+            case .pressure_msl:
                 fallthrough
             case .relative_humidity_2m_max:
                 fallthrough
             case .relative_humidity_2m_min:
                 fallthrough
-            case .relative_humidity_2m_mean:
-                return isFuture ? "20211115" : "20211117"*/
+            case .relative_humidity_2m_mean:*/
+                return isFuture ? "20211115" : "20211117"
             default:
                 fatalError("Version not set")
             }
