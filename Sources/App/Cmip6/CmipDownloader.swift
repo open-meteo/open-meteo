@@ -249,10 +249,10 @@ enum Cmip6Domain: String, Codable, GenericDomain {
 }
 
 enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVariableMixable {
-    case pressure_msl
     case temperature_2m_min
     case temperature_2m_max
     case temperature_2m_mean
+    case pressure_msl
     case cloudcover_mean
     case precipitation_sum
     // Note: runoff includes soil drainage -> not surface runoff
@@ -593,8 +593,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             case .relative_humidity_2m_mean:
                 return .restoreFrom(dt: 3*3600, shortName: "hurs", aggregate: .mean)
             case .pressure_msl:
-                // pressure is only surface and not MSL for 3h data....
-                return .restoreFrom(dt: 3*3600, shortName: "psl", aggregate: .mean)
+                // Only 3h surface pressure available, MSL pressure only for 6h
+                return .restoreFrom(dt: 3*3600, shortName: "ps", aggregate: .mean)
             case .temperature_2m_mean:
                 return .restoreFrom(dt: 3*3600, shortName: "tas", aggregate: .mean)
             case .temperature_2m_max:
@@ -848,6 +848,21 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         return try OmFileReader(file: monthlyOmFile)
                     }
                     
+                    if shortName == "ps" {
+                        let monthlyTemperature = try (1...12).map { month in
+                            let monthlyOmFile = "\(domain.downloadDirectory)tas_\(year)\(month).om"
+                            return try OmFileReader(file: monthlyOmFile)
+                        }
+                        let elevation = try domain.elevationFile!.readAll()
+                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { (surfacePressure6h, locationRange) in
+                            
+                            let temperature = try monthlyTemperature.combine(locationRange: locationRange)
+                            surfacePressure6h.data = Meteorology.sealevelPressure(temperature2m: temperature, surfacePressure: surfacePressure6h, elevation: Array(elevation[locationRange]))
+                            surfacePressure6h.interpolateAndAggregate(dt6h: dt, variable: variable, aggregate: aggregate)
+                        })
+                        return
+                    }
+                    
                     if shortName == "hurs" {
                         // Calculate relative humidity from specific humidity, temperature and pressure
                         let monthlyTemperature = try (1...12).map { month in
@@ -878,12 +893,13 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             return ArraySlice(specificHumidity.data)
                         })
                         progress.finish()
-                    } else {
-                        // Interpolate and afterwards aggregate to get min/max values
-                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { data6h in
-                            data6h.interpolateAndAggregate(dt6h: dt, variable: variable, aggregate: aggregate)
-                        })
+                        return
                     }
+                    
+                    // Interpolate and afterwards aggregate to get min/max values
+                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { (data6h, locationRange) in
+                        data6h.interpolateAndAggregate(dt6h: dt, variable: variable, aggregate: aggregate)
+                    })
                     
                 case .monthly:
                     // download month files and combine to yearly file
@@ -1038,7 +1054,7 @@ extension Array2DFastTime {
 
 extension OmFileWriter {
     /// Take an array of `OmFileReader` and combine them to a continous time series
-    func write(logger: Logger, file: String, compressionType: CompressionType, scalefactor: Float, nLocationsPerChunk: Int, chunkedFiles: [OmFileReader<MmapFile>], dataCallback: ((inout Array2DFastTime) -> ())?) throws {
+    func write(logger: Logger, file: String, compressionType: CompressionType, scalefactor: Float, nLocationsPerChunk: Int, chunkedFiles: [OmFileReader<MmapFile>], dataCallback: ((_ data: inout Array2DFastTime, _ locationRange: Range<Int>) throws -> ())?) throws {
         let progress = ProgressTracker(logger: logger, total: self.dim0, label: "Convert \(file)")
 
         try write(file: file, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { dim0 in
@@ -1046,7 +1062,7 @@ extension OmFileWriter {
 
             var fasttime = try chunkedFiles.combine(locationRange: locationRange)
             
-            dataCallback?(&fasttime)
+            try dataCallback?(&fasttime, locationRange)
             
             guard fasttime.nTime == dim1 else {
                 fatalError("chunked files did not contain all timesteps (fasttime.nTime=\(fasttime.nTime), dim1=\(dim1))")

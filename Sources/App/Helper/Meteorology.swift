@@ -61,6 +61,15 @@ struct Meteorology {
         }
     }
     
+    /// Calculate mea nsea level pressure, corrected by temperature.
+    static func sealevelPressure(temperature2m: Array2DFastTime, surfacePressure: Array2DFastTime, elevation: [Float]) -> [Float] {
+        return zip(temperature2m.data, surfacePressure.data).enumerated().map { (i, arg1) -> Float in
+            let (t, p) = arg1
+            let elevation = elevation[i % temperature2m.nTime]
+            return p * Meteorology.sealevelPressureFactor(temperature: t, elevation: elevation)
+        }
+    }
+    
     /// Calculate mean sea level pressure, corrected by temperature.
     @inlinable static func sealevelPressureFactor(temperature: Float, elevation: Float) -> Float {
         let t0 = (temperature + 273.15 + 0.0065 * elevation)
@@ -171,7 +180,7 @@ struct Meteorology {
     public static func specificToRelativeHumidity(specificHumidity: Array2DFastTime, temperature: Array2DFastTime, sealLevelPressure: Array2DFastTime, elevation: [Float]) -> [Float] {
         
         return temperature.data.enumerated().map { (i, temp) in
-            let asl = sealLevelPressure.data[i % sealLevelPressure.nTime]
+            let asl = elevation[i % sealLevelPressure.nTime]
             let qair = specificHumidity.data[i]
             
             let asl0 = asl.isNaN ? 0 : asl
