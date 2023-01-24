@@ -388,10 +388,10 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 fallthrough
             case .pressure_msl:
                 fallthrough
-            case .relative_humidity_2m_mean:
-                fallthrough
             case .shortwave_radiation_sum:
                 return isFuture ? "20211116" : "20211029"
+            case .relative_humidity_2m_mean:
+                fallthrough
             case .precipitation_sum:
                 return isFuture ? "20211116" : "20211028"
             case .temperature_2m_max:
