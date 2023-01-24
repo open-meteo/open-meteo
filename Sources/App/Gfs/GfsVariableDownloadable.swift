@@ -181,7 +181,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...1e9)
         case .lifted_index: return .hermite(bounds: 0...1e9)
-        case .visibility: return .hermite(bounds: nil)
+        case .visibility: return .hermite(bounds: 0...1e9)
         }
     }
     
