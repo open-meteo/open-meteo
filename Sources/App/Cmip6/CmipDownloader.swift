@@ -8,6 +8,15 @@ import SwiftNetCDF
  https://esgf-data.dkrz.de/search/cmip6-dkrz/
  https://esgf-node.llnl.gov/search/cmip6/
  
+ Robustness of CMIP6 Historical Global Mean Temperature Simulations: Trends, Long-Term Persistence, Autocorrelation, and Distributional Shape
+ https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2020EF001667
+ 
+ precip biases
+ https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002196
+ 
+ droughts
+ https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002150
+ 
  INTERESSTING:
  
  CMCC-CM2-VHR4 (CMCC Italy) https://www.wdc-climate.de/ui/cmip6?input=CMIP6.HighResMIP.CMCC.CMCC-CM2-VHR4
@@ -118,6 +127,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         }
     }
     
+    // gn = native
+    // gr = resampled
     var gridName: String {
         switch self {
         case .CMCC_CM2_VHR4:
@@ -830,7 +841,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
                         if !FileManager.default.fileExists(atPath: monthlyOmFile) {
                             // Feb 29 is ignored in CMCC_CM2_VHR4.....
-                            let day = (domain == .CMCC_CM2_VHR4 && month == 2) ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
+                            let day = (domain.needsLeapYearFix && month == 2) ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
                             // 3h data appears to be centered on 1:30
                             let lastHour = dt == 3*3600 ? "2230" : "1800"
                             let firstHour = dt == 3*3600 ? "0130" : "0000"
@@ -914,7 +925,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let monthlyOmFile = "\(domain.downloadDirectory)\(short)_\(year)\(month).om"
                         if !FileManager.default.fileExists(atPath: monthlyOmFile) {
                             // Feb 29 is ignored in CMCC_CM2_VHR4.....
-                            let day = (domain == .CMCC_CM2_VHR4 && month == 2) ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
+                            let day = (domain.needsLeapYearFix && month == 2) ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
                             let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(year)\(month.zeroPadded(len: 2))\(day).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             
