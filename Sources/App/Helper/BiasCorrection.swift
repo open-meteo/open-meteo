@@ -214,8 +214,8 @@ extension RandomAccessCollection where Element == Float {
         }
         let d=Float(self.count*sumxsq-sumx*sumx)
         let m=(Float(self.count)*sumxy-Float(sumx)*sumy)/d
-        //let c=(sumy*Float(sumxsq)-Float(sumx)*sumxy)/d
-        return self.enumerated().lazy.map { (i,v) in v - Float(i) * m }
+        let c=(sumy*Float(sumxsq)-Float(sumx)*sumxy)/d
+        return self.enumerated().lazy.map { (i,v) in v - Float(i) * m - c/2}
     }
 }
 
@@ -232,8 +232,8 @@ struct BiasCorrectionSeasonalLinear {
         var sums = [Float](repeating: 0, count: binsPerYear)
         var weights = [Float](repeating: 0, count: binsPerYear)
         for (t, v) in zip(time, data) {
-            let monthBin = t.secondInAverageYear / (31_557_600 / binsPerYear)
-            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / binsPerYear)) / Float(Timestamp.secondsPerAverageYear / binsPerYear)
             let weighted = Interpolations.linearWeighted(value: v, fraction: fraction)
             sums[monthBin] += weighted.a
             weights[monthBin] += weighted.weightA
@@ -248,8 +248,8 @@ struct BiasCorrectionSeasonalLinear {
         let binsPerYear = meansPerYear.count
         assert(time.count == indices.count)
         for (i ,t) in zip(indices, time) {
-            let monthBin = t.secondInAverageYear / (31_557_600 / binsPerYear)
-            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / binsPerYear)) / Float(Timestamp.secondsPerAverageYear / binsPerYear)
             let m = Interpolations.linear(a: meansPerYear[monthBin], b: meansPerYear[(monthBin+1) % binsPerYear], fraction: fraction)
             let o = Interpolations.linear(a: otherWeights.meansPerYear[monthBin], b: otherWeights.meansPerYear[(monthBin+1) % binsPerYear], fraction: fraction)
             switch type {
@@ -274,8 +274,8 @@ struct BiasCorrectionSeasonalHermite {
         var sums = [Double](repeating: 0, count: binsPerYear)
         var weights = [Double](repeating: 0, count: binsPerYear)
         for (t, v) in zip(time, data) {
-            let monthBin = t.secondInAverageYear / (31_557_600 / binsPerYear)
-            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / binsPerYear)) / Float(Timestamp.secondsPerAverageYear / binsPerYear)
             let weighted = Interpolations.hermiteWeighted(value: v, fraction: fraction)
             sums[(monthBin-1+binsPerYear) % binsPerYear] += Double(weighted.a)
             weights[(monthBin-1+binsPerYear) % binsPerYear] +=  Double(weighted.weightA)
@@ -295,8 +295,8 @@ struct BiasCorrectionSeasonalHermite {
         let binsPerYear = meansPerYear.count
         assert(time.count == indices.count)
         for (i ,t) in zip(indices, time) {
-            let monthBin = t.secondInAverageYear / (31_557_600 / binsPerYear)
-            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / binsPerYear)) / Float(31_557_600 / binsPerYear)
+            let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / binsPerYear)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / binsPerYear)) / Float(Timestamp.secondsPerAverageYear / binsPerYear)
             let m = Interpolations.hermite(
                 A: meansPerYear[(monthBin-1+binsPerYear) % binsPerYear],
                 B: meansPerYear[monthBin],
@@ -334,19 +334,22 @@ struct CdfMonthly: MonthlyBinable {
     let cdf: [Float]
     let bins: Bins
     
-    static var binsPerYear: Int { 6 }
+    static var nMonths: Int { 12 / monthsToAggregate }
+    
+    /// How many months to aggregate per year
+    static var monthsToAggregate: Int { 3 }
     
     var nBins: Int {
-        cdf.count / Self.binsPerYear
+        cdf.count / Self.monthsToAggregate
     }
     
     /// input temperature and time axis
     init<T: Sequence>(vector: T, time: TimerangeDt, bins: Bins) where T.Element == Float {
         let count = bins.nQuantiles
-        var cdf = [Float](repeating: 0, count: count * Self.binsPerYear)
+        var cdf = [Float](repeating: 0, count: count * Self.monthsToAggregate)
         for (t, value) in zip(time, vector) {
-            let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
-            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
+            let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / Self.monthsToAggregate)
+            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / Self.monthsToAggregate)) / Float(Timestamp.secondsPerAverageYear / Self.monthsToAggregate)
             for (i, bin) in bins.enumerated().reversed() {
                 if value >= bin && value < bins[i+1] {
                     // value exactly inside a bin, adjust weight
@@ -354,10 +357,10 @@ struct CdfMonthly: MonthlyBinable {
                     let weigthted = Interpolations.linearWeighted(value: fraction, fraction: interBinFraction)
                     assert(interBinFraction >= 0 && interBinFraction <= 1)
                     cdf[monthBin * count + i] += weigthted.a
-                    cdf[((monthBin+1) % Self.binsPerYear) * count + i] += weigthted.b
+                    cdf[((monthBin+1) % Self.monthsToAggregate) * count + i] += weigthted.b
                 } else if value < bin {
                     cdf[monthBin * count + i] += 1-fraction
-                    cdf[((monthBin+1) % Self.binsPerYear) * count + i] += fraction
+                    cdf[((monthBin+1) % Self.monthsToAggregate) * count + i] += fraction
                 } else {
                     break
                 }
@@ -380,11 +383,11 @@ struct CdfMonthly: MonthlyBinable {
     
     /// linear interpolate between 2 months CDF
     func get(bin: Int, time t: Timestamp) -> Float {
-        let monthBin = t.secondInAverageYear / (31_557_600 / Self.binsPerYear)
-        let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(31_557_600 / Self.binsPerYear)) / Float(31_557_600 / Self.binsPerYear)
+        let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / Self.monthsToAggregate)
+        let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / Self.monthsToAggregate)) / Float(Timestamp.secondsPerAverageYear / Self.monthsToAggregate)
         
-        let binLength = cdf.count / Self.binsPerYear
-        return Interpolations.linear(a: cdf[binLength * monthBin + bin], b: cdf[binLength * ((monthBin+1) % Self.binsPerYear) + bin], fraction: fraction)
+        let binLength = cdf.count / Self.monthsToAggregate
+        return Interpolations.linear(a: cdf[binLength * monthBin + bin], b: cdf[binLength * ((monthBin+1) % Self.monthsToAggregate) + bin], fraction: fraction)
     }
 }
 
@@ -402,7 +405,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     static var monthsToAggregate: Int { 3 }
     
     /// How many years to aggreate
-    static var yearsToAggregate: Int { 4 }
+    static var yearsToAggregate: Int { 10 }
     
     /// input temperature and time axis
     init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {

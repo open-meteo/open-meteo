@@ -327,52 +327,6 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .terrainOptimised)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
-            /*
-             normal 10y sliding
-             QDM projected rmse: 2.1408963
-             QDM projected me: -0.018368302
-             QDM qctime rmse: 2.142249
-             QDM qctime me: 0.40969
-             mean per year reference=[31.5] refForecast=[31.425] qc=[46.0625] qcForecast=[42.875]
-             >25.0°C QDM projected rmse: 4.0031238
-             >25.0°C QDM projected me: 0.075
-             >25.0°C QDM qctime rmse: 4.175823
-             >25.0°C QDM qctime me: 3.1875
-             
-             detrend 10y sliding
-             QDM projected rmse: 2.146497
-             QDM projected me: 0.37727377
-             QDM qctime rmse: 2.1588807
-             QDM qctime me: 0.8117633
-             mean per year reference=[31.5] refForecast=[27.1] qc=[46.0625] qcForecast=[41.875]
-             >25.0°C QDM projected rmse: 4.1593266
-             >25.0°C QDM projected me: 4.4
-             >25.0°C QDM qctime rmse: 4.160829
-             >25.0°C QDM qctime me: 4.1875
-             
-             normal 2 years sliding
-             QDM projected rmse: 2.1241827
-             QDM projected me: -0.047693256
-             QDM qctime rmse: 2.1715572
-             QDM qctime me: 0.39521652
-             mean per year reference=[31.5] refForecast=[32.05] qc=[46.0625] qcForecast=[47.625]
-             >25.0°C QDM projected rmse: 3.435113
-             >25.0°C QDM projected me: -0.55
-             >25.0°C QDM qctime rmse: 4.2646804
-             >25.0°C QDM qctime me: -1.5625
-             
-             detrend 2 years
-             QDM projected rmse: 2.1482747
-             QDM projected me: 0.37949517
-             QDM qctime rmse: 2.1614432
-             QDM qctime me: 0.81603646
-             mean per year reference=[31.5] refForecast=[27.425] qc=[46.0625] qcForecast=[41.875]
-             >25.0°C QDM projected rmse: 4.2337923
-             >25.0°C QDM projected me: 4.075
-             >25.0°C QDM qctime rmse: 4.1907635
-             >25.0°C QDM qctime me: 4.1875
-             */
-            
             let start = DispatchTime.now()
             let corrected = QuantileDeltaMappingBiasCorrection.quantileDeltaMappingMonthlyDetrend(
                 reference: ArraySlice(reference),
@@ -482,8 +436,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .temperature_2m_max_reference:
             let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .terrainOptimised)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
-            let detrend: [Float] = reference.detrendLinear().map({$0})
-            return DataAndUnit(detrend, .celsius)
+            return DataAndUnit(reference, .celsius)
         }
     }
     
