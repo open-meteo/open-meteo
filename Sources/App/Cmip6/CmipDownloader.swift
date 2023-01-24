@@ -18,6 +18,7 @@ import SwiftNetCDF
  NO daily min/max directly
  
  FGOALS-f3  (CAS China) https://www.wdc-climate.de/ui/cmip6?input=CMIP6.HighResMIP.CAS.FGOALS-f3-H.highresSST-future
+ https://www.tandfonline.com/doi/full/10.1080/16742834.2020.1814675
  0.25°
  3h: air tmp, clc, wind, hum, sw
  6h: missing temperature for higher altitude,
@@ -79,7 +80,7 @@ import SwiftNetCDF
  
  
  TODO:
- - CMCC daily min/max from 6h data
+ - CMCC daily min/max from 6h data -> download again?
  - fgoals daily min/max from 3h data
  - DONE missing feb 29 in CMCC
  - bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4 -> Calculate and store BIAS coefficients (~203 floats) for each ERA5 grid-cell
@@ -385,25 +386,28 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 fallthrough
             case .cloudcover_mean:
                 fallthrough
+            case .pressure_msl:
+                fallthrough
+            case .relative_humidity_2m_mean:
+                fallthrough
             case .shortwave_radiation_sum:
                 return isFuture ? "20211116" : "20211029"
             case .precipitation_sum:
                 return isFuture ? "20211116" : "20211028"
-                
             case .temperature_2m_max:
                 fallthrough
             case .temperature_2m_min:
                 fallthrough
             case .temperature_2m_mean:
                 fallthrough
-            case .pressure_msl:
+            /*case .pressure_msl:
                 fallthrough
             case .relative_humidity_2m_max:
                 fallthrough
             case .relative_humidity_2m_min:
                 fallthrough
             case .relative_humidity_2m_mean:
-                return isFuture ? "20211115" : "20211117"
+                return isFuture ? "20211115" : "20211117"*/
             default:
                 fatalError("Version not set")
             }
@@ -576,17 +580,17 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             //case .temperature_2m_mean:
                 //return .yearly
-            //case .pressure_msl:
-                //return .yearly
+            case .pressure_msl:
+                return .yearly
+            case .relative_humidity_2m_mean:
+                return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
             case .windspeed_10m_mean:
                 return .yearly
-            //case .windspeed_10m_max: only historical wind max
-            //    return .yearly
             case .precipitation_sum:
                 return .yearly
-            case .relative_humidity_2m_min:
+            /*case .relative_humidity_2m_min:
                 return .restoreFrom(dt: 3*3600, shortName: "hurs", aggregate: .min)
             case .relative_humidity_2m_max:
                 return .restoreFrom(dt: 3*3600, shortName: "hurs", aggregate: .max)
@@ -594,7 +598,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .restoreFrom(dt: 3*3600, shortName: "hurs", aggregate: .mean)
             case .pressure_msl:
                 // Only 3h surface pressure available, MSL pressure only for 6h
-                return .restoreFrom(dt: 3*3600, shortName: "ps", aggregate: .mean)
+                // Not downloadable now, because chinese server is offline
+                return .restoreFrom(dt: 3*3600, shortName: "ps", aggregate: .mean)*/
             case .temperature_2m_mean:
                 return .restoreFrom(dt: 3*3600, shortName: "tas", aggregate: .mean)
             case .temperature_2m_max:
@@ -974,7 +979,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     }*/
                 case .yearly:
                     /// `FGOALS_f3_H` has no near surface relative humidity, calculate from specific humidity
-                    let calculateRhFromSpecificHumidity = domain == .FGOALS_f3_H_highresSST && variable == .relative_humidity_2m_mean
+                    let calculateRhFromSpecificHumidity = (domain == .FGOALS_f3_H_highresSST || domain == .FGOALS_f3_H) && variable == .relative_humidity_2m_mean
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
