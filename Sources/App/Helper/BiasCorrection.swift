@@ -64,6 +64,48 @@ struct QuantileDeltaMappingBiasCorrection {
         }
     }
     
+    /// Calculate CDFs over the entire  control and forecast timespan using sliding windows
+    /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
+    /// TODO: check if dry periods are still correct
+    static func quantileDeltaMappingMonthlyDetrend(reference: ArraySlice<Float>, referenceTime: TimerangeDt, controlAndForecast: ArraySlice<Float>, controlAndForecastTime: TimerangeDt, type: ChangeType) -> [Float] {
+        let nQuantiles = 100
+        
+        //return controlAndForecast.detrendLinear().map({$0})
+        
+        // Compute reference distributions
+        let referenceDetrended = reference.detrendLinear()
+        let binsRefernce = calculateBins(referenceDetrended, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let cdfRefernce = CdfMonthly(vector: referenceDetrended, time: referenceTime, bins: binsRefernce)
+        
+        let controlDetrended = controlAndForecast[0..<reference.count].detrendLinear()
+        let binsControl = calculateBins(controlDetrended, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let cdfControl = CdfMonthly(vector: controlDetrended, time: referenceTime, bins: binsControl)
+        
+        // Apply
+        let binsForecast = calculateBins(controlAndForecast, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let cdfForecast = CdfMonthly10YearSliding(vector: controlAndForecast, time: controlAndForecastTime, bins: binsForecast)
+
+        switch type {
+        case .absoluteChage:
+            return zip(controlAndForecastTime, controlAndForecast).map { (time, forecast) in
+                let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: time, extrapolate: false)
+                return qdm1 + forecast - interpolate(cdfControl, binsControl, x: epsilon, time: time, extrapolate: false)
+            }
+        case .relativeChange:
+            let maxScaleFactor: Float = 10
+            return zip(controlAndForecastTime, controlAndForecast).map { (time, forecast) in
+                guard forecast > 0 else {
+                    return 0
+                }
+                let epsilon = interpolate(binsForecast, cdfForecast, x: forecast, time: time, extrapolate: false)
+                let qdm1 = interpolate(cdfRefernce, binsRefernce, x: epsilon, time: time, extrapolate: false)
+                let scale = forecast / interpolate(cdfControl, binsControl, x: epsilon, time: time, extrapolate: false)
+                return qdm1 * min(max(scale, maxScaleFactor * -1), maxScaleFactor)
+            }
+        }
+    }
+    
     /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
     /*static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, control: ArraySlice<Float>, referenceTime: TimerangeDt, forecast: ArraySlice<Float>, forecastTime: TimerangeDt, type: ChangeType) -> [Float] {
         let nQuantiles = 100
@@ -100,7 +142,7 @@ struct QuantileDeltaMappingBiasCorrection {
     
     /// Calcualte min/max from vector and return bins
     /// nQuantiles of 100 should be sufficient
-    static func calculateBins(_ vector: ArraySlice<Float>, nQuantiles: Int = 100, min: Float? = nil) -> Bins {
+    static func calculateBins<T: Sequence>(_ vector: T, nQuantiles: Int = 100, min: Float? = nil) -> Bins where T.Element == Float {
         guard let minMax = vector.minAndMax() else {
             return Bins(min: .nan, max: .nan, nQuantiles: nQuantiles)
         }
@@ -155,6 +197,28 @@ struct QuantileDeltaMappingBiasCorrection {
         return yL + dydx * (x - xL);       // linear interpolation
     }
 }
+
+extension RandomAccessCollection where Element == Float {
+    /// Linearly detrend data
+    func detrendLinear() -> LazyMapSequence<EnumeratedSequence<Self>, Float> {
+        var sumx = 0
+        var sumxsq = 0
+        var sumy: Float = 0
+        var sumxy: Float = 0
+        
+        for (i, t) in self.enumerated() {
+            sumx=sumx+i;
+            sumxsq=sumxsq+(i*i);
+            sumy=sumy+t;
+            sumxy=sumxy+Float(i)*t;
+        }
+        let d=Float(self.count*sumxsq-sumx*sumx)
+        let m=(Float(self.count)*sumxy-Float(sumx)*sumy)/d
+        //let c=(sumy*Float(sumxsq)-Float(sumx)*sumxy)/d
+        return self.enumerated().lazy.map { (i,v) in v - Float(i) * m }
+    }
+}
+
 
 /// Calculate and/or apply a linear bias correction to correct a fixed offset
 /// Deltas are calculated for each month individually and use linear interpolation
@@ -277,7 +341,7 @@ struct CdfMonthly: MonthlyBinable {
     }
     
     /// input temperature and time axis
-    init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {
+    init<T: Sequence>(vector: T, time: TimerangeDt, bins: Bins) where T.Element == Float {
         let count = bins.nQuantiles
         var cdf = [Float](repeating: 0, count: count * Self.binsPerYear)
         for (t, value) in zip(time, vector) {
@@ -338,7 +402,7 @@ struct CdfMonthly10YearSliding: MonthlyBinable {
     static var monthsToAggregate: Int { 3 }
     
     /// How many years to aggreate
-    static var yearsToAggregate: Int { 10 }
+    static var yearsToAggregate: Int { 4 }
     
     /// input temperature and time axis
     init(vector: ArraySlice<Float>, time: TimerangeDt, bins: Bins) {
