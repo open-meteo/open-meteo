@@ -58,7 +58,6 @@ struct CamsController {
                 latitude: reader.modelLat,
                 longitude: reader.modelLon,
                 elevation: nil,
-                elevation_raw: nil,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,

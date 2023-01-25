@@ -82,8 +82,6 @@ struct ForecastapiResult {
     /// Desired elevation from a DEM. Used in statistical downscaling
     let elevation: Float?
     
-    /// Raw grid-cell elevation or later station elevation
-    let elevation_raw: Float?
     let generationtime_ms: Double
     let utc_offset_seconds: Int
     let timezone: TimeZone
@@ -127,10 +125,9 @@ struct ForecastapiResult {
             _ = writer.eventLoop.performWithTask {
                 var b = BufferAndWriter(writer: writer)
                 
-                b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation,elevation_raw\n")
+                b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
                 let elevation = elevation.map({ $0.isNaN ? "NaN" : "\($0)" }) ?? "NaN"
-                let elevation_raw = elevation_raw.map({ $0.isNaN ? "NaN" : "\($0)" }) ?? "NaN"
-                b.buffer.writeString("\(latitude),\(longitude),\(elevation),\(utc_offset_seconds),\(timezone.identifier),\(timezone.abbreviation() ?? ""),\(elevation_raw)\n")
+                b.buffer.writeString("\(latitude),\(longitude),\(elevation),\(utc_offset_seconds),\(timezone.identifier),\(timezone.abbreviation() ?? "")\n")
                 
                 if let current_weather = current_weather {
                     b.buffer.writeString("\n")
@@ -197,7 +194,6 @@ struct ForecastapiResult {
         sheet.write("utc_offset_seconds")
         sheet.write("timezone")
         sheet.write("timezone_abbreviation")
-        sheet.write("elevation_raw")
         sheet.endRow()
         sheet.startRow()
         sheet.write(latitude)
@@ -206,7 +202,6 @@ struct ForecastapiResult {
         sheet.write(utc_offset_seconds)
         sheet.write(timezone.identifier)
         sheet.write(timezone.abbreviation() ?? "")
-        sheet.write(elevation_raw ?? .nan)
         sheet.endRow()
         
         if let current_weather = current_weather {
@@ -279,9 +274,6 @@ struct ForecastapiResult {
                 """)
                 if let elevation = elevation, !elevation.isNaN {
                     b.buffer.writeString(",\"elevation\":\(elevation)")
-                }
-                if let elevation_raw = elevation_raw, !elevation_raw.isNaN {
-                    b.buffer.writeString(",\"elevation_raw\":\(elevation_raw)")
                 }
                 if let current_weather = current_weather {
                     let ww = current_weather.weathercode.isNaN ? "null" : String(format: "%.0f", current_weather.weathercode)

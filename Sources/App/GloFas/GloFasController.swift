@@ -135,7 +135,6 @@ struct GloFasController {
                 latitude: readers[0].modelLat,
                 longitude: readers[0].modelLon,
                 elevation: nil,
-                elevation_raw: nil,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,

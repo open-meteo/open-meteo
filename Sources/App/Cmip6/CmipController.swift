@@ -95,7 +95,6 @@ struct CmipController {
                 latitude: readers[0].modelLat,
                 longitude: readers[0].modelLon,
                 elevation: readers[0].targetElevation,
-                elevation_raw: readers[0].modelElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: TimeZone(identifier: "GMT")!,
