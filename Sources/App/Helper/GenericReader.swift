@@ -123,7 +123,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.domain = domain
         self.position = gridpoint.gridpoint
         self.modelElevation = gridpoint.gridElevation
-        self.targetElevation = elevation
+        self.targetElevation = elevation.isNaN ? gridpoint.gridElevation : elevation
         
         omFileSplitter = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: domain.omfileArchive)
         
@@ -144,7 +144,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             return DataAndUnit(data.map({$0 / 100}), .hectoPascal)
         }
         
-        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN {
+        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
             for i in data.indices {
                 // correct temperature by 0.65° per 100 m elevation
                 data[i] += (modelElevation - targetElevation) * 0.0065

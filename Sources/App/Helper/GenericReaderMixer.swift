@@ -47,10 +47,21 @@ extension GenericReaderMixer {
         reader.first!.modelDtSeconds
     }
     
+    /// Last domain is supposed to be the highest resolution domain
     public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        let reader = try domains.compactMap {
-            try Reader(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode)
-        }
+        /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
+        var elevation = elevation
+        
+        let reader: [Reader] = try domains.reversed().compactMap { domain -> (Reader?) in
+            guard let domain = try Reader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            if elevation.isNaN {
+                elevation = domain.modelElevation
+            }
+            return domain
+        }.reversed()
+        
         guard !reader.isEmpty else {
             return nil
         }

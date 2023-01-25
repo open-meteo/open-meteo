@@ -532,7 +532,7 @@ struct GfsMixer: GenericReaderMixer {
 
 extension GfsMixer {
     func getDaily(variable: GfsDailyWeatherVariable, params: GfsQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
-        let time = timeDaily.with(dtSeconds: reader.last!.reader.reader.domain.dtSeconds)
+        let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
         case .temperature_2m_max:
             let data = try get(raw: .temperature_2m, time: time).convertAndRound(params: params)
@@ -595,7 +595,7 @@ extension GfsMixer {
     }
     
     func prefetchData(variables: [GfsDailyWeatherVariable], time timeDaily: TimerangeDt) throws {
-        let time = timeDaily.with(dtSeconds: reader.last!.reader.reader.domain.dtSeconds)
+        let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             switch variable {
             case .temperature_2m_max:

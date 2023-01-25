@@ -693,6 +693,14 @@
             <td>Geographical WGS84 coordinate of the location</td>
           </tr>
           <tr>
+            <th scope="row">elevation</th>
+            <td>Floating point</td>
+            <td>No</td>
+            <td></td>
+            <td>The elevation used for statistical downscaling. Per default, a <a href="https://openmeteo.substack.com/p/improving-weather-forecasts-with" title="Elevation based grid-cell selection explained"></a>90 meter digital elevation model is used</a>. You can manually set the elevation to correctly match mountain peaks. 
+              If <mark>&elevation=nan</mark> is specified, downscaling will be disabled and the API uses the average grid-cell height.</td>
+          </tr>
+          <tr>
             <th scope="row">start_date<br />end_date</th>
             <td>String (yyyy-mm-dd)</td>
             <td>Yes</td>
