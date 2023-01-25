@@ -26,7 +26,7 @@ struct Era5Controller {
             let domains = params.models ?? [.best_match]
             
             let readers = try domains.compactMap {
-                try GenericReaderMulti<CdsVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised)
+                try GenericReaderMulti<CdsVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
             }
             
             guard !readers.isEmpty else {
@@ -249,6 +249,7 @@ struct Era5Query: Content, QueryWithTimezone, ApiUnitsSelectable {
     let format: ForecastResultFormat?
     let timezone: String?
     let models: [CdsDomainApi]?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate

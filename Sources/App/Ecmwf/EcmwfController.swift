@@ -19,7 +19,7 @@ struct EcmwfController {
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 10, allowedRange: allowedRange)
             let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
             
-            guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
+            guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
@@ -72,6 +72,7 @@ struct EcmwfQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let past_days: Int?
     let format: ForecastResultFormat?
     let timezone: String?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

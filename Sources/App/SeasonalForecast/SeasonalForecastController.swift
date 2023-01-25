@@ -235,7 +235,7 @@ struct SeasonalForecastController {
             let hourlyTime = time.range.range(dtSeconds: domain.dtSeconds)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try SeasonalForecastReader(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+            guard let reader = try SeasonalForecastReader(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
@@ -312,6 +312,7 @@ struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable
     let forecast_days: Int?
     let format: ForecastResultFormat?
     let timezone: String?
+    var cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

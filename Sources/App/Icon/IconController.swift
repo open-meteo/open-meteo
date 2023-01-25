@@ -22,7 +22,7 @@ public struct IconController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+            guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
@@ -127,6 +127,7 @@ struct IconApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable 
     let timeformat: Timeformat?
     let past_days: Int?
     let format: ForecastResultFormat?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

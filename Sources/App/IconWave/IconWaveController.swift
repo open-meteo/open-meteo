@@ -20,7 +20,7 @@ struct IconWaveController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try IconWaveMixer(domains: IconWaveReader.Domain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .sea) else {
+            guard let reader = try IconWaveMixer(domains: IconWaveReader.Domain.allCases, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .sea) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
@@ -86,6 +86,7 @@ struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
     let past_days: Int?
     let format: ForecastResultFormat?
     let timezone: String?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

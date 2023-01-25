@@ -20,7 +20,7 @@ struct MetNoController {
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
             
-            guard let reader = try MetNoReader(domain: MetNoDomain.nordic_pp, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .nearest) else {
+            guard let reader = try MetNoReader(domain: MetNoDomain.nordic_pp, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
@@ -96,6 +96,7 @@ struct MetNoQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let past_days: Int?
     let format: ForecastResultFormat?
     let timezone: String?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

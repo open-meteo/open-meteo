@@ -26,7 +26,7 @@ extension Gridable {
 
         
         switch mode {
-        case .terrainOptimised:
+        case .land:
             return try findPointTerrainOptimised(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile)
         case .sea:
             return try findPointInSea(lat: lat, lon: lon, elevationFile: elevationFile)
@@ -141,8 +141,8 @@ extension Gridable {
     }
 }
 
-enum GridSelectionMode {
-    case terrainOptimised
+enum GridSelectionMode: Codable {
+    case land
     case sea
     case nearest
 }

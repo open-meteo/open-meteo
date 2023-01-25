@@ -24,7 +24,7 @@ struct CamsController {
             
             let domains = (params.domains ?? .auto).camsDomains
             
-            guard let reader = try CamsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
+            guard let reader = try CamsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             // Start data prefetch to boooooooost API speed :D
@@ -249,6 +249,7 @@ struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
     let format: ForecastResultFormat?
     let timezone: String?
     let domains: Domain?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

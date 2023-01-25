@@ -141,6 +141,8 @@ protocol QueryWithTimezone {
     var latitude: Float { get }
     
     var longitude: Float { get }
+    
+    var cell_selection: GridSelectionMode? { get }
 }
 
 fileprivate let timezoneDatabase = try! SwiftTimeZoneLookup(databasePath: "./Resources/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources/")

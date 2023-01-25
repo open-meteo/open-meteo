@@ -23,7 +23,7 @@ public struct JmaController {
             
             let domains = [JmaDomain.gsm, .msm]
             
-            guard let reader = try JmaMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+            guard let reader = try JmaMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
@@ -129,6 +129,7 @@ struct JmaQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let past_days: Int?
     let forecast_days: Int?
     let format: ForecastResultFormat?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

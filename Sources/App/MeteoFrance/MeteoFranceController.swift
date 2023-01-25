@@ -28,7 +28,7 @@ public struct MeteoFranceController {
             
             let domains = [MeteoFranceDomain.arpege_world, .arpege_europe, .arome_france, .arome_france_hd] //[MeteoFranceDomain.arome_france]
             
-            guard let reader = try MeteoFranceMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+            guard let reader = try MeteoFranceMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
@@ -134,6 +134,7 @@ struct MeteoFranceQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
     let past_days: Int?
     let forecast_days: Int?
     let format: ForecastResultFormat?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

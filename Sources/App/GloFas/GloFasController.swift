@@ -93,7 +93,7 @@ struct GloFasController {
             let domains = params.models ?? [.seamless_v3]
             
             let readers = try domains.compactMap {
-                guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: .nearest) else {
+                guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
                 return reader
@@ -183,6 +183,7 @@ struct GloFasQuery: Content, QueryWithStartEndDateTimeZone {
     let timezone: String?
     let models: [GlofasDomainApi]?
     let ensemble: Bool
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?

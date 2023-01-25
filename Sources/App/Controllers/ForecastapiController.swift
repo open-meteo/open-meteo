@@ -51,7 +51,7 @@ public struct ForecastapiController: RouteCollection {
             let domains = params.models ?? [.best_match]
             
             let readers = try domains.compactMap {
-                try GenericReaderMulti<ForecastVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised)
+                try GenericReaderMulti<ForecastVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
             }
             
             guard !readers.isEmpty else {
@@ -91,7 +91,7 @@ public struct ForecastapiController: RouteCollection {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                guard let reader = try GenericReaderMulti<ForecastVariable>(domain: MultiDomains.best_match, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: .terrainOptimised) else {
+                guard let reader = try GenericReaderMulti<ForecastVariable>(domain: MultiDomains.best_match, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
                 let temperature = try reader.get(variable: .surface(.temperature_2m), time: time)!.convertAndRound(params: params)
@@ -178,6 +178,7 @@ struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
     let past_days: Int?
     let format: ForecastResultFormat?
     let models: [MultiDomains]?
+    let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?
