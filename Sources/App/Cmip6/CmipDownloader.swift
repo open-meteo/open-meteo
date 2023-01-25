@@ -876,7 +876,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             surfacePressure6h.data = Meteorology.sealevelPressure(temperature2m: temperature, surfacePressure: surfacePressure6h, elevation: Array(elevation[locationRange]))
                             surfacePressure6h.interpolateAndAggregate(dt6h: dt, variable: variable, aggregate: aggregate)
                         })
-                        return
+                        break
                     }
                     
                     if shortName == "hurs" {
@@ -909,7 +909,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             return ArraySlice(specificHumidity.data)
                         })
                         progress.finish()
-                        return
+                        break
                     }
                     
                     // Interpolate and afterwards aggregate to get min/max values
