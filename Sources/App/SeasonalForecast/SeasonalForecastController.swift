@@ -281,7 +281,8 @@ struct SeasonalForecastController {
             let out = ForecastapiResult(
                 latitude: reader.modelLat,
                 longitude: reader.modelLon,
-                elevation: elevationOrDem,
+                elevation: reader.targetElevation,
+                elevation_raw: reader.modelElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,

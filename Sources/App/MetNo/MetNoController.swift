@@ -63,9 +63,10 @@ struct MetNoController {
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
-                latitude: reader.reader.modelLat,
-                longitude: reader.reader.modelLon,
-                elevation: nil,
+                latitude: reader.modelLat,
+                longitude: reader.modelLon,
+                elevation: reader.targetElevation,
+                elevation_raw: reader.modelElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,

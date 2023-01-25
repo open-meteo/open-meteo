@@ -1075,8 +1075,13 @@
           <tr>
             <th scope="row">elevation</th>
             <td>Floating point</td>
-            <td>The elevation in meters of the selected weather grid-cell. In mountain terrain it might differ from the
-              location you would expect.</td>
+            <td>The elevation from a 90 meter digital elevation model. This effects which grid-cell is selected (see parameter <mark>cell_selection</mark>). 
+              Statistical downscaling is used to adapt weather conditions for this elevation. This elevation can also be controlled with the query parameter <mark>elevation</mark>. If <mark>&elevation=nan</mark> is specified, all downscaling is disabled.</td>
+          </tr>
+          <tr>
+            <th scope="row">elevation_raw</th>
+            <td>Floating point</td>
+            <td>The elevation in meters of the selected weather grid-cell.</td>
           </tr>
           <tr>
             <th scope="row">generationtime_ms</th>

@@ -98,6 +98,7 @@ public struct IconController {
                 latitude: reader.modelLat,
                 longitude: reader.modelLon,
                 elevation: reader.targetElevation,
+                elevation_raw: reader.modelElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: timezone,
