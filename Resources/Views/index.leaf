@@ -65,8 +65,7 @@
         <div class="tab-pane fade show active" id="tab-weather-api" role="tabpanel"
           aria-labelledby="tab-weather-api-tab">
           <p>$ curl "<a class="text-white text-decoration-none"
-              href="https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true&hourly=temperature_2m,relativehumidity_2m,windspeed_10m">https://api.open-meteo.com/v1/forecast<br />?latitude=52.52&amp;longitude=13.41<br />&amp;current_weather=true<br />&amp;hourly=temperature_2m,
-              relativehumidity_2m, windspeed_10m</a>"</p>
+              href="https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&current_weather=true&hourly=temperature_2m,relativehumidity_2m,windspeed_10m">https://api.open-meteo.com/v1/forecast<wbr />?latitude=52.52&amp;longitude=13.41<wbr />&amp;current_weather=true<wbr />&amp;hourly=temperature_2m,relativehumidity_2m,windspeed_10m</a>"</p>
           <pre>
 {
   "current_weather": {
@@ -84,8 +83,7 @@
         </div>
         <div class="tab-pane fade" id="tab-last-10-days" role="tabpanel" aria-labelledby="tab-last-10-days-tab">
           <p>$ curl "<a class="text-white text-decoration-none"
-              href="https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&past_days=10&hourly=temperature_2m,relativehumidity_2m,windspeed_10m">https://api.open-meteo.com/v1/forecast<br />?latitude=52.52&amp;longitude=13.41<br /><mark>&amp;past_days=10</mark><br />&amp;hourly=temperature_2m,
-              relativehumidity_2m, windspeed_10m</a>"</p>
+              href="https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&past_days=10&hourly=temperature_2m,relativehumidity_2m,windspeed_10m">https://api.open-meteo.com/v1/forecast<wbr />?latitude=52.52&amp;longitude=13.41<wbr /><mark>&amp;past_days=10</mark><wbr />&amp;hourly=temperature_2m,relativehumidity_2m,windspeed_10m</a>"</p>
           <pre>
 {
   "hourly": {
@@ -99,7 +97,7 @@
         <div class="tab-pane fade" id="tab-historical-weather-data" role="tabpanel"
           aria-labelledby="tab-historical-weather-data-tab">
           <p>$ curl "<a class="text-white text-decoration-none"
-              href="https://archive-api.open-meteo.com/v1/era5?latitude=52.52&longitude=13.41&start_date=2021-01-01&end_date=2021-12-31&hourly=temperature_2m">https://archive-api.open-meteo.com/v1/era5<br />?latitude=52.52&amp;longitude=13.41<br /><mark>&amp;start_date=2021-01-01&amp;end_date=2021-12-31</mark><br />&amp;hourly=temperature_2m</a>"
+              href="https://archive-api.open-meteo.com/v1/era5?latitude=52.52&longitude=13.41&start_date=2021-01-01&end_date=2021-12-31&hourly=temperature_2m">https://archive-api.open-meteo.com/v1/era5<wbr />?latitude=52.52&amp;longitude=13.41<wbr /><mark>&amp;start_date=2021-01-01&amp;end_date=2021-12-31</mark><wbr />&amp;hourly=temperature_2m</a>"
           </p>
           <pre>
 {
