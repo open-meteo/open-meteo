@@ -89,10 +89,10 @@ import SwiftNetCDF
  
  
  TODO:
- - CMCC daily min/max from 6h data -> download again?
- - fgoals daily min/max from 3h data
+ - CMCC daily min/max from 6h data DOWNLOADING
+ - fgoals daily min/max from 3h data DOWNLOADING
  - DONE missing feb 29 in CMCC
- - bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4 -> Calculate and store BIAS coefficients (~203 floats) for each ERA5 grid-cell
+ - bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4
  - larger files than just 1 year
  
  */
