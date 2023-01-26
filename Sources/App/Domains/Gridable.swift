@@ -141,7 +141,7 @@ extension Gridable {
     }
 }
 
-enum GridSelectionMode: Codable {
+enum GridSelectionMode: String, Codable {
     case land
     case sea
     case nearest
