@@ -328,6 +328,13 @@
                     EC_Earth3P_HR <span class="text-muted">(35 km)</span>
                   </label>
                 </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="MPI_ESM1_2_XR" id="MPI_ESM1_2_XR" name="models">
+                  <label class="form-check-label" for="MPI_ESM1_2_XR">
+                    MPI_ESM1_2_XR <span class="text-muted">(46 km)</span>
+                  </label>
+                </div>
+                
               </div>
               <!--<div class="col-md-12">
                 <small class="text-muted">Note: The default <mark>Best Match</mark> combines ERA5 and ERA5-Land
