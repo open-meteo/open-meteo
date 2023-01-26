@@ -97,7 +97,7 @@
         <div class="tab-pane fade" id="tab-historical-weather-data" role="tabpanel"
           aria-labelledby="tab-historical-weather-data-tab">
           <p>$ curl "<a class="text-white text-decoration-none"
-              href="https://archive-api.open-meteo.com/v1/era5?latitude=52.52&longitude=13.41&start_date=2021-01-01&end_date=2021-12-31&hourly=temperature_2m">https://archive-api.open-meteo.com/v1/era5<wbr />?latitude=52.52&amp;longitude=13.41<wbr /><mark>&amp;start_date=2021-01-01&amp;end_date=2021-12-31</mark><wbr />&amp;hourly=temperature_2m</a>"
+              href="https://archive-api.open-meteo.com/v1/era5?latitude=52.52&longitude=13.41&start_date=2021-01-01&end_date=2021-12-31&hourly=temperature_2m">https://archive-api.open-meteo.com/v1/era5<wbr />?latitude=52.52&amp;longitude=13.41<wbr /><mark>&amp;start_date=2021-01-01<wbr />&amp;end_date=2021-12-31</mark><wbr />&amp;hourly=temperature_2m</a>"
           </p>
           <pre>
 {
