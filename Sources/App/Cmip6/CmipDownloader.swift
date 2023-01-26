@@ -843,13 +843,21 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             // Feb 29 is ignored in CMCC_CM2_VHR4.....
                             let day = (domain.needsLeapYearFix && month == 2) ? 28 : YearMonth(year: year, month: month).advanced(by: 1).timestamp.add(hours: -1).toComponents().day
                             // 3h data appears to be centered on 1:30
-                            let lastHour = dt == 3*3600 ? "2230" : "1800"
+                            var lastHour = dt == 3*3600 ? "2230" : "1800"
                             let firstHour = dt == 3*3600 ? "0130" : "0000"
+                            /// Last hour is missing, but only in november 2016
+                            let singleBrokenMonthInFgoalsDrivingAnyoneInsaneWorkingWithThisData = year == 2016 && month == 11 && domain == .FGOALS_f3_H
+                            if singleBrokenMonthInFgoalsDrivingAnyoneInsaneWorkingWithThisData {
+                                lastHour = "1930"
+                            }
                             let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/\(timeRes)/\(short)/\(grid)/v\(version)/\(short)_\(timeRes)_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01\(firstHour)-\(year)\(month.zeroPadded(len: 2))\(day)\(lastHour).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             
                             let isLeapMonth = month == 2 && Timestamp(year, 2, 28).add(days: 1).toComponents().day == 29
-                            let duplicateTimeStep = (domain.needsLeapYearFix && isLeapMonth) ? (27 * 86400/dt) ..< (28 * 86400/dt) : nil
+                            var duplicateTimeStep = (domain.needsLeapYearFix && isLeapMonth) ? (27 * 86400/dt) ..< (28 * 86400/dt) : nil
+                            if singleBrokenMonthInFgoalsDrivingAnyoneInsaneWorkingWithThisData {
+                                duplicateTimeStep = 238 ..< 239
+                            }
                             let array = try NetCDF.read(path: ncFile, short: short, fma: short == "huss" ? (1000,0) : variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
                             try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: short == "huss" ? 100 : variable.scalefactor, all: array.data)
