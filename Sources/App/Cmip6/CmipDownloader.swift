@@ -104,6 +104,7 @@ enum Cmip6Domain: String, Codable, GenericDomain {
     case MRI_AGCM3_2_S
     case EC_Earth3P_HR
     case MPI_ESM1_2_XR
+    case NICAM16_8S
     
     /// https://gmd.copernicus.org/articles/12/4999/2019/gmd-12-4999-2019.pdf
     /// Disabled bacause uses 360 days
@@ -127,6 +128,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return "EC-Earth3P-HR"
         case .MPI_ESM1_2_XR:
             return "MPI-ESM1-2-XR"
+        case .NICAM16_8S:
+            return "NICAM16-8S"
         }
     }
     
@@ -150,6 +153,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return "gr"
         case .MPI_ESM1_2_XR:
             return "gn"
+        case .NICAM16_8S:
+            return "gr"
         }
     }
     
@@ -171,6 +176,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             return "EC-Earth-Consortium"
         case .MPI_ESM1_2_XR:
             return "MPI-M"
+        case .NICAM16_8S:
+            return "MIROC"
         }
     }
     
@@ -199,6 +206,7 @@ enum Cmip6Domain: String, Codable, GenericDomain {
     private static var elevationEC_Earth3P_HR = try? OmFileReader(file: Self.EC_Earth3P_HR.surfaceElevationFileOm)
     //private static var elevationHadGEM3_GC31_HM = try? OmFileReader(file: Self.HadGEM3_GC31_HM.surfaceElevationFileOm)
     private static var elevationMPI_ESM1_2_XR = try? OmFileReader(file: Self.MPI_ESM1_2_XR.surfaceElevationFileOm)
+    private static var elevationNICAM16_8S = try? OmFileReader(file: Self.NICAM16_8S.surfaceElevationFileOm)
     
     var elevationFile: OmFileReader<MmapFile>? {
         switch self {
@@ -218,6 +226,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
             //return Self.elevationHadGEM3_GC31_HM
         case .MPI_ESM1_2_XR:
             return Self.elevationMPI_ESM1_2_XR
+        case .NICAM16_8S:
+            return Self.elevationNICAM16_8S
         }
     }
     
@@ -249,6 +259,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         //    return RegularGrid(nx: 1024, ny: 768, latMin: -90, lonMin: -180, dx: 360/1024, dy: 180/768)
         case .MPI_ESM1_2_XR:
             return RegularGrid(nx: 768, ny: 384, latMin: -90, lonMin: -180, dx: 360/768, dy: 180/384)
+        case .NICAM16_8S:
+            return RegularGrid(nx: 1280, ny: 640, latMin: -90, lonMin: -180, dx: 360/1280, dy: 180/640)
         }
     }
     
@@ -269,6 +281,8 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         //case .HadGEM3_GC31_HM:
         //    return ("20200910", "20200910")
         case .MPI_ESM1_2_XR:
+            return nil
+        case .NICAM16_8S:
             return nil
         }
     }
@@ -455,6 +469,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return "20211011"
             }
             return isFuture ? "20190711" : "20190923"
+        case .NICAM16_8S:
+            return isFuture ? "20210122" : "20190830"
         }
     }
     
@@ -689,7 +705,39 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
-            default: return nil
+            default:
+                return nil
+            }
+        case .NICAM16_8S:
+            switch self {
+            case .temperature_2m_min:
+                return .yearly
+            case .temperature_2m_max:
+                return .yearly
+            case .temperature_2m_mean:
+                return .yearly
+            case .pressure_msl:
+                return .yearly
+            case .cloudcover_mean:
+                return .yearly
+            case .precipitation_sum:
+                return .yearly
+            case .snowfall_water_equivalent_sum:
+                return .yearly
+            case .relative_humidity_2m_min:
+                return .yearly
+            case .relative_humidity_2m_max:
+                return .yearly
+            case .relative_humidity_2m_mean:
+                return .yearly
+            case .windspeed_10m_mean:
+                return .yearly
+            case .windspeed_10m_max:
+                return .yearly
+            case .soil_moisture_0_to_10cm:
+                return nil
+            case .shortwave_radiation_sum:
+                return .yearly
             }
         }
     }

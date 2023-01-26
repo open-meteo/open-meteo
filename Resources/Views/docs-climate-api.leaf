@@ -334,6 +334,13 @@
                     MPI_ESM1_2_XR <span class="text-muted">(46 km)</span>
                   </label>
                 </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="NICAM16_8S" id="NICAM16_8S" name="models">
+                  <label class="form-check-label" for="NICAM16_8S">
+                    NICAM16_8S <span class="text-muted">(30 km)</span>
+                  </label>
+                </div>
+                
                 
               </div>
               <!--<div class="col-md-12">
