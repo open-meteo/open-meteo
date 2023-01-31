@@ -861,7 +861,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                        "https://esgf-data1.llnl.gov/thredds/fileServer/css03_data/CMIP6/",
                        "https://esgf-data04.diasjp.net/thredds/fileServer/esg_dataroot/CMIP6/",
                        "https://esgf-data03.diasjp.net/thredds/fileServer/esg_dataroot/CMIP6/",
-                       //"https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"
+                       "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"
         ]
         
         guard let yearlyPath = domain.omfileArchive else {
