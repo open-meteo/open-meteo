@@ -595,6 +595,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             // 3h values are only available for the non-SST version
             // the non sst version has tasmax/min
             // snow is only in SST version
+            // daily temperature min/max are only available for 1950-2015
             switch self {
             case .relative_humidity_2m_mean:
                 return .yearly
