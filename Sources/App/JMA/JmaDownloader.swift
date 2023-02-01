@@ -489,6 +489,9 @@ enum JmaDomain: String, GenericDomain {
     var omfileArchive: String? {
         return nil
     }
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        return nil
+    }
     
     var dtSeconds: Int {
         if self == .gsm {

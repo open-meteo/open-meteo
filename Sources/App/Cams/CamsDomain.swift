@@ -37,6 +37,9 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     var omfileArchive: String? {
         return nil
     }
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        return nil
+    }
     
     var dtSeconds: Int {
         return 3600

@@ -17,6 +17,9 @@ enum IconWaveDomain: String, Codable, CaseIterable, GenericDomain {
     var omfileArchive: String? {
         return nil
     }
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        return nil
+    }
     var downloadDirectory: String {
         return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
     }

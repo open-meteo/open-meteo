@@ -39,6 +39,9 @@ enum EcmwfDomain: String, GenericDomain {
     var omfileArchive: String? {
         return nil
     }
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        return nil
+    }
     
     var omFileLength: Int {
         // 104

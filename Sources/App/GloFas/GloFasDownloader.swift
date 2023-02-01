@@ -438,6 +438,9 @@ enum GloFasDomain: String, GenericDomain {
     var omfileArchive: String? {
         return "\(OpenMeteo.dataDictionary)archive-glofas-\(rawValue)/"
     }
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        return nil
+    }
     
     var grid: Gridable {
         switch self {

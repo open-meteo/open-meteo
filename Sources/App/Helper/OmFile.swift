@@ -11,6 +11,9 @@ struct OmFileSplitter {
     /// like `/data/domain-yearly/` and will be expanded to `/data/domain-yearly/2012_variable.om`
     let yearlyArchivePath: String?
     
+    /// Like `/data/domain-master/`
+    let omFileMaster: (path: String, time: TimerangeDt)?
+    
     /// actually also in file
     let nLocations: Int
     
@@ -41,11 +44,12 @@ struct OmFileSplitter {
         max(6, 3072 / nTimePerFile)
     }
     
-    init(basePath: String, nLocations: Int, nTimePerFile: Int, yearlyArchivePath: String?) {
+    init(basePath: String, nLocations: Int, nTimePerFile: Int, yearlyArchivePath: String?, omFileMaster: (path: String, time: TimerangeDt)? = nil) {
         self.basePath = basePath
         self.nLocations = nLocations
         self.nTimePerFile = nTimePerFile
         self.yearlyArchivePath = yearlyArchivePath
+        self.omFileMaster = omFileMaster
     }
     
     // optimise to use 8 MB memory, but aligned to even `chunknLocations`
@@ -59,7 +63,21 @@ struct OmFileSplitter {
         let ringtime = time.toIndexTime()
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var start = ringtime.lowerBound
-        if let yearlyArchivePath = yearlyArchivePath {
+        
+        if let omFileMaster {
+            let fileTime = omFileMaster.time.toIndexTime()
+            if let offsets = ringtime.intersect(fileTime: fileTime),
+               let omFile = try OmFileManager.get(basePath: omFileMaster.path, variable: variable, timeChunk: 0),
+                omFile.dim0 == nLocations {
+                try omFile.willNeed(dim0Slow: location..<location+1, dim1: offsets.file)
+                start = fileTime.upperBound
+            }
+        }
+        if start >= ringtime.upperBound {
+            return
+        }
+        
+        if let yearlyArchivePath {
             let startYear = time.range.lowerBound.toComponents().year
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year
@@ -105,7 +123,17 @@ struct OmFileSplitter {
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var out = [Float](repeating: .nan, count: ringtime.count)
         
-        if let yearlyArchivePath = yearlyArchivePath {
+        if let omFileMaster {
+            let fileTime = omFileMaster.time.toIndexTime()
+            if let offsets = ringtime.intersect(fileTime: fileTime),
+               let omFile = try OmFileManager.get(basePath: omFileMaster.path, variable: variable, timeChunk: 0),
+                omFile.dim0 == nLocations {
+                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location..<location+1, dim1: offsets.file)
+                start = fileTime.upperBound
+            }
+        }
+        
+        if let yearlyArchivePath {
             let startYear = time.range.lowerBound.toComponents().year
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year

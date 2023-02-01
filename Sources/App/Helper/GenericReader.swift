@@ -22,6 +22,9 @@ protocol GenericDomain {
     
     /// The time length of each compressed time series file
     var omFileLength: Int { get }
+    
+    /// Single master file for a large time series
+    var omFileMaster: (path: String, time: TimerangeDt)? { get }
 }
 
 extension GenericDomain {
@@ -125,7 +128,13 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.modelElevation = gridpoint.gridElevation
         self.targetElevation = elevation.isNaN ? gridpoint.gridElevation : elevation
         
-        omFileSplitter = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: domain.omfileArchive)
+        omFileSplitter = OmFileSplitter(
+            basePath: domain.omfileDirectory,
+            nLocations: domain.grid.count,
+            nTimePerFile: domain.omFileLength,
+            yearlyArchivePath: domain.omfileArchive,
+            omFileMaster: domain.omFileMaster
+        )
         
         (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
     }

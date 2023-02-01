@@ -60,6 +60,9 @@ enum CdsDomain: String, GenericDomain {
     var omfileArchive: String? {
         return "\(OpenMeteo.dataDictionary)yearly-\(rawValue)//"
     }
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        return nil
+    }
     
     /// Use store 14 days per om file
     var omFileLength: Int {

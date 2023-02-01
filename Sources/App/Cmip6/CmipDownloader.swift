@@ -89,11 +89,13 @@ import SwiftNetCDF
  
  
  TODO:
- - CMCC daily min/max from 6h data DOWNLOADING
- - fgoals daily min/max from 3h data DOWNLOADING
+ - DONE CMCC daily min/max from 6h data
+ - DONE fgoals daily min/max from 3h data
  - DONE missing feb 29 in CMCC
- - bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4
- - larger files than just 1 year
+ - master file for sequential access
+ - Bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4
+ - Bias correcition linear with seasonal split
+ 
  
  */
 enum Cmip6Domain: String, Codable, GenericDomain {
@@ -193,6 +195,15 @@ enum Cmip6Domain: String, Codable, GenericDomain {
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
         "\(omfileDirectory)HSURF.om"
+    }
+    
+    /// Single file to contain the entire timerange of data -> faster for sequentual disk access
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        let path = "\(OpenMeteo.dataDictionary)master-\(rawValue)/"
+        if self == .EC_Earth3P_HR {
+            return (path, TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2050,1,1), dtSeconds: dtSeconds))
+        }
+        return (path, TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2051,1,1), dtSeconds: dtSeconds))
     }
     
     var dtSeconds: Int {
@@ -908,6 +919,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
         
         for year in years {
             for variable in variables {
+                if let master = domain.omFileMaster, FileManager.default.fileExists(atPath: "\(master.path)\(variable.rawValue)_0.om") {
+                    continue
+                }
                 let isFuture = year >= 2015
                 guard let timeType = variable.domainTimeRange(for: domain, isFuture: isFuture) else {
                     continue
@@ -1143,6 +1157,24 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 default:
                     break
                 }
+            }
+        }
+        
+        // Generate a single master file instead of yearly files
+        // ~800 MB memory for 6000 location chunks
+        if let master = domain.omFileMaster {
+            logger.info("Generating master files")
+            for variable in variables {
+                let masterFile = "\(master.path)\(variable.rawValue)_0.om"
+                if FileManager.default.fileExists(atPath: masterFile) {
+                    continue
+                }
+                let yearlyReader = try years.map { year in
+                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
+                    return try OmFileReader(file: omFile)
+                }
+                try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 6, chunk1: 183)
+                    .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: yearlyReader, dataCallback: nil)
             }
         }
     }
