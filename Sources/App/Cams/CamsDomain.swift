@@ -71,6 +71,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, Codable, GenericVariab
     case aerosol_optical_depth
     case carbon_monoxide
     case nitrogen_dioxide
+    case ammonia
     case ozone
     case sulphur_dioxide
     case uv_index
@@ -113,6 +114,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, Codable, GenericVariab
             return .microgramsPerQuibicMeter
         case .nitrogen_dioxide:
             return .microgramsPerQuibicMeter
+        case .ammonia:
+            return .microgramsPerQuibicMeter
         case .ozone:
             return .microgramsPerQuibicMeter
         case .sulphur_dioxide:
@@ -151,6 +154,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, Codable, GenericVariab
             return 1
         case .nitrogen_dioxide:
             return 20
+        case .ammonia:
+            return 20
         case .ozone:
             return 1
         case .sulphur_dioxide:
@@ -187,6 +192,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, Codable, GenericVariab
             return ("carbon_monoxide", "co_conc")
         case .nitrogen_dioxide:
             return ("nitrogen_dioxide", "no2_conc")
+        case .ammonia:
+            return ("ammonia", "nh3_conc")
         case .ozone:
             return ("ozone", "o3_conc")
         case .sulphur_dioxide:
@@ -229,6 +236,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, Codable, GenericVariab
             return ("co", true, massMixingToUgm3)
         case .nitrogen_dioxide:
             return ("no2", true, massMixingToUgm3)
+        case .ammonia:
+            return nil
         case .ozone:
             return ("go3", true, massMixingToUgm3)
         case .sulphur_dioxide:
