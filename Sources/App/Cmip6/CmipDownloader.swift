@@ -1165,6 +1165,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
         if let master = domain.omFileMaster {
             logger.info("Generating master files")
             for variable in variables {
+                try FileManager.default.createDirectory(atPath: master.path, withIntermediateDirectories: true)
                 let masterFile = "\(master.path)\(variable.rawValue)_0.om"
                 if FileManager.default.fileExists(atPath: masterFile) {
                     continue
@@ -1173,7 +1174,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
                     return try OmFileReader(file: omFile)
                 }
-                try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 6, chunk1: 183)
+                try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512)
                     .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: yearlyReader, dataCallback: nil)
             }
         }
