@@ -22,7 +22,7 @@ struct Dem90 {
             return .nan
         }
         let lati = Int(lat)
-        guard let om = try OmFileManager.get(basePath: Dem90.omDirectory, variable: "lat", timeChunk: lati) else {
+        guard let om = try OmFileManager.get(OmFilePathWithTime(basePath: Dem90.omDirectory, variable: "lat", timeChunk: lati)) else {
             // file not available
             return .nan
         }

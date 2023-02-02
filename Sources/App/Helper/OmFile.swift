@@ -44,6 +44,16 @@ struct OmFileSplitter {
         max(6, 3072 / nTimePerFile)
     }
     
+    init<Domain: GenericDomain>(_ domain: Domain) {
+        self.init(
+            basePath: domain.omfileDirectory,
+            nLocations: domain.grid.count,
+            nTimePerFile: domain.omFileLength,
+            yearlyArchivePath: domain.omfileArchive,
+            omFileMaster: domain.omFileMaster
+        )
+    }
+    
     init(basePath: String, nLocations: Int, nTimePerFile: Int, yearlyArchivePath: String?, omFileMaster: (path: String, time: TimerangeDt)? = nil) {
         self.basePath = basePath
         self.nLocations = nLocations
@@ -58,7 +68,7 @@ struct OmFileSplitter {
     }
 
     /// Prefetch all required data into memory
-    func willNeed(variable: String, location: Int, time: TimerangeDt) throws {
+    func willNeed(variable: String, location: Range<Int>, time: TimerangeDt) throws {
         // TODO: maybe we can keep the file handles better in scope
         let ringtime = time.toIndexTime()
         /// If yearly files are present, the start parameter is moved to read fewer files later
@@ -67,9 +77,9 @@ struct OmFileSplitter {
         if let omFileMaster {
             let fileTime = omFileMaster.time.toIndexTime()
             if let offsets = ringtime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(basePath: omFileMaster.path, variable: variable, timeChunk: 0),
+               let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: omFileMaster.path, variable: variable, timeChunk: 0)),
                 omFile.dim0 == nLocations {
-                try omFile.willNeed(dim0Slow: location..<location+1, dim1: offsets.file)
+                try omFile.willNeed(dim0Slow: location, dim1: offsets.file)
                 start = fileTime.upperBound
             }
         }
@@ -88,13 +98,13 @@ struct OmFileSplitter {
                 guard let offsets = ringtime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                guard let omFile = try OmFileManager.get(basePath: yearlyArchivePath, variable: variable, timeChunk: year) else {
+                guard let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: yearlyArchivePath, variable: variable, timeChunk: year)) else {
                     continue
                 }
                 guard omFile.dim0 == nLocations else {
                     continue
                 }
-                try omFile.willNeed(dim0Slow: location..<location+1, dim1: offsets.file)
+                try omFile.willNeed(dim0Slow: location, dim1: offsets.file)
                 start = fileTime.upperBound
             }
         }
@@ -107,28 +117,33 @@ struct OmFileSplitter {
             guard let offsets = ringtime.intersect(fileTime: fileTime) else {
                 continue
             }
-            guard let omFile = try OmFileManager.get(basePath: basePath, variable: variable, timeChunk: timeChunk) else {
+            guard let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: basePath, variable: variable, timeChunk: timeChunk)) else {
                 continue
             }
             guard omFile.dim0 == nLocations else {
                 continue
             }
-            try omFile.willNeed(dim0Slow: location..<location+1, dim1: offsets.file)
+            try omFile.willNeed(dim0Slow: location, dim1: offsets.file)
         }
     }
     
-    func read(variable: String, location: Int, time: TimerangeDt) throws -> [Float] {
+    func read2D(variable: String, location: Range<Int>, time: TimerangeDt) throws -> Array2DFastTime {
+        let data = try read(variable: variable, location: location, time: time)
+        return Array2DFastTime(data: data, nLocations: location.count, nTime: time.count)
+    }
+    
+    func read(variable: String, location: Range<Int>, time: TimerangeDt) throws -> [Float] {
         let ringtime = time.toIndexTime()
         var start = ringtime.lowerBound
         /// If yearly files are present, the start parameter is moved to read fewer files later
-        var out = [Float](repeating: .nan, count: ringtime.count)
+        var out = [Float](repeating: .nan, count: ringtime.count * location.count)
         
         if let omFileMaster {
             let fileTime = omFileMaster.time.toIndexTime()
             if let offsets = ringtime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(basePath: omFileMaster.path, variable: variable, timeChunk: 0),
+               let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: omFileMaster.path, variable: variable, timeChunk: 0)),
                 omFile.dim0 == nLocations {
-                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location..<location+1, dim1: offsets.file)
+                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
                 start = fileTime.upperBound
             }
         }
@@ -144,7 +159,7 @@ struct OmFileSplitter {
                 guard let offsets = ringtime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                guard let omFile = try OmFileManager.get(basePath: yearlyArchivePath, variable: variable, timeChunk: year) else {
+                guard let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: yearlyArchivePath, variable: variable, timeChunk: year)) else {
                     continue
                 }
                 guard omFile.dim0 == nLocations else {
@@ -152,7 +167,7 @@ struct OmFileSplitter {
                 }
                 //assert(omFile.chunk0 == nLocations)
                 //assert(omFile.chunk1 == nTimePerFile)
-                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location..<location+1, dim1: offsets.file)
+                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
                 start = fileTime.upperBound
             }
         }
@@ -166,7 +181,7 @@ struct OmFileSplitter {
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
-            guard let omFile = try OmFileManager.get(basePath: basePath, variable: variable, timeChunk: timeChunk) else {
+            guard let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: basePath, variable: variable, timeChunk: timeChunk)) else {
                 continue
             }
             guard omFile.dim0 == nLocations else {
@@ -174,7 +189,7 @@ struct OmFileSplitter {
             }
             //assert(omFile.chunk0 == nLocations)
             //assert(omFile.chunk1 == nTimePerFile)
-            try omFile.read(into: &out, arrayRange: offsets.array.add(delta), dim0Slow: location..<location+1, dim1: offsets.file)
+            try omFile.read(into: &out, arrayRange: offsets.array.add(delta), dim0Slow: location, dim1: offsets.file)
         }
         return out
     }

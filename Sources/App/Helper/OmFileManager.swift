@@ -4,6 +4,35 @@ import NIOConcurrencyHelpers
 import Vapor
 import NIO
 
+/// Represents an om file that can be cached for file accesses.
+protocol OmFileManagerReadable: Hashable {
+    /// Will only be called if the file path needs to be assembled
+    func getFilePath() -> String
+}
+
+/// Simple base path, variable name and timechunk
+struct OmFilePathWithTime: OmFileManagerReadable {
+    let basePath: String
+    let variable: String
+    let timeChunk: Int
+    
+    func getFilePath() -> String {
+        return basePath + variable + "_\(timeChunk).om"
+    }
+}
+
+/// Assemble a file path if required. Includes data directory as a prefix.
+/// All input paths can be passed by reference and do not require to allocate new strings unless required
+struct OmFilePathWithSuffix: OmFileManagerReadable {
+    let domain: String
+    let directory: String
+    let variable: String
+    let suffix: String
+    
+    func getFilePath() -> String {
+        return "\(OpenMeteo.dataDictionary)\(directory)-\(domain)/\(variable)_\(suffix).om"
+    }
+}
 
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
@@ -72,17 +101,13 @@ final class OmFileManager: LifecycleHandler {
     }
     
     /// Get cached file or return nil, if the files does not exist
-    public static func get(basePath: String, variable: String, timeChunk: Int) throws -> OmFileReader<MmapFile>? {
-        try instance.get(basePath: basePath, variable: variable, timeChunk: timeChunk)
+    public static func get<File: OmFileManagerReadable>(_ file: File) throws -> OmFileReader<MmapFile>? {
+        try instance.get(file)
     }
 
     /// Get cached file or return nil, if the files does not exist
-    public func get(basePath: String, variable: String, timeChunk: Int) throws -> OmFileReader<MmapFile>? {
-        var hasher = Hasher()
-        basePath.hash(into: &hasher)
-        variable.hash(into: &hasher)
-        timeChunk.hash(into: &hasher)
-        let key = hasher.finalize()
+    public func get<File: OmFileManagerReadable>(_ file: File) throws -> OmFileReader<MmapFile>? {
+        let key = file.hashValue
         
         return try lock.withLock {
             if let file = cached[key] {
@@ -95,7 +120,7 @@ final class OmFileManager: LifecycleHandler {
             }
             // The actual path name string is interpolated as last as possible. So a cached request, does not have to assemble a path string
             // This might be a bit over-optimised to just safe string allocations...
-            let path = basePath + variable + "_\(timeChunk).om"
+            let path = file.getFilePath()
             guard FileManager.default.fileExists(atPath: path) else {
                 cached[key] = .missing(path: path)
                 return nil

@@ -221,26 +221,27 @@ extension RandomAccessCollection where Element == Float {
 
 
 /// Calculate and/or apply a linear bias correction to correct a fixed offset
-/// Deltas are calculated for each month individually and use linear interpolation
+/// Deltas are calculated for each bi-monthly individually and use linear interpolation
+/// Bi-monthly `binsPerYear = 6` seems to produce stable results and also workins in monsoon climate
 struct BiasCorrectionSeasonalLinear {
     /// Could be one mean value for each month. Depends on `binsPerYear`
     /// Values are a mean of input data
     let meansPerYear: [Float]
     
     /// Calculate means using the inverse of linear interpolation
-    public init(_ data: ArraySlice<Float>, time: TimerangeDt, binsPerYear: Int = 12) {
-        var sums = [Float](repeating: 0, count: binsPerYear)
-        var weights = [Float](repeating: 0, count: binsPerYear)
+    public init(_ data: ArraySlice<Float>, time: TimerangeDt, binsPerYear: Int = 6) {
+        var sums = [Double](repeating: 0, count: binsPerYear)
+        var weights = [Double](repeating: 0, count: binsPerYear)
         for (t, v) in zip(time, data) {
             let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / binsPerYear)
-            let fraction = Float(t.secondInAverageYear).truncatingRemainder(dividingBy: Float(Timestamp.secondsPerAverageYear / binsPerYear)) / Float(Timestamp.secondsPerAverageYear / binsPerYear)
-            let weighted = Interpolations.linearWeighted(value: v, fraction: fraction)
+            let fraction = Double(t.secondInAverageYear).truncatingRemainder(dividingBy: Double(Timestamp.secondsPerAverageYear / binsPerYear)) / Double(Timestamp.secondsPerAverageYear / binsPerYear)
+            let weighted = Interpolations.linearWeighted(value: Double(v), fraction: fraction)
             sums[monthBin] += weighted.a
             weights[monthBin] += weighted.weightA
             sums[(monthBin+1) % binsPerYear] += weighted.b
             weights[(monthBin+1) % binsPerYear] += weighted.weightB
         }
-        self.meansPerYear = zip(weights, sums).map({ $0.0 <= 0.001 ? .nan : $0.1 / $0.0 })
+        self.meansPerYear = zip(weights, sums).map({ Float($0.0 <= 0.001 ? .nan : $0.1 / $0.0) })
     }
     
     func applyOffset(on data: inout [Float], otherWeights: BiasCorrectionSeasonalLinear, time: TimerangeDt, type: QuantileDeltaMappingBiasCorrection.ChangeType, indices: Range<Int>? = nil) {
@@ -262,9 +263,8 @@ struct BiasCorrectionSeasonalLinear {
     }
 }
 
-/// Calculate and/or apply a linear bias correction to correct a fixed offset
-/// Deltas are calculated for each month individually and use linear interpolation
-struct BiasCorrectionSeasonalHermite {
+/// No real benefit compared to linear
+/*struct BiasCorrectionSeasonalHermite {
     /// Could be one mean value for each month. Depends on `binsPerYear`
     /// Values are a mean of input data
     let meansPerYear: [Float]
@@ -319,7 +319,7 @@ struct BiasCorrectionSeasonalHermite {
             }
         }
     }
-}
+}*/
 
 
 
@@ -539,6 +539,10 @@ struct Interpolations {
     }
     
     @inlinable static func linearWeighted(value: Float, fraction: Float) -> (a: Float, b: Float, weightA: Float, weightB: Float) {
+        return (value * (1-fraction), value * fraction, (1-fraction), fraction)
+    }
+    
+    @inlinable static func linearWeighted(value: Double, fraction: Double) -> (a: Double, b: Double, weightA: Double, weightB: Double) {
         return (value * (1-fraction), value * fraction, (1-fraction), fraction)
     }
     

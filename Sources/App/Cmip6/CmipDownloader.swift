@@ -197,6 +197,15 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
+    /// Get the file path to a linear bias seasonal file for a given variable
+    func getBiasCorrectionFile(for variable: Cmip6Variable) -> OmFilePathWithSuffix {
+        return OmFilePathWithSuffix(domain: self.rawValue, directory: "master", variable: variable.omFileName, suffix: "linear_bias_seasonal")
+    }
+    
+    func openBiasCorrectionFile(for variable: Cmip6Variable) throws -> OmFileReader<MmapFile>? {
+        return try OmFileManager.get(getBiasCorrectionFile(for: variable))
+    }
+    
     /// Single file to contain the entire timerange of data -> faster for sequentual disk access
     var omFileMaster: (path: String, time: TimerangeDt)? {
         let path = "\(OpenMeteo.dataDictionary)master-\(rawValue)/"
@@ -879,6 +888,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
         guard let yearlyPath = domain.omfileArchive else {
             fatalError("yearly archive path not defined")
         }
+        guard let master = domain.omFileMaster else {
+            fatalError("no master defined")
+        }
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: yearlyPath, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
@@ -919,7 +931,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
         
         for year in years {
             for variable in variables {
-                if let master = domain.omFileMaster, FileManager.default.fileExists(atPath: "\(master.path)\(variable.rawValue)_0.om") {
+                if FileManager.default.fileExists(atPath: "\(master.path)\(variable.rawValue)_0.om") {
                     continue
                 }
                 let isFuture = year >= 2015
@@ -1161,25 +1173,53 @@ struct DownloadCmipCommand: AsyncCommandFix {
         }
         
         // Generate a single master file instead of yearly files
-        // ~800 MB memory for 6000 location chunks
-        if let master = domain.omFileMaster {
-            logger.info("Generating master files")
-            for variable in variables {
-                try FileManager.default.createDirectory(atPath: master.path, withIntermediateDirectories: true)
-                let masterFile = "\(master.path)\(variable.rawValue)_0.om"
-                if FileManager.default.fileExists(atPath: masterFile) {
-                    continue
-                }
-                let yearlyReader = years.compactMap { year in
-                    let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
-                    return try? OmFileReader(file: omFile)
-                }
-                if yearlyReader.isEmpty {
-                    continue
-                }
-                try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512)
-                    .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: yearlyReader, dataCallback: nil)
+        // ~80 MB memory for 600 location chunks
+        logger.info("Generating master files")
+        try FileManager.default.createDirectory(atPath: master.path, withIntermediateDirectories: true)
+        for variable in variables {
+            let masterFile = "\(master.path)\(variable.rawValue)_0.om"
+            if FileManager.default.fileExists(atPath: masterFile) {
+                continue
             }
+            let yearlyReader = years.compactMap { year in
+                let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
+                return try? OmFileReader(file: omFile)
+            }
+            if yearlyReader.isEmpty {
+                continue
+            }
+            try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512)
+                .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: 600, chunkedFiles: yearlyReader, dataCallback: nil)
+        }
+        
+        try generateBiasCorrectionFields(logger: logger, domain: domain, variables: variables)
+    }
+    
+    /// Generate seasonal averages for bias corrections
+    func generateBiasCorrectionFields(logger: Logger, domain: Cmip6Domain, variables: [Cmip6Variable]) throws {
+        logger.info("Calculating bias correction fields")
+        let binsPerYear = 6
+        let reader = OmFileSplitter(domain)
+        let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
+        for variable in variables {
+            let biasFile = domain.getBiasCorrectionFile(for: variable).getFilePath()
+            if FileManager.default.fileExists(atPath: biasFile) {
+                continue
+            }
+            let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
+            let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
+            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
+                let locationRange = dim0..<min(dim0+200, writer.dim0)
+                var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
+                try reader.willNeed(variable: variable.omFileName, location: locationRange, time: time)
+                let data = try reader.read2D(variable: variable.omFileName, location: locationRange, time: time)
+                for l in 0..<locationRange.count {
+                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(data[l, 0..<time.count], time: time, binsPerYear: binsPerYear).meansPerYear)
+                }
+                progress.add(bias.nLocations)
+                return ArraySlice(bias.data)
+            })
+            progress.finish()
         }
     }
 }

@@ -194,7 +194,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         /*let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
         let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)*/
         let breakyear = 2005
-        let referenceTime = TimerangeDt(start: Timestamp(1965,1,1), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
+        let referenceTime = TimerangeDt(start: Timestamp(1959,1,2), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
         //let forecastTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
         let qcTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2022,1,1), dtSeconds: 24*3600)
                 
@@ -270,9 +270,11 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
             let forecast = try get(raw: .precipitation_sum, time: time).data
             let start = DispatchTime.now()
-            let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 12)
-            let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 12)
+            let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 6)
+            let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 6)
             
+            print(referenceWeights.meansPerYear)
+            print(controlWeights.meansPerYear)
             print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(/))
             
             var correctedForecast = forecast
@@ -282,13 +284,15 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             let reference2 = reference
             let correctedForecast2 = correctedForecast
             let qc = try era5Reader.get(raw: .precipitation, time: qcTime.with(dtSeconds: 3600)).data.sum(by: 24)
-            let qcBinsPerYearBy = Float(31_557_600) / 86400 / 1
+            let qcBinsPerYearBy = Float(365.25)
+            //print(reference2.sum(by: qcBinsPerYearBy))
+            //print(correctedForecast2.sum(by: qcBinsPerYearBy))
             print("Linear bias projected rmse: \(zip(reference2.sum(by: qcBinsPerYearBy), correctedForecast2.sum(by: qcBinsPerYearBy)).rmse())")
             print("Linear bias projected me: \(zip(reference2.sum(by: qcBinsPerYearBy), correctedForecast2.sum(by: qcBinsPerYearBy)).meanError())")
             print("Linear bias qctime rmse: \(zip(qc.sum(by: qcBinsPerYearBy), Array(correctedForecast2[reference.count ..< reference.count + qc.count]).sum(by: qcBinsPerYearBy)).rmse())")
             print("Linear bias qctime me: \(zip(qc.sum(by: qcBinsPerYearBy), Array(correctedForecast2[reference.count ..< reference.count + qc.count]).sum(by: qcBinsPerYearBy)).meanError())")
             
-            let thres: Float = 15
+            let thres: Float = 5
             let referenceEvents = reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
             let qcEvents = qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
             let forecastEventsQcLength = correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
@@ -369,8 +373,8 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             
             let forecast = try get(raw: .temperature_2m_max, time: time).data
             let start = DispatchTime.now()            
-            let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 12)
-            let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 12)
+            let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 6)
+            let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 6)
             
             print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(-))
             
@@ -382,7 +386,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             print(controlWeights.meansPerYear)
             
             let reference2 = reference
-            var correctedForecast2 = correctedForecast
+            let correctedForecast2 = correctedForecast
             let qc = try era5Reader.get(raw: .temperature_2m, time: qcTime.with(dtSeconds: 3600)).data.max(by: 24)
             let qcBinsPerYearBy = Float(31_557_600) / 86400 / 1
             

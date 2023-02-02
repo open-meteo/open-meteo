@@ -141,12 +141,12 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
     func prefetchData(variable: Variable, time: TimerangeDt) throws {
-        try omFileSplitter.willNeed(variable: variable.omFileName, location: position, time: time)
+        try omFileSplitter.willNeed(variable: variable.omFileName, location: position..<position+1, time: time)
     }
     
     /// Read and scale if required
     private func readAndScale(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        var data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
+        var data = try omFileSplitter.read(variable: variable.omFileName, location: position..<position+1, time: time)
         
         /// Scale pascal to hecto pasal. Case in era5
         if variable.unit == .pascal {

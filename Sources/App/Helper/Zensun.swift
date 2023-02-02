@@ -270,7 +270,7 @@ public struct Zensun {
         // For some reason, the code below deaverages data!
         // Same issue with taylor series expansion
         
-        var out = [Float]()
+        /*var out = [Float]()
         out.reserveCapacity(directRadiation.count)
         
         for (dhi, timestamp) in zip(directRadiation, timerange) {
@@ -342,7 +342,7 @@ public struct Zensun {
             let dni = dhi / zzBackwards
             out.append(dni)
         }
-        return out
+        return out*/
     }
     
     /// Calculate DNI based on zenith angle
