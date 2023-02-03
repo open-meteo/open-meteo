@@ -8,20 +8,19 @@
 import Foundation
 
 /// The required functions to implement a reader that provides derived variables
-protocol GenericReaderDerived {
-    associatedtype Domain: GenericDomain
-    associatedtype Variable: GenericVariable, Hashable
+protocol GenericReaderDerived: GenericReaderMixable {
     associatedtype Derived: RawRepresentableString
+    associatedtype ReaderNext: GenericReaderMixable
     
-    var reader: GenericReaderCached<Domain, Variable> { get }
+    var reader: ReaderNext { get }
     
-    init(reader: GenericReaderCached<Domain, Variable>)
+    init(reader: ReaderNext)
 
     func get(derived: Derived, time: TimerangeDt) throws -> DataAndUnit
     func prefetchData(derived: Derived, time: TimerangeDt) throws
     
-    func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit
-    func prefetchData(raw: Variable, time: TimerangeDt) throws
+    func get(raw: ReaderNext.MixingVar, time: TimerangeDt) throws -> DataAndUnit
+    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDt) throws
 }
 
 extension GenericReaderDerived {
@@ -38,29 +37,14 @@ extension GenericReaderDerived {
     }
     
     var modelDtSeconds: Int {
-        reader.domain.dtSeconds
+        reader.modelDtSeconds
     }
     
     var targetElevation: Float {
         reader.targetElevation
     }
     
-    var domain: Domain {
-        reader.domain
-    }
-    
-    init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let reader = try GenericReaderCached<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            return nil
-        }
-        self.init(reader: reader)
-    }
-    
-    public init(domain: Domain, position: Range<Int>) {
-        self.init(reader: GenericReaderCached<Domain, Variable>(domain: domain, position: position))
-    }
-    
-    func prefetchData(variable: VariableOrDerived<Variable, Derived>, time: TimerangeDt) throws {
+    func prefetchData(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDt) throws {
         switch variable {
         case .raw(let raw):
             return try prefetchData(raw: raw, time: time)
@@ -69,7 +53,7 @@ extension GenericReaderDerived {
         }
     }
     
-    func get(variable: VariableOrDerived<Variable, Derived>, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDt) throws -> DataAndUnit {
         switch variable {
         case .raw(let raw):
             return try get(raw: raw, time: time)
@@ -78,10 +62,21 @@ extension GenericReaderDerived {
         }
     }
     
-    func prefetchData(variables: [VariableOrDerived<Variable, Derived>], time: TimerangeDt) throws {
+    func prefetchData(variables: [VariableOrDerived<ReaderNext.MixingVar, Derived>], time: TimerangeDt) throws {
         try variables.forEach { variable in
             try prefetchData(variable: variable, time: time)
         }
+    }
+    
+    init?(domain: ReaderNext.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try ReaderNext(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.init(reader: reader)
+    }
+    
+    public init(domain: ReaderNext.Domain, position: Range<Int>) {
+        self.init(reader: ReaderNext(domain: domain, position: position))
     }
 }
 
@@ -91,11 +86,11 @@ protocol GenericReaderDerivedSimple: GenericReaderDerived {
 }
 
 extension GenericReaderDerivedSimple {
-    func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(raw: ReaderNext.MixingVar, time: TimerangeDt) throws -> DataAndUnit {
         try reader.get(variable: raw, time: time)
     }
     
-    func prefetchData(raw: Variable, time: TimerangeDt) throws {
+    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDt) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
 }

@@ -23,11 +23,9 @@ struct CmipController {
             let domains = params.models ?? [.MRI_AGCM3_2_S]
             
             let readers = try domains.map {
-                guard var reader = try Cmip6Reader(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                guard let reader = try Cmip6Reader(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                reader.lat = params.latitude
-                reader.lon = params.longitude
                 return reader
             }
             
@@ -53,7 +51,7 @@ struct CmipController {
                 res.reserveCapacity(variables.count * readers.count)
                 for reader in readers {
                     for variable in variables {
-                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.reader.reader.domain.rawValue)" : variable.rawValue
                         let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: name)
                         assert(hourlyTime.count == d.data.count)
                         res.append(d)
@@ -79,7 +77,7 @@ struct CmipController {
                             }
                             continue
                         }*/
-                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.reader.reader.domain.rawValue)" : variable.rawValue
                         let d = try reader.get(variable: variable, time: dailyTime).toApi(name: name)
                         // TODO: reanble
                         //assert(dailyTime.count == d.data.count)
@@ -122,13 +120,13 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case snowfall_sum
     case rain_sum
     
-    case precipitation_qdm
+    /*case precipitation_qdm
     case precipitation_linear
     
     case temperature_2m_max_qdm
     case temperature_2m_max_linear
     case temperature_2m_max_reference
-    case temperature_2m_max_trend
+    case temperature_2m_max_trend*/
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -257,55 +255,26 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
 }
 
 struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
-    typealias MixingVar = Cmip6VariableOrDerived
-    
-    typealias Domain = Cmip6Domain
-    
-    typealias Variable = Cmip6Variable
+    typealias ReaderNext = Cmip6BiasCorrector
     
     typealias Derived = Cmip6VariableDerived
     
-    var reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>
+    var reader: Cmip6BiasCorrector
     
-    var lat: Float = 0
-    var lon: Float = 0
-    
-    init(reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>) {
+    init(reader: Cmip6BiasCorrector) {
         self.reader = reader
-    }
-    
-    /// Get Bias correction field from era5-land or era5
-    func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> BiasCorrectionSeasonalLinear {
-        // TODO initialise readers only once
-        guard let era5Land = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
-        }
-        if let referenceWeightFile = try variable.openBiasCorrectionFile(for: era5Land.domain) {
-            let weights = try referenceWeightFile.read(dim0Slow: era5Land.reader.reader.position, dim1: 0..<referenceWeightFile.dim1)
-            if !weights.containsNaN() {
-                return BiasCorrectionSeasonalLinear(meansPerYear: weights)
-            }
-        }
-        guard let era5 = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
-        }
-        guard let referenceWeightFile = try variable.openBiasCorrectionFile(for: era5.domain) else {
-            throw ForecastapiError.generic(message: "Could not read reference weight file for domain \(era5.domain)")
-        }
-        let weights = try referenceWeightFile.read(dim0Slow: era5.reader.reader.position, dim1: 0..<referenceWeightFile.dim1)
-        return BiasCorrectionSeasonalLinear(meansPerYear: weights)
     }
 
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
         /*let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
         let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)*/
-        let breakyear = 2005
-        let referenceTime = TimerangeDt(start: Timestamp(1959,1,2), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
+        //let breakyear = 2005
+        //let referenceTime = TimerangeDt(start: Timestamp(1959,1,2), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
         //let forecastTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
-        let qcTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2022,1,1), dtSeconds: 24*3600)
+        //let qcTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2022,1,1), dtSeconds: 24*3600)
                 
         switch derived {
-        case .precipitation_qdm:
+        /*case .precipitation_qdm:
             let controlAndForecast = try get(raw: .precipitation_sum, time: time).data
             let era5Reader = try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land)!
             var reference = try era5Reader.get(raw: .precipitation, time: referenceTime.with(dtSeconds: 3600)).data.sum(by: 24)
@@ -551,7 +520,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             print(">\(thres)°C Hermite bias qctime rmse: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
             print(">\(thres)°C Hermite bias qctime me: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")*/
             
-            return DataAndUnit(correctedForecast2, .celsius)
+            return DataAndUnit(correctedForecast2, .celsius)*/
             
         case .snowfall_sum:
             let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time).data
@@ -564,10 +533,10 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
                 return max($0.0-$0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
-        case .temperature_2m_max_reference:
+        /*case .temperature_2m_max_reference:
             let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
-            return DataAndUnit(reference, .celsius)
+            return DataAndUnit(reference, .celsius)*/
         }
     }
     
@@ -578,8 +547,6 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .rain_sum:
             try prefetchData(raw: .precipitation_sum, time: time)
             try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
-        default:
-            break
         }
     }
 }

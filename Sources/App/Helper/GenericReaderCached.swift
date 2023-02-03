@@ -2,7 +2,7 @@ import Foundation
 
 
 /// A generic reader that caches all file system reads
-final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable> where Variable: Hashable {
+final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable>: GenericReaderMixable where Variable: Hashable {
     private var cache: [VariableAndTime: DataAndUnit]
     let reader: GenericReader<Domain, Variable>
     
@@ -35,6 +35,10 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
     /// Longitude of the grid point
     var domain: Domain {
         return reader.domain
+    }
+    
+    var modelDtSeconds: Int {
+        return reader.modelDtSeconds
     }
     
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
