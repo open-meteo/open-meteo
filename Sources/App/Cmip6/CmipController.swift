@@ -19,7 +19,7 @@ struct CmipController {
             let time = try params.getTimerange(allowedRange: allowedRange)
             //let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
-            let biasCorrection = params.bias_correction ?? true
+            let biasCorrection = !(params.disable_bias_correction ?? false)
             
             let domains = params.models ?? [.MRI_AGCM3_2_S]
             
@@ -303,7 +303,7 @@ struct CmipQuery: Content, QueryWithTimezone, ApiUnitsSelectable {
     let timeformat: Timeformat?
     let format: ForecastResultFormat?
     let cell_selection: GridSelectionMode?
-    let bias_correction: Bool?
+    let disable_bias_correction: Bool?
     
     /// not used, because only daily data
     let timezone: String?

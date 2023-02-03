@@ -371,8 +371,8 @@
       <h2>Settings</h2>
       <div class="col-12 pb-3">
         <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="bias_correction" name="bias_correction" value="true" checked>
-          <label class="form-check-label" for="bias_correction">Statistical downscaling with ERA5-Land as reference</label>
+          <input class="form-check-input" type="checkbox" id="disable_bias_correction" name="disable_bias_correction" value="true">
+          <label class="form-check-label" for="disable_bias_correction">Disable statistical downscaling with ERA5-Land as reference</label>
         </div>
       </div>
       <!--<div class="col-3">
