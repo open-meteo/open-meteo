@@ -801,7 +801,11 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         }
     }
     
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func getMultiplyAdd(domain: Cmip6Domain) -> (multiply: Float, add: Float)? {
+        if domain == .NICAM16_8S && [Cmip6Variable.relative_humidity_2m_mean, .relative_humidity_2m_max, .relative_humidity_2m_min].contains(self) {
+            return (100, 0)
+        }
+        
         switch self {
         case .temperature_2m_min:
             fallthrough

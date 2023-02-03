@@ -111,6 +111,13 @@
           </label>
         </div>-->
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="pressure_msl_mean" id="pressure_msl_mean"
+            name="daily">
+          <label class="form-check-label" for="pressure_msl_mean">
+            Pressure msl
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max"
             name="daily">
           <label class="form-check-label" for="temperature_2m_max">
@@ -265,6 +272,12 @@
           <input class="form-check-input" type="checkbox" value="windspeed_10m_max" id="windspeed_10m_max" name="daily">
           <label class="form-check-label" for="windspeed_10m_max">
             Maximum Wind Speed (10 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm" id="soil_moisture_0_to_10cm" name="daily">
+          <label class="form-check-label" for="soil_moisture_0_to_10cm">
+            Soil Moisture (0-10 cm)
           </label>
         </div>
         <!--<div class="form-check">
