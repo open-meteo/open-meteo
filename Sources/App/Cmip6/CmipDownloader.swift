@@ -982,7 +982,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             if singleBrokenMonthInFgoalsDrivingAnyoneInsaneWorkingWithThisData {
                                 duplicateTimeStep = 238 ..< 239
                             }
-                            let array = try NetCDF.read(path: ncFile, short: short, fma: short == "huss" ? (1000,0) : variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
+                            let array = try NetCDF.read(path: ncFile, short: short, fma: short == "huss" ? (1000,0) : variable.getMultiplyAdd(domain: domain), duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
                             try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: short == "huss" ? 100 : variable.scalefactor, all: array.data)
                         }
@@ -1065,7 +1065,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             
                             let isLeapMonth = month == 2 && Timestamp(year, 2, 28).add(days: 1).toComponents().day == 29
                             let duplicateTimeStep = (domain.needsLeapYearFix && isLeapMonth) ? 27..<28 : nil
-                            let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
+                            let array = try NetCDF.read(path: ncFile, short: short, fma: variable.getMultiplyAdd(domain: domain), duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
                             try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
                         }
@@ -1134,7 +1134,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     let nDays = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year+1,1,1), dtSeconds: 86400).count
                     let isLeapYear = nDays == 366
                     let duplicateTimeStep = (domain.needsLeapYearFix && isLeapYear) ? 30 + 28 ..< 30 + 29 : nil
-                    var array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd, duplicateTimeStep: duplicateTimeStep)
+                    var array = try NetCDF.read(path: ncFile, short: short, fma: variable.getMultiplyAdd(domain: domain), duplicateTimeStep: duplicateTimeStep)
                     guard array.nTime == nDays else {
                         fatalError("Array length does not match nDays=\(nDays) array.nTime=\(array.nTime)")
                     }
