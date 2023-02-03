@@ -17,16 +17,24 @@ struct CmipController {
             let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)
             //let timezone = try params.resolveTimezone()
             let time = try params.getTimerange(allowedRange: allowedRange)
-            let hourlyTime = time.range.range(dtSeconds: 3600)
+            //let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
+            let biasCorrection = params.bias_correction ?? true
             
             let domains = params.models ?? [.MRI_AGCM3_2_S]
             
-            let readers = try domains.map {
-                guard let reader = try Cmip6Reader(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
+            let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
+                if biasCorrection {
+                    guard let reader = try Cmip6Reader<Cmip6BiasCorrector>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                        throw ForecastapiError.noDataAvilableForThisLocation
+                    }
+                    return reader
+                } else {
+                    guard let reader = try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                        throw ForecastapiError.noDataAvilableForThisLocation
+                    }
+                    return reader
                 }
-                return reader
             }
             
             guard !readers.isEmpty else {
@@ -34,11 +42,11 @@ struct CmipController {
             }
 
             // Start data prefetch to boooooooost API speed :D
-            if let hourlyVariables = params.hourly {
+            /*if let hourlyVariables = params.hourly {
                 for reader in readers {
                     try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
                 }
-            }
+            }*/
             if let dailyVariables = params.daily {
                 for reader in readers {
                     try reader.prefetchData(variables: dailyVariables, time: dailyTime)
@@ -46,7 +54,7 @@ struct CmipController {
             }
             
             
-            let hourly: ApiSection? = try params.hourly.map { variables in
+            /*let hourly: ApiSection? = try params.hourly.map { variables in
                 var res = [ApiColumn]()
                 res.reserveCapacity(variables.count * readers.count)
                 for reader in readers {
@@ -58,26 +66,13 @@ struct CmipController {
                     }
                 }
                 return ApiSection(name: "hourly", time: hourlyTime, columns: res)
-            }
+            }*/
             let daily: ApiSection? = try params.daily.map { dailyVariables in
                 var res = [ApiColumn]()
                 res.reserveCapacity(dailyVariables.count * readers.count)
-                //var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
-                
-                for reader in readers {
+                for (reader, domain) in zip(readers, domains) {
                     for variable in dailyVariables {
-                        /*if variable == .sunrise || variable == .sunset {
-                            // only calculate sunrise/set once
-                            let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
-                            riseSet = times
-                            if variable == .sunset {
-                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
-                            } else {
-                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
-                            }
-                            continue
-                        }*/
-                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.reader.reader.domain.rawValue)" : variable.rawValue
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
                         let d = try reader.get(variable: variable, time: dailyTime).toApi(name: name)
                         assert(dailyTime.count == d.data.count)
                         res.append(d)
@@ -96,7 +91,7 @@ struct CmipController {
                 utc_offset_seconds: time.utcOffsetSeconds,
                 timezone: TimeZone(identifier: "GMT")!,
                 current_weather: nil,
-                sections: [hourly, daily].compactMap({$0}),
+                sections: [/*hourly,*/ daily].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
             )
             return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
@@ -104,6 +99,16 @@ struct CmipController {
             return req.eventLoop.makeFailedFuture(error)
         }
     }
+}
+
+protocol Cmip6Readerable {
+    func prefetchData(variables: [Cmip6VariableOrDerived], time: TimerangeDt) throws
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit
+    var modelLat: Float { get }
+    var modelLon: Float { get }
+    var modelElevation: Float { get }
+    var targetElevation: Float { get }
+    var modelDtSeconds: Int { get }
 }
 
 extension Cmip6Domain: MultiDomainMixerDomain {
@@ -214,7 +219,7 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
         }
         let isElevationCorrectable = variable == .temperature_2m_max || variable == .temperature_2m_min || variable == .temperature_2m_mean
         let modelElevation = referenceWeights.modelElevation
-        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
+        if isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
             for i in data.indices {
                 // correct temperature by 0.65° per 100 m elevation
                 data[i] += (modelElevation - targetElevation) * 0.0065
@@ -247,14 +252,13 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
     }
 }
 
-struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
-    typealias ReaderNext = Cmip6BiasCorrector
-    
+struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple, GenericReaderMixable, Cmip6Readerable where ReaderNext.Domain == Cmip6Domain, ReaderNext.MixingVar == Cmip6Variable {
+
     typealias Derived = Cmip6VariableDerived
     
-    var reader: Cmip6BiasCorrector
+    var reader: ReaderNext
     
-    init(reader: Cmip6BiasCorrector) {
+    init(reader: ReaderNext) {
         self.reader = reader
     }
 
@@ -299,6 +303,7 @@ struct CmipQuery: Content, QueryWithTimezone, ApiUnitsSelectable {
     let timeformat: Timeformat?
     let format: ForecastResultFormat?
     let cell_selection: GridSelectionMode?
+    let bias_correction: Bool?
     
     /// not used, because only daily data
     let timezone: String?
