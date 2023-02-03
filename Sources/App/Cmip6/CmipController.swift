@@ -79,8 +79,7 @@ struct CmipController {
                         }*/
                         let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.reader.reader.domain.rawValue)" : variable.rawValue
                         let d = try reader.get(variable: variable, time: dailyTime).toApi(name: name)
-                        // TODO: reanble
-                        //assert(dailyTime.count == d.data.count)
+                        assert(dailyTime.count == d.data.count)
                         res.append(d)
                     }
                 }
@@ -100,9 +99,6 @@ struct CmipController {
                 sections: [hourly, daily].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
             )
-            //let response = Response()
-            //try response.content.encode(out, as: .json)
-
             return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
         } catch {
             return req.eventLoop.makeFailedFuture(error)
@@ -119,14 +115,6 @@ extension Cmip6Domain: MultiDomainMixerDomain {
 enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case snowfall_sum
     case rain_sum
-    
-    /*case precipitation_qdm
-    case precipitation_linear
-    
-    case temperature_2m_max_qdm
-    case temperature_2m_max_linear
-    case temperature_2m_max_reference
-    case temperature_2m_max_trend*/
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -213,7 +201,7 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
         let raw = try reader.get(variable: variable, time: time)
         var data = raw.data
         
-        guard let controlWeightFile = try Cmip6Variable.temperature_2m_max.openBiasCorrectionFile(for: reader.domain) else {
+        guard let controlWeightFile = try variable.openBiasCorrectionFile(for: reader.domain) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position, dim1: 0..<controlWeightFile.dim1))
@@ -266,262 +254,7 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     }
 
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
-        /*let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
-        let forecastTime = TimerangeDt(start: Timestamp(1995,1,1), to: Timestamp(2015,1,1), dtSeconds: 24*3600)*/
-        //let breakyear = 2005
-        //let referenceTime = TimerangeDt(start: Timestamp(1959,1,2), to: Timestamp(breakyear,1,1), dtSeconds: 24*3600)
-        //let forecastTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2050,1,1), dtSeconds: 24*3600)
-        //let qcTime = TimerangeDt(start: Timestamp(breakyear,1,1), to: Timestamp(2022,1,1), dtSeconds: 24*3600)
-                
         switch derived {
-        /*case .precipitation_qdm:
-            let controlAndForecast = try get(raw: .precipitation_sum, time: time).data
-            let era5Reader = try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land)!
-            var reference = try era5Reader.get(raw: .precipitation, time: referenceTime.with(dtSeconds: 3600)).data.sum(by: 24)
-            
-            if reference.containsNaN() {
-                for i in reference.indices {
-                    if reference[i].isNaN {
-                        reference[i] = 0
-                    }
-                }
-            }
-            if controlAndForecast.containsNaN() {
-                fatalError("control contsains NaNs")
-            }
-
-            let start = DispatchTime.now()
-            let corrected = QuantileDeltaMappingBiasCorrection.quantileDeltaMappingMonthly(
-                reference: ArraySlice(reference),
-                referenceTime: referenceTime,
-                controlAndForecast: ArraySlice(controlAndForecast),
-                controlAndForecastTime: time,
-                type: .relativeChange
-            )
-            print("QDM time \(start.timeElapsedPretty())")
-            
-            let qc = try era5Reader.get(raw: .precipitation, time: qcTime.with(dtSeconds: 3600)).data.sum(by: 24)
-            let qcBinsPerYearBy = Float(31_557_600) / 86400 / 1
-            
-            print("Raw control rmse: \(zip(reference, controlAndForecast).rmse())")
-            print("Raw control me: \(zip(reference, controlAndForecast).meanError())")
-            
-            print("QDM projected rmse: \(zip(reference, corrected).rmse())")
-            print("QDM projected me: \(zip(reference, corrected).meanError())")
-            
-            print("QDM qctime rmse: \(zip(qc, corrected[reference.count ..< reference.count + qc.count]).rmse())")
-            print("QDM qctime me: \(zip(qc, corrected[reference.count ..< reference.count + qc.count]).meanError())")
-            
-            let thres: Float = 15
-            let referenceEvents = reference.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let qcEvents = qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsQcLength = corrected[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsReferenceTime = corrected[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
-            print(">\(thres)mm QDM projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
-            print(">\(thres)mm QDM projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
-            print(">\(thres)mm QDM qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
-            print(">\(thres)mm QDM qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
-            
-            return DataAndUnit(corrected, .millimeter)
-            
-        case .precipitation_linear:
-            let control = try get(raw: .precipitation_sum, time: referenceTime).data
-            let era5Reader = try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land)!
-            var reference = try era5Reader.get(raw: .precipitation, time: referenceTime.with(dtSeconds: 3600)).data.sum(by: 24)
-            
-            if reference.containsNaN() {
-                for i in reference.indices {
-                    if reference[i].isNaN {
-                        reference[i] = 0
-                    }
-                }
-                //print(reference.firstIndex(where: {$0.isNaN})!)
-                //fatalError("reference contsains NaNs")
-            }
-            if control.containsNaN() {
-                fatalError("control contsains NaNs")
-            }
-            
-            let forecast = try get(raw: .precipitation_sum, time: time).data
-            let start = DispatchTime.now()
-            let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 6)
-            let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 6)
-            
-            print(referenceWeights.meansPerYear)
-            print(controlWeights.meansPerYear)
-            print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(/))
-            
-            var correctedForecast = forecast
-            referenceWeights.applyOffset(on: &correctedForecast, otherWeights: controlWeights, time: time, type: .relativeChange)
-            print("Linear bias time \(start.timeElapsedPretty())")
-            
-            let reference2 = reference
-            let correctedForecast2 = correctedForecast
-            let qc = try era5Reader.get(raw: .precipitation, time: qcTime.with(dtSeconds: 3600)).data.sum(by: 24)
-            let qcBinsPerYearBy = Float(365.25)
-            //print(reference2.sum(by: qcBinsPerYearBy))
-            //print(correctedForecast2.sum(by: qcBinsPerYearBy))
-            print("Linear bias projected rmse: \(zip(reference2.sum(by: qcBinsPerYearBy), correctedForecast2.sum(by: qcBinsPerYearBy)).rmse())")
-            print("Linear bias projected me: \(zip(reference2.sum(by: qcBinsPerYearBy), correctedForecast2.sum(by: qcBinsPerYearBy)).meanError())")
-            print("Linear bias qctime rmse: \(zip(qc.sum(by: qcBinsPerYearBy), Array(correctedForecast2[reference.count ..< reference.count + qc.count]).sum(by: qcBinsPerYearBy)).rmse())")
-            print("Linear bias qctime me: \(zip(qc.sum(by: qcBinsPerYearBy), Array(correctedForecast2[reference.count ..< reference.count + qc.count]).sum(by: qcBinsPerYearBy)).meanError())")
-            
-            let thres: Float = 5
-            let referenceEvents = reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let qcEvents = qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsQcLength = correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsReferenceTime = correctedForecast2[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
-            print(">\(thres)mm Linear bias projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
-            print(">\(thres)mm Linear bias projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
-            print(">\(thres)mm Linear bias qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
-            print(">\(thres)mm Linear bias qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
-            
-            
-            return DataAndUnit(correctedForecast2, .millimeter)
-            
-        case .temperature_2m_max_trend:
-            let temp = try get(raw: .temperature_2m_max, time: time).data
-            
-            var sumx = 0
-            var sumxsq = 0
-            var sumy: Float = 0
-            var sumxy: Float = 0
-            
-            for (i, t) in temp.enumerated() {
-                sumx=sumx+i;
-                sumxsq=sumxsq+(i*i);
-                sumy=sumy+t;
-                sumxy=sumxy+Float(i)*t;
-            }
-            let d=Float(temp.count*sumxsq-sumx*sumx)
-            let m=(Float(temp.count)*sumxy-Float(sumx)*sumy)/d
-            let c=(sumy*Float(sumxsq)-Float(sumx)*sumxy)/d
-            
-            return DataAndUnit(temp.indices.map { Float($0) * m + c }, .celsius)
-            
-        case .temperature_2m_max_qdm:
-            let controlAndForecast = try get(raw: .temperature_2m_max, time: time).data
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land)!
-            let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
-            
-            let start = DispatchTime.now()
-            let corrected = QuantileDeltaMappingBiasCorrection.quantileDeltaMappingMonthlyDetrend(
-                reference: ArraySlice(reference),
-                referenceTime: referenceTime,
-                controlAndForecast: ArraySlice(controlAndForecast),
-                controlAndForecastTime: time,
-                type: .absoluteChage
-            )
-            print("QDM time \(start.timeElapsedPretty())")
-            
-            let qc = try era5Reader.get(raw: .temperature_2m, time: qcTime.with(dtSeconds: 3600)).data.max(by: 24)
-            let qcBinsPerYearBy = Float(31_557_600) / 86400 / 1
-            
-            print("Raw control rmse: \(zip(reference, controlAndForecast).rmse())")
-            print("Raw control me: \(zip(reference, controlAndForecast).meanError())")
-            
-            print("QDM projected rmse: \(zip(reference, corrected).rmse())")
-            print("QDM projected me: \(zip(reference, corrected).meanError())")
-            
-            print("QDM qctime rmse: \(zip(qc, corrected[reference.count ..< reference.count + qc.count]).rmse())")
-            print("QDM qctime me: \(zip(qc, corrected[reference.count ..< reference.count + qc.count]).meanError())")
-            
-            let thres: Float = 25
-            let referenceEvents = reference.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let qcEvents = qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsQcLength = corrected[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsReferenceTime = corrected[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
-            print(">\(thres)°C QDM projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
-            print(">\(thres)°C QDM projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
-            print(">\(thres)°C QDM qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
-            print(">\(thres)°C QDM qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
-            
-            return DataAndUnit(corrected, .celsius)
-            
-        case .temperature_2m_max_linear:
-            guard let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-
-            let referenceWeights = try getEra5BiasCorrectionWeights(for: .temperature_2m_max)
-            
-            // if era5-land weights not available, use era5
-            
-            // apply bias correction
-            
-            // apply elevation correction
-            
-            // upstream corrects temperature to target elevation
-            
-            
-            let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
-            
-            let forecast = try get(raw: .temperature_2m_max, time: time).data
-            let start = DispatchTime.now()            
-            //let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 6)
-            //let control = try get(raw: .temperature_2m_max, time: referenceTime).data
-            //let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 6)
-            
-
-            guard let controlWeightFile = try Cmip6Variable.temperature_2m_max.openBiasCorrectionFile(for: reader.domain) else {
-                throw ForecastapiError.generic(message: "Could not read reference weight file for domain \(reader.domain)")
-            }
-
-            let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: self.reader.reader.position, dim1: 0..<controlWeightFile.dim1))
-            
-            print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(-))
-            
-            var correctedForecast = forecast
-            referenceWeights.applyOffset(on: &correctedForecast, otherWeights: controlWeights, time: time, type: .absoluteChage)
-            print("Linear bias time \(start.timeElapsedPretty())")
-            
-            print(referenceWeights.meansPerYear)
-            print(controlWeights.meansPerYear)
-            
-            let reference2 = reference
-            let correctedForecast2 = correctedForecast
-            let qc = try era5Reader.get(raw: .temperature_2m, time: qcTime.with(dtSeconds: 3600)).data.max(by: 24)
-            let qcBinsPerYearBy = Float(31_557_600) / 86400 / 1
-            
-            print("Linear bias projected rmse: \(zip(reference2, correctedForecast2).rmse())")
-            print("Linear bias projected me: \(zip(reference2, correctedForecast2).meanError())")
-            print("Linear bias qctime rmse: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).rmse())")
-            print("Linear bias qctime me: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).meanError())")
-            
-            let thres: Float = 25
-            let referenceEvents = reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let qcEvents = qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsQcLength = correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            let forecastEventsReferenceTime = correctedForecast2[0 ..< reference.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)
-            print("mean per year reference=\(referenceEvents.mean(by: referenceEvents.count)) refForecast=\(forecastEventsReferenceTime.mean(by: forecastEventsReferenceTime.count)) qc=\(qcEvents.mean(by: qcEvents.count)) qcForecast=\(forecastEventsQcLength.mean(by: forecastEventsQcLength.count))")
-            print(">\(thres)°C Linear bias projected rmse: \(zip(referenceEvents, forecastEventsReferenceTime).rmse())")
-            print(">\(thres)°C Linear bias projected me: \(zip(referenceEvents, forecastEventsReferenceTime).meanError())")
-            print(">\(thres)°C Linear bias qctime rmse: \(zip(qcEvents, forecastEventsQcLength).rmse())")
-            print(">\(thres)°C Linear bias qctime me: \(zip(qcEvents, forecastEventsQcLength).meanError())")
-            
-            
-            /*let referenceWeights2 = BiasCorrectionSeasonalHermite(ArraySlice(reference), time: referenceTime, binsPerYear: 12)
-            let controlWeights2 = BiasCorrectionSeasonalHermite(ArraySlice(control), time: referenceTime, binsPerYear: 12)
-                        
-            correctedForecast = forecast
-            referenceWeights2.applyOffset(on: &correctedForecast, otherWeights: controlWeights2, time: time, type: .absoluteChage)
-            correctedForecast2 = correctedForecast
-            
-            print("Hermite bias projected rmse: \(zip(reference2, correctedForecast2).rmse())")
-            print("Hermite bias projected me: \(zip(reference2, correctedForecast2).meanError())")
-            print("Hermite bias qctime rmse: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).rmse())")
-            print("Hermite bias qctime me: \(zip(qc, correctedForecast2[reference.count ..< reference.count + qc.count]).meanError())")
-            
-            print(">\(thres)°C Hermite bias projected rmse: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
-            print(">\(thres)°C Hermite bias projected me: \(zip(reference2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")
-            print(">\(thres)°C Hermite bias qctime rmse: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).rmse())")
-            print(">\(thres)°C Hermite bias qctime me: \(zip(qc.map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy), correctedForecast2[reference.count ..< reference.count + qc.count].map{$0 > thres ? 1 : 0}.sum(by: qcBinsPerYearBy)).meanError())")*/
-            
-            return DataAndUnit(correctedForecast2, .celsius)*/
-            
         case .snowfall_sum:
             let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
@@ -533,10 +266,6 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
                 return max($0.0-$0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
-        /*case .temperature_2m_max_reference:
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land)!
-            let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
-            return DataAndUnit(reference, .celsius)*/
         }
     }
     
