@@ -96,6 +96,12 @@ enum PrecipitationUnit: String, Codable {
     case inch
 }
 
+struct ApiUnits: ApiUnitsSelectable {
+    let temperature_unit: TemperatureUnit?
+    let windspeed_unit: WindspeedUnit?
+    let precipitation_unit: PrecipitationUnit?
+}
+
 protocol ApiUnitsSelectable {
     var temperature_unit: TemperatureUnit? { get }
     var windspeed_unit: WindspeedUnit? { get }

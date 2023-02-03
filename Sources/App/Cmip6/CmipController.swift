@@ -367,14 +367,15 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             return DataAndUnit(corrected, .celsius)
             
         case .temperature_2m_max_linear:
-            let control = try get(raw: .temperature_2m_max, time: referenceTime).data
             let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land)!
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
             let forecast = try get(raw: .temperature_2m_max, time: time).data
             let start = DispatchTime.now()            
             let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 6)
-            let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 6)
+            //let control = try get(raw: .temperature_2m_max, time: referenceTime).data
+            //let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 6)
+            let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try Cmip6Variable.temperature_2m_max.openBiasCorrectionFile(for: reader.domain)!.read(dim0Slow: self.reader.reader.position, dim1: 0..<6))
             
             print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(-))
             

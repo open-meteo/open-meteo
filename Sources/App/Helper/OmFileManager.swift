@@ -32,6 +32,9 @@ struct OmFilePathWithSuffix: OmFileManagerReadable {
     func getFilePath() -> String {
         return "\(OpenMeteo.dataDictionary)\(directory)-\(domain)/\(variable)_\(suffix).om"
     }
+    func createDirectory() throws {
+        try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDictionary)\(directory)-\(domain)", withIntermediateDirectories: true)
+    }
 }
 
 /// cache file handles, background close checks

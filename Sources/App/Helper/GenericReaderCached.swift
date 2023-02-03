@@ -45,6 +45,11 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
         self.cache = .init()
     }
     
+    public init(domain: Domain, position: Range<Int>) {
+        self.reader = GenericReader<Domain, Variable>(domain: domain, position: position)
+        self.cache = .init()
+    }
+    
     func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
         if let value = cache[VariableAndTime(variable: variable, time: time)] {
             return value

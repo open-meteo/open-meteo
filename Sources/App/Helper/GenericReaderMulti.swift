@@ -27,6 +27,11 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         reader.last!.modelElevation
     }
     
+    public init(domain: MultiDomainMixerDomain, reader: [any GenericReaderMixable]) {
+        self.reader = reader
+        self.domain = domain
+    }
+    
     public init?(domain: MultiDomainMixerDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         let reader = try domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
         guard !reader.isEmpty else {

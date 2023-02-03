@@ -228,6 +228,11 @@ struct BiasCorrectionSeasonalLinear {
     /// Values are a mean of input data
     let meansPerYear: [Float]
     
+    /// Initialise from exising data
+    public init(meansPerYear: [Float]) {
+        self.meansPerYear = meansPerYear
+    }
+    
     /// Calculate means using the inverse of linear interpolation
     public init(_ data: ArraySlice<Float>, time: TimerangeDt, binsPerYear: Int = 6) {
         var sums = [Double](repeating: 0, count: binsPerYear)

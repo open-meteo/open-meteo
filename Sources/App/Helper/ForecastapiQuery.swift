@@ -18,6 +18,7 @@ enum ForecastapiError: Error {
     case latitudeAndLongitudeSameCount
     case latitudeAndLongitudeNotEmpty
     case latitudeAndLongitudeMaximum(max: Int)
+    case generic(message: String)
 }
 
 extension ForecastapiError: AbortError {
@@ -57,6 +58,8 @@ extension ForecastapiError: AbortError {
             return "Parameter 'latitude' and 'longitude' must not exceed \(max) coordinates."
         case .noDataAvilableForThisLocation:
             return "No data is available for this location"
+        case .generic(message: let message):
+            return message
         }
     }
 }

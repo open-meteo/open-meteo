@@ -56,6 +56,10 @@ extension GenericReaderDerived {
         self.init(reader: reader)
     }
     
+    public init(domain: Domain, position: Range<Int>) {
+        self.init(reader: GenericReaderCached<Domain, Variable>(domain: domain, position: position))
+    }
+    
     func prefetchData(variable: VariableOrDerived<Variable, Derived>, time: TimerangeDt) throws {
         switch variable {
         case .raw(let raw):

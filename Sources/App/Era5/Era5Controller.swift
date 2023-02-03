@@ -220,8 +220,12 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
     case apparent_temperature_max
     case apparent_temperature_min
     case apparent_temperature_mean
+    case relative_humidity_2m_min
+    case relative_humidity_2m_max
+    case relative_humidity_2m_mean
     case precipitation_sum
     case snowfall_sum
+    case snowfall_water_equivalent_sum
     case rain_sum
     case shortwave_radiation_sum
     case windspeed_10m_max
@@ -309,6 +313,14 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
             return .min(.cloudcover)
         case .cloudcover_mean:
             return .mean(.cloudcover)
+        case .relative_humidity_2m_min:
+            return .min(.relativehumidity_2m)
+        case .relative_humidity_2m_max:
+            return .max(.relativehumidity_2m)
+        case .relative_humidity_2m_mean:
+            return .mean(.relativehumidity_2m)
+        case .snowfall_water_equivalent_sum:
+            return .sum(.snowfall_water_equivalent)
         }
     }
 }

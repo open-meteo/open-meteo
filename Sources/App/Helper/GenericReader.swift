@@ -25,6 +25,9 @@ protocol GenericDomain {
     
     /// Single master file for a large time series
     var omFileMaster: (path: String, time: TimerangeDt)? { get }
+    
+    /// Domain name used in data directories
+    var rawValue: String { get }
 }
 
 extension GenericDomain {
@@ -96,7 +99,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     let domain: Domain
     
     /// Grid index in data files
-    let position: Int
+    let position: Range<Int>
     
     /// Elevation of the grid point
     let modelElevation: Float
@@ -117,6 +120,17 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         return domain.dtSeconds
     }
     
+    /// Initialise reader to read a range of locations
+    public init(domain: Domain, position: Range<Int>) {
+        self.domain = domain
+        self.position = position
+        self.modelElevation = .nan
+        self.targetElevation = .nan
+        self.modelLat = .nan
+        self.modelLon = .nan
+        self.omFileSplitter = OmFileSplitter(domain)
+    }
+    
     /// Return nil, if the coordinates are outside the domain grid
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         // check if coordinates are in domain, otherwise return nil
@@ -124,29 +138,23 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             return nil
         }
         self.domain = domain
-        self.position = gridpoint.gridpoint
+        self.position = gridpoint.gridpoint ..< gridpoint.gridpoint + 1
         self.modelElevation = gridpoint.gridElevation
         self.targetElevation = elevation.isNaN ? gridpoint.gridElevation : elevation
         
-        omFileSplitter = OmFileSplitter(
-            basePath: domain.omfileDirectory,
-            nLocations: domain.grid.count,
-            nTimePerFile: domain.omFileLength,
-            yearlyArchivePath: domain.omfileArchive,
-            omFileMaster: domain.omFileMaster
-        )
+        omFileSplitter = OmFileSplitter(domain)
         
         (modelLat, modelLon) = domain.grid.getCoordinates(gridpoint: gridpoint.gridpoint)
     }
     
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
     func prefetchData(variable: Variable, time: TimerangeDt) throws {
-        try omFileSplitter.willNeed(variable: variable.omFileName, location: position..<position+1, time: time)
+        try omFileSplitter.willNeed(variable: variable.omFileName, location: position, time: time)
     }
     
     /// Read and scale if required
     private func readAndScale(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        var data = try omFileSplitter.read(variable: variable.omFileName, location: position..<position+1, time: time)
+        var data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
         
         /// Scale pascal to hecto pasal. Case in era5
         if variable.unit == .pascal {
@@ -176,6 +184,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         let timeLow = time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
         let read = try readAndScale(variable: variable, time: timeLow)
         let dataLow = read.data
+        
+        if position.count > 1 {
+            throw ForecastapiError.generic(message: "Multi point support for temporal interpolation unavailable")
+        }
         
         let data = dataLow.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
         return DataAndUnit(data, read.unit)

@@ -28,6 +28,7 @@ protocol GenericReaderMixable {
     func prefetchData(variable: MixingVar, time: TimerangeDt) throws
 
     init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws
+    init(domain: Domain, position: Range<Int>)
 }
 
 extension GenericReaderMixer {

@@ -197,15 +197,6 @@ enum Cmip6Domain: String, Codable, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
-    /// Get the file path to a linear bias seasonal file for a given variable
-    func getBiasCorrectionFile(for variable: Cmip6Variable) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: self.rawValue, directory: "master", variable: variable.omFileName, suffix: "linear_bias_seasonal")
-    }
-    
-    func openBiasCorrectionFile(for variable: Cmip6Variable) throws -> OmFileReader<MmapFile>? {
-        return try OmFileManager.get(getBiasCorrectionFile(for: variable))
-    }
-    
     /// Single file to contain the entire timerange of data -> faster for sequentual disk access
     var omFileMaster: (path: String, time: TimerangeDt)? {
         let path = "\(OpenMeteo.dataDictionary)master-\(rawValue)/"
@@ -312,7 +303,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     case temperature_2m_min
     case temperature_2m_max
     case temperature_2m_mean
-    case pressure_msl
+    case pressure_msl_mean
     case cloudcover_mean
     case precipitation_sum
     // Note: runoff includes soil drainage -> not surface runoff
@@ -352,9 +343,18 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         return rawValue
     }
     
+    /// Get the file path to a linear bias seasonal file for a given variable
+    func getBiasCorrectionFile(for domain: GenericDomain) -> OmFilePathWithSuffix {
+        return OmFilePathWithSuffix(domain: domain.rawValue, directory: "master", variable: omFileName, suffix: "linear_bias_seasonal")
+    }
+    
+    func openBiasCorrectionFile(for domain: GenericDomain) throws -> OmFileReader<MmapFile>? {
+        return try OmFileManager.get(getBiasCorrectionFile(for: domain))
+    }
+    
     var interpolation: ReaderInterpolation {
         switch self {
-        case .pressure_msl:
+        case .pressure_msl_mean:
             return .hermite(bounds: nil)
         case .temperature_2m_min:
             return .hermite(bounds: nil)
@@ -389,7 +389,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     
     var unit: SiUnit {
         switch self {
-        case .pressure_msl:
+        case .pressure_msl_mean:
             return .hectoPascal
         case .temperature_2m_min:
             return .celsius
@@ -445,7 +445,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 fallthrough
             case .cloudcover_mean:
                 fallthrough
-            case .pressure_msl:
+            case .pressure_msl_mean:
                 fallthrough
             case .shortwave_radiation_sum:
                 return isFuture ? "20211116" : "20211029"
@@ -496,7 +496,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     
     var scalefactor: Float {
         switch self {
-        case .pressure_msl:
+        case .pressure_msl_mean:
             return 10
         case .temperature_2m_min:
             return 20
@@ -537,7 +537,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return isFuture ? .yearly : .monthly
         case .MRI_AGCM3_2_S:
             switch self {
-            case .pressure_msl:
+            case .pressure_msl_mean:
                 return .yearly
             case .temperature_2m_min:
                 return .yearly
@@ -591,7 +591,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .restoreFrom(dt: 6*3600, shortName: "hurs", aggregate: .max)
             case .relative_humidity_2m_mean:
                 return .restoreFrom(dt: 6*3600, shortName: "hurs", aggregate: .mean)
-            case .pressure_msl:
+            case .pressure_msl_mean:
                 return .restoreFrom(dt: 6*3600, shortName: "psl", aggregate: .mean)
             case .temperature_2m_mean:
                 return .restoreFrom(dt: 6*3600, shortName: "tas", aggregate: .mean)
@@ -623,7 +623,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             case .temperature_2m_mean:
                 return .yearly
-            case .pressure_msl:
+            case .pressure_msl_mean:
                 return .yearly
             case .snowfall_water_equivalent_sum:
                 return .yearly
@@ -647,7 +647,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             //case .temperature_2m_mean:
                 //return .yearly
-            case .pressure_msl:
+            case .pressure_msl_mean:
                 return .yearly
             case .relative_humidity_2m_mean:
                 return .yearly
@@ -710,7 +710,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             case .temperature_2m_mean:
                 return .yearly
-            case .pressure_msl:
+            case .pressure_msl_mean:
                 return .yearly
             case .cloudcover_mean:
                 return .yearly
@@ -737,7 +737,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             case .temperature_2m_mean:
                 return .yearly
-            case .pressure_msl:
+            case .pressure_msl_mean:
                 return .yearly
             case .cloudcover_mean:
                 return .yearly
@@ -766,7 +766,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     /// hourly the same but no min/max. Hourly one file per month. Daily = yearly file
     var shortname: String {
         switch self {
-        case .pressure_msl:
+        case .pressure_msl_mean:
             return "psl"
         case .temperature_2m_min:
             return "tasmin"
@@ -809,7 +809,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             fallthrough
         case .temperature_2m_mean:
             return (1, -273.15)
-        case .pressure_msl:
+        case .pressure_msl_mean:
             return (1/100, 0)
         case .precipitation_sum:
             fallthrough
@@ -1202,7 +1202,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
         let reader = OmFileSplitter(domain)
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
         for variable in variables {
-            let biasFile = domain.getBiasCorrectionFile(for: variable).getFilePath()
+            let biasFile = variable.getBiasCorrectionFile(for: domain).getFilePath()
             if FileManager.default.fileExists(atPath: biasFile) {
                 continue
             }

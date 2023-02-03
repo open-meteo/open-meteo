@@ -108,6 +108,9 @@ struct DownloadEra5Command: AsyncCommandFix {
         @Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless if files could be downloaded")
         var force: Bool
         
+        @Flag(name: "calculate-bias-field", short: "b", help: "Generate seasonal averages for bias corrections for CMIP climate data")
+        var calculateBiasField: Bool
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() -> TimerangeDt {
             let dt = 3600*24
@@ -144,6 +147,10 @@ struct DownloadEra5Command: AsyncCommandFix {
             try runStripSea(logger: logger, year: Int(stripseaYear)!, domain: domain, variables: variables)
             return
         }
+        if signature.calculateBiasField {
+            try generateBiasCorrectionFields(logger: logger, domain: domain)
+            return
+        }
         guard let cdskey = signature.cdskey else {
             fatalError("cds key is required")
         }
@@ -173,6 +180,54 @@ struct DownloadEra5Command: AsyncCommandFix {
         let timeinterval = signature.getTimeinterval()
         let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables)
         try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain, variables: variables)
+    }
+    
+    /// Generate seasonal averages for bias corrections for CMIP climate data
+    /// They way how `GenericReaderMulti` is used, is not the cleanest, but otherwise daily calculations need to be implemented manually
+    func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, variables: [Cmip6Variable] = Cmip6Variable.allCases) throws {
+        logger.info("Calculating bias correction fields")
+        
+        let binsPerYear = 6
+        let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
+        let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm)
+        for variable in variables {
+            try variable.getBiasCorrectionFile(for: domain).createDirectory()
+            let biasFile = variable.getBiasCorrectionFile(for: domain).getFilePath()
+            if FileManager.default.fileExists(atPath: biasFile) {
+                continue
+            }
+            guard let era5Variable = Era5DailyWeatherVariable(rawValue: variable.rawValue) else {
+                fatalError("Could not initialise Era5DailyWeatherVariable for \(variable)")
+            }
+            let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
+            let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
+            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
+                let locationRange = dim0..<min(dim0+200, writer.dim0)
+                var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
+                let reader = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(domain: domain, position: locationRange)])
+                try reader.prefetchData(variables: [era5Variable], time: time)
+                guard var dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
+                    fatalError("Could not get \(era5Variable)")
+                }
+                /// first hour in precipitation in 1970 is missing... fill with previous timestep
+                for i in dataFlat.indices.reversed() {
+                    if dataFlat[i].isNaN {
+                        dataFlat[i] = dataFlat[i-1]
+                    }
+                }
+                let data = Array2DFastTime(
+                    data: dataFlat,
+                    nLocations: locationRange.count,
+                    nTime: time.count
+                )
+                for l in 0..<locationRange.count {
+                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(data[l, 0..<time.count], time: time, binsPerYear: binsPerYear).meansPerYear)
+                }
+                progress.add(bias.nLocations)
+                return ArraySlice(bias.data)
+            })
+            progress.finish()
+        }
     }
     
     func stripSea(logger: Logger, readFilePath: String, writeFilePath: String, elevation: [Float]) throws {
