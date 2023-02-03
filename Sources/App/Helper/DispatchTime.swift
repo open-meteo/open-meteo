@@ -36,6 +36,6 @@ extension Double {
         if milliseconds < 1000 * 60 * 90 {
             return "\(minutes.round(digits: 0))m"
         }
-        return "\(hours.round(digits: 0))h \(minutes.round(digits: 0))m"
+        return "\(Int(hours).zeroPadded(len: 2)):\((Int(minutes) % 60).zeroPadded(len: 2))"
     }
 }

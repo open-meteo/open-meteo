@@ -60,7 +60,8 @@ final class ProgressTracker {
             let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
             let ratio = Int(Float(done) / (Float(total)) * 100)
             let rate = Double(done - doneLastPrint) / deltaT
-            logger.info("[ \(label) ] \(ratio)% \(work) / \(total) in \(timeElapsed), \(rate.rounded()) per second")
+            let remainingTime = Double(total - done) / rate
+            logger.info("[ \(label) ] \(ratio)% \(done) / \(total) in \(timeElapsed), \(Int(rate.rounded()))/s remaining \(remainingTime.asSecondsPrettyPrint)")
             lastPrint = Date()
             doneLastPrint = done
         }
