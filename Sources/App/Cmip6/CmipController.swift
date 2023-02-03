@@ -182,18 +182,18 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
     let readerEra5Land: GenericReader<CdsDomain, Era5Variable>
     
     /// Get Bias correction field from era5-land or era5
-    func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> BiasCorrectionSeasonalLinear {
+    func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
         if let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5Land.domain) {
             let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position, dim1: 0..<referenceWeightFile.dim1)
             if !weights.containsNaN() {
-                return BiasCorrectionSeasonalLinear(meansPerYear: weights)
+                return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5.modelElevation)
             }
         }
         guard let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5.domain) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(readerEra5.domain)")
         }
         let weights = try referenceWeightFile.read(dim0Slow: readerEra5.position, dim1: 0..<referenceWeightFile.dim1)
-        return BiasCorrectionSeasonalLinear(meansPerYear: weights)
+        return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5Land.modelElevation)
     }
     
     
@@ -206,15 +206,20 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
         }
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position, dim1: 0..<controlWeightFile.dim1))
         let referenceWeights = try getEra5BiasCorrectionWeights(for: variable)
-        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
+        referenceWeights.weights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
         if let bounds = variable.interpolation.bounds {
             for i in data.indices {
                 data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
             }
         }
-        
-        // TODO: temperature lapse rate correction
-        
+        let isElevationCorrectable = variable == .temperature_2m_max || variable == .temperature_2m_min || variable == .temperature_2m_mean
+        let modelElevation = referenceWeights.modelElevation
+        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
+            for i in data.indices {
+                // correct temperature by 0.65° per 100 m elevation
+                data[i] += (modelElevation - targetElevation) * 0.0065
+            }
+        }
         return DataAndUnit(data, raw.unit)
     }
     
