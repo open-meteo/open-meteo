@@ -170,7 +170,88 @@ extension Sequence where Element == Float {
     }
 }
 
-
+/// Apply bias correction to raw variables
+struct Cmip6BiasCorrector: GenericReaderMixable {
+    typealias MixingVar = Cmip6Variable
+    
+    typealias Domain = Cmip6Domain
+    
+    var modelLat: Float { reader.modelLat }
+    
+    var modelLon: Float { reader.modelLon }
+    
+    var modelElevation: Float { reader.modelElevation }
+    
+    var targetElevation: Float { reader.targetElevation }
+    
+    var modelDtSeconds: Int { reader.modelDtSeconds }
+    
+    /// cmip reader
+    let reader: GenericReader<Cmip6Domain, Cmip6Variable>
+    
+    /// era5 reader
+    let readerEra5: GenericReader<CdsDomain, Era5Variable>
+    
+    /// era5 land reader
+    let readerEra5Land: GenericReader<CdsDomain, Era5Variable>
+    
+    /// Get Bias correction field from era5-land or era5
+    func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> BiasCorrectionSeasonalLinear {
+        // TODO initialise readers only once
+        if let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5Land.domain) {
+            let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position, dim1: 0..<referenceWeightFile.dim1)
+            if !weights.containsNaN() {
+                return BiasCorrectionSeasonalLinear(meansPerYear: weights)
+            }
+        }
+        guard let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5.domain) else {
+            throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(readerEra5.domain)")
+        }
+        let weights = try referenceWeightFile.read(dim0Slow: readerEra5.position, dim1: 0..<referenceWeightFile.dim1)
+        return BiasCorrectionSeasonalLinear(meansPerYear: weights)
+    }
+    
+    
+    func get(variable: Cmip6Variable, time: TimerangeDt) throws -> DataAndUnit {
+        let raw = try reader.get(variable: variable, time: time)
+        var data = raw.data
+        
+        guard let controlWeightFile = try Cmip6Variable.temperature_2m_max.openBiasCorrectionFile(for: reader.domain) else {
+            throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
+        }
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position, dim1: 0..<controlWeightFile.dim1))
+        let referenceWeights = try getEra5BiasCorrectionWeights(for: variable)
+        // TODO: correct type per variable
+        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: .absoluteChage)
+        
+        // TODO: temperature lapse rate correction
+        
+        return DataAndUnit(data, raw.unit)
+    }
+    
+    func prefetchData(variable: Cmip6Variable, time: TimerangeDt) throws {
+        try reader.prefetchData(variable: variable, time: time)
+    }
+    
+    init?(domain: Cmip6Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        guard let readerEra5Land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        guard let readerEra5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        self.reader = reader
+        self.readerEra5Land = readerEra5Land
+        self.readerEra5 = readerEra5
+    }
+    
+    init(domain: Cmip6Domain, position: Range<Int>) {
+        fatalError("cmip6 not implemented")
+    }
+}
 
 struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     typealias MixingVar = Cmip6VariableOrDerived
