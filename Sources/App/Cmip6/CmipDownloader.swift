@@ -318,7 +318,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     //case surface_temperature
     
     /// Moisture in Upper Portion of Soil Column.
-    case soil_moisture_0_to_10cm
+    case soil_moisture_0_to_10cm_mean
     case shortwave_radiation_sum
     
     enum TimeType {
@@ -380,7 +380,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return .hermite(bounds: nil)
         case .windspeed_10m_max:
             return .hermite(bounds: nil)
-        case .soil_moisture_0_to_10cm:
+        case .soil_moisture_0_to_10cm_mean:
             return .hermite(bounds: nil)
         case .shortwave_radiation_sum:
             return .hermite(bounds: 0...1800*24)
@@ -415,7 +415,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return .ms
         case .windspeed_10m_max:
             return .ms
-        case .soil_moisture_0_to_10cm:
+        case .soil_moisture_0_to_10cm_mean:
             return .gramPerKilogram
         case .shortwave_radiation_sum:
             return .megaJoulesPerSquareMeter
@@ -423,7 +423,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m_max || self == .temperature_2m_min || self == .temperature_2m_mean
+        // should not be corrected because BIAS correction is used later
+        return false
     }
     
     
@@ -524,7 +525,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return 10
         //case .surface_temperature:
         //    return 20
-        case .soil_moisture_0_to_10cm:
+        case .soil_moisture_0_to_10cm_mean:
             return 1000
         case .shortwave_radiation_sum:
             return 10
@@ -561,7 +562,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             //case .surface_temperature:
             //    return .yearly
-            case .soil_moisture_0_to_10cm:
+            case .soil_moisture_0_to_10cm_mean:
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
@@ -755,7 +756,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
                 return .yearly
             case .windspeed_10m_max:
                 return .yearly
-            case .soil_moisture_0_to_10cm:
+            case .soil_moisture_0_to_10cm_mean:
                 return nil
             case .shortwave_radiation_sum:
                 return .yearly
@@ -788,7 +789,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         //    return "mrro"
         case .snowfall_water_equivalent_sum:
             return "prsn" //kg m-2 s-1
-        case .soil_moisture_0_to_10cm: // Moisture in Upper Portion of Soil Column
+        case .soil_moisture_0_to_10cm_mean: // Moisture in Upper Portion of Soil Column
             return "mrsos"
         case .shortwave_radiation_sum:
             return "rsds"

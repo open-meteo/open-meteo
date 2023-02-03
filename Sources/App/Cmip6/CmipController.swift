@@ -189,6 +189,28 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     init(reader: GenericReaderCached<Cmip6Domain, Cmip6Variable>) {
         self.reader = reader
     }
+    
+    /// Get Bias correction field from era5-land or era5
+    func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> BiasCorrectionSeasonalLinear {
+        // TODO initialise readers only once
+        guard let era5Land = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        if let referenceWeightFile = try variable.openBiasCorrectionFile(for: era5Land.domain) {
+            let weights = try referenceWeightFile.read(dim0Slow: era5Land.reader.reader.position, dim1: 0..<referenceWeightFile.dim1)
+            if !weights.containsNaN() {
+                return BiasCorrectionSeasonalLinear(meansPerYear: weights)
+            }
+        }
+        guard let era5 = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        guard let referenceWeightFile = try variable.openBiasCorrectionFile(for: era5.domain) else {
+            throw ForecastapiError.generic(message: "Could not read reference weight file for domain \(era5.domain)")
+        }
+        let weights = try referenceWeightFile.read(dim0Slow: era5.reader.reader.position, dim1: 0..<referenceWeightFile.dim1)
+        return BiasCorrectionSeasonalLinear(meansPerYear: weights)
+    }
 
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
         /*let referenceTime = TimerangeDt(start: Timestamp(1959,1,1), to: Timestamp(1995,1,1), dtSeconds: 24*3600)
@@ -367,15 +389,35 @@ struct Cmip6Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             return DataAndUnit(corrected, .celsius)
             
         case .temperature_2m_max_linear:
-            let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land)!
+            guard let era5Reader = try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: reader.targetElevation, mode: .land) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+
+            let referenceWeights = try getEra5BiasCorrectionWeights(for: .temperature_2m_max)
+            
+            // if era5-land weights not available, use era5
+            
+            // apply bias correction
+            
+            // apply elevation correction
+            
+            // upstream corrects temperature to target elevation
+            
+            
             let reference = try era5Reader.get(raw: .temperature_2m, time: referenceTime.with(dtSeconds: 3600)).data.max(by: 24)
             
             let forecast = try get(raw: .temperature_2m_max, time: time).data
             let start = DispatchTime.now()            
-            let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 6)
+            //let referenceWeights = BiasCorrectionSeasonalLinear(ArraySlice(reference), time: referenceTime, binsPerYear: 6)
             //let control = try get(raw: .temperature_2m_max, time: referenceTime).data
             //let controlWeights = BiasCorrectionSeasonalLinear(ArraySlice(control), time: referenceTime, binsPerYear: 6)
-            let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try Cmip6Variable.temperature_2m_max.openBiasCorrectionFile(for: reader.domain)!.read(dim0Slow: self.reader.reader.position, dim1: 0..<6))
+            
+
+            guard let controlWeightFile = try Cmip6Variable.temperature_2m_max.openBiasCorrectionFile(for: reader.domain) else {
+                throw ForecastapiError.generic(message: "Could not read reference weight file for domain \(reader.domain)")
+            }
+
+            let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: self.reader.reader.position, dim1: 0..<controlWeightFile.dim1))
             
             print("mean weight delta",zip(referenceWeights.meansPerYear, controlWeights.meansPerYear).map(-))
             

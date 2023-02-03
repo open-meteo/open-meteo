@@ -248,6 +248,8 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
     case cloudcover_max
     case cloudcover_min
     case cloudcover_mean
+    /// only for CMIP6 reference
+    case soil_moisture_0_to_10cm_mean
     
     var aggregation: DailyAggregation<CdsVariable> {
         switch self {
@@ -321,6 +323,8 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
             return .mean(.relativehumidity_2m)
         case .snowfall_water_equivalent_sum:
             return .sum(.snowfall_water_equivalent)
+        case .soil_moisture_0_to_10cm_mean:
+            return .mean(.soil_moisture_0_to_7cm)
         }
     }
 }

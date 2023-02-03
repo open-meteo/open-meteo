@@ -275,9 +275,9 @@
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm" id="soil_moisture_0_to_10cm" name="daily">
-          <label class="form-check-label" for="soil_moisture_0_to_10cm">
-            Soil Moisture (0-10 cm)
+          <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm_mean" id="soil_moisture_0_to_10cm_mean" name="daily">
+          <label class="form-check-label" for="soil_moisture_0_to_10cm_mean">
+            Mean Soil Moisture (0-10 cm)
           </label>
         </div>
         <!--<div class="form-check">
