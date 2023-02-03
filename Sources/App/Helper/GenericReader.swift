@@ -87,6 +87,15 @@ enum ReaderInterpolation {
             return false
         }
     }
+    
+    var bounds: ClosedRange<Float>? {
+        switch self {
+        case .hermite(let bounds):
+            return bounds
+        default:
+            return nil
+        }
+    }
 }
 
 

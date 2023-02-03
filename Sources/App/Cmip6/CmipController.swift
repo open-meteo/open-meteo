@@ -197,7 +197,6 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
     
     /// Get Bias correction field from era5-land or era5
     func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> BiasCorrectionSeasonalLinear {
-        // TODO initialise readers only once
         if let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5Land.domain) {
             let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position, dim1: 0..<referenceWeightFile.dim1)
             if !weights.containsNaN() {
@@ -221,8 +220,12 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
         }
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position, dim1: 0..<controlWeightFile.dim1))
         let referenceWeights = try getEra5BiasCorrectionWeights(for: variable)
-        // TODO: correct type per variable
-        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: .absoluteChage)
+        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
+        if let bounds = variable.interpolation.bounds {
+            for i in data.indices {
+                data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
+            }
+        }
         
         // TODO: temperature lapse rate correction
         

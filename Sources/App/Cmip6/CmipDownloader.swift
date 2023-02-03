@@ -427,6 +427,38 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         return false
     }
     
+    var biasCorrectionType: QuantileDeltaMappingBiasCorrection.ChangeType {
+        switch self {
+        case .temperature_2m_min:
+            return .absoluteChage
+        case .temperature_2m_max:
+            return .absoluteChage
+        case .temperature_2m_mean:
+            return .absoluteChage
+        case .pressure_msl_mean:
+            return .absoluteChage
+        case .cloudcover_mean:
+            return .absoluteChage
+        case .precipitation_sum:
+            return .relativeChange
+        case .snowfall_water_equivalent_sum:
+            return .relativeChange
+        case .relative_humidity_2m_min:
+            return .absoluteChage
+        case .relative_humidity_2m_max:
+            return .absoluteChage
+        case .relative_humidity_2m_mean:
+            return .absoluteChage
+        case .windspeed_10m_mean:
+            return .absoluteChage
+        case .windspeed_10m_max:
+            return .absoluteChage
+        case .soil_moisture_0_to_10cm_mean:
+            return .absoluteChage
+        case .shortwave_radiation_sum:
+            return .relativeChange
+        }
+    }
     
     func version(for domain: Cmip6Domain, isFuture: Bool) -> String {
         switch domain {
