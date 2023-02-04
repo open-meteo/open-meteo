@@ -209,7 +209,7 @@ struct DownloadEra5Command: AsyncCommandFix {
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 let reader = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(domain: domain, position: locationRange)])
                 try reader.prefetchData(variables: [era5Variable], time: time)
-                guard var dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
+                guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
                     fatalError("Could not get \(era5Variable)")
                 }
                 let data = Array2DFastTime(

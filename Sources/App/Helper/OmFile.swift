@@ -143,7 +143,16 @@ struct OmFileSplitter {
             if let offsets = ringtime.intersect(fileTime: fileTime),
                let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: omFileMaster.path, variable: variable, timeChunk: 0)),
                 omFile.dim0 == nLocations {
-                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
+                if location.count == 1 {
+                    try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
+                } else {
+                    // TODO: The 2D code could be moved directly into `read`
+                    var temp = [Float](repeating: .nan, count: location.count * offsets.file.count)
+                    try omFile.read(into: &temp, arrayRange: temp.indices, dim0Slow: location, dim1: offsets.file)
+                    for l in 0..<location.count {
+                        out[offsets.array.add(ringtime.count * l)] = temp[offsets.file.count * l ..< offsets.file.count * (l+1)]
+                    }
+                }
                 start = fileTime.upperBound
             }
         }
@@ -167,7 +176,15 @@ struct OmFileSplitter {
                 }
                 //assert(omFile.chunk0 == nLocations)
                 //assert(omFile.chunk1 == nTimePerFile)
-                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
+                if location.count == 1 {
+                    try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
+                } else {
+                    var temp = [Float](repeating: .nan, count: location.count * offsets.file.count)
+                    try omFile.read(into: &temp, arrayRange: temp.indices, dim0Slow: location, dim1: offsets.file)
+                    for l in 0..<location.count {
+                        out[offsets.array.add(ringtime.count * l)] = temp[offsets.file.count * l ..< offsets.file.count * (l+1)]
+                    }
+                }
                 start = fileTime.upperBound
             }
         }
@@ -189,7 +206,15 @@ struct OmFileSplitter {
             }
             //assert(omFile.chunk0 == nLocations)
             //assert(omFile.chunk1 == nTimePerFile)
-            try omFile.read(into: &out, arrayRange: offsets.array.add(delta), dim0Slow: location, dim1: offsets.file)
+            if location.count == 1 {
+                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
+            } else {
+                var temp = [Float](repeating: .nan, count: location.count * offsets.file.count)
+                try omFile.read(into: &temp, arrayRange: temp.indices, dim0Slow: location, dim1: offsets.file)
+                for l in 0..<location.count {
+                    out[offsets.array.add(ringtime.count * l)] = temp[offsets.file.count * l ..< offsets.file.count * (l+1)]
+                }
+            }
         }
         return out
     }
