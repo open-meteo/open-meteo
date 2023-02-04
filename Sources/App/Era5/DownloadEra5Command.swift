@@ -199,6 +199,9 @@ struct DownloadEra5Command: AsyncCommandFix {
             guard let era5Variable = Era5DailyWeatherVariable(rawValue: variable.rawValue) else {
                 fatalError("Could not initialise Era5DailyWeatherVariable for \(variable)")
             }
+            guard Era5Variable(rawValue: era5Variable.aggregation.variables.0!.rawValue)!.availableForDomain(domain: domain) else {
+                continue
+            }
             let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
@@ -208,12 +211,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                 try reader.prefetchData(variables: [era5Variable], time: time)
                 guard var dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
                     fatalError("Could not get \(era5Variable)")
-                }
-                /// first hour in precipitation in 1970 is missing... fill with previous timestep
-                for i in dataFlat.indices.reversed() {
-                    if dataFlat[i].isNaN {
-                        dataFlat[i] = dataFlat[i-1]
-                    }
                 }
                 let data = Array2DFastTime(
                     data: dataFlat,

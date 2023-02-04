@@ -238,6 +238,9 @@ struct BiasCorrectionSeasonalLinear {
         var sums = [Double](repeating: 0, count: binsPerYear)
         var weights = [Double](repeating: 0, count: binsPerYear)
         for (t, v) in zip(time, data) {
+            if v.isNaN {
+                continue
+            }
             let monthBin = t.secondInAverageYear / (Timestamp.secondsPerAverageYear / binsPerYear)
             let fraction = Double(t.secondInAverageYear).truncatingRemainder(dividingBy: Double(Timestamp.secondsPerAverageYear / binsPerYear)) / Double(Timestamp.secondsPerAverageYear / binsPerYear)
             let weighted = Interpolations.linearWeighted(value: Double(v), fraction: fraction)
