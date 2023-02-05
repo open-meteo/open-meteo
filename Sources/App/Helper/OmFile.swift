@@ -207,12 +207,12 @@ struct OmFileSplitter {
             //assert(omFile.chunk0 == nLocations)
             //assert(omFile.chunk1 == nTimePerFile)
             if location.count == 1 {
-                try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
+                try omFile.read(into: &out, arrayRange: offsets.array.add(delta), dim0Slow: location, dim1: offsets.file)
             } else {
                 var temp = [Float](repeating: .nan, count: location.count * offsets.file.count)
                 try omFile.read(into: &temp, arrayRange: temp.indices, dim0Slow: location, dim1: offsets.file)
                 for l in 0..<location.count {
-                    out[offsets.array.add(ringtime.count * l)] = temp[offsets.file.count * l ..< offsets.file.count * (l+1)]
+                    out[offsets.array.add(delta + ringtime.count * l)] = temp[offsets.file.count * l ..< offsets.file.count * (l+1)]
                 }
             }
         }
