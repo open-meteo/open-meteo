@@ -21,7 +21,7 @@
   </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Climate API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">High resolution climate models</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Downscaled climate models to 10 km and daily resolution</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -49,7 +49,11 @@
       href="https://openmeteo.substack.com/p/historical-weather-api-with-high" target="_blank">blog article</a>.
   </div>-->
 
-  <form id="api_form" method="get" action="http://89.58.17.152/v1/climate">
+  <div class="alert alert-warning" role="alert">
+    ⚠️ This API endpoint is work in progress! 🚧 👷
+  </div>
+
+  <form id="api_form" method="get" action="https://climate-api.open-meteo.com/v1/climate">
     <div class="row py-3 px-0">
       <h2>Select Coordinates or City</h2>
       <div class="col-md-3">
@@ -102,63 +106,15 @@
     </div>
 
     <div class="row py-3 px-0">
-      <h2>Daily Weather Variables <small class="text-muted">(*)</small></h2>
-      <div class="col-md-6">
-        <!--<div class="form-check">
-          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode_daily" name="daily">
-          <label class="form-check-label" for="weathercode_daily">
-            Weathercode
-          </label>
-        </div>-->
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="pressure_msl_mean" id="pressure_msl_mean"
-            name="daily">
-          <label class="form-check-label" for="pressure_msl_mean">
-            Pressure msl
-          </label>
-        </div>
+      <h2>Daily Weather Variables</h2>
+      <div class="col-md-4">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max"
-            name="daily">
+            name="daily" checked>
           <label class="form-check-label" for="temperature_2m_max">
             Maximum Temperature (2 m)
           </label>
         </div>
-        <!--<div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_2m_max_qm" id="temperature_2m_max_qm"
-            name="daily">
-          <label class="form-check-label" for="temperature_2m_max_qm">
-            Maximum Temperature (2 m) Bias corrected QM
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_2m_max_qdm" id="temperature_2m_max_qdm"
-            name="daily">
-          <label class="form-check-label" for="temperature_2m_max_qdm">
-            Maximum Temperature (2 m) Bias corrected QDM
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_2m_max_reference" id="temperature_2m_max_reference"
-            name="daily">
-          <label class="form-check-label" for="temperature_2m_max_reference">
-            Maximum Temperature (2 m) Reference
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_2m_max_trend" id="temperature_2m_max_trend"
-            name="daily">
-          <label class="form-check-label" for="temperature_2m_max_trend">
-            Maximum Temperature (2 m) Trend
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_2m_max_linear" id="temperature_2m_max_linear"
-            name="daily">
-          <label class="form-check-label" for="temperature_2m_max_linear">
-            Maximum Temperature (2 m) Linear corrected
-          </label>
-        </div>-->
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_min" id="temperature_2m_min"
             name="daily">
@@ -180,20 +136,6 @@
             Mean Cloud Cover
           </label>
         </div>
-        <!--<div class="form-check">
-          <input class="form-check-input" type="checkbox" value="apparent_temperature_max" id="apparent_temperature_max"
-            name="daily">
-          <label class="form-check-label" for="apparent_temperature_max">
-            Maximum Apparent Temperature (2 m)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="apparent_temperature_min" id="apparent_temperature_min"
-            name="daily">
-          <label class="form-check-label" for="apparent_temperature_min">
-            Minimum Apparent Temperature (2 m)
-          </label>
-        </div>-->
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="shortwave_radiation_sum" id="shortwave_radiation_sum"
             name="daily">
@@ -202,7 +144,7 @@
           </label>
         </div>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-4">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="relative_humidity_2m_min" id="relative_humidity_2m_min"
             name="daily">
@@ -224,24 +166,25 @@
             Mean Relative Humidity (2 m)
           </label>
         </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="pressure_msl_mean" id="pressure_msl_mean"
+            name="daily">
+          <label class="form-check-label" for="pressure_msl_mean">
+            Pressure msl
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm_mean" id="soil_moisture_0_to_10cm_mean" name="daily">
+          <label class="form-check-label" for="soil_moisture_0_to_10cm_mean">
+            Mean Soil Moisture (0-10 cm)
+          </label>
+        </div>
       </div>
-      <div class="col-md-6">
+      <div class="col-md-4">
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="precipitation_sum" id="precipitation_sum" name="daily">
           <label class="form-check-label" for="precipitation_sum">
             Precipitation Sum
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="precipitation_qdm" id="precipitation_qdm" name="daily">
-          <label class="form-check-label" for="precipitation_qdm">
-            Precipitation Sum qdm
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="precipitation_linear" id="precipitation_linear" name="daily">
-          <label class="form-check-label" for="precipitation_linear">
-            Precipitation Sum linear
           </label>
         </div>
         <div class="form-check">
@@ -256,12 +199,6 @@
             Snowfall Sum
           </label>
         </div>
-        <!--<div class="form-check">
-          <input class="form-check-input" type="checkbox" value="runoff_sum" id="runoff_sum" name="daily">
-          <label class="form-check-label" for="runoff_sum">
-            Runoff Sum
-          </label>
-        </div>-->
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="windspeed_10m_mean" id="windspeed_10m_mean" name="daily">
           <label class="form-check-label" for="windspeed_10m_mean">
@@ -274,21 +211,7 @@
             Maximum Wind Speed (10 m)
           </label>
         </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm_mean" id="soil_moisture_0_to_10cm_mean" name="daily">
-          <label class="form-check-label" for="soil_moisture_0_to_10cm_mean">
-            Mean Soil Moisture (0-10 cm)
-          </label>
-        </div>
-        <!--<div class="form-check">
-          <input class="form-check-input" type="checkbox" value="et0_fao_evapotranspiration"
-            id="et0_fao_evapotranspiration_daily" name="daily">
-          <label class="form-check-label" for="et0_fao_evapotranspiration_daily">
-            Reference Evapotranspiration (ET₀)
-          </label>
-        </div>-->
       </div>
-      <small class="text-muted">* Parameter <mark>timezone</mark> is mandatory</small>
     </div>
 
     <div class="row py-3 px-0">
@@ -306,31 +229,31 @@
             <div class="accordion-body row">
               <div class="col-md-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="CMCC_CM2_VHR4" id="CMCC_CM2_VHR4" name="models">
+                  <input class="form-check-input" type="checkbox" value="CMCC_CM2_VHR4" id="CMCC_CM2_VHR4" name="models" checked>
                   <label class="form-check-label" for="CMCC_CM2_VHR4">
                     CMCC_CM2_VHR4 <span class="text-muted">(27 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="FGOALS_f3_H" id="FGOALS_f3_H" name="models">
+                  <input class="form-check-input" type="checkbox" value="FGOALS_f3_H" id="FGOALS_f3_H" name="models" checked>
                   <label class="form-check-label" for="FGOALS_f3_H">
                     FGOALS_f3_H <span class="text-muted">(25 km)</span>
                   </label>
                 </div>
-                <div class="form-check">
+                <!--<div class="form-check">
                   <input class="form-check-input" type="checkbox" value="FGOALS_f3_H_highresSST" id="FGOALS_f3_H_highresSST" name="models">
                   <label class="form-check-label" for="FGOALS_f3_H_highresSST">
                     FGOALS_f3_H_highresSST <span class="text-muted">(25 km)</span>
                   </label>
-                </div>
+                </div>-->
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="HiRAM_SIT_HR" id="HiRAM_SIT_HR" name="models">
+                  <input class="form-check-input" type="checkbox" value="HiRAM_SIT_HR" id="HiRAM_SIT_HR" name="models" checked>
                   <label class="form-check-label" for="HiRAM_SIT_HR">
                     HiRAM_SIT_HR <span class="text-muted">(23 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="MRI_AGCM3_2_S" id="MRI_AGCM3_2_S" name="models">
+                  <input class="form-check-input" type="checkbox" value="MRI_AGCM3_2_S" id="MRI_AGCM3_2_S" name="models" checked>
                   <label class="form-check-label" for="MRI_AGCM3_2_S">
                     MRI_AGCM3_2_S <span class="text-muted">(18 km)</span>
                   </label>
@@ -353,14 +276,7 @@
                     NICAM16_8S <span class="text-muted">(30 km)</span>
                   </label>
                 </div>
-                
-                
               </div>
-              <!--<div class="col-md-12">
-                <small class="text-muted">Note: The default <mark>Best Match</mark> combines ERA5 and ERA5-Land
-                  seamlessly. The CERRA model will also be included in <mark>Best Match</mark> once real-time updates
-                  become available.</small>
-              </div>-->
             </div>
           </div>
         </div>
@@ -375,30 +291,6 @@
           <label class="form-check-label" for="disable_bias_correction">Disable statistical downscaling with ERA5-Land as reference</label>
         </div>
       </div>
-      <!--<div class="col-3">
-        <div class="form-floating mb-3">
-          <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="GMT">
-            <option value="America/Anchorage">America/Anchorage</option>
-            <option value="America/Los_Angeles">America/Los_Angeles</option>
-            <option value="America/Denver">America/Denver</option>
-            <option value="America/Chicago">America/Chicago</option>
-            <option value="America/New_York">America/New_York</option>
-            <option value="America/Sao_Paulo">America/Sao_Paulo</option>
-            <option selected value="GMT">GMT+0</option>
-            <option value="auto">Automatically detect time zone</option>
-            <option value="Europe/London">Europe/London</option>
-            <option value="Europe/Berlin">Europe/Berlin</option>
-            <option value="Europe/Moscow">Europe/Moscow</option>
-            <option value="Africa/Cairo">Africa/Cairo</option>
-            <option value="Asia/Bangkok">Asia/Bangkok</option>
-            <option value="Asia/Singapore">Asia/Singapore</option>
-            <option value="Asia/Tokyo">Asia/Tokyo</option>
-            <option value="Australia/Sydney">Australia/Sydney</option>
-            <option value="Pacific/Auckland">Pacific/Auckland</option>
-          </select>
-          <label for="timezone">Timezone</label>
-        </div>
-      </div>-->
       <div class="col-3">
         <div class="form-floating mb-3">
           <select class="form-select" name="temperature_unit" id="temperature_unit" aria-label="Temperature Unit"
@@ -470,7 +362,7 @@
 
   <h2 id="data-sources" class="mt-5">Data Sources</h2>
   <div class="row">
-    <div class="col-6">
+    <!--<div class="col-6">
       <p>The Historical Weather API is based on reanalysis datasets and uses a combination of weather station,
         aircraft, buoy, radar, and satellite observations to create a comprehensive record of past weather conditions.
         These datasets are able to fill in gaps by using mathematical models to estimate the values of various weather
@@ -484,7 +376,7 @@
         increased to 5 km, although this higher resolution is only available up until June 2021, with real-time
         updates expected to be available sometime in 2023. In general, a higher spatial resolution means that the data
         is more detailed and represents the weather conditions more accurately at smaller scales.</p>
-    </div>
+    </div>-->
   </div>
   <div class="table-responsive">
     <table class="table">
@@ -494,8 +386,10 @@
           <th scope="col">Origin</th>
           <th scope="col">Run by</th>
           <th scope="col">Spatial Resolution</th>
-          <th scope="col">Temporal Resolution</th>
-          <th scope="col">Data Availability</th>
+          <th scope="col">aerosol</th>
+          <th scope="col">atmos</th>
+          <th scope="col">land</th>
+          <th scope="col">seaIce</th>
         </tr>
       </thead>
       <tbody>
@@ -506,18 +400,22 @@
           <td>Italy</td>
           <td>Fondazione Centro Euro-Mediterraneo sui Cambiamenti Climatici, Lecce (CMCC)</td>
           <td>0.31°/0.23° (~27 km)</td>
-          <td>Daily</td>
-          <td>1950 to 2050</td>
+          <td>25 km</td>
+          <td>25 km</td>
+          <td>25 km</td>
+          <td>25 km</td>
         </tr>
         <tr>
           <th scope="row"><a
-              href="https://www.wdc-climate.de/ui/cmip6?input=CMIP6.HighResMIP.CAS.FGOALS-f3-H.highresSST-future">FGOALS_f3_H</a>
+              href="https://www.wdc-climate.de/ui/cmip6?input=CMIP6.HighResMIP.CAS.FGOALS-f3-H">FGOALS_f3_H</a>
           </th>
           <td>China</td>
           <td>Chinese Academy of Sciences, Beijing (CAS)</td>
           <td>0.23 (~23 km)</td>
-          <td>Daily</td>
-          <td>1950 to 2050</td>
+          <td>25 km</td>
+          <td>25 km</td>
+          <td>10 km</td>
+          <td>10 km</td>
         </tr>
         <tr>
           <th scope="row"><a
@@ -526,8 +424,10 @@
           <td>Taiwan</td>
           <td>Research Center for Environmental Changes, Academia Sinica, Nankang, Taipei (AS-RCEC)</td>
           <td>0.23° (~23 km)</td>
-          <td>Daily</td>
-          <td>1950 to 2050</td>
+          <td>25 km</td>
+          <td>25 km</td>
+          <td>25 km</td>
+          <td>25 km</td>
         </tr>
         <tr>
           <th scope="row"><a
@@ -536,21 +436,135 @@
           <td>Japan</td>
           <td>Meteorological Research Institute, Tsukuba, Ibaraki (MRI) </td>
           <td>0.18 (~18 km)</td>
-          <td>Daily</td>
-          <td>1950 to 2050</td>
+          <td>250 km</td>
+          <td>25 km</td>
+          <td>25 km</td>
+          <td>-</td>
+        </tr>
+        <tr>
+          <th scope="row"><a
+              href="https://www.wdc-climate.de/ui/cmip6?input=CMIP6.HighResMIP.EC-Earth-Consortium.EC-Earth3P-HR">EC_Earth3P_HR</a>
+          </th>
+          <td>Europe</td>
+          <td>EC-Earth consortium, Rossby Center, Swedish Meteorological and Hydrological Institute/SMHI, Norrkoping, Sweden</td>
+          <td>0.31°/0.23° (~27 km)</td>
+          <td>50 km</td>
+          <td>50 km</td>
+          <td>25 km</td>
+          <td>25 km</td>
+        </tr>
+        <tr>
+          <th scope="row"><a
+              href="https://www.wdc-climate.de/ui/cmip6?input=CMIP6.HighResMIP.MPI-M.MPI-ESM1-2-XR">MPI_ESM1_2_XR</a>
+          </th>
+          <td>Germany</td>
+          <td>Max Planck Institute for Meteorology, Hamburg 20146, Germany</td>
+          <td>0.46° (~47 km)</td>
+          <td>50 km</td>
+          <td>50 km</td>
+          <td>50 km</td>
+          <td>50 km</td>
+        </tr>
+        <tr>
+          <th scope="row"><a
+              href="https://www.wdc-climate.de/ui/cmip6?input=CMIP6.HighResMIP.MIROC.NICAM16-8S">NICAM16_8S</a>
+          </th>
+          <td>Japan</td>
+          <td>Japan Agency for Marine-Earth Science and Technology, Kanagawa 236-0001, Japan (MIROC)</td>
+          <td>0.28° (~28 km)</td>
+          <td>25 km</td>
+          <td>50 km</td>
+          <td>25 km</td>
+          <td>25 km</td>
         </tr>
       </tbody>
     </table>
   </div>
-  <p>Different reanalysis models may include different sets of weather variables in their datasets. For example, the
-    ERA5 model includes all weather variables, while the ERA5-Land model only includes surface variables such as
-    temperature, humidity, soil temperature, and soil moisture. The CERRA model includes most weather variables, but
-    does not include soil temperature and moisture. It is important to be aware of the specific variables that are
-    included in a particular reanalysis model in order to understand the limitations and potential biases of the data.
-  </p>
+  <div class="table-responsive">
+    <table class="table">
+      <caption>&#x26a0;&#xfe0f; = Only daily <mark>mean</mark> values available. No daily minima or maxima.</caption>
+      <thead>
+        <tr>
+          <th scope="col" style="width: 22%">Model</th>
+          <th scope="col" style="width: 13%">Temperature</th>
+          <th scope="col" style="width: 13%">Relative<br/>Humidity</th>
+          <th scope="col" style="width: 13%">Wind</th>
+          <th scope="col" style="width: 13%">Precipitation</th>
+          <th scope="col" style="width: 13%">Snowfall,<br/>Solar Radiation &<br/>Clouds</th>
+          <th scope="col" style="width: 13%">Soil moisture</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">CMCC-CM2-VHR4</th>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x274c;</td>
+          <td>&#x274c;</td>
+        </tr>
+        <tr>
+          <th scope="row">FGOALS-f3-H</th>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x274c;</td>
+        </tr>
+        <tr>
+          <th scope="row">HiRAM-SIT-HR</th>
+          <td>&#x2705;</td>
+          <td>&#x26a0;&#xfe0f;</td>
+          <td>&#x26a0;&#xfe0f;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x274c;</td>
+        </tr>
+        <tr>
+          <th scope="row">MRI-AGCM3-2-S</th>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+        </tr>
+        <tr>
+          <th scope="row">EC_Earth3P_HR</th>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x274c;</td>
+        </tr>
+        <tr>
+          <th scope="row">MPI_ESM1_2_XR</th>
+          <td>&#x2705;</td>
+          <td>&#x26a0;&#xfe0f;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x274c;</td>
+        </tr>
+        <tr>
+          <th scope="row">NICAM16_8S</th>
+          <td>&#x2705;</td>
+          <td>&#x26a0;&#xfe0f;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x2705;</td>
+          <td>&#x274c;</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
 
   <div class="col-12 py-5">
-    <h2 id="api-documentation">API Documentation</h2>
+    <!--<h2 id="api-documentation">API Documentation</h2>
     <p>The API endpoint <mark>/v1/climate</mark> allows users to retrieve historical weather data for a specific
       location and time
       period. To use this endpoint, you can specify a geographical coordinate, a time interval, and a list of weather
@@ -1022,7 +1036,7 @@ Olsson E., Verrelle A., Wang Z.Q., (accessed on 2022-12-31), doi: '10.24381/cds.
   <p>All users of Open-Meteo data must provide a clear attribution to the Copernicus program as well as a reference to
     Open-Meteo.</p>
 
-
+  -->
 
   <!--<div class=col-12>
       <h1>Docs</h1>

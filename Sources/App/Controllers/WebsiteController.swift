@@ -211,8 +211,13 @@ struct WebsiteController: RouteCollection {
         if req.headers[.host].contains(where: { $0.contains("api") }) {
             return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
         }
-        let context = IndexContext(title: "Climate API")
-        return req.view.render("docs-climate-api", context)
+        return req.view.render("docs-climate-api", [
+            "title": "Climate API",
+            "date_start": "1950-01-01",
+            "date_end": "2050-12-31",
+            "date_end_default": "2050-12-31",
+            "date_start_default": "1950-01-01"
+        ])
     }
     
     func dwdApiHandler(_ req: Request) -> EventLoopFuture<View> {
