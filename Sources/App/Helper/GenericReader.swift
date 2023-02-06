@@ -111,7 +111,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     let position: Range<Int>
     
     /// Elevation of the grid point
-    let modelElevation: Float
+    let modelElevation: ElevationOrSea
     
     /// The desired elevation. Used to correct temperature forecasts
     let targetElevation: Float
@@ -133,7 +133,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     public init(domain: Domain, position: Range<Int>) {
         self.domain = domain
         self.position = position
-        self.modelElevation = .nan
+        self.modelElevation = .noData
         self.targetElevation = .nan
         self.modelLat = .nan
         self.modelLon = .nan
@@ -149,7 +149,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.domain = domain
         self.position = gridpoint.gridpoint ..< gridpoint.gridpoint + 1
         self.modelElevation = gridpoint.gridElevation
-        self.targetElevation = elevation.isNaN ? gridpoint.gridElevation : elevation
+        self.targetElevation = elevation.isNaN ? gridpoint.gridElevation.numeric : elevation
         
         omFileSplitter = OmFileSplitter(domain)
         
@@ -170,10 +170,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             return DataAndUnit(data.map({$0 / 100}), .hectoPascal)
         }
         
-        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
+        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.numeric.isNaN && !targetElevation.isNaN && targetElevation != modelElevation.numeric {
             for i in data.indices {
                 // correct temperature by 0.65° per 100 m elevation
-                data[i] += (modelElevation - targetElevation) * 0.0065
+                data[i] += (modelElevation.numeric - targetElevation) * 0.0065
             }
         }
         return DataAndUnit(data, variable.unit)

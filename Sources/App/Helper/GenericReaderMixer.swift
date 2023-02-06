@@ -20,7 +20,7 @@ protocol GenericReaderMixable {
     
     var modelLat: Float { get }
     var modelLon: Float { get }
-    var modelElevation: Float { get }
+    var modelElevation: ElevationOrSea { get }
     var targetElevation: Float { get }
     var modelDtSeconds: Int { get }
     
@@ -38,7 +38,7 @@ extension GenericReaderMixer {
     var modelLon: Float {
         reader.last!.modelLon
     }
-    var modelElevation: Float {
+    var modelElevation: ElevationOrSea {
         reader.last!.modelElevation
     }
     var targetElevation: Float {
@@ -58,7 +58,7 @@ extension GenericReaderMixer {
                 return nil
             }
             if elevation.isNaN {
-                elevation = domain.modelElevation
+                elevation = domain.modelElevation.numeric
             }
             return domain
         }.reversed()

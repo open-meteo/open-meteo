@@ -23,7 +23,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
     var modelDtSeconds: Int {
         reader.first!.modelDtSeconds
     }
-    var modelElevation: Float {
+    var modelElevation: ElevationOrSea {
         reader.last!.modelElevation
     }
     

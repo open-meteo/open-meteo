@@ -13,7 +13,7 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
     }
     
     /// Elevation of the grid point
-    var modelElevation: Float {
+    var modelElevation: ElevationOrSea {
         return reader.modelElevation
     }
     

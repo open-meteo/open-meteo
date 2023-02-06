@@ -166,7 +166,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderMixable {
             let dewpoint = try get(derived: .dewpoint_2m, time: time).data
             
             let et0 = swrad.indices.map { i in
-                return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: self.modelElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
+                return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: self.modelElevation.numeric, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
             }
             return DataAndUnit(et0, .millimeter)
         case .diffuse_radiation:
@@ -177,7 +177,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderMixable {
         case .surface_pressure:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let pressure = try get(raw: .pressure_msl, time: time)
-            return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: modelElevation), pressure.unit)
+            return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: modelElevation.numeric), pressure.unit)
         case .cloudcover:
             let low = try get(raw: .cloudcover_low, time: time).data
             let mid = try get(raw: .cloudcover_mid, time: time).data

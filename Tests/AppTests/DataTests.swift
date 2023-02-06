@@ -35,11 +35,11 @@ final class DataTests: XCTestCase {
         
         let optimised = try IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.elevationFile!)!
         XCTAssertEqual(optimised.gridpoint, 225405)
-        XCTAssertEqual(optimised.gridElevation, 600)
+        XCTAssertEqual(optimised.gridElevation.numeric, 600)
         
         let nearest = try IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.elevationFile!)!
         XCTAssertEqual(nearest.gridpoint, 225406)
-        XCTAssertEqual(nearest.gridElevation, 1006.0)
+        XCTAssertEqual(nearest.gridElevation.numeric, 1006.0)
     }
     
     func testLambertConformal() {

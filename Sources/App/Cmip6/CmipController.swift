@@ -99,7 +99,7 @@ protocol Cmip6Readerable {
     func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit
     var modelLat: Float { get }
     var modelLon: Float { get }
-    var modelElevation: Float { get }
+    var modelElevation: ElevationOrSea { get }
     var targetElevation: Float { get }
     var modelDtSeconds: Int { get }
 }
@@ -160,11 +160,11 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
     
     typealias Domain = Cmip6Domain
     
-    var modelLat: Float { reader.modelLat }
+    var modelLat: Float { readerEra5Land?.modelLat ?? readerEra5.modelLat }
     
-    var modelLon: Float { reader.modelLon }
+    var modelLon: Float { readerEra5Land?.modelLon ?? readerEra5.modelLon }
     
-    var modelElevation: Float { reader.modelElevation }
+    var modelElevation: ElevationOrSea { readerEra5Land?.modelElevation ?? readerEra5.modelElevation }
     
     var targetElevation: Float { reader.targetElevation }
     
@@ -177,21 +177,21 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
     let readerEra5: GenericReader<CdsDomain, Era5Variable>
     
     /// era5 land reader
-    let readerEra5Land: GenericReader<CdsDomain, Era5Variable>
+    let readerEra5Land: GenericReader<CdsDomain, Era5Variable>?
     
     /// Get Bias correction field from era5-land or era5
     func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
-        if let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5Land.domain) {
+        if let readerEra5Land, let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5Land.domain) {
             let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position, dim1: 0..<referenceWeightFile.dim1)
             if !weights.containsNaN() {
-                return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5.modelElevation)
+                return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5.modelElevation.numeric)
             }
         }
         guard let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5.domain) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(readerEra5.domain)")
         }
         let weights = try referenceWeightFile.read(dim0Slow: readerEra5.position, dim1: 0..<referenceWeightFile.dim1)
-        return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5Land.modelElevation)
+        return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5.modelElevation.numeric)
     }
     
     
@@ -236,7 +236,8 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         self.reader = reader
-        self.readerEra5Land = readerEra5Land
+        /// No data on sea for ERA5-Land
+        self.readerEra5Land = readerEra5Land.modelElevation.isSea ? nil : readerEra5Land
         self.readerEra5 = readerEra5
     }
     

@@ -32,7 +32,7 @@ extension GenericReaderDerived {
         reader.modelLon
     }
     
-    var modelElevation: Float {
+    var modelElevation: ElevationOrSea {
         reader.modelElevation
     }
     
