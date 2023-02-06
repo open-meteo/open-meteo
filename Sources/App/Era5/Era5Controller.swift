@@ -6,110 +6,103 @@ import Vapor
  TODO time arrays in large history responses are very inefficient
  */
 struct Era5Controller {
-    func query(_ req: Request) -> EventLoopFuture<Response> {
-        do {
-            // API should only be used on the subdomain
-            if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "archive-api.") }) {
-                throw Abort.init(.notFound)
-            }
-            let generationTimeStart = Date()
-            let params = try req.query.decode(Era5Query.self)
-            try params.validate()
-            let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
-            
-            let allowedRange = Timestamp(1959, 1, 1) ..< Timestamp.now()
-            let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, allowedRange: allowedRange)
-            let hourlyTime = time.range.range(dtSeconds: 3600)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
-            
-            let domains = params.models ?? [.best_match]
-            
-            let readers = try domains.compactMap {
-                try GenericReaderMulti<CdsVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
-            }
-            
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-
-            // Start data prefetch to boooooooost API speed :D
-            if let hourlyVariables = params.hourly {
-                for reader in readers {
-                    try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
-                }
-            }
-            if let dailyVariables = params.daily {
-                for reader in readers {
-                    try reader.prefetchData(variables: dailyVariables, time: dailyTime)
-                }
-            }
-            
-            
-            let hourly: ApiSection? = try params.hourly.map { variables in
-                var res = [ApiColumn]()
-                res.reserveCapacity(variables.count * readers.count)
-                for reader in readers {
-                    for variable in variables {
-                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                        guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params).toApi(name: name) else {
-                            continue
-                        }
-                        assert(hourlyTime.count == d.data.count)
-                        res.append(d)
-                    }
-                }
-                return ApiSection(name: "hourly", time: hourlyTime, columns: res)
-            }
-            let daily: ApiSection? = try params.daily.map { dailyVariables in
-                var res = [ApiColumn]()
-                res.reserveCapacity(dailyVariables.count * readers.count)
-                var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
-                
-                for reader in readers {
-                    for variable in dailyVariables {
-                        if variable == .sunrise || variable == .sunset {
-                            // only calculate sunrise/set once
-                            let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
-                            riseSet = times
-                            if variable == .sunset {
-                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
-                            } else {
-                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
-                            }
-                            continue
-                        }
-                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                        guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime)?.toApi(name: name) else {
-                            continue
-                        }
-                        assert(dailyTime.count == d.data.count)
-                        res.append(d)
-                    }
-                }
-                
-                return ApiSection(name: "daily", time: dailyTime, columns: res)
-            }
-            
-            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-            let out = ForecastapiResult(
-                latitude: readers[0].modelLat,
-                longitude: readers[0].modelLon,
-                elevation: readers[0].targetElevation,
-                generationtime_ms: generationTimeMs,
-                utc_offset_seconds: time.utcOffsetSeconds,
-                timezone: timezone,
-                current_weather: nil,
-                sections: [hourly, daily].compactMap({$0}),
-                timeformat: params.timeformatOrDefault
-            )
-            //let response = Response()
-            //try response.content.encode(out, as: .json)
-
-            return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
-        } catch {
-            return req.eventLoop.makeFailedFuture(error)
+    func query(_ req: Request) throws -> EventLoopFuture<Response> {
+        try req.ensureSubdomain("archive-api")
+        let generationTimeStart = Date()
+        let params = try req.query.decode(Era5Query.self)
+        try params.validate()
+        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
+        
+        let allowedRange = Timestamp(1959, 1, 1) ..< Timestamp.now()
+        let timezone = try params.resolveTimezone()
+        let time = try params.getTimerange(timezone: timezone, allowedRange: allowedRange)
+        let hourlyTime = time.range.range(dtSeconds: 3600)
+        let dailyTime = time.range.range(dtSeconds: 3600*24)
+        
+        let domains = params.models ?? [.best_match]
+        
+        let readers = try domains.compactMap {
+            try GenericReaderMulti<CdsVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
         }
+        
+        guard !readers.isEmpty else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+
+        // Start data prefetch to boooooooost API speed :D
+        if let hourlyVariables = params.hourly {
+            for reader in readers {
+                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+            }
+        }
+        if let dailyVariables = params.daily {
+            for reader in readers {
+                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+            }
+        }
+        
+        
+        let hourly: ApiSection? = try params.hourly.map { variables in
+            var res = [ApiColumn]()
+            res.reserveCapacity(variables.count * readers.count)
+            for reader in readers {
+                for variable in variables {
+                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                    guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params).toApi(name: name) else {
+                        continue
+                    }
+                    assert(hourlyTime.count == d.data.count)
+                    res.append(d)
+                }
+            }
+            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+        }
+        let daily: ApiSection? = try params.daily.map { dailyVariables in
+            var res = [ApiColumn]()
+            res.reserveCapacity(dailyVariables.count * readers.count)
+            var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
+            
+            for reader in readers {
+                for variable in dailyVariables {
+                    if variable == .sunrise || variable == .sunset {
+                        // only calculate sunrise/set once
+                        let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
+                        riseSet = times
+                        if variable == .sunset {
+                            res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
+                        } else {
+                            res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
+                        }
+                        continue
+                    }
+                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                    guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime)?.toApi(name: name) else {
+                        continue
+                    }
+                    assert(dailyTime.count == d.data.count)
+                    res.append(d)
+                }
+            }
+            
+            return ApiSection(name: "daily", time: dailyTime, columns: res)
+        }
+        
+        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+        let out = ForecastapiResult(
+            latitude: readers[0].modelLat,
+            longitude: readers[0].modelLon,
+            elevation: readers[0].targetElevation,
+            generationtime_ms: generationTimeMs,
+            utc_offset_seconds: time.utcOffsetSeconds,
+            timezone: timezone,
+            current_weather: nil,
+            sections: [hourly, daily].compactMap({$0}),
+            timeformat: params.timeformatOrDefault
+        )
+        //let response = Response()
+        //try response.content.encode(out, as: .json)
+
+        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
     }
 }
 

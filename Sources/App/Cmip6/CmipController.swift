@@ -3,101 +3,94 @@ import Vapor
 
 
 struct CmipController {
-    func query(_ req: Request) -> EventLoopFuture<Response> {
-        do {
-            // API should only be used on the subdomain
-            if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "climate-api.") }) {
-                throw Abort.init(.notFound)
-            }
-            let generationTimeStart = Date()
-            let params = try req.query.decode(CmipQuery.self)
-            try params.validate()
-            let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
-            
-            let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)
-            //let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(allowedRange: allowedRange)
-            //let hourlyTime = time.range.range(dtSeconds: 3600)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
-            let biasCorrection = !(params.disable_bias_correction ?? false)
-            
-            let domains = params.models ?? [.MRI_AGCM3_2_S]
-            
-            let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
-                if biasCorrection {
-                    guard let reader = try Cmip6Reader<Cmip6BiasCorrector>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
-                        throw ForecastapiError.noDataAvilableForThisLocation
-                    }
-                    return reader
-                } else {
-                    guard let reader = try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
-                        throw ForecastapiError.noDataAvilableForThisLocation
-                    }
-                    return reader
+    func query(_ req: Request) throws -> EventLoopFuture<Response> {
+        try req.ensureSubdomain("climate-api")
+        let generationTimeStart = Date()
+        let params = try req.query.decode(CmipQuery.self)
+        try params.validate()
+        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
+        
+        let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)
+        //let timezone = try params.resolveTimezone()
+        let time = try params.getTimerange(allowedRange: allowedRange)
+        //let hourlyTime = time.range.range(dtSeconds: 3600)
+        let dailyTime = time.range.range(dtSeconds: 3600*24)
+        let biasCorrection = !(params.disable_bias_correction ?? false)
+        
+        let domains = params.models ?? [.MRI_AGCM3_2_S]
+        
+        let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
+            if biasCorrection {
+                guard let reader = try Cmip6Reader<Cmip6BiasCorrector>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
                 }
-            }
-            
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-
-            // Start data prefetch to boooooooost API speed :D
-            /*if let hourlyVariables = params.hourly {
-                for reader in readers {
-                    try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                return reader
+            } else {
+                guard let reader = try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
                 }
-            }*/
-            if let dailyVariables = params.daily {
-                for reader in readers {
-                    try reader.prefetchData(variables: dailyVariables, time: dailyTime)
-                }
+                return reader
             }
-            
-            
-            /*let hourly: ApiSection? = try params.hourly.map { variables in
-                var res = [ApiColumn]()
-                res.reserveCapacity(variables.count * readers.count)
-                for reader in readers {
-                    for variable in variables {
-                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.reader.reader.domain.rawValue)" : variable.rawValue
-                        let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: name)
-                        assert(hourlyTime.count == d.data.count)
-                        res.append(d)
-                    }
-                }
-                return ApiSection(name: "hourly", time: hourlyTime, columns: res)
-            }*/
-            let daily: ApiSection? = try params.daily.map { dailyVariables in
-                var res = [ApiColumn]()
-                res.reserveCapacity(dailyVariables.count * readers.count)
-                for (reader, domain) in zip(readers, domains) {
-                    for variable in dailyVariables {
-                        let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
-                        let d = try reader.get(variable: variable, time: dailyTime).toApi(name: name)
-                        assert(dailyTime.count == d.data.count)
-                        res.append(d)
-                    }
-                }
-                
-                return ApiSection(name: "daily", time: dailyTime, columns: res)
-            }
-            
-            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-            let out = ForecastapiResult(
-                latitude: readers[0].modelLat,
-                longitude: readers[0].modelLon,
-                elevation: readers[0].targetElevation,
-                generationtime_ms: generationTimeMs,
-                utc_offset_seconds: time.utcOffsetSeconds,
-                timezone: TimeZone(identifier: "GMT")!,
-                current_weather: nil,
-                sections: [/*hourly,*/ daily].compactMap({$0}),
-                timeformat: params.timeformatOrDefault
-            )
-            return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
-        } catch {
-            return req.eventLoop.makeFailedFuture(error)
         }
+        
+        guard !readers.isEmpty else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+
+        // Start data prefetch to boooooooost API speed :D
+        /*if let hourlyVariables = params.hourly {
+            for reader in readers {
+                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+            }
+        }*/
+        if let dailyVariables = params.daily {
+            for reader in readers {
+                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+            }
+        }
+        
+        
+        /*let hourly: ApiSection? = try params.hourly.map { variables in
+            var res = [ApiColumn]()
+            res.reserveCapacity(variables.count * readers.count)
+            for reader in readers {
+                for variable in variables {
+                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.reader.reader.domain.rawValue)" : variable.rawValue
+                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: name)
+                    assert(hourlyTime.count == d.data.count)
+                    res.append(d)
+                }
+            }
+            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+        }*/
+        let daily: ApiSection? = try params.daily.map { dailyVariables in
+            var res = [ApiColumn]()
+            res.reserveCapacity(dailyVariables.count * readers.count)
+            for (reader, domain) in zip(readers, domains) {
+                for variable in dailyVariables {
+                    let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                    let d = try reader.get(variable: variable, time: dailyTime).toApi(name: name)
+                    assert(dailyTime.count == d.data.count)
+                    res.append(d)
+                }
+            }
+            
+            return ApiSection(name: "daily", time: dailyTime, columns: res)
+        }
+        
+        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+        let out = ForecastapiResult(
+            latitude: readers[0].modelLat,
+            longitude: readers[0].modelLon,
+            elevation: readers[0].targetElevation,
+            generationtime_ms: generationTimeMs,
+            utc_offset_seconds: time.utcOffsetSeconds,
+            timezone: TimeZone(identifier: "GMT")!,
+            current_weather: nil,
+            sections: [/*hourly,*/ daily].compactMap({$0}),
+            timeformat: params.timeformatOrDefault
+        )
+        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
     }
 }
 

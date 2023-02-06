@@ -74,78 +74,71 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderMixable {
 }
 
 struct GloFasController {
-    func query(_ req: Request) -> EventLoopFuture<Response> {
-        do {
-            // API should only be used on the subdomain
-            if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "flood-api.") }) {
-                throw Abort.init(.notFound)
-            }
-            let generationTimeStart = Date()
-            let params = try req.query.decode(GloFasQuery.self)
-            try params.validate()
-            let currentTime = Timestamp.now()
-            
-            let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
-            let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange, past_days_max: 360)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
-            
-            let domains = params.models ?? [.seamless_v3]
-            
-            let readers = try domains.compactMap {
-                guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
-                }
-                return reader
-            }
-            
-            guard !readers.isEmpty else {
+    func query(_ req: Request) throws -> EventLoopFuture<Response> {
+        try req.ensureSubdomain("flood-api")
+        let generationTimeStart = Date()
+        let params = try req.query.decode(GloFasQuery.self)
+        try params.validate()
+        let currentTime = Timestamp.now()
+        
+        let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
+        let timezone = try params.resolveTimezone()
+        let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange, past_days_max: 360)
+        let dailyTime = time.range.range(dtSeconds: 3600*24)
+        
+        let domains = params.models ?? [.seamless_v3]
+        
+        let readers = try domains.compactMap {
+            guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            
-            /// convert variables
-            let variablesMember: [VariableOrDerived<GloFasReader.Variable, GloFasReader.Derived>] = params.daily.map {
-                switch $0 {
-                case .raw(let raw):
-                    return .raw(.init(raw, 0))
-                case .derived(let derived):
-                    return .derived(derived)
-                }
-            }
-            /// Variables wih 51 members if requested
-            let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
-            
-            
-            // Start data prefetch to boooooooost API speed :D
-            for reader in readers {
-                try reader.prefetchData(variables: variables, time: dailyTime)
-            }
-            
-            let daily = ApiSection(name: "daily", time: dailyTime, columns: try variables.flatMap { variable in
-                try zip(readers, domains).compactMap { (reader, domain) in
-                    let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
-                    let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(temperatureUnit: .celsius, windspeedUnit: .ms, precipitationUnit: .mm).toApi(name: name)
-                    assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
-                    return d
-                }
-            })
-            
-            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-            let out = ForecastapiResult(
-                latitude: readers[0].modelLat,
-                longitude: readers[0].modelLon,
-                elevation: nil,
-                generationtime_ms: generationTimeMs,
-                utc_offset_seconds: time.utcOffsetSeconds,
-                timezone: timezone,
-                current_weather: nil,
-                sections: [daily],
-                timeformat: params.timeformatOrDefault
-            )
-            return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
-        } catch {
-            return req.eventLoop.makeFailedFuture(error)
+            return reader
         }
+        
+        guard !readers.isEmpty else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        
+        /// convert variables
+        let variablesMember: [VariableOrDerived<GloFasReader.Variable, GloFasReader.Derived>] = params.daily.map {
+            switch $0 {
+            case .raw(let raw):
+                return .raw(.init(raw, 0))
+            case .derived(let derived):
+                return .derived(derived)
+            }
+        }
+        /// Variables wih 51 members if requested
+        let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
+        
+        
+        // Start data prefetch to boooooooost API speed :D
+        for reader in readers {
+            try reader.prefetchData(variables: variables, time: dailyTime)
+        }
+        
+        let daily = ApiSection(name: "daily", time: dailyTime, columns: try variables.flatMap { variable in
+            try zip(readers, domains).compactMap { (reader, domain) in
+                let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(temperatureUnit: .celsius, windspeedUnit: .ms, precipitationUnit: .mm).toApi(name: name)
+                assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
+                return d
+            }
+        })
+        
+        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+        let out = ForecastapiResult(
+            latitude: readers[0].modelLat,
+            longitude: readers[0].modelLon,
+            elevation: nil,
+            generationtime_ms: generationTimeMs,
+            utc_offset_seconds: time.utcOffsetSeconds,
+            timezone: timezone,
+            current_weather: nil,
+            sections: [daily],
+            timeformat: params.timeformatOrDefault
+        )
+        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
     }
 }
 

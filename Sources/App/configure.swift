@@ -130,3 +130,50 @@ extension Application {
     return app
   }
 }
+
+/// Simple API key management. Ensures API calls do not get blocked by automatic rate limiting above 10k daily calls.
+fileprivate struct ApiKeyManager {
+    static var apiKeys: [String.SubSequence] = Environment.get("API_APIKEYS")?.split(separator: ",") ?? []
+}
+
+enum ApiKeyManagerError: Error {
+    case apiKeyRequired
+    case apiKeyInvalid
+}
+
+extension ApiKeyManagerError: AbortError {
+    var status: HTTPResponseStatus {
+        switch self {
+        case .apiKeyRequired:
+            return .unauthorized
+        case .apiKeyInvalid:
+            return .badRequest
+        }
+    }
+    
+    var reason: String {
+        switch self {
+        case .apiKeyRequired:
+            return "API key required. Please add &apikey= to the URL."
+        case .apiKeyInvalid:
+            return "The supplied API key is invalid."
+        }
+    }
+}
+
+extension Request {
+    /// If on open-meteo servers, make sure, the right domain is active. For reserved API instances, and API key required.
+    func ensureSubdomain(_ subdomain: String) throws {
+        if headers[.host].contains(where: { $0.contains("open-meteo.com") && !($0.starts(with: subdomain) || $0.starts(with: "customer-\(subdomain)")) }) {
+            throw Abort.init(.notFound)
+        }
+        if !ApiKeyManager.apiKeys.isEmpty && headers[.host].contains(where: { $0.contains("open-meteo.com") && $0.starts(with: "customer-\(subdomain)") }) {
+            guard let apikey: String = try query.get(at: "apikey") else {
+                throw ApiKeyManagerError.apiKeyRequired
+            }
+            guard ApiKeyManager.apiKeys.contains(String.SubSequence(apikey)) else {
+                throw ApiKeyManagerError.apiKeyInvalid
+            }
+        }
+    }
+}

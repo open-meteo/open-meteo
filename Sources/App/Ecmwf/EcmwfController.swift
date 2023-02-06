@@ -3,56 +3,49 @@ import Vapor
 
 
 struct EcmwfController {
-    func query(_ req: Request) -> EventLoopFuture<Response> {
-        do {
-            // API should only be used on the subdomain
-            if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "api.") }) {
-                throw Abort.init(.notFound)
-            }
-            let generationTimeStart = Date()
-            let params = try req.query.decode(EcmwfQuery.self)
-            try params.validate()
-            let currentTime = Timestamp.now()
-            
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 11)
-            let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 10, allowedRange: allowedRange)
-            let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
-            
-            guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            // Start data prefetch to boooooooost API speed :D
-            if let hourlyVariables = params.hourly {
-                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
-            }
-            
-            let hourly: ApiSection? = try params.hourly.map { variables in
-                var res = [ApiColumn]()
-                res.reserveCapacity(variables.count)
-                for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
-                    res.append(d)
-                }
-                return ApiSection(name: "hourly", time: hourlyTime, columns: res)
-            }
-            
-            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-            let out = ForecastapiResult(
-                latitude: reader.reader.modelLat,
-                longitude: reader.reader.modelLon,
-                elevation: nil,
-                generationtime_ms: generationTimeMs,
-                utc_offset_seconds: time.utcOffsetSeconds,
-                timezone: timezone,
-                current_weather: nil,
-                sections: [hourly].compactMap({$0}),
-                timeformat: params.timeformatOrDefault
-            )
-            return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
-        } catch {
-            return req.eventLoop.makeFailedFuture(error)
+    func query(_ req: Request) throws -> EventLoopFuture<Response> {
+        try req.ensureSubdomain("api")
+        let generationTimeStart = Date()
+        let params = try req.query.decode(EcmwfQuery.self)
+        try params.validate()
+        let currentTime = Timestamp.now()
+        
+        let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 11)
+        let timezone = try params.resolveTimezone()
+        let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 10, allowedRange: allowedRange)
+        let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
+        
+        guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
         }
+        // Start data prefetch to boooooooost API speed :D
+        if let hourlyVariables = params.hourly {
+            try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+        }
+        
+        let hourly: ApiSection? = try params.hourly.map { variables in
+            var res = [ApiColumn]()
+            res.reserveCapacity(variables.count)
+            for variable in variables {
+                let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
+                res.append(d)
+            }
+            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+        }
+        
+        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+        let out = ForecastapiResult(
+            latitude: reader.reader.modelLat,
+            longitude: reader.reader.modelLon,
+            elevation: nil,
+            generationtime_ms: generationTimeMs,
+            utc_offset_seconds: time.utcOffsetSeconds,
+            timezone: timezone,
+            current_weather: nil,
+            sections: [hourly].compactMap({$0}),
+            timeformat: params.timeformatOrDefault
+        )
+        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
     }
 }
 

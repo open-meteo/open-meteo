@@ -213,86 +213,79 @@ extension SeasonalForecastReader {
  - daily data
  */
 struct SeasonalForecastController {
-    func query(_ req: Request) -> EventLoopFuture<Response> {
-        do {
-            // API should only be used on the subdomain
-            if req.headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "seasonal-api.") }) {
-                throw Abort.init(.notFound)
-            }
-            let generationTimeStart = Date()
-            let params = try req.query.decode(SeasonalQuery.self)
-            try params.validate()
-            let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
-            let currentTime = Timestamp.now()
-            
-            /// Will be configurable by API later
-            let domain = SeasonalForecastDomain.ncep
-            let members = 1..<domain.nMembers+1
-            
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
-            let timezone = try params.resolveTimezone()
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
-            let hourlyTime = time.range.range(dtSeconds: domain.dtSeconds)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
-            
-            guard let reader = try SeasonalForecastReader(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            
-            // Start data prefetch to boooooooost API speed :D
-            if let hourlyVariables = params.six_hourly {
-                for varible in hourlyVariables {
-                    for member in members {
-                        try reader.prefetchData(variable: varible, member: member, time: hourlyTime)
-                    }
-                }
-            }
-            
-            // Start data prefetch to boooooooost API speed :D
-            if let dailyVariables = params.daily {
-                for varible in dailyVariables {
-                    for member in members {
-                        try reader.prefetchData(variable: varible, member: member, time: dailyTime)
-                    }
-                }
-            }
-            
-            let hourly: ApiSection? = try params.six_hourly.map { variables in
-                return ApiSection(name: "six_hourly", time: hourlyTime, columns: try variables.flatMap { variable in
-                    try members.map { member in
-                        let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(params: params).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
-                        assert(hourlyTime.count == d.data.count, "hours \(hourlyTime.count), values \(d.data.count)")
-                        return d
-                    }
-                })
-            }
-            
-            let daily: ApiSection? = try params.daily.map { dailyVariables in
-                return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.flatMap { variable in
-                    try members.map { member in
-                        let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(params: params).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
-                        assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
-                        return d
-                    }
-                })
-            }
-            
-            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-            let out = ForecastapiResult(
-                latitude: reader.modelLat,
-                longitude: reader.modelLon,
-                elevation: reader.targetElevation,
-                generationtime_ms: generationTimeMs,
-                utc_offset_seconds: time.utcOffsetSeconds,
-                timezone: timezone,
-                current_weather: nil,
-                sections: [hourly, daily].compactMap({$0}),
-                timeformat: params.timeformatOrDefault
-            )
-            return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
-        } catch {
-            return req.eventLoop.makeFailedFuture(error)
+    func query(_ req: Request) throws -> EventLoopFuture<Response> {
+        try req.ensureSubdomain("seasonal-api")
+        let generationTimeStart = Date()
+        let params = try req.query.decode(SeasonalQuery.self)
+        try params.validate()
+        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
+        let currentTime = Timestamp.now()
+        
+        /// Will be configurable by API later
+        let domain = SeasonalForecastDomain.ncep
+        let members = 1..<domain.nMembers+1
+        
+        let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
+        let timezone = try params.resolveTimezone()
+        let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
+        let hourlyTime = time.range.range(dtSeconds: domain.dtSeconds)
+        let dailyTime = time.range.range(dtSeconds: 3600*24)
+        
+        guard let reader = try SeasonalForecastReader(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
         }
+        
+        // Start data prefetch to boooooooost API speed :D
+        if let hourlyVariables = params.six_hourly {
+            for varible in hourlyVariables {
+                for member in members {
+                    try reader.prefetchData(variable: varible, member: member, time: hourlyTime)
+                }
+            }
+        }
+        
+        // Start data prefetch to boooooooost API speed :D
+        if let dailyVariables = params.daily {
+            for varible in dailyVariables {
+                for member in members {
+                    try reader.prefetchData(variable: varible, member: member, time: dailyTime)
+                }
+            }
+        }
+        
+        let hourly: ApiSection? = try params.six_hourly.map { variables in
+            return ApiSection(name: "six_hourly", time: hourlyTime, columns: try variables.flatMap { variable in
+                try members.map { member in
+                    let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(params: params).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
+                    assert(hourlyTime.count == d.data.count, "hours \(hourlyTime.count), values \(d.data.count)")
+                    return d
+                }
+            })
+        }
+        
+        let daily: ApiSection? = try params.daily.map { dailyVariables in
+            return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.flatMap { variable in
+                try members.map { member in
+                    let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(params: params).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
+                    assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
+                    return d
+                }
+            })
+        }
+        
+        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+        let out = ForecastapiResult(
+            latitude: reader.modelLat,
+            longitude: reader.modelLon,
+            elevation: reader.targetElevation,
+            generationtime_ms: generationTimeMs,
+            utc_offset_seconds: time.utcOffsetSeconds,
+            timezone: timezone,
+            current_weather: nil,
+            sections: [hourly, daily].compactMap({$0}),
+            timeformat: params.timeformatOrDefault
+        )
+        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
     }
 }
 
