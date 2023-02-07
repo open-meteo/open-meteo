@@ -4,7 +4,7 @@ import Vapor
 
 struct IconWaveController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain("api")
+        try req.ensureSubdomain("marine-api")
         let generationTimeStart = Date()
         let params = try req.query.decode(IconWaveQuery.self)
         try params.validate()
