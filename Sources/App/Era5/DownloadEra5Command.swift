@@ -188,7 +188,8 @@ struct DownloadEra5Command: AsyncCommandFix {
         logger.info("Calculating bias correction fields")
         
         let binsPerYear = 6
-        let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
+        let nLocationChunks = 200
+        let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: nLocationChunks, chunk1: binsPerYear)
         let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm)
         let availableForEra5Land: [Cmip6Variable] = [
             .temperature_2m_min,
@@ -216,10 +217,14 @@ struct DownloadEra5Command: AsyncCommandFix {
             let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
-                let locationRange = dim0..<min(dim0+200, writer.dim0)
+                let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
+                /// Location range to prefetch for next iteration
+                let locationRangeNext = min(dim0+nLocationChunks, writer.dim0)..<min(dim0+nLocationChunks*2, writer.dim0)
+                let readerNext = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(domain: domain, position: locationRangeNext)])
+                try readerNext.prefetchData(variables: [era5Variable], time: time)
+                
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 let reader = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(domain: domain, position: locationRange)])
-                try reader.prefetchData(variables: [era5Variable], time: time)
                 guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
                     fatalError("Could not get \(era5Variable)")
                 }
