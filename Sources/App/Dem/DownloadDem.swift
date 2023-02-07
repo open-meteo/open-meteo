@@ -21,12 +21,12 @@ struct Dem90 {
         if lat < -90 || lat >= 90 || lon < -180 || lon >= 180 {
             return .nan
         }
-        let lati = Int(lat)
+        let lati = lat < 0 ? Int(lat) - 1 : Int(lat)
         guard let om = try OmFileManager.get(OmFilePathWithTime(basePath: Dem90.omDirectory, variable: "lat", timeChunk: lati)) else {
             // file not available
             return .nan
         }
-        let latrow = abs(Int(lat * 1200) % 1200)
+        let latrow = Int(lat * 1200 + 90 * 1200) % 1200
         let px = pixel(latitude: lati)
         let lonrow = Int((lon + 180) * Float(px))
         return try om.read(dim0Slow: latrow..<latrow+1, dim1: lonrow..<lonrow+1)[0]

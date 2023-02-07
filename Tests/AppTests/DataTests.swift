@@ -14,6 +14,9 @@ final class DataTests: XCTestCase {
     func testDem90() throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: Dem90.omDirectory), "Elevation information unavailable")
         
+        XCTAssertEqual(try Dem90.read(lat: -32.878000, lon: 28.101000), 25) // beach, SE south africa
+        XCTAssertEqual(try Dem90.read(lat: -32.878000, lon: 28.120000), 0) // water, SE south africa
+        
         XCTAssertEqual(try Dem90.read(lat: 46.885748, lon: 8.670080), 991)
         XCTAssertEqual(try Dem90.read(lat: 46.885748, lon: 8.669093), 1028)
         XCTAssertEqual(try Dem90.read(lat: 46.885748, lon: 8.670988), 1001)
@@ -22,12 +25,12 @@ final class DataTests: XCTestCase {
         // greenland
         XCTAssertEqual(try Dem90.read(lat: 72.71190, lon: -31.81641), 2878.0)
         // bolivia
-        XCTAssertEqual(try Dem90.read(lat: -15.11455, lon: -65.74219), 171)
+        XCTAssertEqual(try Dem90.read(lat: -15.11455, lon: -65.74219), 162.0)
         // antarctica
-        XCTAssertEqual(try Dem90.read(lat: -70.52490, lon: -65.30273), 1509)
-        XCTAssertEqual(try Dem90.read(lat: -80.95610, lon: -70.66406), 253)
-        XCTAssertEqual(try Dem90.read(lat: -81.20142, lon: 2.10938), 2389)
-        XCTAssertEqual(try Dem90.read(lat: -80.58973, lon: 108.28125), 3388)
+        XCTAssertEqual(try Dem90.read(lat: -70.52490, lon: -65.30273), 1749.0)
+        XCTAssertEqual(try Dem90.read(lat: -80.95610, lon: -70.66406), 124.0)
+        XCTAssertEqual(try Dem90.read(lat: -81.20142, lon: 2.10938), 2342.0)
+        XCTAssertEqual(try Dem90.read(lat: -80.58973, lon: 108.28125), 3348.0)
     }
     
     func testElevationMatching() throws {
