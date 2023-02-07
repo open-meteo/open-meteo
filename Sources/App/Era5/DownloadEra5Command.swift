@@ -190,6 +190,16 @@ struct DownloadEra5Command: AsyncCommandFix {
         let binsPerYear = 6
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
         let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm)
+        let availableForEra5Land: [Cmip6Variable] = [
+            .temperature_2m_min,
+            .temperature_2m_max,
+            .temperature_2m_mean,
+            .relative_humidity_2m_max,
+            .relative_humidity_2m_min,
+            .relative_humidity_2m_mean,
+            .soil_moisture_0_to_10cm_mean
+        ]
+        
         for variable in variables {
             try variable.getBiasCorrectionFile(for: domain).createDirectory()
             let biasFile = variable.getBiasCorrectionFile(for: domain).getFilePath()
@@ -199,7 +209,8 @@ struct DownloadEra5Command: AsyncCommandFix {
             guard let era5Variable = Era5DailyWeatherVariable(rawValue: variable.rawValue) else {
                 fatalError("Could not initialise Era5DailyWeatherVariable for \(variable)")
             }
-            guard Era5Variable(rawValue: era5Variable.aggregation.variables.0!.rawValue)!.availableForDomain(domain: domain) else {
+            if domain == .era5_land && !availableForEra5Land.contains(variable) {
+                logger.info("Skipping \(variable), because unavailable for ERA5-Land")
                 continue
             }
             let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
