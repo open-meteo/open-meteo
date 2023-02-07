@@ -102,6 +102,9 @@ struct DownloadEra5Command: AsyncCommandFix {
         @Option(name: "stripseaYear", short: "s", help: "strip sea of converted files")
         var stripseaYear: String?
         
+        @Option(name: "prefetch-factor", short: "p", help: "Prefetch factor for bias calculation. Default 2")
+        var prefetchFactor: Int?
+        
         @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
         var cdskey: String?
         
@@ -148,7 +151,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             return
         }
         if signature.calculateBiasField {
-            try generateBiasCorrectionFields(logger: logger, domain: domain)
+            try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
             return
         }
         guard let cdskey = signature.cdskey else {
@@ -184,7 +187,7 @@ struct DownloadEra5Command: AsyncCommandFix {
     
     /// Generate seasonal averages for bias corrections for CMIP climate data
     /// They way how `GenericReaderMulti` is used, is not the cleanest, but otherwise daily calculations need to be implemented manually
-    func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, variables: [Cmip6Variable] = Cmip6Variable.allCases) throws {
+    func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, prefetchFactor: Int, variables: [Cmip6Variable] = Cmip6Variable.allCases) throws {
         logger.info("Calculating bias correction fields")
         
         let binsPerYear = 6
@@ -219,7 +222,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
                 /// Location range to prefetch for next iteration
-                let locationRangeNext = min(dim0+nLocationChunks, writer.dim0)..<min(dim0+nLocationChunks*2, writer.dim0)
+                let locationRangeNext = min(dim0+nLocationChunks, writer.dim0)..<min(dim0+nLocationChunks*prefetchFactor, writer.dim0)
                 let readerNext = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(domain: domain, position: locationRangeNext)])
                 try readerNext.prefetchData(variables: [era5Variable], time: time)
                 
