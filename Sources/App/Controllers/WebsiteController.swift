@@ -25,6 +25,7 @@ struct WebsiteController: RouteCollection {
         routes.get("en", "docs", "gem-api", use: gemApiHandler)
         routes.get("en", "docs", "flood-api", use: floodApiHandler)
         routes.get("en", "features", use: featuresHandler)
+        routes.get("en", "pricing", use: pricingHandler)
     }
     
     func robotsTxtHandler(_ req: Request) -> String {
@@ -234,6 +235,14 @@ struct WebsiteController: RouteCollection {
             ContextWithLevels.PressureVariable(label: "Geopotential Height", name: "geopotential_height"),
         ])
         return req.view.render("docs-dwd-api", context)
+    }
+    
+    func pricingHandler(_ req: Request) -> EventLoopFuture<View> {
+        if req.headers[.host].contains(where: { $0.contains("api") }) {
+            return req.eventLoop.makeFailedFuture(Abort.init(.notFound))
+        }
+        let context = IndexContext(title: "Pricing")
+        return req.view.render("terms", context)
     }
 }
 
