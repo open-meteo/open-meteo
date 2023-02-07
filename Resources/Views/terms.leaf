@@ -34,20 +34,20 @@
         </nav>
     </div>
 </div>
-
-<script async src="https://js.stripe.com/v3/pricing-table.js"></script>
-<stripe-pricing-table class="row" pricing-table-id="prctbl_1MJg0iLNZMSyEuRUvpoeTHOb"
-    publishable-key="pk_live_51MJeWDLNZMSyEuRU9z4cAidPizoNKshAoYEoTCcD6f94ShOpnqwpShwYfgpPMfISmiXFLNWWM8u769epiIwaMeV900ZFxKd8rR">
-</stripe-pricing-table>
-
-<div class="container px-4 py-5">
-    <p>If you already have a subscription, you can manage it in the <a
-            href="https://billing.stripe.com/p/login/00gbIQ79OcpM9eEbII">customer portal</a>.</p>
+<div class="container px-4">
+<div class="alert alert-warning" role="alert">
+    ⚠️ 🚧 👷The commercial API subscription is in development. Support, dedicated API endpoints and API keys are available, but the API usage dashboard or self-management of API keys, are not yet done! In case you need any assistance, don't hesitate and contact us at <a href="mailto:info@open-meteo.com">info@open-meteo.com</a>!  
+  </div>
 </div>
 
-<div class="container px-4 py-2" id="featured-3">
+<div class="container px-4 py-3" id="featured-3">
+    <script async src="https://js.stripe.com/v3/pricing-table.js"></script>
+    <stripe-pricing-table class="row" pricing-table-id="prctbl_1MJg0iLNZMSyEuRUvpoeTHOb"
+        publishable-key="pk_live_51MJeWDLNZMSyEuRU9z4cAidPizoNKshAoYEoTCcD6f94ShOpnqwpShwYfgpPMfISmiXFLNWWM8u769epiIwaMeV900ZFxKd8rR">
+    </stripe-pricing-table>
+</div>
 
-
+<div class="container px-4 py-2">
     <div class="row g-4 py-5 row-cols-1 row-cols-lg-3">
         <div class="feature col">
             <div class="feature-icon bg-primary bg-gradient">
