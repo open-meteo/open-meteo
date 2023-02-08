@@ -170,6 +170,11 @@ struct JmaDownload: AsyncCommandFix {
                     data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
                 }
                 
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+                }
+                
                 progress.add(locationRange.count)
                 return data2d.data[0..<locationRange.count * nTime]
             }
@@ -181,6 +186,7 @@ struct JmaDownload: AsyncCommandFix {
 protocol JmaVariableDownloadable: GenericVariable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var skipHour0: Bool { get }
+    var isAccumulatedSinceModelStart: Bool { get }
 }
 
 extension GribMessage {
@@ -257,6 +263,15 @@ enum JmaSurfaceVariable: String, CaseIterable, Codable, JmaVariableDownloadable,
     
     var omFileName: String {
         return rawValue
+    }
+    
+    var isAccumulatedSinceModelStart: Bool {
+        switch self {
+        case .precipitation:
+            return true
+        default:
+            return false
+        }
     }
     
     var scalefactor: Float {
@@ -394,6 +409,10 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
     
     var omFileName: String {
         return rawValue
+    }
+    
+    var isAccumulatedSinceModelStart: Bool {
+        return false
     }
     
     var scalefactor: Float {
