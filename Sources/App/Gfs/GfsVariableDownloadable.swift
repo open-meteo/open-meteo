@@ -258,9 +258,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .uv_index:
             fallthrough
         case .uv_index_clear_sky:
-            // UVB to etyhemally UV https://link.springer.com/article/10.1039/b312985c
-            // 25 m2/W to get the uv index
-            return (18.9/25, 0)
+            // UVB to etyhemally UV factor 18.9 https://link.springer.com/article/10.1039/b312985c
+            // 0.025 m2/W to get the uv index
+            // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv
+            return (18.9 * 0.025, 0)
         default:
             return nil
         }
