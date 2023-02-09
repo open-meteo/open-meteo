@@ -68,7 +68,7 @@ enum SiUnit: String, Codable {
         case .pascal: return 0
         case .centimeter: return 2
         case .second: return 2
-        case .microgramsPerQuibicMeter: return 0
+        case .microgramsPerQuibicMeter: return 1
         case .grainsPerQuibicMeter: return 1
         case .dimensionless: return 2
         case .joulesPerKilogram: return 1

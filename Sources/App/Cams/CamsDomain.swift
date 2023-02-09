@@ -153,13 +153,13 @@ enum CamsVariable: String, CaseIterable, GenericVariable, Codable, GenericVariab
         case .carbon_monoxide:
             return 1
         case .nitrogen_dioxide:
-            return 20
+            return 10
         case .ammonia:
-            return 20
+            return 10
         case .ozone:
             return 1
         case .sulphur_dioxide:
-            return 20
+            return 10
         case .uv_index:
             return 20
         case .uv_index_clear_sky:

@@ -202,6 +202,13 @@
             UV Index Clear Sky
           </label>
         </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="ammonia" id="ammonia"
+            name="hourly">
+          <label class="form-check-label" for="ammonia">
+            Ammonia NH<sub>3</sub> <small class="text-muted">(*)</small>
+          </label>
+        </div>
       </div>
       <div class="col-md-4">
         <div class="form-check">
@@ -793,6 +800,12 @@
             <td>Instant</td>
             <td>μg/m³</td>
             <td>Atmospheric gases close to surface (10 meter above ground)</td>
+          </tr>
+          <tr>
+            <th scope="row">ammonia</th>
+            <td>Instant</td>
+            <td>μg/m³</td>
+            <td>Ammonia concentration. Only available for Europe.</td>
           </tr>
           <tr>
             <th scope="row">aerosol_optical_depth</th>
