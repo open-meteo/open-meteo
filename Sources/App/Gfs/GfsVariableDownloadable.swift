@@ -1,7 +1,7 @@
 /// Required additions to a GFS variable to make it downloadable
 protocol GfsVariableDownloadable: GenericVariable {
     func gribIndexName(for domain: GfsDomain) -> String?
-    var skipHour0: Bool { get }
+    func skipHour0(for domain: GfsDomain) -> Bool
     var interpolationType: Interpolation2StepType { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var isAveragedOverForecastTime: Bool { get }
@@ -53,6 +53,40 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .soil_temperature_100_to_200cm:
                 return nil
             case .pressure_msl:
+                return nil
+            default: break
+            }
+        }
+        
+        if domain == .gfs013 {
+            switch self {
+            case .pressure_msl:
+                return nil // only specific humidity
+            case .relativehumidity_2m:
+                return nil
+            case .precipitation:
+                return nil // only PRATE grib code
+            case .showers:
+                return nil
+            case .wind_u_component_80m:
+                return nil
+            case .wind_v_component_80m:
+                return nil
+            case .windgusts_10m:
+                return nil
+            case .freezinglevel_height:
+                return nil
+            case .frozen_precipitation_percent:
+                return nil
+            case .categorical_ice_pellets:
+                return nil
+            case .categorical_freezing_rain:
+                return nil
+            case .cape:
+                return nil
+            case .lifted_index:
+                return nil
+            case .visibility:
                 return nil
             default: break
             }
@@ -126,15 +160,15 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .visibility:
             return ":VIS:surface:"
         case .diffuse_radiation:
-            // only HRRR
-            if domain != .hrrr_conus {
+            // not in gfs025
+            if domain == .gfs025 {
                 return nil
             }
             return ":VDDSF:surface:"
         }
     }
     
-    var skipHour0: Bool {
+    func skipHour0(for domain: GfsDomain) -> Bool {
         switch self {
         case .precipitation: return true
         case .sensible_heatflux: return true
@@ -142,6 +176,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .showers: return true
         case .shortwave_radiation: return true
         case .diffuse_radiation: return true
+        case .cloudcover: fallthrough // cloud cover not available in hour 0 in GFS013
+        case .cloudcover_low: fallthrough
+        case .cloudcover_mid: fallthrough
+        case .cloudcover_high: return domain == .gfs013
         default: return false
         }
     }
@@ -254,7 +292,7 @@ extension GfsPressureVariable: GfsVariableDownloadable {
         }
     }
     
-    var skipHour0: Bool {
+    func skipHour0(for domain: GfsDomain) -> Bool {
         return false
     }
     

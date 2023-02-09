@@ -38,6 +38,8 @@ struct GfsDownload: AsyncCommandFix {
             fatalError("Invalid domain '\(signature.domain)'")
         }
         switch domain {
+        case .gfs013:
+            fallthrough
         case .hrrr_conus:
             fallthrough
         //case .nam_conus:
@@ -157,7 +159,7 @@ struct GfsDownload: AsyncCommandFix {
         }
         //let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
         
-        let variablesHour0 = variables.filter({!$0.variable.skipHour0})
+        let variablesHour0 = variables.filter({!$0.variable.skipHour0(for: domain)})
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
@@ -174,6 +176,8 @@ struct GfsDownload: AsyncCommandFix {
                 if domain.isGlobal {
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                 }
+                //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
+                
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
@@ -209,11 +213,11 @@ struct GfsDownload: AsyncCommandFix {
                 continue
             }
             
-            let skip = variable.skipHour0 ? 1 : 0
+            let skip = variable.skipHour0(for: domain) ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
             let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
-                if hour == 0 && variable.skipHour0 {
+                if hour == 0 && variable.skipHour0(for: domain) {
                     return nil
                 }
                 /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
@@ -236,6 +240,8 @@ struct GfsDownload: AsyncCommandFix {
                 // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
                 if variable.isAveragedOverForecastTime {
                     switch domain {
+                    case .gfs013:
+                        fallthrough
                     case .gfs025:
                         data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
                     //case .nam_conus:

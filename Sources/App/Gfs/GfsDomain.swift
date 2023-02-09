@@ -10,6 +10,9 @@ import SwiftPFor2D
  
  */
 enum GfsDomain: String, GenericDomain {
+    /// T1534 sflux grid
+    case gfs013
+    
     case gfs025
     //case nam_conus // disabled because it only add 12 forecast hours
     case hrrr_conus
@@ -32,11 +35,13 @@ enum GfsDomain: String, GenericDomain {
     }
     
     var isGlobal: Bool {
-        return self == .gfs025
+        return self == .gfs025 || self == .gfs013
     }
     
     var elevationFile: OmFileReader<MmapFile>? {
         switch self {
+        case .gfs013:
+            return Self.gfs013ElevationFile
         case .gfs025:
             return Self.gfs025ElevationFile
         //case .nam_conus:
@@ -50,6 +55,8 @@ enum GfsDomain: String, GenericDomain {
     var lastRun: Int {
         let t = Timestamp.now()
         switch self {
+        case .gfs013:
+            fallthrough
         case .gfs025:
             // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
             return ((t.hour - 3 + 24) % 24) / 6 * 6
@@ -62,6 +69,7 @@ enum GfsDomain: String, GenericDomain {
         }
     }
     
+    private static var gfs013ElevationFile = try? OmFileReader(file: Self.gfs013.surfaceElevationFileOm)
     private static var gfs025ElevationFile = try? OmFileReader(file: Self.gfs025.surfaceElevationFileOm)
     //private static var namConusElevationFile = try? OmFileReader(file: Self.nam_conus.surfaceElevationFileOm)
     private static var hrrrConusElevationFile = try? OmFileReader(file: Self.hrrr_conus.surfaceElevationFileOm)
@@ -73,6 +81,8 @@ enum GfsDomain: String, GenericDomain {
     
     func forecastHours(run: Int) -> [Int] {
         switch self {
+        case .gfs013:
+            fallthrough
         case .gfs025:
             return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
         //case .nam_conus:
@@ -88,6 +98,8 @@ enum GfsDomain: String, GenericDomain {
     /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     var levels: [Int] {
         switch self {
+        case .gfs013:
+            return []
         case .gfs025:
             return [10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
         //case .nam_conus:
@@ -105,6 +117,8 @@ enum GfsDomain: String, GenericDomain {
         switch self {
         //case .nam_conus:
             //return 60 + 4*24
+        case .gfs013:
+            fallthrough
         case .gfs025:
             return 384 + 1 + 4*24
         case .hrrr_conus:
@@ -114,6 +128,9 @@ enum GfsDomain: String, GenericDomain {
     
     var grid: Gridable {
         switch self {
+        case .gfs013:
+            // Coordinates confirmed with eccodes coordinate output
+            return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536-1) / 2, lonMin: -180, dx: 360/3072, dy: 0.11714935)
         case .gfs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         /*case .nam_conus:
@@ -133,6 +150,8 @@ enum GfsDomain: String, GenericDomain {
         let fHH = forecastHour.zeroPadded(len: 2)
         let fHHH = forecastHour.zeroPadded(len: 3)
         switch self {
+        case .gfs013:
+            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.sfluxgrbf\(fHHH).grib2"
         case .gfs025:
             return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f\(fHHH)"
         //case .nam_conus:

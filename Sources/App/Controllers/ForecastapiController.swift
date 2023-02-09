@@ -210,6 +210,7 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
     case gfs_seamless
     case gfs_mix
     case gfs_global
+    case gfs013
     case gfs_hrrr
     
     case meteofrance_seamless
@@ -297,6 +298,8 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
             return try GfsMixer(domains: [.gfs025, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_global:
             return try GfsReader(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .gfs013:
+            return try GfsReader(domain: .gfs013, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gfs_hrrr:
             return try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .meteofrance_seamless:

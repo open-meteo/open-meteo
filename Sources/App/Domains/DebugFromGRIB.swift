@@ -8,7 +8,7 @@ extension GribMessage {
     }
     
     /// Print debug grid information
-    func debugGrid(grid: Gridable) throws {
+    func debugGrid(grid: Gridable, flipLatidude: Bool, shift180Longitude: Bool) throws {
         guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
             fatalError("Could not get Nx")
         }
@@ -22,13 +22,19 @@ extension GribMessage {
         for atr in self.iterate(namespace: .geography) {
             print(atr)
         }
-        print(get(attribute: "projString")!)
+        //print(get(attribute: "projString")!)
         
         var coords = [Coords]()
-        
+        //var lat = 0.0
         for (i,(latitude, longitude,_)) in try iterateCoordinatesAndValues().enumerated() {
+            let longitude = shift180Longitude ? longitude + 180 : longitude
             let lon = Float(longitude + 180).truncatingRemainder(dividingBy: 360) - 180
-            let c = Coords(i: i, x: i % nx, y: i / nx, latitude: Float(latitude), longitude: lon)
+            
+            let c = Coords(i: i, x: i % nx, y: (i / nx), latitude: Float(latitude), longitude: lon)
+            /*if c.x == 0 {
+                print(latitude - lat)
+                lat = latitude
+            }*/
             if c.x == 0, c.y == 0 {
                 coords.append(c)
             }
@@ -54,16 +60,19 @@ extension GribMessage {
         print("Validating grid settings now")
         for c in coords {
             print(c)
-            guard let gridpoint = grid.findPoint(lat: c.latitude, lon: c.longitude) else {
+            let latitude = flipLatidude ? -1 * c.latitude : c.latitude
+            guard let gridpoint = grid.findPoint(lat: latitude, lon: c.longitude) else {
                 print("FAILED NULL")
                 continue
             }
-            if gridpoint != c.i {
-                print("FAILED gridpoint=\(gridpoint), x=\(gridpoint % nx), y=\(gridpoint / nx)")
+            let x = gridpoint % nx
+            let y = gridpoint / nx
+            if x != c.x || y != c.y {
+                print("FAILED gridpoint=\(gridpoint), x=\(x), y=\(y)")
                 continue
             }
             let coords = grid.getCoordinates(gridpoint: gridpoint)
-            if abs(coords.latitude - c.latitude) > 0.002 || abs(coords.longitude - c.longitude) > 0.002 {
+            if abs(coords.latitude - latitude) > 0.002 || abs(coords.longitude - c.longitude) > 0.002 {
                 print("FAILED lat=\(coords.latitude), lon=\(coords.longitude)")
                 continue
             }
