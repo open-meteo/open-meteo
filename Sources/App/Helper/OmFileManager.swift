@@ -160,7 +160,7 @@ extension OmFileReader {
     }
     /// Read data into existing output float buffer
     public func read(into: UnsafeMutablePointer<Float>, arrayDim1Range: Range<Int>, arrayDim1Length: Int, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
-        assert(arrayDim1Range.count == dim0Read.count * dim1Read.count)
+        assert(arrayDim1Range.count == dim1Read.count)
         let chunkBuffer = OmFileReader.getBuffer(minBytes: P4NDEC256_BOUND(n: chunk0*chunk1, bytesPerElement: compression.bytesPerElement)).baseAddress!
         try read(into: into, arrayDim1Range: arrayDim1Range, arrayDim1Length: arrayDim1Length, chunkBuffer: chunkBuffer, dim0Slow: dim0Read, dim1: dim1Read)
     }
@@ -179,7 +179,7 @@ extension OmFileReader {
         let dim1Read = dim1Read ?? 0..<dim1
         let count = dim0Read.count * dim1Read.count
         return try [Float](unsafeUninitializedCapacity: count, initializingWith: {ptr, countRead in
-            try read(into: ptr.baseAddress!, arrayDim1Range: 0..<count, arrayDim1Length: dim1Read.count, dim0Slow: dim0Read, dim1: dim1Read)
+            try read(into: ptr.baseAddress!, arrayDim1Range: 0..<dim1Read.count, arrayDim1Length: dim1Read.count, dim0Slow: dim0Read, dim1: dim1Read)
             countRead += count
         })
     }
