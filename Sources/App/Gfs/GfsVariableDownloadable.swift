@@ -54,6 +54,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return nil
             case .pressure_msl:
                 return nil
+            case .uv_index:
+                return nil
+            case .uv_index_clear_sky:
+                return nil
             default: break
             }
         }
@@ -165,6 +169,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return nil
             }
             return ":VDDSF:surface:"
+        case .uv_index:
+            return ":DUVB:surface:"
+        case .uv_index_clear_sky:
+            return ":CDUVB:surface:"
         }
     }
     
@@ -176,6 +184,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .showers: return true
         case .shortwave_radiation: return true
         case .diffuse_radiation: return true
+        case .uv_index: return true
+        case .uv_index_clear_sky: return true
         case .cloudcover: fallthrough // cloud cover not available in hour 0 in GFS013
         case .cloudcover_low: fallthrough
         case .cloudcover_mid: fallthrough
@@ -201,6 +211,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .windgusts_10m: return .linear
         case .freezinglevel_height: return .hermite(bounds: nil)
         case .shortwave_radiation: return .solar_backwards_averaged
+        case .uv_index: return .solar_backwards_averaged
+        case .uv_index_clear_sky: return .solar_backwards_averaged
         case .soil_temperature_0_to_10cm: return .hermite(bounds: nil)
         case .soil_temperature_10_to_40cm: return .hermite(bounds: nil)
         case .soil_temperature_40_to_100cm: return .hermite(bounds: nil)
@@ -243,6 +255,12 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (100, 0)
         case .categorical_ice_pellets:
             return (100, 0)
+        case .uv_index:
+            fallthrough
+        case .uv_index_clear_sky:
+            // UVB to etyhemally UV https://link.springer.com/article/10.1039/b312985c
+            // 25 m2/W to get the uv index
+            return (18.9/25, 0)
         default:
             return nil
         }
@@ -254,6 +272,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .diffuse_radiation: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
+        case .uv_index:
+            return true
+        case .uv_index_clear_sky:
+            return true
         default: return false
         }
     }

@@ -221,9 +221,8 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
     //case direct_radiation
     
     /// only GFS
-    //case uv_index
-    /// only GFS
-    //case uv_index_clear_sky
+    case uv_index
+    case uv_index_clear_sky
     
     case cape
     case lifted_index
@@ -281,6 +280,8 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
         case .lifted_index: return 10
         case .visibility: return 0.05 // 50 meter
         case .diffuse_radiation: return 1
+        case .uv_index: return 20
+        case .uv_index_clear_sky: return 20
         }
     }
     
@@ -324,6 +325,8 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
         case .lifted_index: return .dimensionless
         case .visibility: return .meter
         case .diffuse_radiation: return .wattPerSquareMeter
+        case .uv_index: return .dimensionless
+        case .uv_index_clear_sky: return .dimensionless
         }
     }
     
