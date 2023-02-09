@@ -69,7 +69,7 @@ extension Gridable {
         let x = center % nx
         let y = center / nx
         var elevation = Float.nan
-        try elevationFile.read(into: &elevation, arrayRange: 0..<1, dim0Slow: y..<y+1, dim1: x..<x+1)
+        try elevationFile.read(into: &elevation, arrayDim1Range: 0..<1, arrayDim1Length: 1, dim0Slow: y..<y+1, dim1: x..<x+1)
         if elevation.isNaN {
             return nil
         }

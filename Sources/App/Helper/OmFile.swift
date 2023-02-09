@@ -143,16 +143,7 @@ struct OmFileSplitter {
             if let offsets = ringtime.intersect(fileTime: fileTime),
                let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: omFileMaster.path, variable: variable, timeChunk: 0)),
                 omFile.dim0 == nLocations {
-                if location.count == 1 {
-                    try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
-                } else {
-                    // TODO: The 2D code could be moved directly into `read`
-                    var temp = [Float](repeating: .nan, count: location.count * offsets.file.count)
-                    try omFile.read(into: &temp, arrayRange: temp.indices, dim0Slow: location, dim1: offsets.file)
-                    for l in 0..<location.count {
-                        out[offsets.array.add(ringtime.count * l)] = temp[offsets.file.count * l ..< offsets.file.count * (l+1)]
-                    }
-                }
+                try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: time.count, dim0Slow: location, dim1: offsets.file)
                 start = fileTime.upperBound
             }
         }
@@ -176,15 +167,7 @@ struct OmFileSplitter {
                 }
                 //assert(omFile.chunk0 == nLocations)
                 //assert(omFile.chunk1 == nTimePerFile)
-                if location.count == 1 {
-                    try omFile.read(into: &out, arrayRange: offsets.array, dim0Slow: location, dim1: offsets.file)
-                } else {
-                    var temp = [Float](repeating: .nan, count: location.count * offsets.file.count)
-                    try omFile.read(into: &temp, arrayRange: temp.indices, dim0Slow: location, dim1: offsets.file)
-                    for l in 0..<location.count {
-                        out[offsets.array.add(ringtime.count * l)] = temp[offsets.file.count * l ..< offsets.file.count * (l+1)]
-                    }
-                }
+                try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: offsets.file.count, dim0Slow: location, dim1: offsets.file)
                 start = fileTime.upperBound
             }
         }
@@ -206,15 +189,7 @@ struct OmFileSplitter {
             }
             //assert(omFile.chunk0 == nLocations)
             //assert(omFile.chunk1 == nTimePerFile)
-            if location.count == 1 {
-                try omFile.read(into: &out, arrayRange: offsets.array.add(delta), dim0Slow: location, dim1: offsets.file)
-            } else {
-                var temp = [Float](repeating: .nan, count: location.count * offsets.file.count)
-                try omFile.read(into: &temp, arrayRange: temp.indices, dim0Slow: location, dim1: offsets.file)
-                for l in 0..<location.count {
-                    out[offsets.array.add(delta + ringtime.count * l)] = temp[offsets.file.count * l ..< offsets.file.count * (l+1)]
-                }
-            }
+            try omFile.read(into: &out, arrayDim1Range: offsets.array.add(delta), arrayDim1Length: time.count, dim0Slow: location, dim1: offsets.file)
         }
         return out
     }
@@ -292,7 +267,7 @@ struct OmFileSplitter {
             for writer in writers {
                 // Read existing data for a chunk of locations
                 if let omRead = writer.read, omRead.dim0 == nLocations, omRead.dim1 == nTimePerFile {
-                    try omRead.read(into: &fileData, arrayRange: 0..<locationRange.count * nTimePerFile, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
+                    try omRead.read(into: &fileData, arrayDim1Range: 0..<locationRange.count * nTimePerFile, arrayDim1Length: nTimePerFile, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
                 } else {
                     /// If the old file does not exist, just make sure it is filled with NaNs
                     for i in fileData.indices {

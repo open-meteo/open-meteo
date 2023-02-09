@@ -542,8 +542,20 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)
     }
     
-    /// Read data into existing buffers
-    public func read(into: UnsafeMutablePointer<Float>, arrayRange: Range<Int>, chunkBuffer: UnsafeMutableRawPointer, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+    /// Read data into existing buffers. Can only work with sequential ranges. Reading random offsets, requires external loop.
+    ///
+    /// This code could be moved to C/Rust for better performance. The 2D delta and scaling code is not yet using vector instructions yet
+    /// Future implemtations could use async io via lib uring
+    ///
+    /// `into` is a 2d flat array with `arrayDim1Length` count elements in the fast dimension
+    /// `chunkBuffer` is used to temporary decompress chunks of data
+    /// `arrayDim1Range` defines the offset in dimension 1 what is applied to the read into array
+    /// `arrayDim1Length` if dim0Slow.count is greater than 1, the arrayDim1Length will be used as a stride. Like `nTime` in a 2d fast time array
+    /// `dim0Slow` the slow dimension to read. Typically a location range
+    /// `dim1Read` the fast dimension to read. Tpyicall a time range
+    public func read(into: UnsafeMutablePointer<Float>, arrayDim1Range: Range<Int>, arrayDim1Length: Int, chunkBuffer: UnsafeMutableRawPointer, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+        
+        assert(arrayDim1Range.count == dim1Read.count)
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
             throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
@@ -607,7 +619,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                             
                             let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
                             let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
-                            let localRange = localOut1.add(localOut0 * dim1Read.count + arrayRange.lowerBound)
+                            let localRange = localOut1.add(localOut0 * arrayDim1Length + arrayDim1Range.lowerBound)
                             
                             for (posBuffer, posOut) in zip(read, localRange) {
                                 let val = chunkBuffer[posBuffer]
@@ -665,7 +677,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                             
                             let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
                             let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
-                            let localRange = localOut1.add(localOut0 * dim1Read.count + arrayRange.lowerBound)
+                            let localRange = localOut1.add(localOut0 * arrayDim1Length + arrayDim1Range.lowerBound)
                             
                             for (posBuffer, posOut) in zip(read, localRange) {
                                 let val = chunkBuffer[posBuffer]
