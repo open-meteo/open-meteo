@@ -92,6 +92,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return nil
             case .visibility:
                 return nil
+            case .snow_depth:
+                return nil // somehow only NaNs in gfs013
             default: break
             }
         }
