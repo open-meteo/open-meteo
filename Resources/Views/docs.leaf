@@ -1546,6 +1546,11 @@
             <td>mm</td>
             <td>Daily sum of ET₀ Reference Evapotranspiration of a well watered grass field</td>
           </tr>
+          <tr>
+            <th scope="row">uv_index_max<br>uv_index_clear_sky_max</th>
+            <td>Index</td>
+            <td>Daily maximum in UV Index starting from 0. <mark>uv_index_clear_sky_max</mark> assumes cloud free conditions. Please follow the <a href="https://www.who.int/news-room/questions-and-answers/item/radiation-the-ultraviolet-(uv)-index">official WMO guidelines</a> for ultraviolet index.</td>
+          </tr>
         </tbody>
       </table>
     </div>
