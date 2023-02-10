@@ -55,9 +55,7 @@ struct GloFasDownloader: AsyncCommandFix {
     
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
-        guard let domain = GloFasDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try GloFasDomain.load(rawValue: signature.domain)
         
         switch domain {
         case .consolidatedv3:
@@ -422,7 +420,7 @@ struct GloFasDownloader: AsyncCommandFix {
     }
 }
 
-enum GloFasDomain: String, GenericDomain {
+enum GloFasDomain: String, GenericDomain, CaseIterable {
     case consolidated
     case forecastv3
     case consolidatedv3

@@ -33,9 +33,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        guard let domain = CamsDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try CamsDomain.load(rawValue: signature.domain)
         
         let run = signature.run.map {
             guard let run = Int($0) else {
@@ -44,14 +42,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
             return run
         } ?? domain.lastRun
         
-        let onlyVariables: [CamsVariable]? = signature.onlyVariables.map {
-            $0.split(separator: ",").map {
-                guard let variable = CamsVariable(rawValue: String($0)) else {
-                    fatalError("Invalid variable '\($0)'")
-                }
-                return variable
-            }
-        }
+        let onlyVariables = try CamsVariable.load(commaSeparatedOptional: signature.onlyVariables)
         
         let logger = context.application.logger
         let date = Timestamp.now().with(hour: run)

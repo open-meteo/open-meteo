@@ -59,7 +59,7 @@ struct CdoHelper {
 }
 
 struct DownloadIconCommand: AsyncCommandFix {
-    enum VariableGroup: String, RawRepresentable {
+    enum VariableGroup: String, RawRepresentable, CaseIterable {
         case all
         case surface
         case modelLevel
@@ -324,9 +324,7 @@ struct DownloadIconCommand: AsyncCommandFix {
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
-        guard let domain = IconDomains.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try IconDomains.load(rawValue: signature.domain)
         
         let run = signature.run.map {
             guard let run = Int($0) else {
@@ -335,22 +333,14 @@ struct DownloadIconCommand: AsyncCommandFix {
             return run
         } ?? domain.lastRun
         
-        let group: VariableGroup = signature.group.map { str in
-            guard let group = VariableGroup.init(rawValue: str) else {
-                fatalError("Invalid group '\(str)'")
-            }
-            return group
-        } ?? .all
+        let group = try VariableGroup.load(rawValueOptional: signature.group) ?? .all
         
-        let onlyVariables: [IconVariableDownloadable]? = signature.onlyVariables.map {
-            $0.split(separator: ",").map {
+        let onlyVariables: [IconVariableDownloadable]? = try signature.onlyVariables.map {
+            try $0.split(separator: ",").map {
                 if let variable = IconPressureVariable(rawValue: String($0)) {
                     return variable
                 }
-                guard let variable = IconSurfaceVariable(rawValue: String($0)) else {
-                    fatalError("Invalid variable '\($0)'")
-                }
-                return variable
+                return try IconSurfaceVariable.load(rawValue: String($0))
             }
         }
         

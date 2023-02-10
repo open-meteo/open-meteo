@@ -35,9 +35,8 @@ struct SeasonalForecastDownload: AsyncCommandFix {
     
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
-        guard let domain = SeasonalForecastDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try SeasonalForecastDomain.load(rawValue: signature.domain)
+        
         switch domain {
         case .ecmwf:
             fatalError()

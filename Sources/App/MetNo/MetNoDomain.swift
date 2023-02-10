@@ -1,7 +1,7 @@
 import Foundation
 import SwiftPFor2D
 
-enum MetNoDomain: String, GenericDomain {
+enum MetNoDomain: String, GenericDomain, CaseIterable {
     case nordic_pp
     
     var omfileDirectory: String {

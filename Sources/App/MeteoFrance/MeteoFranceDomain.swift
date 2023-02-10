@@ -24,7 +24,7 @@ Docs https://mf-models-on-aws.org/en/doc
  - SP3, dist, brightness temperature
  
  */
-enum MeteoFranceDomain: String, GenericDomain {
+enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     case arpege_europe
     case arpege_world
     case arome_france

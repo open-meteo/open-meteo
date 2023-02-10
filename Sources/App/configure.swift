@@ -74,6 +74,7 @@ public func configure(_ app: Application) throws {
     app.commands.use(GemDownload(), as: "download-gem")
     app.commands.use(DownloadCmipCommand(), as: "download-cmip6")
     app.commands.use(SyncCommand(), as: "sync")
+    app.commands.use(ExportCommand(), as: "export")
 
     app.http.server.configuration.hostname = "0.0.0.0"
     

@@ -1,7 +1,7 @@
 import Foundation
 import SwiftPFor2D
 
-enum SeasonalForecastDomain: String, GenericDomain {
+enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     case ecmwf
     case ukMetOffice
     case meteoFrance

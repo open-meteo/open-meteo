@@ -37,9 +37,8 @@ struct MeteoFranceDownload: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
-        guard let domain = MeteoFranceDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try MeteoFranceDomain.load(rawValue: signature.domain)
+        
         let run = signature.run.map {
             guard let run = Int($0) else {
                 fatalError("Invalid run '\($0)'")
@@ -47,15 +46,12 @@ struct MeteoFranceDownload: AsyncCommandFix {
             return run
         } ?? domain.lastRun
         
-        let onlyVariables: [MeteoFranceVariableDownloadable]? = signature.onlyVariables.map {
-            $0.split(separator: ",").map {
+        let onlyVariables: [MeteoFranceVariableDownloadable]? = try signature.onlyVariables.map {
+            try $0.split(separator: ",").map {
                 if let variable = MeteoFrancePressureVariable(rawValue: String($0)) {
                     return variable
                 }
-                guard let variable = MeteoFranceSurfaceVariable(rawValue: String($0)) else {
-                    fatalError("Invalid variable '\($0)'")
-                }
-                return variable
+                return try MeteoFranceSurfaceVariable.load(rawValue: String($0))
             }
         }
         

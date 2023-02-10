@@ -5,7 +5,7 @@ import SwiftPFor2D
 
 
 ///  ERA5: https://rmets.onlinelibrary.wiley.com/doi/10.1002/qj.3803
-enum CdsDomain: String, GenericDomain {
+enum CdsDomain: String, GenericDomain, CaseIterable {
     case era5
     case era5_land
     case cerra
@@ -140,9 +140,7 @@ struct DownloadEra5Command: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         
-        guard let domain = CdsDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try CdsDomain.load(rawValue: signature.domain)
         
         let variables: [GenericVariable] = domain == .cerra ? CerraVariable.allCases : Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         

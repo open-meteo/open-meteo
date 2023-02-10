@@ -9,7 +9,7 @@ import SwiftPFor2D
  
  
  */
-enum GfsDomain: String, GenericDomain {
+enum GfsDomain: String, GenericDomain, CaseIterable {
     /// T1534 sflux grid
     case gfs013
     

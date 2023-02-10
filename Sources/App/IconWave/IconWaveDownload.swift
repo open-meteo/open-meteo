@@ -30,9 +30,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        guard let domain = IconWaveDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try IconWaveDomain.load(rawValue: signature.domain)
         
         let run = signature.run.map {
             guard let run = Int($0) else {
@@ -41,14 +39,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
             return run
         } ?? domain.lastRun
         
-        let onlyVariables: [IconWaveVariable]? = signature.onlyVariables.map {
-            $0.split(separator: ",").map {
-                guard let variable = IconWaveVariable(rawValue: String($0)) else {
-                    fatalError("Invalid variable '\($0)'")
-                }
-                return variable
-            }
-        }
+        let onlyVariables = try IconWaveVariable.load(commaSeparatedOptional: signature.onlyVariables)
         
         let logger = context.application.logger
         let date = Timestamp.now().with(hour: run)

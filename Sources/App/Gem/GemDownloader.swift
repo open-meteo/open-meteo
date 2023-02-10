@@ -46,9 +46,7 @@ struct GemDownload: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
-        guard let domain = GemDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try GemDomain.load(rawValue: signature.domain)
         
         let run = signature.run.flatMap(Int.init).map { Timestamp.now().with(hour: $0) } ?? domain.lastRun
         
@@ -724,7 +722,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
 typealias GemVariable = SurfaceAndPressureVariable<GemSurfaceVariable, GemPressureVariable>
 
 
-enum GemDomain: String, GenericDomain {
+enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_global
     case gem_regional
     case gem_hrdps_continental

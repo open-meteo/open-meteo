@@ -34,9 +34,8 @@ struct GfsDownload: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
-        guard let domain = GfsDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try GfsDomain.load(rawValue: signature.domain)
+        
         switch domain {
         case .gfs013:
             fallthrough
@@ -52,15 +51,12 @@ struct GfsDownload: AsyncCommandFix {
                 return run
             } ?? domain.lastRun
             
-            let onlyVariables: [GfsVariableDownloadable]? = signature.onlyVariables.map {
-                $0.split(separator: ",").map {
+            let onlyVariables: [GfsVariableDownloadable]? = try signature.onlyVariables.map {
+                try $0.split(separator: ",").map {
                     if let variable = GfsPressureVariable(rawValue: String($0)) {
                         return variable
                     }
-                    guard let variable = GfsSurfaceVariable(rawValue: String($0)) else {
-                        fatalError("Invalid variable '\($0)'")
-                    }
-                    return variable
+                    return try GfsSurfaceVariable.load(rawValue: String($0))
                 }
             }
             

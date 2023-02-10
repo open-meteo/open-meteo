@@ -35,9 +35,8 @@ struct MetNoDownloader: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
-        guard let domain = MetNoDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try MetNoDomain.load(rawValue: signature.domain)
+        
         let run = signature.run.map {
             guard let run = Int($0) else {
                 fatalError("Invalid run '\($0)'")
@@ -45,16 +44,7 @@ struct MetNoDownloader: AsyncCommandFix {
             return run
         } ?? domain.lastRun
         
-        let onlyVariables: [MetNoVariable]? = signature.onlyVariables.map {
-            $0.split(separator: ",").map {
-                guard let variable = MetNoVariable(rawValue: String($0)) else {
-                    fatalError("Invalid variable '\($0)'")
-                }
-                return variable
-            }
-        }
-        
-        let variables = onlyVariables ?? MetNoVariable.allCases
+        let variables = try MetNoVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? MetNoVariable.allCases
         
         let date = Timestamp.now().add(-24*3600 * (signature.pastDays ?? 0)).with(hour: run)
         

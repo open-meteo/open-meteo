@@ -38,9 +38,7 @@ struct JmaDownload: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
-        guard let domain = JmaDomain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try JmaDomain.load(rawValue: signature.domain)
         
         let run = signature.run.flatMap(Int.init).map { Timestamp.now().with(hour: $0) } ?? domain.lastRun
 
@@ -495,7 +493,7 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
 typealias JmaVariable = SurfaceAndPressureVariable<JmaSurfaceVariable, JmaPressureVariable>
 
 
-enum JmaDomain: String, GenericDomain {
+enum JmaDomain: String, GenericDomain, CaseIterable {
     case gsm
     case msm
     

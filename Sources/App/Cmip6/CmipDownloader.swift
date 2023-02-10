@@ -98,7 +98,7 @@ import SwiftNetCDF
  
  
  */
-enum Cmip6Domain: String, Codable, GenericDomain {
+enum Cmip6Domain: String, Codable, CaseIterable, GenericDomain {
     case CMCC_CM2_VHR4
     case FGOALS_f3_H_highresSST
     case FGOALS_f3_H
@@ -900,18 +900,9 @@ struct DownloadCmipCommand: AsyncCommandFix {
         let deleteNetCDF = !signature.keepNetCdf
         let years = signature.years
         
-        let variables = signature.onlyVariables.map {
-            $0.split(separator: ",").map {
-                guard let variable = Cmip6Variable(rawValue: String($0)) else {
-                    fatalError("Invalid variable '\($0)'")
-                }
-                return variable
-            }
-        } ?? Cmip6Variable.allCases
+        let variables = try Cmip6Variable.load(commaSeparatedOptional: signature.onlyVariables) ?? Cmip6Variable.allCases
         
-        guard let domain = Cmip6Domain.init(rawValue: signature.domain) else {
-            fatalError("Invalid domain '\(signature.domain)'")
-        }
+        let domain = try Cmip6Domain.load(rawValue: signature.domain)
         
         // Automatically try all servers. From fastest to slowest
         let servers = ["https://esgf3.dkrz.de/thredds/fileServer/cmip6/",
