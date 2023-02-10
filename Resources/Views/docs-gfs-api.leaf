@@ -795,6 +795,14 @@
           <tr>
             <th scope="row"><a href="https://www.nco.ncep.noaa.gov/pmb/products/gfs/" target="_blank">GFS</a></th>
             <td>Global</td>
+            <td>0.11° (~13 km)</td>
+            <td>Hourly, 3-hourly after 120 hours</td>
+            <td>16 days</td>
+            <td>Every 6 hours</td>
+          </tr>
+          <tr>
+            <th scope="row"><a href="https://www.nco.ncep.noaa.gov/pmb/products/gfs/" target="_blank">GFS Pressure Variables</a></th>
+            <td>Global</td>
             <td>0.25° (~25 km)</td>
             <td>Hourly, 3-hourly after 120 hours</td>
             <td>16 days</td>

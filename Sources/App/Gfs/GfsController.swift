@@ -25,7 +25,7 @@ public struct GfsController {
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
-        let domains = [GfsDomain.gfs025, /*.nam_conus,*/ .hrrr_conus]
+        let domains = [GfsDomain.gfs025, .gfs013, /*.nam_conus,*/ .hrrr_conus]
         
         guard let reader = try GfsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
             throw ForecastapiError.noDataAvilableForThisLocation

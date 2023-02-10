@@ -97,7 +97,11 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         }
         
         if domain == .gfs025 {
-            switch self {
+            // if variable is in gfs013, it is not required for gfs025
+            if self.gribIndexName(for: .gfs013) != nil {
+                return nil
+            }
+            /*switch self {
             case .uv_index:
                 return nil
             case .uv_index_clear_sky:
@@ -105,7 +109,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .diffuse_radiation:
                 return nil
             default: break
-            }
+            }*/
         }
         
         switch self {

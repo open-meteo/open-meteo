@@ -561,10 +561,10 @@
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input debug-hidden" type="checkbox" value="gfs013"
-                    id="gfs013" name="models">
-                  <label class="form-check-label" for="gfs013">
-                    GFS Global 0.13°
+                  <input class="form-check-input debug-hidden" type="checkbox" value="gfs025"
+                    id="gfs025" name="models">
+                  <label class="form-check-label" for="gfs025">
+                    GFS Global 0.25°
                   </label>
                 </div>
                 <div class="form-check">
