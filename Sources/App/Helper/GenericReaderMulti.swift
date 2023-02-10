@@ -106,7 +106,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
 }
 
 /// Conditional conformace just use RawValue (String) to resolve `ForecastVariable` to a specific type
-fileprivate extension GenericReaderMixable {
+extension GenericReaderMixable {
     func get(mixed: String, time: TimerangeDt) throws -> DataAndUnit? {
         guard let v = MixingVar(rawValue: mixed) else {
             return nil

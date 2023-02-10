@@ -41,6 +41,13 @@ final class TransferAmountTracker {
             transferedLastPrint = transfered
         }
     }
+    
+    /// Print end statistics
+    func finish() {
+        let timeElapsed = Date().timeIntervalSince(startTime)
+        let rate = Int(Double(transfered) / timeElapsed)
+        logger.info("Completed in \(timeElapsed.asSecondsPrettyPrint). Average speed \(rate.bytesHumanReadable)/s")
+    }
 }
 
 /// Sum up transfered amount and print statistics every couple of seconds
