@@ -252,10 +252,13 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
             guard let gfs025: any GenericReaderMixable = try GfsReader(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
+            guard let gfs013: any GenericReaderMixable = try GfsReader(domain: .gfs013, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
+            }
             // Scandinavian region, combine with ICON
             if lat >= 54.9, let metno = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode) {
                 let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode)
-                return Array([gfs025, icon, iconEu, metno].compacted())
+                return Array([gfs025, gfs013, icon, iconEu, metno].compacted())
             }
             // If Icon-d2 is available, use icon domains
             if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode) {
@@ -263,31 +266,31 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
                 guard let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
                 }
-                return [gfs025, icon, iconEu, iconD2]
+                return [gfs025, gfs013, icon, iconEu, iconD2]
             }
             // For western europe, use arome models
             if let arome_france_hd = try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode) {
                 let arome_france = try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode)
                 let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode)
-                return Array([gfs025, icon, arpege_europe, arome_france, arome_france_hd].compacted())
+                return Array([gfs025, gfs013, icon, arpege_europe, arome_france, arome_france_hd].compacted())
             }
             // For North America, use HRRR
             if let hrrr = try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [icon, gfs025, hrrr]
+                return [icon, gfs025, gfs013, hrrr]
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
             if let jma_msm = try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, icon, jma_msm]
+                return [gfs025, gfs013, icon, jma_msm]
             }
             
             // Remaining eastern europe
             if let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, icon, iconEu]
+                return [gfs025, gfs013, icon, iconEu]
             }
             
             // Northern africa
             if let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, icon, arpege_europe]
+                return [gfs025, gfs013, icon, arpege_europe]
             }
             
             // Remaining parts of the world
@@ -417,6 +420,8 @@ enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
     case direct_normal_irradiance_instant
     case visibility
     case cape
+    case uv_index
+    case uv_index_clear_sky
     
     /// Currently only from icon-d2
     case lightning_potential
@@ -501,6 +506,8 @@ enum ForecastVariableDaily: String, Codable, DailyVariableCalculatable {
     case cloudcover_max
     case cloudcover_min
     case cloudcover_mean
+    case uv_index_max
+    case uv_index_clear_sky_max
     
     var aggregation: DailyAggregation<ForecastVariable> {
         switch self {
@@ -580,6 +587,10 @@ enum ForecastVariableDaily: String, Codable, DailyVariableCalculatable {
             return .min(.surface(.cloudcover))
         case .cloudcover_mean:
             return .mean(.surface(.cloudcover))
+        case .uv_index_max:
+            return .max(.surface(.uv_index))
+        case .uv_index_clear_sky_max:
+            return .max(.surface(.uv_index_clear_sky))
         }
     }
 }
