@@ -96,6 +96,18 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             }
         }
         
+        if domain == .gfs025 {
+            switch self {
+            case .uv_index:
+                return nil
+            case .uv_index_clear_sky:
+                return nil
+            case .diffuse_radiation:
+                return nil
+            default: break
+            }
+        }
+        
         switch self {
         case .temperature_2m:
             return ":TMP:2 m above ground:"
@@ -164,10 +176,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .visibility:
             return ":VIS:surface:"
         case .diffuse_radiation:
-            // not in gfs025
-            if domain == .gfs025 {
-                return nil
-            }
             return ":VDDSF:surface:"
         case .uv_index:
             return ":DUVB:surface:"
