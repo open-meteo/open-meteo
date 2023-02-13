@@ -21,7 +21,7 @@
   </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Climate API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Downscaled climate models to 10 km with daily resolution</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Explore Climate Change on a Local Level with High-Resolution Climate Data</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -50,7 +50,7 @@
   </div>-->
 
   <div class="alert alert-warning" role="alert">
-    ⚠️ This API endpoint is work in progress! 🚧 👷
+    ⚠️ This API endpoint is work in progress! Since 2023-02-13 all data has been finalized! 🚧 👷
   </div>
 
   <form id="api_form" method="get" action="https://climate-api.open-meteo.com/v1/climate">
@@ -109,6 +109,13 @@
       <h2>Daily Weather Variables</h2>
       <div class="col-md-4">
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="temperature_2m_mean" id="temperature_2m_mean"
+            name="daily">
+          <label class="form-check-label" for="temperature_2m_mean">
+            Mean Temperature (2 m)
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="temperature_2m_max" id="temperature_2m_max"
             name="daily" checked>
           <label class="form-check-label" for="temperature_2m_max">
@@ -123,28 +130,27 @@
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="temperature_2m_mean" id="temperature_2m_mean"
+          <input class="form-check-input" type="checkbox" value="windspeed_10m_mean" id="windspeed_10m_mean"
             name="daily">
-          <label class="form-check-label" for="temperature_2m_mean">
-            Mean Temperature (2 m)
+          <label class="form-check-label" for="windspeed_10m_mean">
+            Mean Wind Speed (10 m)
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="cloudcover_mean" id="cloudcover_mean"
-            name="daily">
-          <label class="form-check-label" for="cloudcover_mean">
-            Mean Cloud Cover
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="shortwave_radiation_sum" id="shortwave_radiation_sum"
-            name="daily">
-          <label class="form-check-label" for="shortwave_radiation_sum">
-            Shortwave Radiation Sum
+          <input class="form-check-input" type="checkbox" value="windspeed_10m_max" id="windspeed_10m_max" name="daily">
+          <label class="form-check-label" for="windspeed_10m_max">
+            Maximum Wind Speed (10 m)
           </label>
         </div>
       </div>
       <div class="col-md-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="relative_humidity_2m_mean"
+            id="relative_humidity_2m_mean" name="daily">
+          <label class="form-check-label" for="temperaturelative_humidity_2m_meanre_2m_mean">
+            Mean Relative Humidity (2 m)
+          </label>
+        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="relative_humidity_2m_min" id="relative_humidity_2m_min"
             name="daily">
@@ -160,23 +166,16 @@
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_2m_mean" id="relative_humidity_2m_mean"
-            name="daily">
-          <label class="form-check-label" for="temperaturelative_humidity_2m_meanre_2m_mean">
-            Mean Relative Humidity (2 m)
+          <input class="form-check-input" type="checkbox" value="cloudcover_mean" id="cloudcover_mean" name="daily">
+          <label class="form-check-label" for="cloudcover_mean">
+            Mean Cloud Cover
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="pressure_msl_mean" id="pressure_msl_mean"
+          <input class="form-check-input" type="checkbox" value="shortwave_radiation_sum" id="shortwave_radiation_sum"
             name="daily">
-          <label class="form-check-label" for="pressure_msl_mean">
-            Pressure msl
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm_mean" id="soil_moisture_0_to_10cm_mean" name="daily">
-          <label class="form-check-label" for="soil_moisture_0_to_10cm_mean">
-            Mean Soil Moisture (0-10 cm)
+          <label class="form-check-label" for="shortwave_radiation_sum">
+            Shortwave Radiation Sum
           </label>
         </div>
       </div>
@@ -200,15 +199,16 @@
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_10m_mean" id="windspeed_10m_mean" name="daily">
-          <label class="form-check-label" for="windspeed_10m_mean">
-            Mean Wind Speed (10 m)
+          <input class="form-check-input" type="checkbox" value="pressure_msl_mean" id="pressure_msl_mean" name="daily">
+          <label class="form-check-label" for="pressure_msl_mean">
+            Sealevel Pressure
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="windspeed_10m_max" id="windspeed_10m_max" name="daily">
-          <label class="form-check-label" for="windspeed_10m_max">
-            Maximum Wind Speed (10 m)
+          <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_10cm_mean"
+            id="soil_moisture_0_to_10cm_mean" name="daily">
+          <label class="form-check-label" for="soil_moisture_0_to_10cm_mean">
+            Mean Soil Moisture (0-10 cm)
           </label>
         </div>
       </div>
@@ -229,13 +229,15 @@
             <div class="accordion-body row">
               <div class="col-md-4">
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="CMCC_CM2_VHR4" id="CMCC_CM2_VHR4" name="models" checked>
+                  <input class="form-check-input" type="checkbox" value="CMCC_CM2_VHR4" id="CMCC_CM2_VHR4" name="models"
+                    checked>
                   <label class="form-check-label" for="CMCC_CM2_VHR4">
                     CMCC_CM2_VHR4 <span class="text-muted">(30 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="FGOALS_f3_H" id="FGOALS_f3_H" name="models" checked>
+                  <input class="form-check-input" type="checkbox" value="FGOALS_f3_H" id="FGOALS_f3_H" name="models"
+                    checked>
                   <label class="form-check-label" for="FGOALS_f3_H">
                     FGOALS_f3_H <span class="text-muted">(28 km)</span>
                   </label>
@@ -247,31 +249,36 @@
                   </label>
                 </div>-->
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="HiRAM_SIT_HR" id="HiRAM_SIT_HR" name="models" checked>
+                  <input class="form-check-input" type="checkbox" value="HiRAM_SIT_HR" id="HiRAM_SIT_HR" name="models"
+                    checked>
                   <label class="form-check-label" for="HiRAM_SIT_HR">
                     HiRAM_SIT_HR <span class="text-muted">(25 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="MRI_AGCM3_2_S" id="MRI_AGCM3_2_S" name="models" checked>
+                  <input class="form-check-input" type="checkbox" value="MRI_AGCM3_2_S" id="MRI_AGCM3_2_S" name="models"
+                    checked>
                   <label class="form-check-label" for="MRI_AGCM3_2_S">
                     MRI_AGCM3_2_S <span class="text-muted">(20 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="EC_Earth3P_HR" id="EC_Earth3P_HR" name="models">
+                  <input class="form-check-input" type="checkbox" value="EC_Earth3P_HR" id="EC_Earth3P_HR" name="models"
+                    checked>
                   <label class="form-check-label" for="EC_Earth3P_HR">
                     EC_Earth3P_HR <span class="text-muted">(29 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="MPI_ESM1_2_XR" id="MPI_ESM1_2_XR" name="models">
+                  <input class="form-check-input" type="checkbox" value="MPI_ESM1_2_XR" id="MPI_ESM1_2_XR" name="models"
+                    checked>
                   <label class="form-check-label" for="MPI_ESM1_2_XR">
                     MPI_ESM1_2_XR <span class="text-muted">(51 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="NICAM16_8S" id="NICAM16_8S" name="models">
+                  <input class="form-check-input" type="checkbox" value="NICAM16_8S" id="NICAM16_8S" name="models"
+                    checked>
                   <label class="form-check-label" for="NICAM16_8S">
                     NICAM16_8S <span class="text-muted">(31 km)</span>
                   </label>
@@ -287,8 +294,10 @@
       <h2>Settings</h2>
       <div class="col-12 pb-3">
         <div class="form-check form-switch">
-          <input class="form-check-input" type="checkbox" id="disable_bias_correction" name="disable_bias_correction" value="true">
-          <label class="form-check-label" for="disable_bias_correction">Disable statistical downscaling with ERA5-Land as reference</label>
+          <input class="form-check-input" type="checkbox" id="disable_bias_correction" name="disable_bias_correction"
+            value="true">
+          <label class="form-check-label" for="disable_bias_correction">Raw data. Disable statistical downscaling with
+            ERA5-Land (10 km)</label>
         </div>
       </div>
       <div class="col-3">
@@ -362,21 +371,30 @@
 
   <h2 id="data-sources" class="mt-5">Data Sources</h2>
   <div class="row">
-    <!--<div class="col-6">
-      <p>The Historical Weather API is based on reanalysis datasets and uses a combination of weather station,
-        aircraft, buoy, radar, and satellite observations to create a comprehensive record of past weather conditions.
-        These datasets are able to fill in gaps by using mathematical models to estimate the values of various weather
-        variables. As a result, reanalysis datasets are able to provide detailed historical weather information for
-        locations that may not have had weather stations nearby, such as rural areas or the open ocean.</p>
+    <div class="col-6">
+      <p>This API utilizes regional downscaled high-resolution climate models, specifically those with up to 20
+        kilometer resolution from the HighResMip working group, which are part of the IPCC CMIP6 project.</p>
+      <p>The API offers climate data at a regional, rather than continental, level by downsizing it to a 10 km
+        resolution. This allows for direct comparison of various climate models to identify vulnerable regions to
+        climate change impacts or assessing the impact of climate change on specific sectors, such as agriculture or
+        public health. The reference point used is ERA5-Land, which is accessible through the <a>Historical Weather
+          API</a>.</p>
+      <p>With typical weather variables in daily resolution data from 1950 to 2050 data allows estimation of common
+        climate parameters like the number of days with temperatures exceeding 30°C or duration of droughts.
+        Furthermore, daily data enables running of models to predict crop yield, pest infestation, and water balance.
+      </p>
     </div>
     <div class="col-6">
-      <p>The spatial resolution of a weather reanalysis dataset refers to the size of the grid cells used to represent
-        the data. In the case of the reanalysis dataset described, the cells covering land have a resolution of 11 km,
-        while those covering the ocean have a resolution of 25 km. For the region of Europe, the resolution is
-        increased to 5 km, although this higher resolution is only available up until June 2021, with real-time
-        updates expected to be available sometime in 2023. In general, a higher spatial resolution means that the data
-        is more detailed and represents the weather conditions more accurately at smaller scales.</p>
-    </div>-->
+      <p>While the data from past and recent years is available, it should not be confused with actual measurements, as
+        it serves the purpose of model validation rather than showing actual past weather.</p>
+      <p>While these models consider different emission scenarios, the variations in these scenarios are less noticeable
+        until 2050. Projections beyond 2050 are highly dependent on different emission scenarios. Projections until 2100
+        are only accessible through lower resolution climate models that use different scenarios.</p>
+      <p>The climate models available in this API vary in their accuracy and level of uncertainty, and depending on the
+        analysis, some models may be more suitable than others. It is not possible to provide a general recommendation
+        on which model is better. It is recommended to run analyses with multiple models and evaluate their performance
+        afterward.</p>
+    </div>
   </div>
   <div class="table-responsive">
     <table class="table">
@@ -431,7 +449,8 @@
               href="https://www.wdc-climate.de/ui/cmip6?input=CMIP6.HighResMIP.EC-Earth-Consortium.EC-Earth3P-HR">EC_Earth3P_HR</a>
           </th>
           <td>Europe</td>
-          <td>EC-Earth consortium, Rossby Center, Swedish Meteorological and Hydrological Institute/SMHI, Norrkoping, Sweden</td>
+          <td>EC-Earth consortium, Rossby Center, Swedish Meteorological and Hydrological Institute/SMHI, Norrkoping,
+            Sweden</td>
           <td>29&nbsp;km</td>
           <td><a href="https://gmd.copernicus.org/articles/13/3507/2020/">Model</a></td>
         </tr>
@@ -456,6 +475,12 @@
       </tbody>
     </table>
   </div>
+  <div class="row">
+    <p>Some weather variables may not be available in all climate models. Notably, soil moisture is only available in
+      MRI-AGCM3-2-S. Additionally, some models may not provide certain aggregations, such as maximum relative humidity.
+      However, mean relative humidity is generally available. The table below outlines the weather variables that are
+      available in each model:</p>
+  </div>
   <div class="table-responsive">
     <table class="table">
       <caption>&#x26a0;&#xfe0f; = Only daily <mark>mean</mark> values available. No daily minima or maxima.</caption>
@@ -463,10 +488,10 @@
         <tr>
           <th scope="col" style="width: 22%">Model</th>
           <th scope="col" style="width: 13%">Temperature</th>
-          <th scope="col" style="width: 13%">Relative<br/>Humidity</th>
+          <th scope="col" style="width: 13%">Relative<br />Humidity</th>
           <th scope="col" style="width: 13%">Wind</th>
           <th scope="col" style="width: 13%">Precipitation</th>
-          <th scope="col" style="width: 13%">Snowfall,<br/>Solar Radiation &<br/>Clouds</th>
+          <th scope="col" style="width: 13%">Snowfall,<br />Solar Radiation &<br />Clouds</th>
           <th scope="col" style="width: 13%">Soil moisture</th>
         </tr>
       </thead>
@@ -540,13 +565,10 @@
 
 
   <div class="col-12 py-5">
-    <!--<h2 id="api-documentation">API Documentation</h2>
-    <p>The API endpoint <mark>/v1/climate</mark> allows users to retrieve historical weather data for a specific
-      location and time
-      period. To use this endpoint, you can specify a geographical coordinate, a time interval, and a list of weather
-      variables that they are interested in. The endpoint will then return the requested data in a format that can be
-      easily accessed and used by applications or other software. This endpoint can be very useful for researchers and
-      other users who need to access detailed historical weather data for specific locations and time periods.</p>
+    <h2 id="api-documentation">API Documentation</h2>
+    <p>The API endpoint <mark>/v1/climate</mark> allows users to retrieve climate weather data from multiple climate
+      models. To use this endpoint, you can specify a geographical coordinate, a time interval, and a list of weather
+      variables that they are interested in. It is recommended to use the full time range of 1950 to 2050.</p>
     <p>All URL parameters are listed below:</p>
     <div class="table-responsive">
       <table class="table">
@@ -573,26 +595,25 @@
             <td>Yes</td>
             <td></td>
             <td>The time interval to get weather data. A day must be specified as an ISO8601 date (e.g.
-              <mark>2022-12-31</mark>).
+              <mark>2022-12-31</mark>). Data is available from <mark>1950-01-01</mark> until <mark>2050-01-01</mark>.
             </td>
           </tr>
           <tr>
-            <th scope="row">hourly</th>
+            <th scope="row">models</th>
             <td>String array</td>
-            <td>No</td>
+            <td>Yes</td>
             <td></td>
-            <td>A list of weather variables which should be returned. Values can be comma separated, or multiple
-              <mark>&hourly=</mark> parameter in the URL can be used.
-            </td>
+            <td>A list of climate models separated by comma. 7 climate models are available <mark>CMCC_CM2_VHR4</mark>,
+              <mark>FGOALS_f3_H</mark>, <mark>HiRAM_SIT_HR</mark> <mark>MRI_AGCM3_2_S</mark>,
+              <mark>EC_Earth3P_HR</mark>, <mark>MPI_ESM1_2_XR</mark>, and <mark>NICAM16_8S</mark> are supported.</td>
           </tr>
           <tr>
             <th scope="row">daily</th>
             <td>String array</td>
-            <td>No</td>
+            <td>Yes</td>
             <td></td>
             <td>A list of daily weather variable aggregations which should be returned. Values can be comma separated,
-              or multiple <mark>&daily=</mark> parameter in the URL can be used. If daily weather variables are
-              specified, parameter <mark>timezone</mark> is required.</td>
+              or multiple <mark>&daily=</mark> parameter in the URL can be used.</td>
           </tr>
           <tr>
             <th scope="row">temperature_unit</th>
@@ -626,22 +647,25 @@
             </td>
           </tr>
           <tr>
-            <th scope="row">timezone</th>
-            <td>String</td>
+            <th scope="row">disable_bias_correction</th>
+            <td>Bool</td>
             <td>No</td>
-            <td><mark>GMT</mark></td>
-            <td>If <mark>timezone</mark> is set, all timestamps are returned as local-time and data is returned starting
-              at 00:00 local-time. Any time zone name from the <a
-                href="https://en.wikipedia.org/wiki/List_of_tz_database_time_zones" target="_blank">time zone
-                database</a> is supported If <mark>auto</mark> is set as a time zone, the coordinates will be
-              automatically resolved to the local time zone..</td>
+            <td><mark>false</mark></td>
+            <td>Setting <mark>disable_bias_correction</mark> to <mark>true</mark> disables statistical downscaling and
+              bias correction onto ERA5-Land. By default, all data is corrected using linear bias correction, and
+              coefficients have been calculated for each month over a 50-year time series. The climate change signal is
+              not affected by linear bias correction.
+            </td>
           </tr>
           <tr>
             <th scope="row">cell_selection</th>
             <td>String</td>
             <td>No</td>
             <td><mark>land</mark></td>
-            <td>Set a preference how grid-cells are selected. The default <mark>land</mark> finds a suitable grid-cell on land with <a href="https://openmeteo.substack.com/p/improving-weather-forecasts-with" title="Elevation based grid-cell selection explained">similar elevation to the requested coordinates using a 90-meter digital elevation model</a>. 
+            <td>Set a preference how grid-cells are selected. The default <mark>land</mark> finds a suitable grid-cell
+              on land with <a href="https://openmeteo.substack.com/p/improving-weather-forecasts-with"
+                title="Elevation based grid-cell selection explained">similar elevation to the requested coordinates
+                using a 90-meter digital elevation model</a>.
               <mark>sea</mark> prefers grid-cells on sea. <mark>nearest</mark> selects the nearest possible grid-cell.
             </td>
         </tbody>
@@ -650,185 +674,10 @@
     <p>Additional optional URL parameters will be added. For API stability, no required parameters will be added in the
       future!</p>
 
-
-    <h3 class="mt-5">Hourly Parameter Definition</h3>
-    <p>The parameter <mark>&hourly=</mark> accepts the following values. Most weather variables are given as an
-      instantaneous value for the indicated hour. Some variables like precipitation are calculated from the preceding
-      hour as and average or sum.</p>
-    <div class="table-responsive">
-      <table class="table">
-        <thead>
-          <tr>
-            <th scope="col">Variable</th>
-            <th scope="col">Valid time</th>
-            <th scope="col">Unit</th>
-            <th scope="col">Description</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <th scope="row">temperature_2m</th>
-            <td>Instant</td>
-            <td>°C (°F)</td>
-            <td>Air temperature at 2 meters above ground</td>
-          </tr>
-          <tr>
-            <th scope="row">relativehumidity_2m</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>Relative humidity at 2 meters above ground</td>
-          </tr>
-          <tr>
-            <th scope="row">dewpoint_2m</th>
-            <td>Instant</td>
-            <td>°C (°F)</td>
-            <td>Dew point temperature at 2 meters above ground</td>
-          </tr>
-          <tr>
-            <th scope="row">apparent_temperature</th>
-            <td>Instant</td>
-            <td>°C (°F)</td>
-            <td>Apparent temperature is the perceived feels-like temperature combining wind chill factor, relative
-              humidity and solar radiation</td>
-          </tr>
-          <tr>
-            <th scope="row">pressure_msl<br />surface_pressure</th>
-            <td>Instant</td>
-            <td>hPa</td>
-            <td>Atmospheric air pressure reduced to mean sea level (msl) or pressure at surface. Typically pressure on
-              mean sea level is used in meteorology. Surface pressure gets lower with increasing elevation.</td>
-          </tr>
-          <tr>
-            <th scope="row">precipitation</th>
-            <td>Preceding hour sum</td>
-            <td>mm (inch)</td>
-            <td>Total precipitation (rain, showers, snow) sum of the preceding hour. Data is stored with a 0.1 mm
-              precision. If precipitation data is summed up to monthly sums, there might be small inconsistencies with
-              the total precipitation amount.</td>
-          </tr>
-          <tr>
-            <th scope="row">rain</th>
-            <td>Preceding hour sum</td>
-            <td>mm (inch)</td>
-            <td>Only liquid precipitation of the preceding hour including local showers and rain from large scale
-              systems.</td>
-          </tr>
-          <tr>
-            <th scope="row">snowfall</th>
-            <td>Preceding hour sum</td>
-            <td>cm (inch)</td>
-            <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by
-              7. E.g. 7 cm snow = 10 mm precipitation water equivalent</td>
-          </tr>
-          <tr>
-            <th scope="row">cloudcover</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>Total cloud cover as an area fraction</td>
-          </tr>
-          <tr>
-            <th scope="row">cloudcover_low</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>Low level clouds and fog up to 2 km altitude</td>
-          </tr>
-          <tr>
-            <th scope="row">cloudcover_mid</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>Mid level clouds from 2 to 6 km altitude</td>
-          </tr>
-          <tr>
-            <th scope="row">cloudcover_high</th>
-            <td>Instant</td>
-            <td>%</td>
-            <td>High level clouds from 6 km altitude</td>
-          </tr>
-          <tr>
-            <th scope="row">shortwave_radiation</th>
-            <td>Preceding hour mean</td>
-            <td>W/m²</td>
-            <td>Shortwave solar radiation as average of the preceding hour. This is equal to the total global horizontal
-              irradiation </td>
-          </tr>
-          <tr>
-            <th scope="row">direct_radiation<br />direct_normal_irradiance</th>
-            <td>Preceding hour mean</td>
-            <td>W/m²</td>
-            <td>Direct solar radiation as average of the preceding hour on the horizontal plane and the normal plane
-              (perpendicular to the sun)</td>
-          </tr>
-          <tr>
-            <th scope="row">diffuse_radiation</th>
-            <td>Preceding hour mean</td>
-            <td>W/m²</td>
-            <td>Diffuse solar radiation as average of the preceding hour</td>
-          </tr>
-          <tr>
-            <th scope="row">windspeed_10m<br />windspeed_100m</th>
-            <td>Instant</td>
-            <td>km/h (mph, m/s, knots)</td>
-            <td>Wind speed at 10 or 100 meters above ground. Wind speed on 10 meters is the standard level.</td>
-          </tr>
-          <tr>
-            <th scope="row">winddirection_10m<br>winddirection_100m</th>
-            <td>Instant</td>
-            <td>°</td>
-            <td>Wind direction at 10 or 100 meters above ground</td>
-          </tr>
-          <tr>
-            <th scope="row">windgusts_10m</th>
-            <td>Preceding hour max</td>
-            <td>km/h (mph, m/s, knots)</td>
-            <td>Gusts at 10 meters above ground as a maximum of the preceding hour</td>
-          </tr>
-          <tr>
-            <th scope="row">et0_fao_evapotranspiration</th>
-            <td>Preceding hour sum</td>
-            <td>mm (inch)</td>
-            <td>ET₀ Reference Evapotranspiration of a well watered grass field. Based on <a
-                href="https://www.fao.org/3/x0490e/x0490e04.htm" target="_blank">FAO-56 Penman-Monteith equations</a>
-              ET₀
-              is calculated from temperature, wind speed, humidity and solar radiation. Unlimited soil water is
-              assumed. ET₀ is commonly used to estimate the required irrigation for plants.</td>
-          </tr>
-          <tr>
-            <th scope="row">weathercode</th>
-            <td>Instant</td>
-            <td>WMO code</td>
-            <td>Weather condition as a numeric code. Follow WMO weather interpretation codes. See table below for
-              details. Weather code is calculated from cloud cover analysis, precipitation and snowfall. As barely no
-              information about atmospheric stability is available, estimation about thunderstorms is not possible.</td>
-          </tr>
-          <tr>
-            <th scope="row">vapor_pressure_deficit</th>
-            <td>Instant</td>
-            <td>kPa</td>
-            <td>Vapor Pressure Deificit (VPD) in kilopascal (kPa). For high VPD (&gt;1.6), water transpiration of plants
-              increases. For low VPD (&lt;0.4), transpiration decreases</td>
-          </tr>
-          <tr>
-            <th scope="row">
-              soil_temperature_0_to_7cm<br />soil_temperature_7_to_28cm<br />soil_temperature_28_to_100cm<br />soil_temperature_100_to_255cm
-            </th>
-            <td>Instant</td>
-            <td>°C (°F)</td>
-            <td>Average temperature of different soil levels below ground.</td>
-          </tr>
-          <tr>
-            <th scope="row">
-              soil_moisture_0_to_7cm<br />soil_moisture_7_to_28cm<br />soil_moisture_28_to_100cm<br />soil_moisture_100_to_255cm
-            </th>
-            <td>Instant</td>
-            <td>m³/m³</td>
-            <td>Average soil water content as volumetric mixing ratio at 0-7, 7-28, 28-100 and 100-255 cm depths.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-
     <h3 class="mt-5">Daily Parameter Definition</h3>
-    <p>Aggregations are a simple 24 hour aggregation from hourly values. The parameter <mark>&daily=</mark> accepts the
+    <p>The climate data in this API is presented as daily aggregations. Some models provide daily aggregations directly,
+      while others calculate daily values from 3 or 6-hourly data. To ensure the correct preservation of daily maximum
+      temperatures, data has been reconstructed using cubic splines. The parameter <mark>&daily=</mark> accepts the
       following values:</p>
     <div class="table-responsive">
       <table class="table">
@@ -841,71 +690,61 @@
         </thead>
         <tbody>
           <tr>
-            <th scope="row">weathercode</th>
-            <td>WMO code</td>
-            <td>The most severe weather condition on a given day</td>
+            <th scope="row">temperature_2m_max<br>temperature_2m_min<br>temperature_2m_mean</th>
+            <td>°C (°F)</td>
+            <td>Maximum, minimum and mean daily air temperature at 2 meters above ground. Additionally, temperature is downscaled using a 90-meter digital elevation model. Climate models are not perfect, and they have inherent uncertainties and biases that can affect the accuracy of their temperature predictions. However, the temperature anomaly over a long period of time is a good indicator the future Earth's climate. The following paper analyses the <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2020EF001667">robustness of CMIP6 temperature predictions</a>.</td>
           </tr>
           <tr>
-            <th scope="row">temperature_2m_max<br>temperature_2m_min</th>
-            <td>°C (°F)</td>
-            <td>Maximum and minimum daily air temperature at 2 meters above ground</td>
+            <th scope="row">cloudcover_mean</th>
+            <td>%</td>
+            <td>Mean cloud cover on a given day. Cloud cover in climate models is generally represented through simplified parameterizations that estimate the cloud amount, height, and thickness based on atmospheric conditions such as temperature, humidity, and wind speed. These parameterizations have been shown to provide reasonable estimates of global cloud cover and sis but they can have significant uncertainties and biases on regional and local scales. Systematic biases have corrected using ERA5.</td>
           </tr>
           <tr>
-            <th scope="row">apparent_temperature_max<br>apparent_temperature_min</th>
-            <td>°C (°F)</td>
-            <td>Maximum and minimum daily apparent temperature</td>
+            <th scope="row">relative_humidity_2m_max<br>relative_humidity_2m_min<br>relative_humidity_2m_mean</th>
+            <td>%</td>
+            <td>Maximum, minimum and mean daily relative humidity at 2 meters above ground. While systematic biases in relative humidity have been removed through bias correction, caution should still be exercised when using relative humidity data as raw data shows larger differences between different climate models.</td>
+          </tr>
+          <tr>
+            <th scope="row">soil_moisture_0_to_10cm_mean</th>
+            <td>m³/m³</td>
+            <td>Daily mean soil moisture fraction within 0-10 cm. Soil moisture data is only available by <mark>MRI_AGCM3_2_S</mark>. Due to the limited number of climate models that provide soil moisture data, it is not possible to make a general statement about their accuracy. As a result, it may be advisable to conduct your own water balance modeling.</td>
           </tr>
           <tr>
             <th scope="row">precipitation_sum</th>
             <td>mm</td>
-            <td>Sum of daily precipitation (including rain, showers and snowfall)</td>
+            <td>Sum of daily precipitation (including rain, showers and snowfall). Climate models have been able to capture some of the large-scale patterns of precipitation and associated droughts and extreme precipitation events, particularly over longer time scales. However, there are still uncertainties associated with the representation of precipitation at smaller scales, where many of these events occur. Please compare different climate models for drought duration or extreme precipitation events. The following papers <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002196">analyze extreme precipitation</a> and <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002150">droughts in CMIP6 model</a>.</td>
           </tr>
           <tr>
             <th scope="row">rain_sum</th>
             <td>mm</td>
-            <td>Sum of daily rain</td>
+            <td>Sum of daily liquid rain. The sum of snowfall converted to liquid water and rain, is equal to precipitation.</td>
           </tr>
           <tr>
             <th scope="row">snowfall_sum</th>
             <td>cm</td>
-            <td>Sum of daily snowfall</td>
+            <td>Sum of daily snowfall. Please note that snowfall data may have larger biases in complex terrain, as it is not adjusted for different terrain elevations. Use this data with caution.</td>
           </tr>
           <tr>
-            <th scope="row">precipitation_hours</th>
-            <td>hours</td>
-            <td>The number of hours with rain</td>
-          </tr>
-          <tr>
-            <th scope="row">sunrise<br>sunset</th>
-            <td>iso8601</td>
-            <td>Sun rise and set times</td>
-          </tr>
-          <tr>
-            <th scope="row">windspeed_10m_max<br />windgusts_10m_max</th>
+            <th scope="row">windspeed_10m_mean<br />windspeed_10m_max</th>
             <td>km/h (mph, m/s, knots)</td>
-            <td>Maximum wind speed and gusts on a day</td>
+            <td>Mean and maximum wind speed 10 meter above ground on a day. Simulations of winds and pressure systems in climate models are greatly influenced by the resolution used to model the terrain. Without bias correction, wind speed can vary significantly between different climate models, particularly in complex terrain. Moreover, the behavior of wind speed can differ between different regions, as climate models can have biases or uncertainties in their representation of wind patterns in specific geographic areas. Therefore, it is important to consider the resolution of the model and to use multiple models when analyzing wind speed data.</td>
           </tr>
           <tr>
-            <th scope="row">winddirection_10m_dominant</th>
-            <td>°</td>
-            <td>Dominant wind direction</td>
+            <th scope="row">pressure_msl_mean</th>
+            <td>hPa</td>
+            <td>Daily mean air pressure reduced to mean sea level.</td>
           </tr>
           <tr>
             <th scope="row">shortwave_radiation_sum</th>
             <td>MJ/m²</td>
-            <td>The sum of solar radiaion on a given day in Megajoules</td>
-          </tr>
-          <tr>
-            <th scope="row">et0_fao_evapotranspiration</th>
-            <td>mm</td>
-            <td>Daily sum of ET₀ Reference Evapotranspiration of a well watered grass field</td>
+            <td>The sum of solar radiation on a given day in Megajoules. Shortwave radiation predictions are impacted by aerosols and clouds present in the atmosphere. The future composition of gases in the atmosphere is a key area of study in climate modeling. As there are uncertainties associated with aerosols and clouds, it is important to take these into account when using shortwave radiation data.</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <h3 class="mt-5">JSON Return Object</h3>
-    <p>On success a JSON object will be returned.</p>
+    <p>On success a JSON object will be returned. Please note: the resulting JSON might be multiple mega bytes in size.</p>
     <pre>
       <code>
 {
@@ -914,11 +753,11 @@
   "generationtime_ms": 2.2119,
   "timezone": "Europe/Berlin",
   "timezone_abbreviation": "CEST",
-  "hourly": {
-    "time": ["2022-07-01T00:00", "2022-07-01T01:00", "2022-07-01T02:00", ...],
-    "temperature_2m": [13, 12.7, 12.7, 12.5, 12.5, 12.8, 13, 12.9, 13.3, ...]
+  "daily": {
+    "time": ["2022-07-01", "2022-07-01", "2022-07-01", ...],
+    "temperature_2m_max": [13, 12.7, 12.7, 12.5, 12.5, 12.8, ...]
   },
-  "hourly_units": {
+  "daily_units": {
     "temperature_2m": "°C"
   },
 }
@@ -939,7 +778,7 @@
             <th scope="row">latitude, longitude</th>
             <td>Floating point</td>
             <td>WGS84 of the center of the weather grid-cell which was used to generate this forecast. This coordinate
-              might be up to 5 km away.</td>
+              might be up to 10 km away.</td>
           </tr>
           <tr>
             <th scope="row">generationtime_ms</th>
@@ -956,18 +795,6 @@
             <th scope="row">timezone<br />timezone_abbreviation</th>
             <td>String</td>
             <td>Timezone identifier (e.g. <mark>Europe/Berlin</mark>) and abbreviation (e.g. <mark>CEST</mark>)</td>
-          </tr>
-          <tr>
-            <th scope="row">hourly</th>
-            <td>Object</td>
-            <td>For each selected weather variable, data will be returned as a floating point array. Additionally a
-              <mark>time</mark> array will be returned with ISO8601 timestamps.
-            </td>
-          </tr>
-          <tr>
-            <th scope="row">hourly_units</th>
-            <td>Object</td>
-            <td>For each selected weather variable, the unit will be listed here.</td>
           </tr>
           <tr>
             <th scope="row">daily</th>
@@ -995,49 +822,18 @@
   </div>
 
   <h2 id="citation">Citation & Acknowledgement</h2>
-  <p>ERA5: Generated using Copernicus Climate Change Service information 2022.</p>
-  <pre>
-ERA5: Hersbach, H., Bell, B., Berrisford, P., Biavati, G., Horányi, A., Muñoz Sabater, J., Nicolas, J., 
-Peubey, C., Radu, R., Rozum, I., Schepers, D., Simmons, A., Soci, C., Dee, D., Thépaut, J-N. (2018): 
-ERA5 hourly data on single levels from 1959 to present. 
-Copernicus Climate Change Service (C3S) Climate Data Store (CDS). (Updated daily), 10.24381/cds.adbb2d47
+  <p>
+CMIP6 model data is licensed under a Creative Commons Attribution 4.0 International License (<a href="https://creativecommons.org/licenses/">CC BY 4.0</a>). 
+Consult <a href="https://pcmdi.llnl.gov/CMIP6/TermsOfUse">https://pcmdi.llnl.gov/CMIP6/TermsOfUse</a> for terms of use governing CMIP6 output, including citation requirements and proper acknowledgment. 
+The data producers and data providers make no warranty, either express or implied, including, but not limited to, warranties of merchantability and fitness for a particular purpose. 
+All liabilities arising from the supply of the information (including any liability arising in negligence) are excluded to the fullest extent permitted by law.
+  </p>
 
-ERA5-Land: Muñoz Sabater, J., (2019): ERA5-Land hourly data from 1981 to present. (Accessed on daily), 10.24381/cds.e2161bac
-
-CERRA: Schimanke S., Ridal M., Le Moigne P., Berggren L., Undén P., Randriamampianina R., Andrea U., Bazile E., 
-Bertelsen A., Brousseau P., Dahlgren P., Edvinsson L., El Said A., Glinton M., Hopsch S., Isaksson L., Mladek R., 
-Olsson E., Verrelle A., Wang Z.Q., (accessed on 2022-12-31), doi: '10.24381/cds.622a565a'
-  </pre>
-
-  <p>All users of Open-Meteo data must provide a clear attribution to the Copernicus program as well as a reference to
+  <p>All users of Open-Meteo data must provide a clear attribution to the CMIP6 program as well as a reference to
     Open-Meteo.</p>
 
-  -->
-
-  <!--<div class=col-12>
-      <h1>Docs</h1>
-      <div id="swagger-ui">
-      </div>
-    </div>-->
 </div>
 
-<!--<link type="text/css" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.30.0/swagger-ui.css">
-    <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@3.30.0/swagger-ui-bundle.js"></script>
-    <script>
-        const ui = SwaggerUIBundle({
-            url: '/docs/openapi.yml',
-        oauth2RedirectUrl: window.location.origin + '/docs/oauth2-redirect',
-            dom_id: '#swagger-ui',
-            presets: [
-                SwaggerUIBundle.presets.apis,
-                SwaggerUIBundle.SwaggerUIStandalonePreset
-            ],
-            layout: "BaseLayout",
-            deepLinking: true,
-            showExtensions: true,
-            showCommonExtensions: true
-        })
-    </script>-->
 #endexport
 
 #export("footer"):
