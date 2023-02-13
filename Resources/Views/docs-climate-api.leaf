@@ -712,7 +712,7 @@
           <tr>
             <th scope="row">precipitation_sum</th>
             <td>mm</td>
-            <td>Sum of daily precipitation (including rain, showers and snowfall). Climate models have been able to capture some of the large-scale patterns of precipitation and associated droughts and extreme precipitation events, particularly over longer time scales. However, there are still uncertainties associated with the representation of precipitation at smaller scales, where many of these events occur. Please compare different climate models for drought duration or extreme precipitation events. The following papers <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002196">analyze extreme precipitation</a> and <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002150">droughts in CMIP6 model</a>.</td>
+            <td>Sum of daily precipitation (including rain, showers and snowfall). Climate models have been able to capture some of the large-scale patterns of precipitation and associated droughts and extreme precipitation events, particularly over longer time scales. However, there are still uncertainties associated with the representation of precipitation at smaller scales, where many of these events occur. Please compare different climate models for drought duration or extreme precipitation events. The following papers <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002196">analyze extreme precipitation</a> and <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002150">droughts in CMIP6 models</a>.</td>
           </tr>
           <tr>
             <th scope="row">rain_sum</th>
