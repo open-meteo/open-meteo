@@ -398,7 +398,11 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 let snowwater = try get(raw: .snowfall_water_equivalent, time: time).data
                 let total = try get(raw: .precipitation, time: time).data
                 let showers = try get(raw: .showers, time: time).data
-                return DataAndUnit(zip(zip(total, snowwater).map(-), showers).map(-), .millimeter)
+                let rain = zip(zip(total, snowwater), showers).map { (arg0, showers) in
+                    let (total, snowwater) = arg0
+                    return max(total - snowwater - showers, 0)
+                }
+                return DataAndUnit(rain, .millimeter)
             case .cloudcover_low:
                 let cl0 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 1000))), time: time)
                 let cl1 = try get(variable: .derived(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 950))), time: time)
