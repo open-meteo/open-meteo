@@ -69,7 +69,7 @@ struct CmipController {
             for (reader, domain) in zip(readers, domains) {
                 for variable in dailyVariables {
                     let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
-                    let d = try reader.get(variable: variable, time: dailyTime).toApi(name: name)
+                    let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: params).toApi(name: name)
                     assert(dailyTime.count == d.data.count)
                     res.append(d)
                 }
