@@ -416,7 +416,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
         case .windspeed_10m_max:
             return .ms
         case .soil_moisture_0_to_10cm_mean:
-            return .gramPerKilogram
+            return .qubicMeterPerQubicMeter
         case .shortwave_radiation_sum:
             return .megaJoulesPerSquareMeter
         }
@@ -839,6 +839,10 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return (100, 0)
         }
         
+        if (domain == .NICAM16_8S || domain == .FGOALS_f3_H) && self == .cloudcover_mean {
+            return (100, 0)
+        }
+        
         switch self {
         case .temperature_2m_min:
             fallthrough
@@ -852,6 +856,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             fallthrough
         case .snowfall_water_equivalent_sum:
             return (3600*24, 0)
+        case .soil_moisture_0_to_10cm_mean:
+            return (0.001 / 0.10, 0) // 10cm depth
         //case .runoff_sum:
         //    return (3600*24, 0)
         case .shortwave_radiation_sum:
