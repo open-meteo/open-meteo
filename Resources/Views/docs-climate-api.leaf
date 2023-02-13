@@ -231,13 +231,13 @@
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="CMCC_CM2_VHR4" id="CMCC_CM2_VHR4" name="models" checked>
                   <label class="form-check-label" for="CMCC_CM2_VHR4">
-                    CMCC_CM2_VHR4 <span class="text-muted">(27 km)</span>
+                    CMCC_CM2_VHR4 <span class="text-muted">(30 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="FGOALS_f3_H" id="FGOALS_f3_H" name="models" checked>
                   <label class="form-check-label" for="FGOALS_f3_H">
-                    FGOALS_f3_H <span class="text-muted">(25 km)</span>
+                    FGOALS_f3_H <span class="text-muted">(28 km)</span>
                   </label>
                 </div>
                 <!--<div class="form-check">
@@ -249,31 +249,31 @@
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="HiRAM_SIT_HR" id="HiRAM_SIT_HR" name="models" checked>
                   <label class="form-check-label" for="HiRAM_SIT_HR">
-                    HiRAM_SIT_HR <span class="text-muted">(23 km)</span>
+                    HiRAM_SIT_HR <span class="text-muted">(25 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="MRI_AGCM3_2_S" id="MRI_AGCM3_2_S" name="models" checked>
                   <label class="form-check-label" for="MRI_AGCM3_2_S">
-                    MRI_AGCM3_2_S <span class="text-muted">(18 km)</span>
+                    MRI_AGCM3_2_S <span class="text-muted">(20 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="EC_Earth3P_HR" id="EC_Earth3P_HR" name="models">
                   <label class="form-check-label" for="EC_Earth3P_HR">
-                    EC_Earth3P_HR <span class="text-muted">(35 km)</span>
+                    EC_Earth3P_HR <span class="text-muted">(29 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="MPI_ESM1_2_XR" id="MPI_ESM1_2_XR" name="models">
                   <label class="form-check-label" for="MPI_ESM1_2_XR">
-                    MPI_ESM1_2_XR <span class="text-muted">(46 km)</span>
+                    MPI_ESM1_2_XR <span class="text-muted">(51 km)</span>
                   </label>
                 </div>
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="NICAM16_8S" id="NICAM16_8S" name="models">
                   <label class="form-check-label" for="NICAM16_8S">
-                    NICAM16_8S <span class="text-muted">(30 km)</span>
+                    NICAM16_8S <span class="text-muted">(31 km)</span>
                   </label>
                 </div>
               </div>
@@ -385,11 +385,8 @@
           <th scope="col">Climate Model</th>
           <th scope="col">Origin</th>
           <th scope="col">Run by</th>
-          <th scope="col">Spatial Resolution</th>
-          <th scope="col">aerosol</th>
-          <th scope="col">atmos</th>
-          <th scope="col">land</th>
-          <th scope="col">seaIce</th>
+          <th scope="col">Resolution</th>
+          <th scope="col">Description</th>
         </tr>
       </thead>
       <tbody>
@@ -399,11 +396,8 @@
           </th>
           <td>Italy</td>
           <td>Fondazione Centro Euro-Mediterraneo sui Cambiamenti Climatici, Lecce (CMCC)</td>
-          <td>0.31°/0.23° (~27 km)</td>
-          <td>25 km</td>
-          <td>25 km</td>
-          <td>25 km</td>
-          <td>25 km</td>
+          <td>30&nbsp;km</td>
+          <td></td>
         </tr>
         <tr>
           <th scope="row"><a
@@ -411,11 +405,8 @@
           </th>
           <td>China</td>
           <td>Chinese Academy of Sciences, Beijing (CAS)</td>
-          <td>0.23 (~23 km)</td>
-          <td>25 km</td>
-          <td>25 km</td>
-          <td>10 km</td>
-          <td>10 km</td>
+          <td>28&nbsp;km</td>
+          <td><a href="https://link.springer.com/content/pdf/10.1007/s00376-022-2030-5.pdf">Model</a></td>
         </tr>
         <tr>
           <th scope="row"><a
@@ -423,11 +414,8 @@
           </th>
           <td>Taiwan</td>
           <td>Research Center for Environmental Changes, Academia Sinica, Nankang, Taipei (AS-RCEC)</td>
-          <td>0.23° (~23 km)</td>
-          <td>25 km</td>
-          <td>25 km</td>
-          <td>25 km</td>
-          <td>25 km</td>
+          <td>25&nbsp;km</td>
+          <td></td>
         </tr>
         <tr>
           <th scope="row"><a
@@ -435,11 +423,8 @@
           </th>
           <td>Japan</td>
           <td>Meteorological Research Institute, Tsukuba, Ibaraki (MRI) </td>
-          <td>0.18 (~18 km)</td>
-          <td>250 km</td>
-          <td>25 km</td>
-          <td>25 km</td>
-          <td>-</td>
+          <td>20&nbsp;km</td>
+          <td></td>
         </tr>
         <tr>
           <th scope="row"><a
@@ -447,11 +432,8 @@
           </th>
           <td>Europe</td>
           <td>EC-Earth consortium, Rossby Center, Swedish Meteorological and Hydrological Institute/SMHI, Norrkoping, Sweden</td>
-          <td>0.31°/0.23° (~27 km)</td>
-          <td>50 km</td>
-          <td>50 km</td>
-          <td>25 km</td>
-          <td>25 km</td>
+          <td>29&nbsp;km</td>
+          <td><a href="https://gmd.copernicus.org/articles/13/3507/2020/">Model</a></td>
         </tr>
         <tr>
           <th scope="row"><a
@@ -459,11 +441,8 @@
           </th>
           <td>Germany</td>
           <td>Max Planck Institute for Meteorology, Hamburg 20146, Germany</td>
-          <td>0.46° (~47 km)</td>
-          <td>50 km</td>
-          <td>50 km</td>
-          <td>50 km</td>
-          <td>50 km</td>
+          <td>51&nbsp;km</td>
+          <td><a href="https://gmd.copernicus.org/articles/12/3241/2019/">Model</a></td>
         </tr>
         <tr>
           <th scope="row"><a
@@ -471,11 +450,8 @@
           </th>
           <td>Japan</td>
           <td>Japan Agency for Marine-Earth Science and Technology, Kanagawa 236-0001, Japan (MIROC)</td>
-          <td>0.28° (~28 km)</td>
-          <td>25 km</td>
-          <td>50 km</td>
-          <td>25 km</td>
-          <td>25 km</td>
+          <td>31&nbsp;km</td>
+          <td><a href="https://gmd.copernicus.org/articles/14/795/2021/">Model</a></td>
         </tr>
       </tbody>
     </table>
