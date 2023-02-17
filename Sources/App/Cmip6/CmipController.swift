@@ -279,7 +279,7 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             let wind = try get(raw: .windspeed_10m_mean, time: time).data
             let radiation = try get(raw: .shortwave_radiation_sum, time: time).data
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-            let hasRhMinMax = domain == .CMCC_CM2_VHR4 || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR
+            let hasRhMinMax = !(domain == .CMCC_CM2_VHR4 || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR)
             let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
             let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
             
@@ -319,7 +319,7 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             try prefetchData(raw: .temperature_2m_mean, time: time)
             try prefetchData(raw: .windspeed_10m_mean, time: time)
             try prefetchData(raw: .shortwave_radiation_sum, time: time)
-            let hasRhMinMax = domain == .CMCC_CM2_VHR4 || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR
+            let hasRhMinMax = !(domain == .CMCC_CM2_VHR4 || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR)
             if hasRhMinMax {
                 try prefetchData(raw: .relative_humidity_2m_min, time: time)
                 try prefetchData(raw: .relative_humidity_2m_max, time: time)
