@@ -23,6 +23,7 @@ protocol GenericReaderMixable {
     var modelElevation: ElevationOrSea { get }
     var targetElevation: Float { get }
     var modelDtSeconds: Int { get }
+    var domain: Domain { get }
     
     func get(variable: MixingVar, time: TimerangeDt) throws -> DataAndUnit
     func prefetchData(variable: MixingVar, time: TimerangeDt) throws

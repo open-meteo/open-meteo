@@ -211,6 +211,13 @@
             Mean Soil Moisture (0-10 cm)
           </label>
         </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="et0_fao_evapotranspiration_sum"
+            id="et0_fao_evapotranspiration_sum" name="daily">
+          <label class="form-check-label" for="et0_fao_evapotranspiration_sum">
+            Reference Evapotranspiration (ET₀)
+          </label>
+        </div>
       </div>
     </div>
 

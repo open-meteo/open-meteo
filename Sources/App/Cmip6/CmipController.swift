@@ -113,6 +113,7 @@ extension Cmip6Domain: MultiDomainMixerDomain {
 enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case snowfall_sum
     case rain_sum
+    case et0_fao_evapotranspiration_sum
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -169,6 +170,8 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
     var targetElevation: Float { reader.targetElevation }
     
     var modelDtSeconds: Int { reader.modelDtSeconds }
+    
+    var domain: Domain { reader.domain }
     
     /// cmip reader
     let reader: GenericReader<Cmip6Domain, Cmip6Variable>
@@ -269,6 +272,37 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
                 return max($0.0-$0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
+        case .et0_fao_evapotranspiration_sum:
+            let tempmax = try get(raw: .temperature_2m_max, time: time).data
+            let tempmin = try get(raw: .temperature_2m_min, time: time).data
+            let tempmean = try get(raw: .temperature_2m_mean, time: time).data
+            let wind = try get(raw: .windspeed_10m_mean, time: time).data
+            let radiation = try get(raw: .shortwave_radiation_sum, time: time).data
+            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let hasRhMinMax = domain == .CMCC_CM2_VHR4 || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR
+            let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
+            let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
+            
+            var et0 = [Float]()
+            et0.reserveCapacity(tempmax.count)
+            for i in tempmax.indices {
+                let rh: Meteorology.MaxAndMinOrMean
+                if let rhmin {
+                    rh = .maxmin(max: rhmaxOrMean[i], min: rhmin[i])
+                } else {
+                    rh = .mean(mean: rhmaxOrMean[i])
+                }
+                et0.append(Meteorology.et0EvapotranspirationDaily(
+                    temperature2mCelsiusDailyMax: tempmax[i],
+                    temperature2mCelsiusDailyMin: tempmin[i],
+                    temperature2mCelsiusDailyMean: tempmean[i],
+                    windspeed10mMeterPerSecondMean: wind[i],
+                    shortwaveRadiationMJSum: radiation[i],
+                    elevation: reader.targetElevation,
+                    extraTerrestrialRadiationSum: exrad[i] * 0.0036 * 24,
+                    relativeHumidity: rh))
+            }
+            return DataAndUnit(et0, .millimeter)
         }
     }
     
@@ -279,6 +313,19 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
         case .rain_sum:
             try prefetchData(raw: .precipitation_sum, time: time)
             try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
+        case .et0_fao_evapotranspiration_sum:
+            try prefetchData(raw: .temperature_2m_max, time: time)
+            try prefetchData(raw: .temperature_2m_min, time: time)
+            try prefetchData(raw: .temperature_2m_mean, time: time)
+            try prefetchData(raw: .windspeed_10m_mean, time: time)
+            try prefetchData(raw: .shortwave_radiation_sum, time: time)
+            let hasRhMinMax = domain == .CMCC_CM2_VHR4 || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR
+            if hasRhMinMax {
+                try prefetchData(raw: .relative_humidity_2m_min, time: time)
+                try prefetchData(raw: .relative_humidity_2m_max, time: time)
+            } else {
+                try prefetchData(raw: .relative_humidity_2m_mean, time: time)
+            }
         }
     }
 }
