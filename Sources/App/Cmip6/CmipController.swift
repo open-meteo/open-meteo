@@ -278,10 +278,11 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             let tempmean = try get(raw: .temperature_2m_mean, time: time).data
             let wind = try get(raw: .windspeed_10m_mean, time: time).data
             let radiation = try get(raw: .shortwave_radiation_sum, time: time).data
-            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-            let hasRhMinMax = !(domain == .CMCC_CM2_VHR4 || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR)
+            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.with(dtSeconds: 3600)).sum(by: 24)
+            let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
             let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
+            let elevation = reader.targetElevation.isNaN ? reader.modelElevation.numeric : reader.targetElevation
             
             var et0 = [Float]()
             et0.reserveCapacity(tempmax.count)
@@ -298,8 +299,8 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
                     temperature2mCelsiusDailyMean: tempmean[i],
                     windspeed10mMeterPerSecondMean: wind[i],
                     shortwaveRadiationMJSum: radiation[i],
-                    elevation: reader.targetElevation,
-                    extraTerrestrialRadiationSum: exrad[i] * 0.0036 * 24,
+                    elevation: elevation.isNaN ? 0 : elevation,
+                    extraTerrestrialRadiationSum: exrad[i] * 0.0036,
                     relativeHumidity: rh))
             }
             return DataAndUnit(et0, .millimeter)
@@ -319,7 +320,7 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             try prefetchData(raw: .temperature_2m_mean, time: time)
             try prefetchData(raw: .windspeed_10m_mean, time: time)
             try prefetchData(raw: .shortwave_radiation_sum, time: time)
-            let hasRhMinMax = !(domain == .CMCC_CM2_VHR4 || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR)
+            let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             if hasRhMinMax {
                 try prefetchData(raw: .relative_humidity_2m_min, time: time)
                 try prefetchData(raw: .relative_humidity_2m_max, time: time)

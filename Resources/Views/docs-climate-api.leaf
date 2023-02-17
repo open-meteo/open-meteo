@@ -515,8 +515,8 @@
         <tr>
           <th scope="row">FGOALS-f3-H</th>
           <td>&#x2705;</td>
-          <td>&#x2705;</td>
-          <td>&#x2705;</td>
+          <td>&#x26a0;&#xfe0f;</td>
+          <td>&#x26a0;&#xfe0f;</td>
           <td>&#x2705;</td>
           <td>&#x2705;</td>
           <td>&#x274c;</td>
@@ -560,7 +560,7 @@
         <tr>
           <th scope="row">NICAM16_8S</th>
           <td>&#x2705;</td>
-          <td>&#x26a0;&#xfe0f;</td>
+          <td>&#x2705;</td>
           <td>&#x2705;</td>
           <td>&#x2705;</td>
           <td>&#x2705;</td>
