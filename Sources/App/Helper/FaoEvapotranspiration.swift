@@ -12,7 +12,8 @@ extension Meteorology {
     /// FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
     public static func et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, temperature2mCelsiusDailyMean: Float, windspeed10mMeterPerSecondMean: Float, shortwaveRadiationMJSum: Float, elevation: Float, extraTerrestrialRadiationSum: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
         
-        let Rs = extraTerrestrialRadiationSum
+        /// short wave radiaton or use Hargreaves’ radiation formula (Page 60)
+        let Rs = shortwaveRadiationMJSum.isNaN ? 0.16 * sqrtf(temperature2mCelsiusDailyMax - temperature2mCelsiusDailyMin) * extraTerrestrialRadiationSum : shortwaveRadiationMJSum
                 
         let windspeed2m = scaleWindFactor(from: 10, to: 2) * windspeed10mMeterPerSecondMean
 

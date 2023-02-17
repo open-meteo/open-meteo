@@ -42,10 +42,10 @@ final class MeteorologyTests: XCTestCase {
         XCTAssertTrue(Meteorology.et0Evapotranspiration(temperature2mCelsius: .nan, windspeed10mMeterPerSecond: 2, dewpointCelsius: 13.8, shortwaveRadiationWatts: 0, elevation: 250, extraTerrestrialRadiation: 0, dtSeconds: 3600).isNaN)
         
         var et0day = Meteorology.et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: 32, temperature2mCelsiusDailyMin: 18, temperature2mCelsiusDailyMean: 24, windspeed10mMeterPerSecondMean: 8, shortwaveRadiationMJSum: 20, elevation: 100, extraTerrestrialRadiationSum: 28, relativeHumidity: .maxmin(max: 78, min: 54))
-        XCTAssertEqual(et0day, 3.8538766)
+        XCTAssertEqual(et0day, 2.7935097)
         
         et0day = Meteorology.et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: 32, temperature2mCelsiusDailyMin: 18, temperature2mCelsiusDailyMean: 24, windspeed10mMeterPerSecondMean: 8, shortwaveRadiationMJSum: 20, elevation: 100, extraTerrestrialRadiationSum: 28, relativeHumidity: .mean(mean: 66))
-        XCTAssertEqual(et0day, 3.8350008)
+        XCTAssertEqual(et0day, 2.7744882)
     }
     
     func testVaporPressureDeficit() {
