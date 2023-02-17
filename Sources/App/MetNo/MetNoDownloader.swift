@@ -176,10 +176,10 @@ struct MetNoDownloader: AsyncCommandFix {
 }
 
 
-fileprivate extension NetCDF {
+extension NetCDF {
     /// Try to open a file. If it does not excist, wait 10 seconds and try again until deadline is reached
     /// Works with OpenDap urls
-    static func openOrWait(path: String, deadline: Date, logger: Logger) throws -> Group {
+    public static func openOrWait(path: String, deadline: Date, logger: Logger) throws -> Group {
         let startTime = Date()
         var lastPrint = Date().addingTimeInterval(TimeInterval(-60))
         let retySeconds = 10
@@ -203,7 +203,7 @@ fileprivate extension NetCDF {
     }
     
     /// Try to open a file, but catch error "file not found"
-    static func openCatchMssing(path: String, allowUpdate: Bool) throws -> Group? {
+    fileprivate static func openCatchMssing(path: String, allowUpdate: Bool) throws -> Group? {
         do {
             return try open(path: path, allowUpdate: allowUpdate)
         } catch (NetCDFError.ncerror(code: let code, error: let error)) {
