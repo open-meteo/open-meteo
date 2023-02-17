@@ -556,7 +556,7 @@ enum ForecastVariableDaily: String, Codable, DailyVariableCalculatable {
         case .sunset:
             return .none
         case .et0_fao_evapotranspiration:
-            return .sum(.surface(.evapotranspiration))
+            return .sum(.surface(.et0_fao_evapotranspiration))
         case .visibility_max:
             return .max(.surface(.visibility))
         case .visibility_min:
