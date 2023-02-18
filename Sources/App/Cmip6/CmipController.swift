@@ -117,6 +117,7 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case dewpoint_2m_max
     case dewpoint_2m_min
     case dewpoint_2m_mean
+    case vapor_pressure_deficit_mean
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -320,6 +321,28 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             let temp = try get(raw: .temperature_2m_mean, time: time).data
             let rh = try get(raw: .relative_humidity_2m_mean, time: time).data
             return DataAndUnit(zip(temp, rh).map(Meteorology.dewpoint), .celsius)
+        case .vapor_pressure_deficit_mean:
+            let tempmax = try get(raw: .temperature_2m_max, time: time).data
+            let tempmin = try get(raw: .temperature_2m_min, time: time).data
+            let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
+            let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
+            let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
+            
+            var vpd = [Float]()
+            vpd.reserveCapacity(tempmax.count)
+            for i in tempmax.indices {
+                let rh: Meteorology.MaxAndMinOrMean
+                if let rhmin {
+                    rh = .maxmin(max: rhmaxOrMean[i], min: rhmin[i])
+                } else {
+                    rh = .mean(mean: rhmaxOrMean[i])
+                }
+                vpd.append(Meteorology.vaporPressureDeficitDaily(
+                    temperature2mCelsiusDailyMax: tempmax[i],
+                    temperature2mCelsiusDailyMin: tempmin[i],
+                    relativeHumidity: rh))
+            }
+            return DataAndUnit(vpd, .kiloPascal)
         }
     }
     
@@ -352,6 +375,16 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
         case .dewpoint_2m_mean:
             try prefetchData(raw: .temperature_2m_mean, time: time)
             try prefetchData(raw: .relative_humidity_2m_mean, time: time)
+        case .vapor_pressure_deficit_mean:
+            try prefetchData(raw: .temperature_2m_max, time: time)
+            try prefetchData(raw: .temperature_2m_min, time: time)
+            let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
+            if hasRhMinMax {
+                try prefetchData(raw: .relative_humidity_2m_min, time: time)
+                try prefetchData(raw: .relative_humidity_2m_max, time: time)
+            } else {
+                try prefetchData(raw: .relative_humidity_2m_mean, time: time)
+            }
         }
     }
 }

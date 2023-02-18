@@ -9,6 +9,30 @@ extension Meteorology {
         case maxmin(max: Float, min: Float)
     }
     
+    /// Calculate daily vapor pressure deficit using relative humidity min/max if available
+    public static func vaporPressureDeficitDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
+        /// Slope of saturation vapour pressure curve at air temperature T [kPa °C-1], (Page 37)
+        let β = Float(17.27) // Actually 17.625 is now recommended. FAO uses the old one.
+        let λ = Float(237.3) // 243.04 new recommendation
+        let e0min = 0.6108 * exp(β * temperature2mCelsiusDailyMin / (temperature2mCelsiusDailyMin + λ))
+        let e0max = 0.6108 * exp(β * temperature2mCelsiusDailyMax / (temperature2mCelsiusDailyMax + λ))
+        /// saturation vapor pressure at air temperature Thr. (kPa)
+        let esat = (e0min + e0max) / 2
+        
+        /// actual vapour pressure [kPa], (Page 37)
+        let ea: Float
+        
+        switch relativeHumidity {
+        case .mean(mean: let mean):
+            ea = mean/100 * (e0max + e0min) / 2
+        case .maxmin(max: let max, min: let min):
+            ea = (e0min * max / 100 + e0max * min / 100) / 2
+        }
+        
+        let vaporPressureDeficit = esat-ea
+        return vaporPressureDeficit
+    }
+    
     /// FAO et0 calculation based on https://marais.ch/doc/fao56.pdf
     public static func et0EvapotranspirationDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, temperature2mCelsiusDailyMean: Float, windspeed10mMeterPerSecondMean: Float, shortwaveRadiationMJSum: Float, elevation: Float, extraTerrestrialRadiationSum: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
         
@@ -18,7 +42,7 @@ extension Meteorology {
         let windspeed2m = scaleWindFactor(from: 10, to: 2) * windspeed10mMeterPerSecondMean
 
         /// Slope of saturation vapour pressure curve at air temperature T [kPa °C-1], (Page 37)
-        let β = Float(17.27) // Actaually 17.625 is now recommended. FAO uses the old one.
+        let β = Float(17.27) // Actually 17.625 is now recommended. FAO uses the old one.
         let λ = Float(237.3) // 243.04 new recommendation
         let e0min = 0.6108 * exp(β * temperature2mCelsiusDailyMin / (temperature2mCelsiusDailyMin + λ))
         let e0max = 0.6108 * exp(β * temperature2mCelsiusDailyMax / (temperature2mCelsiusDailyMax + λ))
