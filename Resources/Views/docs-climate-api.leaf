@@ -142,29 +142,6 @@
             Maximum Wind Speed (10 m)
           </label>
         </div>
-      </div>
-      <div class="col-md-4">
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_2m_mean"
-            id="relative_humidity_2m_mean" name="daily">
-          <label class="form-check-label" for="temperaturelative_humidity_2m_meanre_2m_mean">
-            Mean Relative Humidity (2 m)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_2m_min" id="relative_humidity_2m_min"
-            name="daily">
-          <label class="form-check-label" for="relative_humidity_2m_min">
-            Maximum Relative Humidity (2 m)
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="relative_humidity_2m_max" id="relative_humidity_2m_max"
-            name="daily">
-          <label class="form-check-label" for="relative_humidity_2m_max">
-            Minimum Relative Humidity (2 m)
-          </label>
-        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="cloudcover_mean" id="cloudcover_mean" name="daily">
           <label class="form-check-label" for="cloudcover_mean">
@@ -178,6 +155,51 @@
             Shortwave Radiation Sum
           </label>
         </div>
+      </div>
+      <div class="col-md-4">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="relative_humidity_2m_mean"
+            id="relative_humidity_2m_mean" name="daily">
+          <label class="form-check-label" for="temperaturelative_humidity_2m_meanre_2m_mean">
+            Mean Relative Humidity (2 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="relative_humidity_2m_max" id="relative_humidity_2m_max"
+            name="daily">
+          <label class="form-check-label" for="relative_humidity_2m_max">
+            Maximum Relative Humidity (2 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="relative_humidity_2m_min" id="relative_humidity_2m_min"
+            name="daily">
+          <label class="form-check-label" for="relative_humidity_2m_min">
+            Minimum Relative Humidity (2 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="dewpoint_2m_mean"
+            id="dewpoint_2m_mean" name="daily">
+          <label class="form-check-label" for="dewpoint_2m_mean">
+            Mean Dewpoint (2 m)
+          </label>
+        </div>
+        <div class="form-check">
+            <input class="form-check-input" type="checkbox" value="dewpoint_2m_min" id="dewpoint_2m_min"
+            name="daily">
+          <label class="form-check-label" for="dewpoint_2m_min">
+            Minimum Dewpoint (2 m)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="dewpoint_2m_max" id="dewpoint_2m_max"
+            name="daily">
+          <label class="form-check-label" for="dewpoint_2m_max">
+            Maximum Dewpoint (2 m)
+          </label>
+        </div>
+
       </div>
       <div class="col-md-4">
         <div class="form-check">

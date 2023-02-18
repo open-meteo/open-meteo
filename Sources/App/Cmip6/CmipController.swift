@@ -114,6 +114,9 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case snowfall_sum
     case rain_sum
     case et0_fao_evapotranspiration_sum
+    case dewpoint_2m_max
+    case dewpoint_2m_min
+    case dewpoint_2m_mean
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -304,6 +307,19 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
                     relativeHumidity: rh))
             }
             return DataAndUnit(et0, .millimeter)
+        case .dewpoint_2m_max:
+            // The inverted max/min is on purpose as the maximum dew point is reached at minimum temperature
+            let temp = try get(raw: .temperature_2m_min, time: time).data
+            let rh = try get(raw: .relative_humidity_2m_max, time: time).data
+            return DataAndUnit(zip(temp, rh).map(Meteorology.dewpoint), .celsius)
+        case .dewpoint_2m_min:
+            let temp = try get(raw: .temperature_2m_max, time: time).data
+            let rh = try get(raw: .relative_humidity_2m_min, time: time).data
+            return DataAndUnit(zip(temp, rh).map(Meteorology.dewpoint), .celsius)
+        case .dewpoint_2m_mean:
+            let temp = try get(raw: .temperature_2m_mean, time: time).data
+            let rh = try get(raw: .relative_humidity_2m_mean, time: time).data
+            return DataAndUnit(zip(temp, rh).map(Meteorology.dewpoint), .celsius)
         }
     }
     
@@ -327,6 +343,15 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             } else {
                 try prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
+        case .dewpoint_2m_max:
+            try prefetchData(raw: .temperature_2m_min, time: time)
+            try prefetchData(raw: .relative_humidity_2m_max, time: time)
+        case .dewpoint_2m_min:
+            try prefetchData(raw: .temperature_2m_max, time: time)
+            try prefetchData(raw: .relative_humidity_2m_min, time: time)
+        case .dewpoint_2m_mean:
+            try prefetchData(raw: .temperature_2m_mean, time: time)
+            try prefetchData(raw: .relative_humidity_2m_mean, time: time)
         }
     }
 }
