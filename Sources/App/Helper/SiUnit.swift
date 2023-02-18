@@ -12,6 +12,7 @@ enum SiUnit: String, Codable {
     case millimeter = "mm"
     case centimeter = "cm"
     case inch = "inch"
+    case feet = "ft"
     case meter = "m"
     case gpm = "gpm"
     case percent = "%"
@@ -49,6 +50,7 @@ enum SiUnit: String, Codable {
         case .ms: return 2
         case .millimeter: return 2
         case .inch: return 3
+        case .feet: return 3
         case .meter: return 2
         case .percent: return 0
         case .hectoPascal: return 1
@@ -158,6 +160,18 @@ struct DataAndUnit {
                 data[i] /= 25.4
             }
             unit = .inch
+        }
+        if unit == .centimeter && precipitationUnit == .inch {
+            for i in data.indices {
+                data[i] /= 2.54
+            }
+            unit = .inch
+        }
+        if unit == .meter && precipitationUnit == .inch {
+            for i in data.indices {
+                data[i] *= 3.280839895
+            }
+            unit = .feet
         }
         
         // round to 0 to 3 digits
