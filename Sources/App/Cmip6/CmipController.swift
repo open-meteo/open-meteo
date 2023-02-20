@@ -309,18 +309,20 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             }
             return DataAndUnit(et0, .millimeter)
         case .dewpoint_2m_max:
-            // The inverted max/min is on purpose as the maximum dew point is reached at minimum temperature
-            let temp = try get(raw: .temperature_2m_min, time: time).data
-            let rh = try get(raw: .relative_humidity_2m_max, time: time).data
-            return DataAndUnit(zip(temp, rh).map(Meteorology.dewpoint), .celsius)
+            let tempMin = try get(raw: .temperature_2m_min, time: time).data
+            let tempMax = try get(raw: .temperature_2m_max, time: time).data
+            let rhMax = try get(raw: .relative_humidity_2m_max, time: time).data
+            return DataAndUnit(zip(zip(tempMax, tempMin), rhMax).map(Meteorology.dewpointDaily), .celsius)
         case .dewpoint_2m_min:
-            let temp = try get(raw: .temperature_2m_max, time: time).data
-            let rh = try get(raw: .relative_humidity_2m_min, time: time).data
-            return DataAndUnit(zip(temp, rh).map(Meteorology.dewpoint), .celsius)
+            let tempMin = try get(raw: .temperature_2m_min, time: time).data
+            let tempMax = try get(raw: .temperature_2m_max, time: time).data
+            let rhMin = try get(raw: .relative_humidity_2m_min, time: time).data
+            return DataAndUnit(zip(zip(tempMax, tempMin), rhMin).map(Meteorology.dewpointDaily), .celsius)
         case .dewpoint_2m_mean:
-            let temp = try get(raw: .temperature_2m_mean, time: time).data
-            let rh = try get(raw: .relative_humidity_2m_mean, time: time).data
-            return DataAndUnit(zip(temp, rh).map(Meteorology.dewpoint), .celsius)
+            let tempMin = try get(raw: .temperature_2m_min, time: time).data
+            let tempMax = try get(raw: .temperature_2m_max, time: time).data
+            let rhMean = try get(raw: .relative_humidity_2m_mean, time: time).data
+            return DataAndUnit(zip(zip(tempMax, tempMin), rhMean).map(Meteorology.dewpointDaily), .celsius)
         case .vapor_pressure_deficit_mean:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data

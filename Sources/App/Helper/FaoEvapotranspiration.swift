@@ -9,6 +9,16 @@ extension Meteorology {
         case maxmin(max: Float, min: Float)
     }
     
+    /// Calculate relative dewpoint from humidity and temperature for daily variables
+    /// Temperature max/min should be used instead of mean temperature, similar for FAO implementation
+    /// As there is an inverse relation between all variables, min/max vlues are not perfectly accurate afterwards
+    @inlinable public static func dewpointDaily(temperature2mCelsiusDaily: (max: Float, min: Float), relativeHumidity: Float) -> Float {
+        let β = Float(17.625)
+        let λ = Float(243.04)
+        let meanSat = ((β*temperature2mCelsiusDaily.min)/(λ+temperature2mCelsiusDaily.min) + (β*temperature2mCelsiusDaily.max)/(λ+temperature2mCelsiusDaily.max)) / 2
+        return λ*(log(relativeHumidity/100)+(meanSat))/(β-log(relativeHumidity/100)-(meanSat))
+    }
+    
     /// Calculate daily vapor pressure deficit using relative humidity min/max if available
     public static func vaporPressureDeficitDaily(temperature2mCelsiusDailyMax: Float, temperature2mCelsiusDailyMin: Float, relativeHumidity: MaxAndMinOrMean) -> Float {
         /// Slope of saturation vapour pressure curve at air temperature T [kPa °C-1], (Page 37)
