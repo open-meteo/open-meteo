@@ -1305,18 +1305,35 @@ extension OmFileWriter {
 extension Array where Element == OmFileReader<MmapFile> {
     /// Read the same location range from multiple files and assemble a time series
     fileprivate func combine(locationRange: Range<Int>) throws -> Array2DFastTime {
-        let ntChunks = self.reduce(0, {$0 + $1.dim1})
+        let ntChunks = self.reduce(0, {
+            $0 + ($1.dim0 == 1 && $1.dim1 > 1 ? 1 : $1.dim1)
+        })
         var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: ntChunks * locationRange.count), nLocations: locationRange.count, nTime: ntChunks)
 
         var timeOffset = 0
         for omfile in self {
-            try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
-            let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
-            let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: omfile.dim1)
-            for l in 0..<locationRange.count {
-                fasttime[l, timeOffset ..< timeOffset + omfile.dim1] = read2d[l, 0..<omfile.dim1]
+            if omfile.dim0 == 1 && omfile.dim1 > 1 {
+                // only one timestep in file
+                // dim0 = 1 nTime
+                // dim1 = nLocation
+                try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
+                let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
+                let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: 1)
+                for l in 0..<locationRange.count {
+                    fasttime[l, timeOffset ..< timeOffset + 1] = read2d[l, 0..<1]
+                }
+                timeOffset += 1
+            } else {
+                // dim0 = nLocation
+                // dim1 = nTime
+                try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
+                let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<omfile.dim1)
+                let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: omfile.dim1)
+                for l in 0..<locationRange.count {
+                    fasttime[l, timeOffset ..< timeOffset + omfile.dim1] = read2d[l, 0..<omfile.dim1]
+                }
+                timeOffset += omfile.dim1
             }
-            timeOffset += omfile.dim1
         }
         return fasttime
     }
