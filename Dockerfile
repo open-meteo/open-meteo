@@ -30,7 +30,7 @@ RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app
 
 
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y libnetcdf19 libeccodes0 libbz2 cdo curl python3-pip && rm -rf /var/lib/apt/lists/*
+RUN apt update && apt install -y libnetcdf19 libeccodes0 bzip2 cdo curl python3-pip && rm -rf /var/lib/apt/lists/*
 RUN pip3 install cdsapi
 
 # Switch to the new home directory
