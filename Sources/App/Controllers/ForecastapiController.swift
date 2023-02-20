@@ -210,7 +210,6 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
     case gfs_seamless
     case gfs_mix
     case gfs_global
-    case gfs025
     case gfs_hrrr
     
     case meteofrance_seamless
@@ -249,16 +248,13 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
             guard let icon: any GenericReaderMixable = try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
-            guard let gfs025: any GenericReaderMixable = try GfsReader(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
-            }
             guard let gfs013: any GenericReaderMixable = try GfsReader(domain: .gfs013, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
             // Scandinavian region, combine with ICON
             if lat >= 54.9, let metno = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode) {
                 let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode)
-                return Array([gfs025, gfs013, icon, iconEu, metno].compacted())
+                return Array([gfs013, icon, iconEu, metno].compacted())
             }
             // If Icon-d2 is available, use icon domains
             if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode) {
@@ -266,43 +262,41 @@ enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
                 guard let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
                 }
-                return [gfs025, gfs013, icon, iconEu, iconD2]
+                return [gfs013, icon, iconEu, iconD2]
             }
             // For western europe, use arome models
             if let arome_france_hd = try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode) {
                 let arome_france = try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode)
                 let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode)
-                return Array([gfs025, gfs013, icon, arpege_europe, arome_france, arome_france_hd].compacted())
+                return Array([gfs013, icon, arpege_europe, arome_france, arome_france_hd].compacted())
             }
             // For North America, use HRRR
             if let hrrr = try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [icon, gfs025, gfs013, hrrr]
+                return [icon, gfs013, hrrr]
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
             if let jma_msm = try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, gfs013, icon, jma_msm]
+                return [gfs013, icon, jma_msm]
             }
             
             // Remaining eastern europe
             if let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, gfs013, icon, iconEu]
+                return [gfs013, icon, iconEu]
             }
             
             // Northern africa
             if let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [gfs025, gfs013, icon, arpege_europe]
+                return [gfs013, icon, arpege_europe]
             }
             
             // Remaining parts of the world
-            return [gfs025, icon]
+            return [gfs013, icon]
         case .gfs_seamless:
             fallthrough
         case .gfs_mix:
-            return try GfsMixer(domains: [.gfs025, .gfs013, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GfsMixer(domains: [.gfs013, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_global:
-            return try GfsMixer(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
-        case .gfs025:
-            return try GfsReader(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try GfsMixer(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_hrrr:
             return try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .meteofrance_seamless:

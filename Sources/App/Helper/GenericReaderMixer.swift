@@ -48,6 +48,9 @@ extension GenericReaderMixer {
     var modelDtSeconds: Int {
         reader.first!.modelDtSeconds
     }
+    var domain: Reader.Domain {
+        reader.last!.domain
+    }
     
     /// Last domain is supposed to be the highest resolution domain
     public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {

@@ -25,7 +25,8 @@ public struct GfsController {
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
-        let domains = [GfsDomain.gfs025, .gfs013, /*.nam_conus,*/ .hrrr_conus]
+        // gfs025 is automatically used inside `GfsMixer`
+        let domains = [GfsDomain.gfs013, /*.nam_conus,*/ .hrrr_conus]
         
         guard let reader = try GfsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
             throw ForecastapiError.noDataAvilableForThisLocation
@@ -235,6 +236,45 @@ struct GfsPressureVariableDerived: PressureVariableRespresentable, GenericVariab
     }
 }
 
+/**
+ Combine GFS013 and GFS025 transparently. This is done before derived variables are calculated. Therefore weather codes can use variables from both global GFS domains at once
+ */
+struct GfsMixer025_013: GenericReaderMixer, GenericReaderMixable {
+    typealias MixingVar = GfsVariable
+    
+    typealias Domain = GfsDomain
+    
+    let reader: [GenericReaderCached<GfsDomain, GfsVariable>]
+    
+    init(reader: [GenericReaderCached<GfsDomain, GfsVariable>]) {
+        self.reader = reader
+    }
+    
+    init(domain: GfsDomain, position: Range<Int>) {
+        fatalError("GfsMixer025_013 for position ranges not implemented")
+    }
+    
+    init?(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        switch domain {
+        case .gfs013:
+            guard let gfs025 = try GenericReaderCached<GfsDomain, GfsVariable>(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            guard let gfs013 = try GenericReaderCached<GfsDomain, GfsVariable>(domain: .gfs013, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            reader = [gfs025, gfs013]
+        case .gfs025:
+            fatalError("gfs025 should not been initilised in GfsMixer025_013")
+        case .hrrr_conus:
+            guard let hrrr = try GenericReaderCached<GfsDomain, GfsVariable>(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            reader = [hrrr]
+        }
+    }
+}
+
 typealias GfsVariableDerived = SurfaceAndPressureVariable<GfsVariableDerivedSurface, GfsPressureVariableDerived>
 
 typealias GfsVariableCombined = VariableOrDerived<GfsVariable, GfsVariableDerived>
@@ -248,7 +288,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
     
     typealias MixingVar = GfsVariableCombined
     
-    var reader: GenericReaderCached<GfsDomain, GfsVariable>
+    var reader: GfsMixer025_013
     
     func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
@@ -259,11 +299,11 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
         }
         
         /// GFS has no diffuse radiation
-        if reader.domain == .gfs025, case let .surface(variable) = raw, variable == .diffuse_radiation {
+        /*if reader.domain == .gfs025, case let .surface(variable) = raw, variable == .diffuse_radiation {
             let ghi = try reader.get(variable: .surface(.shortwave_radiation), time: time)
             let dhi = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: ghi.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
             return DataAndUnit(dhi, ghi.unit)
-        }
+        }*/
         
         return try reader.get(variable: raw, time: time)
     }
@@ -275,9 +315,9 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
         }
         
         /// GFS has no diffuse radiation
-        if reader.domain == .gfs025, case let .surface(variable) = raw, variable == .diffuse_radiation {
+        /*if reader.domain == .gfs025, case let .surface(variable) = raw, variable == .diffuse_radiation {
             return try reader.prefetchData(variable: .surface(.shortwave_radiation), time: time)
-        }
+        }*/
         
         try reader.prefetchData(variable: raw, time: time)
     }
