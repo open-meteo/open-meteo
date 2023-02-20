@@ -58,7 +58,7 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
         guard let master = domain.omFileMaster else {
             fatalError("no master file defined")
         }
-        let masterFile = "\(master.path)_precipitation_sum_0.om"
+        let masterFile = "\(master.path)precipitation_sum_0.om"
         if FileManager.default.fileExists(atPath: masterFile) {
             logger.info("Master file already present")
             return
