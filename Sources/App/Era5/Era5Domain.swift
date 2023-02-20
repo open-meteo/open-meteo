@@ -39,6 +39,21 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
          return false
     }
     
+    var isAccumulatedSinceModelStart: Bool {
+        switch self {
+        case .shortwave_radiation:
+            fallthrough
+        case .direct_radiation:
+            fallthrough
+        case .precipitation:
+            fallthrough
+        case .snowfall_water_equivalent:
+            return true
+        default:
+            return false
+        }
+    }
+    
     var interpolation: ReaderInterpolation {
         fatalError("Interpolation not required for era5")
     }
@@ -99,6 +114,57 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
         case .soil_moisture_7_to_28cm: return "volumetric_soil_water_layer_2"
         case .soil_moisture_28_to_100cm: return "volumetric_soil_water_layer_3"
         case .soil_moisture_100_to_255cm: return "volumetric_soil_water_layer_4"
+        }
+    }
+    
+    var marsGribCode: String {
+        switch self {
+        case .temperature_2m:
+            return "167.128"
+        case .wind_u_component_100m:
+            return "246.228"
+        case .wind_v_component_100m:
+            return "247.228"
+        case .wind_u_component_10m:
+            return "165.128"
+        case .wind_v_component_10m:
+            return "166.128"
+        case .windgusts_10m:
+            return "49.128"
+        case .dewpoint_2m:
+            return "168.128"
+        case .cloudcover_low:
+            return "186.128"
+        case .cloudcover_mid:
+            return "187.128"
+        case .cloudcover_high:
+            return "188.128"
+        case .pressure_msl:
+            return "151.128"
+        case .snowfall_water_equivalent:
+            return "144.128"
+        case .soil_temperature_0_to_7cm:
+            return "139.128"
+        case .soil_temperature_7_to_28cm:
+            return "170.128"
+        case .soil_temperature_28_to_100cm:
+            return "183.128"
+        case .soil_temperature_100_to_255cm:
+            return "236.128"
+        case .soil_moisture_0_to_7cm:
+            return "39.128"
+        case .soil_moisture_7_to_28cm:
+            return "40.128"
+        case .soil_moisture_28_to_100cm:
+            return "41.128"
+        case .soil_moisture_100_to_255cm:
+            return "42.128"
+        case .shortwave_radiation:
+            return "169.128"
+        case .precipitation:
+            return "228.128"
+        case .direct_radiation:
+            return "21.228"
         }
     }
     

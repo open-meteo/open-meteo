@@ -242,14 +242,26 @@ struct GribArray2D {
     }
     
     public mutating func load(message: GribMessage) throws {
-        guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
-            fatalError("Could not get Nx")
+        guard let gridType = message.get(attribute: "gridType") else {
+            fatalError("Could not get gridType")
         }
-        guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
-            fatalError("Could not get Ny")
-        }
-        guard nx == array.nx, ny == array.ny else {
-            fatalError("GRIB dimensions (nx=\(nx), ny=\(ny)) do not match domain grid dimensions (nx=\(array.nx), ny=\(array.ny))")
+        if gridType == "reduced_gg" {
+            guard let numberOfCodedValues = message.get(attribute: "numberOfCodedValues").map(Int.init) ?? nil else {
+                fatalError("Could not get numberOfCodedValues")
+            }
+            guard numberOfCodedValues == array.count else {
+                fatalError("GRIB dimensions (count=\(numberOfCodedValues)) do not match domain grid dimensions (nx=\(array.nx), ny=\(array.ny))")
+            }
+        } else {
+            guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
+                fatalError("Could not get Nx")
+            }
+            guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
+                fatalError("Could not get Ny")
+            }
+            guard nx == array.nx, ny == array.ny else {
+                fatalError("GRIB dimensions (nx=\(nx), ny=\(ny)) do not match domain grid dimensions (nx=\(array.nx), ny=\(array.ny))")
+            }
         }
         try message.loadDoubleNotNaNChecked(into: &double)
         for i in double.indices {

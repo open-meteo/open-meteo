@@ -111,6 +111,7 @@ enum CdsDomainApi: String, Codable, CaseIterable, MultiDomainMixerDomain {
     case era5
     case cerra
     case era5_land
+    case ecmwf_ifs
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -124,6 +125,8 @@ enum CdsDomainApi: String, Codable, CaseIterable, MultiDomainMixerDomain {
             return try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .cerra:
             return try CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .ecmwf_ifs:
+            return try Era5Reader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
 }
