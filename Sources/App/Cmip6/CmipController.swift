@@ -191,7 +191,7 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
         if let readerEra5Land, let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5Land.domain) {
             let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position, dim1: 0..<referenceWeightFile.dim1)
             if !weights.containsNaN() {
-                return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5.modelElevation.numeric)
+                return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5Land.modelElevation.numeric)
             }
         }
         guard let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5.domain) else {

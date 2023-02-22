@@ -184,6 +184,57 @@ extension OmFileReader {
         })
     }
     
+    /// Read interpolated between 4 points
+    public func readInterpolated(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
+        
+        // reads 4 points. As 2 points are next to each other, we can read a small row of 2 elements at once
+        let top = try read(dim0Slow: dim0Y * dim0Nx + dim0X ..< dim0Y * dim0Nx + dim0X + 2, dim1: dim1Read)
+        let bottom = try read(dim0Slow: (dim0Y + 1) * dim0Nx + dim0X ..< (dim0Y + 1) * dim0Nx + dim0X + 2, dim1: dim1Read)
+        
+        // interpolate linearly between
+        let nt = dim1Read.count
+        return zip(zip(top[0..<nt], top[nt..<2*nt]), zip(bottom[0..<nt], bottom[nt..<2*nt])).map {
+            let ((a,b),(c,d)) = $0
+            return  a * (1-dim0XFraction) * (1-dim0YFraction) +
+                    b * (dim0XFraction) * (1-dim0YFraction) +
+                    c * (1-dim0XFraction) * (dim0YFraction) +
+                    d * (dim0XFraction) * (dim0YFraction)
+        }
+    }
+    
+    /// Read interpolated between 4 points. If one point is NaN, ignore it.
+    /*public func readInterpolatedIgnoreNaN(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
+        
+        // reads 4 points. As 2 points are next to each other, we can read a small row of 2 elements at once
+        let top = try read(dim0Slow: dim0Y * dim0Nx + dim0X ..< dim0Y * dim0Nx + dim0X + 2, dim1: dim1Read)
+        let bottom = try read(dim0Slow: (dim0Y + 1) * dim0Nx + dim0X ..< (dim0Y + 1) * dim0Nx + dim0X + 2, dim1: dim1Read)
+        
+        // interpolate linearly between
+        let nt = dim1Read.count
+        return zip(zip(top[0..<nt], top[nt..<2*nt]), zip(bottom[0..<nt], bottom[nt..<2*nt])).map {
+            let ((a,b),(c,d)) = $0
+            var value: Float = 0
+            var weight: Float = 0
+            if !a.isNaN {
+                value += a * (1-dim0XFraction) * (1-dim0YFraction)
+                weight += (1-dim0XFraction) * (1-dim0YFraction)
+            }
+            if !b.isNaN {
+                value += b * (1-dim0XFraction) * (dim0YFraction)
+                weight += (1-dim0XFraction) * (dim0YFraction)
+            }
+            if !c.isNaN {
+                value += c * (dim0XFraction) * (1-dim0YFraction)
+                weight += (dim0XFraction) * (1-dim0YFraction)
+            }
+            if !d.isNaN {
+                value += d * (dim0XFraction) * (dim0YFraction)
+                weight += (dim0XFraction) * (dim0YFraction)
+            }
+            return weight > 0.001 ? value / weight : .nan
+        }
+    }*/
+    
     // prefect and read all
     public func readAll() throws -> [Float] {
         fn.prefetchData(offset: 0, count: fn.count)

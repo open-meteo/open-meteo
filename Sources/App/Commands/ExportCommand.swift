@@ -110,6 +110,8 @@ enum ExportDomain: String, CaseIterable {
     case CMCC_CM2_VHR4
     case MRI_AGCM3_2_S
     case CMCC_CM2_VHR4_downscaled
+    //case CMCC_CM2_VHR4_era5_10km_interpolated
+    //case CMCC_CM2_VHR4_downscaled_imerg
     
     var genericDomain: GenericDomain {
         switch self {

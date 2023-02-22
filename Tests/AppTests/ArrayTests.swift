@@ -94,15 +94,22 @@ final class ArrayTests: XCTestCase {
     }
 }
 
-func XCTAssertEqualArray<T: Collection>(_ a: T, _ b: T, accuracy: Float) where T.Element == Float {
+func XCTAssertEqualArray<T: Collection>(_ a: T, _ b: T, accuracy: Float) where T.Element == Float, T: Equatable {
     guard a.count == b.count else {
         XCTFail("Array length different")
         return
     }
+    var failed = false
     for (a1,b1) in zip(a,b) {
         if a1.isNaN && b1.isNaN {
             continue
         }
-        XCTAssertEqual(a1, b1, accuracy: accuracy)
+        if abs(a1 - b1) > accuracy {
+            failed = true
+            break
+        }
+    }
+    if failed {
+        XCTAssertEqual(a, b)
     }
 }
