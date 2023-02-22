@@ -11,6 +11,8 @@ protocol GenericReaderMixer {
     
     var reader: [Reader] { get }
     init(reader: [Reader])
+    
+    static func makeReader(domain: Reader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Reader?
 }
 
 /// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
@@ -28,8 +30,8 @@ protocol GenericReaderMixable {
     func get(variable: MixingVar, time: TimerangeDt) throws -> DataAndUnit
     func prefetchData(variable: MixingVar, time: TimerangeDt) throws
 
-    init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws
-    init(domain: Domain, position: Range<Int>)
+    //init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws
+    //init(domain: Domain, position: Range<Int>)
 }
 
 extension GenericReaderMixer {
@@ -52,8 +54,28 @@ extension GenericReaderMixer {
         reader.last!.domain
     }
     
-    /// Last domain is supposed to be the highest resolution domain
     public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
+        var elevation = elevation
+        
+        let reader: [Reader] = try domains.reversed().compactMap { domain -> (Reader?) in
+            guard let domain = try Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            if elevation.isNaN {
+                elevation = domain.modelElevation.numeric
+            }
+            return domain
+        }.reversed()
+        
+        guard !reader.isEmpty else {
+            return nil
+        }
+        self.init(reader: reader)
+    }
+
+    /// Last domain is supposed to be the highest resolution domain
+    /*public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
         var elevation = elevation
         
@@ -71,7 +93,7 @@ extension GenericReaderMixer {
             return nil
         }
         self.init(reader: reader)
-    }
+    }*/
     
     func prefetchData(variable: Reader.MixingVar, time: TimerangeDt) throws {
         for reader in reader {

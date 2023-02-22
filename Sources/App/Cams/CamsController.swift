@@ -227,6 +227,13 @@ extension Array where Element == Float {
 
 struct CamsMixer: GenericReaderMixer {
     let reader: [CamsReader]
+    
+    static func makeReader(domain: CamsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> CamsReader? {
+        guard let reader = try GenericReader<CamsDomain, CamsVariable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        return CamsReader(reader: GenericReaderCached(reader: reader))
+    }
 }
 
 struct CamsQuery: Content, QueryWithStartEndDateTimeZone {

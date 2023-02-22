@@ -247,6 +247,13 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderMixable {
     
     var reader: GenericReaderCached<MeteoFranceDomain, MeteoFranceVariable>
     
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+    }
+    
     func get(raw: MeteoFranceVariable, time: TimerangeDt) throws -> DataAndUnit {
         // arpege_europe and arpege_world have no level 125
         if reader.domain == .arpege_europe || reader.domain == .arpege_world, case let .pressure(pressure) = raw, pressure.level == 125  {
@@ -527,6 +534,10 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderMixable {
 
 struct MeteoFranceMixer: GenericReaderMixer {
     let reader: [MeteoFranceReader]
+    
+    static func makeReader(domain: MeteoFranceReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> MeteoFranceReader? {
+        return try MeteoFranceReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    }
 }
 
 extension MeteoFranceMixer {

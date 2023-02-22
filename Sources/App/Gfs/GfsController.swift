@@ -254,24 +254,11 @@ struct GfsMixer025_013: GenericReaderMixer, GenericReaderMixable {
         fatalError("GfsMixer025_013 for position ranges not implemented")
     }
     
-    init?(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        switch domain {
-        case .gfs013:
-            guard let gfs025 = try GenericReaderCached<GfsDomain, GfsVariable>(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                return nil
-            }
-            guard let gfs013 = try GenericReaderCached<GfsDomain, GfsVariable>(domain: .gfs013, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                return nil
-            }
-            reader = [gfs025, gfs013]
-        case .gfs025:
-            fatalError("gfs025 should not been initilised in GfsMixer025_013")
-        case .hrrr_conus:
-            guard let hrrr = try GenericReaderCached<GfsDomain, GfsVariable>(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                return nil
-            }
-            reader = [hrrr]
+    static func makeReader(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReaderCached<GfsDomain, GfsVariable>? {
+        guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: .gfs025, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
         }
+        return GenericReaderCached(reader: reader)
     }
 }
 
@@ -289,6 +276,23 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
     typealias MixingVar = GfsVariableCombined
     
     var reader: GfsMixer025_013
+    
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        switch domain {
+        case .gfs013:
+            guard let reader = try GfsMixer025_013(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            self.reader = reader
+        case .gfs025:
+            fatalError("gfs025 should not been initilised in GfsMixer025_013")
+        case .hrrr_conus:
+            guard let reader = try GfsMixer025_013(domains: [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            self.reader = reader
+        }
+    }
     
     func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
@@ -561,6 +565,10 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
 
 struct GfsMixer: GenericReaderMixer {
     let reader: [GfsReader]
+    
+    static func makeReader(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GfsReader? {
+        return try GfsReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    }
 }
 
 extension GfsMixer {

@@ -72,6 +72,13 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     typealias Derived = EcmwfVariableDerived
     
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+    }
+    
     func get(derived: EcmwfVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
         switch derived {
         case .windspeed_10m:

@@ -233,6 +233,13 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     var reader: GenericReaderCached<GemDomain, GemVariable>
     
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+    }
+    
     func prefetchData(raw: GemSurfaceVariable, time: TimerangeDt) throws {
         try prefetchData(raw: .surface(raw), time: time)
     }
@@ -457,6 +464,10 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
 
 struct GemMixer: GenericReaderMixer {
     let reader: [GemReader]
+    
+    static func makeReader(domain: GemReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GemReader? {
+        return try GemReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    }
 }
 
 extension GemMixer {

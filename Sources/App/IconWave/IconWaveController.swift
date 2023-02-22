@@ -65,6 +65,10 @@ typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
 
 struct IconWaveMixer: GenericReaderMixer {
     let reader: [IconWaveReader]
+    
+    static func makeReader(domain: IconWaveReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> IconWaveReader? {
+        return try IconWaveReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    }
 }
 
 struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {

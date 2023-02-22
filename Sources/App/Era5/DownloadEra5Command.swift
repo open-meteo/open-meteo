@@ -233,11 +233,11 @@ struct DownloadEra5Command: AsyncCommandFix {
                 let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
                 /// Location range to prefetch for next iteration
                 let locationRangeNext = min(dim0+nLocationChunks, writer.dim0)..<min(dim0+nLocationChunks*prefetchFactor, writer.dim0)
-                let readerNext = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(domain: domain, position: locationRangeNext)])
+                let readerNext = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: GenericReader<CdsDomain, Era5Variable>(domain: domain, position: locationRangeNext)))])
                 try readerNext.prefetchData(variables: [era5Variable], time: time)
                 
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
-                let reader = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(domain: domain, position: locationRange)])
+                let reader = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: GenericReader<CdsDomain, Era5Variable>(domain: domain, position: locationRange)))])
                 guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
                     fatalError("Could not get \(era5Variable)")
                 }

@@ -123,6 +123,13 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     typealias Derived = MetNoVariableDerived
     
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+    }
+    
     func prefetchData(derived: MetNoVariableDerived, time: TimerangeDt) throws {
         switch derived {
         case .apparent_temperature:

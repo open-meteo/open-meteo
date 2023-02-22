@@ -147,7 +147,7 @@ enum TargetGridDomain: String, CaseIterable {
 enum ExportDomain: String, CaseIterable {
     case CMCC_CM2_VHR4
     case MRI_AGCM3_2_S
-    case CMCC_CM2_VHR4_downscaled
+    //case CMCC_CM2_VHR4_downscaled
     //case CMCC_CM2_VHR4_era5_10km_interpolated
     //case CMCC_CM2_VHR4_downscaled_imerg
     
@@ -157,9 +157,9 @@ enum ExportDomain: String, CaseIterable {
             return Cmip6Domain.CMCC_CM2_VHR4
         case .MRI_AGCM3_2_S:
             return Cmip6Domain.MRI_AGCM3_2_S
-        case .CMCC_CM2_VHR4_downscaled:
+        //case .CMCC_CM2_VHR4_downscaled:
             // need domain with downscaling
-            return CdsDomain.era5_land
+        //    return CdsDomain.era5_land
         }
     }
     
@@ -170,25 +170,28 @@ enum ExportDomain: String, CaseIterable {
     func getReader(position: Range<Int>) throws -> any GenericReaderMixable {
         switch self {
         case .CMCC_CM2_VHR4:
-            return Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .CMCC_CM2_VHR4, position: position)
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position))
         case .MRI_AGCM3_2_S:
-            return Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .MRI_AGCM3_2_S, position: position)
-        case .CMCC_CM2_VHR4_downscaled:
-            return Cmip6Reader<Cmip6BiasCorrector>(domain: .CMCC_CM2_VHR4, position: position)
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position))
+        //case .CMCC_CM2_VHR4_downscaled:
+        //    return Cmip6Reader<Cmip6BiasCorrector>(domain: .CMCC_CM2_VHR4, position: position)
         }
     }
     
     func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> any GenericReaderMixable {
         
         /// todo pass target domain grid to bias corrector
+        fatalError()
         
-        switch self {
+        /*switch self {
         case .CMCC_CM2_VHR4:
+            let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
+            let deriver = Cmip6Reader(reader: reader)
+            let biasCorrector = Cmip6BiasCorrector()
+            
             return try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
         case .MRI_AGCM3_2_S:
             return try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .MRI_AGCM3_2_S, lat: lat, lon: lon, elevation: elevation, mode: mode)!
-        case .CMCC_CM2_VHR4_downscaled:
-            return try Cmip6Reader<Cmip6BiasCorrector>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
-        }
+        }*/
     }
 }

@@ -278,6 +278,10 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
 
 struct Era5Mixer: GenericReaderMixer {
     let reader: [Era5Reader]
+    
+    static func makeReader(domain: CdsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader? {
+        return try Era5Reader.init(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    }
 }
 
 struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
@@ -289,6 +293,16 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     typealias Derived = Era5VariableDerived
     
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+    }
+    
+    public init(reader: GenericReaderCached<CdsDomain, Era5Variable>) {
+        self.reader = reader
+    }
     
     func prefetchData(variables: [Era5HourlyVariable], time: TimerangeDt) throws {
         for variable in variables {

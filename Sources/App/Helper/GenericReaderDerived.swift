@@ -13,8 +13,6 @@ protocol GenericReaderDerived: GenericReaderMixable {
     associatedtype ReaderNext: GenericReaderMixable
     
     var reader: ReaderNext { get }
-    
-    init(reader: ReaderNext)
 
     func get(derived: Derived, time: TimerangeDt) throws -> DataAndUnit
     func prefetchData(derived: Derived, time: TimerangeDt) throws
@@ -72,7 +70,7 @@ extension GenericReaderDerived {
         }
     }
     
-    init?(domain: ReaderNext.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    /*init?(domain: ReaderNext.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         guard let reader = try ReaderNext(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
@@ -81,7 +79,7 @@ extension GenericReaderDerived {
     
     public init(domain: ReaderNext.Domain, position: Range<Int>) {
         self.init(reader: ReaderNext(domain: domain, position: position))
-    }
+    }*/
 }
 
 /// A reader that does not modify reader. E.g. pass all reads directly to reader

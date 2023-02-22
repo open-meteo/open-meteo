@@ -41,16 +41,8 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
         return reader.modelDtSeconds
     }
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            return nil
-        }
+    public init(reader: GenericReader<Domain, Variable>) {
         self.reader = reader
-        self.cache = .init()
-    }
-    
-    public init(domain: Domain, position: Range<Int>) {
-        self.reader = GenericReader<Domain, Variable>(domain: domain, position: position)
         self.cache = .init()
     }
     

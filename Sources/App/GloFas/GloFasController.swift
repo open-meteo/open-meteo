@@ -5,6 +5,10 @@ typealias GloFasVariableMember = VariableAndMemberAndControl<GloFasVariable>
 
 struct GloFasMixer: GenericReaderMixer {
     var reader: [GloFasReader]
+    
+    static func makeReader(domain: GloFasReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GloFasReader? {
+        return try GloFasReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    }
 }
 
 enum GlofasDerivedVariable: String, Codable, CaseIterable, GenericVariableMixable {
@@ -30,6 +34,13 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderMixable {
     typealias Variable = GloFasVariableMember
     
     typealias Derived = GlofasDerivedVariable
+    
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+    }
     
     func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDt) throws {
         for member in 0..<51 {

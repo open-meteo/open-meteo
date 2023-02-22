@@ -7,6 +7,13 @@ struct IconReader: GenericReaderDerived, GenericReaderMixable {
     typealias MixingVar = VariableOrDerived<IconVariable, IconVariableDerived>
 
     var reader: GenericReaderCached<IconDomains, IconVariable>
+    
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+    }
 
     func get(raw: IconVariable, time: TimerangeDt) throws -> DataAndUnit {
         // icon-d2 has no levels 800, 900, 925
@@ -354,6 +361,10 @@ struct IconReader: GenericReaderDerived, GenericReaderMixable {
 
 struct IconMixer: GenericReaderMixer {
     let reader: [IconReader]
+    
+    static func makeReader(domain: IconReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> IconReader? {
+        return try IconReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    }
 }
 
 extension IconMixer {

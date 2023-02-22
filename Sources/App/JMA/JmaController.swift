@@ -230,6 +230,13 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderMixable {
     
     var reader: GenericReaderCached<JmaDomain, JmaVariable>
     
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+    }
+    
     func prefetchData(raw: JmaSurfaceVariable, time: TimerangeDt) throws {
         try prefetchData(raw: .surface(raw), time: time)
     }
@@ -442,6 +449,10 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderMixable {
 
 struct JmaMixer: GenericReaderMixer {
     let reader: [JmaReader]
+    
+    static func makeReader(domain: JmaReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> JmaReader? {
+        return try JmaReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    }
 }
 
 extension JmaMixer {

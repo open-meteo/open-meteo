@@ -21,15 +21,16 @@ struct CmipController {
         
         let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
             if biasCorrection {
-                guard let reader = try Cmip6Reader<Cmip6BiasCorrector>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                guard let reader = try Cmip6BiasCorrector(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                return reader
+                return Cmip6Reader(reader: reader)
             } else {
-                guard let reader = try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                
+                guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                return reader
+                return Cmip6Reader(reader: reader)
             }
         }
         
