@@ -250,6 +250,53 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
         self.readerEra5 = readerEra5
     }
     
+    init?(domain: Cmip6Domain, target: TargetGridDomain, position: Int) throws {
+        switch target {
+        case .era5_interpolated_10km:
+            /// target grid is already era5_land
+            let (lat, lon) = target.grid.getCoordinates(gridpoint: position)
+            
+            /// elevation from ERA5-Land
+            let targetElevation = try target.getTargetElevation(gridpoint: position)
+            
+            /// Read weights from ERA5 as linear interpolated values
+            let posEra5Fractional = CdsDomain.era5.grid.findPointInterpolated(lat: lat, lon: lon)
+            
+            guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: targetElevation.numeric, mode: .land) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            self.reader = reader
+        case .era5_land:
+            /// target grid is era5_land
+            let (lat, lon) = target.grid.getCoordinates(gridpoint: position)
+            
+            /// elevation from ERA5-Land
+            let targetElevation = try target.getTargetElevation(gridpoint: position)
+            
+            // if target elevation is nan, we only need to consider era5 weights
+            let era5LandPos = position
+            
+            let era5Pos = try CdsDomain.era5.grid.findPoint(lat: lat, lon: lon, elevation: targetElevation.numeric, elevationFile: CdsDomain.era5.elevationFile, mode: .land)
+            
+            guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: targetElevation.numeric, mode: .land) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            self.reader = reader
+        case .imerg:
+            /// grid is IMERG
+            let (lat, lon) = target.grid.getCoordinates(gridpoint: position)
+            
+            let imergPos = position
+            
+            guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: .nan, mode: .nearest) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            self.reader = reader
+        }
+        
+        fatalError()
+    }
+    
     init(domain: Cmip6Domain, position: Range<Int>) {
         fatalError("cmip6 not implemented")
     }

@@ -136,11 +136,32 @@ enum TargetGridDomain: String, CaseIterable {
     case imerg
     
     var grid: Gridable {
-        fatalError()
+        switch self {
+        case .era5_interpolated_10km:
+            fallthrough
+        case .era5_land:
+            return CdsDomain.era5_land.grid
+        case .imerg:
+            return SatelliteDomain.imerg_daily.grid
+        }
     }
     
     var elevation: OmFileReader<MmapFile> {
         fatalError()
+    }
+    
+    func getTargetElevation(gridpoint: Int) throws -> ElevationOrSea {
+        switch self {
+        case .era5_interpolated_10km:
+            fallthrough
+        case .era5_land:
+            guard let elevationFile = CdsDomain.era5_land.elevationFile else {
+                fatalError("could not read elevation file for ERA5_Land")
+            }
+            return try CdsDomain.era5_land.grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
+        case .imerg:
+            return .noData
+        }
     }
 }
 
@@ -182,12 +203,11 @@ enum ExportDomain: String, CaseIterable {
         
         /// todo pass target domain grid to bias corrector
         fatalError()
-        
         /*switch self {
         case .CMCC_CM2_VHR4:
             let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
             let deriver = Cmip6Reader(reader: reader)
-            let biasCorrector = Cmip6BiasCorrector()
+            let biasCorrector = Cmip6BiasCorrector(domain: <#Cmip6Domain#>, position: <#Range<Int>#>)
             
             return try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
         case .MRI_AGCM3_2_S:
