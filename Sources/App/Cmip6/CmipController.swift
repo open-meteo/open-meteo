@@ -189,6 +189,7 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
     /// Get Bias correction field from era5-land or era5
     func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
         if let readerEra5Land, let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5Land.domain) {
+            let pos = readerEra5Land.domain.grid.findPointInterpolated(lat: 4, lon: 5)!
             let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position, dim1: 0..<referenceWeightFile.dim1)
             if !weights.containsNaN() {
                 return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5Land.modelElevation.numeric)

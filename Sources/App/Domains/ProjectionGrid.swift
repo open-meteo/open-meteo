@@ -32,6 +32,17 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         }
         return y * nx + x
     }
+    
+    func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? {
+        let (x,y) = projection.forward(latitude: lat, longitude: lon)
+        if y < 0 || x < 0 || y >= Float(ny) || x >= Float(nx) {
+            return nil
+        }
+        let xFraction = x.truncatingRemainder(dividingBy: 1)
+        let yFraction = y.truncatingRemainder(dividingBy: 1)
+        return GridPoint2DFraction(gridpoint: Int(y) * nx + Int(x), xFraction: xFraction, yFraction: yFraction)
+    }
+    
 
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {
         let y = gridpoint / nx

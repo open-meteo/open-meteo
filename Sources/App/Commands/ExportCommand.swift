@@ -1,4 +1,5 @@
 import Foundation
+import SwiftPFor2D
 import Vapor
 import SwiftNetCDF
 
@@ -18,6 +19,9 @@ struct ExportCommand: AsyncCommandFix {
         
         @Argument(name: "variable", help: "Weather variable")
         var variable: String
+        
+        @Argument(name: "target_grid", help: "Interpolate data onto this grid, perform bias correction and elevation correction")
+        var targetGridDomain: String
         
         @Option(name: "start_date")
         var startDate: String?
@@ -50,6 +54,7 @@ struct ExportCommand: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         let domain = try ExportDomain.load(rawValue: signature.domain)
+        let targetGridDomaind = try TargetGridDomain.load(rawValueOptional: signature.targetGridDomain)
         let filePath = "./test.nc"
         
         guard let time = try signature.getTime(dtSeconds: 86400) else {
@@ -61,12 +66,12 @@ struct ExportCommand: AsyncCommandFix {
         let size = grid.count * time.count * 4
         logger.info("Total raw size \(size.bytesHumanReadable)")
         
-        try generateNetCdf(logger: logger, file: filePath, domain: domain, variable: signature.variable, time: time, nLocationChunk: 48, compressionLevel: signature.compressionLevel)
+        try generateNetCdf(logger: logger, file: filePath, domain: domain, variable: signature.variable, time: time, nLocationChunk: 48, compressionLevel: signature.compressionLevel, targetGridDomain: targetGridDomaind)
         try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
     }
     
-    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, nLocationChunk: Int, compressionLevel: Int?) throws {
-        let grid = domain.grid
+    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, nLocationChunk: Int, compressionLevel: Int?, targetGridDomain: TargetGridDomain?) throws {
+        let grid = targetGridDomain?.grid ?? domain.grid
 
         let ncFile = try NetCDF.create(path: "\(file)~", overwriteExisting: true)
         try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
@@ -83,6 +88,25 @@ struct ExportCommand: AsyncCommandFix {
         }
 
         let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4)
+        
+        /// Interpolate data from one grid to another and perform bias correction
+        if let targetGridDomain {
+            let elevationFile = targetGridDomain.elevation
+            for l in 0..<grid.count {
+                let coords = grid.getCoordinates(gridpoint: l)
+                let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
+                
+                // Read data
+                let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
+                guard let data = try reader.get(mixed: variable, time: time) else {
+                    fatalError("Invalid variable \(variable)")
+                }
+                try ncVariable.write(data.data, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, time.count])
+                progress.add(time.count * 4)
+            }
+            progress.finish()
+            return
+        }
         
         // Loop over chunks of locations, read and write
         for l in stride(from: 0, to: grid.count, by: nLocationChunk) {
@@ -105,6 +129,20 @@ struct ExportCommand: AsyncCommandFix {
     }
 }
 
+enum TargetGridDomain: String, CaseIterable {
+    /// interpolates weights to 10 km, uses elevation information from era5 land
+    case era5_interpolated_10km
+    case era5_land
+    case imerg
+    
+    var grid: Gridable {
+        fatalError()
+    }
+    
+    var elevation: OmFileReader<MmapFile> {
+        fatalError()
+    }
+}
 
 enum ExportDomain: String, CaseIterable {
     case CMCC_CM2_VHR4
@@ -137,6 +175,20 @@ enum ExportDomain: String, CaseIterable {
             return Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .MRI_AGCM3_2_S, position: position)
         case .CMCC_CM2_VHR4_downscaled:
             return Cmip6Reader<Cmip6BiasCorrector>(domain: .CMCC_CM2_VHR4, position: position)
+        }
+    }
+    
+    func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> any GenericReaderMixable {
+        
+        /// todo pass target domain grid to bias corrector
+        
+        switch self {
+        case .CMCC_CM2_VHR4:
+            return try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
+        case .MRI_AGCM3_2_S:
+            return try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .MRI_AGCM3_2_S, lat: lat, lon: lon, elevation: elevation, mode: mode)!
+        case .CMCC_CM2_VHR4_downscaled:
+            return try Cmip6Reader<Cmip6BiasCorrector>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
         }
     }
 }

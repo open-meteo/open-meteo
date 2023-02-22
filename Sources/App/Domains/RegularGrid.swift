@@ -25,4 +25,17 @@ struct RegularGrid: Gridable {
         let lon = lonMin + Float(x) * dx
         return (lat, lon)
     }
+    
+    func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? {
+        let x = (lon-lonMin) / dx
+        let y = (lat-latMin) / dy
+        
+        if y < 0 || x < 0 || y >= Float(ny) || x >= Float(nx) {
+            return nil
+        }
+        
+        let xFraction = (lon-lonMin).truncatingRemainder(dividingBy: dx)
+        let yFraction = (lat-latMin).truncatingRemainder(dividingBy: dy)
+        return GridPoint2DFraction(gridpoint: Int(y) * nx + Int(x), xFraction: xFraction, yFraction: yFraction)
+    }
 }

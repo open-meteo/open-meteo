@@ -187,6 +187,21 @@ extension OmFileReader {
     /// Read interpolated between 4 points
     public func readInterpolated(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
         
+        // bound x and y
+        var dim0X = dim0X
+        var dim0XFraction = dim0XFraction
+        if dim0X > dim0Nx-2 {
+            dim0X = dim0Nx-2
+            dim0XFraction = 1
+        }
+        var dim0Y = dim0Y
+        var dim0YFraction = dim0YFraction
+        let dim0Ny = dim0 / dim0Nx
+        if dim0Y > dim0Ny-2 {
+            dim0Y = dim0Ny-2
+            dim0YFraction = 1
+        }
+        
         // reads 4 points. As 2 points are next to each other, we can read a small row of 2 elements at once
         let top = try read(dim0Slow: dim0Y * dim0Nx + dim0X ..< dim0Y * dim0Nx + dim0X + 2, dim1: dim1Read)
         let bottom = try read(dim0Slow: (dim0Y + 1) * dim0Nx + dim0X ..< (dim0Y + 1) * dim0Nx + dim0X + 2, dim1: dim1Read)

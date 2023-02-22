@@ -7,7 +7,14 @@ public protocol Gridable {
     var ny: Int { get }
     
     func findPoint(lat: Float, lon: Float) -> Int?
+    func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction?
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
+}
+
+public struct GridPoint2DFraction {
+    let gridpoint: Int
+    let xFraction: Float
+    let yFraction: Float
 }
 
 enum ElevationOrSea {
@@ -18,6 +25,15 @@ enum ElevationOrSea {
     var isSea: Bool {
         switch self {
         case .sea:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    var hasNoData: Bool {
+        switch self {
+        case .noData:
             return true
         default:
             return false
@@ -61,23 +77,33 @@ extension Gridable {
         }
     }
     
+    /// Read elevation for a single grid point
+    func readElevation(gridpoint: Int, elevationFile: OmFileReader<MmapFile>) throws -> ElevationOrSea {
+        let x = gridpoint % nx
+        let y = gridpoint / nx
+        var elevation = Float.nan
+        try elevationFile.read(into: &elevation, arrayDim1Range: 0..<1, arrayDim1Length: 1, dim0Slow: y..<y+1, dim1: x..<x+1)
+        if elevation.isNaN {
+            return .noData
+        }
+        if elevation <= -999 {
+            // sea gtid point
+            return .sea
+        }
+        return .elevation(elevation)
+    }
+    
     /// Get nearest grid point
     func findPointNearest(lat: Float, lon: Float, elevationFile: OmFileReader<MmapFile>) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
         guard let center = findPoint(lat: lat, lon: lon) else {
             return nil
         }
-        let x = center % nx
-        let y = center / nx
-        var elevation = Float.nan
-        try elevationFile.read(into: &elevation, arrayDim1Range: 0..<1, arrayDim1Length: 1, dim0Slow: y..<y+1, dim1: x..<x+1)
-        if elevation.isNaN {
+        let elevation = try readElevation(gridpoint: center, elevationFile: elevationFile)
+        if elevation.hasNoData {
+            // grid is masked out in certain areas
             return nil
         }
-        if elevation <= -999 {
-            // sea gtid point
-            return (center, .sea)
-        }
-        return (center, .elevation(elevation))
+        return (center, elevation)
     }
     
     /// Find point, perferably in sea
