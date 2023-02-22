@@ -17,6 +17,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     //case nam_conus // disabled because it only add 12 forecast hours
     case hrrr_conus
     
+    case gfs025_ensemble
+    
     var omfileDirectory: String {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
@@ -31,7 +33,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        return 3600
+        return self == .gfs025_ensemble ? 3*3600 : 3600
     }
     
     var isGlobal: Bool {
@@ -42,6 +44,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gfs013:
             return Self.gfs013ElevationFile
+        case .gfs025_ensemble:
+            fallthrough
         case .gfs025:
             return Self.gfs025ElevationFile
         //case .nam_conus:
@@ -55,6 +59,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     var lastRun: Int {
         let t = Timestamp.now()
         switch self {
+        case .gfs025_ensemble:
+            fallthrough
         case .gfs013:
             fallthrough
         case .gfs025:
@@ -81,6 +87,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     func forecastHours(run: Int) -> [Int] {
         switch self {
+        case .gfs025_ensemble:
+            return Array(stride(from: 0, to: 240, by: 3))
         case .gfs013:
             fallthrough
         case .gfs025:
@@ -98,6 +106,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     var levels: [Int] {
         switch self {
+        case .gfs025_ensemble:
+            return []
         case .gfs013:
             return []
         case .gfs025:
@@ -115,6 +125,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     var omFileLength: Int {
         switch self {
+        case .gfs025_ensemble:
+            return (240 + 4*24)/3 + 1 //113
         //case .nam_conus:
             //return 60 + 4*24
         case .gfs013:
@@ -131,6 +143,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfs013:
             // Coordinates confirmed with eccodes coordinate output
             return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536-1) / 2, lonMin: -180, dx: 360/3072, dy: 0.11714935)
+        case .gfs025_ensemble:
+            fallthrough
         case .gfs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         /*case .nam_conus:
@@ -150,6 +164,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         let fHH = forecastHour.zeroPadded(len: 2)
         let fHHH = forecastHour.zeroPadded(len: 3)
         switch self {
+        case .gfs025_ensemble:
+            fatalError("not supported, as it needs a member string")
         case .gfs013:
             return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.sfluxgrbf\(fHHH).grib2"
         case .gfs025:
@@ -229,6 +245,8 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
     
     case visibility
     
+    case precipitation_probability
+    
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
         case .soil_moisture_0_to_10cm: return true
@@ -282,11 +300,17 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
         case .diffuse_radiation: return 1
         case .uv_index: return 20
         case .uv_index_clear_sky: return 20
+        case .precipitation_probability: return 1
         }
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Gfs interpolation not required for reader. Already 1h")
+        switch self {
+        case .precipitation_probability:
+            return .linear
+        default:
+            fatalError("Gfs interpolation not required for reader. Already 1h")
+        }
     }
     
     var unit: SiUnit {
@@ -327,6 +351,7 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
         case .diffuse_radiation: return .wattPerSquareMeter
         case .uv_index: return .dimensionless
         case .uv_index_clear_sky: return .dimensionless
+        case .precipitation_probability: return .percent
         }
     }
     

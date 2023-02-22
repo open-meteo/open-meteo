@@ -35,8 +35,22 @@ struct GfsDownload: AsyncCommandFix {
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try GfsDomain.load(rawValue: signature.domain)
+        disableIdleSleep()
+        
+        let run = signature.run.map {
+            guard let run = Int($0) else {
+                fatalError("Invalid run '\($0)'")
+            }
+            return run
+        } ?? domain.lastRun
+        
+        /// 18z run is available the day after starting 05:26
+        let date = Timestamp.now().with(hour: run)
         
         switch domain {
+        case .gfs025_ensemble:
+            try await downloadPrecipitationProbability(application: context.application, run: date, skipFilesIfExisting: signature.skipExisting)
+            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: date, createNetcdf: signature.createNetcdf)
         case .gfs013:
             fallthrough
         case .hrrr_conus:
@@ -44,13 +58,6 @@ struct GfsDownload: AsyncCommandFix {
         //case .nam_conus:
         //    fallthrough
         case .gfs025:
-            let run = signature.run.map {
-                guard let run = Int($0) else {
-                    fatalError("Invalid run '\($0)'")
-                }
-                return run
-            } ?? domain.lastRun
-            
             let onlyVariables: [GfsVariableDownloadable]? = try signature.onlyVariables.map {
                 try $0.split(separator: ",").map {
                     if let variable = GfsPressureVariable(rawValue: String($0)) {
@@ -68,9 +75,6 @@ struct GfsDownload: AsyncCommandFix {
             let surfaceVariables = GfsSurfaceVariable.allCases
             
             let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
-            
-            /// 18z run is available the day after starting 05:26
-            let date = Timestamp.now().with(hour: run)
             
             try await downloadGfs(application: context.application, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
             try convertGfs(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
@@ -194,12 +198,12 @@ struct GfsDownload: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour)
-        let nTime = forecastHours.max()!+1
+        let nTime = forecastHours.max()! / domain.dtHours + 1
         
         let grid = domain.grid
         let nLocations = grid.count
         
-        let ringtime = run.timeIntervalSince1970 / 3600 ..< run.timeIntervalSince1970 / 3600 + nTime
+        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
         
         var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
@@ -236,6 +240,8 @@ struct GfsDownload: AsyncCommandFix {
                 // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
                 if variable.isAveragedOverForecastTime {
                     switch domain {
+                    case .gfs025_ensemble:
+                        fatalError()
                     case .gfs013:
                         fallthrough
                     case .gfs025:
@@ -271,6 +277,73 @@ struct GfsDownload: AsyncCommandFix {
             }
             progress.finish()
         }
+    }
+    
+    /// Download precipitation members from GFS ensemble and calculate probability
+    func downloadPrecipitationProbability(application: Application, run: Timestamp, skipFilesIfExisting: Bool) async throws {
+        let domain = GfsDomain.gfs025_ensemble
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        
+        let grid = domain.grid
+        var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+        let logger = application.logger
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4, waitAfterLastModified: 90)
+        
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        
+        enum EnsembleVariable: CurlIndexedVariable, CaseIterable {
+            var gribIndexName: String? {
+                return "APCP:surface"
+            }
+            case precipitation
+        }
+        let members = 0...30
+        let forecastHours = domain.forecastHours(run: run.hour)
+        var previous = [Int: [Float]]()
+        previous.reserveCapacity(members.count)
+        let threshold = Float(0.1)
+        
+        for forecastHour in forecastHours {
+            if forecastHour == 0 {
+                continue
+            }
+            let file = "\(domain.downloadDirectory)precipitation_probability_\(forecastHour).fpg"
+            if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
+                continue
+            }
+            /// Probability 0-100
+            var greater01 = [Float](repeating: 0, count: grid.count)
+            // Download all members, and increase precipitation probability
+            for member in members {
+                let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
+                let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/pgrb2sp25/\(memberString).t\(run.hh)z.pgrb2s.0p25.f\(forecastHour.zeroPadded(len: 3))"
+                let grib = try await curl.downloadIndexedGrib(url: url, variables: EnsembleVariable.allCases)[0]
+                try grib2d.load(message: grib.message)
+                grib2d.array.shift180LongitudeAndFlipLatitude()
+                let startStep = Int(grib.message.get(attribute: "stepRange")!.split(separator: "-")[0])!
+                
+                // deaccumlate on the fly
+                if startStep != forecastHour - 3, let previousData = previous[member] {
+                    for i in 0..<grib2d.array.data.count {
+                        if grib2d.array.data[i] - previousData[i] >= threshold {
+                            greater01[i] += 100 / Float(members.count)
+                        }
+                    }
+                } else {
+                    for i in 0..<grib2d.array.data.count {
+                        if grib2d.array.data[i] >= threshold {
+                            greater01[i] += 100 / Float(members.count)
+                        }
+                    }
+                }
+                previous[member] = grib2d.array.data
+            }
+            //try Array2D(data: greater01, nx: grid.nx, ny: grid.ny).writeNetcdf(filename: "\(domain.downloadDirectory)precipitation_probability_\(forecastHour).nc")
+            try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, all: greater01)
+        }
+        curl.printStatistics()
     }
 }
 

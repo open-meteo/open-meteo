@@ -28,6 +28,15 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             }
         }*/
         
+        if domain == .gfs025_ensemble {
+            switch self {
+            case .precipitation_probability:
+                return ":APCP:surface:"
+            default:
+                return nil
+            }
+        }
+        
         if domain == .hrrr_conus {
             switch self {
             case .lifted_index:
@@ -187,11 +196,14 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return ":DUVB:surface:"
         case .uv_index_clear_sky:
             return ":CDUVB:surface:"
+        case .precipitation_probability:
+            return nil
         }
     }
     
     func skipHour0(for domain: GfsDomain) -> Bool {
         switch self {
+        case .precipitation_probability: return true
         case .precipitation: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
@@ -246,6 +258,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .cape: return .hermite(bounds: 0...1e9)
         case .lifted_index: return .hermite(bounds: 0...1e9)
         case .visibility: return .hermite(bounds: 0...1e9)
+        case .precipitation_probability: return .linear
         }
     }
     
