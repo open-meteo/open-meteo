@@ -320,7 +320,7 @@ struct GfsDownload: AsyncCommandFix {
         let forecastHours = domain.forecastHours(run: run.hour)
         var previous = [Int: [Float]]()
         previous.reserveCapacity(members.count)
-        let threshold = Float(0.1)
+        let threshold = Float(0.3)
         
         for forecastHour in forecastHours {
             if forecastHour == 0 {

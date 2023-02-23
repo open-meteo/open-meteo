@@ -165,6 +165,9 @@ enum GfsDailyWeatherVariable: String, Codable {
     case apparent_temperature_max
     case apparent_temperature_min
     case precipitation_sum
+    case precipitation_probability_max
+    case precipitation_probability_min
+    case precipitation_probability_mean
     case snowfall_sum
     //case rain_sum
     //case showers_sum
@@ -577,6 +580,15 @@ extension GfsMixer {
     func getDaily(variable: GfsDailyWeatherVariable, params: GfsQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
         let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
+        case .precipitation_probability_max:
+            let data = try get(raw: .precipitation_probability, time: time).convertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .precipitation_probability_min:
+            let data = try get(raw: .precipitation_probability, time: time).convertAndRound(params: params)
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .precipitation_probability_mean:
+            let data = try get(raw: .precipitation_probability, time: time).convertAndRound(params: params)
+            return DataAndUnit(data.data.mean(by: 24), data.unit)
         case .temperature_2m_max:
             let data = try get(raw: .temperature_2m, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
@@ -641,6 +653,12 @@ extension GfsMixer {
         let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             switch variable {
+            case .precipitation_probability_min:
+                fallthrough
+            case .precipitation_probability_mean:
+                fallthrough
+            case .precipitation_probability_max:
+                try prefetchData(raw: .precipitation_probability, time: time)
             case .temperature_2m_max:
                 fallthrough
             case .temperature_2m_min:

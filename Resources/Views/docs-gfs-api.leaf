@@ -144,6 +144,12 @@
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="precipitation_probability" id="precipitation_probability" name="hourly">
+          <label class="form-check-label" for="precipitation_probability">
+            Precipitation Probability
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode" name="hourly">
           <label class="form-check-label" for="weathercode">
             Weathercode
@@ -1117,6 +1123,13 @@
             <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by
               7. E.g. 7 cm snow = 10 mm precipitation water equivalent</td>
           </tr>
+          <tr>
+            <th scope="row">precipitation_probability</th>
+            <td>Preceding hour probability</td>
+            <td>%</td>
+            <td>Probability of precipitation with more than 0.1 mm of the preceding hour. Probability is based on ensemble weather models with 0.25° (~27 km) resolution. 
+              30 different simulations are computed to better represent future weather conditions.</td>
+          </tr>
           <!--<tr>
               <th scope="row">rain</th>
               <td>Preceding hour sum</td>
@@ -1310,6 +1323,11 @@
             <th scope="row">precipitation_hours</th>
             <td>hours</td>
             <td>The number of hours with rain</td>
+          </tr>
+          <tr>
+            <th scope="row">precipitation_probability_max<br/>precipitation_probability_min<br>precipitation_probability_mean</th>
+            <td>%</td>
+            <td>Probability of precipitation</td>
           </tr>
           <!--<tr>
               <th scope="row">weathercode</th>

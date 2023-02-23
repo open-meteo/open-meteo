@@ -366,6 +366,7 @@ enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
     case pressure_msl
     case relativehumidity_2m
     case precipitation
+    case precipitation_probability
     case weathercode
     case temperature_80m
     case temperature_120m
@@ -469,6 +470,9 @@ enum ForecastVariableDaily: String, Codable, DailyVariableCalculatable {
     case apparent_temperature_min
     case apparent_temperature_mean
     case precipitation_sum
+    case precipitation_probability_max
+    case precipitation_probability_min
+    case precipitation_probability_mean
     case snowfall_sum
     case rain_sum
     case showers_sum
@@ -585,6 +589,12 @@ enum ForecastVariableDaily: String, Codable, DailyVariableCalculatable {
             return .max(.surface(.uv_index))
         case .uv_index_clear_sky_max:
             return .max(.surface(.uv_index_clear_sky))
+        case .precipitation_probability_max:
+            return .max(.surface(.precipitation_probability))
+        case .precipitation_probability_min:
+            return .max(.surface(.precipitation_probability))
+        case .precipitation_probability_mean:
+            return .max(.surface(.precipitation_probability))
         }
     }
 }
