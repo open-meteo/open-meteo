@@ -411,7 +411,9 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Gfs interpolation not required for reader. Already 1h")
+        return .linear
+        // possible due to gfs025 ensemble
+        //fatalError("Gfs interpolation not required for reader. Already 1h")
     }
     
     var unit: SiUnit {
