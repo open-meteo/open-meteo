@@ -283,6 +283,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         switch domain {
         case .gfs013:
+            // Note gfs025_ensemble only offers precipitation probability at 3h
+            // A nicer implementation should use a dedicated variables enum
             guard let reader = try GfsMixer025_013(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 return nil
             }

@@ -309,7 +309,9 @@ enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, Generic
         case .precipitation_probability:
             return .linear
         default:
-            fatalError("Gfs interpolation not required for reader. Already 1h")
+            // fatalError("Gfs interpolation not required for reader. Already 1h")
+            // Because GFS025 ensemble is 3 hours and in the GFS mixer, wen need this code path
+            return .linear
         }
     }
     
