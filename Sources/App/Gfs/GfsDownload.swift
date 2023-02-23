@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import SwiftPFor2D
+import SwiftNetCDF
 
 
 /**
@@ -228,6 +229,21 @@ struct GfsDownload: AsyncCommandFix {
                 return (hour, reader)
             })
             
+            // Create netcdf file for debugging
+            if createNetcdf {
+                let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName).nc", overwriteExisting: true)
+                try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
+                var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
+                    try ncFile.createDimension(name: "time", length: nTime),
+                    try ncFile.createDimension(name: "LAT", length: grid.ny),
+                    try ncFile.createDimension(name: "LON", length: grid.nx)
+                ])
+                for reader in readers {
+                    let data = try reader.reader.readAll()
+                    try ncVariable.write(data, offset: [reader.hour/domain.dtHours, 0, 0], count: [1, grid.ny, grid.nx])
+                }
+            }
+            
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
@@ -256,11 +272,12 @@ struct GfsDownload: AsyncCommandFix {
                 // interpolate missing timesteps. We always fill 2 timesteps at once
                 // data looks like: DDDDDDDDDD--D--D--D--D--D
                 let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
-                    if forecastHours.contains(hour) || hour % 3 != 1 {
+                    let forecastHour = hour * domain.dtHours
+                    if forecastHours.contains(forecastHour) || forecastHour % 3 != 1 {
                         // process 2 timesteps at once
                         return nil
                     }
-                    return hour
+                    return forecastHour
                 }
                 
                 // Fill in missing hourly values after switching to 3h
@@ -341,6 +358,7 @@ struct GfsDownload: AsyncCommandFix {
                 previous[member] = grib2d.array.data
             }
             //try Array2D(data: greater01, nx: grid.nx, ny: grid.ny).writeNetcdf(filename: "\(domain.downloadDirectory)precipitation_probability_\(forecastHour).nc")
+            try FileManager.default.removeItemIfExists(at: file)
             try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, all: greater01)
         }
         curl.printStatistics()
