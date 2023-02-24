@@ -235,13 +235,13 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderMixable {
     
     init?(domain: Cmip6Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            return nil
         }
         guard let readerEra5Land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            return nil
         }
         guard let readerEra5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            return nil
         }
         self.reader = reader
         /// No data on sea for ERA5-Land
@@ -333,10 +333,10 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderMixable {
     
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            return nil
         }
         guard let referencePosition = referenceDomain.grid.findPointInterpolated(lat: lat, lon: lon) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            return nil
         }
         self.referenceDomain = referenceDomain
         self.referencePosition = referencePosition
@@ -412,10 +412,10 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderMixable {
     
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            return nil
         }
         guard let referencePosition = try referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.elevationFile, mode: mode) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            return nil
         }
         self.referenceDomain = referenceDomain
         self.referenceElevation = referencePosition.gridElevation

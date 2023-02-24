@@ -20,8 +20,8 @@ struct ExportCommand: AsyncCommandFix {
         @Argument(name: "variable", help: "Weather variable")
         var variable: String
         
-        @Argument(name: "target_grid", help: "Interpolate data onto this grid, perform bias correction and elevation correction")
-        var targetGridDomain: String
+        @Option(name: "target_grid", help: "Interpolate data onto this grid, perform bias correction and elevation correction")
+        var targetGridDomain: String?
         
         @Option(name: "start_date")
         var startDate: String?
@@ -44,9 +44,6 @@ struct ExportCommand: AsyncCommandFix {
     }
     
     /**
-     Limitations:
-     - no derived daily variables yet
-     
      TODO:
      - file names
      - dynamic nChunkLocations calculation
@@ -58,20 +55,21 @@ struct ExportCommand: AsyncCommandFix {
         let filePath = "./test.nc"
         
         guard let time = try signature.getTime(dtSeconds: 86400) else {
-            fatalError("no time")
+            fatalError("start_date and end_date must be specified")
         }
         let grid = domain.grid
         logger.info("Exporing variable \(signature.variable) for dataset \(domain)")
-        logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
-        let size = grid.count * time.count * 4
-        logger.info("Total raw size \(size.bytesHumanReadable)")
-        
+
         try generateNetCdf(logger: logger, file: filePath, domain: domain, variable: signature.variable, time: time, nLocationChunk: 48, compressionLevel: signature.compressionLevel, targetGridDomain: targetGridDomaind)
         try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
     }
     
     func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, nLocationChunk: Int, compressionLevel: Int?, targetGridDomain: TargetGridDomain?) throws {
-        let grid = targetGridDomain?.grid ?? domain.grid
+        let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
+        
+        logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
+        let size = grid.count * time.count * 4
+        logger.info("Total raw size \(size.bytesHumanReadable)")
 
         let ncFile = try NetCDF.create(path: "\(file)~", overwriteExisting: true)
         try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
@@ -91,7 +89,10 @@ struct ExportCommand: AsyncCommandFix {
         
         /// Interpolate data from one grid to another and perform bias correction
         if let targetGridDomain {
-            let elevationFile = targetGridDomain.elevation
+            let targetDomain = targetGridDomain.genericDomain
+            guard let elevationFile = targetDomain.elevationFile else {
+                fatalError("Could not read elevation file for domain \(targetDomain)")
+            }
             for l in 0..<grid.count {
                 let coords = grid.getCoordinates(gridpoint: l)
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
@@ -135,42 +136,26 @@ enum TargetGridDomain: String, CaseIterable {
     case era5_land
     case imerg
     
-    var grid: Gridable {
+    var genericDomain: GenericDomain {
         switch self {
         case .era5_interpolated_10km:
             fallthrough
         case .era5_land:
-            return CdsDomain.era5_land.grid
+            return CdsDomain.era5_land
         case .imerg:
-            return SatelliteDomain.imerg_daily.grid
-        }
-    }
-    
-    var elevation: OmFileReader<MmapFile> {
-        fatalError()
-    }
-    
-    func getTargetElevation(gridpoint: Int) throws -> ElevationOrSea {
-        switch self {
-        case .era5_interpolated_10km:
-            fallthrough
-        case .era5_land:
-            guard let elevationFile = CdsDomain.era5_land.elevationFile else {
-                fatalError("could not read elevation file for ERA5_Land")
-            }
-            return try CdsDomain.era5_land.grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-        case .imerg:
-            return .noData
+            return SatelliteDomain.imerg_daily
         }
     }
 }
 
 enum ExportDomain: String, CaseIterable {
     case CMCC_CM2_VHR4
+    case FGOALS_f3_H
+    case HiRAM_SIT_HR
     case MRI_AGCM3_2_S
-    //case CMCC_CM2_VHR4_downscaled
-    //case CMCC_CM2_VHR4_era5_10km_interpolated
-    //case CMCC_CM2_VHR4_downscaled_imerg
+    case EC_Earth3P_HR
+    case MPI_ESM1_2_XR
+    case NICAM16_8S
     
     var genericDomain: GenericDomain {
         switch self {
@@ -178,9 +163,35 @@ enum ExportDomain: String, CaseIterable {
             return Cmip6Domain.CMCC_CM2_VHR4
         case .MRI_AGCM3_2_S:
             return Cmip6Domain.MRI_AGCM3_2_S
-        //case .CMCC_CM2_VHR4_downscaled:
-            // need domain with downscaling
-        //    return CdsDomain.era5_land
+        case .FGOALS_f3_H:
+            return Cmip6Domain.FGOALS_f3_H
+        case .HiRAM_SIT_HR:
+            return Cmip6Domain.HiRAM_SIT_HR
+        case .EC_Earth3P_HR:
+            return Cmip6Domain.EC_Earth3P_HR
+        case .MPI_ESM1_2_XR:
+            return Cmip6Domain.MPI_ESM1_2_XR
+        case .NICAM16_8S:
+            return Cmip6Domain.NICAM16_8S
+        }
+    }
+    
+    var cmipDomain: Cmip6Domain? {
+        switch self {
+        case .CMCC_CM2_VHR4:
+            return Cmip6Domain.CMCC_CM2_VHR4
+        case .MRI_AGCM3_2_S:
+            return Cmip6Domain.MRI_AGCM3_2_S
+        case .FGOALS_f3_H:
+            return Cmip6Domain.FGOALS_f3_H
+        case .HiRAM_SIT_HR:
+            return Cmip6Domain.HiRAM_SIT_HR
+        case .EC_Earth3P_HR:
+            return Cmip6Domain.EC_Earth3P_HR
+        case .MPI_ESM1_2_XR:
+            return Cmip6Domain.MPI_ESM1_2_XR
+        case .NICAM16_8S:
+            return Cmip6Domain.NICAM16_8S
         }
     }
     
@@ -194,24 +205,40 @@ enum ExportDomain: String, CaseIterable {
             return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position))
         case .MRI_AGCM3_2_S:
             return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position))
-        //case .CMCC_CM2_VHR4_downscaled:
-        //    return Cmip6Reader<Cmip6BiasCorrector>(domain: .CMCC_CM2_VHR4, position: position)
+        case .FGOALS_f3_H:
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position))
+        case .HiRAM_SIT_HR:
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position))
+        case .EC_Earth3P_HR:
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position))
+        case .MPI_ESM1_2_XR:
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position))
+        case .NICAM16_8S:
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position))
         }
     }
     
     func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> any GenericReaderMixable {
-        
-        /// todo pass target domain grid to bias corrector
-        fatalError()
-        /*switch self {
-        case .CMCC_CM2_VHR4:
-            let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
-            let deriver = Cmip6Reader(reader: reader)
-            let biasCorrector = Cmip6BiasCorrector(domain: <#Cmip6Domain#>, position: <#Range<Int>#>)
-            
-            return try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .CMCC_CM2_VHR4, lat: lat, lon: lon, elevation: elevation, mode: mode)!
-        case .MRI_AGCM3_2_S:
-            return try Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>(domain: .MRI_AGCM3_2_S, lat: lat, lon: lon, elevation: elevation, mode: mode)!
-        }*/
+
+        guard let cmipDomain = self.cmipDomain else {
+            fatalError("Downscaling only supported for CMIP domains")
+        }
+        switch targetGridDomain {
+        case .era5_interpolated_10km:
+            guard let biasCorrector = try Cmip6BiasCorrectorInterpolatedWeights(domain: cmipDomain, referenceDomain: CdsDomain.era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return Cmip6Reader(reader: biasCorrector)
+        case .era5_land:
+            guard let biasCorrector = try Cmip6BiasCorrectorEra5Seamless(domain: cmipDomain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return Cmip6Reader(reader: biasCorrector)
+        case .imerg:
+            guard let biasCorrector = try Cmip6BiasCorrectorGenericDomain(domain: cmipDomain, referenceDomain: SatelliteDomain.imerg_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return Cmip6Reader(reader: biasCorrector)
+        }
     }
 }
