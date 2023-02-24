@@ -21,7 +21,7 @@ struct CmipController {
         
         let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
             if biasCorrection {
-                guard let reader = try Cmip6BiasCorrector(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
                 return Cmip6Reader(reader: reader)
@@ -161,7 +161,7 @@ extension Sequence where Element == Float {
 }
 
 /// Apply bias correction to raw variables
-struct Cmip6BiasCorrector: GenericReaderMixable {
+struct Cmip6BiasCorrectorEra5Seamless: GenericReaderMixable {
     typealias MixingVar = Cmip6Variable
     
     typealias Domain = Cmip6Domain
@@ -190,7 +190,6 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
     /// Get Bias correction field from era5-land or era5
     func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
         if let readerEra5Land, let referenceWeightFile = try variable.openBiasCorrectionFile(for: readerEra5Land.domain) {
-            let pos = readerEra5Land.domain.grid.findPointInterpolated(lat: 4, lon: 5)!
             let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position, dim1: 0..<referenceWeightFile.dim1)
             if !weights.containsNaN() {
                 return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5Land.modelElevation.numeric)
@@ -249,56 +248,192 @@ struct Cmip6BiasCorrector: GenericReaderMixable {
         self.readerEra5Land = readerEra5Land.modelElevation.isSea ? nil : readerEra5Land
         self.readerEra5 = readerEra5
     }
+}
+
+/**
+ Perform bias correction using another domain (reference domain). Interpolate weights
+ */
+final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderMixable {
+    typealias MixingVar = Cmip6Variable
     
-    init?(domain: Cmip6Domain, target: TargetGridDomain, position: Int) throws {
-        switch target {
-        case .era5_interpolated_10km:
-            /// target grid is already era5_land
-            let (lat, lon) = target.grid.getCoordinates(gridpoint: position)
-            
-            /// elevation from ERA5-Land
-            let targetElevation = try target.getTargetElevation(gridpoint: position)
-            
-            /// Read weights from ERA5 as linear interpolated values
-            let posEra5Fractional = CdsDomain.era5.grid.findPointInterpolated(lat: lat, lon: lon)
-            
-            guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: targetElevation.numeric, mode: .land) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            self.reader = reader
-        case .era5_land:
-            /// target grid is era5_land
-            let (lat, lon) = target.grid.getCoordinates(gridpoint: position)
-            
-            /// elevation from ERA5-Land
-            let targetElevation = try target.getTargetElevation(gridpoint: position)
-            
-            // if target elevation is nan, we only need to consider era5 weights
-            let era5LandPos = position
-            
-            let era5Pos = try CdsDomain.era5.grid.findPoint(lat: lat, lon: lon, elevation: targetElevation.numeric, elevationFile: CdsDomain.era5.elevationFile, mode: .land)
-            
-            guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: targetElevation.numeric, mode: .land) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            self.reader = reader
-        case .imerg:
-            /// grid is IMERG
-            let (lat, lon) = target.grid.getCoordinates(gridpoint: position)
-            
-            let imergPos = position
-            
-            guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: .nan, mode: .nearest) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            self.reader = reader
+    typealias Domain = Cmip6Domain
+    
+    var modelLat: Float { reader.modelLat }
+    
+    var modelLon: Float { reader.modelLon }
+    
+    var modelElevation: ElevationOrSea { reader.modelElevation }
+    
+    var targetElevation: Float { reader.targetElevation }
+    
+    var modelDtSeconds: Int { reader.modelDtSeconds }
+    
+    var domain: Domain { reader.domain }
+    
+    /// cmip reader
+    let reader: GenericReader<Cmip6Domain, Cmip6Variable>
+    
+    /// imerg grid point
+    let referencePosition: GridPoint2DFraction
+    
+    let referenceDomain: GenericDomain
+    
+    var _referenceElevation: ElevationOrSea? = nil
+    
+    func getReferenceElevation() throws -> ElevationOrSea {
+        if let _referenceElevation {
+            return _referenceElevation
         }
-        
-        fatalError()
+        guard let elevationFile = referenceDomain.elevationFile else {
+            throw ForecastapiError.generic(message: "Elevation file for domain \(referenceDomain) is missing")
+        }
+        let referenceElevation = try referenceDomain.grid.readElevationInterpolated(gridpoint: referencePosition, elevationFile: elevationFile)
+        self._referenceElevation = referenceElevation
+        return referenceElevation
     }
     
-    init(domain: Cmip6Domain, position: Range<Int>) {
-        fatalError("cmip6 not implemented")
+    func get(variable: Cmip6Variable, time: TimerangeDt) throws -> DataAndUnit {
+        let raw = try reader.get(variable: variable, time: time)
+        var data = raw.data
+        
+        guard let controlWeightFile = try variable.openBiasCorrectionFile(for: reader.domain) else {
+            throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
+        }
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position, dim1: 0..<controlWeightFile.dim1))
+        
+        guard let referenceWeightFile = try variable.openBiasCorrectionFile(for: referenceDomain) else {
+            throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
+        }
+        let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.readInterpolated(dim0: referencePosition, dim0Nx: referenceDomain.grid.nx, dim1: 0..<referenceWeightFile.dim1))
+        
+        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
+        if let bounds = variable.interpolation.bounds {
+            for i in data.indices {
+                data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
+            }
+        }
+        let isElevationCorrectable = variable == .temperature_2m_max || variable == .temperature_2m_min || variable == .temperature_2m_mean
+        
+        if isElevationCorrectable && variable.unit == .celsius && !targetElevation.isNaN {
+            let modelElevation = try getReferenceElevation().numeric
+            if !modelElevation.isNaN && targetElevation != modelElevation {
+                for i in data.indices {
+                    // correct temperature by 0.65° per 100 m elevation
+                    data[i] += (modelElevation - targetElevation) * 0.0065
+                }
+            }
+
+        }
+        return DataAndUnit(data, raw.unit)
+    }
+    
+    func prefetchData(variable: Cmip6Variable, time: TimerangeDt) throws {
+        try reader.prefetchData(variable: variable, time: time)
+    }
+    
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        guard let referencePosition = referenceDomain.grid.findPointInterpolated(lat: lat, lon: lon) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        self.referenceDomain = referenceDomain
+        self.referencePosition = referencePosition
+        self.reader = reader
+    }
+}
+
+
+/**
+ Perform bias correction using another domain
+ */
+struct Cmip6BiasCorrectorGenericDomain: GenericReaderMixable {
+    typealias MixingVar = Cmip6Variable
+    
+    typealias Domain = Cmip6Domain
+    
+    var modelLat: Float { reader.modelLat }
+    
+    var modelLon: Float { reader.modelLon }
+    
+    var modelElevation: ElevationOrSea { reader.modelElevation }
+    
+    var targetElevation: Float { reader.targetElevation }
+    
+    var modelDtSeconds: Int { reader.modelDtSeconds }
+    
+    var domain: Domain { reader.domain }
+    
+    /// cmip reader
+    let reader: GenericReader<Cmip6Domain, Cmip6Variable>
+    
+    /// imerg grid point
+    let referencePosition: Int
+    
+    let referenceDomain: GenericDomain
+    
+    let referenceElevation: ElevationOrSea
+    
+    func get(variable: Cmip6Variable, time: TimerangeDt) throws -> DataAndUnit {
+        let raw = try reader.get(variable: variable, time: time)
+        var data = raw.data
+        
+        guard let controlWeightFile = try variable.openBiasCorrectionFile(for: reader.domain) else {
+            throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
+        }
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position, dim1: 0..<controlWeightFile.dim1))
+        
+        guard let referenceWeightFile = try variable.openBiasCorrectionFile(for: referenceDomain) else {
+            throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
+        }
+        let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.read(dim0Slow: referencePosition..<referencePosition+1, dim1: 0..<referenceWeightFile.dim1))
+        
+        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
+        if let bounds = variable.interpolation.bounds {
+            for i in data.indices {
+                data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
+            }
+        }
+        let isElevationCorrectable = variable == .temperature_2m_max || variable == .temperature_2m_min || variable == .temperature_2m_mean
+        let modelElevation = referenceElevation.numeric
+        if isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
+            for i in data.indices {
+                // correct temperature by 0.65° per 100 m elevation
+                data[i] += (modelElevation - targetElevation) * 0.0065
+            }
+        }
+        return DataAndUnit(data, raw.unit)
+    }
+    
+    func prefetchData(variable: Cmip6Variable, time: TimerangeDt) throws {
+        try reader.prefetchData(variable: variable, time: time)
+    }
+    
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+        guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        guard let referencePosition = try referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.elevationFile, mode: mode) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        self.referenceDomain = referenceDomain
+        self.referenceElevation = referencePosition.gridElevation
+        self.referencePosition = referencePosition.gridpoint
+        
+        self.reader = reader
+    }
+    
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea) throws {
+        
+        let (lat, lon) = referenceDomain.grid.getCoordinates(gridpoint: referencePosition)
+        guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        self.reader = reader
+        self.referenceDomain = referenceDomain
+        self.referencePosition = referencePosition
+        self.referenceElevation = referenceElevation
     }
 }
 

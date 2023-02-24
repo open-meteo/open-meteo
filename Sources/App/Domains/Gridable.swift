@@ -93,6 +93,19 @@ extension Gridable {
         return .elevation(elevation)
     }
     
+    /// Read elevation for a single grid point. Interpolates linearly between grid-cells. Should only be used for linear interpolated reads afterwards
+    func readElevationInterpolated(gridpoint: GridPoint2DFraction, elevationFile: OmFileReader<MmapFile>) throws -> ElevationOrSea {
+        let elevation = try elevationFile.readInterpolated(pos: gridpoint)
+        if elevation.isNaN {
+            return .noData
+        }
+        if elevation <= -999 {
+            // sea gtid point
+            return .sea
+        }
+        return .elevation(elevation)
+    }
+    
     /// Get nearest grid point
     func findPointNearest(lat: Float, lon: Float, elevationFile: OmFileReader<MmapFile>) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
         guard let center = findPoint(lat: lat, lon: lon) else {

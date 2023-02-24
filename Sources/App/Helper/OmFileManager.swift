@@ -184,7 +184,20 @@ extension OmFileReader {
         })
     }
     
-    /// Read interpolated between 4 points
+    /// Read interpolated between 4 points. Assuming dim0 is used for lcations and dim1 is a time series
+    public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
+        let gridpoint = dim0.gridpoint
+        return try readInterpolated(
+            dim0X: gridpoint % dim0Nx,
+            dim0XFraction: dim0.xFraction,
+            dim0Y: gridpoint / dim0Nx,
+            dim0YFraction: dim0.yFraction,
+            dim0Nx: dim0Nx,
+            dim1: dim1Read
+        )
+    }
+    
+    /// Read interpolated between 4 points. Assuming dim0 is used for lcations and dim1 is a time series
     public func readInterpolated(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
         
         // bound x and y
@@ -215,6 +228,43 @@ extension OmFileReader {
                     c * (1-dim0XFraction) * (dim0YFraction) +
                     d * (dim0XFraction) * (dim0YFraction)
         }
+    }
+    
+    
+    /// Read interpolated between 4 points. Assuming dim0 and dim1 are a spatial field
+    public func readInterpolated(pos: GridPoint2DFraction) throws -> Float {
+        return try readInterpolated(
+            dim0: pos.gridpoint % self.dim0,
+            dim0Fraction: pos.xFraction,
+            dim1: pos.gridpoint / self.dim0,
+            dim1Fraction: pos.yFraction
+        )
+    }
+    
+    /// Read interpolated between 4 points. Assuming dim0 and dim1 are a spatial field
+    public func readInterpolated(dim0: Int, dim0Fraction: Float, dim1: Int, dim1Fraction: Float) throws -> Float {
+        // bound x and y
+        var dim0 = dim0
+        var dim0Fraction = dim0Fraction
+        if dim0 > self.dim0-2 {
+            dim0 = self.dim0-2
+            dim0Fraction = 1
+        }
+        var dim1 = dim1
+        var dim1Fraction = dim1Fraction
+        if dim1 > self.dim1-2 {
+            dim1 = self.dim1-2
+            dim1Fraction = 1
+        }
+        
+        // reads 4 points at once
+        let points = try read(dim0Slow: dim0 ..< dim0 + 2, dim1: dim1 ..< dim1 + 2)
+        
+        // interpolate linearly between
+        return points[0] * (1-dim0Fraction) * (1-dim1Fraction) +
+               points[1] * (dim0Fraction) * (1-dim1Fraction) +
+               points[2] * (1-dim0Fraction) * (dim1Fraction) +
+               points[3] * (dim0Fraction) * (dim1Fraction)
     }
     
     /// Read interpolated between 4 points. If one point is NaN, ignore it.
