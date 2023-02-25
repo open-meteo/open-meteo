@@ -29,7 +29,7 @@ struct ExportCommand: AsyncCommandFix {
         @Option(name: "end_date")
         var endDate: String?
         
-        @Option(name: "compression", short: "c", help: "Enable NetCDF compression and set the compression level from 1-9")
+        @Option(name: "compression", short: "c", help: "Enable NetCDF compression and set the compression level from 0-9")
         var compressionLevel: Int?
         
         /// Get time range from parameters
@@ -54,13 +54,30 @@ struct ExportCommand: AsyncCommandFix {
         let targetGridDomaind = try TargetGridDomain.load(rawValueOptional: signature.targetGridDomain)
         let filePath = "./test.nc"
         
+        /*let om = try OmFileReader(file: "/Volumes/2TB_1GBs/data/master-MRI_AGCM3_2_S/temperature_2m_max_linear_bias_seasonal.om")
+        
+        let data = try om.readAll()
+        let grid2 = Cmip6Domain.MRI_AGCM3_2_S.grid
+        
+        let ncFile = try NetCDF.create(path: filePath, overwriteExisting: true)
+        try ncFile.setAttribute("TITLE", "\(domain) aa")
+        
+        var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
+            try ncFile.createDimension(name: "LAT", length: grid2.ny),
+            try ncFile.createDimension(name: "LON", length: grid2.nx),
+            try ncFile.createDimension(name: "time", length: 6)
+        ])
+        try ncVariable.write(data)
+        return*/
+        
+        
         guard let time = try signature.getTime(dtSeconds: 86400) else {
             fatalError("start_date and end_date must be specified")
         }
         let grid = domain.grid
         logger.info("Exporing variable \(signature.variable) for dataset \(domain)")
 
-        try generateNetCdf(logger: logger, file: filePath, domain: domain, variable: signature.variable, time: time, nLocationChunk: 48, compressionLevel: signature.compressionLevel, targetGridDomain: targetGridDomaind)
+        try generateNetCdf(logger: logger, file: "\(filePath)~", domain: domain, variable: signature.variable, time: time, nLocationChunk: 48, compressionLevel: signature.compressionLevel, targetGridDomain: targetGridDomaind)
         try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
     }
     
@@ -71,7 +88,7 @@ struct ExportCommand: AsyncCommandFix {
         let size = grid.count * time.count * 4
         logger.info("Total raw size \(size.bytesHumanReadable)")
 
-        let ncFile = try NetCDF.create(path: "\(file)~", overwriteExisting: true)
+        let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
         try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
         
         var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
@@ -80,7 +97,7 @@ struct ExportCommand: AsyncCommandFix {
             try ncFile.createDimension(name: "time", length: time.count)
         ])
         
-        if let compressionLevel {
+        if let compressionLevel, compressionLevel > 0 {
             try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
             try ncVariable.defineChunking(chunking: .chunked, chunks: [1, nLocationChunk, time.count])
         }

@@ -322,7 +322,6 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderMixable {
                     data[i] += (modelElevation - targetElevation) * 0.0065
                 }
             }
-
         }
         return DataAndUnit(data, raw.unit)
     }

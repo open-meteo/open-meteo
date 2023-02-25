@@ -12,6 +12,13 @@ struct RegularGrid: Gridable {
     func findPoint(lat: Float, lon: Float) -> Int? {
         let x = Int(roundf((lon-lonMin) / dx))
         let y = Int(roundf((lat-latMin) / dy))
+        if y >= 0 && x == nx {
+            // Allow points on the border. Technically for global grids, this grid point now wrappes to the eastern side
+            return y * nx + (nx - 1)
+        }
+        if x >= 0 && y == ny {
+            return (ny - 1) * nx + x
+        }
         if y < 0 || x < 0 || y >= ny || x >= nx {
             return nil
         }

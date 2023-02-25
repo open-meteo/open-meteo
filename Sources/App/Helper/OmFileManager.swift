@@ -234,9 +234,9 @@ extension OmFileReader {
     /// Read interpolated between 4 points. Assuming dim0 and dim1 are a spatial field
     public func readInterpolated(pos: GridPoint2DFraction) throws -> Float {
         return try readInterpolated(
-            dim0: pos.gridpoint % self.dim0,
+            dim0: pos.gridpoint % self.dim1,
             dim0Fraction: pos.xFraction,
-            dim1: pos.gridpoint / self.dim0,
+            dim1: pos.gridpoint / self.dim1,
             dim1Fraction: pos.yFraction
         )
     }
