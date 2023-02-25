@@ -931,9 +931,9 @@
           </tr>
           <tr>
             <th scope="row">windgusts_10m</th>
-            <td>Preceding hour max</td>
+            <td>Instant</td>
             <td>km/h (mph, m/s, knots)</td>
-            <td>Gusts at 10 meters above ground as a maximum of the preceding hour</td>
+            <td>Gusts at 10 meters above ground of the indicated hour. Wind gusts in <mark>CERRA</mark> are defined as the maximum wind gusts of the preceding hour. Please consult the <a href="https://www.ecmwf.int/en/elibrary/81271-ifs-documentation-cy47r3-part-iv-physical-processes">ECMWF IFS documentation</a> for more information on how wind gusts are parameterized in weather models.</td>
           </tr>
           <tr>
             <th scope="row">et0_fao_evapotranspiration</th>
