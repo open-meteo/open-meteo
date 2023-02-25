@@ -631,10 +631,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                 let endStep = Int(message.get(attribute: "endStep")!)!
                 logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
                 
-                if variable == .windgusts_10m && endStep == 0 {
-                    return
-                }
-                
                 try grib2d.load(message: message)
                 if let scaling = variable.netCdfScaling {
                     grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))

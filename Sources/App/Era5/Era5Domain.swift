@@ -130,7 +130,8 @@ enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
         case .wind_v_component_10m:
             return "166.128"
         case .windgusts_10m:
-            return "49.128"
+            // Instantaneous 10 metre wind gust
+            return "29.228"
         case .dewpoint_2m:
             return "168.128"
         case .cloudcover_low:
