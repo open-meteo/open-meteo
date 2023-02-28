@@ -20,8 +20,8 @@ struct ExportCommand: AsyncCommandFix {
         @Argument(name: "variable", help: "Weather variable")
         var variable: String
         
-        @Option(name: "target_grid", help: "Interpolate data onto this grid, perform bias correction and elevation correction")
-        var targetGridDomain: String?
+        @Option(name: "regridding", help: "Regrid data to a specified grid, perform bias and elevation correction")
+        var regriddingDomain: String?
         
         @Option(name: "start_date")
         var startDate: String?
@@ -29,8 +29,17 @@ struct ExportCommand: AsyncCommandFix {
         @Option(name: "end_date")
         var endDate: String?
         
+        @Option(name: "output", short: "o", help: "Output file name. Default: ./output.nc")
+        var outputFilename: String?
+        
         @Option(name: "compression", short: "c", help: "Enable NetCDF compression and set the compression level from 0-9")
         var compressionLevel: Int?
+        
+        @Flag(name: "output_coordinates", help: "Output grid coordinates in NetCDF file")
+        var outputCoordinates: Bool
+        
+        @Flag(name: "output_elevation", help: "Output grid elevation in NetCDF file")
+        var outputElevation: Bool
         
         /// Get time range from parameters
         func getTime(dtSeconds: Int) throws -> TimerangeDt? {
@@ -45,14 +54,16 @@ struct ExportCommand: AsyncCommandFix {
     
     /**
      TODO:
-     - file names
      - dynamic nChunkLocations calculation
+     - normals calculation
+     - export glofas
+     - export era5 (needs 2D solar)
      */
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         let domain = try ExportDomain.load(rawValue: signature.domain)
-        let targetGridDomaind = try TargetGridDomain.load(rawValueOptional: signature.targetGridDomain)
-        let filePath = "./test.nc"
+        let regriddingDomain = try TargetGridDomain.load(rawValueOptional: signature.regriddingDomain)
+        let filePath = signature.outputFilename ?? "./output.nc"
         
         /*let om = try OmFileReader(file: "/Volumes/2TB_1GBs/data/master-MRI_AGCM3_2_S/temperature_2m_max_linear_bias_seasonal.om")
         
@@ -71,17 +82,27 @@ struct ExportCommand: AsyncCommandFix {
         return*/
         
         
-        guard let time = try signature.getTime(dtSeconds: 86400) else {
+        guard let time = try signature.getTime(dtSeconds: domain.genericDomain.dtSeconds) else {
             fatalError("start_date and end_date must be specified")
         }
-        let grid = domain.grid
-        logger.info("Exporing variable \(signature.variable) for dataset \(domain)")
+        logger.info("Exporing variable \(signature.variable) for dataset \(domain) to file '\(filePath)'")
 
-        try generateNetCdf(logger: logger, file: "\(filePath)~", domain: domain, variable: signature.variable, time: time, nLocationChunk: 48, compressionLevel: signature.compressionLevel, targetGridDomain: targetGridDomaind)
+        try generateNetCdf(
+            logger: logger,
+            file: "\(filePath)~",
+            domain: domain,
+            variable: signature.variable,
+            time: time,
+            nLocationChunk: 48,
+            compressionLevel: signature.compressionLevel,
+            targetGridDomain: regriddingDomain,
+            outputCoordinates: signature.outputCoordinates,
+            outputElevation: signature.outputElevation
+        )
         try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
     }
     
-    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, nLocationChunk: Int, compressionLevel: Int?, targetGridDomain: TargetGridDomain?) throws {
+    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, nLocationChunk: Int, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool) throws {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
@@ -91,17 +112,35 @@ struct ExportCommand: AsyncCommandFix {
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
         try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
         
-        var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-            try ncFile.createDimension(name: "LAT", length: grid.ny),
-            try ncFile.createDimension(name: "LON", length: grid.nx),
-            try ncFile.createDimension(name: "time", length: time.count)
-        ])
+        let latDimension = try ncFile.createDimension(name: "LAT", length: grid.ny)
+        let lonDimension = try ncFile.createDimension(name: "LON", length: grid.nx)
+        let timeDimension = try ncFile.createDimension(name: "time", length: time.count)
+        
+        if outputCoordinates {
+            logger.info("Writing coordinates")
+            var ncLat = try ncFile.createVariable(name: "latitude", type: Float.self, dimensions: [latDimension])
+            var ncLon = try ncFile.createVariable(name: "longitude", type: Float.self, dimensions: [lonDimension])
+            try ncLat.write((0..<grid.ny).map{ grid.getCoordinates(gridpoint: $0 * grid.nx).latitude })
+            try ncLon.write((0..<grid.nx).map{ grid.getCoordinates(gridpoint: $0).longitude })
+        }
+        if outputElevation {
+            logger.info("Writing elevation information")
+            var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
+            let targetDomain = targetGridDomain?.genericDomain ?? domain.genericDomain
+            guard let elevationFile = targetDomain.elevationFile else {
+                fatalError("Could not read elevation file for domain \(targetDomain)")
+            }
+            try ncElevation.write(elevationFile.readAll())
+        }
+        
+        var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
         
         if let compressionLevel, compressionLevel > 0 {
             try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
             try ncVariable.defineChunking(chunking: .chunked, chunks: [1, nLocationChunk, time.count])
         }
 
+        logger.info("Writing data")
         let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4)
         
         /// Interpolate data from one grid to another and perform bias correction
@@ -110,6 +149,7 @@ struct ExportCommand: AsyncCommandFix {
             guard let elevationFile = targetDomain.elevationFile else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
+            
             for l in 0..<grid.count {
                 let coords = grid.getCoordinates(gridpoint: l)
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
@@ -238,7 +278,7 @@ enum ExportDomain: String, CaseIterable {
     func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> any GenericReaderMixable {
 
         guard let cmipDomain = self.cmipDomain else {
-            fatalError("Downscaling only supported for CMIP domains")
+            fatalError("Regridding only supported for CMIP domains")
         }
         switch targetGridDomain {
         case .era5_interpolated_10km:

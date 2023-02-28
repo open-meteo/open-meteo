@@ -99,7 +99,8 @@ extension Gridable {
         if elevation.isNaN {
             return .noData
         }
-        if elevation <= -999 {
+        // Due to interpolation, -999 is not clearly sea
+        if elevation <= -50 {
             // sea gtid point
             return .sea
         }
