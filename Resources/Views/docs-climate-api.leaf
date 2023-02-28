@@ -9,7 +9,7 @@
 #export("content"):
 
 <div class="px-4 py-5 text-center text-white" style="
-            background-image: url('https://assets.open-meteo.com/images/fog.webp');
+            background-image: url('https://assets.open-meteo.com/images/stoos.webp');
             background-size: cover;
             background-position: center;
             height: 500px;
