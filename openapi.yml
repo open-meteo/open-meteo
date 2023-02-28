@@ -86,6 +86,9 @@ paths:
             - windgusts_10m_max
             - winddirection_10m_dominant
             - shortwave_radiation_sum
+            - uv_index_max
+            - uv_index_clear_sky_max
+            - et0_fao_evapotranspiration 
       - name: latitude
         in: query
         required: true
