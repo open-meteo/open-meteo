@@ -37,6 +37,7 @@ Apps:
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
+- [omWeather](https://github.com/woheller69/omweather) Android Weather App
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
