@@ -347,7 +347,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
             return Self.windspeed_10m_max.omFileName
         }
         if self == .windgusts_10m_mean {
-            return Self.windgusts_10m_mean.omFileName
+            return Self.windspeed_10m_mean.omFileName
         }
         return rawValue
     }
