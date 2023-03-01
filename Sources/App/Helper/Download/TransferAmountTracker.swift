@@ -16,10 +16,12 @@ final class TransferAmountTracker {
     var lastPrint = Date()
     let logger: Logger
     let totalSize: Int?
+    let name: String
     
-    public init(logger: Logger, totalSize: Int?) {
+    public init(logger: Logger, totalSize: Int?, name: String = "Transferred") {
         self.logger = logger
         self.totalSize = totalSize
+        self.name = name
     }
     
     /// Print status from time to time
@@ -32,9 +34,9 @@ final class TransferAmountTracker {
             if let totalSize {
                 let percent = round(Float(transfered) / Float(totalSize) * 100)
                 let remainingTime = Double(totalSize - transfered) / (Double(transfered - transferedLastPrint) / deltaT)
-                logger.info("Transferred \(percent)% \(transfered.bytesHumanReadable) / \(totalSize.bytesHumanReadable) in \(timeElapsed), \(rate.bytesHumanReadable)/s remaining \(remainingTime.asSecondsPrettyPrint)")
+                logger.info("\(name) \(percent)% \(transfered.bytesHumanReadable) / \(totalSize.bytesHumanReadable) in \(timeElapsed), \(rate.bytesHumanReadable)/s remaining \(remainingTime.asSecondsPrettyPrint)")
             } else {
-                logger.info("Transferred \(transfered.bytesHumanReadable) in \(timeElapsed), \(rate.bytesHumanReadable)/s")
+                logger.info("\(name) \(transfered.bytesHumanReadable) in \(timeElapsed), \(rate.bytesHumanReadable)/s")
             }
 
             lastPrint = Date()

@@ -29,6 +29,9 @@ struct ExportCommand: AsyncCommandFix {
         @Option(name: "end_date")
         var endDate: String?
         
+        @Option(name: "calculate_daily_normals_over_n_years")
+        var dailyNormalsOverNYears: Int?
+        
         @Option(name: "output", short: "o", help: "Output file name. Default: ./output.nc")
         var outputFilename: String?
         
@@ -65,13 +68,6 @@ struct ExportCommand: AsyncCommandFix {
         let regriddingDomain = try TargetGridDomain.load(rawValueOptional: signature.regriddingDomain)
         let filePath = signature.outputFilename ?? "./output.nc"
         
-        /*
-         daily normals:
-         - loop over locations
-         - loop over timerange, aggregate into 10 year bin and 5 day bin (always mean)
-         
-         */
-        
         /*let om = try OmFileReader(file: "/Volumes/2TB_1GBs/data/master-MRI_AGCM3_2_S/temperature_2m_max_linear_bias_seasonal.om")
         
         let data = try om.readAll()
@@ -88,12 +84,11 @@ struct ExportCommand: AsyncCommandFix {
         try ncVariable.write(data)
         return*/
         
-        
         guard let time = try signature.getTime(dtSeconds: domain.genericDomain.dtSeconds) else {
             fatalError("start_date and end_date must be specified")
         }
         logger.info("Exporing variable \(signature.variable) for dataset \(domain) to file '\(filePath)'")
-
+        
         try generateNetCdf(
             logger: logger,
             file: "\(filePath)~",
@@ -104,25 +99,21 @@ struct ExportCommand: AsyncCommandFix {
             compressionLevel: signature.compressionLevel,
             targetGridDomain: regriddingDomain,
             outputCoordinates: signature.outputCoordinates,
-            outputElevation: signature.outputElevation
+            outputElevation: signature.outputElevation,
+            dailyNormalsOverNYears: signature.dailyNormalsOverNYears
         )
         try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
     }
     
-    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, nLocationChunk: Int, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool) throws {
+    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, nLocationChunk: Int, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, dailyNormalsOverNYears: Int?) throws {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
-        let size = grid.count * time.count * 4
-        logger.info("Total raw size \(size.bytesHumanReadable)")
-
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
         try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
-        
         let latDimension = try ncFile.createDimension(name: "LAT", length: grid.ny)
         let lonDimension = try ncFile.createDimension(name: "LON", length: grid.nx)
-        let timeDimension = try ncFile.createDimension(name: "time", length: time.count)
-        
+
         if outputCoordinates {
             logger.info("Writing coordinates")
             var ncLat = try ncFile.createVariable(name: "latitude", type: Float.self, dimensions: [latDimension])
@@ -140,15 +131,74 @@ struct ExportCommand: AsyncCommandFix {
             try ncElevation.write(elevationFile.readAll())
         }
         
+        // Calculate daily normals
+        if let dailyNormalsOverNYears {
+            let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
+            let normalsCalculator = DailyNormalsCalculator(time: time, dailyNormalsOverNYears: dailyNormalsOverNYears)
+            let timeDimension = try ncFile.createDimension(name: "time", length: normalsCalculator.numYearBins * 365)
+            var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
+            if let compressionLevel, compressionLevel > 0 {
+                try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
+                try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, normalsCalculator.numYearBins * 365])
+            }
+            
+            logger.info("Calculating daily normals. numYearBins=\(normalsCalculator.numYearBins). Total raw size \((grid.count * normalsCalculator.numYearBins * 365 * 4).bytesHumanReadable)")
+            
+            if let targetGridDomain {
+                let targetDomain = targetGridDomain.genericDomain
+                guard let elevationFile = targetDomain.elevationFile else {
+                    fatalError("Could not read elevation file for domain \(targetDomain)")
+                }
+                for l in 0..<grid.count {
+                    let coords = grid.getCoordinates(gridpoint: l)
+                    let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
+                    
+                    // Read data
+                    let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
+                    guard let data = try reader.get(mixed: variable, time: time) else {
+                        fatalError("Invalid variable \(variable)")
+                    }
+                    let normals = normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data))
+                    try ncVariable.write(normals, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
+                    progress.add(time.count * 4)
+                }
+                progress.finish()
+                return
+            }
+            // Loop over chunks of locations, read and write
+            for l in stride(from: 0, to: grid.count, by: nLocationChunk) {
+                // Prefetch the next location chunk
+                let positionNext = min(l+nLocationChunk, grid.count)..<min(l+nLocationChunk*2, grid.count)
+                let readerNext = try domain.getReader(position: positionNext)
+                let _ = try readerNext.prefetchData(mixed: variable, time: time)
+                
+                // Read data
+                let position = l..<min(l+nLocationChunk, grid.count)
+                let reader = try domain.getReader(position: position)
+                guard let data = try reader.get(mixed: variable, time: time) else {
+                    fatalError("Invalid variable \(variable)")
+                }
+                let data2d = Array2DFastTime(data: data.data, nLocations: position.count, nTime: time.count)
+                for (i, gridpoint) in position.enumerated() {
+                    let normals = normalsCalculator.calculateDailyNormals(values: data2d[i, 0..<data2d.nTime])
+                    try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
+                }
+                progress.add(position.count * time.count * 4)
+            }
+            progress.finish()
+            return
+        }
+        
+        let timeDimension = try ncFile.createDimension(name: "time", length: time.count)
         var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
         
         if let compressionLevel, compressionLevel > 0 {
             try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
             try ncVariable.defineChunking(chunking: .chunked, chunks: [1, nLocationChunk, time.count])
         }
-
-        logger.info("Writing data")
-        let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4)
+        
+        logger.info("Writing data. Total raw size \((grid.count * time.count * 4).bytesHumanReadable)")
+        let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
         
         /// Interpolate data from one grid to another and perform bias correction
         if let targetGridDomain {
@@ -193,6 +243,45 @@ struct ExportCommand: AsyncCommandFix {
         progress.finish()
     }
 }
+
+/// Calculate daily normals. Combine 5 days to have some sort of statistical significance.
+struct DailyNormalsCalculator {
+    let time: TimerangeDt
+    let yearStart: Int
+    let numYearBins: Int
+    let dailyNormalsOverNYears: Int
+    
+    init(time: TimerangeDt, dailyNormalsOverNYears: Int) {
+        yearStart = Int(round(Float(time.range.lowerBound.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear)))
+        /// not included end
+        let yearEnd = Int(round(Float(time.range.upperBound.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear)))
+        numYearBins = (yearEnd - yearStart) / dailyNormalsOverNYears
+        self.dailyNormalsOverNYears = dailyNormalsOverNYears
+        self.time = time
+    }
+    
+    func calculateDailyNormals(values: ArraySlice<Float>) -> [Float] {
+        var sum = [Float](repeating: 0, count: numYearBins * 365)
+        var count = [Float](repeating: 0, count: numYearBins * 365)
+        for (t, value) in zip(time, values) {
+            let yearIndex = (t.timeIntervalSince1970 / Timestamp.secondsPerAverageYear - yearStart) / dailyNormalsOverNYears
+            guard yearIndex >= 0 && yearIndex < numYearBins else {
+                continue
+            }
+            for i in -2...2 {
+                /// 0-364
+                let dayOfYear = Int(Float(t.add(days: i).timeIntervalSince1970 / 86400).truncatingRemainder(dividingBy: 365.25)) % 365
+                sum[yearIndex * 365 + dayOfYear] += value
+                count[yearIndex * 365 + dayOfYear] += 1
+            }
+        }
+        for i in sum.indices {
+            sum[i] /= count[i]
+        }
+        return sum
+    }
+}
+
 
 enum TargetGridDomain: String, CaseIterable {
     /// interpolates weights to 10 km, uses elevation information from era5 land
