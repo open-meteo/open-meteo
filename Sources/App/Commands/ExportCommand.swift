@@ -158,7 +158,7 @@ struct ExportCommand: AsyncCommandFix {
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    let normals = normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data))
+                    let normals = variable == "precipitation_sum" ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data.data)) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data))
                     try ncVariable.write(normals, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
                     progress.add(time.count * 4)
                 }
@@ -180,8 +180,8 @@ struct ExportCommand: AsyncCommandFix {
                 }
                 let data2d = Array2DFastTime(data: data.data, nLocations: position.count, nTime: time.count)
                 for (i, gridpoint) in position.enumerated() {
-                    let normals = normalsCalculator.calculateDailyNormals(values: data2d[i, 0..<data2d.nTime])
-                    try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
+                    let normals = variable == "precipitation_sum" ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: data2d[i, 0..<data2d.nTime]) : normalsCalculator.calculateDailyNormals(values: data2d[i, 0..<data2d.nTime])
+                    try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
                 }
                 progress.add(position.count * time.count * 4)
             }
@@ -260,6 +260,7 @@ struct DailyNormalsCalculator {
         self.time = time
     }
     
+    /// Calculate mean daily normals
     func calculateDailyNormals(values: ArraySlice<Float>) -> [Float] {
         var sum = [Float](repeating: 0, count: numYearBins * 365)
         var count = [Float](repeating: 0, count: numYearBins * 365)
@@ -279,6 +280,40 @@ struct DailyNormalsCalculator {
             sum[i] /= count[i]
         }
         return sum
+    }
+    
+    /// Calculate daily mean values, but preserve events below a certain threshold. E.g. for precipitation
+    func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, lowerThanThreshold: Float = 0.1) -> [Float] {
+        
+        let partPerYear = 33 // ~11 days
+        var monthly_sum = [Float](repeating: 0, count: numYearBins * partPerYear)
+        var monthly_events = [Float](repeating: 0, count: numYearBins * partPerYear)
+        var monthly_count = [Float](repeating: 0, count: numYearBins * partPerYear)
+        
+        for (t, value) in zip(time, values) {
+            let yearIndex = (t.timeIntervalSince1970 / Timestamp.secondsPerAverageYear - yearStart) / dailyNormalsOverNYears
+            guard yearIndex >= 0 && yearIndex < numYearBins else {
+                continue
+            }
+            let monthIndex = (t.timeIntervalSince1970 / (Timestamp.secondsPerAverageYear / partPerYear)) % 12
+            monthly_sum[yearIndex * partPerYear + monthIndex] += value
+            monthly_count[yearIndex * partPerYear + monthIndex] += 1
+            if value < lowerThanThreshold {
+                monthly_events[yearIndex * partPerYear + monthIndex] += 1
+            }
+        }
+        return (0..<365*numYearBins).map { i in
+            let daysPerPart = 365/partPerYear
+            let monthIndex = i / partPerYear
+            let fractionBelowThreshold = monthly_events[monthIndex] / monthly_sum[monthIndex]
+            let dryDays = Int(round(fractionBelowThreshold * Float(daysPerPart)))
+            let wetDays = daysPerPart - dryDays
+            let dayOfPart = i % daysPerPart
+            if dayOfPart < dryDays {
+                return 0
+            }
+            return monthly_sum[monthIndex] / monthly_count[monthIndex] / (Float(wetDays) / Float(daysPerPart))
+        }
     }
 }
 
