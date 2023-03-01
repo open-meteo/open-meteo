@@ -167,11 +167,10 @@ struct GemDownload: AsyncCommandFix {
                     continue
                 }
                 /// 003/CMC_glb_CIN_SFC_0_latlon.15x.15_2022112100_P003.grib2
-                let hhhmm = domain == .gem_hrdps_continental ? "\(h3)-00" : "\(h3)"
                 let gribName = variable.gribName(domain: domain)
-                let url = "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
+                let url = domain == .gem_hrdps_continental ? "\(server)\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_HRDPS_\(gribName)_RLatLon0.0225_PT\(h3)H.grib2" : "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(h3).grib2"
                 for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
-                    //try message.debugGrid(grid: domain.grid)
+                    //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                     //fatalError()
                     try grib2d.load(message: message)
                     
@@ -306,6 +305,57 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
     //case lifted_index
     
     func gribName(domain: GemDomain) -> String {
+        if domain == .gem_hrdps_continental {
+            switch self {
+            case .temperature_2m:
+                return "TMP_AGL-2m"
+            case .temperature_40m:
+                return "TMP_AGL-40m"
+            case .temperature_80m:
+                return "TMP_AGL-80m"
+            case .temperature_120m:
+                return "TMP_AGL-120m"
+            case .dewpoint_2m:
+                return "DPT_AGL-2m"
+            case .cloudcover:
+                return "TCDC_Sfc"
+            case .pressure_msl:
+                return "PRMSL_MSL"
+            case .shortwave_radiation:
+                return "DSWRF_Sfc"
+            case .windspeed_10m:
+                return "WIND_AGL-10m"
+            case .winddirection_10m:
+                return "WDIR_AGL-10m"
+            case .windspeed_40m:
+                return "WIND_AGL-40m"
+            case .winddirection_40m:
+                return "WDIR_AGL-40m"
+            case .windspeed_80m:
+                return "WIND_AGL-80m"
+            case .winddirection_80m:
+                return "WDIR_AGL-80m"
+            case .windspeed_120m:
+                return "WIND_AGL-120m"
+            case .winddirection_120m:
+                return "WDIR_AGL-120m"
+            case .windgusts_10m:
+                return "GUST_AGL-10m"
+            case .showers:
+                return "ACPCP_Sfc"
+            case .snowfall_water_equivalent:
+                return "WEASN_Sfc"
+            case .soil_temperature_0_to_10cm:
+                return "TSOIL_DBS-0-10cm"
+            case .soil_moisture_0_to_10cm:
+                return "SOILW_DBS-0-10cm"
+            case .precipitation:
+                return "APCP_Sfc"
+            case .cape:
+                return "CAPE_Sfc"
+            }
+        }
+        
         switch self {
         case .temperature_2m:
             return "TMP_TGL_2"
@@ -348,7 +398,7 @@ enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable,
         case .snowfall_water_equivalent:
             return "WEASN_SFC_0"
         case .cape:
-            return domain == .gem_hrdps_continental ? "CAPE_ETAL_10000" : "CAPE_SFC_0"
+            return "CAPE_SFC_0"
         //case .cin:
         //    return "CIN_SFC_0"
         //case .lifted_index:
@@ -802,6 +852,9 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     
     /// pressure levels
     var levels: [Int] {
+        if self == .gem_hrdps_continental {
+            return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50].reversed()
+        }
         return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50, 30, 20, 10/*, 5, 1*/].reversed() // 5 and 1 not available for dewpoint
     }
     
@@ -828,7 +881,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_regional:
             return "ps10km"
         case .gem_hrdps_continental:
-            return "ps2.5km"
+            return "RLatLon0.0225"
         }
     }
     
@@ -839,7 +892,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_regional:
             return "model_\(rawValue)/10km/grib2"
         case .gem_hrdps_continental:
-            return "model_hrdps/continental/grib2"
+            return "model_hrdps/continental/2.5km"
         }
     }
     
@@ -861,7 +914,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_regional:
             return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
         case .gem_hrdps_continental:
-            return ProjectionGrid(nx: 2576, ny: 1456, latitude: 35.603374...45.85184, longitude: -128.08255...(-43.829773), projection: StereograpicProjection(latitude: 90, longitude: 252, radius: 6371229))
+            return ProjectionGrid(nx: 2540, ny: 1290, latitude: 39.626034...47.876457, longitude: -133.62952...(-40.708557), projection: RotatedLatLonProjection(latitude: -36.0885, longitude: 245.305))
         }
     }
 }

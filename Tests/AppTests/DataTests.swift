@@ -116,6 +116,36 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(pos / nx, 468)
     }
     
+    func testHrdpsGrid() {
+        let grid = ProjectionGrid(nx: 2540, ny: 1290, latitude: 39.626034...47.876457, longitude: -133.62952...(-40.708557), projection: RotatedLatLonProjection(latitude: -36.0885, longitude: 245.305))
+        
+        var pos = grid.findPoint(lat: 39.626034, lon: -133.62952)!
+        var (lat,lon) = grid.getCoordinates(gridpoint: pos)
+        XCTAssertEqual(pos, 0)
+        XCTAssertEqual(lat, 39.626034, accuracy: 0.001)
+        XCTAssertEqual(lon, -133.62952, accuracy: 0.001)
+        
+        pos = grid.findPoint(lat: 27.284597, lon: -66.96642)!
+        (lat,lon) = grid.getCoordinates(gridpoint: pos)
+        XCTAssertEqual(pos, 2539) //  x: 2539, y: 0,
+        XCTAssertEqual(lat, 27.284597, accuracy: 0.001)
+        XCTAssertEqual(lon, -66.96642, accuracy: 0.001)
+        
+        // Coords(i: 720852, x: 2032, y: 283, latitude: 38.96126, longitude: -73.63256)
+        pos = grid.findPoint(lat: 38.96126, lon: -73.63256)!
+        (lat,lon) = grid.getCoordinates(gridpoint: pos)
+        XCTAssertEqual(pos, 720852)
+        XCTAssertEqual(lat, 38.96126, accuracy: 0.001)
+        XCTAssertEqual(lon, -73.63256, accuracy: 0.001)
+        
+        // Coords(i: 3276599, x: 2539, y: 1289, latitude: 47.876457, longitude: -40.708557)
+        pos = grid.findPoint(lat: 47.876457, lon: -40.708557)!
+        (lat,lon) = grid.getCoordinates(gridpoint: pos)
+        XCTAssertEqual(pos, 3276599)
+        XCTAssertEqual(lat, 47.876457, accuracy: 0.001)
+        XCTAssertEqual(lon, -40.708557, accuracy: 0.001)
+    }
+    
     func testCerraGrid() {
         // 
         let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
