@@ -353,11 +353,11 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVaria
     }
     
     /// Get the file path to a linear bias seasonal file for a given variable
-    func getBiasCorrectionFile(for domain: GenericDomain) -> OmFilePathWithSuffix {
+    func getBiasCorrectionFile(for domain: Cmip6Domain) -> OmFilePathWithSuffix {
         return OmFilePathWithSuffix(domain: domain.rawValue, directory: "master", variable: omFileName, suffix: "linear_bias_seasonal")
     }
     
-    func openBiasCorrectionFile(for domain: GenericDomain) throws -> OmFileReader<MmapFile>? {
+    func openBiasCorrectionFile(for domain: Cmip6Domain) throws -> OmFileReader<MmapFile>? {
         return try OmFileManager.get(getBiasCorrectionFile(for: domain))
     }
     

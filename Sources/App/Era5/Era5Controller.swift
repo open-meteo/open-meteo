@@ -1,4 +1,5 @@
 import Foundation
+import SwiftPFor2D
 import Vapor
 
 
@@ -246,6 +247,15 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
     case cloudcover_mean
     /// only for CMIP6 reference
     case soil_moisture_0_to_10cm_mean
+    
+    /// Get the file path to a linear bias seasonal file for a given variable
+    func getBiasCorrectionFile(for domain: GenericDomain) -> OmFilePathWithSuffix {
+        return OmFilePathWithSuffix(domain: domain.rawValue, directory: "master", variable: rawValue, suffix: "linear_bias_seasonal")
+    }
+    
+    func openBiasCorrectionFile(for domain: GenericDomain) throws -> OmFileReader<MmapFile>? {
+        return try OmFileManager.get(getBiasCorrectionFile(for: domain))
+    }
     
     var aggregation: DailyAggregation<CdsVariable> {
         switch self {

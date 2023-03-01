@@ -215,13 +215,13 @@ struct DownloadEra5Command: AsyncCommandFix {
         ]
         
         for variable in variables {
-            try variable.getBiasCorrectionFile(for: domain).createDirectory()
-            let biasFile = variable.getBiasCorrectionFile(for: domain).getFilePath()
-            if FileManager.default.fileExists(atPath: biasFile) {
-                continue
-            }
             guard let era5Variable = Era5DailyWeatherVariable(rawValue: variable.rawValue) else {
                 fatalError("Could not initialise Era5DailyWeatherVariable for \(variable)")
+            }
+            try era5Variable.getBiasCorrectionFile(for: domain).createDirectory()
+            let biasFile = era5Variable.getBiasCorrectionFile(for: domain).getFilePath()
+            if FileManager.default.fileExists(atPath: biasFile) {
+                continue
             }
             if domain == .era5_land && !availableForEra5Land.contains(variable) {
                 logger.info("Skipping \(variable), because unavailable for ERA5-Land")
