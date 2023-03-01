@@ -65,6 +65,13 @@ struct ExportCommand: AsyncCommandFix {
         let regriddingDomain = try TargetGridDomain.load(rawValueOptional: signature.regriddingDomain)
         let filePath = signature.outputFilename ?? "./output.nc"
         
+        /*
+         daily normals:
+         - loop over locations
+         - loop over timerange, aggregate into 10 year bin and 5 day bin (always mean)
+         
+         */
+        
         /*let om = try OmFileReader(file: "/Volumes/2TB_1GBs/data/master-MRI_AGCM3_2_S/temperature_2m_max_linear_bias_seasonal.om")
         
         let data = try om.readAll()
