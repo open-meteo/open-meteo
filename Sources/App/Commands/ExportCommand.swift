@@ -133,6 +133,8 @@ struct ExportCommand: AsyncCommandFix {
         
         // Calculate daily normals
         if let dailyNormalsOverNYears {
+            let variablesPrecipitation = ["precipitation_sum", "snowfall_water_equivalent_sum"]
+            
             let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
             let normalsCalculator = DailyNormalsCalculator(time: time, dailyNormalsOverNYears: dailyNormalsOverNYears)
             let timeDimension = try ncFile.createDimension(name: "time", length: normalsCalculator.numYearBins * 365)
@@ -158,7 +160,7 @@ struct ExportCommand: AsyncCommandFix {
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    let normals = variable == "precipitation_sum" ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data.data)) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data))
+                    let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data.data)) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data))
                     try ncVariable.write(normals, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
                     progress.add(time.count * 4)
                 }
@@ -180,7 +182,7 @@ struct ExportCommand: AsyncCommandFix {
                 }
                 let data2d = Array2DFastTime(data: data.data, nLocations: position.count, nTime: time.count)
                 for (i, gridpoint) in position.enumerated() {
-                    let normals = variable == "precipitation_sum" ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: data2d[i, 0..<data2d.nTime]) : normalsCalculator.calculateDailyNormals(values: data2d[i, 0..<data2d.nTime])
+                    let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: data2d[i, 0..<data2d.nTime]) : normalsCalculator.calculateDailyNormals(values: data2d[i, 0..<data2d.nTime])
                     try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
                 }
                 progress.add(position.count * time.count * 4)
@@ -284,35 +286,44 @@ struct DailyNormalsCalculator {
     
     /// Calculate daily mean values, but preserve events below a certain threshold. E.g. for precipitation
     func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, lowerThanThreshold: Float = 0.1) -> [Float] {
+        /// Number of parts to split a year into. 365 / 33 = ~11 days
+        let partPerYear = 33
+        /// Sum of all values
+        var partsSum = [Float](repeating: 0, count: numYearBins * partPerYear)
+        /// Sum of all events where value is below threshold
+        var partsEvents = [Float](repeating: 0, count: numYearBins * partPerYear)
+        /// Number of values accumulated for this part
+        var partsCount = [Float](repeating: 0, count: numYearBins * partPerYear)
+        /// Number of seconds in e.g. ~11 days
+        let secondsPerPart = Timestamp.secondsPerAverageYear / partPerYear
         
-        let partPerYear = 33 // ~11 days
-        var monthly_sum = [Float](repeating: 0, count: numYearBins * partPerYear)
-        var monthly_events = [Float](repeating: 0, count: numYearBins * partPerYear)
-        var monthly_count = [Float](repeating: 0, count: numYearBins * partPerYear)
-        
+        // Calculate statistics for each part
         for (t, value) in zip(time, values) {
             let yearIndex = (t.timeIntervalSince1970 / Timestamp.secondsPerAverageYear - yearStart) / dailyNormalsOverNYears
             guard yearIndex >= 0 && yearIndex < numYearBins else {
                 continue
             }
-            let monthIndex = (t.timeIntervalSince1970 / (Timestamp.secondsPerAverageYear / partPerYear)) % 12
-            monthly_sum[yearIndex * partPerYear + monthIndex] += value
-            monthly_count[yearIndex * partPerYear + monthIndex] += 1
+            let partIndex = (t.timeIntervalSince1970 / secondsPerPart) % partPerYear
+            partsSum[yearIndex * partPerYear + partIndex] += value
+            partsCount[yearIndex * partPerYear + partIndex] += 1
             if value < lowerThanThreshold {
-                monthly_events[yearIndex * partPerYear + monthIndex] += 1
+                partsEvents[yearIndex * partPerYear + partIndex] += 1
             }
         }
+        // Restore 365 daily normals. The first days of a part will always be "wet days"
         return (0..<365*numYearBins).map { i in
-            let daysPerPart = 365/partPerYear
-            let monthIndex = i / partPerYear
-            let fractionBelowThreshold = monthly_events[monthIndex] / monthly_sum[monthIndex]
+            let daysPerPart = 365 / partPerYear
+            let yearIndex = i / 365
+            let partIndex = min((i % 365) / daysPerPart, partPerYear-1)
+            let index = yearIndex * partPerYear + partIndex
+            let fractionBelowThreshold = partsEvents[index] / partsSum[index]
             let dryDays = Int(round(fractionBelowThreshold * Float(daysPerPart)))
-            let wetDays = daysPerPart - dryDays
+            let wetDays = max(daysPerPart - dryDays, 1)
             let dayOfPart = i % daysPerPart
             if dayOfPart < dryDays {
                 return 0
             }
-            return monthly_sum[monthIndex] / monthly_count[monthIndex] / (Float(wetDays) / Float(daysPerPart))
+            return partsSum[index] / partsCount[index] / (Float(wetDays) / Float(daysPerPart))
         }
     }
 }
