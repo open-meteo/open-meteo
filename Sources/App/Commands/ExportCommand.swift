@@ -284,8 +284,13 @@ struct DailyNormalsCalculator {
         return sum
     }
     
-    /// Calculate daily mean values, but preserve events below a certain threshold. E.g. for precipitation
-    func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, lowerThanThreshold: Float = 0.1) -> [Float] {
+    /// Calculate daily mean values, but preserve events below a certain threshold. E.g. for precipitation. Approach:
+    /// - Split a year into 33 parts (each 11 days long)
+    /// - For each "part" calculate sum, count and the number below a threshold
+    /// - Also distribute each "value" into 3 parts to reduce outliners
+    /// - To restore daily normals, calculate the average for each part and distribute according to "days below threshold"
+    /// - Days below threhold (dry days) will be at the bedinning of each 11-day part
+    func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, lowerThanThreshold: Float = 0.3) -> [Float] {
         /// Number of parts to split a year into. 365 / 33 = ~11 days
         let partPerYear = 33
         /// Sum of all values
@@ -304,13 +309,16 @@ struct DailyNormalsCalculator {
                 continue
             }
             let partIndex = (t.timeIntervalSince1970 / secondsPerPart) % partPerYear
-            partsSum[yearIndex * partPerYear + partIndex] += value
-            partsCount[yearIndex * partPerYear + partIndex] += 1
-            if value < lowerThanThreshold {
-                partsEvents[yearIndex * partPerYear + partIndex] += 1
+            // Distribute the value also to the previous and next bin
+            for i in -1...1 {
+                partsSum[yearIndex * partPerYear + ((partIndex+i) % partPerYear)] += value
+                partsCount[yearIndex * partPerYear + ((partIndex+i) % partPerYear)] += 1
+                if value < lowerThanThreshold {
+                    partsEvents[yearIndex * partPerYear + ((partIndex+i) % partPerYear)] += 1
+                }
             }
         }
-        // Restore 365 daily normals. The first days of a part will always be "wet days"
+        // Restore 365 daily normals. The first days of a part will always be "dry days"
         return (0..<365*numYearBins).map { i in
             let daysPerPart = 365 / partPerYear
             let yearIndex = i / 365
