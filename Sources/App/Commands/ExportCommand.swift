@@ -7,6 +7,10 @@ import SwiftNetCDF
  Export a dataset to NetCDF. `Time` is the column major orientation. Use the following command to transpose a NetCDF file
  `brew install nco`
  `ncpdq -O -a time,LAT,LON test.nc test2.nc`
+ 
+ TODO:
+ - Export of derived variables using solar radiation are not yet supported
+ - Support arbitrary resampling to other grids
  */
 struct ExportCommand: AsyncCommandFix {
     var help: String {
@@ -55,11 +59,6 @@ struct ExportCommand: AsyncCommandFix {
         }
     }
     
-    /**
-     TODO:
-     - export glofas
-     - export era5 (needs 2D solar)
-     */
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         let domain = try ExportDomain.load(rawValue: signature.domain)
@@ -363,6 +362,12 @@ enum ExportDomain: String, CaseIterable {
     case EC_Earth3P_HR
     case MPI_ESM1_2_XR
     case NICAM16_8S
+    case glofas_v3_consolidated
+    case glofas_v4_consolidated
+    case glofas_v3_forecast
+    case glofas_v3_seasonal
+    case era5_land
+    case era5
     
     var genericDomain: GenericDomain {
         switch self {
@@ -380,6 +385,18 @@ enum ExportDomain: String, CaseIterable {
             return Cmip6Domain.MPI_ESM1_2_XR
         case .NICAM16_8S:
             return Cmip6Domain.NICAM16_8S
+        case .glofas_v3_consolidated:
+            return GloFasDomain.consolidatedv3
+        case .glofas_v4_consolidated:
+            return GloFasDomain.consolidated
+        case .glofas_v3_forecast:
+            return GloFasDomain.forecastv3
+        case .glofas_v3_seasonal:
+            return GloFasDomain.seasonalv3
+        case .era5_land:
+            return CdsDomain.era5_land
+        case .era5:
+            return CdsDomain.era5
         }
     }
     
@@ -399,6 +416,18 @@ enum ExportDomain: String, CaseIterable {
             return Cmip6Domain.MPI_ESM1_2_XR
         case .NICAM16_8S:
             return Cmip6Domain.NICAM16_8S
+        case .glofas_v3_consolidated:
+            return nil
+        case .glofas_v4_consolidated:
+            return nil
+        case .glofas_v3_forecast:
+            return nil
+        case .glofas_v3_seasonal:
+            return nil
+        case .era5_land:
+            return nil
+        case .era5:
+            return nil
         }
     }
     
@@ -422,6 +451,18 @@ enum ExportDomain: String, CaseIterable {
             return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position))
         case .NICAM16_8S:
             return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position))
+        case .glofas_v3_consolidated:
+            return GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidatedv3, position: position)
+        case .glofas_v4_consolidated:
+            return GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidated, position: position)
+        case .glofas_v3_forecast:
+            return GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.forecastv3, position: position)
+        case .glofas_v3_seasonal:
+            return GenericReader<GloFasDomain, GloFasVariableMember>(domain: GloFasDomain.seasonalv3, position: position)
+        case .era5_land:
+            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position)))
+        case .era5:
+            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position)))
         }
     }
     
