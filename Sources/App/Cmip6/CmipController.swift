@@ -119,6 +119,7 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case dewpoint_2m_min
     case dewpoint_2m_mean
     case vapor_pressure_deficit_mean
+    case growing_degree_days_base_0_limit_30
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -528,6 +529,14 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
                     relativeHumidity: rh))
             }
             return DataAndUnit(vpd, .kiloPascal)
+        case .growing_degree_days_base_0_limit_30:
+            let base: Float = 0
+            let limit: Float = 30
+            let tempmax = try get(raw: .temperature_2m_max, time: time).data
+            let tempmin = try get(raw: .temperature_2m_min, time: time).data
+            return DataAndUnit(zip(tempmax, tempmin).map({ (tmax, tmin) in
+                max(min((tmax - tmin) / 2, limit) - base, 0)
+            }), .gddCelsius)
         }
     }
     
@@ -570,6 +579,9 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             } else {
                 try prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
+        case .growing_degree_days_base_0_limit_30:
+            try prefetchData(raw: .temperature_2m_max, time: time)
+            try prefetchData(raw: .temperature_2m_min, time: time)
         }
     }
 }

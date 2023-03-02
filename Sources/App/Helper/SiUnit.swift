@@ -38,6 +38,7 @@ enum SiUnit: String, Codable {
     case dimensionless = ""
     case eaqi = "EAQI"
     case usaqi = "USAQI"
+    case gddCelsius = "GGDc"
     
     var significantDigits: Int {
         switch self {
@@ -77,6 +78,7 @@ enum SiUnit: String, Codable {
         case .qubicMeterPerSecond: return 2
         case .eaqi: return 0
         case .usaqi: return 0
+        case .gddCelsius: return 2
         }
     }
 }
