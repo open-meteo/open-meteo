@@ -57,8 +57,6 @@ struct ExportCommand: AsyncCommandFix {
     
     /**
      TODO:
-     - dynamic nChunkLocations calculation
-     - normals calculation
      - export glofas
      - export era5 (needs 2D solar)
      */
@@ -95,7 +93,6 @@ struct ExportCommand: AsyncCommandFix {
             domain: domain,
             variable: signature.variable,
             time: time,
-            nLocationChunk: 48,
             compressionLevel: signature.compressionLevel,
             targetGridDomain: regriddingDomain,
             outputCoordinates: signature.outputCoordinates,
@@ -105,8 +102,11 @@ struct ExportCommand: AsyncCommandFix {
         try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
     }
     
-    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, nLocationChunk: Int, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, dailyNormalsOverNYears: Int?) throws {
+    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, dailyNormalsOverNYears: Int?) throws {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
+        
+        /// needs to be evenly dividable by grid.nx
+        let nLocationChunk = grid.nx / ((18...1).first(where: { grid.nx % $0 == 0 }) ?? 1)
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)

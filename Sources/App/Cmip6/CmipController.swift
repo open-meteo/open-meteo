@@ -105,11 +105,6 @@ protocol Cmip6Readerable {
     var modelDtSeconds: Int { get }
 }
 
-extension Cmip6Domain: MultiDomainMixerDomain {
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixable] {
-        fatalError()
-    }
-}
 
 enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case snowfall_sum
