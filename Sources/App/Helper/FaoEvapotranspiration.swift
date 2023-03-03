@@ -9,6 +9,27 @@ extension Meteorology {
         case maxmin(max: Float, min: Float)
     }
     
+    /// Rought approximation for leaf wetness probability. With only daily data, this wont be very accurate
+    /// https://www.umfcv.ro/files/!/x/4/_/4_%20Intro_Env_MED_.pdf
+    public static func leafwetnessPorbabilityDaily(temperature2mCelsiusDaily: (max: Float, min: Float), relativeHumidity: MaxAndMinOrMean, precipitation: Float) -> Float {
+        /// High likelyhood of leafwetness during rain
+        if precipitation > 1 {
+            return min(80 + precipitation*2, 100)
+        }
+
+        let Tmean = (temperature2mCelsiusDaily.max + temperature2mCelsiusDaily.min) / 2
+        /// Leaf wetness inlikely below 10°C. Scale a factor from 5°C - 15°C from 0 to 1
+        let temperatureProbability = max(min((Tmean - 5) * 10, 1), 0)
+        
+        /// Leaf wetness likely at low VPD
+        let vpd = vaporPressureDeficitDaily(temperature2mCelsiusDailyMax: temperature2mCelsiusDaily.max, temperature2mCelsiusDailyMin: temperature2mCelsiusDaily.min, relativeHumidity: relativeHumidity)
+
+        // 0.4 kPa is basically fully saturated. Scale VPD from 0 to 0.8 to 100 to 0%
+        let vpdProbability = max(min((1 - (vpd - 0.1) * 1.25), 1), 0)
+        return max(min(temperatureProbability * vpdProbability * 100, 100), 0)
+        
+    }
+    
     /// Calculate relative dewpoint from humidity and temperature for daily variables
     /// Temperature max/min should be used instead of mean temperature, similar for FAO implementation
     /// As there is an inverse relation between all variables, min/max vlues are not perfectly accurate afterwards

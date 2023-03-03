@@ -115,6 +115,7 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case dewpoint_2m_mean
     case vapor_pressure_deficit_mean
     case growing_degree_days_base_0_limit_30
+    case leaf_wetness_probability
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -532,6 +533,26 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             return DataAndUnit(zip(tempmax, tempmin).map({ (tmax, tmin) in
                 max(min((tmax - tmin) / 2, limit) - base, 0)
             }), .gddCelsius)
+        case .leaf_wetness_probability:
+            let tempmax = try get(raw: .temperature_2m_max, time: time).data
+            let tempmin = try get(raw: .temperature_2m_min, time: time).data
+            let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
+            let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
+            let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
+            let preciptitation = try get(raw: .precipitation_sum, time: time).data
+            
+            var leafWetness = [Float]()
+            leafWetness.reserveCapacity(tempmax.count)
+            for i in tempmax.indices {
+                let rh: Meteorology.MaxAndMinOrMean
+                if let rhmin {
+                    rh = .maxmin(max: rhmaxOrMean[i], min: rhmin[i])
+                } else {
+                    rh = .mean(mean: rhmaxOrMean[i])
+                }
+                leafWetness.append(Meteorology.leafwetnessPorbabilityDaily(temperature2mCelsiusDaily: (max: tempmax[i], min: tempmin[i]), relativeHumidity: rh, precipitation: preciptitation[i]))
+            }
+            return DataAndUnit(leafWetness, .percent)
         }
     }
     
@@ -577,6 +598,17 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
         case .growing_degree_days_base_0_limit_30:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
+        case .leaf_wetness_probability:
+            try prefetchData(raw: .temperature_2m_max, time: time)
+            try prefetchData(raw: .temperature_2m_min, time: time)
+            try prefetchData(raw: .precipitation_sum, time: time)
+            let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
+            if hasRhMinMax {
+                try prefetchData(raw: .relative_humidity_2m_min, time: time)
+                try prefetchData(raw: .relative_humidity_2m_max, time: time)
+            } else {
+                try prefetchData(raw: .relative_humidity_2m_mean, time: time)
+            }
         }
     }
 }
