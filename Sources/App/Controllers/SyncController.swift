@@ -187,7 +187,7 @@ struct SyncCommand: AsyncCommandFix {
         @Option(name: "rate", help: "Transferrate in megabytes per second")
         var rate: Int?
         
-        @Option(name: "max-age-days", help: "Maximum age of synchronised files. Default 7 days.")
+        @Option(name: "max-age-days", help: "Maximum age of synchronised files. Default unlimited.")
         var maxAgeDays: Int?
         
         @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of seconds.")
@@ -203,7 +203,7 @@ struct SyncCommand: AsyncCommandFix {
         guard server.last == "/" else {
             fatalError("Server URL must end with a '/'.")
         }
-        let maxAgeDays = signature.maxAgeDays ?? 7
+        let maxAgeDays = signature.maxAgeDays ?? 9000
         var newerThan = Timestamp.now().add(-24 * 3600 * maxAgeDays).timeIntervalSince1970
         
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, retryError4xx: false)
