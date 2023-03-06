@@ -138,7 +138,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
     /// download MeteoFrance
     func download(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5)
                 
         /// world 0-24, 27-48, 51-72, 75-102
         let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)

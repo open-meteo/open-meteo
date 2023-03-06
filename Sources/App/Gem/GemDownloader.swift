@@ -137,7 +137,7 @@ struct GemDownload: AsyncCommandFix {
     /// Download data and store as compressed files for each timestep
     func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5)
         let downloadDirectory = domain.downloadDirectory
         
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
