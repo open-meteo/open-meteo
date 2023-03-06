@@ -270,9 +270,9 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
         case .apparent_temperature_mean:
             return .mean(.apparent_temperature)
         case .apparent_temperature_max:
-            return .min(.apparent_temperature)
-        case .apparent_temperature_min:
             return .max(.apparent_temperature)
+        case .apparent_temperature_min:
+            return .min(.apparent_temperature)
         case .precipitation_sum:
             return .sum(.precipitation)
         case .snowfall_sum:
