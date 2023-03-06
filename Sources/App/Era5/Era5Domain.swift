@@ -369,6 +369,10 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             try prefetchData(derived: .cloudcover, time: time)
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(derived: .snowfall, time: time)
+        case .soil_moisture_0_to_100cm:
+            try prefetchData(raw: .soil_moisture_0_to_7cm, time: time)
+            try prefetchData(raw: .soil_moisture_7_to_28cm, time: time)
+            try prefetchData(raw: .soil_moisture_28_to_100cm, time: time)
         }
     }
     
@@ -473,6 +477,14 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
                 visibilityMeters: nil,
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
            )
+        case .soil_moisture_0_to_100cm:
+            let sm0_7 = try get(raw: .soil_moisture_0_to_7cm, time: time)
+            let sm7_28 = try get(raw: .soil_moisture_7_to_28cm, time: time).data
+            let sm28_100 = try get(raw: .soil_moisture_28_to_100cm, time: time).data
+            return DataAndUnit(zip(sm0_7.data, zip(sm7_28, sm28_100)).map({
+                let (sm0_7, (sm7_28, sm28_100)) = $0
+                return sm0_7 * 0.07 + sm7_28 * (0.28 - 0.07) + sm28_100 * (1 - 0.28)
+            }), sm0_7.unit)
         }
     }
 }
