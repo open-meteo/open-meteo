@@ -33,6 +33,17 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(try Dem90.read(lat: -80.58973, lon: 108.28125), 3348.0)
     }
     
+    func testRegularGrid() {
+        let grid = RegularGrid(nx: 768, ny: 384, latMin: -90, lonMin: -180, dx: 360/768, dy: 180/384)
+        
+        // Exactly on the border
+        let pos = grid.findPoint(lat: 89.90001, lon: 179.80002)!
+        let (lat,lon) = grid.getCoordinates(gridpoint: pos)
+        XCTAssertEqual(pos, 294911)
+        XCTAssertEqual(lat, 89.53125, accuracy: 0.001)
+        XCTAssertEqual(lon, 179.53125, accuracy: 0.001)
+    }
+    
     func testElevationMatching() throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: Dem90.omDirectory), "Elevation information unavailable")
         
