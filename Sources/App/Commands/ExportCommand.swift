@@ -284,21 +284,21 @@ struct DailyNormalsCalculator {
     }
     
     /// Calculate daily mean values, but preserve events below a certain threshold. E.g. for precipitation. Approach:
-    /// - Split a year into 33 parts (each 11 days long)
+    /// - Split a year into 52 parts (each 7 days long)
     /// - For each "part" calculate sum, count and the number below a threshold
-    /// - Also distribute each "value" into 3 parts to reduce outliners
+    /// - Also distribute each "value" into 5 parts to reduce outliners. Effectivly calcualting 35 days sliding values
     /// - To restore daily normals, calculate the average for each part and distribute according to "days below threshold"
     /// - Days below threhold (dry days) will be at the bedinning of each 11-day part
     func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, lowerThanThreshold: Float = 0.3) -> [Float] {
-        /// Number of parts to split a year into. 365 / 33 = ~11 days
-        let partPerYear = 33
+        /// Number of parts to split a year into. 365.25 / 52 = ~7.02 days
+        let partPerYear = 52
         /// Sum of all values
         var partsSum = [Float](repeating: 0, count: numYearBins * partPerYear)
         /// Sum of all events where value is below threshold
         var partsEvents = [Float](repeating: 0, count: numYearBins * partPerYear)
         /// Number of values accumulated for this part
         var partsCount = [Float](repeating: 0, count: numYearBins * partPerYear)
-        /// Number of seconds in e.g. ~11 days
+        /// Number of seconds in e.g. ~7 days
         let secondsPerPart = Timestamp.secondsPerAverageYear / partPerYear
         
         // Calculate statistics for each part
@@ -309,7 +309,7 @@ struct DailyNormalsCalculator {
             }
             let partIndex = (t.timeIntervalSince1970 / secondsPerPart) % partPerYear
             // Distribute the value also to the previous and next bin
-            for i in -1...1 {
+            for i in -2...2 {
                 partsSum[yearIndex * partPerYear + ((partIndex+i) % partPerYear)] += value
                 partsCount[yearIndex * partPerYear + ((partIndex+i) % partPerYear)] += 1
                 if value < lowerThanThreshold {
