@@ -145,6 +145,7 @@ enum CdsVariable: String, Codable, GenericVariableMixable {
     case soil_temperature_7_to_28cm
     case soil_temperature_28_to_100cm
     case soil_temperature_100_to_255cm
+    case soil_temperature_0_to_100cm
     case soil_moisture_0_to_7cm
     case soil_moisture_7_to_28cm
     case soil_moisture_28_to_100cm
@@ -205,6 +206,7 @@ enum Era5VariableDerived: String, Codable, RawRepresentableString, GenericVariab
     case direct_normal_irradiance
     case weathercode
     case soil_moisture_0_to_100cm
+    case soil_temperature_0_to_100cm
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

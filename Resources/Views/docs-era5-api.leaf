@@ -302,6 +302,13 @@
             Soil Temperature (100-255 cm)
           </label>
         </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_temperature_0_to_100cm"
+            id="soil_temperature_100_to_255cm" name="hourly">
+          <label class="form-check-label" for="soil_temperature_100_to_255cm">
+            Soil Temperature (0-100 cm)
+          </label>
+        </div>
         <div class="form-check">
           <input class="form-check-input" type="checkbox" value="soil_moisture_0_to_7cm" id="soil_moisture_0_to_7cm"
             name="hourly">

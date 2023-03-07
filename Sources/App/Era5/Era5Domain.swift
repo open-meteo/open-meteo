@@ -373,6 +373,10 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             try prefetchData(raw: .soil_moisture_0_to_7cm, time: time)
             try prefetchData(raw: .soil_moisture_7_to_28cm, time: time)
             try prefetchData(raw: .soil_moisture_28_to_100cm, time: time)
+        case .soil_temperature_0_to_100cm:
+            try prefetchData(raw: .soil_temperature_0_to_7cm, time: time)
+            try prefetchData(raw: .soil_temperature_7_to_28cm, time: time)
+            try prefetchData(raw: .soil_temperature_28_to_100cm, time: time)
         }
     }
     
@@ -485,6 +489,14 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
                 let (sm0_7, (sm7_28, sm28_100)) = $0
                 return sm0_7 * 0.07 + sm7_28 * (0.28 - 0.07) + sm28_100 * (1 - 0.28)
             }), sm0_7.unit)
+        case .soil_temperature_0_to_100cm:
+            let st0_7 = try get(raw: .soil_temperature_0_to_7cm, time: time)
+            let st7_28 = try get(raw: .soil_temperature_7_to_28cm, time: time).data
+            let st28_100 = try get(raw: .soil_temperature_28_to_100cm, time: time).data
+            return DataAndUnit(zip(st0_7.data, zip(st7_28, st28_100)).map({
+                let (st0_7, (st7_28, st28_100)) = $0
+                return st0_7 * 0.07 + st7_28 * (0.28 - 0.07) + st28_100 * (1 - 0.28)
+            }), st0_7.unit)
         }
     }
 }
