@@ -456,7 +456,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
                 return DataAndUnit(zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity), .percent)
             case .cloudcover:
                 let rh = try get(derived: .pressure(GemPressureVariableDerived(variable: .relativehumidity, level: v.level)), time: time)
-                return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percent)
             }
         }
     }

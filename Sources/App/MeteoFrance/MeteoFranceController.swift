@@ -263,8 +263,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderMixable {
         /// AROME France domain has no cloud cover for pressure levels, calculate from RH
         if reader.domain == .arome_france, case let .pressure(pressure) = raw, pressure.variable == .cloudcover {
             let rh = try get(raw: .pressure(MeteoFrancePressureVariable(variable: .relativehumidity, level: pressure.level)), time: time)
-            let clc = rh.data.map(Meteorology.relativeHumidityToCloudCover)
-            return DataAndUnit(clc, .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))}), .percent)
         }
         
         return try reader.get(variable: raw, time: time)

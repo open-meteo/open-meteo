@@ -203,9 +203,14 @@ struct Meteorology {
     
     /// Calculate upper level clouds from relative humidity using Sundqvist et al. (1989):
     /// See https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
-    @inlinable public static func relativeHumidityToCloudCover(relativeHumidity rh: Float) -> Float {
-        let rhCrit: Float = 80
-        return max(1 - sqrtf(max(1 - rh / 100, 0) / (1 - rhCrit / 100)), 0) * 100
+    /// https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2018MS001400  chapter 3.1
+    @inlinable public static func relativeHumidityToCloudCover(relativeHumidity rh: Float, pressureHPa: Float) -> Float {
+        let a1: Float = 0.7
+        let a2: Float = 0.9
+        let a3: Float = 4.0
+        let pressureSurface: Float = 1013.25
+        let rhCrit = a1 + (a2 - a1) * expf(1-powf(pressureSurface / pressureHPa, a3))
+        return max(1 - sqrtf(max(1 - rh / 100, 0) / (1 - rhCrit)), 0) * 100
     }
     
     /// Approximate altitude in meters from pressure level in hPa

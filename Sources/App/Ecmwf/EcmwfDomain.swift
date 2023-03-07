@@ -219,31 +219,31 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderMixable {
             return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
         case .cloudcover_1000hPa:
             let rh = try get(raw: .relative_humidity_1000hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 1000)}), .percent)
         case .cloudcover_925hPa:
             let rh = try get(raw: .relative_humidity_925hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 925)}), .percent)
         case .cloudcover_850hPa:
             let rh = try get(raw: .relative_humidity_850hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 850)}), .percent)
         case .cloudcover_700hPa:
             let rh = try get(raw: .relative_humidity_700hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 700)}), .percent)
         case .cloudcover_500hPa:
             let rh = try get(raw: .relative_humidity_500hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 500)}), .percent)
         case .cloudcover_300hPa:
             let rh = try get(raw: .relative_humidity_300hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 300)}), .percent)
         case .cloudcover_250hPa:
             let rh = try get(raw: .relative_humidity_250hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 250)}), .percent)
         case .cloudcover_200hPa:
             let rh = try get(raw: .relative_humidity_200hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 200)}), .percent)
         case .cloudcover_50hPa:
             let rh = try get(raw: .relative_humidity_50hPa, time: time)
-            return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 50)}), .percent)
         case .snowfall:
             let temperature = try get(raw: .temperature_2m, time: time)
             let precipitation = try get(raw: .precipitation, time: time)

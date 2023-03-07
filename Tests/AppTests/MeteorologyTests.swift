@@ -23,6 +23,16 @@ final class MeteorologyTests: XCTestCase {
         XCTAssertEqual(Meteorology.scaleWindFactor(from: 174, to: 120), 0.9603451)
     }
     
+    func testCloudcover() {
+        XCTAssertEqual(Meteorology.relativeHumidityToCloudCover(relativeHumidity: 80, pressureHPa: 1000), 0)
+        XCTAssertEqual(Meteorology.relativeHumidityToCloudCover(relativeHumidity: 85, pressureHPa: 1000), 0)
+        XCTAssertEqual(Meteorology.relativeHumidityToCloudCover(relativeHumidity: 95, pressureHPa: 1000), 32.740467)
+        XCTAssertEqual(Meteorology.relativeHumidityToCloudCover(relativeHumidity: 95, pressureHPa: 1013), 29.359013)
+        XCTAssertEqual(Meteorology.relativeHumidityToCloudCover(relativeHumidity: 95, pressureHPa: 950), 42.449123)
+        XCTAssertEqual(Meteorology.relativeHumidityToCloudCover(relativeHumidity: 95, pressureHPa: 500), 59.17517)
+        XCTAssertEqual(Meteorology.relativeHumidityToCloudCover(relativeHumidity: 95, pressureHPa: 200), 59.17517)
+    }
+    
     func testWinddirection() {
         XCTAssertEqualArray(Meteorology.windirectionFast(u: [.nan, 0, 1, -1, 1, -1], v: [0, 0, -1, -1, 1, 1]), [.nan, 180.0, 315.00012, 44.999893, 224.99991, 135.00009], accuracy: 0.0001)
         XCTAssertEqual(Meteorology.windirectionFast(u: [-1,-0,0,1,2,3,4,5,6], v: [-3,-2,-1,-0,0,1,2,3,4]), [18.435059, 360.0, 360.0, 270.0, 270.0, 251.56496, 243.43501, 239.03632, 236.3099])

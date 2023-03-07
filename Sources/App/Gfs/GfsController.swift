@@ -305,8 +305,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
         if reader.domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloudcover {
             let rh = try reader.get(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)), time: time)
-            let clc = rh.data.map(Meteorology.relativeHumidityToCloudCover)
-            return DataAndUnit(clc, .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))}), .percent)
         }
         
         /// GFS has no diffuse radiation

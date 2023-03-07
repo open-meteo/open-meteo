@@ -353,7 +353,7 @@ struct IconReader: GenericReaderDerived, GenericReaderMixable {
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloudcover:
                 let rh = try get(raw: IconPressureVariable(variable: .relativehumidity, level: level), time: time)
-                return DataAndUnit(rh.data.map(Meteorology.relativeHumidityToCloudCover), .percent)
+                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level))}), .percent)
             }
         }
     }
