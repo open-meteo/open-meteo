@@ -27,7 +27,22 @@ extension Meteorology {
         // 0.4 kPa is basically fully saturated. Scale VPD from 0 to 0.8 to 100 to 0%
         let vpdProbability = max(min((1 - (vpd - 0.1) * 1.25), 1), 0)
         return max(min(temperatureProbability * vpdProbability * 100, 100), 0)
+    }
+    
+    public static func leafwetnessPorbability(temperature2mCelsius: Float, dewpointCelsius: Float, precipitation: Float) -> Float {
+        /// High likelyhood of leafwetness during rain
+        if precipitation > 1 {
+            return min(80 + precipitation*2, 100)
+        }
+        /// Leaf wetness inlikely below 10°C. Scale a factor from 5°C - 15°C from 0 to 1
+        let temperatureProbability = max(min((temperature2mCelsius - 5) * 10, 1), 0)
         
+        /// Leaf wetness likely at low VPD
+        let vpd = vaporPressureDeficit(temperature2mCelsius: temperature2mCelsius, dewpointCelsius: dewpointCelsius)
+
+        // 0.4 kPa is basically fully saturated. Scale VPD from 0 to 0.8 to 100 to 0%
+        let vpdProbability = max(min((1 - (vpd - 0.1) * 1.25), 1), 0)
+        return max(min(temperatureProbability * vpdProbability * 100, 100), 0)
     }
     
     /// Calculate relative dewpoint from humidity and temperature for daily variables

@@ -170,6 +170,8 @@ enum CdsVariable: String, Codable, GenericVariableMixable {
     case et0_fao_evapotranspiration
     case cloudcover
     case direct_normal_irradiance
+    case growing_degree_days_base_0_limit_50
+    case leaf_wetness_probability
     
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
@@ -207,6 +209,8 @@ enum Era5VariableDerived: String, Codable, RawRepresentableString, GenericVariab
     case weathercode
     case soil_moisture_0_to_100cm
     case soil_temperature_0_to_100cm
+    case growing_degree_days_base_0_limit_50
+    case leaf_wetness_probability
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -253,6 +257,9 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
     case soil_moisture_0_to_10cm_mean
     case soil_moisture_0_to_100cm_mean
     case soil_temperature_0_to_100cm_mean
+    case vapor_pressure_deficit_max
+    case growing_degree_days_base_0_limit_50
+    case leaf_wetness_probability_mean
     
     /// Get the file path to a linear bias seasonal file for a given variable
     func getBiasCorrectionFile(for domain: GenericDomain) -> OmFilePathWithSuffix {
@@ -341,6 +348,12 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
             return .mean(.soil_moisture_0_to_100cm)
         case .soil_temperature_0_to_100cm_mean:
             return .mean(.soil_temperature_0_to_100cm)
+        case .vapor_pressure_deficit_max:
+            return .max(.vapor_pressure_deficit)
+        case .growing_degree_days_base_0_limit_50:
+            return .sum(.growing_degree_days_base_0_limit_50)
+        case .leaf_wetness_probability_mean:
+            return .mean(.leaf_wetness_probability)
         }
     }
 }

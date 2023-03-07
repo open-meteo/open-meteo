@@ -113,9 +113,9 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case dewpoint_2m_max
     case dewpoint_2m_min
     case dewpoint_2m_mean
-    case vapor_pressure_deficit_mean
-    case growing_degree_days_base_0_limit_30
-    case leaf_wetness_probability
+    case vapor_pressure_deficit_max
+    case growing_degree_days_base_0_limit_50
+    case leaf_wetness_probability_mean
     case soil_moisture_0_to_100cm_mean
     case soil_temperature_0_to_100cm_mean
     
@@ -505,7 +505,7 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             let tempMax = try get(raw: .temperature_2m_max, time: time).data
             let rhMean = try get(raw: .relative_humidity_2m_mean, time: time).data
             return DataAndUnit(zip(zip(tempMax, tempMin), rhMean).map(Meteorology.dewpointDaily), .celsius)
-        case .vapor_pressure_deficit_mean:
+        case .vapor_pressure_deficit_max:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
@@ -527,15 +527,15 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
                     relativeHumidity: rh))
             }
             return DataAndUnit(vpd, .kiloPascal)
-        case .growing_degree_days_base_0_limit_30:
+        case .growing_degree_days_base_0_limit_50:
             let base: Float = 0
-            let limit: Float = 30
+            let limit: Float = 50
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
             return DataAndUnit(zip(tempmax, tempmin).map({ (tmax, tmin) in
                 max(min((tmax - tmin) / 2, limit) - base, 0)
             }), .gddCelsius)
-        case .leaf_wetness_probability:
+        case .leaf_wetness_probability_mean:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
@@ -605,7 +605,7 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
         case .dewpoint_2m_mean:
             try prefetchData(raw: .temperature_2m_mean, time: time)
             try prefetchData(raw: .relative_humidity_2m_mean, time: time)
-        case .vapor_pressure_deficit_mean:
+        case .vapor_pressure_deficit_max:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
@@ -615,10 +615,10 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             } else {
                 try prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
-        case .growing_degree_days_base_0_limit_30:
+        case .growing_degree_days_base_0_limit_50:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
-        case .leaf_wetness_probability:
+        case .leaf_wetness_probability_mean:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
             try prefetchData(raw: .precipitation_sum, time: time)

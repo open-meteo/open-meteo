@@ -543,6 +543,27 @@
             Mean Soil Moisture (0-100 cm)
           </label>
         </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="growing_degree_days_base_0_limit_50"
+            id="growing_degree_days_base_0_limit_50" name="daily">
+          <label class="form-check-label" for="growing_degree_days_base_0_limit_50">
+            Growing Degree Days Base 0 Limit 50
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="leaf_wetness_probability_mean"
+            id="leaf_wetness_probability_mean" name="daily">
+          <label class="form-check-label" for="leaf_wetness_probability_mean">
+            Mean Leaf Wetness Probability
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="vapor_pressure_deficit_max"
+            id="vapor_pressure_deficit_max" name="daily">
+          <label class="form-check-label" for="vapor_pressure_deficit_max">
+            Vapour Pressure Deficit Max
+          </label>
+        </div>
       </div>
       <small class="text-muted">* Parameter <mark>timezone</mark> is mandatory</small>
     </div>

@@ -377,6 +377,12 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             try prefetchData(raw: .soil_temperature_0_to_7cm, time: time)
             try prefetchData(raw: .soil_temperature_7_to_28cm, time: time)
             try prefetchData(raw: .soil_temperature_28_to_100cm, time: time)
+        case .growing_degree_days_base_0_limit_50:
+            try prefetchData(raw: .temperature_2m, time: time)
+        case .leaf_wetness_probability:
+            try prefetchData(raw: .precipitation, time: time)
+            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
         }
     }
     
@@ -497,6 +503,21 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
                 let (st0_7, (st7_28, st28_100)) = $0
                 return st0_7 * 0.07 + st7_28 * (0.28 - 0.07) + st28_100 * (1 - 0.28)
             }), st0_7.unit)
+        case .growing_degree_days_base_0_limit_50:
+            let base: Float = 0
+            let limit: Float = 50
+            let t2m = try get(raw: .temperature_2m, time: time).data
+            return DataAndUnit(t2m.map({ t2m in
+                max(min(t2m, limit) - base, 0) / 24
+            }), .gddCelsius)
+        case .leaf_wetness_probability:
+            let temperature = try get(raw: .temperature_2m, time: time).data
+            let dewpoint = try get(raw: .dewpoint_2m, time: time).data
+            let precipitation = try get(raw: .precipitation, time: time).data
+            return DataAndUnit(zip(zip(temperature, dewpoint), precipitation).map( {
+                let ((temperature, dewpoint), precipitation) = $0
+                return Meteorology.leafwetnessPorbability(temperature2mCelsius: temperature, dewpointCelsius: dewpoint, precipitation: precipitation)
+            }), .percent)
         }
     }
 }
