@@ -1,5 +1,16 @@
 import Foundation
 
+extension Sequence where Element == Float {
+    func mean() -> Float {
+        var sum: Float = 0
+        var count: Int = 0
+        for value in self {
+            sum += value
+            count += 1
+        }
+        return count == 0 ? .nan : sum / Float(count)
+    }
+}
 
 extension Array where Element == Float {
     func max(by: Int) -> [Float] {

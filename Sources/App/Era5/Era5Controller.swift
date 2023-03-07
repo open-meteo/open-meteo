@@ -251,6 +251,8 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
     case cloudcover_mean
     /// only for CMIP6 reference
     case soil_moisture_0_to_10cm_mean
+    case soil_moisture_0_to_100cm_mean
+    case soil_temperature_0_to_100cm_mean
     
     /// Get the file path to a linear bias seasonal file for a given variable
     func getBiasCorrectionFile(for domain: GenericDomain) -> OmFilePathWithSuffix {
@@ -335,6 +337,10 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
             return .sum(.snowfall_water_equivalent)
         case .soil_moisture_0_to_10cm_mean:
             return .mean(.soil_moisture_0_to_7cm)
+        case .soil_moisture_0_to_100cm_mean:
+            return .mean(.soil_moisture_0_to_100cm)
+        case .soil_temperature_0_to_100cm_mean:
+            return .mean(.soil_temperature_0_to_100cm)
         }
     }
 }

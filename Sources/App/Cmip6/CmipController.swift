@@ -116,6 +116,8 @@ enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
     case vapor_pressure_deficit_mean
     case growing_degree_days_base_0_limit_30
     case leaf_wetness_probability
+    case soil_moisture_0_to_100cm_mean
+    case soil_temperature_0_to_100cm_mean
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -553,6 +555,24 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
                 leafWetness.append(Meteorology.leafwetnessPorbabilityDaily(temperature2mCelsiusDaily: (max: tempmax[i], min: tempmin[i]), relativeHumidity: rh, precipitation: preciptitation[i]))
             }
             return DataAndUnit(leafWetness, .percent)
+        case .soil_moisture_0_to_100cm_mean:
+            // estimate soil moisture in 0-100 by a moving average over 0-10 cm moisture
+            let sm0_10 = try get(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            let sm10_28 = sm0_10.data.indices.map { return sm0_10.data[max(0, $0-5) ..< $0+1].mean() }
+            let sm28_100 = sm10_28.indices.map { return sm10_28[max(0, $0-51) ..< $0+1].mean() }
+            return DataAndUnit(zip(sm0_10.data, zip(sm10_28, sm28_100)).map({
+                let (sm0_10, (sm10_28, sm28_100)) = $0
+                return sm0_10 * 0.1 + sm10_28 * (0.28 - 0.1) + sm28_100 * (1 - 0.28)
+            }), sm0_10.unit)
+        case .soil_temperature_0_to_100cm_mean:
+            let t2m = try get(raw: .temperature_2m_mean, time: time)
+            let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0-3) ..< $0+1].mean() }
+            let st7_28 = st0_7.indices.map { return st0_7[max(0, $0-5) ..< $0+1].mean() }
+            let st28_100 = st7_28.indices.map { return st7_28[max(0, $0-51) ..< $0+1].mean() }
+            return DataAndUnit(zip(st0_7, zip(st7_28, st28_100)).map({
+                let (st0_7, (st7_28, st28_100)) = $0
+                return st0_7 * 0.07 + st7_28 * (0.28 - 0.07) + st28_100 * (1 - 0.28)
+            }), t2m.unit)
         }
     }
     
@@ -609,6 +629,10 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
             } else {
                 try prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
+        case .soil_moisture_0_to_100cm_mean:
+            try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
+        case .soil_temperature_0_to_100cm_mean:
+            try prefetchData(raw: .temperature_2m_mean, time: time)
         }
     }
 }
