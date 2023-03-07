@@ -197,22 +197,23 @@ struct DownloadEra5Command: AsyncCommandFix {
     
     /// Generate seasonal averages for bias corrections for CMIP climate data
     /// They way how `GenericReaderMulti` is used, is not the cleanest, but otherwise daily calculations need to be implemented manually
-    func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, prefetchFactor: Int, variables: [Cmip6Variable] = Cmip6Variable.allCases) throws {
+    func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, prefetchFactor: Int) throws {
         logger.info("Calculating bias correction fields")
         
         let binsPerYear = 6
         let nLocationChunks = 200
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: nLocationChunks, chunk1: binsPerYear)
         let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm)
-        let availableForEra5Land: [Cmip6Variable] = [
-            .temperature_2m_min,
+        let variables: [Cmip6VariableOrDerived] = Cmip6Variable.allCases.map{.raw($0)} + Cmip6VariableDerived.allCases.map{.derived($0)}
+        let availableForEra5Land: [Cmip6VariableOrDerived] = [
+            Cmip6Variable.temperature_2m_min,
             .temperature_2m_max,
             .temperature_2m_mean,
             .relative_humidity_2m_max,
             .relative_humidity_2m_min,
             .relative_humidity_2m_mean,
             .soil_moisture_0_to_10cm_mean
-        ]
+        ].map{.raw($0)}
         
         for variable in variables {
             guard let era5Variable = Era5DailyWeatherVariable(rawValue: variable.rawValue) else {
@@ -223,7 +224,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             if FileManager.default.fileExists(atPath: biasFile) {
                 continue
             }
-            if domain == .era5_land && !availableForEra5Land.contains(variable) {
+            if domain == .era5_land && !availableForEra5Land.contains(where: {$0.rawValue == variable.rawValue}) {
                 logger.info("Skipping \(variable), because unavailable for ERA5-Land")
                 continue
             }

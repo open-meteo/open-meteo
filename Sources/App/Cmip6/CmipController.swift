@@ -106,7 +106,7 @@ protocol Cmip6Readerable {
 }
 
 
-enum Cmip6VariableDerived: String, Codable, GenericVariableMixable {
+enum Cmip6VariableDerived: String, Codable, GenericVariableMixable, CaseIterable {
     case snowfall_sum
     case rain_sum
     case et0_fao_evapotranspiration_sum
