@@ -14,7 +14,7 @@ struct Era5Controller {
         try params.validate()
         let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
         
-        let allowedRange = Timestamp(1959, 1, 1) ..< Timestamp.now()
+        let allowedRange = Timestamp(1940, 1, 1) ..< Timestamp.now()
         let timezone = try params.resolveTimezone()
         let time = try params.getTimerange(timezone: timezone, allowedRange: allowedRange)
         let hourlyTime = time.range.range(dtSeconds: 3600)
