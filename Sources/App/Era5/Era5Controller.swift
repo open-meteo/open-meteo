@@ -390,12 +390,6 @@ struct Era5Query: Content, QueryWithTimezone, ApiUnitsSelectable {
         guard end_date.date >= start_date.date else {
             throw ForecastapiError.enddateMustBeLargerEqualsThanStartdate
         }
-        guard start_date.year >= 1959, start_date.year <= 2030 else {
-            throw ForecastapiError.dateOutOfRange(parameter: "start_date", allowed: Timestamp(1959,1,1)..<Timestamp(2031,1,1))
-        }
-        guard end_date.year >= 1959, end_date.year <= 2030 else {
-            throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: Timestamp(1959,1,1)..<Timestamp(2031,1,1))
-        }
         if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
         }
