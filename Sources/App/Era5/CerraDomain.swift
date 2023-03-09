@@ -6,7 +6,7 @@ import SwiftPFor2D
 
 typealias CerraHourlyVariable = VariableOrDerived<CerraVariable, CerraVariableDerived>
 
-enum CerraVariableDerived: String, Codable, RawRepresentableString, GenericVariableMixable {
+enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixable {
     case apparent_temperature
     case dewpoint_2m
     //case relativehumidity_2m
@@ -230,7 +230,7 @@ Sources:
  - https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-cerra-single-levels?tab=form
  - https://cds.climate.copernicus.eu/cdsapp#!/dataset/reanalysis-cerra-height-levels?tab=overview
  */
-enum CerraVariable: String, CaseIterable, Codable, GenericVariable {
+enum CerraVariable: String, CaseIterable, GenericVariable {
     case temperature_2m
     case windspeed_10m
     case winddirection_10m

@@ -2,7 +2,7 @@ import SwiftPFor2D
 
 
 /// Might be used to decode API queries later
-enum Era5Variable: String, CaseIterable, Codable, GenericVariable {
+enum Era5Variable: String, CaseIterable, GenericVariable {
     case temperature_2m
     case wind_u_component_100m
     case wind_v_component_100m

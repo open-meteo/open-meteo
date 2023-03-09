@@ -34,14 +34,16 @@ public struct GfsController {
         
         
         // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = params.hourly {
+        let paramsHourly = try GfsVariableCombined.load(commaSeparatedOptional: params.hourly)
+        let paramsDaily = try GfsDailyWeatherVariable.load(commaSeparatedOptional: params.daily)
+        if let hourlyVariables = paramsHourly {
             try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
         }
-        if let dailyVariables = params.daily {
+        if let dailyVariables = paramsDaily {
             try reader.prefetchData(variables: dailyVariables, time: dailyTime)
         }
         
-        let hourly: ApiSection? = try params.hourly.map { variables in
+        let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
@@ -75,7 +77,7 @@ public struct GfsController {
             currentWeather = nil
         }
         
-        let daily: ApiSection? = try params.daily.map { dailyVariables in
+        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
             var res = [ApiColumn]()
             res.reserveCapacity(dailyVariables.count)
             var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
@@ -119,8 +121,8 @@ public struct GfsController {
 struct GfsQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
-    let hourly: [GfsVariableCombined]?
-    let daily: [GfsDailyWeatherVariable]?
+    let hourly: [String]?
+    let daily: [String]?
     let current_weather: Bool?
     let elevation: Float?
     let timezone: String?
@@ -159,7 +161,7 @@ struct GfsQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
 }
 
 
-enum GfsDailyWeatherVariable: String, Codable {
+enum GfsDailyWeatherVariable: String, RawRepresentableString {
     case temperature_2m_max
     case temperature_2m_min
     case apparent_temperature_max
@@ -185,7 +187,7 @@ enum GfsDailyWeatherVariable: String, Codable {
     case et0_fao_evapotranspiration
 }
 
-enum GfsVariableDerivedSurface: String, Codable, CaseIterable, GenericVariableMixable {
+enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumitidy_2m
     case dewpoint_2m

@@ -241,7 +241,7 @@ extension GribMessage {
     }
 }
 
-enum JmaSurfaceVariable: String, CaseIterable, Codable, JmaVariableDownloadable, GenericVariableMixable {
+enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericVariableMixable {
     case temperature_2m
     case cloudcover
     case cloudcover_low

@@ -262,7 +262,7 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
 typealias IconVariable = SurfaceAndPressureVariable<IconSurfaceVariable, IconPressureVariable>
 
 
-enum IconSurfaceVariable: String, CaseIterable, Codable, GenericVariableMixable {
+enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     case temperature_2m
     case cloudcover // cloudcover total
     case cloudcover_low

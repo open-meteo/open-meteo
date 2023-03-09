@@ -1,6 +1,6 @@
 import Foundation
 
-enum IconWaveVariableDaily: String, Codable {
+enum IconWaveVariableDaily: String, RawRepresentableString {
     case wave_height_max
     case wind_wave_height_max
     case swell_wave_height_max

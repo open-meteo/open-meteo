@@ -200,7 +200,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
 /**
  List of all surface MeteoFrance variables
  */
-enum MeteoFranceSurfaceVariable: String, CaseIterable, Codable, GenericVariable, GenericVariableMixable {
+enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
     case cloudcover
     case cloudcover_low

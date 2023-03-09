@@ -11,7 +11,7 @@ struct GloFasMixer: GenericReaderMixer {
     }
 }
 
-enum GlofasDerivedVariable: String, Codable, CaseIterable, GenericVariableMixable {
+enum GlofasDerivedVariable: String, CaseIterable, GenericVariableMixable {
     case river_discharge_mean
     case river_discharge_min
     case river_discharge_max
@@ -97,7 +97,7 @@ struct GloFasController {
         let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange, past_days_max: 360)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
-        let domains = params.models ?? [.seamless_v3]
+        let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.seamless_v3]
         
         let readers = try domains.compactMap {
             guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
@@ -110,8 +110,9 @@ struct GloFasController {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         
-        /// convert variables
-        let variablesMember: [VariableOrDerived<GloFasReader.Variable, GloFasReader.Derived>] = params.daily.map {
+        // convert variables
+        let paramsDaily = try GloFasVariableOrDerived.load(commaSeparated: params.daily)
+        let variablesMember: [VariableOrDerived<GloFasReader.Variable, GloFasReader.Derived>] = paramsDaily.map {
             switch $0 {
             case .raw(let raw):
                 return .raw(.init(raw, 0))
@@ -153,7 +154,7 @@ struct GloFasController {
     }
 }
 
-enum GlofasDomainApi: String, Codable, CaseIterable {
+enum GlofasDomainApi: String, RawRepresentableString, CaseIterable {
     case seamless_v3
     case forecast_v3
     case consolidated_v3
@@ -179,13 +180,13 @@ enum GlofasDomainApi: String, Codable, CaseIterable {
 struct GloFasQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let daily: [GloFasVariableOrDerived]
+    let daily: [String]
     let timeformat: Timeformat?
     let past_days: Int?
     let forecast_days: Int?
     let format: ForecastResultFormat?
     let timezone: String?
-    let models: [GlofasDomainApi]?
+    let models: [String]?
     let ensemble: Bool
     let cell_selection: GridSelectionMode?
     

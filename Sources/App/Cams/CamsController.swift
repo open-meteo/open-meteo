@@ -23,15 +23,16 @@ struct CamsController {
         guard let reader = try CamsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
+        let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
         // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = params.hourly {
+        if let hourlyVariables = paramsHourly {
             try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
         }
         /*if let dailyVariables = params.daily {
             try reader.prefetchData(variables: dailyVariables)
         }*/
         
-        let hourly: ApiSection? = try params.hourly.map { variables in
+        let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
@@ -65,7 +66,7 @@ struct CamsController {
     }
 }
 
-enum CamsVariableDerived: String, Codable, GenericVariableMixable {
+enum CamsVariableDerived: String, GenericVariableMixable {
     case european_aqi
     case european_aqi_pm2_5
     case european_aqi_pm10
@@ -239,7 +240,7 @@ struct CamsMixer: GenericReaderMixer {
 struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let hourly: [VariableOrDerived<CamsVariable, CamsVariableDerived>]?
+    let hourly: [String]?
     //let daily: [CamsVariableDaily]?
     //let temperature_unit: TemperatureUnit?
     //let windspeed_unit: WindspeedUnit?

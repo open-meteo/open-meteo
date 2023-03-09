@@ -181,7 +181,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
 /**
  List of all surface GFS variables
  */
-enum GfsSurfaceVariable: String, CaseIterable, Codable, GenericVariable, GenericVariableMixable {
+enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
     case cloudcover
     case cloudcover_low

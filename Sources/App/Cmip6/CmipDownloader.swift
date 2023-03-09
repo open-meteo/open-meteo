@@ -98,7 +98,7 @@ import SwiftNetCDF
  
  
  */
-enum Cmip6Domain: String, Codable, CaseIterable, GenericDomain {
+enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     case CMCC_CM2_VHR4
     case FGOALS_f3_H_highresSST
     case FGOALS_f3_H
@@ -299,7 +299,7 @@ enum Cmip6Domain: String, Codable, CaseIterable, GenericDomain {
     }
 }
 
-enum Cmip6Variable: String, CaseIterable, GenericVariable, Codable, GenericVariableMixable {
+enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m_min
     case temperature_2m_max
     case temperature_2m_mean

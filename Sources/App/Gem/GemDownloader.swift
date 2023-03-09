@@ -264,7 +264,7 @@ protocol GemVariableDownloadable: GenericVariable {
     func availableFor(domain: GemDomain) -> Bool
 }
 
-enum GemSurfaceVariable: String, CaseIterable, Codable, GemVariableDownloadable, GenericVariableMixable {
+enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericVariableMixable {
     case temperature_2m
     case temperature_40m
     case temperature_80m

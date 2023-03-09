@@ -96,12 +96,12 @@ typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableD
 typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, VariableAndMember<CfsVariable>>
 
 
-enum CfsVariableDerived: String, Codable, RawRepresentableString {
+enum CfsVariableDerived: String, RawRepresentableString {
     case windspeed_10m
     case winddirection_10m
 }
 
-enum DailyCfsVariable: String, Codable {
+enum DailyCfsVariable: String, RawRepresentableString {
     case temperature_2m_max
     case temperature_2m_min
     case precipitation_sum
@@ -235,8 +235,11 @@ struct SeasonalForecastController {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         
+        let paramsSixHourly = try SeasonalForecastVariable.load(commaSeparatedOptional: params.six_hourly)
+        let paramsDaily = try DailyCfsVariable.load(commaSeparatedOptional: params.daily)
+        
         // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = params.six_hourly {
+        if let hourlyVariables = paramsSixHourly {
             for varible in hourlyVariables {
                 for member in members {
                     try reader.prefetchData(variable: varible, member: member, time: hourlyTime)
@@ -245,7 +248,7 @@ struct SeasonalForecastController {
         }
         
         // Start data prefetch to boooooooost API speed :D
-        if let dailyVariables = params.daily {
+        if let dailyVariables = paramsDaily {
             for varible in dailyVariables {
                 for member in members {
                     try reader.prefetchData(variable: varible, member: member, time: dailyTime)
@@ -253,7 +256,7 @@ struct SeasonalForecastController {
             }
         }
         
-        let hourly: ApiSection? = try params.six_hourly.map { variables in
+        let hourly: ApiSection? = try paramsSixHourly.map { variables in
             return ApiSection(name: "six_hourly", time: hourlyTime, columns: try variables.flatMap { variable in
                 try members.map { member in
                     let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(params: params).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
@@ -263,7 +266,7 @@ struct SeasonalForecastController {
             })
         }
         
-        let daily: ApiSection? = try params.daily.map { dailyVariables in
+        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
             return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.flatMap { variable in
                 try members.map { member in
                     let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(params: params).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
@@ -292,8 +295,8 @@ struct SeasonalForecastController {
 struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
-    let six_hourly: [SeasonalForecastVariable]?
-    let daily: [DailyCfsVariable]?
+    let six_hourly: [String]?
+    let daily: [String]?
     //let current_weather: Bool?
     let elevation: Float?
     //let timezone: String?

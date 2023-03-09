@@ -20,7 +20,7 @@ struct Era5Controller {
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
-        let domains = params.models ?? [.best_match]
+        let domains = try CdsDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
         
         let readers = try domains.compactMap {
             try GenericReaderMulti<CdsVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
@@ -31,19 +31,21 @@ struct Era5Controller {
         }
 
         // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = params.hourly {
+        let paramsHourly = try CdsVariable.load(commaSeparatedOptional: params.hourly)
+        let paramsDaily = try Era5DailyWeatherVariable.load(commaSeparatedOptional: params.daily)
+        if let hourlyVariables = paramsHourly {
             for reader in readers {
                 try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
         }
-        if let dailyVariables = params.daily {
+        if let dailyVariables = paramsDaily {
             for reader in readers {
                 try reader.prefetchData(variables: dailyVariables, time: dailyTime)
             }
         }
         
         
-        let hourly: ApiSection? = try params.hourly.map { variables in
+        let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count * readers.count)
             for reader in readers {
@@ -58,7 +60,7 @@ struct Era5Controller {
             }
             return ApiSection(name: "hourly", time: hourlyTime, columns: res)
         }
-        let daily: ApiSection? = try params.daily.map { dailyVariables in
+        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
             var res = [ApiColumn]()
             res.reserveCapacity(dailyVariables.count * readers.count)
             var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
@@ -107,7 +109,7 @@ struct Era5Controller {
     }
 }
 
-enum CdsDomainApi: String, Codable, CaseIterable, MultiDomainMixerDomain {
+enum CdsDomainApi: String, RawRepresentableString, CaseIterable, MultiDomainMixerDomain {
     case best_match
     case era5
     case cerra
@@ -132,7 +134,7 @@ enum CdsDomainApi: String, Codable, CaseIterable, MultiDomainMixerDomain {
     }
 }
 
-enum CdsVariable: String, Codable, GenericVariableMixable {
+enum CdsVariable: String, GenericVariableMixable {
     case temperature_2m
     case windgusts_10m
     case dewpoint_2m
@@ -191,7 +193,7 @@ enum CdsVariable: String, Codable, GenericVariableMixable {
 
 typealias Era5HourlyVariable = VariableOrDerived<Era5Variable, Era5VariableDerived>
 
-enum Era5VariableDerived: String, Codable, RawRepresentableString, GenericVariableMixable {
+enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable {
     case apparent_temperature
     case relativehumidity_2m
     case windspeed_10m
@@ -217,7 +219,7 @@ enum Era5VariableDerived: String, Codable, RawRepresentableString, GenericVariab
     }
 }
 
-enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
+enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalculatable {
     case weathercode
     case temperature_2m_max
     case temperature_2m_min
@@ -361,8 +363,8 @@ enum Era5DailyWeatherVariable: String, Codable, DailyVariableCalculatable {
 struct Era5Query: Content, QueryWithTimezone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
-    let hourly: [CdsVariable]?
-    let daily: [Era5DailyWeatherVariable]?
+    let hourly: [String]?
+    let daily: [String]?
     //let current_weather: Bool?
     let elevation: Float?
     //let timezone: String?
@@ -372,7 +374,7 @@ struct Era5Query: Content, QueryWithTimezone, ApiUnitsSelectable {
     let timeformat: Timeformat?
     let format: ForecastResultFormat?
     let timezone: String?
-    let models: [CdsDomainApi]?
+    let models: [String]?
     let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`

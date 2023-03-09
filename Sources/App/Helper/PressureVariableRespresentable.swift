@@ -2,7 +2,7 @@ import Foundation
 
 
 /// Represent a variable combined with a pressure level and helps decoding it
-protocol PressureVariableRespresentable: RawRepresentable, Codable where RawValue == String, Variable.RawValue == String {
+protocol PressureVariableRespresentable: RawRepresentable where RawValue == String, Variable.RawValue == String {
     associatedtype Variable: RawRepresentable
     
     var variable: Variable { get }
@@ -73,29 +73,6 @@ enum SurfaceAndPressureVariable<Surface: RawRepresentableString, Pressure: RawRe
         switch self {
         case .surface(let variable): return variable.rawValue
         case .pressure(let variable): return variable.rawValue
-        }
-    }
-}
-
-extension SurfaceAndPressureVariable: Codable where Surface: Codable, Pressure: Codable {
-    init(from decoder: Decoder) throws {
-        do {
-            let variable = try Pressure(from: decoder)
-            self = .pressure(variable)
-            return
-        } catch {
-            let variable = try Surface(from: decoder)
-            self = .surface(variable)
-            return
-        }
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        switch self {
-        case .surface(let value):
-            try value.encode(to: encoder)
-        case .pressure(let value):
-            try value.encode(to: encoder)
         }
     }
 }
@@ -175,29 +152,6 @@ enum VariableOrDerived<Raw: RawRepresentableString, Derived: RawRepresentableStr
         switch self {
         case .raw(let variable): return variable.rawValue
         case .derived(let variable): return variable.rawValue
-        }
-    }
-}
-
-extension VariableOrDerived: Codable where Raw: Codable, Derived: Codable {
-    init(from decoder: Decoder) throws {
-        do {
-            let variable = try Derived(from: decoder)
-            self = .derived(variable)
-            return
-        } catch {
-            let variable = try Raw(from: decoder)
-            self = .raw(variable)
-            return
-        }
-    }
-    
-    func encode(to encoder: Encoder) throws {
-        switch self {
-        case .raw(let value):
-            try value.encode(to: encoder)
-        case .derived(let value):
-            try value.encode(to: encoder)
         }
     }
 }

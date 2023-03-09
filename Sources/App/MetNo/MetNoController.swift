@@ -20,11 +20,12 @@ struct MetNoController {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = params.hourly {
+        let paramsHourly = try MetNoHourlyVariable.load(commaSeparatedOptional: params.hourly)
+        if let hourlyVariables = paramsHourly {
             try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
         }
         
-        let hourly: ApiSection? = try params.hourly.map { variables in
+        let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
@@ -78,7 +79,7 @@ typealias MetNoHourlyVariable = VariableOrDerived<MetNoVariable, MetNoVariableDe
 struct MetNoQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
-    let hourly: [MetNoHourlyVariable]?
+    let hourly: [String]?
     let current_weather: Bool?
     let elevation: Float?
     //let timezone: String?
@@ -286,7 +287,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
 }
 
 /// cloudcover low/mid/high and wind u/v components are requried to be used in the general forecast api
-enum MetNoVariableDerived: String, Codable, GenericVariableMixable {
+enum MetNoVariableDerived: String, GenericVariableMixable {
     /*case cloudcover_low
     case cloudcover_mid
     case cloudcover_high*/

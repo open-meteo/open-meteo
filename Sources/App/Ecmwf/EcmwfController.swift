@@ -19,11 +19,12 @@ struct EcmwfController {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = params.hourly {
+        let paramsHourly = try EcmwfHourlyVariable.load(commaSeparatedOptional: params.hourly)
+        if let hourlyVariables = paramsHourly {
             try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
         }
         
-        let hourly: ApiSection? = try params.hourly.map { variables in
+        let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
@@ -54,7 +55,7 @@ typealias EcmwfHourlyVariable = VariableOrDerived<EcmwfVariable, EcmwfVariableDe
 struct EcmwfQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
-    let hourly: [EcmwfHourlyVariable]?
+    let hourly: [String]?
     //let current_weather: Bool?
     let elevation: Float?
     //let timezone: String?

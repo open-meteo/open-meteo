@@ -158,7 +158,7 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     }
 }
 
-enum CfsVariable: String, CaseIterable, Codable, GenericVariable {
+enum CfsVariable: String, CaseIterable, GenericVariable {
     case temperature_2m
     case temperature_2m_max
     case temperature_2m_min

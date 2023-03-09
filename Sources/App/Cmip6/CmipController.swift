@@ -17,7 +17,7 @@ struct CmipController {
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         let biasCorrection = !(params.disable_bias_correction ?? false)
         
-        let domains = params.models ?? [.MRI_AGCM3_2_S]
+        let domains = try Cmip6Domain.load(commaSeparatedOptional: params.models) ?? [.MRI_AGCM3_2_S]
         
         let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
             if biasCorrection {
@@ -26,7 +26,6 @@ struct CmipController {
                 }
                 return Cmip6Reader(reader: reader)
             } else {
-                
                 guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
@@ -44,7 +43,8 @@ struct CmipController {
                 try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
         }*/
-        if let dailyVariables = params.daily {
+        let paramsDaily = try Cmip6VariableOrDerived.load(commaSeparatedOptional: params.daily)
+        if let dailyVariables = paramsDaily {
             for reader in readers {
                 try reader.prefetchData(variables: dailyVariables, time: dailyTime)
             }
@@ -64,7 +64,7 @@ struct CmipController {
             }
             return ApiSection(name: "hourly", time: hourlyTime, columns: res)
         }*/
-        let daily: ApiSection? = try params.daily.map { dailyVariables in
+        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
             var res = [ApiColumn]()
             res.reserveCapacity(dailyVariables.count * readers.count)
             for (reader, domain) in zip(readers, domains) {
@@ -106,7 +106,7 @@ protocol Cmip6Readerable {
 }
 
 
-enum Cmip6VariableDerived: String, Codable, GenericVariableMixable, CaseIterable {
+enum Cmip6VariableDerived: String, GenericVariableMixable, CaseIterable {
     case snowfall_sum
     case rain_sum
     case et0_fao_evapotranspiration_sum
@@ -640,8 +640,8 @@ struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple
 struct CmipQuery: Content, QueryWithTimezone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
-    let hourly: [Cmip6VariableOrDerived]?
-    let daily: [Cmip6VariableOrDerived]?
+    //let hourly: [Cmip6VariableOrDerived]?
+    let daily: [String]?
     //let current_weather: Bool?
     let elevation: Float?
     //let timezone: String?
@@ -655,7 +655,7 @@ struct CmipQuery: Content, QueryWithTimezone, ApiUnitsSelectable {
     
     /// not used, because only daily data
     let timezone: String?
-    let models: [Cmip6Domain]?
+    let models: [String]?
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate

@@ -20,14 +20,16 @@ struct IconWaveController {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = params.hourly {
+        let paramsHourly = try IconWaveVariable.load(commaSeparatedOptional: params.hourly)
+        let paramsDaily = try IconWaveVariableDaily.load(commaSeparatedOptional: params.daily)
+        if let hourlyVariables = paramsHourly {
             try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
         }
-        if let dailyVariables = params.daily {
+        if let dailyVariables = paramsDaily {
             try reader.prefetchData(variables: dailyVariables, time: dailyTime)
         }
         
-        let hourly: ApiSection? = try params.hourly.map { variables in
+        let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
@@ -37,7 +39,7 @@ struct IconWaveController {
             return ApiSection(name: "hourly", time: hourlyTime, columns: res)
         }
         
-        let daily: ApiSection? = try params.daily.map { dailyVariables in
+        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
             return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.map { variable in
                 let d = try reader.getDaily(variable: variable, time: dailyTime).toApi(name: variable.rawValue)
                 assert(dailyTime.count == d.data.count)
@@ -74,8 +76,8 @@ struct IconWaveMixer: GenericReaderMixer {
 struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
     let latitude: Float
     let longitude: Float
-    let hourly: [IconWaveVariable]?
-    let daily: [IconWaveVariableDaily]?
+    let hourly: [String]?
+    let daily: [String]?
     //let temperature_unit: TemperatureUnit?
     //let windspeed_unit: WindspeedUnit?
     //let precipitation_unit: PrecipitationUnit?

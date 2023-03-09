@@ -64,7 +64,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
 }
 
 /// Variables for CAMS. Some variables are not available in
-enum CamsVariable: String, CaseIterable, GenericVariable, Codable, GenericVariableMixable {
+enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case pm10
     case pm2_5
     case dust

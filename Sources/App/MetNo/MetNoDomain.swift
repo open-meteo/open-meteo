@@ -57,7 +57,7 @@ enum MetNoDomain: String, GenericDomain, CaseIterable {
     }
 }
 
-enum MetNoVariable: String, CaseIterable, Codable, GenericVariable, GenericVariableMixable {
+enum MetNoVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
     case cloudcover
     case pressure_msl

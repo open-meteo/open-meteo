@@ -511,7 +511,7 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     }
 }
 
-enum GloFasVariable: String, Codable, GenericVariable {
+enum GloFasVariable: String, GenericVariable {
     case river_discharge
     
     var omFileName: String {

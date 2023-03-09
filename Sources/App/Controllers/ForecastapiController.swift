@@ -43,7 +43,7 @@ public struct ForecastapiController: RouteCollection {
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
-        let domains = params.models ?? [.best_match]
+        let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
         
         let readers = try domains.compactMap {
             try GenericReaderMulti<ForecastVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
@@ -53,20 +53,22 @@ public struct ForecastapiController: RouteCollection {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         
+        let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
+        let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
         
         // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = params.hourly {
+        if let hourlyVariables = paramsHourly {
             for reader in readers {
                 try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
         }
-        if let dailyVariables = params.daily {
+        if let dailyVariables = paramsDaily {
             for reader in readers {
                 try reader.prefetchData(variables: dailyVariables, time: dailyTime)
             }
         }
         
-        let hourly: ApiSection? = try params.hourly.map { variables in
+        let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count * readers.count)
             for reader in readers {
@@ -108,7 +110,7 @@ public struct ForecastapiController: RouteCollection {
             currentWeather = nil
         }
         
-        let daily: ApiSection? = try params.daily.map { dailyVariables in
+        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
             var res = [ApiColumn]()
             res.reserveCapacity(dailyVariables.count * readers.count)
             var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
@@ -155,11 +157,12 @@ public struct ForecastapiController: RouteCollection {
 }
 
 
+
 struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
-    let hourly: [ForecastVariable]?
-    let daily: [ForecastVariableDaily]?
+    let hourly: [String]?
+    let daily: [String]?
     let current_weather: Bool?
     let elevation: Float?
     let timezone: String?
@@ -169,7 +172,7 @@ struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
     let timeformat: Timeformat?
     let past_days: Int?
     let format: ForecastResultFormat?
-    let models: [MultiDomains]?
+    let models: [String]?
     let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
@@ -204,7 +207,7 @@ struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
  
  Note Nov 2022: Use the term `seamless` instead of `mix`
  */
-enum MultiDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
+enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixerDomain {
     case best_match
 
     case gfs_seamless
@@ -357,7 +360,7 @@ enum ModelError: AbortError {
 
 
 /// Define all available surface weather variables
-enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
+enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case temperature_2m
     case cloudcover
     case cloudcover_low
@@ -436,7 +439,7 @@ enum ForecastSurfaceVariable: String, Codable, GenericVariableMixable {
 }
 
 /// Available pressure level variables
-enum ForecastPressureVariableType: String, Codable, GenericVariableMixable {
+enum ForecastPressureVariableType: String, GenericVariableMixable {
     case temperature
     case geopotential_height
     case relativehumidity
@@ -462,7 +465,7 @@ struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariable
 typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable, ForecastPressureVariable>
 
 /// Available daily aggregations
-enum ForecastVariableDaily: String, Codable, DailyVariableCalculatable {
+enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableString {
     case temperature_2m_max
     case temperature_2m_min
     case temperature_2m_mean
