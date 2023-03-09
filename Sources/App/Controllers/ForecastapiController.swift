@@ -38,7 +38,7 @@ public struct ForecastapiController: RouteCollection {
         
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 16)
         let timezone = try params.resolveTimezone()
-        let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+        let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, allowedRange: allowedRange)
         
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
@@ -171,6 +171,7 @@ struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
     let precipitation_unit: PrecipitationUnit?
     let timeformat: Timeformat?
     let past_days: Int?
+    let forecast_days: Int?
     let format: ForecastResultFormat?
     let models: [String]?
     let cell_selection: GridSelectionMode?
@@ -189,6 +190,9 @@ struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
         }
         if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
+        }
+        if let forecast_days = forecast_days, forecast_days <= 0 || forecast_days > 16 {
+            throw ForecastapiError.forecastDaysInvalid(given: forecast_days, allowed: 0...16)
         }
     }
     

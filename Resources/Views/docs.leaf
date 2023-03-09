@@ -893,6 +893,52 @@
       </div>
       <div class="col-3">
         <div class="form-floating mb-3">
+          <select class="form-select" name="past_days" id="past_days" aria-label="Past days" data-default="0">
+            <option selected value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="5">5</option>
+            <option value="7">1 week</option>
+            <option value="14">2 weeks</option>
+            <option value="31">1 month</option>
+            <option value="61">2 months</option>
+            <option value="92">3 months</option>
+          </select>
+          <label for="past_days">Past days</label>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="form-floating mb-3">
+          <select class="form-select" name="forecast_days" id="forecast_days" aria-label="Forecast days"
+            data-default="7">
+            <option value="1">1 day</option>
+            <option value="3">3 days</option>
+            <option selected value="7">7 days</option>
+            <option value="14">14 days</option>
+            <option value="16">16 days</option>
+          </select>
+          <label for="forecast_days">Forecast days</label>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="form-floating">
+          <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
+            data-date-start-date="2022-06-08" value="" data-default="" name="start_date" id="start_date"><span
+            class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+          <label for="start_date">Start date</label>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="form-floating">
+          <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
+            data-date-start-date="2022-06-08" value="" data-default="" name="end_date" id="end_date"><span
+            class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
+          <label for="end_date">End date</label>
+        </div>
+      </div>
+      <div class="col-3">
+        <div class="form-floating mb-3">
           <select class="form-select" name="timezone" id="timezone" aria-label="Timezone" data-default="GMT">
             <option value="America/Anchorage">America/Anchorage</option>
             <option value="America/Los_Angeles">America/Los_Angeles</option>
@@ -913,39 +959,6 @@
             <option value="Pacific/Auckland">Pacific/Auckland</option>
           </select>
           <label for="timezone">Timezone</label>
-        </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating mb-3">
-          <select class="form-select" name="past_days" id="past_days" aria-label="Past days" data-default="0">
-            <option selected value="0">0</option>
-            <option value="1">1</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="5">5</option>
-            <option value="7">1 week</option>
-            <option value="14">2 weeks</option>
-            <option value="31">1 month</option>
-            <option value="61">2 months</option>
-            <option value="92">3 months</option>
-          </select>
-          <label for="past_days">Past days</label>
-        </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating">
-          <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="2022-06-08" value="" data-default="" name="start_date" id="start_date"><span
-            class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
-          <label for="start_date">Start date</label>
-        </div>
-      </div>
-      <div class="col-3">
-        <div class="form-floating">
-          <input type="text" class="form-control" data-provide="datepicker" data-date-format="yyyy-mm-dd"
-            data-date-start-date="2022-06-08" value="" data-default="" name="end_date" id="end_date"><span
-            class="input-group-addon"><i class="glyphicon glyphicon-th"></i></span>
-          <label for="end_date">End date</label>
         </div>
       </div>
       <div class="col-12 pb-3 debug-hidden">
@@ -1055,7 +1068,8 @@
 
     <h2 id="api-documentation" class="mt-5">API Documentation</h2>
     <p>The API endpoint <mark>/v1/forecast</mark> accepts a geographical coordinate, a list of weather variables and
-      responds with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours.
+      responds with a JSON hourly weather forecast for 7 days. Time always starts at 0:00 today and contains 168 hours. If
+      <mark>&forecast_days=16</mark> is set, up to 16 days of forecast can be returned.
       All URL parameters are listed below:</p>
     <div class="table-responsive">
       <table class="table">
@@ -1157,6 +1171,13 @@
             <td>No</td>
             <td><mark>0</mark></td>
             <td>If <mark>past_days</mark> is set, yesterday or the day before yesterday data are also returned.</td>
+          </tr>
+          <tr>
+            <th scope="row">forecast_days</th>
+            <td>Integer (0-16)</td>
+            <td>No</td>
+            <td><mark>7</mark></td>
+            <td>Per default, only 7 days are returned. Up to 16 days of forecast are possible.</td>
           </tr>
           <tr>
             <th scope="row">start_date<br />end_date</th>

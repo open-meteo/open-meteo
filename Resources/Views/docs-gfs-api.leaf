@@ -707,6 +707,7 @@
             <option value="1">1 day</option>
             <option value="3">3 days</option>
             <option selected value="7">7 days</option>
+            <option value="14">14 days</option>
             <option value="16">16 days</option>
           </select>
           <label for="forecast_days">Forecast days</label>
