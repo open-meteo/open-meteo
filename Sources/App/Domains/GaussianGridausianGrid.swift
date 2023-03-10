@@ -12,9 +12,9 @@ struct GaussianGrid: Gridable {
     
     let type: GridType
     
-    var nx: Int { type.count }
+    var nx: Int { return 4 * 1280 * (1280 + 9) }
     
-    var ny: Int { return 4 * 1280 * (1280 + 9) }
+    var ny: Int { 1 }
     
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? {
         fatalError("fractional grid position not possible with Gaussian Grid")
