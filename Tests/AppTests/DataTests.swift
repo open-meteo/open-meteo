@@ -310,4 +310,65 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(bologna % grid.nx, 363) // x
         XCTAssertEqual(bologna / grid.nx, 265) // y        
     }
+    
+    /**
+     Coords(i: 0, x: 0, y: 0, latitude: 89.94619, longitude: 0.0)
+     Coords(i: 65996, x: 65996, y: 0, latitude: 77.50439, longitude: 75.16484)
+     Coords(i: 131992, x: 131992, y: 0, latitude: 72.23198, longitude: 156.88715)
+     Coords(i: 197988, x: 197988, y: 0, latitude: 68.154655, longitude: 59.428574)
+     Coords(i: 263984, x: 263984, y: 0, latitude: 64.78031, longitude: -59.50412)
+     Coords(i: 329980, x: 329980, y: 0, latitude: 61.757465, longitude: -102.85715)
+     Coords(i: 395976, x: 395976, y: 0, latitude: 59.015816, longitude: 173.1236)
+     Coords(i: 461972, x: 461972, y: 0, latitude: 56.48506, longitude: 47.151764)
+     Coords(i: 527968, x: 527968, y: 0, latitude: 54.1652, longitude: 112.762634)
+     Coords(i: 593964, x: 593964, y: 0, latitude: 51.98594, longitude: 172.40366)
+     Coords(i: 659960, x: 659960, y: 0, latitude: 49.947273, longitude: -15.679443)
+     Coords(i: 725956, x: 725956, y: 0, latitude: 47.97891, longitude: -2.3920288)
+     Coords(i: 791952, x: 791952, y: 0, latitude: 46.08084, longitude: -78.41019)
+     Coords(i: 857948, x: 857948, y: 0, latitude: 44.253075, longitude: 171.48093)
+     Coords(i: 923944, x: 923944, y: 0, latitude: 42.495605, longitude: 72.0)
+     Coords(i: 989940, x: 989940, y: 0, latitude: 40.808434, longitude: 19.943176)
+     Coords(i: 5543664, x: 5543664, y: 0, latitude: -39.191563, longitude: -55.955994)
+     Coords(i: 5609660, x: 5609660, y: 0, latitude: -40.808434, longitude: -30.17044)
+     Coords(i: 5675656, x: 5675656, y: 0, latitude: -42.495605, longitude: -82.58823)
+     Coords(i: 5741652, x: 5741652, y: 0, latitude: -44.253075, longitude: 177.5267)
+     Coords(i: 5807648, x: 5807648, y: 0, latitude: -46.08084, longitude: 66.96344)
+     Coords(i: 5873644, x: 5873644, y: 0, latitude: -47.90861, longitude: -9.552246)
+     Coords(i: 5939640, x: 5939640, y: 0, latitude: -49.947273, longitude: 3.1358948)
+     Coords(i: 6005636, x: 6005636, y: 0, latitude: -51.98594, longitude: 174.38531)
+     Coords(i: 6071632, x: 6071632, y: 0, latitude: -54.1652, longitude: -126.77042)
+     Coords(i: 6137628, x: 6137628, y: 0, latitude: -56.48506, longitude: -62.120575)
+     Coords(i: 6203624, x: 6203624, y: 0, latitude: -59.015816, longitude: 170.69662)
+     Coords(i: 6599679, x: 6599679, y: 0, latitude: -89.94619, longitude: -18.0)
+     Coords(i: 6599679, x: 6599679, y: 0, latitude: -89.94619, longitude: -18.0)
+     */
+    func testEcmwfIfsGrid() {
+        let grid = GaussianGrid(type: .o1280)
+        XCTAssertEqual(grid.nxOf(y: 0), 20)
+        XCTAssertEqual(grid.nxOf(y: 1), 24)
+        XCTAssertEqual(grid.nxOf(y: 1280-1), 5136)
+        XCTAssertEqual(grid.nxOf(y: 1281-1), 5136)
+        XCTAssertEqual(grid.nxOf(y: 2559-1), 24)
+        XCTAssertEqual(grid.nxOf(y: 2560-1), 20)
+        
+        XCTAssertEqual(grid.integral(y: 0), 0)
+        XCTAssertEqual(grid.integral(y: 1), 20)
+        XCTAssertEqual(grid.integral(y: 2), 44)
+        XCTAssertEqual(grid.integral(y: 3), 72)
+        XCTAssertEqual(grid.integral(y: 4), 104)
+        XCTAssertEqual(grid.integral(y: 1280-1), 3294704)
+        XCTAssertEqual(grid.integral(y: 1281-1), 3299840)
+        XCTAssertEqual(grid.integral(y: 2559-1), 6599636)
+        XCTAssertEqual(grid.integral(y: 2560-1), 6599660)
+        
+        // All reference points from grib file directly
+        var coord = grid.findPoint(lat: 89.94619, lon: 0)!
+        XCTAssertEqual(coord, 0) // y=0
+        coord = grid.findPoint(lat: 64.78031, lon: -59.50412)!
+        XCTAssertEqual(coord, 263984) // y=358
+        coord = grid.findPoint(lat: -42.495605, lon: -82.58823)!
+        XCTAssertEqual(coord, 5675656) // y=1884
+        coord = grid.findPoint(lat: -51.98594, lon: 174.38531)!
+        XCTAssertEqual(coord, 6005636) // y=2019
+    }
 }

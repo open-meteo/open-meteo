@@ -88,8 +88,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         case .cerra:
             return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
         case .ecmwf_ifs:
-            // TODO: gaussian grid O1280
-            return RegularGrid(nx: 6599680, ny: 1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+            return GaussianGrid(type: .o1280)
         }
     }
 }
