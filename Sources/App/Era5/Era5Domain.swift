@@ -346,12 +346,11 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
             try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
         case .et0_fao_evapotranspiration:
-            try prefetchData(raw: .direct_radiation, time: time)
-            try prefetchData(derived: .diffuse_radiation, time: time)
+            try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .dewpoint_2m, time: time)
-            try prefetchData(raw: .wind_u_component_100m, time: time)
-            try prefetchData(raw: .wind_v_component_100m, time: time)
+            try prefetchData(raw: .wind_u_component_10m, time: time)
+            try prefetchData(raw: .wind_v_component_10m, time: time)
         case .surface_pressure:
             try prefetchData(raw: .pressure_msl, time: time)
         case .snowfall:
