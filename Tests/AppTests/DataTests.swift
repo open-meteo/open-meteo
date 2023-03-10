@@ -363,12 +363,35 @@ final class DataTests: XCTestCase {
         
         // All reference points from grib file directly
         var coord = grid.findPoint(lat: 89.94619, lon: 0)!
+        var pos = grid.getCoordinates(gridpoint: coord)
         XCTAssertEqual(coord, 0) // y=0
+        // slightly inaccurate at the last 2 lines at the pole
+        XCTAssertEqual(pos.latitude, 89.94619, accuracy: 0.005)
+        XCTAssertEqual(pos.longitude, 0)
         coord = grid.findPoint(lat: 64.78031, lon: -59.50412)!
+        pos = grid.getCoordinates(gridpoint: coord)
         XCTAssertEqual(coord, 263984) // y=358
+        XCTAssertEqual(pos.latitude, 64.78031)
+        XCTAssertEqual(pos.longitude, -59.50412, accuracy: 0.0001)
         coord = grid.findPoint(lat: -42.495605, lon: -82.58823)!
+        pos = grid.getCoordinates(gridpoint: coord)
         XCTAssertEqual(coord, 5675656) // y=1884
+        XCTAssertEqual(pos.latitude, -42.495605)
+        XCTAssertEqual(pos.longitude, -82.58823)
         coord = grid.findPoint(lat: -51.98594, lon: 174.38531)!
+        pos = grid.getCoordinates(gridpoint: coord)
         XCTAssertEqual(coord, 6005636) // y=2019
+        XCTAssertEqual(pos.latitude, -51.98594)
+        XCTAssertEqual(pos.longitude, 174.38531, accuracy: 0.0001)
+        coord = grid.findPoint(lat: -0.035149384, lon: 0)!
+        pos = grid.getCoordinates(gridpoint: coord)
+        XCTAssertEqual(coord, 3299840) // y=1280
+        XCTAssertEqual(pos.latitude, -0.035149384)
+        XCTAssertEqual(pos.longitude, 0, accuracy: 0.0001)
+        coord = grid.findPoint(lat: -0.52724075, lon: 0)!
+        pos = grid.getCoordinates(gridpoint: coord)
+        XCTAssertEqual(coord, 3335708)
+        XCTAssertEqual(pos.latitude, -0.52724075)
+        XCTAssertEqual(pos.longitude, 0, accuracy: 0.0001)
     }
 }
