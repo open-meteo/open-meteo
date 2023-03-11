@@ -58,6 +58,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - Kotlin https://github.com/open-meteo/open-meteo-api-kotlin
 - .Net / C# https://github.com/AlienDwarf/open-meteo-dotnet
 - PHP Laravel https://github.com/michaelnabil230/laravel-weather
+- R https://github.com/tpisel/openmeteo
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
 
