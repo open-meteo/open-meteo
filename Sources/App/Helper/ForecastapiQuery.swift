@@ -161,6 +161,10 @@ extension QueryWithTimezone {
                 timezone = res
             }
         }
+        // Some older tz databases my still use the old name for Kyiv
+        if timezone == "Europe/Kyiv", let tz = TimeZone(identifier: "Europe/Kiew") {
+            return tz
+        }
         guard let tz = TimeZone(identifier: timezone) else {
             throw ForecastapiError.invalidTimezone
         }
