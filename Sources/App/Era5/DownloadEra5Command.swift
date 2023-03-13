@@ -231,23 +231,20 @@ struct DownloadEra5Command: AsyncCommandFix {
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
-                /// Location range to prefetch for next iteration
-                let locationRangeNext = min(dim0+nLocationChunks, writer.dim0)..<min(dim0+nLocationChunks*prefetchFactor, writer.dim0)
-                let readerNext = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: GenericReader<CdsDomain, Era5Variable>(domain: domain, position: locationRangeNext)))])
-                try readerNext.prefetchData(variables: [era5Variable], time: time)
-                
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
-                let reader = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: GenericReader<CdsDomain, Era5Variable>(domain: domain, position: locationRange)))])
-                guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
-                    fatalError("Could not get \(era5Variable)")
-                }
-                let data = Array2DFastTime(
-                    data: dataFlat,
-                    nLocations: locationRange.count,
-                    nTime: time.count
-                )
-                for l in 0..<locationRange.count {
-                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(data[l, 0..<time.count], time: time, binsPerYear: binsPerYear).meansPerYear)
+                
+                // Read location one-by-one... Multi location support does not work with derived varibales
+                for (l, gridpoint) in locationRange.enumerated() {
+                    let gridpointNext = min(gridpoint+1, writer.dim0)
+                    let readerNext = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpointNext)))])
+                    try readerNext.prefetchData(variables: [era5Variable], time: time)
+                    
+                    let reader = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpoint)))])
+                    
+                    guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
+                        fatalError("Could not get \(era5Variable)")
+                    }
+                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(dataFlat), time: time, binsPerYear: binsPerYear).meansPerYear)
                 }
                 progress.add(bias.nLocations)
                 return ArraySlice(bias.data)

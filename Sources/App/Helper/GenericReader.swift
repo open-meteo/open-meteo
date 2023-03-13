@@ -129,6 +129,22 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         return domain.dtSeconds
     }
     
+    /// Initialise reader to read a single grid-point
+    public init(domain: Domain, position: Int) throws {
+        self.domain = domain
+        self.position = position..<position+1
+        if let elevationFile = domain.elevationFile {
+            self.modelElevation = try domain.grid.readElevation(gridpoint: position, elevationFile: elevationFile)
+        } else {
+            self.modelElevation = .noData
+        }
+        self.targetElevation = .nan
+        let coords = domain.grid.getCoordinates(gridpoint: position)
+        self.modelLat = coords.latitude
+        self.modelLon = coords.longitude
+        self.omFileSplitter = OmFileSplitter(domain)
+    }
+    
     /// Initialise reader to read a range of locations
     public init(domain: Domain, position: Range<Int>) {
         self.domain = domain

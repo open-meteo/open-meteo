@@ -224,6 +224,9 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
     case temperature_2m_max
     case temperature_2m_min
     case temperature_2m_mean
+    case dewpoint_2m_max
+    case dewpoint_2m_min
+    case dewpoint_2m_mean
     case apparent_temperature_max
     case apparent_temperature_min
     case apparent_temperature_mean
@@ -246,6 +249,7 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
     case sunrise
     case sunset
     case et0_fao_evapotranspiration
+    case et0_fao_evapotranspiration_sum
     case pressure_msl_max
     case pressure_msl_min
     case pressure_msl_mean
@@ -282,6 +286,12 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
             return .min(.temperature_2m)
         case .temperature_2m_mean:
             return .mean(.temperature_2m)
+        case .dewpoint_2m_max:
+            return .max(.dewpoint_2m)
+        case .dewpoint_2m_min:
+            return .min(.dewpoint_2m)
+        case .dewpoint_2m_mean:
+            return .mean(.dewpoint_2m)
         case .apparent_temperature_mean:
             return .mean(.apparent_temperature)
         case .apparent_temperature_max:
@@ -316,6 +326,8 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
             return .none
         case .sunset:
             return .none
+        case .et0_fao_evapotranspiration_sum:
+            fallthrough
         case .et0_fao_evapotranspiration:
             return .sum(.et0_fao_evapotranspiration)
         case .pressure_msl_max:
