@@ -103,7 +103,7 @@ enum ReaderInterpolation {
  Generic reader implementation that resolves a grid point and interpolates data.
  Corrects elevation
  */
-struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericReaderMixable {
+struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericReaderProtocol {
     /// Regerence to the domain object
     let domain: Domain
     

@@ -284,7 +284,7 @@ struct Era5Mixer: GenericReaderMixer {
     }
 }
 
-struct Era5Reader: GenericReaderDerivedSimple, GenericReaderMixable {
+struct Era5Reader: GenericReaderDerivedSimple, GenericReaderProtocol {
     var reader: GenericReaderCached<CdsDomain, Era5Variable>
     
     typealias Domain = CdsDomain

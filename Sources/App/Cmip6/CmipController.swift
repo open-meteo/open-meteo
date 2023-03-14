@@ -160,7 +160,7 @@ extension Sequence where Element == Float {
 }
 
 /// Apply bias correction to raw variables
-struct Cmip6BiasCorrectorEra5Seamless: GenericReaderMixable {
+struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     typealias MixingVar = Cmip6Variable
     
     typealias Domain = Cmip6Domain
@@ -252,7 +252,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderMixable {
 /**
  Perform bias correction using another domain (reference domain). Interpolate weights
  */
-final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderMixable {
+final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     typealias MixingVar = Cmip6Variable
     
     typealias Domain = Cmip6Domain
@@ -346,7 +346,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderMixable {
 /**
  Perform bias correction using another domain
  */
-struct Cmip6BiasCorrectorGenericDomain: GenericReaderMixable {
+struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     typealias MixingVar = Cmip6Variable
     
     typealias Domain = Cmip6Domain
@@ -435,7 +435,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderMixable {
     }
 }
 
-struct Cmip6Reader<ReaderNext: GenericReaderMixable>: GenericReaderDerivedSimple, GenericReaderMixable, Cmip6Readerable where ReaderNext.Domain == Cmip6Domain, ReaderNext.MixingVar == Cmip6Variable {
+struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol, Cmip6Readerable where ReaderNext.Domain == Cmip6Domain, ReaderNext.MixingVar == Cmip6Variable {
 
     typealias Derived = Cmip6VariableDerived
     

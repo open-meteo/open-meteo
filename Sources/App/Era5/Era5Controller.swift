@@ -118,7 +118,7 @@ enum CdsDomainApi: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixable] {
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol] {
         switch self {
         case .best_match:
             return try Era5Mixer(domains: [.era5, .era5_land], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []

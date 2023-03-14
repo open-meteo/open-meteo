@@ -224,7 +224,7 @@ typealias GemVariableDerived = SurfaceAndPressureVariable<GemVariableDerivedSurf
 
 typealias GemVariableCombined = VariableOrDerived<GemVariable, GemVariableDerived>
 
-struct GemReader: GenericReaderDerivedSimple, GenericReaderMixable {
+struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     typealias MixingVar = GemVariableCombined
     
     typealias Domain = GemDomain

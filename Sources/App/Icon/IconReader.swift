@@ -1,6 +1,6 @@
 import Foundation
 
-struct IconReader: GenericReaderDerived, GenericReaderMixable {
+struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = IconDomains
     typealias Variable = IconVariable
     typealias Derived = IconVariableDerived

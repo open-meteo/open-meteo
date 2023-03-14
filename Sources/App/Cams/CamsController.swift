@@ -87,7 +87,7 @@ enum CamsVariableDerived: String, GenericVariableMixable {
     }
 }
 
-struct CamsReader: GenericReaderDerivedSimple, GenericReaderMixable {
+struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     typealias MixingVar = VariableOrDerived<CamsVariable, CamsVariableDerived>
     
     typealias Domain = CamsDomain

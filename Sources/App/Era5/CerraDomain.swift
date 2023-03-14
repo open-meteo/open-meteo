@@ -29,7 +29,7 @@ enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixabl
     }
 }
 
-struct CerraReader: GenericReaderDerivedSimple, GenericReaderMixable {
+struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     var reader: GenericReaderCached<CdsDomain, CerraVariable>
     
     typealias Domain = CdsDomain

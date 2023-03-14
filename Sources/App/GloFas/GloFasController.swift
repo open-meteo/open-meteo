@@ -26,7 +26,7 @@ enum GlofasDerivedVariable: String, CaseIterable, GenericVariableMixable {
 
 typealias GloFasVariableOrDerived = VariableOrDerived<GloFasVariable, GlofasDerivedVariable>
 
-struct GloFasReader: GenericReaderDerivedSimple, GenericReaderMixable {
+struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     var reader: GenericReaderCached<GloFasDomain, GloFasVariableMember>
     
     typealias Domain = GloFasDomain

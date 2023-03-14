@@ -2,12 +2,12 @@ import Foundation
 
 
 protocol MultiDomainMixerDomain: RawRepresentableString {
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixable]
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol]
 }
 
 /// Combine multiple independent weather models, that may not have given forecast variable
 struct GenericReaderMulti<Variable: GenericVariableMixable> {
-    private let reader: [any GenericReaderMixable]
+    private let reader: [any GenericReaderProtocol]
     
     let domain: MultiDomainMixerDomain
     
@@ -27,7 +27,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         reader.last!.modelElevation
     }
     
-    public init(domain: MultiDomainMixerDomain, reader: [any GenericReaderMixable]) {
+    public init(domain: MultiDomainMixerDomain, reader: [any GenericReaderProtocol]) {
         self.reader = reader
         self.domain = domain
     }
@@ -106,7 +106,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
 }
 
 /// Conditional conformace just use RawValue (String) to resolve `ForecastVariable` to a specific type
-extension GenericReaderMixable {
+extension GenericReaderProtocol {
     func get(mixed: String, time: TimerangeDt) throws -> DataAndUnit? {
         guard let v = MixingVar(rawValue: mixed) else {
             return nil

@@ -241,37 +241,11 @@ struct GfsPressureVariableDerived: PressureVariableRespresentable, GenericVariab
     }
 }
 
-/**
- Combine GFS013 and GFS025 transparently. This is done before derived variables are calculated. Therefore weather codes can use variables from both global GFS domains at once
- */
-struct GfsMixer025_013: GenericReaderMixer, GenericReaderMixable {
-    typealias MixingVar = GfsVariable
-    
-    typealias Domain = GfsDomain
-    
-    let reader: [GenericReaderCached<GfsDomain, GfsVariable>]
-    
-    init(reader: [GenericReaderCached<GfsDomain, GfsVariable>]) {
-        self.reader = reader
-    }
-    
-    init(domain: GfsDomain, position: Range<Int>) {
-        fatalError("GfsMixer025_013 for position ranges not implemented")
-    }
-    
-    static func makeReader(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReaderCached<GfsDomain, GfsVariable>? {
-        guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            return nil
-        }
-        return GenericReaderCached(reader: reader)
-    }
-}
-
 typealias GfsVariableDerived = SurfaceAndPressureVariable<GfsVariableDerivedSurface, GfsPressureVariableDerived>
 
 typealias GfsVariableCombined = VariableOrDerived<GfsVariable, GfsVariableDerived>
 
-struct GfsReader: GenericReaderDerived, GenericReaderMixable {
+struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = GfsDomain
     
     typealias Variable = GfsVariable
@@ -280,26 +254,32 @@ struct GfsReader: GenericReaderDerived, GenericReaderMixable {
     
     typealias MixingVar = GfsVariableCombined
     
-    var reader: GfsMixer025_013
+    var reader: GenericReaderMixerSameDomain<GenericReaderCached<GfsDomain, GfsVariable>>
     
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         switch domain {
         case .gfs013:
             // Note gfs025_ensemble only offers precipitation probability at 3h
             // A nicer implementation should use a dedicated variables enum
-            guard let reader = try GfsMixer025_013(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            let readers: [GenericReaderCached<GfsDomain, GfsVariable>] = try [GfsDomain.gfs025_ensemble, .gfs025, .gfs025].compactMap {
+                guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                    return nil
+                }
+                return GenericReaderCached(reader: reader)
+            }
+            guard !readers.isEmpty else {
                 return nil
             }
-            self.reader = reader
+            self.reader = GenericReaderMixerSameDomain(reader: readers)
         case .gfs025:
             fatalError("gfs025 should not been initilised in GfsMixer025_013")
         case .gfs025_ensemble:
             fatalError("gfs025_ensemble should not been initilised in GfsMixer025_013")
         case .hrrr_conus:
-            guard let reader = try GfsMixer025_013(domains: [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 return nil
             }
-            self.reader = reader
+            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
         }
     }
     

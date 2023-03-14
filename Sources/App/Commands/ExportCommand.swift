@@ -435,7 +435,7 @@ enum ExportDomain: String, CaseIterable {
         return genericDomain.grid
     }
     
-    func getReader(position: Range<Int>) throws -> any GenericReaderMixable {
+    func getReader(position: Range<Int>) throws -> any GenericReaderProtocol {
         switch self {
         case .CMCC_CM2_VHR4:
             return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position))
@@ -466,7 +466,7 @@ enum ExportDomain: String, CaseIterable {
         }
     }
     
-    func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> any GenericReaderMixable {
+    func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> any GenericReaderProtocol {
 
         guard let cmipDomain = self.cmipDomain else {
             fatalError("Regridding only supported for CMIP domains")

@@ -6,17 +6,31 @@ protocol GenericVariableMixable: RawRepresentableString {
 }
 
 /// Mix differnet domains together, that offer the same or similar variable set
-protocol GenericReaderMixer {
-    associatedtype Reader: GenericReaderMixable
+protocol GenericReaderMixerRaw {
+    associatedtype Reader: GenericReaderProtocol
     
     var reader: [Reader] { get }
     init(reader: [Reader])
-    
+}
+
+protocol GenericReaderMixer: GenericReaderMixerRaw {
     static func makeReader(domain: Reader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Reader?
 }
 
+struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {    
+    typealias MixingVar = Reader.MixingVar
+    
+    typealias Domain = Reader.Domain
+    
+    let reader: [Reader]
+    
+    init(reader: [Reader]) {
+        self.reader = reader
+    }
+}
+
 /// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
-protocol GenericReaderMixable {
+protocol GenericReaderProtocol {
     associatedtype MixingVar: GenericVariableMixable
     associatedtype Domain
     
@@ -35,25 +49,6 @@ protocol GenericReaderMixable {
 }
 
 extension GenericReaderMixer {
-    var modelLat: Float {
-        reader.last!.modelLat
-    }
-    var modelLon: Float {
-        reader.last!.modelLon
-    }
-    var modelElevation: ElevationOrSea {
-        reader.last!.modelElevation
-    }
-    var targetElevation: Float {
-        reader.last!.targetElevation
-    }
-    var modelDtSeconds: Int {
-        reader.first!.modelDtSeconds
-    }
-    var domain: Reader.Domain {
-        reader.last!.domain
-    }
-    
     public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
         var elevation = elevation
@@ -72,6 +67,27 @@ extension GenericReaderMixer {
             return nil
         }
         self.init(reader: reader)
+    }
+}
+
+extension GenericReaderMixerRaw {
+    var modelLat: Float {
+        reader.last!.modelLat
+    }
+    var modelLon: Float {
+        reader.last!.modelLon
+    }
+    var modelElevation: ElevationOrSea {
+        reader.last!.modelElevation
+    }
+    var targetElevation: Float {
+        reader.last!.targetElevation
+    }
+    var modelDtSeconds: Int {
+        reader.first!.modelDtSeconds
+    }
+    var domain: Reader.Domain {
+        reader.last!.domain
     }
 
     /// Last domain is supposed to be the highest resolution domain

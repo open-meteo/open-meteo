@@ -238,7 +238,7 @@ typealias MeteoFranceVariableDerived = SurfaceAndPressureVariable<MeteoFranceVar
 
 typealias MeteoFranceVariableCombined = VariableOrDerived<MeteoFranceVariable, MeteoFranceVariableDerived>
 
-struct MeteoFranceReader: GenericReaderDerived, GenericReaderMixable {
+struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = MeteoFranceDomain
     
     typealias Variable = MeteoFranceVariable

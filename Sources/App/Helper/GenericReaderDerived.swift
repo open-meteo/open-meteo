@@ -8,9 +8,9 @@
 import Foundation
 
 /// The required functions to implement a reader that provides derived variables
-protocol GenericReaderDerived: GenericReaderMixable {
+protocol GenericReaderDerived: GenericReaderProtocol {
     associatedtype Derived: RawRepresentableString
-    associatedtype ReaderNext: GenericReaderMixable
+    associatedtype ReaderNext: GenericReaderProtocol
     
     var reader: ReaderNext { get }
 

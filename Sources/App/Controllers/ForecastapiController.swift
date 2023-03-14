@@ -249,13 +249,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderMixable] {
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol] {
         switch self {
         case .best_match:
-            guard let icon: any GenericReaderMixable = try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            guard let icon: any GenericReaderProtocol = try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
-            guard let gfs013: any GenericReaderMixable = try GfsReader(domain: .gfs013, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            guard let gfs013: any GenericReaderProtocol = try GfsReader(domain: .gfs013, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
             // Scandinavian region, combine with ICON

@@ -115,7 +115,7 @@ struct MetNoQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     }
 }
 
-struct MetNoReader: GenericReaderDerivedSimple, GenericReaderMixable {
+struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     var reader: GenericReaderCached<MetNoDomain, MetNoVariable>
     
     typealias Domain = MetNoDomain
