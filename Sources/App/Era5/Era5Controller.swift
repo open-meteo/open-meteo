@@ -121,15 +121,15 @@ enum CdsDomainApi: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol] {
         switch self {
         case .best_match:
-            return try Era5Mixer(domains: [.era5, .era5_land], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return [try Era5Factory.makeEra5CombinedLand(lat: lat, lon: lon, elevation: elevation, mode: mode)]
         case .era5:
-            return try Era5Reader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return [try Era5Factory.makeReader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode)]
         case .era5_land:
-            return try Era5Reader(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return [try Era5Factory.makeReader(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode)]
         case .cerra:
             return try CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .ecmwf_ifs:
-            return try Era5Reader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return [try Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode)]
         }
     }
 }

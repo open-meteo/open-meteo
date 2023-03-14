@@ -276,16 +276,35 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     }
 }
 
-struct Era5Mixer: GenericReaderMixer {
-    let reader: [Era5Reader]
+struct Era5Factory {
+    /// Build a single reader for a given CdsDomain
+    public static func makeReader(domain: CdsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader<GenericReaderCached<CdsDomain, Era5Variable>> {
+        guard let reader = try GenericReader<CdsDomain, Era5Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            // should not be possible
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        return .init(reader: GenericReaderCached(reader: reader))
+    }
     
-    static func makeReader(domain: CdsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader? {
-        return try Era5Reader.init(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    /**
+     Build a combined ERA5 and ERA5-Land reader.
+     Derived variables are calculated after combinding both variables to make it possible to calculate ET0 evapotransipiration with temperature from ERA5-Land, but radiation from ERA5
+     */
+    public static func makeEra5CombinedLand(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
+        guard let era5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            // should not be possible
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        guard let era5land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            // should not be possible
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        return .init(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]))
     }
 }
 
-struct Era5Reader: GenericReaderDerivedSimple, GenericReaderProtocol {
-    var reader: GenericReaderCached<CdsDomain, Era5Variable>
+struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol where Reader.MixingVar == Era5Variable {
+    var reader: Reader
     
     typealias Domain = CdsDomain
     
@@ -293,14 +312,7 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderProtocol {
     
     typealias Derived = Era5VariableDerived
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            return nil
-        }
-        self.reader = GenericReaderCached(reader: reader)
-    }
-    
-    public init(reader: GenericReaderCached<CdsDomain, Era5Variable>) {
+    public init(reader: Reader) {
         self.reader = reader
     }
     
@@ -485,7 +497,7 @@ struct Era5Reader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 liftedIndex: nil,
                 visibilityMeters: nil,
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
-           )
+            )
         case .soil_moisture_0_to_100cm:
             let sm0_7 = try get(raw: .soil_moisture_0_to_7cm, time: time)
             let sm7_28 = try get(raw: .soil_moisture_7_to_28cm, time: time).data
