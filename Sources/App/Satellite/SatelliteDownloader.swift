@@ -84,7 +84,7 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
         let reader = OmFileSplitter(domain)
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
         for variable in variables {
-            let biasFile = variable.getBiasCorrectionFile(for: domain).getFilePath()
+            let biasFile = domain.getBiasCorrectionFile(for: variable.omFileName).getFilePath()
             if FileManager.default.fileExists(atPath: biasFile) {
                 continue
             }
@@ -181,11 +181,6 @@ enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVar
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
-    }
-    
-    /// Get the file path to a linear bias seasonal file for a given variable
-    func getBiasCorrectionFile(for domain: GenericDomain) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: domain.rawValue, directory: "master", variable: omFileName, suffix: "linear_bias_seasonal")
     }
 }
 

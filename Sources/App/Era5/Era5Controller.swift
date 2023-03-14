@@ -267,15 +267,6 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
     case growing_degree_days_base_0_limit_50
     case leaf_wetness_probability_mean
     
-    /// Get the file path to a linear bias seasonal file for a given variable
-    func getBiasCorrectionFile(for domain: GenericDomain) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: domain.rawValue, directory: "master", variable: rawValue, suffix: "linear_bias_seasonal")
-    }
-    
-    func openBiasCorrectionFile(for domain: GenericDomain) throws -> OmFileReader<MmapFile>? {
-        return try OmFileManager.get(getBiasCorrectionFile(for: domain))
-    }
-    
     var aggregation: DailyAggregation<CdsVariable> {
         switch self {
         case .weathercode:

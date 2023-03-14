@@ -24,7 +24,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     let domain: Domain
     
     /// Grid index in data files
-    let position: Range<Int>
+    let position: Int
     
     /// Elevation of the grid point
     let modelElevation: ElevationOrSea
@@ -48,7 +48,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// Initialise reader to read a single grid-point
     public init(domain: Domain, position: Int) throws {
         self.domain = domain
-        self.position = position..<position+1
+        self.position = position
         if let elevationFile = domain.elevationFile {
             self.modelElevation = try domain.grid.readElevation(gridpoint: position, elevationFile: elevationFile)
         } else {
@@ -61,17 +61,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         self.omFileSplitter = OmFileSplitter(domain)
     }
     
-    /// Initialise reader to read a range of locations
-    public init(domain: Domain, position: Range<Int>) {
-        self.domain = domain
-        self.position = position
-        self.modelElevation = .noData
-        self.targetElevation = .nan
-        self.modelLat = .nan
-        self.modelLon = .nan
-        self.omFileSplitter = OmFileSplitter(domain)
-    }
-    
     /// Return nil, if the coordinates are outside the domain grid
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         // check if coordinates are in domain, otherwise return nil
@@ -79,7 +68,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             return nil
         }
         self.domain = domain
-        self.position = gridpoint.gridpoint ..< gridpoint.gridpoint + 1
+        self.position = gridpoint.gridpoint
         self.modelElevation = gridpoint.gridElevation
         self.targetElevation = elevation.isNaN ? gridpoint.gridElevation.numeric : elevation
         
@@ -90,12 +79,12 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
     func prefetchData(variable: Variable, time: TimerangeDt) throws {
-        try omFileSplitter.willNeed(variable: variable.omFileName, location: position, time: time)
+        try omFileSplitter.willNeed(variable: variable.omFileName, location: position..<position+1, time: time)
     }
     
     /// Read and scale if required
     private func readAndScale(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
-        var data = try omFileSplitter.read(variable: variable.omFileName, location: position, time: time)
+        var data = try omFileSplitter.read(variable: variable.omFileName, location: position..<position+1, time: time)
         
         /// Scale pascal to hecto pasal. Case in era5
         if variable.unit == .pascal {
@@ -125,10 +114,6 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         let timeLow = time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
         let read = try readAndScale(variable: variable, time: timeLow)
         let dataLow = read.data
-        
-        if position.count > 1 {
-            throw ForecastapiError.generic(message: "Multi point support for temporal interpolation unavailable")
-        }
         
         let data = dataLow.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
         return DataAndUnit(data, read.unit)

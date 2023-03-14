@@ -63,17 +63,6 @@ extension GenericReaderDerived {
             try prefetchData(variable: variable, time: time)
         }
     }
-    
-    /*init?(domain: ReaderNext.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let reader = try ReaderNext(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-            return nil
-        }
-        self.init(reader: reader)
-    }
-    
-    public init(domain: ReaderNext.Domain, position: Range<Int>) {
-        self.init(reader: ReaderNext(domain: domain, position: position))
-    }*/
 }
 
 /// A reader that does not modify reader. E.g. pass all reads directly to reader

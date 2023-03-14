@@ -105,7 +105,7 @@ struct ExportCommand: AsyncCommandFix {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
         
         /// needs to be evenly dividable by grid.nx
-        let nLocationChunk = grid.nx / ((18...1).first(where: { grid.nx % $0 == 0 }) ?? 1)
+        //let nLocationChunk = grid.nx / ((18...1).first(where: { grid.nx % $0 == 0 }) ?? 1)
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
@@ -166,25 +166,16 @@ struct ExportCommand: AsyncCommandFix {
                 progress.finish()
                 return
             }
-            // Loop over chunks of locations, read and write
-            for l in stride(from: 0, to: grid.count, by: nLocationChunk) {
-                // Prefetch the next location chunk
-                let positionNext = min(l+nLocationChunk, grid.count)..<min(l+nLocationChunk*2, grid.count)
-                let readerNext = try domain.getReader(position: positionNext)
-                let _ = try readerNext.prefetchData(mixed: variable, time: time)
-                
+            // Loop over locations, read and write
+            for gridpoint in 0..<grid.count {
                 // Read data
-                let position = l..<min(l+nLocationChunk, grid.count)
-                let reader = try domain.getReader(position: position)
-                guard let data = try reader.get(mixed: variable, time: time) else {
+                let reader = try domain.getReader(position: gridpoint)
+                guard let data = try reader.get(mixed: variable, time: time)?.data else {
                     fatalError("Invalid variable \(variable)")
                 }
-                let data2d = Array2DFastTime(data: data.data, nLocations: position.count, nTime: time.count)
-                for (i, gridpoint) in position.enumerated() {
-                    let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: data2d[i, 0..<data2d.nTime]) : normalsCalculator.calculateDailyNormals(values: data2d[i, 0..<data2d.nTime])
-                    try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
-                }
-                progress.add(position.count * time.count * 4)
+                let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data)) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data))
+                try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
+                progress.add(time.count * 4)
             }
             progress.finish()
             return
@@ -195,7 +186,7 @@ struct ExportCommand: AsyncCommandFix {
         
         if let compressionLevel, compressionLevel > 0 {
             try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
-            try ncVariable.defineChunking(chunking: .chunked, chunks: [1, nLocationChunk, time.count])
+            try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, time.count])
         }
         
         logger.info("Writing data. Total raw size \((grid.count * time.count * 4).bytesHumanReadable)")
@@ -224,21 +215,15 @@ struct ExportCommand: AsyncCommandFix {
             return
         }
         
-        // Loop over chunks of locations, read and write
-        for l in stride(from: 0, to: grid.count, by: nLocationChunk) {
-            // Prefetch the next location chunk
-            let positionNext = min(l+nLocationChunk, grid.count)..<min(l+nLocationChunk*2, grid.count)
-            let readerNext = try domain.getReader(position: positionNext)
-            let _ = try readerNext.prefetchData(mixed: variable, time: time)
-            
+        // Loop over locations, read and write
+        for gridpoint in 0..<grid.count {
             // Read data
-            let position = l..<min(l+nLocationChunk, grid.count)
-            let reader = try domain.getReader(position: position)
+            let reader = try domain.getReader(position: gridpoint)
             guard let data = try reader.get(mixed: variable, time: time) else {
                 fatalError("Invalid variable \(variable)")
             }
-            try ncVariable.write(data.data, offset: [l/grid.nx, l % grid.nx, 0], count: [1, position.count, time.count])
-            progress.add(position.count * time.count * 4)
+            try ncVariable.write(data.data, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
+            progress.add(time.count * 4)
         }
         
         progress.finish()
@@ -435,34 +420,34 @@ enum ExportDomain: String, CaseIterable {
         return genericDomain.grid
     }
     
-    func getReader(position: Range<Int>) throws -> any GenericReaderProtocol {
+    func getReader(position: Int) throws -> any GenericReaderProtocol {
         switch self {
         case .CMCC_CM2_VHR4:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position), domain: Cmip6Domain.CMCC_CM2_VHR4)
+            return Cmip6Reader(reader: try GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position), domain: Cmip6Domain.CMCC_CM2_VHR4)
         case .MRI_AGCM3_2_S:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position), domain: .MRI_AGCM3_2_S)
+            return Cmip6Reader(reader: try GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position), domain: .MRI_AGCM3_2_S)
         case .FGOALS_f3_H:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position), domain: .FGOALS_f3_H)
+            return Cmip6Reader(reader: try GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position), domain: .FGOALS_f3_H)
         case .HiRAM_SIT_HR:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position), domain: .HiRAM_SIT_HR)
+            return Cmip6Reader(reader: try GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position), domain: .HiRAM_SIT_HR)
         case .EC_Earth3P_HR:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position), domain: .EC_Earth3P_HR)
+            return Cmip6Reader(reader: try GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position), domain: .EC_Earth3P_HR)
         case .MPI_ESM1_2_XR:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position), domain: .MPI_ESM1_2_XR)
+            return Cmip6Reader(reader: try GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position), domain: .MPI_ESM1_2_XR)
         case .NICAM16_8S:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position), domain: .NICAM16_8S)
+            return Cmip6Reader(reader: try GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position), domain: .NICAM16_8S)
         case .glofas_v3_consolidated:
-            return GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidatedv3, position: position)
+            return try GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidatedv3, position: position)
         case .glofas_v4_consolidated:
-            return GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidated, position: position)
+            return try GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidated, position: position)
         case .glofas_v3_forecast:
-            return GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.forecastv3, position: position)
+            return try GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.forecastv3, position: position)
         case .glofas_v3_seasonal:
-            return GenericReader<GloFasDomain, GloFasVariableMember>(domain: GloFasDomain.seasonalv3, position: position)
+            return try GenericReader<GloFasDomain, GloFasVariableMember>(domain: GloFasDomain.seasonalv3, position: position)
         case .era5_land:
-            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position)))
+            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position)))
         case .era5:
-            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position)))
+            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position)))
         }
     }
     

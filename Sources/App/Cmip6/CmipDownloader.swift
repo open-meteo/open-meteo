@@ -299,6 +299,17 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     }
 }
 
+extension GenericDomain {
+    /// Get the file path to a linear bias seasonal file for a given variable
+    func getBiasCorrectionFile(for variable: String) -> OmFilePathWithSuffix {
+        return OmFilePathWithSuffix(domain: self.rawValue, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
+    }
+    
+    func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {
+        return try OmFileManager.get(getBiasCorrectionFile(for: variable))
+    }
+}
+
 enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m_min
     case temperature_2m_max
@@ -350,15 +361,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return Self.windspeed_10m_mean.omFileName
         }
         return rawValue
-    }
-    
-    /// Get the file path to a linear bias seasonal file for a given variable
-    func getBiasCorrectionFile(for domain: Cmip6Domain) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: domain.rawValue, directory: "master", variable: omFileName, suffix: "linear_bias_seasonal")
-    }
-    
-    func openBiasCorrectionFile(for domain: Cmip6Domain) throws -> OmFileReader<MmapFile>? {
-        return try OmFileManager.get(getBiasCorrectionFile(for: domain))
     }
     
     var interpolation: ReaderInterpolation {
@@ -1270,22 +1272,25 @@ struct DownloadCmipCommand: AsyncCommandFix {
     func generateBiasCorrectionFields(logger: Logger, domain: Cmip6Domain, variables: [Cmip6Variable]) throws {
         logger.info("Calculating bias correction fields")
         let binsPerYear = 6
-        let reader = OmFileSplitter(domain)
+        let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
+        let variables = Cmip6Variable.allCases.map({ Cmip6VariableOrDerived.raw($0) }) + Cmip6VariableDerived.allCases.map({ Cmip6VariableOrDerived.derived($0) })
+        
+        logger.info("Calculating bias correction fields")
         for variable in variables {
-            let biasFile = variable.getBiasCorrectionFile(for: domain).getFilePath()
+            let biasFile = domain.getBiasCorrectionFile(for: variable.rawValue).getFilePath()
             if FileManager.default.fileExists(atPath: biasFile) {
                 continue
             }
-            let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
-                try reader.willNeed(variable: variable.omFileName, location: locationRange, time: time)
-                let data = try reader.read2D(variable: variable.omFileName, location: locationRange, time: time)
-                for l in 0..<locationRange.count {
-                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(data[l, 0..<time.count], time: time, binsPerYear: binsPerYear).meansPerYear)
+                for (l,gridpoint) in locationRange.enumerated() {
+                    let reader = Cmip6Reader(reader: try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, position: gridpoint), domain: domain)
+                    try reader.prefetchData(variable: variable, time: time)
+                    let data = try reader.get(variable: variable, time: time).data
+                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(data), time: time, binsPerYear: binsPerYear).meansPerYear)
                 }
                 progress.add(bias.nLocations)
                 return ArraySlice(bias.data)
