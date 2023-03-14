@@ -150,7 +150,7 @@ extension SeasonalForecastReader {
     }
     
     func prefetchData(variable: DailyCfsVariable, member: Int, time timeDaily: TimerangeDt) throws {
-        let time = timeDaily.with(dtSeconds: domain.dtSeconds)
+        let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:
             try prefetchData(variable: VariableAndMember(.temperature_2m_max, member), time: time)
@@ -173,7 +173,7 @@ extension SeasonalForecastReader {
     }
     
     func getDaily(variable: DailyCfsVariable, member: Int, params: SeasonalQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
-        let time = timeDaily.with(dtSeconds: domain.dtSeconds)
+        let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:
             let data = try get(variable: VariableAndMember(.temperature_2m_max, member), time: time).convertAndRound(params: params)

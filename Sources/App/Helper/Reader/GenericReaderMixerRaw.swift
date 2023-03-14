@@ -29,25 +29,6 @@ struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReade
     }
 }
 
-/// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
-protocol GenericReaderProtocol {
-    associatedtype MixingVar: GenericVariableMixable
-    //associatedtype Domain
-    
-    var modelLat: Float { get }
-    var modelLon: Float { get }
-    var modelElevation: ElevationOrSea { get }
-    var targetElevation: Float { get }
-    var modelDtSeconds: Int { get }
-    //var domain: Domain { get }
-    
-    func get(variable: MixingVar, time: TimerangeDt) throws -> DataAndUnit
-    func prefetchData(variable: MixingVar, time: TimerangeDt) throws
-
-    //init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws
-    //init(domain: Domain, position: Range<Int>)
-}
-
 extension GenericReaderMixer {    
     public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
@@ -86,27 +67,6 @@ extension GenericReaderMixerRaw {
     var modelDtSeconds: Int {
         reader.first!.modelDtSeconds
     }
-
-    /// Last domain is supposed to be the highest resolution domain
-    /*public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
-        var elevation = elevation
-        
-        let reader: [Reader] = try domains.reversed().compactMap { domain -> (Reader?) in
-            guard let domain = try Reader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                return nil
-            }
-            if elevation.isNaN {
-                elevation = domain.modelElevation.numeric
-            }
-            return domain
-        }.reversed()
-        
-        guard !reader.isEmpty else {
-            return nil
-        }
-        self.init(reader: reader)
-    }*/
     
     func prefetchData(variable: Reader.MixingVar, time: TimerangeDt) throws {
         for reader in reader {

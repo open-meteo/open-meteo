@@ -1,11 +1,5 @@
-//
-//  File.swift
-//  
-//
-//  Created by Patrick Zippenfenig on 08.11.22.
-//
-
 import Foundation
+
 
 /// The required functions to implement a reader that provides derived variables
 protocol GenericReaderDerived: GenericReaderProtocol {
