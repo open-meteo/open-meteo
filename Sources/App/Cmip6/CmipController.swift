@@ -25,7 +25,7 @@ struct CmipController {
                 guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                return Cmip6Reader(reader: reader, domain: domain)
+                return reader
             } else {
                 guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
@@ -106,8 +106,7 @@ protocol Cmip6Readerable {
     var modelDtSeconds: Int { get }
 }
 
-
-enum Cmip6VariableDerived: String, GenericVariableMixable, CaseIterable {
+enum Cmip6VariableDerived: String, GenericVariableMixable, CaseIterable, GenericVariableBiasCorrectable {
     case snowfall_sum
     case rain_sum
     case et0_fao_evapotranspiration_sum
@@ -123,9 +122,47 @@ enum Cmip6VariableDerived: String, GenericVariableMixable, CaseIterable {
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
+    
+    var biasCorrectionType: QuantileDeltaMappingBiasCorrection.ChangeType {
+        switch self {
+        case .snowfall_sum:
+            return .relativeChange(maximum: nil)
+        case .rain_sum:
+            return .relativeChange(maximum: nil)
+        case .et0_fao_evapotranspiration_sum:
+            return .relativeChange(maximum: nil)
+        case .dewpoint_2m_max:
+            return .absoluteChage(bounds: nil)
+        case .dewpoint_2m_min:
+            return .absoluteChage(bounds: nil)
+        case .dewpoint_2m_mean:
+            return .absoluteChage(bounds: nil)
+        case .vapor_pressure_deficit_max:
+            return .relativeChange(maximum: nil)
+        case .growing_degree_days_base_0_limit_50:
+            return .relativeChange(maximum: nil)
+        case .leaf_wetness_probability_mean:
+            return .absoluteChage(bounds: 0...100)
+        case .soil_moisture_0_to_100cm_mean:
+            return .absoluteChage(bounds: 0...10e9)
+        case .soil_temperature_0_to_100cm_mean:
+            return .absoluteChage(bounds: nil)
+        }
+    }
 }
 
 typealias Cmip6VariableOrDerived = VariableOrDerived<Cmip6Variable, Cmip6VariableDerived>
+
+extension VariableOrDerived: GenericVariableBiasCorrectable where Derived: GenericVariableBiasCorrectable, Raw: GenericVariableBiasCorrectable {
+    var biasCorrectionType: QuantileDeltaMappingBiasCorrection.ChangeType {
+        switch self {
+        case .raw(let raw):
+            return raw.biasCorrectionType
+        case .derived(let derived):
+            return derived.biasCorrectionType
+        }
+    }
+}
 
 extension Sequence where Element == (Float, Float) {
     func rmse() -> Float {
@@ -161,8 +198,8 @@ extension Sequence where Element == Float {
 }
 
 /// Apply bias correction to raw variables
-struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
-    typealias MixingVar = Cmip6Variable
+struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol, Cmip6Readerable {
+    typealias MixingVar = Cmip6VariableOrDerived
     
     typealias Domain = Cmip6Domain
     
@@ -179,7 +216,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     var domain: Domain { reader.domain }
     
     /// cmip reader
-    let reader: GenericReader<Cmip6Domain, Cmip6Variable>
+    let reader: Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>
     
     /// era5 reader
     let readerEra5: GenericReader<CdsDomain, Era5Variable>
@@ -188,7 +225,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     let readerEra5Land: GenericReader<CdsDomain, Era5Variable>?
     
     /// Get Bias correction field from era5-land or era5
-    func getEra5BiasCorrectionWeights(for variable: Cmip6Variable) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
+    func getEra5BiasCorrectionWeights(for variable: Cmip6VariableOrDerived) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
         if let readerEra5Land, let variable = Era5DailyWeatherVariable(rawValue: variable.rawValue), let referenceWeightFile = try readerEra5Land.domain.openBiasCorrectionFile(for: variable.rawValue) {
             let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position..<readerEra5Land.position+1, dim1: 0..<referenceWeightFile.dim1)
             if !weights.containsNaN() {
@@ -203,34 +240,42 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     }
     
     
-    func get(variable: Cmip6Variable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit {
         let raw = try reader.get(variable: variable, time: time)
         var data = raw.data
         
-        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.omFileName) else {
+        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
-        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position..<reader.position+1, dim1: 0..<controlWeightFile.dim1))
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.reader.position..<reader.reader.position+1, dim1: 0..<controlWeightFile.dim1))
         let referenceWeights = try getEra5BiasCorrectionWeights(for: variable)
         referenceWeights.weights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
-        if let bounds = variable.interpolation.bounds {
+        if let bounds = variable.biasCorrectionType.bounds {
             for i in data.indices {
                 data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
             }
         }
-        let isElevationCorrectable = variable == .temperature_2m_max || variable == .temperature_2m_min || variable == .temperature_2m_mean
-        let modelElevation = referenceWeights.modelElevation
-        if isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
-            for i in data.indices {
-                // correct temperature by 0.65° per 100 m elevation
-                data[i] += (modelElevation - targetElevation) * 0.0065
+        if case let .raw(raw) = variable {
+            let isElevationCorrectable = raw == .temperature_2m_max || raw == .temperature_2m_min || raw == .temperature_2m_mean
+            let modelElevation = referenceWeights.modelElevation
+            if isElevationCorrectable && raw.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
+                for i in data.indices {
+                    // correct temperature by 0.65° per 100 m elevation
+                    data[i] += (modelElevation - targetElevation) * 0.0065
+                }
             }
         }
         return DataAndUnit(data, raw.unit)
     }
     
-    func prefetchData(variable: Cmip6Variable, time: TimerangeDt) throws {
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws {
         try reader.prefetchData(variable: variable, time: time)
+    }
+    
+    func prefetchData(variables: [Cmip6VariableOrDerived], time: TimerangeDt) throws {
+        for variable in variables {
+            try prefetchData(variable: variable, time: time)
+        }
     }
     
     init?(domain: Cmip6Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
@@ -243,7 +288,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         guard let readerEra5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        self.reader = reader
+        self.reader = Cmip6Reader(reader: reader, domain: domain)
         /// No data on sea for ERA5-Land
         self.readerEra5Land = readerEra5Land.modelElevation.isSea ? nil : readerEra5Land
         self.readerEra5 = readerEra5
@@ -254,7 +299,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
  Perform bias correction using another domain (reference domain). Interpolate weights
  */
 final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
-    typealias MixingVar = Cmip6Variable
+    typealias MixingVar = Cmip6VariableOrDerived
     
     typealias Domain = Cmip6Domain
     
@@ -271,7 +316,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     var domain: Domain { reader.domain }
     
     /// cmip reader
-    let reader: GenericReader<Cmip6Domain, Cmip6Variable>
+    let reader: Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>
     
     /// imerg grid point
     let referencePosition: GridPoint2DFraction
@@ -292,14 +337,14 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         return referenceElevation
     }
     
-    func get(variable: Cmip6Variable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit {
         let raw = try reader.get(variable: variable, time: time)
         var data = raw.data
         
-        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.omFileName) else {
+        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
-        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position..<reader.position+1, dim1: 0..<controlWeightFile.dim1))
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.reader.position..<reader.reader.position+1, dim1: 0..<controlWeightFile.dim1))
         
         guard let referenceVariable = Era5DailyWeatherVariable(rawValue: variable.rawValue), let referenceWeightFile = try referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
@@ -307,26 +352,28 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.readInterpolated(dim0: referencePosition, dim0Nx: referenceDomain.grid.nx, dim1: 0..<referenceWeightFile.dim1))
         
         referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
-        if let bounds = variable.interpolation.bounds {
+        if let bounds = variable.biasCorrectionType.bounds {
             for i in data.indices {
                 data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
             }
         }
-        let isElevationCorrectable = variable == .temperature_2m_max || variable == .temperature_2m_min || variable == .temperature_2m_mean
-        
-        if isElevationCorrectable && variable.unit == .celsius && !targetElevation.isNaN {
-            let modelElevation = try getReferenceElevation().numeric
-            if !modelElevation.isNaN && targetElevation != modelElevation {
-                for i in data.indices {
-                    // correct temperature by 0.65° per 100 m elevation
-                    data[i] += (modelElevation - targetElevation) * 0.0065
+        if case let .raw(raw) = variable {
+            let isElevationCorrectable = raw == .temperature_2m_max || raw == .temperature_2m_min || raw == .temperature_2m_mean
+            
+            if isElevationCorrectable && raw.unit == .celsius && !targetElevation.isNaN {
+                let modelElevation = try getReferenceElevation().numeric
+                if !modelElevation.isNaN && targetElevation != modelElevation {
+                    for i in data.indices {
+                        // correct temperature by 0.65° per 100 m elevation
+                        data[i] += (modelElevation - targetElevation) * 0.0065
+                    }
                 }
             }
         }
         return DataAndUnit(data, raw.unit)
     }
     
-    func prefetchData(variable: Cmip6Variable, time: TimerangeDt) throws {
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws {
         try reader.prefetchData(variable: variable, time: time)
     }
     
@@ -339,7 +386,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         }
         self.referenceDomain = referenceDomain
         self.referencePosition = referencePosition
-        self.reader = reader
+        self.reader = Cmip6Reader(reader: reader, domain: domain)
     }
 }
 
@@ -348,7 +395,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
  Perform bias correction using another domain
  */
 struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
-    typealias MixingVar = Cmip6Variable
+    typealias MixingVar = Cmip6VariableOrDerived
     
     typealias Domain = Cmip6Domain
     
@@ -365,7 +412,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     var domain: Domain { reader.domain }
     
     /// cmip reader
-    let reader: GenericReader<Cmip6Domain, Cmip6Variable>
+    let reader: Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>
     
     /// imerg grid point
     let referencePosition: Int
@@ -374,14 +421,14 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     
     let referenceElevation: ElevationOrSea
     
-    func get(variable: Cmip6Variable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit {
         let raw = try reader.get(variable: variable, time: time)
         var data = raw.data
         
-        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.omFileName) else {
+        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
-        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.position..<reader.position+1, dim1: 0..<controlWeightFile.dim1))
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.reader.position..<reader.reader.position+1, dim1: 0..<controlWeightFile.dim1))
         
         guard let referenceVariable = Era5DailyWeatherVariable(rawValue: variable.rawValue), let referenceWeightFile = try referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
@@ -389,23 +436,25 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.read(dim0Slow: referencePosition..<referencePosition+1, dim1: 0..<referenceWeightFile.dim1))
         
         referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
-        if let bounds = variable.interpolation.bounds {
+        if let bounds = variable.biasCorrectionType.bounds {
             for i in data.indices {
                 data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
             }
         }
-        let isElevationCorrectable = variable == .temperature_2m_max || variable == .temperature_2m_min || variable == .temperature_2m_mean
-        let modelElevation = referenceElevation.numeric
-        if isElevationCorrectable && variable.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
-            for i in data.indices {
-                // correct temperature by 0.65° per 100 m elevation
-                data[i] += (modelElevation - targetElevation) * 0.0065
+        if case let .raw(raw) = variable {
+            let isElevationCorrectable = raw == .temperature_2m_max || raw == .temperature_2m_min || raw == .temperature_2m_mean
+            let modelElevation = referenceElevation.numeric
+            if isElevationCorrectable && raw.unit == .celsius && !modelElevation.isNaN && !targetElevation.isNaN && targetElevation != modelElevation {
+                for i in data.indices {
+                    // correct temperature by 0.65° per 100 m elevation
+                    data[i] += (modelElevation - targetElevation) * 0.0065
+                }
             }
         }
         return DataAndUnit(data, raw.unit)
     }
     
-    func prefetchData(variable: Cmip6Variable, time: TimerangeDt) throws {
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws {
         try reader.prefetchData(variable: variable, time: time)
     }
     
@@ -420,7 +469,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         self.referenceElevation = referencePosition.gridElevation
         self.referencePosition = referencePosition.gridpoint
         
-        self.reader = reader
+        self.reader = Cmip6Reader(reader: reader, domain: domain)
     }
     
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea) throws {
@@ -429,7 +478,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        self.reader = reader
+        self.reader = Cmip6Reader(reader: reader, domain: domain)
         self.referenceDomain = referenceDomain
         self.referencePosition = referencePosition
         self.referenceElevation = referenceElevation

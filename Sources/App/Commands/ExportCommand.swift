@@ -461,17 +461,17 @@ enum ExportDomain: String, CaseIterable {
             guard let biasCorrector = try Cmip6BiasCorrectorInterpolatedWeights(domain: cmipDomain, referenceDomain: CdsDomain.era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return Cmip6Reader(reader: biasCorrector, domain: cmipDomain)
+            return biasCorrector
         case .era5_land:
             guard let biasCorrector = try Cmip6BiasCorrectorEra5Seamless(domain: cmipDomain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return Cmip6Reader(reader: biasCorrector, domain: cmipDomain)
+            return biasCorrector
         case .imerg:
             guard let biasCorrector = try Cmip6BiasCorrectorGenericDomain(domain: cmipDomain, referenceDomain: SatelliteDomain.imerg_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return Cmip6Reader(reader: biasCorrector, domain: cmipDomain)
+            return biasCorrector
         }
     }
 }

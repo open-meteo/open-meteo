@@ -310,7 +310,11 @@ extension GenericDomain {
     }
 }
 
-enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+protocol GenericVariableBiasCorrectable {
+    var biasCorrectionType: QuantileDeltaMappingBiasCorrection.ChangeType { get }
+}
+
+enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixable, GenericVariableBiasCorrectable {
     case temperature_2m_min
     case temperature_2m_max
     case temperature_2m_mean
@@ -449,37 +453,37 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     var biasCorrectionType: QuantileDeltaMappingBiasCorrection.ChangeType {
         switch self {
         case .temperature_2m_min:
-            return .absoluteChage
+            return .absoluteChage(bounds: nil)
         case .temperature_2m_max:
-            return .absoluteChage
+            return .absoluteChage(bounds: nil)
         case .temperature_2m_mean:
-            return .absoluteChage
+            return .absoluteChage(bounds: nil)
         case .pressure_msl_mean:
-            return .absoluteChage
+            return .absoluteChage(bounds: nil)
         case .cloudcover_mean:
-            return .absoluteChage
+            return .absoluteChage(bounds: 0...100)
         case .precipitation_sum:
-            return .relativeChange
+            return .relativeChange(maximum: nil)
         case .snowfall_water_equivalent_sum:
-            return .relativeChange
+            return .relativeChange(maximum: nil)
         case .relative_humidity_2m_min:
-            return .absoluteChage
+            return .absoluteChage(bounds: 0...100)
         case .relative_humidity_2m_max:
-            return .absoluteChage
+            return .absoluteChage(bounds: 0...100)
         case .relative_humidity_2m_mean:
-            return .absoluteChage
+            return .absoluteChage(bounds: 0...100)
         case .windspeed_10m_mean:
-            return .absoluteChage
+            return .relativeChange(maximum: nil)
         case .windspeed_10m_max:
-            return .absoluteChage
+            return .relativeChange(maximum: nil)
         case .windgusts_10m_mean:
-            return .absoluteChage
+            return .relativeChange(maximum: nil)
         case .windgusts_10m_max:
-            return .absoluteChage
+            return .relativeChange(maximum: nil)
         case .soil_moisture_0_to_10cm_mean:
-            return .absoluteChage
+            return .absoluteChage(bounds: 0...10e9)
         case .shortwave_radiation_sum:
-            return .relativeChange
+            return .relativeChange(maximum: nil)
         }
     }
     

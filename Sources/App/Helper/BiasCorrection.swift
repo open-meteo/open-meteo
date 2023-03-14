@@ -13,10 +13,31 @@ struct QuantileDeltaMappingBiasCorrection {
     
     enum ChangeType {
         /// Correct offset. E.g. temperature
-        case absoluteChage
+        case absoluteChage(bounds: ClosedRange<Float>?)
         
         /// Scale. E.g. Precipitation
-        case relativeChange
+        case relativeChange(maximum: Float?)
+        
+        var isRelativeChange: Bool {
+            switch self {
+            case .absoluteChage(bounds: _):
+                return false
+            case .relativeChange(maximum: _):
+                return true
+            }
+        }
+        
+        var bounds: ClosedRange<Float>? {
+            switch self {
+            case .absoluteChage(bounds: let bounds):
+                return bounds
+            case .relativeChange(maximum: let maximum):
+                guard let maximum else {
+                    return nil
+                }
+                return 0...maximum
+            }
+        }
     }
     
     /// Calculate CDFs over the entire  control and forecast timespan using sliding windows
@@ -26,10 +47,10 @@ struct QuantileDeltaMappingBiasCorrection {
         let nQuantiles = 100
         
         // Compute reference distributions
-        let binsRefernce = calculateBins(reference, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let binsRefernce = calculateBins(reference, nQuantiles: nQuantiles, min: type.isRelativeChange ? 0 : nil)
         let cdfRefernce = CdfMonthly10YearSliding(vector: reference, time: referenceTime, bins: binsRefernce)
         
-        let binsControl = calculateBins(controlAndForecast, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let binsControl = calculateBins(controlAndForecast, nQuantiles: nQuantiles, min: type.isRelativeChange ? 0 : nil)
         let cdfControl = CdfMonthly10YearSliding(vector: controlAndForecast, time: controlAndForecastTime, bins: binsControl)
         
         // Apply
@@ -74,15 +95,15 @@ struct QuantileDeltaMappingBiasCorrection {
         
         // Compute reference distributions
         let referenceDetrended = reference.detrendLinear()
-        let binsRefernce = calculateBins(referenceDetrended, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let binsRefernce = calculateBins(referenceDetrended, nQuantiles: nQuantiles, min: type.isRelativeChange ? 0 : nil)
         let cdfRefernce = CdfMonthly(vector: referenceDetrended, time: referenceTime, bins: binsRefernce)
         
         let controlDetrended = controlAndForecast[0..<reference.count].detrendLinear()
-        let binsControl = calculateBins(controlDetrended, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let binsControl = calculateBins(controlDetrended, nQuantiles: nQuantiles, min: type.isRelativeChange ? 0 : nil)
         let cdfControl = CdfMonthly(vector: controlDetrended, time: referenceTime, bins: binsControl)
         
         // Apply
-        let binsForecast = calculateBins(controlAndForecast, nQuantiles: nQuantiles, min: type == .relativeChange ? 0 : nil)
+        let binsForecast = calculateBins(controlAndForecast, nQuantiles: nQuantiles, min: type.isRelativeChange ? 0 : nil)
         let cdfForecast = CdfMonthly10YearSliding(vector: controlAndForecast, time: controlAndForecastTime, bins: binsForecast)
 
         switch type {
