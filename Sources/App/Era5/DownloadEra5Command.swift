@@ -235,7 +235,7 @@ struct DownloadEra5Command: AsyncCommandFix {
                 
                 // Read location one-by-one... Multi location support does not work with derived varibales
                 for (l, gridpoint) in locationRange.enumerated() {
-                    let gridpointNext = min(gridpoint+1, writer.dim0)
+                    let gridpointNext = min(gridpoint+1, writer.dim0-1)
                     let readerNext = GenericReaderMulti<CdsVariable>(domain: CdsDomainApi.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpointNext)))])
                     try readerNext.prefetchData(variables: [era5Variable], time: time)
                     
