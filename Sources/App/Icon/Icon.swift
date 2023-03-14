@@ -57,13 +57,16 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     case icon
     case iconEu = "icon-eu"
     case iconD2 = "icon-d2"
-    
+    case iconD2_15min = "icon-d2-15min"
     
     private static var iconElevataion = try? OmFileReader(file: Self.icon.surfaceElevationFileOm)
     private static var iconD2Elevataion = try? OmFileReader(file: Self.iconD2.surfaceElevationFileOm)
     private static var iconEuElevataion = try? OmFileReader(file: Self.iconEu.surfaceElevationFileOm)
     
     var dtSeconds: Int {
+        if self == .iconD2_15min {
+            return 3600/4
+        }
         return 3600
     }
     
@@ -73,6 +76,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return Self.iconElevataion
         case .iconEu:
             return Self.iconEuElevataion
+        case .iconD2_15min:
+            fallthrough
         case .iconD2:
             return Self.iconD2Elevataion
         }
@@ -113,6 +118,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return [    50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950,      1000] // disabled: 775, 825, 875
         case .iconD2:
             return [                      200, 250, 300, 400, 500, 600, 700,      850,           950, 975, 1000]
+        case .iconD2_15min:
+            return []
         }
     }
     
@@ -131,6 +138,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
                 return 180+1
             }
         case .iconEu: return 120+1
+        case .iconD2_15min: return (48+1)*4
         case .iconD2: return 48+1
         }
     }
@@ -148,6 +156,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
                 return Array(0...78) + Array(stride(from: 81, through: 180, by: 3))
             }
         case .iconEu: return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
+        case .iconD2_15min: return Array(0...48*4)
         case .iconD2: return Array(0...48)
         }
     }
@@ -156,6 +165,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         switch self {
         case .icon: return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
         case .iconEu: return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
+        case .iconD2_15min: fallthrough
         case .iconD2: return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         }
     }
@@ -165,6 +175,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         switch self {
         case .icon: return "global"
         case .iconEu: return "europe"
+        case .iconD2_15min: fallthrough
         case .iconD2: return "germany"
         }
     }
@@ -183,6 +194,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return 120 // was 90
         case .iconEu:
             return 74 // was 60
+        case .iconD2_15min:
+            fallthrough
         case .iconD2:
             return 65
         }

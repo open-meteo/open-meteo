@@ -13,13 +13,17 @@ extension IconSurfaceVariable: IconVariableDownloadable {
     /// Vmax and precip always are empty in the first hour. Weather codes differ a lot in hour 0.
     var skipHour0: Bool {
         switch self {
-        case .precipitation: return true
         case .windgusts_10m: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
         case .direct_radiation: return true
         case .diffuse_radiation: return true
         case .weathercode: return true
+        case .snowfall_water_equivalent: fallthrough
+        case .snowfall_convective_water_equivalent: fallthrough
+        case .precipitation: fallthrough
+        case .showers: fallthrough
+        case .rain: return true
         default: return false
         }
     }
@@ -101,6 +105,33 @@ extension IconSurfaceVariable: IconVariableDownloadable {
     }
     
     func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)? {
+        if domain == .iconD2_15min {
+            switch self {
+            case .direct_radiation:
+                break
+            case .diffuse_radiation:
+                break
+            case .precipitation:
+                break
+            case .cape:
+                break
+            case .lightning_potential:
+                break
+            case .showers:
+                break
+            case .snowfall_convective_water_equivalent:
+                break
+            case .snowfall_water_equivalent:
+                break
+            case .freezinglevel_height:
+                break
+            case .rain:
+                break
+            default:
+                return nil // All other variables are not in ICON-D2 15 minutes
+            }
+        }
+        
         switch self {
         case .soil_temperature_0cm: return ("t_so", "soil-level", 0)
         case .soil_temperature_6cm: return ("t_so", "soil-level", 6)
@@ -214,6 +245,9 @@ extension IconPressureVariable: IconVariableDownloadable {
     }
     
     func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)? {
+        if domain == .iconD2_15min {
+            return nil
+        }
         switch variable {
         case .temperature:
         return ("t", "pressure-level", level)

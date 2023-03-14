@@ -216,7 +216,25 @@ struct DownloadIconCommand: AsyncCommandFix {
                     try FileManager.default.removeItem(atPath: gribFile)
                 } else {
                     // Use async in-memory download and decoding -> 4 times faster, but cannot regrid icosahedral data
-                    let message = try await curl.downloadGrib(url: url, bzip2Decode: true)[0]
+                    let messages = try await curl.downloadGrib(url: url, bzip2Decode: true)
+                    if domain == .iconD2 && messages.count > 1 {
+                        // Write 15min D2 icon data
+                        let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
+                        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+                        for (i, message) in messages.enumerated() {
+                            let h3 = (hour*4+i).zeroPadded(len: 3)
+                            let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
+                            try grib2d.load(message: message)
+                            data = grib2d.array.data
+                            try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
+                            if let fma = variable.multiplyAdd {
+                                data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                            }
+                            let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                            try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
+                        }
+                    }
+                    let message = messages[0]
                     try grib2d.load(message: message)
                     data = grib2d.array.data
                 }
@@ -269,11 +287,12 @@ struct DownloadIconCommand: AsyncCommandFix {
                 continue
             }
             let v = variable.omFileName.uppercased()
-            let skip = variable.skipHour0 ? 1 : 0
+            // ICON-D2 15 minutes data has to skip 4 timesteps (= 1 hour)
+            let skip = variable.skipHour0 ? (domain == .iconD2_15min ? 4 : 1) : 0
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
             let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
-                if hour == 0 && variable.skipHour0 {
+                if hour > skip {
                     return nil
                 }
                 let reader = try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v).fpg")
@@ -287,12 +306,12 @@ struct DownloadIconCommand: AsyncCommandFix {
                 data2d.data.fillWithNaNs()
                 for reader in readers {
                     try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                    data2d[0..<data2d.nLocations, reader.hour /*/ domain.dtHours*/] = readTemp
                 }
                 
                 // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
                 if variable.isAveragedOverForecastTime {
-                    data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+                    data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                 }
                 
                 // interpolate missing timesteps. We always fill 2 timesteps at once
@@ -310,7 +329,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {
-                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                 }
                 
                 progress.add(locationRange.count)
@@ -393,6 +412,10 @@ struct DownloadIconCommand: AsyncCommandFix {
         
         try await downloadIcon(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convertIcon(logger: logger, domain: domain, run: date, variables: variables)
+        if domain == .iconD2 {
+            // ICON-D2 download 15min data as well
+            try convertIcon(logger: logger, domain: .iconD2_15min, run: date, variables: variables)
+        }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -410,6 +433,8 @@ extension IconDomains {
         case .iconD2:
             // Icon d2 has a delay of 44 minutes and runs every 3 hours
             return t.hour / 3 * 3
+        case .iconD2_15min:
+            fatalError("ICON-D2 15minute data can not be downloaded individually")
         }
     }
 }
