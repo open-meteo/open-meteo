@@ -438,19 +438,19 @@ enum ExportDomain: String, CaseIterable {
     func getReader(position: Range<Int>) throws -> any GenericReaderProtocol {
         switch self {
         case .CMCC_CM2_VHR4:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position))
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position), domain: Cmip6Domain.CMCC_CM2_VHR4)
         case .MRI_AGCM3_2_S:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position))
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position), domain: .MRI_AGCM3_2_S)
         case .FGOALS_f3_H:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position))
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position), domain: .FGOALS_f3_H)
         case .HiRAM_SIT_HR:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position))
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position), domain: .HiRAM_SIT_HR)
         case .EC_Earth3P_HR:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position))
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position), domain: .EC_Earth3P_HR)
         case .MPI_ESM1_2_XR:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position))
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position), domain: .MPI_ESM1_2_XR)
         case .NICAM16_8S:
-            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position))
+            return Cmip6Reader(reader: GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position), domain: .NICAM16_8S)
         case .glofas_v3_consolidated:
             return GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidatedv3, position: position)
         case .glofas_v4_consolidated:
@@ -476,17 +476,17 @@ enum ExportDomain: String, CaseIterable {
             guard let biasCorrector = try Cmip6BiasCorrectorInterpolatedWeights(domain: cmipDomain, referenceDomain: CdsDomain.era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return Cmip6Reader(reader: biasCorrector)
+            return Cmip6Reader(reader: biasCorrector, domain: cmipDomain)
         case .era5_land:
             guard let biasCorrector = try Cmip6BiasCorrectorEra5Seamless(domain: cmipDomain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return Cmip6Reader(reader: biasCorrector)
+            return Cmip6Reader(reader: biasCorrector, domain: cmipDomain)
         case .imerg:
             guard let biasCorrector = try Cmip6BiasCorrectorGenericDomain(domain: cmipDomain, referenceDomain: SatelliteDomain.imerg_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return Cmip6Reader(reader: biasCorrector)
+            return Cmip6Reader(reader: biasCorrector, domain: cmipDomain)
         }
     }
 }

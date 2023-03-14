@@ -24,12 +24,12 @@ struct CmipController {
                 guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                return Cmip6Reader(reader: reader)
+                return Cmip6Reader(reader: reader, domain: domain)
             } else {
                 guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                return Cmip6Reader(reader: reader)
+                return Cmip6Reader(reader: reader, domain: domain)
             }
         }
         
@@ -435,14 +435,17 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     }
 }
 
-struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol, Cmip6Readerable where ReaderNext.Domain == Cmip6Domain, ReaderNext.MixingVar == Cmip6Variable {
+struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol, Cmip6Readerable where ReaderNext.MixingVar == Cmip6Variable {
 
     typealias Derived = Cmip6VariableDerived
     
     var reader: ReaderNext
     
-    init(reader: ReaderNext) {
+    var domain: Cmip6Domain
+    
+    init(reader: ReaderNext, domain: Cmip6Domain) {
         self.reader = reader
+        self.domain = domain
     }
 
     func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {

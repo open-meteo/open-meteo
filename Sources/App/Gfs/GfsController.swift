@@ -256,6 +256,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
     
     var reader: GenericReaderMixerSameDomain<GenericReaderCached<GfsDomain, GfsVariable>>
     
+    var domain: Domain
+    
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         switch domain {
         case .gfs013:
@@ -281,11 +283,12 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             }
             self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
         }
+        self.domain = domain
     }
     
     func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
-        if reader.domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloudcover {
+        if domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloudcover {
             let rh = try reader.get(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)), time: time)
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))}), .percent)
         }
@@ -302,7 +305,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
     
     func prefetchData(raw: Variable, time: TimerangeDt) throws {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
-        if reader.domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloudcover {
+        if domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloudcover {
             return try reader.prefetchData(variable: .pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)), time: time)
         }
         

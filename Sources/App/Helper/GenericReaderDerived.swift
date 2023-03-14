@@ -26,9 +26,9 @@ extension GenericReaderDerived {
         reader.modelLat
     }
     
-    var domain: ReaderNext.Domain {
+    /*var domain: ReaderNext.Domain {
         return reader.domain
-    }
+    }*/
     
     var modelLon: Float {
         reader.modelLon

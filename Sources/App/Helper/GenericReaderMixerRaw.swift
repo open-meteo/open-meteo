@@ -14,13 +14,13 @@ protocol GenericReaderMixerRaw {
 }
 
 protocol GenericReaderMixer: GenericReaderMixerRaw {
-    static func makeReader(domain: Reader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Reader?
+    associatedtype Domain: GenericDomain
+    
+    static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Reader?
 }
 
 struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {    
     typealias MixingVar = Reader.MixingVar
-    
-    typealias Domain = Reader.Domain
     
     let reader: [Reader]
     
@@ -32,14 +32,14 @@ struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReade
 /// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
 protocol GenericReaderProtocol {
     associatedtype MixingVar: GenericVariableMixable
-    associatedtype Domain
+    //associatedtype Domain
     
     var modelLat: Float { get }
     var modelLon: Float { get }
     var modelElevation: ElevationOrSea { get }
     var targetElevation: Float { get }
     var modelDtSeconds: Int { get }
-    var domain: Domain { get }
+    //var domain: Domain { get }
     
     func get(variable: MixingVar, time: TimerangeDt) throws -> DataAndUnit
     func prefetchData(variable: MixingVar, time: TimerangeDt) throws
@@ -48,8 +48,8 @@ protocol GenericReaderProtocol {
     //init(domain: Domain, position: Range<Int>)
 }
 
-extension GenericReaderMixer {
-    public init?(domains: [Reader.Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+extension GenericReaderMixer {    
+    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
         var elevation = elevation
         
@@ -85,9 +85,6 @@ extension GenericReaderMixerRaw {
     }
     var modelDtSeconds: Int {
         reader.first!.modelDtSeconds
-    }
-    var domain: Reader.Domain {
-        reader.last!.domain
     }
 
     /// Last domain is supposed to be the highest resolution domain
