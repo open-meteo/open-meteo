@@ -1,7 +1,7 @@
 
 /// Define functions to download surface and pressure level variables for ICON
 protocol IconVariableDownloadable: GenericVariable {
-    var skipHour0: Bool { get }
+    func skipHour0(domain: IconDomains) -> Bool
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
@@ -11,7 +11,12 @@ protocol IconVariableDownloadable: GenericVariable {
 
 extension IconSurfaceVariable: IconVariableDownloadable {
     /// Vmax and precip always are empty in the first hour. Weather codes differ a lot in hour 0.
-    var skipHour0: Bool {
+    func skipHour0(domain: IconDomains) -> Bool {
+        // download hour0 from ICON-D2, because it still contains 15 min data
+        if domain == .iconD2 && self != .weathercode {
+            return false
+        }
+        
         switch self {
         case .windgusts_10m: return true
         case .sensible_heatflux: return true
@@ -228,7 +233,7 @@ extension IconPressureVariable: IconVariableDownloadable {
         return false
     }
     
-    var skipHour0: Bool {
+    func skipHour0(domain: IconDomains) -> Bool {
         return false
     }
     
