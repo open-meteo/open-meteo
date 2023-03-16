@@ -182,7 +182,8 @@ struct DownloadIconCommand: AsyncCommandFix {
             logger.info("Downloading hour \(hour)")
             let h3 = hour.zeroPadded(len: 3)
             for variable in variables {
-                if hour == 0 && variable.skipHour0 {
+                if domain != .iconD2 && hour == 0 && variable.skipHour0 {
+                    // download hour0 from ICON-D2, because it still contains 15 min data
                     continue
                 }
                 guard let v = variable.getVarAndLevel(domain: domain) else {
@@ -288,7 +289,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             }
             let v = variable.omFileName.uppercased()
             // ICON-D2 15 minutes data has to skip 4 timesteps (= 1 hour)
-            let skip = variable.skipHour0 ? (domain == .iconD2_15min ? 4 : 1) : 0
+            let skip = variable.skipHour0 ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
             let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
