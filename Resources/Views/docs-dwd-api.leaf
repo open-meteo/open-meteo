@@ -550,20 +550,20 @@
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="showers" id="showers_15min" name="minutely_15">
-          <label class="form-check-label" for="showers_15min">
-            Showers
-          </label>
-        </div>
-        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="snowfall" id="snowfall_15min" name="minutely_15">
-          <label class="form-check-label" for="snowfal_15minl">
+          <label class="form-check-label" for="snowfall_15min">
             Snowfall
           </label>
         </div>
         <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall_height" id="snowfall_height_15min" name="minutely_15">
+          <label class="form-check-label" for="snowfall_height_15min">
+            Snowfall Height
+          </label>
+        </div>
+        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="freezinglevel_height" id="freezinglevel_height_15min"
-            name="hourly">
+            name="minutely_15">
           <label class="form-check-label" for="freezinglevel_height_15min">
             Freezinglevel Height
           </label>
@@ -571,20 +571,8 @@
       </div>
       <div class="col-md-6">
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode_15min" name="minutely_15">
-          <label class="form-check-label" for="weathercode_15min">
-            Weathercode
-          </label>
-        </div>
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover_15min" name="_15min">
-          <label class="form-check-label" for="cloudcover_15min">
-            Cloudcover Total
-          </label>
-        </div>
-        <div class="form-check">
           <input class="form-check-input" type="checkbox" value="cape" id="cape_15min"
-            name="hominutely_15urly">
+            name="minutely_15">
           <label class="form-check-label" for="cape_15min">
             CAPE
           </label>
@@ -696,7 +684,7 @@
       </div>
 
     </div>
-    <small class="text-muted">* Only available in Central Europe and limited to 3 days of forecast</small>
+    <small class="text-muted">* Only available in Central Europe (otherwise just interpolated data) and limited to 3 days of forecast</small>
 
 
     <div class="row py-3 px-0">
@@ -955,7 +943,7 @@
 
   <div class="col-12 py-5">
     <h2 id="data-sources">Data Source</h2>
-    <p>This API uses global DWD ICON weather forecast and combines them with high-resolution ICON Europe and Central Europe forecasts. Information about DWD wearther models is available <a href="https://www.dwd.de/EN/ourservices/nwp_forecast_data/nwp_forecast_data.html" target="_blank">here</a>. For ICON Global and Europe, values are interpolated from 3-hourly to 1-hourly after 78 hours.</p>
+    <p>This API uses global DWD ICON weather forecast and combines them with high-resolution ICON Europe and Central Europe forecasts. Information about DWD wearther models is available <a href="https://www.dwd.de/EN/ourservices/nwp_forecast_data/nwp_forecast_data.html" target="_blank">here</a>. For ICON Global and Europe, values are interpolated from 3-hourly to 1-hourly after 78 hours. 15-minutely data is only available for a small number of weather variables and only in Central Europe.</p>
     <div class="table-responsive">
       <table class="table">
         <thead>
@@ -989,7 +977,7 @@
             <th scope="row">ICON D2</th>
             <td>Central Europe</td>
             <td>0.02° (~2 km)</td>
-            <td>Hourly</td>
+            <td>15-Minutely</td>
             <td>2 days</td>
             <td>Every 3 hours</td>
           </tr>
@@ -1337,6 +1325,93 @@
             <td>Instant</td>
             <td>m³/m³</td>
             <td>Average soil water content as volumetric mixing ratio at 0-1, 1-3, 3-9, 9-27 and 27-81 cm depths.</td>
+          </tr>
+          <tr>
+            <th scope="row">cape</th>
+            <td>Instant</td>
+            <td>J/kg</td>
+            <td>Convective available potential energy. See <a href="https://en.wikipedia.org/wiki/Convective_available_potential_energy" target="_blank">Wikipedia</a>.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3 class="mt-5">15-Minutely Parameter Definition</h3>
+    <p>The parameter <mark>&minutely_15=</mark> can be used to get 15-minutely data. This data is based on the ICON-D2 model which is only available in Central Europe.
+    If 15-minutely data is requested for locations outside Central Europe, data is interpolated from 1-hourly to 15-minutely.</p>
+    <div class="table-responsive">
+      <table class="table">
+        <thead>
+          <tr>
+            <th scope="col">Variable</th>
+            <th scope="col">Valid time</th>
+            <th scope="col">Unit</th>
+            <th scope="col">Description</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">shortwave_radiation</th>
+            <td>Preceding hour mean</td>
+            <td>W/m²</td>
+            <td>Shortwave solar radiation as average of the preceding 15 minutes. This is equal to the total global horizontal
+              irradiation </td>
+          </tr>
+          <tr>
+            <th scope="row">direct_radiation<br />direct_normal_irradiance</th>
+            <td>Preceding hour mean</td>
+            <td>W/m²</td>
+            <td>Direct solar radiation as average of the preceding 15 minutes on the horizontal plane and the normal plane
+              (perpendicular to the sun)</td>
+          </tr>
+          <tr>
+            <th scope="row">diffuse_radiation</th>
+            <td>Preceding hour mean</td>
+            <td>W/m²</td>
+            <td>Diffuse solar radiation as average of the preceding 15 minutes</td>
+          </tr>
+          <tr>
+            <th scope="row">lightning_potential</th>
+            <td>Instant</td>
+            <td>J/kg</td>
+            <td>The Lightning Potential Index after <a href="https://adgeo.copernicus.org/articles/23/11/2010/adgeo-23-11-2010.pdf">Lynn and Yair (2010)</a>. It is calculated as a vertical integral of the squared updraft velocity weighted by a function that essentially contains the graupel concentration</td>
+          </tr>
+          <tr>
+            <th scope="row">precipitation</th>
+            <td>Preceding hour sum</td>
+            <td>mm (inch)</td>
+            <td>Total precipitation (rain, showers, snow) sum of the preceding hour</td>
+          </tr>
+          <tr>
+            <th scope="row">snowfall</th>
+            <td>Preceding hour sum</td>
+            <td>cm (inch)</td>
+            <td>Snowfall amount of the preceding hour in centimeters. For the water equivalent in millimeter, divide by
+              7. E.g. 7 cm snow = 10 mm precipitation water equivalent</td>
+          </tr>
+          <tr>
+            <th scope="row">rain</th>
+            <td>Preceding hour sum</td>
+            <td>mm (inch)</td>
+            <td>Rain from large scale weather systems of the preceding hour in millimeter</td>
+          </tr>
+          <tr>
+            <th scope="row">snowfall_height</th>
+            <td>Instant</td>
+            <td>meters</td>
+            <td>Height of snowfall limit above mean sea level. It is defined as the height where the wet bulb temperature first exceeds 1.3◦C.</td>
+          </tr>
+          <tr>
+            <th scope="row">freezinglevel_height</th>
+            <td>Instant</td>
+            <td>meters</td>
+            <td>Altitude above sea level of the 0°C level</td>
+          </tr>
+          <tr>
+            <th scope="row">cape</th>
+            <td>Instant</td>
+            <td>J/kg</td>
+            <td>Convective available potential energy. See <a href="https://en.wikipedia.org/wiki/Convective_available_potential_energy" target="_blank">Wikipedia</a>.</td>
           </tr>
         </tbody>
       </table>
