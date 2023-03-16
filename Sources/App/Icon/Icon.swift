@@ -243,7 +243,18 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Icon interpolation not required for reader. Already 1h")
+        switch variable {
+        case .temperature:
+            return .hermite(bounds: nil)
+        case .wind_u_component:
+            return .hermite(bounds: nil)
+        case .wind_v_component:
+            return .hermite(bounds: nil)
+        case .geopotential_height:
+            return .hermite(bounds: nil)
+        case .relativehumidity:
+            return .hermite(bounds: 0...100)
+        }
     }
     
     var unit: SiUnit {
@@ -509,7 +520,96 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Icon interpolation not required for reader. Already 1h")
+        switch self {
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .cloudcover:
+            return .linear
+        case .cloudcover_low:
+            return .linear
+        case .cloudcover_mid:
+            return .linear
+        case .cloudcover_high:
+            return .linear
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .relativehumidity_2m:
+            return .hermite(bounds: 0...100)
+        case .precipitation:
+            return .backwards_sum
+        case .weathercode:
+            return .nearest
+        case .wind_v_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_v_component_80m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_80m:
+            return .hermite(bounds: nil)
+        case .wind_v_component_120m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_120m:
+            return .hermite(bounds: nil)
+        case .wind_v_component_180m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_180m:
+            return .hermite(bounds: nil)
+        case .temperature_80m:
+            return .hermite(bounds: nil)
+        case .temperature_120m:
+            return .hermite(bounds: nil)
+        case .temperature_180m:
+            return .hermite(bounds: nil)
+        case .soil_temperature_0cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_6cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_18cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_54cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_0_1cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_1_3cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_3_9cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_9_27cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_27_81cm:
+            return .hermite(bounds: nil)
+        case .snow_depth:
+            return .linear
+        case .sensible_heatflux:
+            return .hermite(bounds: nil)
+        case .latent_heatflux:
+            return .hermite(bounds: nil)
+        case .showers:
+            return .backwards_sum
+        case .rain:
+            return .backwards_sum
+        case .snowfall_convective_water_equivalent:
+            return .backwards_sum
+        case .snowfall_water_equivalent:
+            return .backwards_sum
+        case .cape:
+            return .hermite(bounds: nil)
+        case .lightning_potential:
+            return .linear
+        case .windgusts_10m:
+            return .linear
+        case .snowfall_height:
+            return .linear
+        case .freezinglevel_height:
+            return .linear
+        case .dewpoint_2m:
+            return .hermite(bounds: nil)
+        case .diffuse_radiation:
+            return .solar_backwards_averaged
+        case .direct_radiation:
+            return .solar_backwards_averaged
+        }
     }
     
     var isElevationCorrectable: Bool {

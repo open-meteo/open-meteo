@@ -17,15 +17,24 @@ public struct IconController {
         
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
+        // limited to 3 forecast days
+        let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange).range.range(dtSeconds: 3600/4)
         
-        guard let reader = try IconMixer(domains: IconDomains.allCases, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+        guard let reader = try IconMixer(domains: [.icon, .iconEu, .iconD2], lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        guard let readerMinutely = try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         
         
         // Start data prefetch to boooooooost API speed :D
+        let paramsMinutely = try IconApiVariable.load(commaSeparatedOptional: params.minutely_15)
         let paramsHourly = try IconApiVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try DailyWeatherVariable.load(commaSeparatedOptional: params.daily)
+        if let minutelyVariables = paramsMinutely {
+            try readerMinutely.prefetchData(variables: minutelyVariables, time: minutelyTime)
+        }
         if let hourlyVariables = paramsHourly {
             try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
         }
@@ -43,15 +52,25 @@ public struct IconController {
             }
             return ApiSection(name: "hourly", time: hourlyTime, columns: res)
         }
+        let minutely: ApiSection? = try paramsMinutely.map { variables in
+            var res = [ApiColumn]()
+            res.reserveCapacity(variables.count)
+            for variable in variables {
+                let d = try readerMinutely.get(variable: variable, time: minutelyTime).convertAndRound(params: params).toApi(name: variable.name)
+                assert(minutelyTime.count == d.data.count)
+                res.append(d)
+            }
+            return ApiSection(name: "minutely_15", time: minutelyTime, columns: res)
+        }
         
         let currentWeather: ForecastapiResult.CurrentWeather?
         if params.current_weather == true {
-            let starttime = currentTime.floor(toNearest: 3600)
-            let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-            let temperature = try reader.get(raw: .temperature_2m, time: time).convertAndRound(params: params)
-            let winddirection = try reader.get(derived: .winddirection_10m, time: time).convertAndRound(params: params)
-            let windspeed = try reader.get(derived: .windspeed_10m, time: time).convertAndRound(params: params)
-            let weathercode = try reader.get(raw: .weathercode, time: time).convertAndRound(params: params)
+            let starttime = currentTime.floor(toNearest: 3600/4)
+            let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600/4)
+            let temperature = try readerMinutely.get(raw: .temperature_2m, time: time).convertAndRound(params: params)
+            let winddirection = try readerMinutely.get(derived: .winddirection_10m, time: time).convertAndRound(params: params)
+            let windspeed = try readerMinutely.get(derived: .windspeed_10m, time: time).convertAndRound(params: params)
+            let weathercode = try readerMinutely.get(raw: .weathercode, time: time).convertAndRound(params: params)
             currentWeather = ForecastapiResult.CurrentWeather(
                 temperature: temperature.data[0],
                 windspeed: windspeed.data[0],
@@ -100,7 +119,7 @@ public struct IconController {
             utc_offset_seconds: time.utcOffsetSeconds,
             timezone: timezone,
             current_weather: currentWeather,
-            sections: [hourly, daily].compactMap({$0}),
+            sections: [minutely, hourly, daily].compactMap({$0}),
             timeformat: params.timeformatOrDefault
         )
         return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
@@ -113,6 +132,7 @@ struct IconApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable 
     let longitude: Float
     let hourly: [String]?
     let daily: [String]?
+    let minutely_15: [String]?
     let current_weather: Bool?
     let elevation: Float?
     let timezone: String?

@@ -39,7 +39,7 @@ function previewData(data, downloadTime) {
     };
 
     var series = [];
-    ["hourly", "six_hourly", "three_hourly", "daily"].forEach(function (section, index) {
+    ["hourly", "six_hourly", "three_hourly", "daily", "minutely_15"].forEach(function (section, index) {
         if (!(section in data)) {
             return
         }

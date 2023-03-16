@@ -5,6 +5,8 @@ extension Array where Element == Float {
     /// bounds: Apply min and max after interpolation
     func interpolate(type: ReaderInterpolation, timeOld: TimerangeDt, timeNew: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
         switch type {
+        case .nearest:
+            return interpolateNearest(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         case .linear:
             return interpolateLinear(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         case .hermite(let bounds):
@@ -13,6 +15,16 @@ extension Array where Element == Float {
             return interpolateSolarBackwards(timeOld: timeOld, timeNew: timeNew, latitude: latitude, longitude: longitude, scalefactor: scalefactor)
         case .backwards_sum:
             return backwardsSum(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
+        }
+    }
+    
+    func interpolateNearest(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
+        return time.map { t in
+            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
+            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
+            let A = self[index]
+            let B = index+1 >= self.count ? A : self[index+1]
+            return fraction < 0.5 ? A : B
         }
     }
     

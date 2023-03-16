@@ -535,6 +535,171 @@
     </div>
 
     <div class="row py-3 px-0">
+      <h2>15-Minutely Weather Variables <small class="text-muted">(*)</small></h2>
+      <div class="col-md-6">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="precipitation" id="precipitation_15min" name="minutely_15">
+          <label class="form-check-label" for="precipitation_15min">
+            Precipitation (rain + showers + snow)
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="rain" id="rain_15min" name="minutely_15">
+          <label class="form-check-label" for="rain_15min">
+            Rain
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="showers" id="showers_15min" name="minutely_15">
+          <label class="form-check-label" for="showers_15min">
+            Showers
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="snowfall" id="snowfall_15min" name="minutely_15">
+          <label class="form-check-label" for="snowfal_15minl">
+            Snowfall
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="freezinglevel_height" id="freezinglevel_height_15min"
+            name="hourly">
+          <label class="form-check-label" for="freezinglevel_height_15min">
+            Freezinglevel Height
+          </label>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="weathercode" id="weathercode_15min" name="minutely_15">
+          <label class="form-check-label" for="weathercode_15min">
+            Weathercode
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cloudcover" id="cloudcover_15min" name="_15min">
+          <label class="form-check-label" for="cloudcover_15min">
+            Cloudcover Total
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="cape" id="cape_15min"
+            name="hominutely_15urly">
+          <label class="form-check-label" for="cape_15min">
+            CAPE
+          </label>
+        </div>
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" value="lightning_potential" id="lightning_potential_15min"
+            name="minutely_15">
+          <label class="form-check-label" for="lightning_potential_15min">
+            Lightning Potential Index LPI
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div class="row py-3 px-0">
+      <div class="accordion" id="accordionVariables_15min">
+        <div class="accordion-item">
+          <h2 class="accordion-header" id="heading-solar-variables_15min">
+            <button class="accordion-button collapsed py-2" type="button" data-bs-toggle="collapse"
+              data-bs-target="#collapse-solar-variables_15min" aria-expanded="false" aria-controls="collapse-solar-variables_15min">
+              Solar Radiation Variables&nbsp;<span class="badge rounded-pill bg-secondary checkboxcounter"
+                data-count-checkboxes-of="#collapse-solar-variables_15min">0/x</span>
+            </button>
+          </h2>
+          <div id="collapse-solar-variables_15min" class="accordion-collapse collapse"
+            aria-labelledby="heading-solar-variables_15min" data-bs-parent="#accordionVariables_15min">
+            <div class="accordion-body row">
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="shortwave_radiation" id="shortwave_radiation_minutely_15"
+                    name="minutely_15">
+                  <label class="form-check-label" for="shortwave_radiation_minutely_15">
+                    Shortwave Solar Radiation
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="direct_radiation" id="direct_radiation_minutely_15"
+                    name="minutely_15">
+                  <label class="form-check-label" for="direct_radiation_minutely_15">
+                    Direct Solar Radiation
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="diffuse_radiation" id="diffuse_radiation_minutely_15"
+                    name="minutely_15">
+                  <label class="form-check-label" for="diffuse_radiation_minutely_15">
+                    Diffuse Solar Radiation
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="direct_normal_irradiance"
+                    id="direct_normal_irradiance_minutely_15" name="minutely_15">
+                  <label class="form-check-label" for="direct_normal_irradiance_minutely_15">
+                    Direct Normal Irradiance DNI
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="terrestrial_radiation"
+                    id="terrestrial_radiation_minutely_15" name="minutely_15">
+                  <label class="form-check-label" for="terrestrial_radiation_minutely_15">
+                    Terrestrial Solar Radiation
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-6">
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="shortwave_radiation_instant"
+                    id="shortwave_radiation_instant_minutely_15" name="minutely_15">
+                  <label class="form-check-label" for="shortwave_radiation_instant_minutely_15">
+                    Shortwave Solar Radiation (Instant)
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="direct_radiation_instant"
+                    id="direct_radiation_instant_minutely_15" name="minutely_15">
+                  <label class="form-check-label" for="direct_radiation_instant_minutely_15">
+                    Direct Solar Radiation (Instant)
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="diffuse_radiation_instant"
+                    id="diffuse_radiation_instant_minutely_15" name="minutely_15">
+                  <label class="form-check-label" for="diffuse_radiation_instant_minutely_15">
+                    Diffuse Solar Radiation (Instant)
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="direct_normal_irradiance_instant"
+                    id="direct_normal_irradiance_instant_minutely_15" name="minutely_15">
+                  <label class="form-check-label" for="direct_normal_irradiance_instant_minutely_15">
+                    Direct Normal Irradiance DNI (Instant)
+                  </label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" value="terrestrial_radiation_instant"
+                    id="terrestrial_radiation_instant_minutely_15" name="minutely_15">
+                  <label class="form-check-label" for="terrestrial_radiation_instant_minutely_15">
+                    Terrestrial Solar Radiation (Instant)
+                  </label>
+                </div>
+              </div>
+              <div class="col-md-12">
+                <small class="text-muted">Note: Solar radiation is averaged over the past 15 minutes. Use
+                  <mark>instant</mark> for radiation at the indicated time.</small>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+    <small class="text-muted">* Only available in Central Europe and limited to 3 days of forecast</small>
+
+
+    <div class="row py-3 px-0">
       <h2>Daily Weather Variables <small class="text-muted">(*)</small></h2>
       <div class="col-md-6">
         <div class="form-check">
