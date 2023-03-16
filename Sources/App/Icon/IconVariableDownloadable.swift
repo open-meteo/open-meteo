@@ -122,9 +122,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 break
             case .lightning_potential:
                 break
-            case .showers:
-                break
-            case .snowfall_convective_water_equivalent:
+            case .snowfall_height:
                 break
             case .snowfall_water_equivalent:
                 break
@@ -133,7 +131,8 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             case .rain:
                 break
             default:
-                return nil // All other variables are not in ICON-D2 15 minutes
+                return nil
+                // All other variables are not in ICON-D2 15 minutes
             }
         }
         
