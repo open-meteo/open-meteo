@@ -138,7 +138,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
                 return 180+1
             }
         case .iconEu: return 120+1
-        case .iconD2_15min: return (48+1)*4
+        case .iconD2_15min: return 48*4
         case .iconD2: return 48+1
         }
     }
@@ -156,7 +156,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
                 return Array(0...78) + Array(stride(from: 81, through: 180, by: 3))
             }
         case .iconEu: return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
-        case .iconD2_15min: return Array(0...48*4)
+        case .iconD2_15min: return Array(0...48*4-1)
         case .iconD2: return Array(0...48)
         }
     }

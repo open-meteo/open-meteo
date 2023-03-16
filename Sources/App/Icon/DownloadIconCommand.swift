@@ -292,7 +292,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
             let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
-                if hour > skip {
+                if hour < skip {
                     return nil
                 }
                 let reader = try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v).fpg")
