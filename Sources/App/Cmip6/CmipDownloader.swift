@@ -871,9 +871,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case .windspeed_10m_max:
             return "sfcWindmax"
         case .windgusts_10m_mean:
-            fatalError()
+            return "MISSING"
         case .windgusts_10m_max:
-            fatalError()
+            return "MISSING"
         }
     }
     
