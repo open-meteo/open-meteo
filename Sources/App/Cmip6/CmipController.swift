@@ -25,12 +25,13 @@ struct CmipController {
                 guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                return reader
+                return Cmip6ReaderPostBiasCorrected(reader: reader, domain: domain)
             } else {
                 guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                return Cmip6Reader(reader: reader, domain: domain)
+                let reader2 = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
+                return Cmip6ReaderPostBiasCorrected(reader: reader2, domain: domain)
             }
         }
         
@@ -44,7 +45,7 @@ struct CmipController {
                 try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
         }*/
-        let paramsDaily = try Cmip6VariableOrDerived.load(commaSeparatedOptional: params.daily)
+        let paramsDaily = try Cmip6VariableOrDerivedPostBias.load(commaSeparatedOptional: params.daily)
         if let dailyVariables = paramsDaily {
             for reader in readers {
                 try reader.prefetchData(variables: dailyVariables, time: dailyTime)
@@ -97,8 +98,8 @@ struct CmipController {
 }
 
 protocol Cmip6Readerable {
-    func prefetchData(variables: [Cmip6VariableOrDerived], time: TimerangeDt) throws
-    func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit
+    func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDt) throws
+    func get(variable: Cmip6VariableOrDerivedPostBias, time: TimerangeDt) throws -> DataAndUnit
     var modelLat: Float { get }
     var modelLon: Float { get }
     var modelElevation: ElevationOrSea { get }
@@ -106,18 +107,27 @@ protocol Cmip6Readerable {
     var modelDtSeconds: Int { get }
 }
 
-enum Cmip6VariableDerived: String, GenericVariableMixable, CaseIterable, GenericVariableBiasCorrectable {
+/// Derived variables that do not need bias correction, but use bias corrected inputs
+enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, CaseIterable {
     case snowfall_sum
     case rain_sum
-    case et0_fao_evapotranspiration_sum
     case dewpoint_2m_max
     case dewpoint_2m_min
     case dewpoint_2m_mean
-    case vapor_pressure_deficit_max
     case growing_degree_days_base_0_limit_50
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIterable, GenericVariableBiasCorrectable {
+
+    case et0_fao_evapotranspiration_sum
     case leaf_wetness_probability_mean
     case soil_moisture_0_to_100cm_mean
     case soil_temperature_0_to_100cm_mean
+    case vapor_pressure_deficit_max
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -125,21 +135,9 @@ enum Cmip6VariableDerived: String, GenericVariableMixable, CaseIterable, Generic
     
     var biasCorrectionType: QuantileDeltaMappingBiasCorrection.ChangeType {
         switch self {
-        case .snowfall_sum:
-            return .relativeChange(maximum: nil)
-        case .rain_sum:
-            return .relativeChange(maximum: nil)
         case .et0_fao_evapotranspiration_sum:
             return .relativeChange(maximum: nil)
-        case .dewpoint_2m_max:
-            return .absoluteChage(bounds: nil)
-        case .dewpoint_2m_min:
-            return .absoluteChage(bounds: nil)
-        case .dewpoint_2m_mean:
-            return .absoluteChage(bounds: nil)
         case .vapor_pressure_deficit_max:
-            return .relativeChange(maximum: nil)
-        case .growing_degree_days_base_0_limit_50:
             return .relativeChange(maximum: nil)
         case .leaf_wetness_probability_mean:
             return .absoluteChage(bounds: 0...100)
@@ -151,7 +149,9 @@ enum Cmip6VariableDerived: String, GenericVariableMixable, CaseIterable, Generic
     }
 }
 
-typealias Cmip6VariableOrDerived = VariableOrDerived<Cmip6Variable, Cmip6VariableDerived>
+typealias Cmip6VariableOrDerived = VariableOrDerived<Cmip6Variable, Cmip6VariableDerivedBiasCorrected>
+
+typealias Cmip6VariableOrDerivedPostBias = VariableOrDerived<Cmip6VariableOrDerived, Cmip6VariableDerivedPostBiasCorrection>
 
 extension VariableOrDerived: GenericVariableBiasCorrectable where Derived: GenericVariableBiasCorrectable, Raw: GenericVariableBiasCorrectable {
     var biasCorrectionType: QuantileDeltaMappingBiasCorrection.ChangeType {
@@ -198,7 +198,7 @@ extension Sequence where Element == Float {
 }
 
 /// Apply bias correction to raw variables
-struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol, Cmip6Readerable {
+struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     typealias MixingVar = Cmip6VariableOrDerived
     
     typealias Domain = Cmip6Domain
@@ -216,7 +216,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol, Cmip6Readerable {
     var domain: Domain { reader.domain }
     
     /// cmip reader
-    let reader: Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>
+    let reader: Cmip6ReaderPreBiasCorrection<GenericReader<Cmip6Domain, Cmip6Variable>>
     
     /// era5 reader
     let readerEra5: GenericReader<CdsDomain, Era5Variable>
@@ -288,7 +288,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol, Cmip6Readerable {
         guard let readerEra5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        self.reader = Cmip6Reader(reader: reader, domain: domain)
+        self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
         /// No data on sea for ERA5-Land
         self.readerEra5Land = readerEra5Land.modelElevation.isSea ? nil : readerEra5Land
         self.readerEra5 = readerEra5
@@ -316,7 +316,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     var domain: Domain { reader.domain }
     
     /// cmip reader
-    let reader: Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>
+    let reader: Cmip6ReaderPreBiasCorrection<GenericReader<Cmip6Domain, Cmip6Variable>>
     
     /// imerg grid point
     let referencePosition: GridPoint2DFraction
@@ -386,7 +386,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         }
         self.referenceDomain = referenceDomain
         self.referencePosition = referencePosition
-        self.reader = Cmip6Reader(reader: reader, domain: domain)
+        self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
     }
 }
 
@@ -412,7 +412,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     var domain: Domain { reader.domain }
     
     /// cmip reader
-    let reader: Cmip6Reader<GenericReader<Cmip6Domain, Cmip6Variable>>
+    let reader: Cmip6ReaderPreBiasCorrection<GenericReader<Cmip6Domain, Cmip6Variable>>
     
     /// imerg grid point
     let referencePosition: Int
@@ -469,7 +469,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         self.referenceElevation = referencePosition.gridElevation
         self.referencePosition = referencePosition.gridpoint
         
-        self.reader = Cmip6Reader(reader: reader, domain: domain)
+        self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
     }
     
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea) throws {
@@ -478,16 +478,19 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        self.reader = Cmip6Reader(reader: reader, domain: domain)
+        self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
         self.referenceDomain = referenceDomain
         self.referencePosition = referencePosition
         self.referenceElevation = referenceElevation
     }
 }
 
-struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol, Cmip6Readerable where ReaderNext.MixingVar == Cmip6Variable {
+/// There are 2 layers of derived variables
+/// "PreBiasCorrected" calculated derived variables before any bias correction
+/// "PostBiasCorrected" is done after bias correction
+struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol, Cmip6Readerable where ReaderNext.MixingVar == Cmip6VariableOrDerived {
 
-    typealias Derived = Cmip6VariableDerived
+    typealias Derived = Cmip6VariableDerivedPostBiasCorrection
     
     var reader: ReaderNext
     
@@ -498,19 +501,84 @@ struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimpl
         self.domain = domain
     }
 
-    func get(derived: Cmip6VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDt) throws -> DataAndUnit {
         switch derived {
         case .snowfall_sum:
-            let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time).data
+            let snowwater = try get(raw: .raw(.snowfall_water_equivalent_sum), time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
             return DataAndUnit(snowfall, .centimeter)
         case .rain_sum:
-            let snowwater = try get(raw: .snowfall_water_equivalent_sum, time: time)
-            let precip = try get(raw: .precipitation_sum, time: time)
+            let snowwater = try get(raw: .raw(.snowfall_water_equivalent_sum), time: time)
+            let precip = try get(raw: .raw(.precipitation_sum), time: time)
             let rain = zip(precip.data, snowwater.data).map({
                 return max($0.0-$0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
+        case .dewpoint_2m_max:
+            let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
+            let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
+            let rhMax = try get(raw: .raw(.relative_humidity_2m_max), time: time).data
+            return DataAndUnit(zip(zip(tempMax, tempMin), rhMax).map(Meteorology.dewpointDaily), .celsius)
+        case .dewpoint_2m_min:
+            let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
+            let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
+            let rhMin = try get(raw: .raw(.relative_humidity_2m_min), time: time).data
+            return DataAndUnit(zip(zip(tempMax, tempMin), rhMin).map(Meteorology.dewpointDaily), .celsius)
+        case .dewpoint_2m_mean:
+            let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
+            let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
+            let rhMean = try get(raw: .raw(.relative_humidity_2m_mean), time: time).data
+            return DataAndUnit(zip(zip(tempMax, tempMin), rhMean).map(Meteorology.dewpointDaily), .celsius)
+        case .growing_degree_days_base_0_limit_50:
+            let base: Float = 0
+            let limit: Float = 50
+            let tempmax = try get(raw: .raw(.temperature_2m_max), time: time).data
+            let tempmin = try get(raw: .raw(.temperature_2m_min), time: time).data
+            return DataAndUnit(zip(tempmax, tempmin).map({ (tmax, tmin) in
+                max(min((tmax - tmin) / 2, limit) - base, 0)
+            }), .gddCelsius)
+        }
+    }
+    
+    func prefetchData(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDt) throws {
+        switch derived {
+        case .snowfall_sum:
+            try prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time)
+        case .rain_sum:
+            try prefetchData(raw: .raw(.precipitation_sum), time: time)
+            try prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time)
+        case .dewpoint_2m_max:
+            try prefetchData(raw: .raw(.temperature_2m_min), time: time)
+            try prefetchData(raw: .raw(.relative_humidity_2m_max), time: time)
+        case .dewpoint_2m_min:
+            try prefetchData(raw: .raw(.temperature_2m_max), time: time)
+            try prefetchData(raw: .raw(.relative_humidity_2m_min), time: time)
+        case .dewpoint_2m_mean:
+            try prefetchData(raw: .raw(.temperature_2m_mean), time: time)
+            try prefetchData(raw: .raw(.relative_humidity_2m_mean), time: time)
+        case .growing_degree_days_base_0_limit_50:
+            try prefetchData(raw: .raw(.temperature_2m_max), time: time)
+            try prefetchData(raw: .raw(.temperature_2m_min), time: time)
+        }
+    }
+}
+
+/// Raw input is used and bias correction is performed afterwards
+struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol where ReaderNext.MixingVar == Cmip6Variable {
+
+    typealias Derived = Cmip6VariableDerivedBiasCorrected
+    
+    var reader: ReaderNext
+    
+    var domain: Cmip6Domain
+    
+    init(reader: ReaderNext, domain: Cmip6Domain) {
+        self.reader = reader
+        self.domain = domain
+    }
+
+    func get(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDt) throws -> DataAndUnit {
+        switch derived {
         case .et0_fao_evapotranspiration_sum:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
@@ -543,21 +611,6 @@ struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimpl
                     relativeHumidity: rh))
             }
             return DataAndUnit(et0, .millimeter)
-        case .dewpoint_2m_max:
-            let tempMin = try get(raw: .temperature_2m_min, time: time).data
-            let tempMax = try get(raw: .temperature_2m_max, time: time).data
-            let rhMax = try get(raw: .relative_humidity_2m_max, time: time).data
-            return DataAndUnit(zip(zip(tempMax, tempMin), rhMax).map(Meteorology.dewpointDaily), .celsius)
-        case .dewpoint_2m_min:
-            let tempMin = try get(raw: .temperature_2m_min, time: time).data
-            let tempMax = try get(raw: .temperature_2m_max, time: time).data
-            let rhMin = try get(raw: .relative_humidity_2m_min, time: time).data
-            return DataAndUnit(zip(zip(tempMax, tempMin), rhMin).map(Meteorology.dewpointDaily), .celsius)
-        case .dewpoint_2m_mean:
-            let tempMin = try get(raw: .temperature_2m_min, time: time).data
-            let tempMax = try get(raw: .temperature_2m_max, time: time).data
-            let rhMean = try get(raw: .relative_humidity_2m_mean, time: time).data
-            return DataAndUnit(zip(zip(tempMax, tempMin), rhMean).map(Meteorology.dewpointDaily), .celsius)
         case .vapor_pressure_deficit_max:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
@@ -580,14 +633,6 @@ struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimpl
                     relativeHumidity: rh))
             }
             return DataAndUnit(vpd, .kiloPascal)
-        case .growing_degree_days_base_0_limit_50:
-            let base: Float = 0
-            let limit: Float = 50
-            let tempmax = try get(raw: .temperature_2m_max, time: time).data
-            let tempmin = try get(raw: .temperature_2m_min, time: time).data
-            return DataAndUnit(zip(tempmax, tempmin).map({ (tmax, tmin) in
-                max(min((tmax - tmin) / 2, limit) - base, 0)
-            }), .gddCelsius)
         case .leaf_wetness_probability_mean:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
@@ -629,13 +674,8 @@ struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimpl
         }
     }
     
-    func prefetchData(derived: Cmip6VariableDerived, time: TimerangeDt) throws {
+    func prefetchData(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDt) throws {
         switch derived {
-        case .snowfall_sum:
-            try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
-        case .rain_sum:
-            try prefetchData(raw: .precipitation_sum, time: time)
-            try prefetchData(raw: .snowfall_water_equivalent_sum, time: time)
         case .et0_fao_evapotranspiration_sum:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
@@ -649,15 +689,6 @@ struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimpl
             } else {
                 try prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
-        case .dewpoint_2m_max:
-            try prefetchData(raw: .temperature_2m_min, time: time)
-            try prefetchData(raw: .relative_humidity_2m_max, time: time)
-        case .dewpoint_2m_min:
-            try prefetchData(raw: .temperature_2m_max, time: time)
-            try prefetchData(raw: .relative_humidity_2m_min, time: time)
-        case .dewpoint_2m_mean:
-            try prefetchData(raw: .temperature_2m_mean, time: time)
-            try prefetchData(raw: .relative_humidity_2m_mean, time: time)
         case .vapor_pressure_deficit_max:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
@@ -668,9 +699,6 @@ struct Cmip6Reader<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimpl
             } else {
                 try prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
-        case .growing_degree_days_base_0_limit_50:
-            try prefetchData(raw: .temperature_2m_max, time: time)
-            try prefetchData(raw: .temperature_2m_min, time: time)
         case .leaf_wetness_probability_mean:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)

@@ -87,16 +87,6 @@ import SwiftNetCDF
  HiRAM_SIT_HR_daily: Raw 1.3TB, Compressed 210 GB
  FGLOALS: Raw 1.2 TB, Compressed 120 GB
  
- 
- TODO:
- - DONE CMCC daily min/max from 6h data
- - DONE fgoals daily min/max from 3h data
- - DONE missing feb 29 in CMCC
- - master file for sequential access
- - Bias correction using RQUANT or QDM https://link.springer.com/article/10.1007/s00382-020-05447-4
- - Bias correcition linear with seasonal split
- 
- 
  */
 enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     case CMCC_CM2_VHR4
@@ -109,7 +99,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     case NICAM16_8S
     
     /// https://gmd.copernicus.org/articles/12/4999/2019/gmd-12-4999-2019.pdf
-    /// Disabled bacause uses 360 days
+    /// Disabled because uses 360 days
     //case HadGEM3_GC31_HM
     
     var soureName: String {
@@ -1285,7 +1275,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
         let binsPerYear = 6
         let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
-        let variables = Cmip6Variable.allCases.map({ Cmip6VariableOrDerived.raw($0) }) + Cmip6VariableDerived.allCases.map({ Cmip6VariableOrDerived.derived($0) })
+        let variables = Cmip6Variable.allCases.map({ Cmip6VariableOrDerived.raw($0) }) + Cmip6VariableDerivedBiasCorrected.allCases.map({ Cmip6VariableOrDerived.derived($0) })
         
         logger.info("Calculating bias correction fields")
         for variable in variables {
@@ -1298,7 +1288,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 for (l,gridpoint) in locationRange.enumerated() {
-                    let reader = Cmip6Reader(reader: try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, position: gridpoint), domain: domain)
+                    let reader = Cmip6ReaderPreBiasCorrection(reader: try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, position: gridpoint), domain: domain)
                     try reader.prefetchData(variable: variable, time: time)
                     let data = try reader.get(variable: variable, time: time).data
                     bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(data), time: time, binsPerYear: binsPerYear).meansPerYear)
