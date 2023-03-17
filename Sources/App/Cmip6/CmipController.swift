@@ -128,6 +128,8 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
     case soil_moisture_0_to_100cm_mean
     case soil_temperature_0_to_100cm_mean
     case vapor_pressure_deficit_max
+    case windgusts_10m_mean
+    case windgusts_10m_max
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -145,6 +147,10 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
             return .absoluteChage(bounds: 0...10e9)
         case .soil_temperature_0_to_100cm_mean:
             return .absoluteChage(bounds: nil)
+        case .windgusts_10m_mean:
+            return .relativeChange(maximum: nil)
+        case .windgusts_10m_max:
+            return .relativeChange(maximum: nil)
         }
     }
 }
@@ -671,6 +677,10 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                 let (st0_7, (st7_28, st28_100)) = $0
                 return st0_7 * 0.07 + st7_28 * (0.28 - 0.07) + st28_100 * (1 - 0.28)
             }), t2m.unit)
+        case .windgusts_10m_mean:
+            return try get(raw: .windspeed_10m_mean, time: time)
+        case .windgusts_10m_max:
+            return try get(raw: .windspeed_10m_max, time: time)
         }
     }
     
@@ -714,6 +724,10 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
         case .soil_temperature_0_to_100cm_mean:
             try prefetchData(raw: .temperature_2m_mean, time: time)
+        case .windgusts_10m_mean:
+            try prefetchData(raw: .windspeed_10m_mean, time: time)
+        case .windgusts_10m_max:
+            try prefetchData(raw: .windspeed_10m_max, time: time)
         }
     }
 }

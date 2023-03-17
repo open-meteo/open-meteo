@@ -319,9 +319,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     case relative_humidity_2m_mean
     case windspeed_10m_mean
     case windspeed_10m_max
-    // wind gusts are not available from CMIP, but calculated from bias correction
-    case windgusts_10m_mean
-    case windgusts_10m_max
     
     //case surface_temperature
     
@@ -348,12 +345,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     }
     
     var omFileName: String {
-        if self == .windgusts_10m_max {
-            return Self.windspeed_10m_max.omFileName
-        }
-        if self == .windgusts_10m_mean {
-            return Self.windspeed_10m_mean.omFileName
-        }
         return rawValue
     }
     
@@ -384,10 +375,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case .windspeed_10m_mean:
             return .hermite(bounds: nil)
         case .windspeed_10m_max:
-            return .hermite(bounds: nil)
-        case .windgusts_10m_max:
-            return .hermite(bounds: nil)
-        case .windgusts_10m_mean:
             return .hermite(bounds: nil)
         case .soil_moisture_0_to_10cm_mean:
             return .hermite(bounds: nil)
@@ -428,10 +415,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .qubicMeterPerQubicMeter
         case .shortwave_radiation_sum:
             return .megaJoulesPerSquareMeter
-        case .windgusts_10m_mean:
-            return .qubicMeterPerSecond
-        case .windgusts_10m_max:
-            return .qubicMeterPerSecond
         }
     }
     
@@ -465,10 +448,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case .windspeed_10m_mean:
             return .relativeChange(maximum: nil)
         case .windspeed_10m_max:
-            return .relativeChange(maximum: nil)
-        case .windgusts_10m_mean:
-            return .relativeChange(maximum: nil)
-        case .windgusts_10m_max:
             return .relativeChange(maximum: nil)
         case .soil_moisture_0_to_10cm_mean:
             return .absoluteChage(bounds: 0...10e9)
@@ -578,24 +557,13 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return 1000
         case .shortwave_radiation_sum:
             return 10
-        case .windgusts_10m_mean:
-            fatalError()
-        case .windgusts_10m_max:
-            fatalError()
         }
     }
     
     func domainTimeRange(for domain: Cmip6Domain, isFuture: Bool) -> TimeType? {
         switch domain {
         case .EC_Earth3P_HR:
-            switch self {
-            case .windgusts_10m_mean:
-                return nil
-            case .windgusts_10m_max:
-                return nil
-            default:
-                return isFuture ? .yearly : .monthly
-            }
+            return isFuture ? .yearly : .monthly
         case .MRI_AGCM3_2_S:
             switch self {
             case .pressure_msl_mean:
@@ -630,10 +598,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .windspeed_10m_mean:
                 return .yearly
-            case .windgusts_10m_mean:
-                return nil
-            case .windgusts_10m_max:
-                return nil
             }
         /*case .HadGEM3_GC31_HM:
             // Has all, but wind max and swrad are in h alf yearly files
@@ -824,10 +788,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return nil
             case .shortwave_radiation_sum:
                 return .yearly
-            case .windgusts_10m_mean:
-                return nil
-            case .windgusts_10m_max:
-                return nil
             }
         }
     }
@@ -867,10 +827,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return "sfcWind"
         case .windspeed_10m_max:
             return "sfcWindmax"
-        case .windgusts_10m_mean:
-            fatalError()
-        case .windgusts_10m_max:
-            fatalError()
         }
     }
     
