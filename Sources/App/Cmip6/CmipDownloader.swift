@@ -598,7 +598,14 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     func domainTimeRange(for domain: Cmip6Domain, isFuture: Bool) -> TimeType? {
         switch domain {
         case .EC_Earth3P_HR:
-            return isFuture ? .yearly : .monthly
+            switch self {
+            case .windgusts_10m_mean:
+                return nil
+            case .windgusts_10m_max:
+                return nil
+            default:
+                return isFuture ? .yearly : .monthly
+            }
         case .MRI_AGCM3_2_S:
             switch self {
             case .pressure_msl_mean:
@@ -871,9 +878,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case .windspeed_10m_max:
             return "sfcWindmax"
         case .windgusts_10m_mean:
-            return "MISSING"
+            fatalError()
         case .windgusts_10m_max:
-            return "MISSING"
+            fatalError()
         }
     }
     
