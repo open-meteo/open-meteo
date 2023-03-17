@@ -263,7 +263,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         case .gfs013:
             // Note gfs025_ensemble only offers precipitation probability at 3h
             // A nicer implementation should use a dedicated variables enum
-            let readers: [GenericReaderCached<GfsDomain, GfsVariable>] = try [GfsDomain.gfs025_ensemble, .gfs025, .gfs025].compactMap {
+            let readers: [GenericReaderCached<GfsDomain, GfsVariable>] = try [GfsDomain.gfs025_ensemble, .gfs025, .gfs013].compactMap {
                 guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                     return nil
                 }
