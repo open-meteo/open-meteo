@@ -15,6 +15,15 @@ struct BenchmarkCommand: Command {
         let file = try OmFileReader(file: "/Volumes/2TB_1GBs/data/master-MRI_AGCM3_2_S/temperature_2m_max_0.om")
         var array = [Float](repeating: .nan, count: 365*100)
         let chunkBuffer = OmFileReader<MmapFile>.getBuffer(minBytes: P4NDEC256_BOUND(n: file.chunk0*file.chunk1, bytesPerElement: file.compression.bytesPerElement)).baseAddress!
+        /*try array.withUnsafeMutableBufferPointer({ ptr in
+            try file.readOLD(into: ptr.baseAddress!,  arrayDim1Range: 0..<ptr.count, arrayDim1Length: ptr.count, chunkBuffer: chunkBuffer, dim0Slow: 100..<101, dim1: 0..<ptr.count)
+            let start = DispatchTime.now()
+            for _ in 1..<2000 {
+                try file.readOLD(into: ptr.baseAddress!,  arrayDim1Range: 0..<ptr.count, arrayDim1Length: ptr.count, chunkBuffer: chunkBuffer, dim0Slow: 100..<101, dim1: 0..<ptr.count)
+            }
+            context.console.info("Time \(start.timeElapsedPretty())")
+        })*/
+        
         try array.withUnsafeMutableBufferPointer({ ptr in
             try file.read(into: ptr.baseAddress!,  arrayDim1Range: 0..<ptr.count, arrayDim1Length: ptr.count, chunkBuffer: chunkBuffer, dim0Slow: 100..<101, dim1: 0..<ptr.count)
             let start = DispatchTime.now()
@@ -23,15 +32,6 @@ struct BenchmarkCommand: Command {
             }
             context.console.info("Time \(start.timeElapsedPretty())")
         })
-        
-        /*try array.withUnsafeMutableBufferPointer({ ptr in
-            try file.read3(into: ptr.baseAddress!,  arrayDim1Range: 0..<ptr.count, arrayDim1Length: ptr.count, chunkBuffer: chunkBuffer, dim0Slow: 100..<101, dim1: 0..<ptr.count)
-            let start = DispatchTime.now()
-            for _ in 1..<2000 {
-                try file.read3(into: ptr.baseAddress!,  arrayDim1Range: 0..<ptr.count, arrayDim1Length: ptr.count, chunkBuffer: chunkBuffer, dim0Slow: 100..<101, dim1: 0..<ptr.count)
-            }
-            context.console.info("Time \(start.timeElapsedPretty())")
-        })*/
                 
         //for _ in 1..<60000000 {
             /*let currentTime = Timestamp(Int(Date().timeIntervalSince1970))

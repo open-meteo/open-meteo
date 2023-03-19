@@ -621,7 +621,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                             let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
                             let localRange = localOut1.add(localOut0 * arrayDim1Length + arrayDim1Range.lowerBound)
                             
-                            for i in 0..<length1 {
+                            for i in 0..<read.count {
                                 let posBuffer = read.lowerBound+i
                                 let posOut = localRange.lowerBound+i
                                 let val = chunkBuffer[posBuffer]
@@ -681,7 +681,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                             let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
                             let localRange = localOut1.add(localOut0 * arrayDim1Length + arrayDim1Range.lowerBound)
                             
-                            for i in 0..<length1 {
+                            for i in 0..<read.count {
                                 let posBuffer = read.lowerBound+i
                                 let posOut = localRange.lowerBound+i
                                 let val = chunkBuffer[posBuffer]
