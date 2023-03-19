@@ -143,7 +143,7 @@ fileprivate let lockBuffers = NIOLock()
 
 extension OmFileReader {
     /// Thread safe buffer provider that automatically reallocates buffers
-    fileprivate static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
+    public static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
         return lockBuffers.withLock {
             if let buffer = buffers[Thread.current] {
                 if buffer.count < minBytes {

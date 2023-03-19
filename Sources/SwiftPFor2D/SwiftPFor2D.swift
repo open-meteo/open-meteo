@@ -474,7 +474,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 ptr.pointee
             }
         }
-
+        
         guard header.magicNumber1 == OmHeader.magicNumber1 && header.magicNumber2 == OmHeader.magicNumber2 else {
             throw SwiftPFor2DError.notAOmFile
         }
@@ -621,7 +621,9 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                             let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
                             let localRange = localOut1.add(localOut0 * arrayDim1Length + arrayDim1Range.lowerBound)
                             
-                            for (posBuffer, posOut) in zip(read, localRange) {
+                            for i in 0..<length1 {
+                                let posBuffer = read.lowerBound+i
+                                let posOut = localRange.lowerBound+i
                                 let val = chunkBuffer[posBuffer]
                                 if val == Int16.max {
                                     into.advanced(by: posOut).pointee = .nan
@@ -679,7 +681,9 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                             let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
                             let localRange = localOut1.add(localOut0 * arrayDim1Length + arrayDim1Range.lowerBound)
                             
-                            for (posBuffer, posOut) in zip(read, localRange) {
+                            for i in 0..<length1 {
+                                let posBuffer = read.lowerBound+i
+                                let posOut = localRange.lowerBound+i
                                 let val = chunkBuffer[posBuffer]
                                 into.advanced(by: posOut).pointee = val
                             }
