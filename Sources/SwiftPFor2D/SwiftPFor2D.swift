@@ -612,18 +612,16 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                         
                         /// Moved to local coordinates... e.g. 50..<350
                         let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                        let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
+                        let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
                         
                         for d0 in clampedLocal0 {
-                            let read = clampedLocal1.add(d0 * length1)
-                            
+                            let readStart = clampedLocal1 + d0 * length1
                             let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                            let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
-                            let localRange = localOut1.add(localOut0 * arrayDim1Length + arrayDim1Range.lowerBound)
-                            
-                            for i in 0..<read.count {
-                                let posBuffer = read.lowerBound+i
-                                let posOut = localRange.lowerBound+i
+                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
+                            let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
+                            for i in 0..<clampedGlobal1.count {
+                                let posBuffer = readStart + i
+                                let posOut = localRange + i
                                 let val = chunkBuffer[posBuffer]
                                 if val == Int16.max {
                                     into.advanced(by: posOut).pointee = .nan
@@ -672,18 +670,16 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                         
                         /// Moved to local coordinates... e.g. 50..<350
                         let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                        let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
+                        let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
                         
                         for d0 in clampedLocal0 {
-                            let read = clampedLocal1.add(d0 * length1)
-                            
+                            let readStart = clampedLocal1 + d0 * length1
                             let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                            let localOut1 = clampedGlobal1.substract(dim1Read.lowerBound)
-                            let localRange = localOut1.add(localOut0 * arrayDim1Length + arrayDim1Range.lowerBound)
-                            
-                            for i in 0..<read.count {
-                                let posBuffer = read.lowerBound+i
-                                let posOut = localRange.lowerBound+i
+                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
+                            let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
+                            for i in 0..<clampedGlobal1.count {
+                                let posBuffer = readStart + i
+                                let posOut = localRange + i
                                 let val = chunkBuffer[posBuffer]
                                 into.advanced(by: posOut).pointee = val
                             }
