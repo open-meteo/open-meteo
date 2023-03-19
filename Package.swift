@@ -51,7 +51,7 @@ let package = Package(
     .target(name: "CHelper", cSettings: [.unsafeFlags(flagsHelper)]),
     .executableTarget(name: "openmeteo-api", dependencies: [.target(name: "App")]),
     .testTarget(name: "AppTests", dependencies: [.target(name: "App")]),
-    .target(name: "SwiftPFor2D", dependencies: ["CTurboPFor"]),
+    .target(name: "SwiftPFor2D", dependencies: ["CTurboPFor", "CHelper"]),
     .target(name: "CTurboPFor", cSettings: [.unsafeFlags(flagsCTurbo)]), // disable all warnings, generated from macros
     //.testTarget(name: "SwiftPFor2DTests", dependencies: ["SwiftPFor2D", "CTurboPFor"]),
   ]

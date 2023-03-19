@@ -1,4 +1,5 @@
 @_implementationOnly import CTurboPFor
+@_implementationOnly import CHelper
 import Foundation
 
 public enum SwiftPFor2DError: Error {
@@ -192,14 +193,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
                     }
                     
                     // 2D delta encoding
-                    if length0 > 1/* && length0 != dx*dx*/ {
-                        //print("in regular 2D")
-                        for d1 in 0..<length1 {
-                            for d0 in (1..<length0).reversed() {
-                                buffer[d0*length1 + d1] &-= buffer[(d0-1)*length1 + d1]
-                            }
-                        }
-                    }
+                    delta2d_encode(length0, length1, buffer)
                     
                     let writeLength = p4nzenc128v16(buffer, length1 * length0, writeBuffer.baseAddress?.advanced(by: writeBufferPos))
                     
@@ -261,14 +255,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
                     }
                     
                     // 2D xor encoding
-                    if length0 > 1/* && length0 != dx*dx*/ {
-                        //print("in regular 2D")
-                        for d1 in 0..<length1 {
-                            for d0 in (1..<length0).reversed() {
-                                buffer[d0*length1 + d1] ^= buffer[(d0-1)*length1 + d1]
-                            }
-                        }
-                    }
+                    delta2d_xor(length0, length1, bufferFloat)
                     
                     let writeLength = fpxenc32(buffer, length1 * length0, writeBuffer.baseAddress?.advanced(by: writeBufferPos), 0)
                     
@@ -602,13 +589,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                         precondition(uncompressedBytes == lengthCompressedBytes)
                         
                         // 2D delta decoding
-                        if length0 > 1 {
-                            for d1 in 0..<length1 {
-                                for d0 in (1..<length0) {
-                                    chunkBuffer[d0*length1 + d1] &+= chunkBuffer[(d0-1)*length1 + d1]
-                                }
-                            }
-                        }
+                        delta2d_decode(length0, length1, chunkBuffer)
                         
                         /// Moved to local coordinates... e.g. 50..<350
                         let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
@@ -660,13 +641,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                         precondition(uncompressedBytes == lengthCompressedBytes)
                         
                         // 2D xor decoding
-                        if length0 > 1 {
-                            for d1 in 0..<length1 {
-                                for d0 in (1..<length0) {
-                                    chunkBufferUInt[d0*length1 + d1] ^= chunkBufferUInt[(d0-1)*length1 + d1]
-                                }
-                            }
-                        }
+                        delta2d_xor(length0, length1, chunkBuffer)
                         
                         /// Moved to local coordinates... e.g. 50..<350
                         let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
