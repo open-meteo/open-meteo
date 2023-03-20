@@ -20,7 +20,7 @@ public struct GfsController {
         
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 17)
         let timezone = try params.resolveTimezone()
-        let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, allowedRange: allowedRange)
+        let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, allowedRange: allowedRange)
         
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
@@ -108,6 +108,7 @@ public struct GfsController {
             elevation: reader.targetElevation,
             generationtime_ms: generationTimeMs,
             utc_offset_seconds: time.utcOffsetSeconds,
+            utc_offset_seconds_actual: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: currentWeather,
             sections: [hourly, daily].compactMap({$0}),

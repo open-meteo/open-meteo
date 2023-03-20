@@ -16,7 +16,7 @@ struct Era5Controller {
         
         let allowedRange = Timestamp(1940, 1, 1) ..< Timestamp.now()
         let timezone = try params.resolveTimezone()
-        let time = try params.getTimerange(timezone: timezone, allowedRange: allowedRange)
+        let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, allowedRange: allowedRange)
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
@@ -97,6 +97,7 @@ struct Era5Controller {
             elevation: readers[0].targetElevation,
             generationtime_ms: generationTimeMs,
             utc_offset_seconds: time.utcOffsetSeconds,
+            utc_offset_seconds_actual: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: nil,
             sections: [hourly, daily].compactMap({$0}),
@@ -400,7 +401,7 @@ struct Era5Query: Content, QueryWithTimezone, ApiUnitsSelectable {
         }
     }
     
-    func getTimerange(timezone: TimeZone, allowedRange: Range<Timestamp>) throws -> TimerangeLocal {
+    func getTimerange(timezone: TimeZone, allowedRange: Range<Timestamp>) throws -> (actualUtcOffset: Int, time: TimerangeLocal) {
         let start = start_date.toTimestamp()
         let includedEnd = end_date.toTimestamp()
         guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
@@ -412,9 +413,10 @@ struct Era5Query: Content, QueryWithTimezone, ApiUnitsSelectable {
         guard allowedRange.contains(includedEnd) else {
             throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
         }
-        let utcOffsetSeconds = (timezone.secondsFromGMT() / 3600) * 3600
-        
-        return TimerangeLocal(range: start.add(-1 * utcOffsetSeconds) ..< includedEnd.add(86400 - utcOffsetSeconds), utcOffsetSeconds: utcOffsetSeconds)
+        let actualUtcOffset = timezone.secondsFromGMT()
+        let utcOffsetSeconds = (actualUtcOffset / 3600) * 3600
+        let time = TimerangeLocal(range: start.add(-1 * utcOffsetSeconds) ..< includedEnd.add(86400 - utcOffsetSeconds), utcOffsetSeconds: utcOffsetSeconds)
+        return (actualUtcOffset, time)
     }
     
     var timeformatOrDefault: Timeformat {

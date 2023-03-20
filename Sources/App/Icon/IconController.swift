@@ -13,12 +13,12 @@ public struct IconController {
         
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 8)
         let timezone = try params.resolveTimezone()
-        let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+        let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
         
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         // limited to 3 forecast days
-        let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange).range.range(dtSeconds: 3600/4)
+        let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange).time.range.range(dtSeconds: 3600/4)
         
         guard let reader = try IconMixer(domains: [.icon, .iconEu, .iconD2], lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
             throw ForecastapiError.noDataAvilableForThisLocation
@@ -117,6 +117,7 @@ public struct IconController {
             elevation: reader.targetElevation,
             generationtime_ms: generationTimeMs,
             utc_offset_seconds: time.utcOffsetSeconds,
+            utc_offset_seconds_actual: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: currentWeather,
             sections: [minutely, hourly, daily].compactMap({$0}),

@@ -12,7 +12,7 @@ struct MetNoController {
         
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 4)
         let timezone = try params.resolveTimezone()
-        let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange)
+        let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange)
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
         
@@ -65,6 +65,7 @@ struct MetNoController {
             elevation: reader.targetElevation,
             generationtime_ms: generationTimeMs,
             utc_offset_seconds: time.utcOffsetSeconds,
+            utc_offset_seconds_actual: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: currentWeather,
             sections: [hourly].compactMap({$0}),

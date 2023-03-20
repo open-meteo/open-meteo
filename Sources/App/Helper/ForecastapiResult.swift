@@ -83,7 +83,10 @@ struct ForecastapiResult {
     let elevation: Float?
     
     let generationtime_ms: Double
+    /// The utc offset rounded to the next hour which is used to process data
     let utc_offset_seconds: Int
+    /// The actual timezone offset
+    let utc_offset_seconds_actual: Int
     let timezone: TimeZone
     let current_weather: CurrentWeather?
     let sections: [ApiSection]
@@ -127,7 +130,7 @@ struct ForecastapiResult {
                 
                 b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
                 let elevation = elevation.map({ $0.isNaN ? "NaN" : "\($0)" }) ?? "NaN"
-                b.buffer.writeString("\(latitude),\(longitude),\(elevation),\(utc_offset_seconds),\(timezone.identifier),\(timezone.abbreviation() ?? "")\n")
+                b.buffer.writeString("\(latitude),\(longitude),\(elevation),\(utc_offset_seconds_actual),\(timezone.identifier),\(timezone.abbreviation() ?? "")\n")
                 
                 if let current_weather = current_weather {
                     b.buffer.writeString("\n")
@@ -199,7 +202,7 @@ struct ForecastapiResult {
         sheet.write(latitude)
         sheet.write(longitude)
         sheet.write(elevation ?? .nan)
-        sheet.write(utc_offset_seconds)
+        sheet.write(utc_offset_seconds_actual)
         sheet.write(timezone.identifier)
         sheet.write(timezone.abbreviation() ?? "")
         sheet.endRow()
@@ -270,7 +273,7 @@ struct ForecastapiResult {
                 var b = BufferAndWriter(writer: writer)
 
                 b.buffer.writeString("""
-                {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation() ?? "")"
+                {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds_actual),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation() ?? "")"
                 """)
                 if let elevation = elevation, !elevation.isNaN {
                     b.buffer.writeString(",\"elevation\":\(elevation)")
