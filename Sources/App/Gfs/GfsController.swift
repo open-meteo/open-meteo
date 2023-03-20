@@ -21,6 +21,8 @@ public struct GfsController {
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 17)
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, allowedRange: allowedRange)
+        /// For fractional timezones, shift data to show only for full timestamps
+        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
@@ -51,7 +53,7 @@ public struct GfsController {
                 assert(hourlyTime.count == d.data.count)
                 res.append(d)
             }
-            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
         }
         
         let currentWeather: ForecastapiResult.CurrentWeather?
@@ -98,7 +100,7 @@ public struct GfsController {
                 assert(dailyTime.count == d.data.count)
                 res.append(d)
             }
-            return ApiSection(name: "daily", time: dailyTime, columns: res)
+            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: res)
         }
         
         let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
@@ -107,8 +109,7 @@ public struct GfsController {
             longitude: reader.modelLon,
             elevation: reader.targetElevation,
             generationtime_ms: generationTimeMs,
-            utc_offset_seconds: time.utcOffsetSeconds,
-            utc_offset_seconds_actual: utcOffsetSecondsActual,
+            utc_offset_seconds: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: currentWeather,
             sections: [hourly, daily].compactMap({$0}),

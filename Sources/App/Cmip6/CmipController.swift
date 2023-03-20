@@ -88,7 +88,6 @@ struct CmipController {
             elevation: readers[0].targetElevation,
             generationtime_ms: generationTimeMs,
             utc_offset_seconds: 0,
-            utc_offset_seconds_actual: 0,
             timezone: TimeZone(identifier: "GMT")!,
             current_weather: nil,
             sections: [/*hourly,*/ daily].compactMap({$0}),

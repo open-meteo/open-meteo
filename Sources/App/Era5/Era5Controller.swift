@@ -17,6 +17,8 @@ struct Era5Controller {
         let allowedRange = Timestamp(1940, 1, 1) ..< Timestamp.now()
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, allowedRange: allowedRange)
+        /// For fractional timezones, shift data to show only for full timestamps
+        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
@@ -58,7 +60,7 @@ struct Era5Controller {
                     res.append(d)
                 }
             }
-            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
         }
         let daily: ApiSection? = try paramsDaily.map { dailyVariables in
             var res = [ApiColumn]()
@@ -87,7 +89,7 @@ struct Era5Controller {
                 }
             }
             
-            return ApiSection(name: "daily", time: dailyTime, columns: res)
+            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: res)
         }
         
         let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
@@ -96,8 +98,7 @@ struct Era5Controller {
             longitude: readers[0].modelLon,
             elevation: readers[0].targetElevation,
             generationtime_ms: generationTimeMs,
-            utc_offset_seconds: time.utcOffsetSeconds,
-            utc_offset_seconds_actual: utcOffsetSecondsActual,
+            utc_offset_seconds: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: nil,
             sections: [hourly, daily].compactMap({$0}),

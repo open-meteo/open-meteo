@@ -13,6 +13,8 @@ struct EcmwfController {
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 11)
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 10, allowedRange: allowedRange)
+        /// For fractional timezones, shift data to show only for full timestamps
+        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
         
         guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
@@ -31,7 +33,7 @@ struct EcmwfController {
                 let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
                 res.append(d)
             }
-            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
         }
         
         let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
@@ -40,8 +42,7 @@ struct EcmwfController {
             longitude: reader.reader.modelLon,
             elevation: nil,
             generationtime_ms: generationTimeMs,
-            utc_offset_seconds: time.utcOffsetSeconds,
-            utc_offset_seconds_actual: utcOffsetSecondsActual,
+            utc_offset_seconds: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: nil,
             sections: [hourly].compactMap({$0}),

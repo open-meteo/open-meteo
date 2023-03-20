@@ -14,6 +14,8 @@ public struct IconController {
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 8)
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+        /// For fractional timezones, shift data to show only for full timestamps
+        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
@@ -50,7 +52,7 @@ public struct IconController {
                 assert(hourlyTime.count == d.data.count)
                 res.append(d)
             }
-            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
         }
         let minutely: ApiSection? = try paramsMinutely.map { variables in
             var res = [ApiColumn]()
@@ -60,7 +62,7 @@ public struct IconController {
                 assert(minutelyTime.count == d.data.count)
                 res.append(d)
             }
-            return ApiSection(name: "minutely_15", time: minutelyTime, columns: res)
+            return ApiSection(name: "minutely_15", time: minutelyTime.add(utcOffsetShift), columns: res)
         }
         
         let currentWeather: ForecastapiResult.CurrentWeather?
@@ -107,7 +109,7 @@ public struct IconController {
                 assert(dailyTime.count == d.data.count)
                 res.append(d)
             }
-            return ApiSection(name: "daily", time: dailyTime, columns: res)
+            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: res)
         }
         
         let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
@@ -116,8 +118,7 @@ public struct IconController {
             longitude: reader.modelLon,
             elevation: reader.targetElevation,
             generationtime_ms: generationTimeMs,
-            utc_offset_seconds: time.utcOffsetSeconds,
-            utc_offset_seconds_actual: utcOffsetSecondsActual,
+            utc_offset_seconds: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: currentWeather,
             sections: [minutely, hourly, daily].compactMap({$0}),

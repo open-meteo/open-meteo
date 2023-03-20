@@ -228,6 +228,8 @@ struct SeasonalForecastController {
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange)
+        /// For fractional timezones, shift data to show only for full timestamps
+        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let hourlyTime = time.range.range(dtSeconds: domain.dtSeconds)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
@@ -257,7 +259,7 @@ struct SeasonalForecastController {
         }
         
         let hourly: ApiSection? = try paramsSixHourly.map { variables in
-            return ApiSection(name: "six_hourly", time: hourlyTime, columns: try variables.flatMap { variable in
+            return ApiSection(name: "six_hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
                 try members.map { member in
                     let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(params: params).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
                     assert(hourlyTime.count == d.data.count, "hours \(hourlyTime.count), values \(d.data.count)")
@@ -267,7 +269,7 @@ struct SeasonalForecastController {
         }
         
         let daily: ApiSection? = try paramsDaily.map { dailyVariables in
-            return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.flatMap { variable in
+            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.flatMap { variable in
                 try members.map { member in
                     let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(params: params).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
                     assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
@@ -282,8 +284,7 @@ struct SeasonalForecastController {
             longitude: reader.modelLon,
             elevation: reader.targetElevation,
             generationtime_ms: generationTimeMs,
-            utc_offset_seconds: time.utcOffsetSeconds,
-            utc_offset_seconds_actual: utcOffsetSecondsActual,
+            utc_offset_seconds: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: nil,
             sections: [hourly, daily].compactMap({$0}),

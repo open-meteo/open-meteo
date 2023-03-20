@@ -13,6 +13,8 @@ struct MetNoController {
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 4)
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange)
+        /// For fractional timezones, shift data to show only for full timestamps
+        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
         
@@ -32,7 +34,7 @@ struct MetNoController {
                 let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
                 res.append(d)
             }
-            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
         }
         
         let currentWeather: ForecastapiResult.CurrentWeather?
@@ -64,8 +66,7 @@ struct MetNoController {
             longitude: reader.modelLon,
             elevation: reader.targetElevation,
             generationtime_ms: generationTimeMs,
-            utc_offset_seconds: time.utcOffsetSeconds,
-            utc_offset_seconds_actual: utcOffsetSecondsActual,
+            utc_offset_seconds: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: currentWeather,
             sections: [hourly].compactMap({$0}),

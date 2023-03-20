@@ -95,6 +95,8 @@ struct GloFasController {
         let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange, past_days_max: 360)
+        /// For fractional timezones, shift data to show only for full timestamps
+        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
         let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.seamless_v3]
@@ -129,7 +131,7 @@ struct GloFasController {
             try reader.prefetchData(variables: variables, time: dailyTime)
         }
         
-        let daily = ApiSection(name: "daily", time: dailyTime, columns: try variables.flatMap { variable in
+        let daily = ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
             try zip(readers, domains).compactMap { (reader, domain) in
                 let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
                 let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(temperatureUnit: .celsius, windspeedUnit: .ms, precipitationUnit: .mm).toApi(name: name)
@@ -144,8 +146,7 @@ struct GloFasController {
             longitude: readers[0].modelLon,
             elevation: nil,
             generationtime_ms: generationTimeMs,
-            utc_offset_seconds: time.utcOffsetSeconds,
-            utc_offset_seconds_actual: utcOffsetSecondsActual,
+            utc_offset_seconds: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: nil,
             sections: [daily],

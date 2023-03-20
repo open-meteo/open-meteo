@@ -13,6 +13,8 @@ struct IconWaveController {
         let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 11)
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 7, allowedRange: allowedRange)
+        /// For fractional timezones, shift data to show only for full timestamps
+        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
@@ -36,11 +38,11 @@ struct IconWaveController {
                 let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.rawValue)
                 res.append(d)
             }
-            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
+            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
         }
         
         let daily: ApiSection? = try paramsDaily.map { dailyVariables in
-            return ApiSection(name: "daily", time: dailyTime, columns: try dailyVariables.map { variable in
+            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.map { variable in
                 let d = try reader.getDaily(variable: variable, time: dailyTime).toApi(name: variable.rawValue)
                 assert(dailyTime.count == d.data.count)
                 return d
@@ -53,8 +55,7 @@ struct IconWaveController {
             longitude: reader.modelLon,
             elevation: nil,
             generationtime_ms: generationTimeMs,
-            utc_offset_seconds: time.utcOffsetSeconds,
-            utc_offset_seconds_actual: utcOffsetSecondsActual,
+            utc_offset_seconds: utcOffsetSecondsActual,
             timezone: timezone,
             current_weather: nil,
             sections: [hourly, daily].compactMap({$0}),
