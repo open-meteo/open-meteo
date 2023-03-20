@@ -163,17 +163,25 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.20220818/conus/hrrr.t00z.wrfnatf00.grib2
         let fHH = forecastHour.zeroPadded(len: 2)
         let fHHH = forecastHour.zeroPadded(len: 3)
+        // Files older than 48 hours are not available anymore on nomads
+        let useArchive = (Timestamp.now().timeIntervalSince1970 - run.timeIntervalSince1970) > 36*3600
+        /// 4 week archive
+        let gfsAws = "https://noaa-gfs-bdp-pds.s3.amazonaws.com/"
+        let gfsNomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
         switch self {
         case .gfs025_ensemble:
             fatalError("not supported, as it needs a member string")
         case .gfs013:
-            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.sfluxgrbf\(fHHH).grib2"
+            return "\(useArchive ? gfsAws : gfsNomads)gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.sfluxgrbf\(fHHH).grib2"
         case .gfs025:
-            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f\(fHHH)"
+            return "\(useArchive ? gfsAws : gfsNomads)gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f\(fHHH)"
         //case .nam_conus:
         //    return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
         case .hrrr_conus:
-            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfprsf\(fHH).grib2"
+            let nomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"
+            //let google = "https://storage.googleapis.com/high-resolution-rapid-refresh/"
+            let aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
+            return "\(useArchive ? aws : nomads)hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfprsf\(fHH).grib2"
         }
     }
 }
