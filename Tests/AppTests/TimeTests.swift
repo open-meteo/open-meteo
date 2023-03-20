@@ -13,6 +13,13 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(date.toIsoString(), "2021-11-23")
     }
     
+    
+    func testTimeFormats() throws {
+        XCTAssertEqual(try Timestamp.from(yyyymmdd: "20211123").format_YYYYMMddHH, "2021112300")
+        XCTAssertEqual(try Timestamp.from(yyyymmdd: "2021112323").format_YYYYMMddHH, "2021112323")
+        XCTAssertEqual(try Timestamp.from(yyyymmdd: "20211123235958").iso8601_YYYY_MM_dd_HH_mm, "2021-11-23T23:59")
+    }
+    
     func testTimeIteration() {
         let range = TimerangeDt(start: Timestamp(2022,7,1), nTime: 5, dtSeconds: 7200)
         XCTAssertEqual(range.range.count, 36000)

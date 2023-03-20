@@ -13,9 +13,6 @@ struct MeteoFranceDownload: AsyncCommandFix {
 
         @Option(name: "run")
         var run: String?
-        
-        @Option(name: "past-days")
-        var pastDays: Int?
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
@@ -39,12 +36,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         let logger = context.application.logger
         let domain = try MeteoFranceDomain.load(rawValue: signature.domain)
         
-        let run = signature.run.map {
-            guard let run = Int($0) else {
-                fatalError("Invalid run '\($0)'")
-            }
-            return run
-        } ?? domain.lastRun
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         let onlyVariables: [MeteoFranceVariableDownloadable]? = try signature.onlyVariables.map {
             try $0.split(separator: ",").map {
@@ -69,16 +61,14 @@ struct MeteoFranceDownload: AsyncCommandFix {
         
         let variables = variablesAll.filter({ $0.availableFor(domain: domain) })
         
-        let date = Timestamp.now().add(-24*3600 * (signature.pastDays ?? 0)).with(hour: run)
-        
-        logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
+        logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         try await downloadElevation(application: context.application, domain: domain)
-        try await download(application: context.application, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
-        try convert(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
+        try await download(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
+        try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     

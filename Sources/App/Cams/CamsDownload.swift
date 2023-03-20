@@ -35,18 +35,12 @@ struct DownloadCamsCommand: AsyncCommandFix {
     func run(using context: CommandContext, signature: Signature) async throws {
         let domain = try CamsDomain.load(rawValue: signature.domain)
         
-        let run = signature.run.map {
-            guard let run = Int($0) else {
-                fatalError("Invalid run '\($0)'")
-            }
-            return run
-        } ?? domain.lastRun
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         let onlyVariables = try CamsVariable.load(commaSeparatedOptional: signature.onlyVariables)
         
         let logger = context.application.logger
-        let date = Timestamp.now().with(hour: run)
-        logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
+        logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         // todo dust multi level
         
@@ -59,14 +53,14 @@ struct DownloadCamsCommand: AsyncCommandFix {
             guard let ftppassword = signature.ftppassword else {
                 fatalError("ftppassword is required")
             }
-            try await downloadCamsGlobal(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
-            try convertCamsGlobal(logger: logger, domain: domain, run: date, variables: variables)
+            try await downloadCamsGlobal(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
+            try convertCamsGlobal(logger: logger, domain: domain, run: run, variables: variables)
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            try downloadCamsEurope(logger: logger, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
-            try convertCamsEurope(logger: logger, domain: domain, run: date, variables: variables)
+            try downloadCamsEurope(logger: logger, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
+            try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
         }
     }
     

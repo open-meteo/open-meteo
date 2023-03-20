@@ -56,7 +56,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     }
     
     /// Based on the current time , guess the current run that should be available soon on the open-data server
-    var lastRun: Int {
+    var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
         case .gfs025_ensemble:
@@ -65,13 +65,13 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             fallthrough
         case .gfs025:
             // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
-            return ((t.hour - 3 + 24) % 24) / 6 * 6
+            return t.with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
         //case .nam_conus:
             // NAM has a delay of 1:40 hours after initialisation. Cronjob starts at 1:40
             //return ((t.hour - 1 + 24) % 24) / 6 * 6
         case .hrrr_conus:
             // HRRR has a delay of 55 minutes after initlisation. Cronjob starts at xx:55
-            return t.hour
+            return t.with(hour: t.hour)
         }
     }
     

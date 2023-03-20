@@ -53,6 +53,31 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var lastRun: Timestamp {
+        switch self {
+        case .ecmwf:
+            fatalError()
+        case .ukMetOffice:
+            fatalError()
+        case .meteoFrance:
+            fatalError()
+        case .dwd:
+            fatalError()
+        case .cmcc:
+            fatalError()
+        case .ncep:
+            let t = Timestamp.now()
+            let hour = ((t.hour - 8 + 24) % 24 ).floor(to: 6)
+            /// 18z run is available the day after starting 05:26
+            return t.add(-8*3600).with(hour: hour)
+        case .jma:
+            fatalError()
+        case .eccc:
+            fatalError()
+        }
+
+    }
+    
     /// 14 days longer than actual one update
     var omFileLength: Int {
         switch self {

@@ -38,20 +38,13 @@ struct GfsDownload: AsyncCommandFix {
         let domain = try GfsDomain.load(rawValue: signature.domain)
         disableIdleSleep()
         
-        let run = signature.run.map {
-            guard let run = Int($0) else {
-                fatalError("Invalid run '\($0)'")
-            }
-            return run
-        } ?? domain.lastRun
-        
         /// 18z run is available the day after starting 05:26
-        let date = Timestamp.now().with(hour: run)
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         switch domain {
         case .gfs025_ensemble:
-            try await downloadPrecipitationProbability(application: context.application, run: date, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: date, createNetcdf: signature.createNetcdf)
+            try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
+            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf)
         case .gfs013:
             fallthrough
         case .hrrr_conus:
@@ -77,8 +70,8 @@ struct GfsDownload: AsyncCommandFix {
             
             let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
             
-            try await downloadGfs(application: context.application, domain: domain, run: date, variables: variables, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, variables: variables, run: date, createNetcdf: signature.createNetcdf)
+            try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
+            try convertGfs(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")

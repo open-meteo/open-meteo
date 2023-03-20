@@ -40,7 +40,7 @@ struct JmaDownload: AsyncCommandFix {
         let logger = context.application.logger
         let domain = try JmaDomain.load(rawValue: signature.domain)
         
-        let run = signature.run.flatMap(Int.init).map { Timestamp.now().with(hour: $0) } ?? domain.lastRun
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
 
         guard let server = signature.server else {
             fatalError("Parameter server required")
@@ -594,5 +594,19 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         case .msm:
             return RegularGrid(nx: 481, ny: 505, latMin: 22.4, lonMin: 120, dx: 0.0625, dy: 0.05)
         }
+    }
+}
+
+
+extension Timestamp {
+    /// Interprete the run parameter as either a simple hour or a fully specified date
+    static func fromRunHourOrYYYYMMDD(_ str: String) throws -> Timestamp {
+        if str.count > 2 {
+            return try Timestamp.from(yyyymmdd: str)
+        }
+        guard let run = Int(str) else {
+            throw TimeError.InvalidDateFromat
+        }
+        return Timestamp.now().with(hour: run)
     }
 }

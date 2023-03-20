@@ -49,19 +49,13 @@ struct SeasonalForecastDownload: AsyncCommandFix {
         case .cmcc:
             fatalError()
         case .ncep:
-            let run = signature.run.map {
-                guard let run = Int($0) else {
-                    fatalError("Invalid run '\($0)'")
-                }
-                return run
-            } ?? ((Timestamp.now().hour - 8 + 24) % 24 ).floor(to: 6)
-            
             /// 18z run is available the day after starting 05:26
-            let date = Timestamp.now().add(-8*3600).with(hour: run)
-            try await downloadCfsElevation(application: context.application, domain: domain, run: date)
+            let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
             
-            try await downloadCfs(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
-            try convertCfs(logger: logger, domain: domain, run: date)
+            try await downloadCfsElevation(application: context.application, domain: domain, run: run)
+            
+            try await downloadCfs(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting)
+            try convertCfs(logger: logger, domain: domain, run: run)
         case .jma:
             fatalError()
         case .eccc:

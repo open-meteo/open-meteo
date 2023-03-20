@@ -48,7 +48,7 @@ struct GemDownload: AsyncCommandFix {
         let logger = context.application.logger
         let domain = try GemDomain.load(rawValue: signature.domain)
         
-        let run = signature.run.flatMap(Int.init).map { Timestamp.now().with(hour: $0) } ?? domain.lastRun
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         let onlyVariables: [GemVariableDownloadable]? = signature.onlyVariables.map {
             $0.split(separator: ",").map {

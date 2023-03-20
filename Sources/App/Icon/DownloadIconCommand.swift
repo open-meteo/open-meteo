@@ -344,12 +344,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         let start = DispatchTime.now()
         let domain = try IconDomains.load(rawValue: signature.domain)
         
-        let run = signature.run.map {
-            guard let run = Int($0) else {
-                fatalError("Invalid run '\($0)'")
-            }
-            return run
-        } ?? domain.lastRun
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         let group = try VariableGroup.load(rawValueOptional: signature.group) ?? .all
         
@@ -405,15 +400,14 @@ struct DownloadIconCommand: AsyncCommandFix {
         let variables = onlyVariables ?? groupVariables
                 
         let logger = context.application.logger
-        let date = Timestamp.now().with(hour: run)
-        logger.info("Downloading domain '\(domain.rawValue)' run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
-        try await convertSurfaceElevation(application: context.application, domain: domain, run: date)
+        logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
         
-        try await downloadIcon(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
-        try convertIcon(logger: logger, domain: domain, run: date, variables: variables)
+        try await downloadIcon(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables)
+        try convertIcon(logger: logger, domain: domain, run: run, variables: variables)
         if domain == .iconD2 {
             // ICON-D2 download 15min data as well
-            try convertIcon(logger: logger, domain: .iconD2_15min, run: date, variables: variables)
+            try convertIcon(logger: logger, domain: .iconD2_15min, run: run, variables: variables)
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -422,16 +416,16 @@ struct DownloadIconCommand: AsyncCommandFix {
 
 extension IconDomains {
     /// Based on the current time , guess the current run that should be available soon on the open-data server
-    fileprivate var lastRun: Int {
+    fileprivate var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
         case .icon: fallthrough
         case .iconEu:
             // Icon has a delay of 2-3 hours after initialisation
-            return ((t.hour - 2 + 24) % 24) / 6 * 6
+            return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
         case .iconD2:
             // Icon d2 has a delay of 44 minutes and runs every 3 hours
-            return t.hour / 3 * 3
+            return t.with(hour: t.hour / 3 * 3)
         case .iconD2_15min:
             fatalError("ICON-D2 15minute data can not be downloaded individually")
         }

@@ -27,23 +27,17 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        let run = signature.run.map {
-            guard let run = Int($0) else {
-                fatalError("Invalid run '\($0)'")
-            }
-            return run
-        } ?? EcmwfDomain.ifs04.lastRun
+        let domain = EcmwfDomain.ifs04
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
+        
         let logger = context.application.logger
 
-        // 18z run starts downloading on the next day
-        let twoHoursAgo = Timestamp.now().add(-7200)
-        let date = twoHoursAgo.with(hour: run)
-        logger.info("Downloading domain ECMWF run '\(date.iso8601_YYYY_MM_dd_HH_mm)'")
+        logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
-        try await downloadEcmwf(application: context.application, base: base, run: date, skipFilesIfExisting: signature.skipExisting)
-        try convertEcmwf(logger: logger, run: date)
+        try await downloadEcmwf(application: context.application, base: base, run: run, skipFilesIfExisting: signature.skipExisting)
+        try convertEcmwf(logger: logger, run: run)
     }
     
     func downloadEcmwf(application: Application, base: String, run: Timestamp, skipFilesIfExisting: Bool) async throws {
@@ -196,12 +190,14 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
 
 extension EcmwfDomain {
     /// Based on the current time , guess the current run that should be available soon on the open-data server
-    fileprivate var lastRun: Int {
+    fileprivate var lastRun: Timestamp {
+        // 18z run starts downloading on the next day
+        let twoHoursAgo = Timestamp.now().add(-7200)
         let t = Timestamp.now()
         switch self {
         case .ifs04:
             // ECMWF has a delay of 7-8 hours after initialisation
-            return ((t.hour - 7 + 24) % 24) / 6 * 6
+            return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
         }
     }
 }

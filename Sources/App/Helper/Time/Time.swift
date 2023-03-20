@@ -58,6 +58,41 @@ public struct Timestamp: Hashable {
         self.timeIntervalSince1970 = timeIntervalSince1970
     }
     
+    /// Decode strings like `20231231` or even with hours, minutes or seconds `20231231235959`
+    static func from(yyyymmdd str: String) throws -> Timestamp {
+        guard str.count >= 8, str.count <= 14 else {
+            throw TimeError.InvalidDateFromat
+        }
+        guard let year = Int(str[0..<4]), year >= 1900, year <= 2200 else {
+            throw TimeError.InvalidDate
+        }
+        guard let month = Int(str[4..<6]), month >= 1, month <= 12 else {
+            throw TimeError.InvalidDate
+        }
+        guard let day = Int(str[6..<8]), day >= 1, day <= 31 else {
+            throw TimeError.InvalidDate
+        }
+        if str.count < 10 {
+            return Timestamp(year, month, day)
+        }
+        guard let hour = Int(str[8..<10]), hour >= 0, day <= 23 else {
+            throw TimeError.InvalidDate
+        }
+        if str.count < 12 {
+            return Timestamp(year, month, day, hour)
+        }
+        guard let minute = Int(str[10..<12]), minute >= 0, minute <= 59 else {
+            throw TimeError.InvalidDate
+        }
+        if str.count < 14 {
+            return Timestamp(year, month, day, hour, minute)
+        }
+        guard let second = Int(str[12..<14]), second >= 0, second <= 59 else {
+            throw TimeError.InvalidDate
+        }
+        return Timestamp(year, month, day, hour, minute, second)
+    }
+    
     public func add(_ secounds: Int) -> Timestamp {
         Timestamp(timeIntervalSince1970 + secounds)
     }

@@ -34,10 +34,10 @@ enum MetNoDomain: String, GenericDomain, CaseIterable {
     }
     
     /// Based on the current time , guess the current run that should be available soon on the open-data server
-    var lastRun: Int {
+    var lastRun: Timestamp {
         let t = Timestamp.now()
         // 30 min delay
-        return t.hour
+        return t.with(hour: t.hour)
     }
     
     /// Filename of the surface elevation file
