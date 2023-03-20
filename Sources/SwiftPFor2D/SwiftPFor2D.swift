@@ -255,7 +255,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
                     }
                     
                     // 2D xor encoding
-                    delta2d_xor(length0, length1, bufferFloat)
+                    delta2d_encode_xor(length0, length1, bufferFloat)
                     
                     let writeLength = fpxenc32(buffer, length1 * length0, writeBuffer.baseAddress?.advanced(by: writeBufferPos), 0)
                     
@@ -641,7 +641,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                         precondition(uncompressedBytes == lengthCompressedBytes)
                         
                         // 2D xor decoding
-                        delta2d_xor(length0, length1, chunkBuffer)
+                        delta2d_decode_xor(length0, length1, chunkBuffer)
                         
                         /// Moved to local coordinates... e.g. 50..<350
                         let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
