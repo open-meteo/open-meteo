@@ -41,7 +41,6 @@
   </div>
 </div>
 
-<!-- http://127.0.0.1:8080/v1/era5 -->
 <div class="container px-4 py-0" id="featured-3">
 
   <!--<div class="alert alert-primary" role="alert">
@@ -293,12 +292,6 @@
                     FGOALS_f3_H <span class="text-muted">(28 km)</span>
                   </label>
                 </div>
-                <!--<div class="form-check">
-                  <input class="form-check-input" type="checkbox" value="FGOALS_f3_H_highresSST" id="FGOALS_f3_H_highresSST" name="models">
-                  <label class="form-check-label" for="FGOALS_f3_H_highresSST">
-                    FGOALS_f3_H_highresSST <span class="text-muted">(25 km)</span>
-                  </label>
-                </div>-->
                 <div class="form-check">
                   <input class="form-check-input" type="checkbox" value="HiRAM_SIT_HR" id="HiRAM_SIT_HR" name="models"
                     checked>
@@ -428,7 +421,7 @@
       <p>The API offers climate data at a regional, rather than continental, level by downsizing it to a 10 km
         resolution. This allows for direct comparison of various climate models to identify vulnerable regions to
         climate change impacts or assessing the impact of climate change on specific sectors, such as agriculture or
-        public health. The reference point used is ERA5-Land, which is accessible through the <a>Historical Weather
+        public health. The reference point used is ERA5-Land, which is accessible through the <a href="/en/docs/historical-weather-api" title="Historical Weather Information via API">Historical Weather
           API</a>.</p>
       <p>With typical weather variables in daily resolution data from 1950 to 2050 data allows estimation of common
         climate parameters like the number of days with temperatures exceeding 30°C or duration of droughts.
@@ -438,9 +431,9 @@
     <div class="col-6">
       <p>While the data from past and recent years is available, it should not be confused with actual measurements, as
         it serves the purpose of model validation rather than showing actual past weather.</p>
-      <p>While these models consider different emission scenarios, the variations in these scenarios are less noticeable
-        until 2050. Projections beyond 2050 are highly dependent on different emission scenarios. Projections until 2100
-        are only accessible through lower resolution climate models that use different scenarios.</p>
+      <p>Projections beyond 2050 are highly dependent on different emission scenarios. 
+        The high resolution climate models are as close to RCP8.5 as possible within CMIP6. While other models consider different emission scenarios, the variations in these scenarios are less noticeable
+        until 2050. Projections until 2100 are not part of this API.</p>
       <p>The climate models available in this API vary in their accuracy and level of uncertainty, and depending on the
         analysis, some models may be more suitable than others. It is not possible to provide a general recommendation
         on which model is better. It is recommended to run analyses with multiple models and evaluate their performance
@@ -528,7 +521,7 @@
   </div>
   <div class="row">
     <p>Some weather variables may not be available in all climate models. Notably, soil moisture is only available in
-      MRI-AGCM3-2-S. Additionally, some models may not provide certain aggregations, such as maximum relative humidity.
+      <mark>MRI-AGCM3-2-S</mark> and <mark>EC_Earth3P_HR</mark>. Additionally, some models may not provide certain aggregations, such as maximum relative humidity.
       However, mean relative humidity is generally available. The table below outlines the weather variables that are
       available in each model:</p>
   </div>
@@ -590,7 +583,7 @@
           <td>&#x2705;</td>
           <td>&#x2705;</td>
           <td>&#x2705;</td>
-          <td>&#x274c;</td>
+          <td>&#x2705;</td>
         </tr>
         <tr>
           <th scope="row">MPI_ESM1_2_XR</th>
@@ -748,7 +741,7 @@
           <tr>
             <th scope="row">cloudcover_mean</th>
             <td>%</td>
-            <td>Mean cloud cover on a given day. Cloud cover in climate models is generally represented through simplified parameterizations that estimate the cloud amount, height, and thickness based on atmospheric conditions such as temperature, humidity, and wind speed. These parameterizations have been shown to provide reasonable estimates of global cloud cover and sis but they can have significant uncertainties and biases on regional and local scales. Systematic biases have corrected using ERA5.</td>
+            <td>Mean cloud cover on a given day. Cloud cover in climate models is generally represented through simplified parameterizations that estimate the cloud amount, height, and thickness based on atmospheric conditions such as temperature, humidity, and wind speed. These parameterizations have been shown to provide reasonable estimates of global cloud cover but they can have significant uncertainties and biases on regional and local scales. Systematic biases have corrected using ERA5.</td>
           </tr>
           <tr>
             <th scope="row">relative_humidity_2m_max<br>relative_humidity_2m_min<br>relative_humidity_2m_mean</th>
@@ -758,12 +751,12 @@
           <tr>
             <th scope="row">soil_moisture_0_to_10cm_mean</th>
             <td>m³/m³</td>
-            <td>Daily mean soil moisture fraction within 0-10 cm. Soil moisture data is only available by <mark>MRI_AGCM3_2_S</mark>. Due to the limited number of climate models that provide soil moisture data, it is not possible to make a general statement about their accuracy. As a result, it may be advisable to conduct your own water balance modeling.</td>
+            <td>Daily mean soil moisture fraction within 0-10 cm. Soil moisture data is only available by <mark>MRI_AGCM3_2_S</mark> and <mark>EC_Earth3P_HR</mark>. Due to the limited number of climate models that provide soil moisture data, it is not possible to make a general statement about their accuracy. As a result, it may be advisable to conduct your own water balance modeling.</td>
           </tr>
           <tr>
             <th scope="row">precipitation_sum</th>
             <td>mm</td>
-            <td>Sum of daily precipitation (including rain, showers and snowfall). Climate models have been able to capture some of the large-scale patterns of precipitation and associated droughts and extreme precipitation events, particularly over longer time scales. However, there are still uncertainties associated with the representation of precipitation at smaller scales, where many of these events occur. Please compare different climate models for drought duration or extreme precipitation events. The following papers <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002196">analyze extreme precipitation</a> and <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002150">droughts in CMIP6 models</a>.</td>
+            <td>Sum of daily precipitation (including rain, showers and snowfall). Climate models have been able to capture some of the large-scale patterns of precipitation and associated droughts and extreme precipitation events, particularly over longer time scales. However, there are still uncertainties associated with the representation of precipitation at smaller scales including thunderstorm. Please compare different climate models for drought duration or extreme precipitation events. The following papers <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002196">analyze extreme precipitation</a> and <a href="https://agupubs.onlinelibrary.wiley.com/doi/full/10.1029/2021EF002150">droughts in CMIP6 models</a>.</td>
           </tr>
           <tr>
             <th scope="row">rain_sum</th>
@@ -778,7 +771,7 @@
           <tr>
             <th scope="row">windspeed_10m_mean<br />windspeed_10m_max</th>
             <td>km/h (mph, m/s, knots)</td>
-            <td>Mean and maximum wind speed 10 meter above ground on a day. Simulations of winds and pressure systems in climate models are greatly influenced by the resolution used to model the terrain. Without bias correction, wind speed can vary significantly between different climate models, particularly in complex terrain. Moreover, the behavior of wind speed can differ between different regions, as climate models can have biases or uncertainties in their representation of wind patterns in specific geographic areas. Therefore, it is important to consider the resolution of the model and to use multiple models when analyzing wind speed data.</td>
+            <td>Mean and maximum wind speed 10 meter above ground on a day. Simulations of winds and pressure systems in climate models are greatly influenced by the resolution used to model the terrain. Without bias correction, wind speed can vary significantly between different climate models, particularly in complex terrain. Although, data is bias corrected with ERA5, it might not accurately represent local conditions.</td>
           </tr>
           <tr>
             <th scope="row">pressure_msl_mean</th>
