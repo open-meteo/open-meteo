@@ -54,6 +54,9 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     var surfaceElevationFileOm: String {
         "\(omfileDirectory)HSURF.om"
     }
+    var soilTypeFileOm: String {
+        "\(omfileDirectory)soil_type.om"
+    }
     
     var downloadDirectory: String {
         return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
@@ -290,7 +293,9 @@ struct DownloadEra5Command: AsyncCommandFix {
             return ArraySlice(data)
         }
     }
-    
+    /**
+     Soil type information: https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle
+     */
     func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain) async throws {
         let logger = application.logger
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
@@ -302,6 +307,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let tempDownloadGribFile = "\(downloadDir)elevation.grib"
         let tempDownloadGribFile2 = domain == .era5_land ? "\(downloadDir)lsm.grib" : nil
+        let tempDownloadGribFile3 = domain == .era5_land ? "\(downloadDir)soil_type.grib" : nil
         
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
@@ -315,18 +321,18 @@ struct DownloadEra5Command: AsyncCommandFix {
                     let date = "2022-03-31"
                     let expver = 1
                     let levtype = "sfc"
-                    let param = ["129.128", "172.128"]
+                    let param = ["129.128", "172.128", "43.128"]
                     let step = 0
                     let stream = "oper"
                     let time = "00:00:00"
-                    let type = "fc"
+                    let type = "an"
                 }
                 try Process.ecmwfApi(key: cdskey, email: email, query: Query(), destinationFile: tempDownloadGribFile)
             case .era5:
                 struct Query: Encodable {
                     let product_type = "reanalysis"
                     let format = "grib"
-                    let variable = ["geopotential", "land_sea_mask"]
+                    let variable = ["geopotential", "land_sea_mask", "soil_type"]
                     let time = "00:00"
                     let day = "01"
                     let month = "01"
@@ -341,16 +347,18 @@ struct DownloadEra5Command: AsyncCommandFix {
             case .era5_land:
                 let z = "https://confluence.ecmwf.int/download/attachments/140385202/geo_1279l4_0.1x0.1.grb?version=1&modificationDate=1570448352562&api=v2&download=true"
                 let lsm = "https://confluence.ecmwf.int/download/attachments/140385202/lsm_1279l4_0.1x0.1.grb?version=1&modificationDate=1567525024201&api=v2&download=true"
+                let soilType = "https://confluence.ecmwf.int/download/attachments/140385202/slt.grib?version=1&modificationDate=1634824634152&api=v2&download=true"
                 let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
                 try await curl.download(url: z, toFile: tempDownloadGribFile, bzip2Decode: false)
                 try await curl.download(url: lsm, toFile: tempDownloadGribFile2!, bzip2Decode: false)
+                try await curl.download(url: lsm, toFile: tempDownloadGribFile3!, bzip2Decode: false)
             case .cerra:
                 struct Query: Encodable {
                     let product_type = "analysis"
                     let data_type = "reanalysis"
                     let level_type = "surface_or_atmosphere"
                     let format = "grib"
-                    let variable = ["land_sea_mask", "orography"]
+                    let variable = ["land_sea_mask", "orography"] //, "soil_type"]
                     let time = "00:00"
                     let day = "21"
                     let month = "12"
@@ -366,7 +374,8 @@ struct DownloadEra5Command: AsyncCommandFix {
         
         var landmask: [Float]? = nil
         var elevation: [Float]? = nil
-        for file in [tempDownloadGribFile, tempDownloadGribFile2].compacted() {
+        var soilType: [Float]? = nil
+        for file in [tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted() {
             try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
                 let shortName = message.get(attribute: "shortName")!
                 var data = try message.getDouble().map(Float.init)
@@ -381,6 +390,8 @@ struct DownloadEra5Command: AsyncCommandFix {
                     elevation = data
                 case "lsm":
                     landmask = data
+                case "soil_type":
+                    soilType = data
                 default:
                     fatalError("Found \(shortName) in grib")
                 }
@@ -389,6 +400,13 @@ struct DownloadEra5Command: AsyncCommandFix {
     
         guard var elevation, let landmask else {
             fatalError("missing elevation in grib")
+        }
+        
+        let chunk0 = min(domain.grid.ny, 20)
+        let writer = OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunk0, chunk1: 400/chunk0)
+        
+        if let soilType {
+            try writer.write(file: domain.soilTypeFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: soilType)
         }
         
         /*let a1 = Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1)
@@ -403,9 +421,7 @@ struct DownloadEra5Command: AsyncCommandFix {
                 elevation[i] = -999
             }
         }
-        
-        let chunk0 = min(domain.grid.ny, 20)
-        let writer = OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunk0, chunk1: 400/chunk0)
+
         try writer.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
         
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
