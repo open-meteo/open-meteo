@@ -97,7 +97,7 @@ struct SyncFileAttributes: Content {
     let time: Int
     
     /// Iterate through data directory and find all matching files
-    static func list(path: String, directories: [String], matchFilename: [String]?, newerThan: Int?, alwaysInclude: [String] = ["HSURF.om", "init.txt"]) -> [SyncFileAttributes] {
+    static func list(path: String, directories: [String], matchFilename: [String]?, newerThan: Int?, alwaysInclude: [String] = ["HSURF.om", "soil_type.om", "init.txt"]) -> [SyncFileAttributes] {
         let pathUrl = URL(fileURLWithPath: path, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
         
