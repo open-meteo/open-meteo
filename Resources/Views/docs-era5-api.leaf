@@ -21,8 +21,8 @@
   </svg>
   <h1 class="display-5" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Historical Weather API</h1>
   <div class="col-lg-6 mx-auto">
-    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">60 years of accurate weather,
-      anywhere with up to 5 km resolution</p>
+    <p class="lead mb-4" style="text-shadow: 3px 3px 2px rgba(0, 0, 0, .7);">Discover how weather has shaped our world
+      from 1940 until now</p>
     <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
       <a href="#api_form" class="btn button btn-primary btn-lg px-4 me-sm-3">URL Builder</a>
       <a href="#api-documentation" class="btn btn-outline-light btn-lg px-4">Parameter documentation</a>
@@ -345,15 +345,15 @@
           </label>
         </div>
         <div class="form-check debug-hidden">
-          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_7cm" id="soil_moisture_index_0_to_7cm"
-            name="hourly">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_7cm"
+            id="soil_moisture_index_0_to_7cm" name="hourly">
           <label class="form-check-label" for="soil_moisture_index_0_to_7cm">
             Soil Moisture Index (0-7 cm)
           </label>
         </div>
         <div class="form-check debug-hidden">
-          <input class="form-check-input" type="checkbox" value="soil_moisture_index_7_to_28cm" id="soil_moisture_index_7_to_28cm"
-            name="hourly">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_7_to_28cm"
+            id="soil_moisture_index_7_to_28cm" name="hourly">
           <label class="form-check-label" for="soil_moisture_index_7_to_28cm">
             Soil Moisture Index (7-28 cm)
           </label>
@@ -373,8 +373,8 @@
           </label>
         </div>
         <div class="form-check debug-hidden">
-          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_100cm" id="soil_moisture_index_0_to_100cm"
-            name="hourly">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_100cm"
+            id="soil_moisture_index_0_to_100cm" name="hourly">
           <label class="form-check-label" for="soil_moisture_index_0_to_100cm">
             Soil Moisture Index (0-100 cm)
           </label>
@@ -485,8 +485,8 @@
           </label>
         </div>
         <div class="form-check">
-          <input class="form-check-input" type="checkbox" value="apparent_temperature_mean" id="apparent_temperature_min"
-            name="daily">
+          <input class="form-check-input" type="checkbox" value="apparent_temperature_mean"
+            id="apparent_temperature_min" name="daily">
           <label class="form-check-label" for="apparent_temperature_min">
             Mean Apparent Temperature (2 m)
           </label>
@@ -713,6 +713,9 @@
         These datasets are able to fill in gaps by using mathematical models to estimate the values of various weather
         variables. As a result, reanalysis datasets are able to provide detailed historical weather information for
         locations that may not have had weather stations nearby, such as rural areas or the open ocean.</p>
+      <p>You can access data dating back to 1940 with a delay of 5 days. If you're looking for weather information from
+        previous days or weeks, our <a href="/en/docs" title="Weather Forecast API documentation">Forecast API</a>
+        offers the <mark>&past_days=</mark> feature for your convenience.</p>
     </div>
     <div class="col-6">
       <p>The spatial resolution of a weather reanalysis dataset refers to the size of the grid cells used to represent
@@ -743,7 +746,7 @@
           <td>Global</td>
           <td>0.25° (~25 km)</td>
           <td>Hourly</td>
-          <td>1959 to present</td>
+          <td>1940 to present</td>
           <td>Daily with 5 days delay</td>
         </tr>
         <tr>
@@ -753,7 +756,7 @@
           <td>Global</td>
           <td>0.1° (~11 km)</td>
           <td>Hourly</td>
-          <td>1959 to present</td>
+          <td>1950 to present</td>
           <td>Daily with 5 days delay</td>
         </tr>
         <tr>
@@ -809,8 +812,12 @@
             <td>Floating point</td>
             <td>No</td>
             <td></td>
-            <td>The elevation used for statistical downscaling. Per default, a <a href="https://openmeteo.substack.com/p/improving-weather-forecasts-with" title="Elevation based grid-cell selection explained"></a>90 meter digital elevation model is used</a>. You can manually set the elevation to correctly match mountain peaks. 
-              If <mark>&elevation=nan</mark> is specified, downscaling will be disabled and the API uses the average grid-cell height.</td>
+            <td>The elevation used for statistical downscaling. Per default, a <a
+                href="https://openmeteo.substack.com/p/improving-weather-forecasts-with"
+                title="Elevation based grid-cell selection explained"></a>90 meter digital elevation model is used</a>.
+              You can manually set the elevation to correctly match mountain peaks.
+              If <mark>&elevation=nan</mark> is specified, downscaling will be disabled and the API uses the average
+              grid-cell height.</td>
           </tr>
           <tr>
             <th scope="row">start_date<br />end_date</th>
@@ -886,7 +893,10 @@
             <td>String</td>
             <td>No</td>
             <td><mark>land</mark></td>
-            <td>Set a preference how grid-cells are selected. The default <mark>land</mark> finds a suitable grid-cell on land with <a href="https://openmeteo.substack.com/p/improving-weather-forecasts-with" title="Elevation based grid-cell selection explained">similar elevation to the requested coordinates using a 90-meter digital elevation model</a>. 
+            <td>Set a preference how grid-cells are selected. The default <mark>land</mark> finds a suitable grid-cell
+              on land with <a href="https://openmeteo.substack.com/p/improving-weather-forecasts-with"
+                title="Elevation based grid-cell selection explained">similar elevation to the requested coordinates
+                using a 90-meter digital elevation model</a>.
               <mark>sea</mark> prefers grid-cells on sea. <mark>nearest</mark> selects the nearest possible grid-cell.
             </td>
         </tbody>
@@ -1025,7 +1035,10 @@
             <th scope="row">windgusts_10m</th>
             <td>Instant</td>
             <td>km/h (mph, m/s, knots)</td>
-            <td>Gusts at 10 meters above ground of the indicated hour. Wind gusts in <mark>CERRA</mark> are defined as the maximum wind gusts of the preceding hour. Please consult the <a href="https://www.ecmwf.int/en/elibrary/81271-ifs-documentation-cy47r3-part-iv-physical-processes">ECMWF IFS documentation</a> for more information on how wind gusts are parameterized in weather models.</td>
+            <td>Gusts at 10 meters above ground of the indicated hour. Wind gusts in <mark>CERRA</mark> are defined as
+              the maximum wind gusts of the preceding hour. Please consult the <a
+                href="https://www.ecmwf.int/en/elibrary/81271-ifs-documentation-cy47r3-part-iv-physical-processes">ECMWF
+                IFS documentation</a> for more information on how wind gusts are parameterized in weather models.</td>
           </tr>
           <tr>
             <th scope="row">et0_fao_evapotranspiration</th>
@@ -1189,8 +1202,11 @@
           <tr>
             <th scope="row">elevation</th>
             <td>Floating point</td>
-            <td>The elevation from a 90 meter digital elevation model. This effects which grid-cell is selected (see parameter <mark>cell_selection</mark>).
-              Statistical downscaling is used to adapt weather conditions for this elevation. This elevation can also be controlled with the query parameter <mark>elevation</mark>. If <mark>&elevation=nan</mark> is specified, all downscaling is disabled and the averge grid-cell elevation is used.</td>
+            <td>The elevation from a 90 meter digital elevation model. This effects which grid-cell is selected (see
+              parameter <mark>cell_selection</mark>).
+              Statistical downscaling is used to adapt weather conditions for this elevation. This elevation can also be
+              controlled with the query parameter <mark>elevation</mark>. If <mark>&elevation=nan</mark> is specified,
+              all downscaling is disabled and the averge grid-cell elevation is used.</td>
           </tr>
           <tr>
             <th scope="row">generationtime_ms</th>

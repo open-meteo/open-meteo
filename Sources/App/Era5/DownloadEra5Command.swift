@@ -147,6 +147,9 @@ struct DownloadEra5Command: AsyncCommandFix {
         @Flag(name: "calculate-bias-field", short: "b", help: "Generate seasonal averages for bias corrections for CMIP climate data")
         var calculateBiasField: Bool
         
+        @Option(name: "only-variables")
+        var onlyVariables: String?
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() -> TimerangeDt {
             let dt = 3600*24
@@ -175,7 +178,9 @@ struct DownloadEra5Command: AsyncCommandFix {
         
         let domain = try CdsDomain.load(rawValue: signature.domain)
         
-        let variables: [GenericVariable] = domain == .cerra ? CerraVariable.allCases : Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
+        let variables: [GenericVariable] = domain == .cerra ?
+            (try CerraVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? CerraVariable.allCases) :
+        (try Era5Variable.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5Variable.allCases).filter({ $0.availableForDomain(domain: domain) })
         
         if let stripseaYear = signature.stripseaYear {
             try runStripSea(logger: logger, year: Int(stripseaYear)!, domain: domain, variables: variables)
@@ -199,13 +204,13 @@ struct DownloadEra5Command: AsyncCommandFix {
                     fatalError("year invalid")
                 }
                 for year in Int(split[0])! ... Int(split[1])! {
-                    try runYear(logger: logger, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables)
+                    try runYear(logger: logger, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: false, timeintervalDaily: nil)
                 }
             } else {
                 guard let year = Int(yearStr) else {
                     fatalError("Could not convert year to integer")
                 }
-                try runYear(logger: logger, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables)
+                try runYear(logger: logger, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: signature.force, timeintervalDaily: signature.force ? signature.getTimeinterval() : nil)
             }
             return
         }
@@ -463,10 +468,10 @@ struct DownloadEra5Command: AsyncCommandFix {
         }
     }
     
-    func runYear(logger: Logger, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable]) throws {
-        let timeintervalDaily = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
+    func runYear(logger: Logger, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?) throws {
+        let timeintervalDaily = timeintervalDaily ?? TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
         let _ = try downloadDailyFiles(logger: logger, cdskey: cdskey, email: email, timeinterval: timeintervalDaily, domain: domain, variables: variables)
-        try convertYear(logger: logger, year: year, domain: domain, variables: variables)
+        try convertYear(logger: logger, year: year, domain: domain, variables: variables, forceUpdate: forceUpdate)
     }
     
     func downloadDailyFiles(logger: Logger, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) throws -> TimerangeDt {
@@ -889,8 +894,9 @@ struct DownloadEra5Command: AsyncCommandFix {
         }
     }
     
-    // Data is stored in one file per hour
-    func convertYear(logger: Logger, year: Int, domain: CdsDomain, variables: [GenericVariable]) throws {
+    /// Data is stored in one file per hour
+    /// If `forceUpdate` is set, an existing file is updated
+    func convertYear(logger: Logger, year: Int, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool) throws {
         let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
         
         let nx = domain.grid.nx // 721
@@ -903,9 +909,10 @@ struct DownloadEra5Command: AsyncCommandFix {
         for variable in variables {
             let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Convert \(variable) year \(year)")
             let writeFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
-            if FileManager.default.fileExists(atPath: writeFile) {
+            if !forceUpdate && FileManager.default.fileExists(atPath: writeFile) {
                 continue
             }
+            let existingFile = forceUpdate ? try? OmFileReader(file: writeFile) : nil
             let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
@@ -914,12 +921,20 @@ struct DownloadEra5Command: AsyncCommandFix {
                 }
                 return try OmFileReader(file: omFile)
             }
+            // For updates, delete file before creating a new one.
+            // Because the file is open, data access is still possible
+            try FileManager.default.removeItemIfExists(at: writeFile)
             
             // chunk 6 locations and 21 days of data
             try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, nx*ny)
                 
                 var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
+                
+                if let existingFile {
+                    // Load existing data if present
+                    try existingFile.read(into: &fasttime.data, arrayRange: 0..<locationRange.count, arrayDim1Length: nt, dim0Slow: locationRange, dim1: 0..<nt)
+                }
                 
                 for (i, omfile) in omFiles.enumerated() {
                     guard let omfile else {
