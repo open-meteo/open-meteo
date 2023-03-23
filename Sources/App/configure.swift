@@ -76,6 +76,7 @@ public func configure(_ app: Application) throws {
     app.commands.use(SatelliteDownloadCommand(), as: "download-satellite")
     app.commands.use(SyncCommand(), as: "sync")
     app.commands.use(ExportCommand(), as: "export")
+    app.commands.use(ConvertOmCommand(), as: "convert-om")
 
     app.http.server.configuration.hostname = "0.0.0.0"
     
