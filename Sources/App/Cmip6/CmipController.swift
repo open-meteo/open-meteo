@@ -115,6 +115,8 @@ enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, Cas
     case dewpoint_2m_min
     case dewpoint_2m_mean
     case growing_degree_days_base_0_limit_50
+    case soil_moisture_index_0_to_10cm_mean
+    case soil_moisture_index_0_to_100cm_mean
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -558,6 +560,24 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             return DataAndUnit(zip(tempmax, tempmin).map({ (tmax, tmin) in
                 max(min((tmax - tmin) / 2, limit) - base, 0)
             }), .gddCelsius)
+        case .soil_moisture_index_0_to_10cm_mean:
+            let soilMoisture = try get(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
+            guard let soilType = try self.getStatic(type: .soilType) else {
+                throw ForecastapiError.generic(message: "Could not read soil type")
+            }
+            guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+                throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
+            }
+            return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .soil_moisture_index_0_to_100cm_mean:
+            let soilMoisture = try get(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
+            guard let soilType = try self.getStatic(type: .soilType) else {
+                throw ForecastapiError.generic(message: "Could not read soil type")
+            }
+            guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+                throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
+            }
+            return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         }
     }
     
@@ -580,6 +600,10 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
         case .growing_degree_days_base_0_limit_50:
             try prefetchData(raw: .raw(.temperature_2m_max), time: time)
             try prefetchData(raw: .raw(.temperature_2m_min), time: time)
+        case .soil_moisture_index_0_to_10cm_mean:
+            try prefetchData(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
+        case .soil_moisture_index_0_to_100cm_mean:
+            try prefetchData(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
         }
     }
 }

@@ -95,7 +95,7 @@ enum SoilTypeEra5: Int {
     /// https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle
     func calculateSoilMoistureIndex(_ data: [Float]) -> [Float] {
         return data.map {
-            return max(min(($0 - permanentWiltingPoint) / (fieldCapacity - permanentWiltingPoint), 1), 0)
+            return ($0 - permanentWiltingPoint) / (fieldCapacity - permanentWiltingPoint)
         }
     }
 }

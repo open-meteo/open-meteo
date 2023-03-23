@@ -255,6 +255,20 @@
           </label>
         </div>
         <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_100cm_mean"
+            id="soil_moisture_index_0_to_100cm_mean" name="daily">
+          <label class="form-check-label" for="soil_moisture_index_0_to_100cm_mean">
+            Mean Soil Moisture Index (0-100 cm)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_10cm_mean"
+            id="soil_moisture_index_0_to_10cm_mean" name="daily">
+          <label class="form-check-label" for="soil_moisture_index_0_to_10cm_mean">
+            Mean Soil Moisture Index (0-10 cm)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
           <input class="form-check-input" type="checkbox" value="soil_temperature_0_to_100cm_mean"
             id="soil_temperature_0_to_100cm_mean" name="daily">
           <label class="form-check-label" for="soil_temperature_0_to_100cm_mean">
