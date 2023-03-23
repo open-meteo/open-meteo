@@ -58,6 +58,10 @@ extension GenericReaderDerived {
         }
     }
     
+    func getStatic(type: ReaderStaticVariable) throws -> Float? {
+        return try reader.getStatic(type: type)
+    }
+    
     func prefetchData(variables: [VariableOrDerived<ReaderNext.MixingVar, Derived>], time: TimerangeDt) throws {
         try variables.forEach { variable in
             try prefetchData(variable: variable, time: time)

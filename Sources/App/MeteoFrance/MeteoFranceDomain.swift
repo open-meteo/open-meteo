@@ -58,16 +58,21 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     private static var aromeFranceElevationFile = try? OmFileReader(file: Self.arome_france.surfaceElevationFileOm)
     private static var aromeFranceHdElevationFile = try? OmFileReader(file: Self.arome_france_hd.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .arpege_europe:
-            return Self.arpegeEuropeElevationFile
-        case .arpege_world:
-            return Self.arpegeWorldElevationFile
-        case .arome_france:
-            return Self.aromeFranceElevationFile
-        case .arome_france_hd:
-            return Self.aromeFranceHdElevationFile
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .arpege_europe:
+                return Self.arpegeEuropeElevationFile
+            case .arpege_world:
+                return Self.arpegeWorldElevationFile
+            case .arome_france:
+                return Self.aromeFranceElevationFile
+            case .arome_france_hd:
+                return Self.aromeFranceHdElevationFile
+            }
         }
     }
     

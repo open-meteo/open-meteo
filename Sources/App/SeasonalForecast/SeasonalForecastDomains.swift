@@ -32,24 +32,29 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     
     static var ncepElevation = try? OmFileReader(file: Self.ncep.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .ecmwf:
-            fatalError()
-        case .ukMetOffice:
-            fatalError()
-        case .meteoFrance:
-            fatalError()
-        case .dwd:
-            fatalError()
-        case .cmcc:
-            fatalError()
-        case .ncep:
-            return Self.ncepElevation
-        case .jma:
-            fatalError()
-        case .eccc:
-            fatalError()
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .ecmwf:
+                fatalError()
+            case .ukMetOffice:
+                fatalError()
+            case .meteoFrance:
+                fatalError()
+            case .dwd:
+                fatalError()
+            case .cmcc:
+                fatalError()
+            case .ncep:
+                return Self.ncepElevation
+            case .jma:
+                fatalError()
+            case .eccc:
+                fatalError()
+            }
         }
     }
     

@@ -230,6 +230,10 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     /// era5 land reader
     let readerEra5Land: GenericReader<CdsDomain, Era5Variable>?
     
+    func getStatic(type: ReaderStaticVariable) throws -> Float? {
+        return try readerEra5.getStatic(type: type) ?? readerEra5.getStatic(type: type)
+    }
+    
     /// Get Bias correction field from era5-land or era5
     func getEra5BiasCorrectionWeights(for variable: Cmip6VariableOrDerived) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
         if let readerEra5Land, let variable = Era5DailyWeatherVariable(rawValue: variable.rawValue), let referenceWeightFile = try readerEra5Land.domain.openBiasCorrectionFile(for: variable.rawValue) {
@@ -331,11 +335,15 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     
     var _referenceElevation: ElevationOrSea? = nil
     
+    func getStatic(type: ReaderStaticVariable) throws -> Float? {
+        throw ForecastapiError.generic(message: "Cmip6BiasCorrectorInterpolatedWeights does not support static files")
+    }
+    
     func getReferenceElevation() throws -> ElevationOrSea {
         if let _referenceElevation {
             return _referenceElevation
         }
-        guard let elevationFile = referenceDomain.elevationFile else {
+        guard let elevationFile = referenceDomain.getStaticFile(type: .elevation) else {
             throw ForecastapiError.generic(message: "Elevation file for domain \(referenceDomain) is missing")
         }
         let referenceElevation = try referenceDomain.grid.readElevationInterpolated(gridpoint: referencePosition, elevationFile: elevationFile)
@@ -427,6 +435,13 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     
     let referenceElevation: ElevationOrSea
     
+    func getStatic(type: ReaderStaticVariable) throws -> Float? {
+        guard let file = referenceDomain.getStaticFile(type: type) else {
+            return nil
+        }
+        return try referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition, file: file)
+    }
+    
     func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit {
         let raw = try reader.get(variable: variable, time: time)
         var data = raw.data
@@ -468,7 +483,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        guard let referencePosition = try referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.elevationFile, mode: mode) else {
+        guard let referencePosition = try referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.getStaticFile(type: .elevation), mode: mode) else {
             return nil
         }
         self.referenceDomain = referenceDomain

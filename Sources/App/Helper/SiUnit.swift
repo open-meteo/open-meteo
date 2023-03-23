@@ -39,6 +39,7 @@ enum SiUnit: String, Codable {
     case eaqi = "EAQI"
     case usaqi = "USAQI"
     case gddCelsius = "GGDc"
+    case fraction
     
     var significantDigits: Int {
         switch self {
@@ -79,6 +80,7 @@ enum SiUnit: String, Codable {
         case .eaqi: return 0
         case .usaqi: return 0
         case .gddCelsius: return 2
+        case .fraction: return 3
         }
     }
 }

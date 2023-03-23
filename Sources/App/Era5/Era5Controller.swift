@@ -176,6 +176,11 @@ enum CdsVariable: String, GenericVariableMixable {
     case direct_normal_irradiance
     case growing_degree_days_base_0_limit_50
     case leaf_wetness_probability
+    case soil_moisture_index_0_to_7cm
+    case soil_moisture_index_7_to_28cm
+    case soil_moisture_index_28_to_100cm
+    case soil_moisture_index_100_to_255cm
+    case soil_moisture_index_0_to_100cm
     
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
@@ -215,6 +220,11 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case soil_temperature_0_to_100cm
     case growing_degree_days_base_0_limit_50
     case leaf_wetness_probability
+    case soil_moisture_index_0_to_7cm
+    case soil_moisture_index_7_to_28cm
+    case soil_moisture_index_28_to_100cm
+    case soil_moisture_index_100_to_255cm
+    case soil_moisture_index_0_to_100cm
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -264,6 +274,11 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
     /// only for CMIP6 reference
     case soil_moisture_0_to_10cm_mean
     case soil_moisture_0_to_100cm_mean
+    case soil_moisture_index_0_to_7cm_mean
+    case soil_moisture_index_7_to_28cm_mean
+    case soil_moisture_index_28_to_100cm_mean
+    case soil_moisture_index_100_to_255cm_mean
+    case soil_moisture_index_0_to_100cm_mean
     case soil_temperature_0_to_100cm_mean
     case vapor_pressure_deficit_max
     case growing_degree_days_base_0_limit_50
@@ -361,6 +376,16 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
             return .sum(.growing_degree_days_base_0_limit_50)
         case .leaf_wetness_probability_mean:
             return .mean(.leaf_wetness_probability)
+        case .soil_moisture_index_0_to_7cm_mean:
+            return .mean(.soil_moisture_index_0_to_7cm)
+        case .soil_moisture_index_7_to_28cm_mean:
+            return .mean(.soil_moisture_index_7_to_28cm)
+        case .soil_moisture_index_28_to_100cm_mean:
+            return .mean(.soil_moisture_index_28_to_100cm)
+        case .soil_moisture_index_100_to_255cm_mean:
+            return .mean(.soil_moisture_index_100_to_255cm)
+        case .soil_moisture_index_0_to_100cm_mean:
+            return .mean(.soil_moisture_index_0_to_100cm)
         }
     }
 }

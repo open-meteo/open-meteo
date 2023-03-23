@@ -3,6 +3,7 @@ import Foundation
 
 /**
  Soil type definitions from ERA5 which uses IFC cycle 41r2
+ The seven soil types are: 1: Coarse, 2: Medium, 3: Medium fine, 4: Fine, 5: Very fine, 6: Organic, 7: Tropical organic. A value of 0 indicates a non-land point.
  
  Defined in https://www.ecmwf.int/en/elibrary/79697-ifs-documentation-cy41r2-part-iv-physical-processes (page 137)
  */
@@ -88,5 +89,13 @@ enum SoilTypeEra5: Int {
     /// Plant available soil moisture `θcap − θpwp` in `m3^m−3`
     var plantAvailableSoilMoisture: Float {
         return fieldCapacity - permanentWiltingPoint
+    }
+    
+    /// soil moisture index (SMI) defined as (SM-PWP)/(FC-PWP). This index is equal to zero at the permanent wilting point and one at field capacity but it can be larger than one after rain
+    /// https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle
+    func calculateSoilMoistureIndex(_ data: [Float]) -> [Float] {
+        return data.map {
+            return max(min(($0 - permanentWiltingPoint) / (fieldCapacity - permanentWiltingPoint), 1), 0)
+        }
     }
 }

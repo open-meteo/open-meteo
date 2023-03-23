@@ -804,14 +804,19 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     private static var gemRegionalElevationFile = try? OmFileReader(file: Self.gem_regional.surfaceElevationFileOm)
     private static var gemHrdpsContinentalElevationFile = try? OmFileReader(file: Self.gem_hrdps_continental.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .gem_global:
-            return Self.gemGlobalElevationFile
-        case .gem_regional:
-            return Self.gemRegionalElevationFile
-        case .gem_hrdps_continental:
-            return Self.gemHrdpsContinentalElevationFile
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .gem_global:
+                return Self.gemGlobalElevationFile
+            case .gem_regional:
+                return Self.gemRegionalElevationFile
+            case .gem_hrdps_continental:
+                return Self.gemHrdpsContinentalElevationFile
+            }
         }
     }
     

@@ -40,18 +40,23 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         return self == .gfs025 || self == .gfs013
     }
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .gfs013:
-            return Self.gfs013ElevationFile
-        case .gfs025_ensemble:
-            fallthrough
-        case .gfs025:
-            return Self.gfs025ElevationFile
-        //case .nam_conus:
-            //return Self.namConusElevationFile
-        case .hrrr_conus:
-            return Self.hrrrConusElevationFile
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .gfs013:
+                return Self.gfs013ElevationFile
+            case .gfs025_ensemble:
+                fallthrough
+            case .gfs025:
+                return Self.gfs025ElevationFile
+                //case .nam_conus:
+                //return Self.namConusElevationFile
+            case .hrrr_conus:
+                return Self.hrrrConusElevationFile
+            }
         }
     }
     

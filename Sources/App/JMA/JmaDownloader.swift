@@ -523,12 +523,17 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     private static var gsmElevationFile = try? OmFileReader(file: Self.gsm.surfaceElevationFileOm)
     private static var msmElevationFile = try? OmFileReader(file: Self.msm.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .gsm:
-            return Self.gsmElevationFile
-        case .msm:
-            return Self.msmElevationFile
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .gsm:
+                return Self.gsmElevationFile
+            case .msm:
+                return Self.msmElevationFile
+            }
         }
     }
     

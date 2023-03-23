@@ -6,11 +6,6 @@ import SwiftPFor2D
 enum EcmwfDomain: String, GenericDomain {
     case ifs04
     
-    /// There is no elevation file for ECMWF
-    var elevationFile: OmFileReader<MmapFile>? {
-        return nil
-    }
-    
     func getDownloadForecastSteps(run: Int) -> [Int] {
         switch run {
         case 0,12: return Array(stride(from: 0, through: 144, by: 3)) + Array(stride(from: 150, through: 240, by: 6))
@@ -34,6 +29,11 @@ enum EcmwfDomain: String, GenericDomain {
     
     var downloadDirectory: String {
         return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+    }
+    
+    /// There is no elevation file for ECMWF
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        return nil
     }
     
     var omfileArchive: String? {

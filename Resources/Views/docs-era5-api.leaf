@@ -344,6 +344,41 @@
             Soil Moisture (0-100 cm)
           </label>
         </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_7cm" id="soil_moisture_index_0_to_7cm"
+            name="hourly">
+          <label class="form-check-label" for="soil_moisture_index_0_to_7cm">
+            Soil Moisture Index (0-7 cm)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_7_to_28cm" id="soil_moisture_index_7_to_28cm"
+            name="hourly">
+          <label class="form-check-label" for="soil_moisture_index_7_to_28cm">
+            Soil Moisture Index (7-28 cm)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_28_to_100cm"
+            id="soil_moisture_index_28_to_100cm" name="hourly">
+          <label class="form-check-label" for="soil_moisture_index_28_to_100cm">
+            Soil Moisture Index (28-100 cm)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_100_to_255cm"
+            id="soil_moisture_index_100_to_255cm" name="hourly">
+          <label class="form-check-label" for="soil_moisture_index_100_to_255cm">
+            Soil Moisture Index (100-255 cm)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_100cm" id="soil_moisture_index_0_to_100cm"
+            name="hourly">
+          <label class="form-check-label" for="soil_moisture_index_0_to_100cm">
+            Soil Moisture Index (0-100 cm)
+          </label>
+        </div>
       </div>
     </div>
 
@@ -541,6 +576,13 @@
             id="soil_moisture_0_to_100cm_mean" name="daily">
           <label class="form-check-label" for="soil_moisture_0_to_100cm_mean">
             Mean Soil Moisture (0-100 cm)
+          </label>
+        </div>
+        <div class="form-check debug-hidden">
+          <input class="form-check-input" type="checkbox" value="soil_moisture_index_0_to_100cm_mean"
+            id="soil_moisture_index_0_to_100cm_mean" name="daily">
+          <label class="form-check-label" for="soil_moisture_index_0_to_100cm_mean">
+            Mean Soil Moisture Index (0-100 cm)
           </label>
         </div>
         <div class="form-check debug-hidden">

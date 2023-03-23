@@ -6,7 +6,7 @@ protocol GenericVariableMixable: RawRepresentableString {
 }
 
 /// Mix differnet domains together, that offer the same or similar variable set
-protocol GenericReaderMixerRaw {
+protocol GenericReaderMixerRaw: GenericReaderProtocol {
     associatedtype Reader: GenericReaderProtocol
     
     var reader: [Reader] { get }
@@ -78,6 +78,10 @@ extension GenericReaderMixerRaw {
         try variables.forEach { variable in
             try prefetchData(variable: variable, time: time)
         }
+    }
+    
+    func getStatic(type: ReaderStaticVariable) throws -> Float? {
+        return try reader.last?.getStatic(type: type)
     }
     
     func get(variable: Reader.MixingVar, time: TimerangeDt) throws -> DataAndUnit {

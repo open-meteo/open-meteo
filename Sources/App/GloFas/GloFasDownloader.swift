@@ -459,7 +459,7 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         return 3600*24
     }
     
-    var elevationFile: SwiftPFor2D.OmFileReader<MmapFile>? {
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
         return nil
     }
     

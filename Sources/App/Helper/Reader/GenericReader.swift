@@ -12,7 +12,13 @@ protocol GenericReaderProtocol {
     var modelDtSeconds: Int { get }
     
     func get(variable: MixingVar, time: TimerangeDt) throws -> DataAndUnit
+    func getStatic(type: ReaderStaticVariable) throws -> Float?
     func prefetchData(variable: MixingVar, time: TimerangeDt) throws
+}
+
+enum ReaderStaticVariable {
+    case soilType
+    case elevation
 }
 
 /**
@@ -49,7 +55,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     public init(domain: Domain, position: Int) throws {
         self.domain = domain
         self.position = position
-        if let elevationFile = domain.elevationFile {
+        if let elevationFile = domain.getStaticFile(type: .elevation) {
             self.modelElevation = try domain.grid.readElevation(gridpoint: position, elevationFile: elevationFile)
         } else {
             self.modelElevation = .noData
@@ -64,7 +70,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// Return nil, if the coordinates are outside the domain grid
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         // check if coordinates are in domain, otherwise return nil
-        guard let gridpoint = try domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: domain.elevationFile, mode: mode) else {
+        guard let gridpoint = try domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: domain.getStaticFile(type: .elevation), mode: mode) else {
             return nil
         }
         self.domain = domain
@@ -121,6 +127,13 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     
     func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
         return try readAndInterpolate(variable: variable, time: time)
+    }
+    
+    func getStatic(type: ReaderStaticVariable) throws -> Float? {
+        guard let file = domain.getStaticFile(type: type) else {
+            return nil
+        }
+        return try domain.grid.readFromStaticFile(gridpoint: position, file: file)
     }
 }
 

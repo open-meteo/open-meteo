@@ -29,12 +29,17 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .gwam:
-            return Self.gwamElevation
-        case .ewam:
-            return Self.ewamElevation
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .gwam:
+                return Self.gwamElevation
+            case .ewam:
+                return Self.ewamElevation
+            }
         }
     }
     

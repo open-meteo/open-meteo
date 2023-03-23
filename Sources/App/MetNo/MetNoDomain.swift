@@ -26,10 +26,15 @@ enum MetNoDomain: String, GenericDomain, CaseIterable {
 
     private static var nordicPpElevationFile = try? OmFileReader(file: Self.nordic_pp.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .nordic_pp:
-            return Self.nordicPpElevationFile
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .nordic_pp:
+                return Self.nordicPpElevationFile
+            }
         }
     }
     

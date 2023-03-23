@@ -124,7 +124,7 @@ struct ExportCommand: AsyncCommandFix {
             logger.info("Writing elevation information")
             var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
             let targetDomain = targetGridDomain?.genericDomain ?? domain.genericDomain
-            guard let elevationFile = targetDomain.elevationFile else {
+            guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
             try ncElevation.write(elevationFile.readAll())
@@ -147,7 +147,7 @@ struct ExportCommand: AsyncCommandFix {
             
             if let targetGridDomain {
                 let targetDomain = targetGridDomain.genericDomain
-                guard let elevationFile = targetDomain.elevationFile else {
+                guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
                     fatalError("Could not read elevation file for domain \(targetDomain)")
                 }
                 for l in 0..<grid.count {
@@ -195,7 +195,7 @@ struct ExportCommand: AsyncCommandFix {
         /// Interpolate data from one grid to another and perform bias correction
         if let targetGridDomain {
             let targetDomain = targetGridDomain.genericDomain
-            guard let elevationFile = targetDomain.elevationFile else {
+            guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
             

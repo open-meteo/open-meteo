@@ -70,16 +70,21 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         return 3600
     }
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .icon:
-            return Self.iconElevataion
-        case .iconEu:
-            return Self.iconEuElevataion
-        case .iconD2_15min:
-            fallthrough
-        case .iconD2:
-            return Self.iconD2Elevataion
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .icon:
+                return Self.iconElevataion
+            case .iconEu:
+                return Self.iconEuElevataion
+            case .iconD2_15min:
+                fallthrough
+            case .iconD2:
+                return Self.iconD2Elevataion
+            }
         }
     }
 

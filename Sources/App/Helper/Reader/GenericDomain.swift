@@ -11,9 +11,6 @@ protocol GenericDomain {
     /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
     var dtSeconds: Int { get }
     
-    /// An instance to read elevation and sea mask information
-    var elevationFile: OmFileReader<MmapFile>? { get }
-    
     /// Where compressed time series files are stroed
     var omfileDirectory: String { get }
     
@@ -28,6 +25,9 @@ protocol GenericDomain {
     
     /// Domain name used in data directories
     var rawValue: String { get }
+    
+    /// The the file containing static information for elevation of soil types
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>?
 }
 
 extension GenericDomain {

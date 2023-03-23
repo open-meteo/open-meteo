@@ -79,10 +79,7 @@ extension Gridable {
     
     /// Read elevation for a single grid point
     func readElevation(gridpoint: Int, elevationFile: OmFileReader<MmapFile>) throws -> ElevationOrSea {
-        let x = gridpoint % nx
-        let y = gridpoint / nx
-        var elevation = Float.nan
-        try elevationFile.read(into: &elevation, arrayDim1Range: 0..<1, arrayDim1Length: 1, dim0Slow: y..<y+1, dim1: x..<x+1)
+        var elevation = try readFromStaticFile(gridpoint: gridpoint, file: elevationFile)
         if elevation.isNaN {
             return .noData
         }
@@ -105,6 +102,15 @@ extension Gridable {
             return .sea
         }
         return .elevation(elevation)
+    }
+    
+    /// Read static information e.g. elevation or soil type
+    func readFromStaticFile(gridpoint: Int, file: OmFileReader<MmapFile>) throws -> Float {
+        let x = gridpoint % nx
+        let y = gridpoint / nx
+        var value = Float.nan
+        try file.read(into: &value, arrayDim1Range: 0..<1, arrayDim1Length: 1, dim0Slow: y..<y+1, dim1: x..<x+1)
+        return value
     }
     
     /// Get nearest grid point

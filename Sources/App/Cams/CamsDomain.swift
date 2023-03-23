@@ -28,6 +28,10 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        return nil
+    }
+    
     var omfileDirectory: String {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
@@ -43,10 +47,6 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     
     var dtSeconds: Int {
         return 3600
-    }
-    
-    var elevationFile: OmFileReader<MmapFile>? {
-        return nil
     }
     
     var omFileLength: Int {

@@ -209,26 +209,31 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     private static var elevationMPI_ESM1_2_XR = try? OmFileReader(file: Self.MPI_ESM1_2_XR.surfaceElevationFileOm)
     private static var elevationNICAM16_8S = try? OmFileReader(file: Self.NICAM16_8S.surfaceElevationFileOm)
     
-    var elevationFile: OmFileReader<MmapFile>? {
-        switch self {
-        case .CMCC_CM2_VHR4:
-            return Self.elevationCMCC_CM2_VHR4
-        case .FGOALS_f3_H:
-            fallthrough
-        case .FGOALS_f3_H_highresSST:
-            return Self.elevationFGOALS_f3_H
-        case .HiRAM_SIT_HR:
-            return Self.elevationHiRAM_SIT_HR
-        case .MRI_AGCM3_2_S:
-            return Self.elevationMRI_AGCM3_2_S
-        case .EC_Earth3P_HR:
-            return Self.elevationEC_Earth3P_HR
-        //case .HadGEM3_GC31_HM:
-            //return Self.elevationHadGEM3_GC31_HM
-        case .MPI_ESM1_2_XR:
-            return Self.elevationMPI_ESM1_2_XR
-        case .NICAM16_8S:
-            return Self.elevationNICAM16_8S
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .CMCC_CM2_VHR4:
+                return Self.elevationCMCC_CM2_VHR4
+            case .FGOALS_f3_H:
+                fallthrough
+            case .FGOALS_f3_H_highresSST:
+                return Self.elevationFGOALS_f3_H
+            case .HiRAM_SIT_HR:
+                return Self.elevationHiRAM_SIT_HR
+            case .MRI_AGCM3_2_S:
+                return Self.elevationMRI_AGCM3_2_S
+            case .EC_Earth3P_HR:
+                return Self.elevationEC_Earth3P_HR
+            //case .HadGEM3_GC31_HM:
+                //return Self.elevationHadGEM3_GC31_HM
+            case .MPI_ESM1_2_XR:
+                return Self.elevationMPI_ESM1_2_XR
+            case .NICAM16_8S:
+                return Self.elevationNICAM16_8S
+            }
         }
     }
     
@@ -1027,7 +1032,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             let monthlyOmFile = "\(domain.downloadDirectory)tas_\(year)\(month).om"
                             return try OmFileReader(file: monthlyOmFile)
                         }
-                        let elevation = try domain.elevationFile!.readAll()
+                        let elevation = try domain.getStaticFile(type: .elevation)!.readAll()
                         try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { (surfacePressure6h, locationRange) in
                             
                             let temperature = try monthlyTemperature.combine(locationRange: locationRange)
@@ -1047,7 +1052,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             let monthlyOmFile = "\(domain.downloadDirectory)psl_\(year)\(month).om"
                             return try OmFileReader(file: monthlyOmFile)
                         }
-                        let elevation = try domain.elevationFile!.readAll()
+                        let elevation = try domain.getStaticFile(type: .elevation)!.readAll()
                         
                         let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(omFile)")
                         try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
@@ -1167,7 +1172,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                     // NOTE: maybe note required if 3h data is used
                     if calculateRhFromSpecificHumidity {
                         let pressure = try OmFileReader(file: "\(yearlyPath)pressure_msl_\(year).om").readAll2D()
-                        let elevation = try domain.elevationFile!.readAll()
+                        let elevation = try domain.getStaticFile(type: .elevation)!.readAll()
                         let temp = try OmFileReader(file: "\(yearlyPath)temperature_2m_mean_\(year).om").readAll2D()
                         array.data.multiplyAdd(multiply: 1000, add: 0)
                         array.data = Meteorology.specificToRelativeHumidity(specificHumidity: array, temperature: temp, sealLevelPressure: pressure, elevation: elevation)

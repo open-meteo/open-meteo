@@ -194,7 +194,7 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         }
     }
     
-    var elevationFile: SwiftPFor2D.OmFileReader<SwiftPFor2D.MmapFile>? {
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
         return nil
     }
     
