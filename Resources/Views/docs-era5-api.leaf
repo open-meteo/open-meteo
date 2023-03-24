@@ -46,8 +46,8 @@
 <div class="container px-4 py-0" id="featured-3">
 
   <div class="alert alert-primary" role="alert">
-    The Open-Meteo Historical Weather API is now using 5 and 11 km reanalysis models! Read the <a
-      href="https://openmeteo.substack.com/p/historical-weather-api-with-high" target="_blank">blog article</a>.
+    The Open-Meteo Historical Weather API made available additional weather information dating back to 1940! Read the <a
+      href="https://openmeteo.substack.com/p/historical-weather-data-from-1940?sd=pf" target="_blank">blog article</a>.
   </div>
 
   <form id="api_form" method="get" action="https://archive-api.open-meteo.com/v1/archive">
