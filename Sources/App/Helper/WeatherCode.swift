@@ -46,7 +46,7 @@ enum WeatherCode: Int {
         if let liftedIndex, liftedIndex <= -2 {
             return thunderstromStrength
         }
-        if let cape, cape >= 1000 {
+        if let cape, cape >= 2000 {
             return thunderstromStrength
         }
         
