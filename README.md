@@ -59,7 +59,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - .Net / C# https://github.com/AlienDwarf/open-meteo-dotnet
 - PHP Laravel https://github.com/michaelnabil230/laravel-weather
 - R https://github.com/tpisel/openmeteo
-- Symfony 6.2 https://gitlab.com/flibidi67/open-meteo
+- PHP Symfony 6.2 https://gitlab.com/flibidi67/open-meteo
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
 
