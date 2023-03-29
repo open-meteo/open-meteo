@@ -60,6 +60,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - PHP Laravel https://github.com/michaelnabil230/laravel-weather
 - R https://github.com/tpisel/openmeteo
 - PHP Symfony 6.2 https://gitlab.com/flibidi67/open-meteo
+- PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
 
