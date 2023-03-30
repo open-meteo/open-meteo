@@ -80,6 +80,10 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 let shortName = message.get(attribute: "shortName")!
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 
+                if ["lsm"].contains(shortName) {
+                    continue
+                }
+                
                 guard let variable = variables.first(where: { variable in
                     if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
                         return true
