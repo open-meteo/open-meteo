@@ -87,4 +87,5 @@ jobs:
         username: apt-repo
         password: ${{ secrets.ftp_password }}
         local-dir: './repo/'
-        server-dir: '/apt-repo/'
+        server-dir: 'aaa/../'
+    - run: "curl --request POST --url https://api.bunny.net/pullzone/884852/purgeCache --header 'AccessKey: ${{ secrets.bunny_api_key }}' --header 'content-type: application/json'"
