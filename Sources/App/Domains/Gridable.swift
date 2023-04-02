@@ -79,7 +79,7 @@ extension Gridable {
     
     /// Read elevation for a single grid point
     func readElevation(gridpoint: Int, elevationFile: OmFileReader<MmapFile>) throws -> ElevationOrSea {
-        var elevation = try readFromStaticFile(gridpoint: gridpoint, file: elevationFile)
+        let elevation = try readFromStaticFile(gridpoint: gridpoint, file: elevationFile)
         if elevation.isNaN {
             return .noData
         }
