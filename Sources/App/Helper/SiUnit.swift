@@ -1,45 +1,90 @@
 import Foundation
 
 
-enum SiUnit: String, Codable {
-    case celsius = "°C"
-    case fahrenheit = "°F"
-    case kelvin = "°K"
-    case kmh = "km/h"
-    case mph = "mp/h"
-    case knots = "kn"
-    case ms = "m/s"
-    case millimeter = "mm"
-    case centimeter = "cm"
-    case inch = "inch"
-    case feet = "ft"
-    case meter = "m"
-    case gpm = "gpm"
-    case percent = "%"
-    case hectoPascal = "hPa"
-    case pascal = "Pa"
-    case degreeDirection = "°"
-    case wmoCode = "wmo code"
-    case wattPerSquareMeter = "W/m²"
-    case kilogramPerSquareMeter = "kg/m²"
-    case gramPerKilogram = "g/kg"
-    case perSecond = "s⁻¹"
-    case second = "s"
-    case qubicMeterPerQubicMeter = "m³/m³"
-    case qubicMeterPerSecond = "m³/s"
-    case kiloPascal = "kPa"
-    case megaJoulesPerSquareMeter = "MJ/m²"
-    case joulesPerKilogram = "J/kg"
-    case hours = "h"
+enum SiUnit {
+    case celsius
+    case fahrenheit
+    case kelvin
+    case kmh
+    case mph
+    case knots
+    case ms
+    case ms_not_unit_converted
+    case millimeter
+    case centimeter
+    case inch
+    case feet
+    case meter
+    case gpm
+    case percent
+    case hectoPascal
+    case pascal
+    case degreeDirection
+    case wmoCode
+    case wattPerSquareMeter
+    case kilogramPerSquareMeter
+    case gramPerKilogram
+    case perSecond
+    case second
+    case qubicMeterPerQubicMeter
+    case qubicMeterPerSecond
+    case kiloPascal
+    case megaJoulesPerSquareMeter
+    case joulesPerKilogram
+    case hours
     case iso8601
     case unixtime
-    case microgramsPerQuibicMeter = "μg/m³"
-    case grainsPerQuibicMeter = "grains/m³"
-    case dimensionless = ""
-    case eaqi = "EAQI"
-    case usaqi = "USAQI"
-    case gddCelsius = "GGDc"
+    case microgramsPerQuibicMeter
+    case grainsPerQuibicMeter
+    case dimensionless
+    case eaqi
+    case usaqi
+    case gddCelsius
     case fraction
+    
+    var rawValue: String {
+        switch self {
+        case .celsius: return "°C"
+        case .fahrenheit: return "°F"
+        case .kelvin: return "°K"
+        case .kmh: return "km/h"
+        case .mph: return "mp/h"
+        case .knots: return "kn"
+        case .ms: return "m/s"
+        case .ms_not_unit_converted: return "m/s"
+        case .millimeter: return "mm"
+        case .centimeter: return "cm"
+        case .inch: return "inch"
+        case .feet: return "ft"
+        case .meter: return "m"
+        case .gpm: return "gpm"
+        case .percent: return "%"
+        case .hectoPascal: return "hPa"
+        case .pascal: return "Pa"
+        case .degreeDirection: return "°"
+        case .wmoCode: return "wmo code"
+        case .wattPerSquareMeter: return "W/m²"
+        case .kilogramPerSquareMeter: return "kg/m²"
+        case .gramPerKilogram: return "g/kg"
+        case .perSecond: return "s⁻¹"
+        case .second: return "s"
+        case .qubicMeterPerQubicMeter: return "m³/m³"
+        case .qubicMeterPerSecond: return "m³/s"
+        case .kiloPascal: return "kPa"
+        case .megaJoulesPerSquareMeter: return "MJ/m²"
+        case .joulesPerKilogram: return "J/kg"
+        case .hours: return "h"
+        case .iso8601: return "iso8601"
+        case .unixtime: return "unixtime"
+        case .microgramsPerQuibicMeter: return "μg/m³"
+        case .grainsPerQuibicMeter: return "grains/m³"
+        case .dimensionless: return ""
+        case .eaqi: return "EAQI"
+        case .usaqi: return "USAQI"
+        case .gddCelsius: return "GGDc"
+        case .fraction: return "fraction"
+        }
+    }
     
     var significantDigits: Int {
         switch self {
@@ -50,6 +95,7 @@ enum SiUnit: String, Codable {
         case .mph: return 1
         case .knots: return 1
         case .ms: return 2
+        case .ms_not_unit_converted: return 2
         case .millimeter: return 2
         case .inch: return 3
         case .feet: return 3
