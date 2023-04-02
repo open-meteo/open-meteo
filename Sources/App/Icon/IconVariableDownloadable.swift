@@ -29,6 +29,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .precipitation: fallthrough
         case .showers: fallthrough
         case .rain: return true
+        case .updraft: return true
         default: return false
         }
     }
