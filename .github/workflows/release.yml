@@ -41,7 +41,7 @@ jobs:
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
     - name: Install NetCDF
-      run: apt-get update && apt-get -qq -y install libnetcdf-dev libeccodes-dev libbz2-dev build-essential
+      run: apt-get update && apt-get -qq -y install libnetcdf-dev libeccodes-dev libbz2-dev build-essential curl
     - name: Build
       run: |
         ${{ env.swift_build }}
@@ -89,5 +89,4 @@ jobs:
         local-dir: './repo/'
         server-dir: 'aaa/../'
     - name: Purge APT CDN cache
-      uses: wei/curl@v1
       run: "curl --request POST --url https://api.bunny.net/pullzone/884852/purgeCache --header 'AccessKey: ${{ secrets.bunny_api_key }}' --header 'content-type: application/json'"
