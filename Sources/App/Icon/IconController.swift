@@ -190,6 +190,7 @@ enum DailyWeatherVariable: String, RawRepresentableString {
     case sunrise
     case sunset
     case et0_fao_evapotranspiration
+    case updraft_max
 }
 
 /// one value 6-18h and then 18-6h

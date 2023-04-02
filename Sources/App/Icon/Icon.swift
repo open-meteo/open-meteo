@@ -395,6 +395,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     /// Diffuse + direct it still valid as the total shortwave radiation
     case direct_radiation
     
+    /// Maximum updraft within 10 km altitude `W_CTMAX`
+    case updraft
+    
     var scalefactor: Float {
         switch self {
         case .temperature_2m: return 20
@@ -447,6 +450,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return 10
         case .snowfall_height:
             return 0.1
+        case .updraft:
+            return 10
         }
     }
     
@@ -503,6 +508,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return .joulesPerKilogram
         case .snowfall_height:
             return .meter
+        case .updraft:
+            return .ms
         }
     }
     
@@ -614,6 +621,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return .solar_backwards_averaged
         case .direct_radiation:
             return .solar_backwards_averaged
+        case .updraft:
+            return .hermite(bounds: 0...200)
         }
     }
     

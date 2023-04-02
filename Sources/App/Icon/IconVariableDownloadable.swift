@@ -95,6 +95,8 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             return .hermite(bounds: nil)
         case .snowfall_height:
             return .hermite(bounds: nil)
+        case .updraft:
+            return .hermite(bounds: 0...200)
         }
     }
     
@@ -183,6 +185,8 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             return domain == .iconD2 ? ("lpi", "single-level", nil) : nil // only in icon d2
         case .snowfall_height:
             return domain == .icon ? nil : ("snowlmt", "single-level", nil) // not in icon global
+        case .updraft:
+            return domain == .iconD2 ? ("w_ctmax", "single-level", nil) : nil // only in icon d2
         }
     }
     

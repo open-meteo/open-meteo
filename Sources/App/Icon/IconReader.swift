@@ -435,6 +435,9 @@ extension IconMixer {
         case .showers_sum:
             let data = try get(raw: .showers, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 24).round(digits: 2), data.unit)
+        case .updraft_max:
+            let data = try get(raw: .updraft, time: time).convertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24).round(digits: 2), data.unit)
         }
     }
     
@@ -499,6 +502,8 @@ extension IconMixer {
                 try prefetchData(raw: .rain, time: time)
             case .showers_sum:
                 try prefetchData(raw: .showers, time: time)
+            case .updraft_max:
+                try prefetchData(raw: .updraft, time: time)
             }
         }
     }
