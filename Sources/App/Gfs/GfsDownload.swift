@@ -201,7 +201,7 @@ struct GfsDownload: AsyncCommandFix {
                     fatalError("stepType=acc not supported")
                 }
                 
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
+                //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
                 
