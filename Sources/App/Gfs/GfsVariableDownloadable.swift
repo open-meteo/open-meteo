@@ -83,12 +83,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return nil
             case .freezinglevel_height:
                 return nil
-            case .frozen_precipitation_percent:
-                return nil
-            case .categorical_ice_pellets:
-                return nil
-            case .categorical_freezing_rain:
-                return nil
             case .cape:
                 return nil
             case .lifted_index:
@@ -104,15 +98,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             if self.gribIndexName(for: .gfs013) != nil {
                 return nil
             }
-            /*switch self {
-            case .uv_index:
-                return nil
-            case .uv_index_clear_sky:
-                return nil
-            case .diffuse_radiation:
-                return nil
-            default: break
-            }*/
         }
         
         switch self {
@@ -172,11 +157,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .shortwave_radiation:
             return ":DSWRF:surface:"
         case .frozen_precipitation_percent:
-            return ":CSNOW:surface:"
-        case .categorical_freezing_rain:
-            return ":CFRZR:surface:"
-        case .categorical_ice_pellets:
-            return ":CICEP:surface:"
+            return ":CPOFP:surface"
         case .cape:
             return ":CAPE:surface:"
         case .lifted_index:
@@ -245,8 +226,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .showers: return .nearest
         case .pressure_msl: return .hermite(bounds: nil)
         case .frozen_precipitation_percent: return .nearest
-        case .categorical_ice_pellets: return .nearest
-        case .categorical_freezing_rain: return .nearest
         case .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...1e9)
         case .lifted_index: return .hermite(bounds: 0...1e9)
@@ -269,12 +248,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (1, -273.15)
         case .soil_temperature_100_to_200cm:
             return (1, -273.15)
-        case .frozen_precipitation_percent:
-            return (100, 0)
-        case .categorical_freezing_rain:
-            return (100, 0)
-        case .categorical_ice_pellets:
-            return (100, 0)
         case .showers:
             return (3600, 0)
         case .precipitation:

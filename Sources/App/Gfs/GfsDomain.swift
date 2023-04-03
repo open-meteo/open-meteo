@@ -3,7 +3,8 @@ import SwiftPFor2D
 
 
 /**
- GFS inventory: https://www.nco.ncep.noaa.gov/pmb/products/gfs/gfs.t00z.pgrb2.0p25.f003.shtml
+ GFS025 inventory: https://www.nco.ncep.noaa.gov/pmb/products/gfs/gfs.t00z.pgrb2.0p25.f003.shtml
+ GFS013 inventory: https://www.nco.ncep.noaa.gov/pmb/products/gfs/gfs.t00z.sfluxgrbf001.grib2.shtml
  NAM inventory: https://www.nco.ncep.noaa.gov/pmb/products/nam/nam.t00z.conusnest.hiresf06.tm00.grib2.shtml
  HRR inventory: https://www.nco.ncep.noaa.gov/pmb/products/hrrr/hrrr.t00z.wrfprsf02.grib2.shtml
  
@@ -232,12 +233,6 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     /// CSNOW categorical snow as percent (0-100)
     case frozen_precipitation_percent
     
-    /// CFRZR
-    case categorical_freezing_rain
-    
-    /// CICEP
-    case categorical_ice_pellets
-    
     //case rain
     //case snowfall_convective_water_equivalent
     //case snowfall_water_equivalent
@@ -305,8 +300,6 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .pressure_msl: return 10
         case .shortwave_radiation: return 1
         case .frozen_precipitation_percent: return 1
-        case .categorical_freezing_rain: return 1
-        case .categorical_ice_pellets: return 1
         case .cape: return 0.1
         case .lifted_index: return 10
         case .visibility: return 0.05 // 50 meter
@@ -358,8 +351,6 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .pressure_msl: return .hectoPascal
         case .shortwave_radiation: return .wattPerSquareMeter
         case .frozen_precipitation_percent: return .percent
-        case .categorical_freezing_rain: return .percent
-        case .categorical_ice_pellets: return .percent
         case .cape: return .joulesPerKilogram
         case .lifted_index: return .dimensionless
         case .visibility: return .meter
