@@ -155,6 +155,9 @@ struct GfsDownload: AsyncCommandFix {
         
         let variablesHour0 = variables.filter({!$0.variable.skipHour0(for: domain)})
         
+        /// Keep data from previous timestep in memory to deaverage the next timestep
+        var previousData = [String: (step: Int, data: [Float])]()
+        
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
             /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
@@ -172,6 +175,32 @@ struct GfsDownload: AsyncCommandFix {
                 }
                 //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
                 
+                guard let stepRange = message.get(attribute: "stepRange"),
+                        let stepType = message.get(attribute: "stepType") else {
+                    fatalError("could not get step range or type")
+                }
+                
+                // Deaverage data
+                if stepType == "avg" {
+                    let startStep = Int(stepRange.split(separator: "-")[0])!
+                    let currentStep = Int(stepRange.split(separator: "-")[1])!
+                    let previous = previousData[variable.variable.rawValue]
+                    // Store data for averaging in next run
+                    previousData[variable.variable.rawValue] = (currentStep, grib2d.array.data)
+                    // For the overall first timestep or the first step of each repeating section, deaveraging is not required
+                    if let previous, previous.step != startStep {
+                        let deltaHours = Float(currentStep - startStep)
+                        let deltaHoursPrevious = Float(previous.step - startStep)
+                        for l in previous.data.indices {
+                            grib2d.array.data[l] = grib2d.array.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious
+                        }
+                    }
+                }
+                
+                if stepType == "acc" {
+                    fatalError("stepType=acc not supported")
+                }
+                
                 //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(forecastHour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
@@ -180,8 +209,7 @@ struct GfsDownload: AsyncCommandFix {
                 if let fma = variable.variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try writer.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
             }
         }
         curl.printStatistics()
@@ -246,22 +274,6 @@ struct GfsDownload: AsyncCommandFix {
                     data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
                 }
                 
-                // Deaverage radiation. Not really correct for 3h data after 120 hours, but solar interpolation will correct it afterwards
-                if variable.isAveragedOverForecastTime {
-                    switch domain {
-                    case .gfs025_ensemble:
-                        fatalError()
-                    case .gfs013:
-                        fallthrough
-                    case .gfs025:
-                        data2d.deavergeOverTime(slidingWidth: 6, slidingOffset: skip)
-                    //case .nam_conus:
-                    //    data2d.deavergeOverTime(slidingWidth: 3, slidingOffset: skip)
-                    case .hrrr_conus:
-                        break
-                    }
-                }
-                
                 // interpolate missing timesteps. We always fill 2 timesteps at once
                 // data looks like: DDDDDDDDDD--D--D--D--D--D
                 let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
@@ -275,12 +287,6 @@ struct GfsDownload: AsyncCommandFix {
                 
                 // Fill in missing hourly values after switching to 3h
                 data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
-                
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
-                    //data2d.deaccumulateOverTime(slidingWidth: domain == .nam_conus ? 3 : data2d.nTime, slidingOffset: skip)
-                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-                }
                 
                 progress.add(locationRange.count)
                 return data2d.data[0..<locationRange.count * nTime]

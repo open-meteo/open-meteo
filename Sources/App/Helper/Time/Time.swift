@@ -75,7 +75,7 @@ public struct Timestamp: Hashable {
         if str.count < 10 {
             return Timestamp(year, month, day)
         }
-        guard let hour = Int(str[8..<10]), hour >= 0, day <= 23 else {
+        guard let hour = Int(str[8..<10]), hour >= 0, hour <= 23 else {
             throw TimeError.InvalidDate
         }
         if str.count < 12 {
