@@ -4,7 +4,7 @@ import Foundation
 enum Interpolation2StepType {
     // Simple linear interpolation
     case linear
-    // Just copy the next value
+    // Just copy the next value. Which means it is backwards filled. n+1 = n
     case nearest
     // Use solar radiation interpolation
     case solar_backwards_averaged

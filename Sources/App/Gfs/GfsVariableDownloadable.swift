@@ -4,13 +4,11 @@ protocol GfsVariableDownloadable: GenericVariable {
     func skipHour0(for domain: GfsDomain) -> Bool
     var interpolationType: Interpolation2StepType { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
-    var isAveragedOverForecastTime: Bool { get }
-    var isAccumulatedSinceModelStart: Bool { get }
 }
 
 extension GfsSurfaceVariable: GfsVariableDownloadable {
     func gribIndexName(for domain: GfsDomain) -> String? {
-        // NAM has eoms different definitons
+        // NAM has different definitons
         /*if domain == .nam_conus {
             switch variable {
             case .lifted_index:
@@ -77,10 +75,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return nil // only specific humidity
             case .relativehumidity_2m:
                 return nil
-            case .precipitation:
-                return nil // only PRATE grib code
-            case .showers:
-                return nil
             case .wind_u_component_80m:
                 return nil
             case .wind_v_component_80m:
@@ -139,7 +133,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .relativehumidity_2m:
             return ":RH:2 m above ground:"
         case .precipitation:
-            return ":APCP:surface:0-"
+            // PRATE:surface:6-7 hour ave fcst:
+            return ":PRATE:surface:"
         case .wind_v_component_10m:
             return ":VGRD:10 m above ground:"
         case .wind_u_component_10m:
@@ -171,7 +166,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .latent_heatflux:
             return ":LHTFL:surface:"
         case .showers:
-            return ":ACPCP:surface:0-"
+            return ":CPRAT:surface:"
         case .windgusts_10m:
             return ":GUST:surface:"
         case .freezinglevel_height:
@@ -228,7 +223,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .cloudcover_mid: return .hermite(bounds: 0...100)
         case .cloudcover_high: return .hermite(bounds: 0...100)
         case .relativehumidity_2m: return .hermite(bounds: 0...100)
-        case .precipitation: return .linear
+        case .precipitation: return .nearest
         case .wind_v_component_10m: return .hermite(bounds: nil)
         case .wind_u_component_10m: return .hermite(bounds: nil)
         case .snow_depth: return .linear
@@ -249,7 +244,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .soil_moisture_100_to_200cm: return .hermite(bounds: nil)
         case .wind_v_component_80m: return .hermite(bounds: nil)
         case .wind_u_component_80m: return .hermite(bounds: nil)
-        case .showers: return .linear
+        case .showers: return .nearest
         case .pressure_msl: return .hermite(bounds: nil)
         case .frozen_precipitation_percent: return .nearest
         case .categorical_ice_pellets: return .nearest
@@ -282,6 +277,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (100, 0)
         case .categorical_ice_pellets:
             return (100, 0)
+        case .showers:
+            return (3600, 0)
+        case .precipitation:
+            return (3600, 0)
         case .uv_index:
             fallthrough
         case .uv_index_clear_sky:
@@ -291,28 +290,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (18.9 * 0.025, 0)
         default:
             return nil
-        }
-    }
-    
-    var isAveragedOverForecastTime: Bool {
-        switch self {
-        case .shortwave_radiation: return true
-        case .diffuse_radiation: return true
-        case .sensible_heatflux: return true
-        case .latent_heatflux: return true
-        case .uv_index:
-            return true
-        case .uv_index_clear_sky:
-            return true
-        default: return false
-        }
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        switch self {
-        case .precipitation: fallthrough
-        case .showers: return true
-        default: return false
         }
     }
 }
@@ -361,13 +338,5 @@ extension GfsPressureVariable: GfsVariableDownloadable {
         default:
             return nil
         }
-    }
-    
-    var isAveragedOverForecastTime: Bool {
-        return false
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        return false
     }
 }
