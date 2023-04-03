@@ -59,8 +59,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 fallthrough
             case .soil_temperature_100_to_200cm:
                 return nil
-            case .surface_pressure:
-                return nil
             case .uv_index:
                 return nil
             case .uv_index_clear_sky:
