@@ -71,8 +71,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         
         if domain == .gfs013 {
             switch self {
-            case .relativehumidity_2m: // only specific humidity
-                return nil
             case .wind_u_component_80m:
                 return nil
             case .wind_v_component_80m:
@@ -111,8 +109,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return ":HCDC:high cloud layer:"
         case .surface_pressure:
             return ":PRES:surface:"
-        case .relativehumidity_2m:
-            return ":RH:2 m above ground:"
+        case .specific_humidity_2m:
+            return ":SPFH:2 m above ground:"
         case .precipitation:
             // PRATE:surface:6-7 hour ave fcst:
             return ":PRATE:surface:"
@@ -199,7 +197,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .cloudcover_low: return .hermite(bounds: 0...100)
         case .cloudcover_mid: return .hermite(bounds: 0...100)
         case .cloudcover_high: return .hermite(bounds: 0...100)
-        case .relativehumidity_2m: return .hermite(bounds: 0...100)
+        case .specific_humidity_2m: return .hermite(bounds: 0...1000)
         case .precipitation: return .nearest
         case .wind_v_component_10m: return .hermite(bounds: nil)
         case .wind_u_component_10m: return .hermite(bounds: nil)
@@ -246,6 +244,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (1, -273.15)
         case .soil_temperature_100_to_200cm:
             return (1, -273.15)
+        case .specific_humidity_2m:
+            return (1000, 0) // kg/kg to g/kg
         case .showers:
             return (3600, 0)
         case .precipitation:
