@@ -212,7 +212,7 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case vapor_pressure_deficit
     case snowfall
     case rain
-    case surface_pressure
+    case pressure_msl
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case weathercode
@@ -359,8 +359,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .snowfall:
                 try prefetchData(raw: .surface(.frozen_precipitation_percent), time: time)
                 try prefetchData(raw: .surface(.precipitation), time: time)
-            case .surface_pressure:
-                try prefetchData(raw: .surface(.pressure_msl), time: time)
+            case .pressure_msl:
+                try prefetchData(raw: .surface(.surface_pressure), time: time)
                 try prefetchData(raw: .surface(.temperature_2m), time: time)
             case .terrestrial_radiation:
                 break
@@ -473,10 +473,10 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(rain, .millimeter)
             case .relativehumitidy_2m:
                 return try get(raw: .surface(.relativehumidity_2m), time: time)
-            case .surface_pressure:
+            case .pressure_msl:
                 let temperature = try get(raw: .surface(.temperature_2m), time: time).data
-                let pressure = try get(raw: .surface(.pressure_msl), time: time)
-                return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
+                let pressure_surface = try get(raw: .surface(.surface_pressure), time: time)
+                return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: pressure_surface.data, elevation: reader.targetElevation), pressure_surface.unit)
             case .terrestrial_radiation:
                 /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
