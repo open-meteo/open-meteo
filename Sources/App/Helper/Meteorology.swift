@@ -52,7 +52,7 @@ struct Meteorology {
         return -1 * speed * cos(directionDegree.degreesToRadians)
     }
     
-    /// Calculate mea nsea level pressure, corrected by temperature.
+    /// Calculate mean sea level pressure, corrected by temperature.
     static func sealevelPressure(temperature: [Float], pressure: [Float], elevation: Float) -> [Float] {
         precondition(temperature.count == pressure.count)
         

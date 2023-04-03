@@ -59,7 +59,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 fallthrough
             case .soil_temperature_100_to_200cm:
                 return nil
-            case .pressure_msl:
+            case .surface_pressure:
                 return nil
             case .uv_index:
                 return nil
@@ -71,9 +71,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         
         if domain == .gfs013 {
             switch self {
-            case .pressure_msl:
-                return nil // only specific humidity
-            case .relativehumidity_2m:
+            case .relativehumidity_2m: // only specific humidity
                 return nil
             case .wind_u_component_80m:
                 return nil
@@ -111,8 +109,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return ":MCDC:middle cloud layer:"
         case .cloudcover_high:
             return ":HCDC:high cloud layer:"
-        case .pressure_msl:
-            return ":PRMSL:mean sea level:"
+        case .surface_pressure:
+            return ":PRES:surface:"
         case .relativehumidity_2m:
             return ":RH:2 m above ground:"
         case .precipitation:
@@ -224,7 +222,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .wind_v_component_80m: return .hermite(bounds: nil)
         case .wind_u_component_80m: return .hermite(bounds: nil)
         case .showers: return .nearest
-        case .pressure_msl: return .hermite(bounds: nil)
+        case .surface_pressure: return .hermite(bounds: nil)
         case .frozen_precipitation_percent: return .nearest
         case .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...1e9)
@@ -238,7 +236,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         switch self {
         case .temperature_2m:
             return (1, -273.15)
-        case .pressure_msl:
+        case .surface_pressure:
             return (1/100, 0)
         case .soil_temperature_0_to_10cm:
             return (1, -273.15)
