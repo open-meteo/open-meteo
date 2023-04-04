@@ -47,7 +47,7 @@ struct Dem90 {
             return 600
         }
         if latitude < -50 {
-            return 1200
+            return 800
         }
         if latitude < 50 {
             return 1200
