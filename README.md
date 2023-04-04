@@ -38,6 +38,7 @@ Apps:
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
 - [omWeather](https://github.com/woheller69/omweather) Android Weather App
+- [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
