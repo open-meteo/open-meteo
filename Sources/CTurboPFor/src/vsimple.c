@@ -38,6 +38,7 @@
 
 #include "conf.h"
 #include "vsimple.h"
+#include <string.h>
 
   #ifdef __ARM_NEON
 #define PREFETCH(_ip_,_rw_)
