@@ -9,7 +9,7 @@ struct CmipController {
         let generationTimeStart = Date()
         let params = try req.query.decode(CmipQuery.self)
         try params.validate()
-        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
+        let elevationOrDem = try params.elevation.map(Float.init) ?? Dem90.read(lat: Float(params.latitude), lon: Float(params.longitude))
         
         let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)
         //let timezone = try params.resolveTimezone()
@@ -22,12 +22,12 @@ struct CmipController {
         
         let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
             if biasCorrection {
-                guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: Float(params.latitude), lon: Float(params.longitude), elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
                 return Cmip6ReaderPostBiasCorrected(reader: reader, domain: domain)
             } else {
-                guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: Float(params.latitude), lon: Float(params.longitude), elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
                 let reader2 = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
@@ -772,12 +772,12 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
 }
 
 struct CmipQuery: Content, QueryWithTimezone, ApiUnitsSelectable {
-    let latitude: Float
-    let longitude: Float
+    let latitude: Double
+    let longitude: Double
     //let hourly: [Cmip6VariableOrDerived]?
     let daily: [String]?
     //let current_weather: Bool?
-    let elevation: Float?
+    let elevation: Double?
     //let timezone: String?
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?

@@ -8,8 +8,8 @@ struct DemController {
     }
 
     struct Query: Content {
-        let latitude: [Float]
-        let longitude: [Float]
+        let latitude: [Double]
+        let longitude: [Double]
         
         func validate() throws {
             guard latitude.count == longitude.count else {
@@ -39,7 +39,7 @@ struct DemController {
         let params = try req.query.decode(Query.self)
         try params.validate()
         let elevation = try zip(params.latitude, params.longitude).map { (latitude, longitude) in
-            try Dem90.read(lat: latitude, lon: longitude)
+            try Dem90.read(lat: Float(latitude), lon: Float(longitude))
         }
         return Result(elevation: elevation)
     }

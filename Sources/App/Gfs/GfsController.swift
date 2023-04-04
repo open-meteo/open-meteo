@@ -15,7 +15,7 @@ public struct GfsController {
         let generationTimeStart = Date()
         let params = try req.query.decode(GfsQuery.self)
         try params.validate()
-        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
+        let elevationOrDem = try params.elevation.map(Float.init) ?? Dem90.read(lat: Float(params.latitude), lon: Float(params.longitude))
         let currentTime = Timestamp.now()
         
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 17)
@@ -30,7 +30,7 @@ public struct GfsController {
         // gfs025 is automatically used inside `GfsMixer`
         let domains = [GfsDomain.gfs013, /*.nam_conus,*/ .hrrr_conus]
         
-        guard let reader = try GfsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+        guard let reader = try GfsMixer(domains: domains, lat: Float(params.latitude), lon: Float(params.longitude), elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         
@@ -87,7 +87,7 @@ public struct GfsController {
             for variable in dailyVariables {
                 if variable == .sunrise || variable == .sunset {
                     // only calculate sunrise/set once
-                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
+                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: Float(params.latitude), lon: Float(params.longitude), utcOffsetSeconds: time.utcOffsetSeconds)
                     riseSet = times
                     if variable == .sunset {
                         res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
@@ -121,12 +121,12 @@ public struct GfsController {
 
 
 struct GfsQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
-    let latitude: Float
-    let longitude: Float
+    let latitude: Double
+    let longitude: Double
     let hourly: [String]?
     let daily: [String]?
     let current_weather: Bool?
-    let elevation: Float?
+    let elevation: Double?
     let timezone: String?
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?

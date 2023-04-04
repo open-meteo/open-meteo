@@ -33,7 +33,7 @@ public struct ForecastapiController: RouteCollection {
         let generationTimeStart = Date()
         let params = try req.query.decode(ForecastApiQuery.self)
         try params.validate()
-        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
+        let elevationOrDem = try params.elevation ?? Dem90.read(lat: Float(params.latitude), lon: Float(params.longitude))
         let currentTime = Timestamp.now()
         
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 16)
@@ -48,7 +48,7 @@ public struct ForecastapiController: RouteCollection {
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
         
         let readers = try domains.compactMap {
-            try GenericReaderMulti<ForecastVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
+            try GenericReaderMulti<ForecastVariable>(domain: $0, lat: Float(params.latitude), lon: Float(params.longitude), elevation: elevationOrDem, mode: params.cell_selection ?? .land)
         }
         
         guard !readers.isEmpty else {
@@ -90,7 +90,7 @@ public struct ForecastapiController: RouteCollection {
         if params.current_weather == true {
             let starttime = currentTime.floor(toNearest: 3600)
             let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-            guard let reader = try GenericReaderMulti<ForecastVariable>(domain: MultiDomains.best_match, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+            guard let reader = try GenericReaderMulti<ForecastVariable>(domain: MultiDomains.best_match, lat: Float(params.latitude), lon: Float(params.longitude), elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             let temperature = try reader.get(variable: .surface(.temperature_2m), time: time)!.convertAndRound(params: params)
@@ -121,7 +121,7 @@ public struct ForecastapiController: RouteCollection {
                 for variable in dailyVariables {
                     if variable == .sunrise || variable == .sunset {
                         // only calculate sunrise/set once
-                        let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
+                        let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: Float(params.latitude), lon: Float(params.longitude), utcOffsetSeconds: time.utcOffsetSeconds)
                         riseSet = times
                         if variable == .sunset {
                             res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
@@ -161,8 +161,8 @@ public struct ForecastapiController: RouteCollection {
 
 
 struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
-    let latitude: Float
-    let longitude: Float
+    let latitude: Double
+    let longitude: Double
     let hourly: [String]?
     let daily: [String]?
     let current_weather: Bool?

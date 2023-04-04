@@ -102,7 +102,7 @@ struct GloFasController {
         let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.seamless_v3]
         
         let readers = try domains.compactMap {
-            guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
+            guard let reader = try $0.getReader(lat: Float(params.latitude), lon: Float(params.longitude), elevation: .nan, mode: params.cell_selection ?? .nearest) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             return reader
@@ -180,8 +180,8 @@ enum GlofasDomainApi: String, RawRepresentableString, CaseIterable {
 }
 
 struct GloFasQuery: Content, QueryWithStartEndDateTimeZone {
-    let latitude: Float
-    let longitude: Float
+    let latitude: Double
+    let longitude: Double
     let daily: [String]
     let timeformat: Timeformat?
     let past_days: Int?

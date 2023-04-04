@@ -16,9 +16,9 @@ struct MetNoController {
         /// For fractional timezones, shift data to show only for full timestamps
         let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let hourlyTime = time.range.range(dtSeconds: 3600)
-        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
+        let elevationOrDem = try params.elevation.map(Float.init) ?? Dem90.read(lat: Float(params.latitude), lon: Float(params.longitude))
         
-        guard let reader = try MetNoReader(domain: MetNoDomain.nordic_pp, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+        guard let reader = try MetNoReader(domain: MetNoDomain.nordic_pp, lat: Float(params.latitude), lon: Float(params.longitude), elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         // Start data prefetch to boooooooost API speed :D
@@ -79,11 +79,11 @@ struct MetNoController {
 typealias MetNoHourlyVariable = VariableOrDerived<MetNoVariable, MetNoVariableDerived>
 
 struct MetNoQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
-    let latitude: Float
-    let longitude: Float
+    let latitude: Double
+    let longitude: Double
     let hourly: [String]?
     let current_weather: Bool?
-    let elevation: Float?
+    let elevation: Double?
     //let timezone: String?
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?

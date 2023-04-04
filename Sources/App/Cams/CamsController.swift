@@ -22,7 +22,7 @@ struct CamsController {
         
         let domains = (params.domains ?? .auto).camsDomains
         
-        guard let reader = try CamsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
+        guard let reader = try CamsMixer(domains: domains, lat: Float(params.latitude), lon: Float(params.longitude), elevation: .nan, mode: params.cell_selection ?? .nearest) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
@@ -240,8 +240,8 @@ struct CamsMixer: GenericReaderMixer {
 }
 
 struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
-    let latitude: Float
-    let longitude: Float
+    let latitude: Double
+    let longitude: Double
     let hourly: [String]?
     //let daily: [CamsVariableDaily]?
     //let temperature_unit: TemperatureUnit?

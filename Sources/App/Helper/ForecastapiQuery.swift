@@ -3,8 +3,8 @@ import Vapor
 import SwiftTimeZoneLookup
 
 enum ForecastapiError: Error {
-    case latitudeMustBeInRangeOfMinus90to90(given: Float)
-    case longitudeMustBeInRangeOfMinus180to180(given: Float)
+    case latitudeMustBeInRangeOfMinus90to90(given: Double)
+    case longitudeMustBeInRangeOfMinus180to180(given: Double)
     case pastDaysInvalid(given: Int, allowed: ClosedRange<Int>)
     case forecastDaysInvalid(given: Int, allowed: ClosedRange<Int>)
     case enddateMustBeLargerEqualsThanStartdate
@@ -140,12 +140,13 @@ extension QueryWithStartEndDateTimeZone {
     }
 }
 
+/// Using double to cicrumvent decoding issues on linux with vapor.... not confirmed
 protocol QueryWithTimezone {
     var timezone: String? { get }
     
-    var latitude: Float { get }
+    var latitude: Double { get }
     
-    var longitude: Float { get }
+    var longitude: Double { get }
     
     var cell_selection: GridSelectionMode? { get }
 }
@@ -159,7 +160,7 @@ extension QueryWithTimezone {
             return TimeZone(identifier: "GMT")!
         }
         if timezone == "auto" {
-            if let res = timezoneDatabase.simple(latitude: latitude, longitude: longitude) {
+            if let res = timezoneDatabase.simple(latitude: Float(latitude), longitude: Float(longitude)) {
                 timezone = res
             }
         }
