@@ -414,8 +414,7 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
         case .relativehumidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         case .vertical_velocity:
-            // Use scalefactor 3 for levels higher than 500 hPa.
-            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+            return (10..<20).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
     }
     

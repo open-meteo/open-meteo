@@ -451,7 +451,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .snowfall_height:
             return 0.1
         case .updraft:
-            return 10
+            return 20
         }
     }
     
