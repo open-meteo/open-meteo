@@ -3,10 +3,6 @@ import Vapor
 
 
 struct DemController {
-    struct Result: Content {
-        let elevation: [Float]
-    }
-
     struct Query: Content {
         let latitude: [Double]
         let longitude: [Double]
@@ -32,7 +28,7 @@ struct DemController {
         }
     }
 
-    func query(_ req: Request) throws -> Result {
+    func query(_ req: Request) throws -> String {
         if req.headers[.host].contains(where: { $0 == "open-meteo.com"}) {
             throw Abort.init(.notFound)
         }
@@ -41,7 +37,9 @@ struct DemController {
         let elevation = try zip(params.latitude, params.longitude).map { (latitude, longitude) in
             try Dem90.read(lat: Float(latitude), lon: Float(longitude))
         }
-        return Result(elevation: elevation)
+        return """
+        {"elevation":\(elevation)}
+        """
     }
 }
 
