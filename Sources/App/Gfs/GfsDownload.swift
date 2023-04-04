@@ -158,6 +158,9 @@ struct GfsDownload: AsyncCommandFix {
         /// Keep data from previous timestep in memory to deaverage the next timestep
         var previousData = [String: (step: Int, data: [Float])]()
         
+        /// Variables that are kept in memory. E.g. keep pressure and temperature in memory to convert specific humidity to relative
+        let keepVariableInMemory = [GfsSurfaceVariable.temperature_2m.rawValue, GfsSurfaceVariable.surface_pressure.rawValue]
+        
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
             /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
@@ -175,7 +178,8 @@ struct GfsDownload: AsyncCommandFix {
                 }
                 //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
                 
-                guard let stepRange = message.get(attribute: "stepRange"),
+                guard let shortName = message.get(attribute: "shortName"),
+                      let stepRange = message.get(attribute: "stepRange"),
                         let stepType = message.get(attribute: "stepType") else {
                     fatalError("could not get step range or type")
                 }
@@ -201,7 +205,22 @@ struct GfsDownload: AsyncCommandFix {
                     fatalError("stepType=acc not supported")
                 }
                 
-                //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
+                // Convert specific humidity to relative humidity
+                if let variable = variable.variable as? GfsSurfaceVariable,
+                    variable == .relativehumidity_2m,
+                    shortName == "2sh"
+                {
+                    guard let temperature = previousData["temperature_2m"], temperature.step == forecastHour else {
+                        fatalError("Could not get temperature 2m to convert specific humidity")
+                    }
+                    guard let surfacePressure = previousData["surface_pressure"], surfacePressure.step == forecastHour else {
+                        fatalError("Could not get surface_pressure to convert specific humidity")
+                    }
+                    grib2d.array.data.multiplyAdd(multiply: 1000, add: 0) // kg/kg to g/kg
+                    grib2d.array.data = Meteorology.specificToRelativeHumidity(specificHumidity: grib2d.array.data, temperature: temperature.data, pressure: surfacePressure.data)
+                }
+                
+                try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
                 
@@ -209,6 +228,12 @@ struct GfsDownload: AsyncCommandFix {
                 if let fma = variable.variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
+                
+                // Keep temperature and pressure in memory to relative humidity conversion
+                if keepVariableInMemory.contains(variable.variable.rawValue) {
+                    previousData[variable.variable.rawValue] = (forecastHour, grib2d.array.data)
+                }
+                
                 try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
             }
         }

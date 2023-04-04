@@ -97,7 +97,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .snowfall_height:
             return .hermite(bounds: nil)
         case .updraft:
-            return .hermite(bounds: 0...200)
+            return .hermite(bounds: nil)
         }
     }
     

@@ -191,7 +191,6 @@ enum GfsDailyWeatherVariable: String, RawRepresentableString {
 
 enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
-    case relativehumidity_2m
     case relativehumitidy_2m
     case dewpoint_2m
     case windspeed_10m
@@ -328,10 +327,10 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.temperature_2m), time: time)
                 try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
                 try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
-                try prefetchData(derived: .surface(.relativehumidity_2m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
                 try prefetchData(raw: .surface(.shortwave_radiation), time: time)
             case .relativehumitidy_2m:
-                try prefetchData(derived: .surface(.relativehumidity_2m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
             case .windspeed_10m:
                 try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
                 try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
@@ -348,11 +347,11 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.latent_heatflux), time: time)
             case .vapor_pressure_deficit:
                 try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(derived: .surface(.relativehumidity_2m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
             case .et0_fao_evapotranspiration:
                 try prefetchData(raw: .surface(.shortwave_radiation), time: time)
                 try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(derived: .surface(.relativehumidity_2m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
                 try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
                 try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
             case .rain:
@@ -369,7 +368,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 break
             case .dewpoint_2m:
                 try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(derived: .surface(.relativehumidity_2m), time: time)
+                try prefetchData(raw: .surface(.relativehumidity_2m), time: time)
             case .diffuse_radiation_instant:
                 try prefetchData(raw: .surface(.diffuse_radiation), time: time)
             case .direct_normal_irradiance:
@@ -392,10 +391,6 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.windgusts_10m), time: time)
                 try prefetchData(raw: .surface(.visibility), time: time)
                 try prefetchData(raw: .surface(.lifted_index), time: time)
-            case .relativehumidity_2m:
-                try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(raw: .surface(.surface_pressure), time: time)
-                try prefetchData(raw: .surface(.specific_humidity_2m), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -438,7 +433,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .apparent_temperature:
                 let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
                 let temperature = try get(raw: .surface(.temperature_2m), time: time).data
-                let relhum = try get(derived: .surface(.relativehumidity_2m), time: time).data
+                let relhum = try get(raw: .surface(.relativehumidity_2m), time: time).data
                 let radiation = try get(raw: .surface(.shortwave_radiation), time: time).data
                 return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
             case .evapotranspiration:
@@ -447,7 +442,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(evapotranspiration, .millimeter)
             case .vapor_pressure_deficit:
                 let temperature = try get(raw: .surface(.temperature_2m), time: time).data
-                let rh = try get(derived: .surface(.relativehumidity_2m), time: time).data
+                let rh = try get(raw: .surface(.relativehumidity_2m), time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
             case .et0_fao_evapotranspiration:
@@ -455,7 +450,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let swrad = try get(raw: .surface(.shortwave_radiation), time: time).data
                 let temperature = try get(raw: .surface(.temperature_2m), time: time).data
                 let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
-                let rh = try get(derived: .surface(.relativehumidity_2m), time: time).data
+                let rh = try get(raw: .surface(.relativehumidity_2m), time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 
                 let et0 = swrad.indices.map { i in
@@ -477,7 +472,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 })
                 return DataAndUnit(rain, .millimeter)
             case .relativehumitidy_2m:
-                return try get(derived: .surface(.relativehumidity_2m), time: time)
+                return try get(raw: .surface(.relativehumidity_2m), time: time)
             case .pressure_msl:
                 let temperature = try get(raw: .surface(.temperature_2m), time: time).data
                 let pressure_surface = try get(raw: .surface(.surface_pressure), time: time)
@@ -492,7 +487,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(solar, .wattPerSquareMeter)
             case .dewpoint_2m:
                 let temperature = try get(raw: .surface(.temperature_2m), time: time)
-                let rh = try get(derived: .surface(.relativehumidity_2m), time: time)
+                let rh = try get(raw: .surface(.relativehumidity_2m), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .shortwave_radiation_instant:
                 let sw = try get(raw: .surface(.shortwave_radiation), time: time)
@@ -538,11 +533,6 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                     visibilityMeters: visibility,
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
-            case .relativehumidity_2m:
-                let temperature = try get(raw: .surface(.temperature_2m), time: time)
-                let pressure = try get(raw: .surface(.surface_pressure), time: time)
-                let q = try get(raw: .surface(.specific_humidity_2m), time: time)
-                return DataAndUnit(Meteorology.specificToRelativeHumidity(specificHumidity: q.data, temperature: temperature.data, pressure: pressure.data), .percent)
             }
         case .pressure(let v):
             switch v.variable {
@@ -667,7 +657,7 @@ extension GfsMixer {
                 try prefetchData(raw: .temperature_2m, time: time)
                 try prefetchData(raw: .wind_u_component_10m, time: time)
                 try prefetchData(raw: .wind_v_component_10m, time: time)
-                try prefetchData(variable: .derived(.surface(.relativehumidity_2m)), time: time)
+                try prefetchData(raw: .relativehumidity_2m, time: time)
                 try prefetchData(raw: .shortwave_radiation, time: time)
             case .precipitation_sum:
                 try prefetchData(raw: .precipitation, time: time)
@@ -692,7 +682,7 @@ extension GfsMixer {
             case .et0_fao_evapotranspiration:
                 try prefetchData(raw: .shortwave_radiation, time: time)
                 try prefetchData(raw: .temperature_2m, time: time)
-                try prefetchData(variable: .derived(.surface(.relativehumidity_2m)), time: time)
+                try prefetchData(raw: .relativehumidity_2m, time: time)
                 try prefetchData(raw: .wind_u_component_10m, time: time)
                 try prefetchData(raw: .wind_v_component_10m, time: time)
             case .snowfall_sum:
