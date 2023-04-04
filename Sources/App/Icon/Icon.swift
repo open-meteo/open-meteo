@@ -622,7 +622,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .direct_radiation:
             return .solar_backwards_averaged
         case .updraft:
-            return .hermite(bounds: 0...200)
+            return .hermite(bounds: nil)
         }
     }
     

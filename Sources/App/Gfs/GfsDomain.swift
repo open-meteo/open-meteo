@@ -203,7 +203,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case cloudcover_high
     case surface_pressure
     
-    case specific_humidity_2m
+    case relativehumidity_2m
     
     /// accumulated since forecast start
     case precipitation
@@ -278,7 +278,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .cloudcover_low: return 1
         case .cloudcover_mid: return 1
         case .cloudcover_high: return 1
-        case .specific_humidity_2m: return 5
+        case .relativehumidity_2m: return 1
         case .precipitation: return 10
         case .wind_v_component_10m: return 10
         case .wind_u_component_10m: return 10
@@ -329,7 +329,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .cloudcover_low: return .percent
         case .cloudcover_mid: return .percent
         case .cloudcover_high: return .percent
-        case .specific_humidity_2m: return .gramPerKilogram
+        case .relativehumidity_2m: return .percent
         case .precipitation: return .millimeter
         case .wind_v_component_10m: return .ms
         case .wind_u_component_10m: return .ms
@@ -377,6 +377,7 @@ enum GfsPressureVariableType: String, CaseIterable {
     case geopotential_height
     case cloudcover
     case relativehumidity
+    //case vertical_velocity
 }
 
 
