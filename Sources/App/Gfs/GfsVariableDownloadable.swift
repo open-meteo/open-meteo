@@ -284,6 +284,20 @@ extension GfsPressureVariable: GfsVariableDownloadable {
             return ":TCDC:\(level) mb:"
         case .relativehumidity:
             return ":RH:\(level) mb:"
+        case .vertical_velocity:
+            switch domain {
+            case .gfs013:
+                return nil
+            case .gfs025:
+                // Vertical Velocity (Geometric) [m/s]
+                return ":DZDT:\(level) mb:"
+            case .hrrr_conus:
+                // Vertical Velocity (Pressure) [Pa/s]
+                // Converted later while downlading
+                return ":VVEL:\(level) mb:"
+            case .gfs025_ensemble:
+                return nil
+            }
         }
     }
     

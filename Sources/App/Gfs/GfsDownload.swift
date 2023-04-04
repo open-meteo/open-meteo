@@ -158,8 +158,11 @@ struct GfsDownload: AsyncCommandFix {
         /// Keep data from previous timestep in memory to deaverage the next timestep
         var previousData = [String: (step: Int, data: [Float])]()
         
-        /// Variables that are kept in memory. E.g. keep pressure and temperature in memory to convert specific humidity to relative
-        let keepVariableInMemory = [GfsSurfaceVariable.temperature_2m.rawValue, GfsSurfaceVariable.surface_pressure.rawValue]
+        /// Variables that are kept in memory
+        /// For GFS013, keep ressure and temperature in memory to convert specific humidity to relative
+        let keepVariableInMemory: [GfsSurfaceVariable] = domain == .gfs013 ? [.temperature_2m, .surface_pressure] : []
+        /// Keep pressure level temperature in memory to convert pressure vertical velocity (Pa/s) to geometric velocity (m/s)
+        let keepVariableInMemoryPressure: [GfsPressureVariableType] = domain == .hrrr_conus ? [.temperature] : []
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
@@ -210,17 +213,30 @@ struct GfsDownload: AsyncCommandFix {
                     variable == .relativehumidity_2m,
                     shortName == "2sh"
                 {
-                    guard let temperature = previousData["temperature_2m"], temperature.step == forecastHour else {
+                    guard let temperature = previousData[GfsSurfaceVariable.temperature_2m.rawValue],
+                            temperature.step == forecastHour else {
                         fatalError("Could not get temperature 2m to convert specific humidity")
                     }
-                    guard let surfacePressure = previousData["surface_pressure"], surfacePressure.step == forecastHour else {
+                    guard let surfacePressure = previousData[GfsSurfaceVariable.surface_pressure.rawValue],
+                            surfacePressure.step == forecastHour else {
                         fatalError("Could not get surface_pressure to convert specific humidity")
                     }
                     grib2d.array.data.multiplyAdd(multiply: 1000, add: 0) // kg/kg to g/kg
                     grib2d.array.data = Meteorology.specificToRelativeHumidity(specificHumidity: grib2d.array.data, temperature: temperature.data, pressure: surfacePressure.data)
                 }
                 
-                try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
+                // Convert pressure vertical velocity to geometric velocity in HRRR
+                if let variable = variable.variable as? GfsPressureVariable,
+                    variable.variable == .vertical_velocity,
+                    shortName == "w"
+                {
+                    guard let temperature = previousData[GfsPressureVariable(variable: .temperature, level: variable.level).rawValue], temperature.step == forecastHour else {
+                        fatalError("Could not get temperature 2m to convert pressure vertical velocity to geometric velocity")
+                    }
+                    grib2d.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: grib2d.array.data, temperature: temperature.data, pressureLevel: Float(variable.level))
+                }
+                
+                //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
                 let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
                 try FileManager.default.removeItemIfExists(at: file)
                 
@@ -230,8 +246,11 @@ struct GfsDownload: AsyncCommandFix {
                 }
                 
                 // Keep temperature and pressure in memory to relative humidity conversion
-                if keepVariableInMemory.contains(variable.variable.rawValue) {
-                    previousData[variable.variable.rawValue] = (forecastHour, grib2d.array.data)
+                if let variable = variable.variable as? GfsSurfaceVariable, keepVariableInMemory.contains(variable) {
+                    previousData[variable.rawValue] = (forecastHour, grib2d.array.data)
+                }
+                if let variable = variable.variable as? GfsPressureVariable, keepVariableInMemoryPressure.contains(variable.variable) {
+                    previousData[variable.rawValue] = (forecastHour, grib2d.array.data)
                 }
                 
                 try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
