@@ -377,7 +377,7 @@ enum GfsPressureVariableType: String, CaseIterable {
     case geopotential_height
     case cloudcover
     case relativehumidity
-    //case vertical_velocity
+    case vertical_velocity
 }
 
 
@@ -413,6 +413,9 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         case .relativehumidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
+        case .vertical_velocity:
+            // Use scalefactor 3 for levels higher than 500 hPa.
+            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         }
     }
     
@@ -436,6 +439,8 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .percent
         case .relativehumidity:
             return .percent
+        case .vertical_velocity:
+            return .ms_not_unit_converted
         }
     }
     

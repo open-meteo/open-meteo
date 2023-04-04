@@ -201,6 +201,23 @@ struct Meteorology {
         }
     }
     
+    /// Convert pressure vertical velocity `omega` (Pa/s) to geometric vertical velocity `w` (m/s)
+    /// See https://www.ncl.ucar.edu/Document/Functions/Contributed/omega_to_w.shtml
+    /// Temperature in Celsius
+    /// PressureLevel in hPa e.g. 1000
+    public static func verticalVelocityPressureToGeometric(omega: [Float], temperature: [Float], pressureLevel: Float) -> [Float] {
+        
+        let p = pressureLevel * 100
+        let rgas: Float = 287.058 // J/(kg-K) => m2/(s2 K)
+        let g: Float    = 9.80665            // m/s2
+        return zip(omega, temperature).map { (omega, temperature) in
+            let t = temperature + 273.15
+            let  rho  = p/(rgas*t)         // density => kg/m3
+            let w    = -omega/(rho*g)     // array operation
+            return w
+        }
+    }
+    
     /// Calculate upper level clouds from relative humidity using Sundqvist et al. (1989):
     /// See https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     /// https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2018MS001400  chapter 3.1
