@@ -192,7 +192,7 @@ struct GfsDownload: AsyncCommandFix {
                         let deltaHours = Float(currentStep - startStep)
                         let deltaHoursPrevious = Float(previous.step - startStep)
                         for l in previous.data.indices {
-                            grib2d.array.data[l] = grib2d.array.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious
+                            grib2d.array.data[l] = (grib2d.array.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious) / (deltaHours - deltaHoursPrevious)
                         }
                     }
                 }
