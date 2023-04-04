@@ -16,10 +16,10 @@ struct RegularGrid: Gridable {
             // Allow points on the border. Technically for global grids, this grid point now wrappes to the eastern side
             return (ny - 1) * nx + (nx - 1)
         }
-        if y >= 0 && x == nx {
+        if y >= 0 && y < ny && x == nx {
             return y * nx + (nx - 1)
         }
-        if x >= 0 && y == ny {
+        if x >= 0 && x < nx && y == ny {
             return (ny - 1) * nx + x
         }
         if y < 0 || x < 0 || y >= ny || x >= nx {
