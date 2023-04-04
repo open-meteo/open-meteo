@@ -7,7 +7,7 @@ public struct GemController {
         let generationTimeStart = Date()
         let params = try req.query.decode(GemQuery.self)
         try params.validate()
-        let elevationOrDem = try params.elevation.map(Float.init) ?? Dem90.read(lat: Float(params.latitude), lon: Float(params.longitude))
+        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
         let currentTime = Timestamp.now()
         
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 11)
@@ -21,7 +21,7 @@ public struct GemController {
         
         let domains = [GemDomain.gem_global, .gem_regional, .gem_hrdps_continental]
         
-        guard let reader = try GemMixer(domains: domains, lat: Float(params.latitude), lon: Float(params.longitude), elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+        guard let reader = try GemMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         
@@ -78,7 +78,7 @@ public struct GemController {
             for variable in dailyVariables {
                 if variable == .sunrise || variable == .sunset {
                     // only calculate sunrise/set once
-                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: Float(params.latitude), lon: Float(params.longitude), utcOffsetSeconds: time.utcOffsetSeconds)
+                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
                     riseSet = times
                     if variable == .sunset {
                         res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
@@ -112,12 +112,12 @@ public struct GemController {
 
 
 struct GemQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
-    let latitude: Double
-    let longitude: Double
+    let latitude: Float
+    let longitude: Float
     let hourly: [String]?
     let daily: [String]?
     let current_weather: Bool?
-    let elevation: Double?
+    let elevation: Float?
     let timezone: String?
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?

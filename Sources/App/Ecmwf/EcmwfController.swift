@@ -17,7 +17,7 @@ struct EcmwfController {
         let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let hourlyTime = time.range.range(dtSeconds: 3600 * 3)
         
-        guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: Float(params.latitude), lon: Float(params.longitude), elevation: .nan, mode: params.cell_selection ?? .nearest) else {
+        guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         // Start data prefetch to boooooooost API speed :D
@@ -55,11 +55,11 @@ struct EcmwfController {
 typealias EcmwfHourlyVariable = VariableOrDerived<EcmwfVariable, EcmwfVariableDerived>
 
 struct EcmwfQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
-    let latitude: Double
-    let longitude: Double
+    let latitude: Float
+    let longitude: Float
     let hourly: [String]?
     //let current_weather: Bool?
-    let elevation: Double?
+    let elevation: Float?
     //let timezone: String?
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
