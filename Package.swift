@@ -18,21 +18,16 @@ let package = Package(
   dependencies: [
     .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.13.1"),
     .package(url: "https://github.com/vapor/vapor.git", from: "4.67.4"),
-    .package(url: "https://github.com/vapor/leaf.git", from: "4.0.0"),
     .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.0.0"),
     .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.1"),
     .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "0.1.5"),
     .package(url: "https://github.com/orlandos-nl/IkigaJSON.git", from: "2.0.0"),
-    //.package(name: "SwiftPFor2D", path: "/Users/om/Documents/SwiftPFor2D"),
-    // NOTE: taged releases do not work, because of unsafe flags....
-    //.package(url: "git@gitlab.com:open-meteo/SwiftPFor2D.git", .branch("main"))
   ],
   targets: [
     .target(
       name: "App",
       dependencies: [
         .product(name: "Vapor", package: "vapor"),
-        .product(name: "Leaf", package: "leaf"),
         .product(name: "SwiftNetCDF", package: "SwiftNetCDF"),
         .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),
         .product(name: "SwiftEccodes", package: "SwiftEccodes"),

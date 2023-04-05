@@ -170,11 +170,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// All levels available in the API
-    static var apiLevels: [Int] {
-        return [10, 20, 30, 50, 70, 100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
-    }
-    
     var omFileLength: Int {
         switch self {
         case .arpege_europe:

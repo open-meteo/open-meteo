@@ -127,11 +127,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return []
         }
     }
-    
-    /// All levels available in the API
-    static var apiLevels: [Int] {
-        return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 975, 1000]
-    }
 
     /// Number  of forecast hours per run
     func nForecastHours(run: Int) -> Int {

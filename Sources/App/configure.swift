@@ -1,5 +1,5 @@
 import Vapor
-import Leaf
+//import Leaf
 import IkigaJSON
 
 struct OpenMeteo {
@@ -91,7 +91,7 @@ public func configure(_ app: Application) throws {
 
     app.logger.logLevel = .debug
 
-    app.views.use(.leaf)
+    //app.views.use(.leaf)
     
     app.lifecycle.use(OmFileManager.instance)
 

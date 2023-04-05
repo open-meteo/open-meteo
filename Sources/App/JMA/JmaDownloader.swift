@@ -578,11 +578,6 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// All levels available in the API
-    static var apiLevels: [Int] {
-        return Self.gsm.levels
-    }
-    
     var omFileLength: Int {
         switch self {
         case .gsm:

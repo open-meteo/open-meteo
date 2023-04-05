@@ -8,29 +8,32 @@ Open-Meteo is an open-source weather API and offers free access for non-commerci
 Head over to https://open-meteo.com! Stay up to date with our blog at https://openmeteo.substack.com.
 
 ## Features 
-- [Hourly weather forecast](https://open-meteo.com/en/docs) for 7 days
-- Global weather models 11 km and regional up to 1.5 km resolution
-- 60 years [Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api)
-- Based on the best weather models: [NOAA GFS with HRRR](https://open-meteo.com/en/docs/gfs-api), [DWD ICON](https://open-meteo.com/en/docs/dwd-api), [MeteoFrance Arome&Arpege](https://open-meteo.com/en/docs/meteofrance-api), [ECMWF IFS](https://open-meteo.com/en/docs/ecmwf-api), [JMA](https://open-meteo.com/en/docs/jma-api) 
-- [Marine Forecast API](https://open-meteo.com/en/docs/marine-weather-api), [Air Quality API](https://open-meteo.com/en/docs/air-quality-api), [Geocoding API](https://open-meteo.com/en/docs/geocoding-api), [Elevation API](https://open-meteo.com/en/docs/elevation-api)
+- [Hourly weather forecast](https://open-meteo.com/en/docs) for up to 16 days
+- Global weather models with 11 km and regional models up to 1.5 km resolution
+- Weather model updates every hour for Europe and North America
+- 80 years [Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api)
+- Based on the best weather models: [NOAA GFS with HRRR](https://open-meteo.com/en/docs/gfs-api), [DWD ICON](https://open-meteo.com/en/docs/dwd-api), [MeteoFrance Arome&Arpege](https://open-meteo.com/en/docs/meteofrance-api), [ECMWF IFS](https://open-meteo.com/en/docs/ecmwf-api), [JMA](https://open-meteo.com/en/docs/jma-api), [GEM HRDPS](https://open-meteo.com/en/docs/gem-api), [MET Norway](https://open-meteo.com/en/docs/metno-api)
+- [Marine Forecast API](https://open-meteo.com/en/docs/marine-weather-api), [Air Quality API](https://open-meteo.com/en/docs/air-quality-api), [Geocoding API](https://open-meteo.com/en/docs/geocoding-api), [Elevation API](https://open-meteo.com/en/docs/elevation-api), [Flood API](https://open-meteo.com/en/docs/flood-api)
+- Lightning fast APIs with response times below 10 ms
+- Servers located in Europe and North America with GeoDNS for best latency and high-availability
 - No API key required, CORS supported, no ads, no tracking, not even cookies
 - Free for non-commercial use with data under Attribution 4.0 International (CC BY 4.0)
-- Lightning fast APIs with response times below 10 ms
-- Servers located in Germany (POP for North-America in planning. Sponsors welcome!)
 - Source code available under AGPLv3
 
 ## How does Open-Meteo work?
-Open-Meteo is using open-data weather forecasts from national weather providers (NWP). 
+Open-Meteo utilizes open-data weather forecasts provided by national weather services. These services offer numerical weather predictions that are free to download. However, working with these models can be challenging, as it requires expertise in binary file formats, grid-systems, projections, and the fundamentals of weather predictions.
 
-NWPs offer numerical weather predictions free to download. Unfortunately working with those models is difficult and requires expert knowledge about binary file formats, grid-systems, projections and fundamentals in weather predictions.
+Like many other weather APIs, Open-Meteo integrates high-resolution local and global weather models. Over 2 TB of data are downloaded and processed daily from multiple national weather services. The collected data is then stored in local files using a customized file format and compression technique to enhance access to time-series data such as a 14-day temperature forecast. 
 
-The gap between downloading weather forecasts from NWPs and using weather forecasts in your home automation system, personal website, widgets for Linux or just tinkering around is huge! Even for small pet projects, you have to sign-up with credit-cards to large API vendors, which honestly do not offer properly engineered APIs.
+In contrast to other weather APIs, Open-Meteo provides complete access to its source code, and all data sources are openly listed, crediting the national weather services for their work. With Docker or prebuilt Ubuntu packages, it is possible to launch your own weather API within minutes. By providing the source code, users can conduct detailed verifications of the weather data processing and even make modifications themselves. Contributions are highly encouraged and welcomed.
 
-Open-Meteo fills this gap and offers free weather forecast APIs for non-commercial use without any sign-up, credit-card or even an API key required!
+The API is available for non-commercial use at no cost. Despite being free of charge, the forecast accuracy is top-notch. The API utilizes a vast array of local weather models with rapid updates, ensuring that the most precise forecast is generated for any location globally.
 
-- Do you want to build an open-source widget for Ubuntu? Sure!
-- Use Open-Meteo for a React/Angular/Flutter App? Go for it!
-- Improve your home automation system? Automate your robot lawn mower? Optimize your garden irrigation system? Open-Meteo is a good place to start!
+## Resources
+- All API documentation can be found on [https://open-mete.com](https://open-mete.com). The source code for the website, documentation and API generator is available here: [https://github.com/open-meteo/open-meteo-website](https://github.com/open-meteo/open-meteo-website)
+- The free non-commerical API is hosted at [https://api.open-meteo.com](https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&hourly=temperature_2m) using to GeoDNS to servers in Europe and North America (HTTPS is optional). The API source code is in this current repository.
+- The geocoding API source code is available in a separate repository [https://github.com/open-meteo/geocoding-api](https://github.com/open-meteo/geocoding-api)
+- Larger changes are announced in the [Open-Meteo Blog](https://openmeteo.substack.com)
 
 ## Who is using Open-Meteo?
 Apps:
@@ -64,13 +67,6 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
-
-## Roadmap 
-- Forecasts in 6-hour intervals for `morning`, `afternoon`, `evening` and `night`
-- 14 day weather forecast based on GFS ensemble and ICON ensemble
-- Wave and current forecasts
-- Air quality forecast with gases and pollen in hourly resolution
-- 15 minutes weather forecast for 2 days for temperature, wind and solar radiation
 
 ## Support
 If you encounter bugs while using Open-Meteo APIs, please file a new issue ticket. For general ideas or Q&A please use the [Discussion](https://github.com/open-meteo/open-meteo/discussions) section on Github. Thanks!

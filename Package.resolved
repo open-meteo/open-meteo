@@ -37,24 +37,6 @@
       }
     },
     {
-      "identity" : "leaf",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/vapor/leaf.git",
-      "state" : {
-        "revision" : "79fbcfb7dd2eb0f01e01b3fb7ee2763df75ef3f6",
-        "version" : "4.2.3"
-      }
-    },
-    {
-      "identity" : "leaf-kit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/vapor/leaf-kit.git",
-      "state" : {
-        "revision" : "c67a1b06561bfb8a427ed7e50e27792e083f2d3e",
-        "version" : "1.8.0"
-      }
-    },
-    {
       "identity" : "multipart-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/multipart-kit.git",
