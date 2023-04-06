@@ -4,7 +4,12 @@ import XCTest
 
 
 final class ZensunTests: XCTestCase {
-    /// https://github.com/open-meteo/open-meteo/issues/48
+    func testIsDaylightTime() {
+        let time = TimerangeDt(start: Timestamp(2023,04,06), nTime: 48, dtSeconds: 3600)
+        let isDay = Zensun.calculateIsDay(timeRange: time, lat: 52.52, lon: 13.42, utcOffsetSeconds: 2*3600)
+        XCTAssertEqual(isDay, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0])
+    }
+    
     func testSunRiseSetLosAngeles() {
         let utcOffsetSeconds = -25200
         let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00

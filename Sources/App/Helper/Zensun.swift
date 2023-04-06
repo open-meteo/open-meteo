@@ -15,60 +15,100 @@ public struct Zensun {
     
     /// Calculate sun rise and set times
     public static func calculateSunRiseSet(timeRange: Range<Timestamp>, lat: Float, lon: Float, utcOffsetSeconds: Int) -> (rise: [Timestamp], set: [Timestamp]) {
-        var rise = [Timestamp]()
-        var set = [Timestamp]()
+        var rises = [Timestamp]()
+        var sets = [Timestamp]()
         let nDays = (timeRange.upperBound.timeIntervalSince1970 - timeRange.lowerBound.timeIntervalSince1970) / 86400
-        rise.reserveCapacity(nDays)
-        set.reserveCapacity(nDays)
+        rises.reserveCapacity(nDays)
+        sets.reserveCapacity(nDays)
         for time in timeRange.stride(dtSeconds: 86400) {
-            /// fractional day number with 12am 1jan = 1
-            let tt = time.add(12*3600).fractionalDayMidday
-            
-            let (eqtime, decang) = time.add(12*3600).getSunDeclination()
-            let latsun = decang
-            
-            /// colatitude of sun
-            let t1 = (90-latsun).degreesToRadians
-
-            /// earth-sun distance in AU
-            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
-            
-            /// solar disk half-angle
-            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
-            
-            /// universal time of noon
-            let noon = 12-lon/15
-
-            /// colatitude of point
-            let t0 = (90-lat).degreesToRadians
-
-            let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
-
-            guard arg <= 1 && arg >= -1 else {
-                if arg > 1 {
-                    // polar night
-                    rise.append(Timestamp(0))
-                    set.append(Timestamp(0))
-                } else {
-                    // polar day
-                    rise.append(Timestamp(0))
-                    set.append(Timestamp(0))
-                }
-                continue
+            switch calculateSunTransit(date: time, lat: lat, lon: lon) {
+                
+            case .polarNight:
+                rises.append(Timestamp(0))
+                sets.append(Timestamp(0))
+            case .polarDay:
+                rises.append(Timestamp(0))
+                sets.append(Timestamp(0))
+            case .transit(rise: let rise, set: let set):
+                rises.append(time.add(utcOffsetSeconds + rise))
+                sets.append(time.add(utcOffsetSeconds + set))
             }
-
-            let dtime = Foundation.acos(arg)/(Float(15).degreesToRadians)
-            let sunrise = noon-dtime-eqtime
-            let sunset = noon+dtime-eqtime
-            
-            rise.append(time.add(utcOffsetSeconds + Int(sunrise*3600)))
-            set.append(time.add(utcOffsetSeconds + Int(sunset*3600)))
         }
-        assert(rise.count == nDays)
-        assert(set.count == nDays)
-        return (rise, set)
+        assert(rises.count == nDays)
+        assert(sets.count == nDays)
+        return (rises, sets)
     }
+    
+    public enum SunTransit {
+        case polarNight
+        case polarDay
+        /// Seconds after midnight in local time!
+        case transit(rise: Int, set: Int)
+    }
+    
+    /// `date` must be LOCAL-TIME midnight and sunTransit will be seconds after local midnight!
+    @inlinable static func calculateSunTransit(date: Timestamp, lat: Float, lon: Float) -> SunTransit {
+        /// fractional day number with 12am 1jan = 1
+        let tt = date.add(12*3600).fractionalDayMidday
+        
+        let (eqtime, decang) = date.add(12*3600).getSunDeclination()
+        let latsun = decang
+        
+        /// colatitude of sun
+        let t1 = (90-latsun).degreesToRadians
 
+        /// earth-sun distance in AU
+        let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+        
+        /// solar disk half-angle
+        let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
+        
+        /// universal time of noon
+        let noon = 12-lon/15
+
+        /// colatitude of point
+        let t0 = (90-lat).degreesToRadians
+
+        let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+        
+        
+        guard arg <= 1 && arg >= -1 else {
+            return arg > 1 ? .polarNight : .polarDay
+        }
+        
+        let dtime = Foundation.acos(arg)/(Float(15).degreesToRadians)
+        let sunrise = noon-dtime-eqtime
+        let sunset = noon+dtime-eqtime
+        return .transit(rise: Int(sunrise*3600), set: Int(sunset*3600))
+    }
+    
+    /// Calculate if a given timestep has daylight (`1`) or not (`0`) using sun transit calculation
+    public static func calculateIsDay(timeRange: TimerangeDt, lat: Float, lon: Float, utcOffsetSeconds: Int) -> [Float] {
+        
+        var lastCalculatedTransit: (date: Timestamp, transit: SunTransit)? = nil
+        return timeRange.map({ time -> Float in
+            // As we iteratate over an hourly range, caculate local-time midnight night for the given timestamp
+            let localMidnight = time.add(-1 * utcOffsetSeconds).floor(toNearest: 24*3600).add(utcOffsetSeconds)
+            
+            // calculate new transit if required
+            if lastCalculatedTransit?.date != localMidnight {
+                lastCalculatedTransit = (localMidnight, calculateSunTransit(date: localMidnight, lat: lat, lon: lon))
+            }
+            guard let lastCalculatedTransit else {
+                fatalError("Not possible")
+            }
+            switch lastCalculatedTransit.transit {
+            case .polarNight:
+                return 0
+            case .polarDay:
+                return 1
+            case .transit(rise: let rise, set: let set):
+                // All seconds are the number of seconds since LOCAL midnight
+                let secondsSinceMidnight = time.add(-1 * utcOffsetSeconds).secondsSinceMidnight
+                return secondsSinceMidnight > rise && secondsSinceMidnight < set ? 1 : 0
+            }
+        })
+    }
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
     /// This function is performance critical for updates. This explains redundant code.
@@ -523,6 +563,11 @@ extension Timestamp {
     /// Range `0 ..< 364.25 * 86400`
     public var secondInAverageYear: Int {
         ((timeIntervalSince1970 %  Self.secondsPerAverageYear) + Self.secondsPerAverageYear) % Self.secondsPerAverageYear
+    }
+    
+    /// Number of seconds since midnight
+    public var secondsSinceMidnight: Int {
+        return timeIntervalSince1970 % (24*3600)
     }
     
     /// Seconds per year if a year has 365.25 days
