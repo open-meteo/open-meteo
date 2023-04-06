@@ -72,6 +72,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .relativehumidity_2m:
                 // Download specific humidity and convert it later
                 return ":SPFH:2 m above ground:"
+            case .categorical_freezing_rain:
+                return nil
             case .wind_u_component_80m:
                 return nil
             case .wind_v_component_80m:
@@ -169,6 +171,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return ":CDUVB:surface:"
         case .precipitation_probability:
             return nil
+        case .categorical_freezing_rain:
+            return ":CFRZR:"
         }
     }
     
@@ -176,6 +180,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         switch self {
         case .precipitation_probability: return true
         case .precipitation: return true
+        case .categorical_freezing_rain: return true
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
         case .showers: return true
@@ -228,6 +233,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .lifted_index: return .hermite(bounds: 0...1e9)
         case .visibility: return .hermite(bounds: 0...1e9)
         case .precipitation_probability: return .linear
+        case .categorical_freezing_rain: return .nearest
         }
     }
     

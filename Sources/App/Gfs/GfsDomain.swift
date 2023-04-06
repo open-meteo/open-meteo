@@ -231,8 +231,11 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     case showers
     
-    /// CSNOW categorical snow as percent (0-100)
+    /// CPOFP Percent frozen precipitation [%]
     case frozen_precipitation_percent
+    
+    /// CFRZR Categorical Freezing Rain (0 or 1)
+    case categorical_freezing_rain
     
     //case rain
     //case snowfall_convective_water_equivalent
@@ -308,6 +311,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index: return 20
         case .uv_index_clear_sky: return 20
         case .precipitation_probability: return 1
+        case .categorical_freezing_rain: return 1
         }
     }
     
@@ -359,6 +363,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index: return .dimensionless
         case .uv_index_clear_sky: return .dimensionless
         case .precipitation_probability: return .percent
+        case .categorical_freezing_rain: return .dimensionless
         }
     }
     
