@@ -186,6 +186,8 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(variable: .derived(.snowfall), time: time)
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(raw: .windgusts_10m, time: time)
+        case .is_day:
+            break
         }
     }
     
@@ -284,6 +286,8 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 visibilityMeters: nil,
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
            )
+        case .is_day:
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
         }
     }
 }
@@ -310,6 +314,7 @@ enum MetNoVariableDerived: String, GenericVariableMixable {
     case terrestrial_radiation_instant
     case snowfall
     case weathercode
+    case is_day
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

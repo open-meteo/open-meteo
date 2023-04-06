@@ -181,6 +181,7 @@ enum CdsVariable: String, GenericVariableMixable {
     case soil_moisture_index_28_to_100cm
     case soil_moisture_index_100_to_255cm
     case soil_moisture_index_0_to_100cm
+    case is_day
     
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
@@ -225,6 +226,7 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case soil_moisture_index_28_to_100cm
     case soil_moisture_index_100_to_255cm
     case soil_moisture_index_0_to_100cm
+    case is_day
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

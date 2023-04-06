@@ -216,6 +216,7 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case weathercode
+    case is_day
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -391,6 +392,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.windgusts_10m), time: time)
                 try prefetchData(raw: .surface(.visibility), time: time)
                 try prefetchData(raw: .surface(.lifted_index), time: time)
+            case .is_day:
+                break
             }
         case .pressure(let v):
             switch v.variable {
@@ -533,6 +536,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                     visibilityMeters: visibility,
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
+            case .is_day:
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
             }
         case .pressure(let v):
             switch v.variable {
