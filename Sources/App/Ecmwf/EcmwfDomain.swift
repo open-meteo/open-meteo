@@ -243,6 +243,8 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let temperature = try get(raw: .temperature_2m, time: time)
             let precipitation = try get(raw: .precipitation, time: time)
             return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
+        case .is_day:
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
         }
     }
     
@@ -350,6 +352,8 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .snowfall:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .precipitation, time: time)
+        case .is_day:
+            break
         }
     }
 }

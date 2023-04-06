@@ -209,6 +209,7 @@ enum MeteoFranceVariableDerivedSurface: String, CaseIterable, GenericVariableMix
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case weathercode
+    case is_day
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -394,6 +395,8 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(derived: .surface(.snowfall), time: time)
                 try prefetchData(variable: .cape, time: time)
                 try prefetchData(variable: .windgusts_10m, time: time)
+            case .is_day:
+                break
             }
         case .pressure(let v):
             switch v.variable {
@@ -513,6 +516,8 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                     visibilityMeters: nil,
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
+            case .is_day:
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
             }
         case .pressure(let v):
             switch v.variable {

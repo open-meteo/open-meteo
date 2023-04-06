@@ -404,6 +404,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .soil_moisture_100_to_255cm, time: time)
         case .soil_moisture_index_0_to_100cm:
             try prefetchData(derived: .soil_moisture_0_to_100cm, time: time)
+        case .is_day:
+            break
         }
     }
     
@@ -584,6 +586,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
             }
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .is_day:
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
         }
     }
 }

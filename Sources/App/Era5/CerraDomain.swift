@@ -23,6 +23,7 @@ enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixabl
     case cloudcover
     case direct_normal_irradiance
     case weathercode
+    case is_day
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -111,6 +112,8 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(derived: .cloudcover, time: time)
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(derived: .snowfall, time: time)
+        case .is_day:
+            break
         }
     }
     
@@ -220,6 +223,8 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 visibilityMeters: nil,
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
            )
+        case .is_day:
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
         }
     }
 }

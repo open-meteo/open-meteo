@@ -84,6 +84,8 @@ enum CamsVariableDerived: String, GenericVariableMixable {
     case us_aqi_so2
     case us_aqi_co
     
+    case is_day
+    
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -169,6 +171,8 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
             let co = try get(raw: .carbon_monoxide, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
             return DataAndUnit(co.map({UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000)}), .usaqi)
+        case .is_day:
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
         }
     }
     
@@ -209,6 +213,8 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-24*3600)))
         case .us_aqi_co:
             try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8*3600)))
+        case .is_day:
+            break
         }
     }
 }

@@ -553,6 +553,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case cloudcover_mid
     case cloudcover_high
     case snowfall
+    case is_day
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
