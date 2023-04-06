@@ -37,6 +37,7 @@ enum SiUnit {
     case microgramsPerQuibicMeter
     case grainsPerQuibicMeter
     case dimensionless
+    case dimensionless_integer
     case eaqi
     case usaqi
     case gddCelsius
@@ -79,6 +80,7 @@ enum SiUnit {
         case .microgramsPerQuibicMeter: return "μg/m³"
         case .grainsPerQuibicMeter: return "grains/m³"
         case .dimensionless: return ""
+        case .dimensionless_integer: return ""
         case .eaqi: return "EAQI"
         case .usaqi: return "USAQI"
         case .gddCelsius: return "GGDc"
@@ -121,6 +123,7 @@ enum SiUnit {
         case .microgramsPerQuibicMeter: return 1
         case .grainsPerQuibicMeter: return 1
         case .dimensionless: return 2
+        case .dimensionless_integer: return 0
         case .joulesPerKilogram: return 1
         case .qubicMeterPerSecond: return 2
         case .eaqi: return 0

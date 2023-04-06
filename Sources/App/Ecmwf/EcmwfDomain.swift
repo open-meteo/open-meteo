@@ -244,7 +244,7 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let precipitation = try get(raw: .precipitation, time: time)
             return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
         }
     }
     

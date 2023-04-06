@@ -224,7 +224,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
            )
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
         }
     }
 }

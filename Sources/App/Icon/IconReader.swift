@@ -336,7 +336,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 //let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
                 //return DataAndUnit(zip(dni.data, factor).map(*), dni.unit)
             case .is_day:
-                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
             }
         case .pressure(let variable):
             let level = variable.level

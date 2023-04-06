@@ -65,6 +65,7 @@ public struct MeteoFranceController {
                 windspeed: windspeed.data[0],
                 winddirection: winddirection.data[0],
                 weathercode: weathercode.data[0],
+                is_day: try reader.get(derived: .is_day, time: time).convertAndRound(params: params).data[0],
                 temperature_unit: temperature.unit,
                 windspeed_unit: windspeed.unit,
                 winddirection_unit: winddirection.unit,
@@ -517,7 +518,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
             case .is_day:
-                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
             }
         case .pressure(let v):
             switch v.variable {

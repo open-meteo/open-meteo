@@ -60,6 +60,7 @@ public struct JmaController {
                 windspeed: windspeed.data[0],
                 winddirection: winddirection.data[0],
                 weathercode: weathercode.data[0],
+                is_day: try reader.get(variable: .is_day, time: time).convertAndRound(params: params).data[0],
                 temperature_unit: temperature.unit,
                 windspeed_unit: windspeed.unit,
                 winddirection_unit: winddirection.unit,
@@ -430,7 +431,7 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let precipitation = try get(raw: .precipitation, time: time)
                 return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
             case .is_day:
-                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
             }
         case .pressure(let v):
             switch v.variable {
