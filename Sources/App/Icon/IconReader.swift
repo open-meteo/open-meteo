@@ -192,6 +192,8 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .direct_radiation, time: time)
             case .direct_normal_irradiance_instant:
                 try prefetchData(raw: .direct_radiation, time: time)
+            case .is_day:
+                break
             }
         case .pressure(let variable):
             let level = variable.level
@@ -333,6 +335,8 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 //let dni = try get(variable: .direct_normal_irradiance)
                 //let factor = Zensun.backwardsAveragedToInstantFactor(time: mixer.time, latitude: mixer.modelLat, longitude: mixer.modelLon)
                 //return DataAndUnit(zip(dni.data, factor).map(*), dni.unit)
+            case .is_day:
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
             }
         case .pressure(let variable):
             let level = variable.level

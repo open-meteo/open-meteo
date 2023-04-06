@@ -426,6 +426,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cape
     case uv_index
     case uv_index_clear_sky
+    case is_day
     
     /// Currently only from icon-d2
     case lightning_potential

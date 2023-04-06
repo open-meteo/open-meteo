@@ -83,12 +83,12 @@ public struct Zensun {
     }
     
     /// Calculate if a given timestep has daylight (`1`) or not (`0`) using sun transit calculation
-    public static func calculateIsDay(timeRange: TimerangeDt, lat: Float, lon: Float, utcOffsetSeconds: Int) -> [Float] {
-        
+    public static func calculateIsDay(timeRange: TimerangeDt, lat: Float, lon: Float) -> [Float] {
+        let universalUtcOffsetSeconds = Int(lon/15 * 3600)
         var lastCalculatedTransit: (date: Timestamp, transit: SunTransit)? = nil
         return timeRange.map({ time -> Float in
             // As we iteratate over an hourly range, caculate local-time midnight night for the given timestamp
-            let localMidnight = time.add(-1 * utcOffsetSeconds).floor(toNearest: 24*3600).add(utcOffsetSeconds)
+            let localMidnight = time.add(universalUtcOffsetSeconds).floor(toNearest: 24*3600).add(-1 * universalUtcOffsetSeconds)
             
             // calculate new transit if required
             if lastCalculatedTransit?.date != localMidnight {
@@ -103,9 +103,9 @@ public struct Zensun {
             case .polarDay:
                 return 1
             case .transit(rise: let rise, set: let set):
-                // All seconds are the number of seconds since LOCAL midnight
-                let secondsSinceMidnight = time.add(-1 * utcOffsetSeconds).secondsSinceMidnight
-                return secondsSinceMidnight > rise && secondsSinceMidnight < set ? 1 : 0
+                // Compare in local time
+                let secondsSinceMidnight = time.add(universalUtcOffsetSeconds).secondsSinceMidnight
+                return secondsSinceMidnight > (rise+universalUtcOffsetSeconds) && secondsSinceMidnight < (set+universalUtcOffsetSeconds) ? 1 : 0
             }
         })
     }
