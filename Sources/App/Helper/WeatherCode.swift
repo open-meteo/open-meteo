@@ -1,11 +1,5 @@
-//
-//  File.swift
-//  
-//
-//  Created by Patrick Zippenfenig on 08.12.22.
-//
-
 import Foundation
+
 
 enum WeatherCode: Int {
     case clearSky = 0
@@ -18,10 +12,12 @@ enum WeatherCode: Int {
     case moderateDrizzle = 53
     case denseDrizzle = 55
     case lightFreezingDrizzle = 56
-    case denseFreezingDrizzle = 57
+    case moderateOrDenseFreezingDrizzle = 57
     case lightRain = 61
     case moderateRain = 63
     case heavyRain = 65
+    case lightFreezingRain = 66
+    case moderateOrHeavyFreezingRain = 67
     case slightSnowfall = 71
     case moderateSnowfall = 73
     case heavySnowfall = 75
@@ -39,7 +35,7 @@ enum WeatherCode: Int {
     /// Calculate weather interpretation code
     /// http://www.cosmo-model.org/content/model/documentation/newsLetters/newsLetter06/cnl6_hoffmann.pdf
     /// https://www.dwd.de/DE/leistungen/pbfb_verlag_promet/pdf_promethefte/28_1_2_pdf.pdf?__blob=publicationFile&v=8
-    public static func calculate(cloudcover: Float, precipitation: Float, convectivePrecipitation: Float?, snowfallCentimeters: Float, gusts: Float?, cape: Float?, liftedIndex: Float?, visibilityMeters: Float?, modelDtHours: Int) -> WeatherCode? {
+    public static func calculate(cloudcover: Float, precipitation: Float, convectivePrecipitation: Float?, snowfallCentimeters: Float, gusts: Float?, cape: Float?, liftedIndex: Float?, visibilityMeters: Float?, categoricalFreezingRain: Float?, modelDtHours: Int) -> WeatherCode? {
         
         let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / Float(modelDtHours)) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / Float(modelDtHours)) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
         
@@ -75,6 +71,18 @@ enum WeatherCode: Int {
         default: break
         }
         
+        if let categoricalFreezingRain, categoricalFreezingRain >= 1 {
+            switch precipitation / Float(modelDtHours) {
+            case 0.1..<0.5: return .lightFreezingDrizzle
+            case 0.5..<1.0: return .moderateOrDenseFreezingDrizzle
+            case 1.0..<1.3: return .moderateOrDenseFreezingDrizzle
+            case 1.3..<2.5: return .lightFreezingRain
+            case 2.5..<7.6: return .moderateOrHeavyFreezingRain
+            case 7.6...: return .moderateOrHeavyFreezingRain
+            default: break
+            }
+        }
+        
         switch precipitation / Float(modelDtHours) {
         case 0.1..<0.5: return .lightDrizzle
         case 0.5..<1.0: return .moderateDrizzle
@@ -100,7 +108,7 @@ enum WeatherCode: Int {
         return nil
     }
     
-    public static func calculate(cloudcover: [Float], precipitation: [Float], convectivePrecipitation: [Float]?, snowfallCentimeters: [Float], gusts: [Float]?, cape: [Float]?, liftedIndex: [Float]?, visibilityMeters: [Float]?, modelDtHours: Int) -> [Float] {
+    public static func calculate(cloudcover: [Float], precipitation: [Float], convectivePrecipitation: [Float]?, snowfallCentimeters: [Float], gusts: [Float]?, cape: [Float]?, liftedIndex: [Float]?, visibilityMeters: [Float]?, categoricalFreezingRain: [Float]?, modelDtHours: Int) -> [Float] {
         
         return cloudcover.indices.map { i in
             return calculate(
@@ -112,6 +120,7 @@ enum WeatherCode: Int {
                 cape: cape?[i],
                 liftedIndex: liftedIndex?[i],
                 visibilityMeters: visibilityMeters?[i],
+                categoricalFreezingRain: categoricalFreezingRain?[i],
                 modelDtHours: modelDtHours
             ).map({Float($0.rawValue)}) ?? .nan
         }

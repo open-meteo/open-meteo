@@ -515,6 +515,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                     cape: cape,
                     liftedIndex: nil,
                     visibilityMeters: nil,
+                    categoricalFreezingRain: nil,
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
             case .is_day:

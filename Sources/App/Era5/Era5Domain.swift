@@ -508,6 +508,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 cape: nil,
                 liftedIndex: nil,
                 visibilityMeters: nil,
+                categoricalFreezingRain: nil,
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
             )
         case .soil_moisture_0_to_100cm:
