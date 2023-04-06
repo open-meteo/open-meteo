@@ -45,6 +45,7 @@ jobs:
     - name: Build
       run: |
         ${{ env.swift_build }}
+        mkdir Resources
         cp .build/release/openmeteo-api openmeteo-api
         cp -r .build/release/*.resources Resources/
     - name: Package
