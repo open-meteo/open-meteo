@@ -525,6 +525,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let cape = try get(raw: .surface(.cape), time: time).data
                 let gusts = try get(raw: .surface(.windgusts_10m), time: time).data
                 let visibility = try get(raw: .surface(.visibility), time: time).data
+                let categoricalFreezingRain = try get(raw: .surface(.categorical_freezing_rain), time: time).data
                 let liftedIndex = try get(raw: .surface(.lifted_index), time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
@@ -535,6 +536,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                     cape: cape,
                     liftedIndex: liftedIndex,
                     visibilityMeters: visibility,
+                    categoricalFreezingRain: categoricalFreezingRain,
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
             case .is_day:
