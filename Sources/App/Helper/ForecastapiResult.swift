@@ -94,6 +94,7 @@ struct ForecastapiResult {
         let windspeed: Float
         let winddirection: Float
         let weathercode: Float
+        let is_day: Float
         let temperature_unit: SiUnit
         let windspeed_unit: SiUnit
         let winddirection_unit: SiUnit
@@ -131,10 +132,11 @@ struct ForecastapiResult {
                 
                 if let current_weather = current_weather {
                     b.buffer.writeString("\n")
-                    b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.rawValue)),windspeed (\(current_weather.windspeed_unit.rawValue)),winddirection (\(current_weather.winddirection_unit.rawValue)),weathercode (\(current_weather.weathercode_unit.rawValue))\n")
+                    b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.rawValue)),windspeed (\(current_weather.windspeed_unit.rawValue)),winddirection (\(current_weather.winddirection_unit.rawValue)),weathercode (\(current_weather.weathercode_unit.rawValue)),is_day\n")
                     b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false))
                     let ww = current_weather.weathercode.isNaN ? "NaN" : String(format: "%.0f", current_weather.weathercode)
-                    b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(current_weather.winddirection),\(ww)\n")
+                    let is_day = current_weather.is_day.isNaN ? "NaN" : String(format: "%.0f", current_weather.is_day)
+                    b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(current_weather.winddirection),\(ww),\(is_day)\n")
                 }
                 
                 for section in sections {
@@ -213,6 +215,7 @@ struct ForecastapiResult {
             sheet.write("windspeed (\(current_weather.windspeed_unit.rawValue))")
             sheet.write("winddirection (\(current_weather.winddirection_unit.rawValue))")
             sheet.write("weathercode (\(current_weather.weathercode_unit.rawValue))")
+            sheet.write("is_day")
             sheet.endRow()
             sheet.startRow()
             sheet.writeTimestamp(current_weather.time.add(utc_offset_seconds))
@@ -220,6 +223,7 @@ struct ForecastapiResult {
             sheet.write(current_weather.windspeed)
             sheet.write(current_weather.winddirection)
             sheet.write(current_weather.weathercode)
+            sheet.write(current_weather.is_day)
             sheet.endRow()
         }
         
@@ -277,8 +281,9 @@ struct ForecastapiResult {
                 }
                 if let current_weather = current_weather {
                     let ww = current_weather.weathercode.isNaN ? "null" : String(format: "%.0f", current_weather.weathercode)
+                    let is_day = current_weather.is_day.isNaN ? "null" : String(format: "%.0f", current_weather.is_day)
                     b.buffer.writeString("""
-                        ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(current_weather.winddirection),"weathercode":\(ww),"time":
+                        ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(current_weather.winddirection),"weathercode":\(ww),"is_day":\(is_day),"time":
                         """)
                     b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
                     b.buffer.writeString("}")

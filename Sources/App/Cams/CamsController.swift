@@ -172,7 +172,7 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let co = try get(raw: .carbon_monoxide, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
             return DataAndUnit(co.map({UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000)}), .usaqi)
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
         }
     }
     

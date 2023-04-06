@@ -102,6 +102,7 @@ public struct ForecastapiController: RouteCollection {
                 windspeed: windspeed.data[0],
                 winddirection: winddirection.data[0],
                 weathercode: weathercode.data[0],
+                is_day: try reader.get(variable: .surface(.is_day), time: time)!.convertAndRound(params: params).data[0],
                 temperature_unit: temperature.unit,
                 windspeed_unit: windspeed.unit,
                 winddirection_unit: winddirection.unit,
