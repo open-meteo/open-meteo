@@ -49,6 +49,18 @@ enum WeatherCode: Int {
             }
         }
         
+        if let categoricalFreezingRain, categoricalFreezingRain >= 1 {
+            switch precipitation / Float(modelDtHours) {
+            case 0.1..<0.5: return .lightFreezingDrizzle
+            case 0.5..<1.0: return .moderateOrDenseFreezingDrizzle
+            case 1.0..<1.3: return .moderateOrDenseFreezingDrizzle
+            case 1.3..<2.5: return .lightFreezingRain
+            case 2.5..<7.6: return .moderateOrHeavyFreezingRain
+            case 7.6...: return .moderateOrHeavyFreezingRain
+            default: break
+            }
+        }
+        
         if (convectivePrecipitation ?? 0) > 0 || (cape ?? 0) >= 800 {
             switch snowfallCentimeters / Float(modelDtHours) {
             case 0.01..<0.2: return .slightSnowShowers
@@ -69,18 +81,6 @@ enum WeatherCode: Int {
         case 0.2..<0.8: return .moderateSnowfall
         case 0.8...: return .heavySnowfall
         default: break
-        }
-        
-        if let categoricalFreezingRain, categoricalFreezingRain >= 1 {
-            switch precipitation / Float(modelDtHours) {
-            case 0.1..<0.5: return .lightFreezingDrizzle
-            case 0.5..<1.0: return .moderateOrDenseFreezingDrizzle
-            case 1.0..<1.3: return .moderateOrDenseFreezingDrizzle
-            case 1.3..<2.5: return .lightFreezingRain
-            case 2.5..<7.6: return .moderateOrHeavyFreezingRain
-            case 7.6...: return .moderateOrHeavyFreezingRain
-            default: break
-            }
         }
         
         switch precipitation / Float(modelDtHours) {
