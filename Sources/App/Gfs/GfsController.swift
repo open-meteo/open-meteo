@@ -357,7 +357,11 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
                 try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
             case .rain:
-                fallthrough
+                try prefetchData(raw: .surface(.frozen_precipitation_percent), time: time)
+                try prefetchData(raw: .surface(.precipitation), time: time)
+                if domain != .hrrr_conus {
+                    try prefetchData(raw: .surface(.showers), time: time)
+                }
             case .snowfall:
                 try prefetchData(raw: .surface(.frozen_precipitation_percent), time: time)
                 try prefetchData(raw: .surface(.precipitation), time: time)
@@ -471,10 +475,22 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .rain:
                 let frozen_precipitation_percent = try get(raw: .surface(.frozen_precipitation_percent), time: time).data
                 let precipitation = try get(raw: .surface(.precipitation), time: time).data
-                let rain = zip(frozen_precipitation_percent, precipitation).map({
-                    max((1-$0/100) * $1, 0)
-                })
-                return DataAndUnit(rain, .millimeter)
+                if domain == .hrrr_conus {
+                    // showers are not available in HRRR
+                    let rain = zip(frozen_precipitation_percent, precipitation).map({ (frozen_precipitation_percent, precipitation) in
+                        let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
+                        return max(precipitation - snowfallWaterEqivalent , 0)
+                    })
+                    return DataAndUnit(rain, .millimeter)
+                } else {
+                    let showers = try get(raw: .surface(.showers), time: time).data
+                    let rain = zip(frozen_precipitation_percent, zip(precipitation, showers)).map({ (frozen_precipitation_percent, arg1) in
+                        let (precipitation, showers) = arg1
+                        let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
+                        return max(precipitation - snowfallWaterEqivalent - showers, 0)
+                    })
+                    return DataAndUnit(rain, .millimeter)
+                }
             case .relativehumitidy_2m:
                 return try get(raw: .surface(.relativehumidity_2m), time: time)
             case .pressure_msl:
