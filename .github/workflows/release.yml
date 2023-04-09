@@ -7,14 +7,14 @@ name: Upload Release Asset
 
 env:
   swift_package_resolve: swift package resolve
-  swift_build: swift build --enable-test-discovery -c release -Xswiftc -Ounchecked -Xswiftc -g -Xswiftc -cross-module-optimization # -Xswiftc -static-stdlib
+  swift_build: swift build --enable-test-discovery -c release -Xswiftc -Ounchecked -Xswiftc -g -Xswiftc -cross-module-optimization -Xswiftc -static-stdlib
   swift_test: swift test
   cache_version: 2
 
 jobs:
   linux:
     runs-on: ubuntu-22.04
-    container: swift:5.7.1-jammy
+    container: swift:5.8.0-jammy
     name: Linux
     steps:
     - name: Get Swift Version
@@ -23,10 +23,10 @@ jobs:
         echo "::set-output name=version::$(swift -version | head -n 1 | sed s/,// )"
       shell: bash
     - uses: actions/checkout@v2
-    - name: Get runtime library
-      uses: wei/curl@v1
-      with:
-        args: -o swiftlang-slim_5.7.1-01-ubuntu-jammy_amd64.deb https://apt.open-meteo.com/pool/main/s/swiftlang-slim/swiftlang-slim_5.7.1-01-ubuntu-jammy_amd64.deb # https://archive.swiftlang.xyz/repos/ubuntu/pool/main/s/swiftlang-slim/swiftlang-slim_5.7.1-01-ubuntu-jammy_amd64.deb
+    #- name: Get runtime library
+    #  uses: wei/curl@v1
+    #  with:
+    #    args: -o libswiftlang_5.8-1.0.0-ubuntu-jammy_amd64.deb https://archive.swiftlang.xyz/repos/ubuntu/pool/main/libs/libswiftlang/libswiftlang_5.8-1.0.0-ubuntu-jammy_amd64.deb # https://apt.open-meteo.com/pool/main/s/swiftlang-slim/swiftlang-slim_5.7.1-01-ubuntu-jammy_amd64.deb
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
       uses: actions/cache@v3
@@ -52,7 +52,8 @@ jobs:
       uses: gravitl/github-action-fpm@master
       with:
         fpm_args: './build'
-        fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf19 -d libeccodes0 -d swiftlang-slim --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-sync.service --deb-systemd build/openmeteo-api.service  --deb-systemd build/openmeteo-api2.service  --deb-systemd build/openmeteo-api3.service --deb-systemd build/openmeteo-notify@.service --deb-default build/openmeteo-api.env --before-install build/openmeteo-before-install.sh --before-upgrade build/openmeteo-before-install.sh build/openmeteo-notify.sh=/usr/local/bin/ openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
+        # -d swiftlang-slim
+        fpm_opts: '-s dir -t deb -n openmeteo-api -v ${{github.ref_name}} -d libnetcdf19 -d libeccodes0 --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-sync.service --deb-systemd build/openmeteo-api.service  --deb-systemd build/openmeteo-api2.service  --deb-systemd build/openmeteo-api3.service --deb-systemd build/openmeteo-notify@.service --deb-default build/openmeteo-api.env --before-install build/openmeteo-before-install.sh --before-upgrade build/openmeteo-before-install.sh build/openmeteo-notify.sh=/usr/local/bin/ openmeteo-api=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
     - name: Rename deb file
       run: mv openmeteo-api_${{github.ref_name}}_amd64.deb openmeteo-api_${{github.ref_name}}_jammy_amd64.deb
     - name: Release
@@ -71,16 +72,16 @@ jobs:
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}
         key_passphrase: ${{ secrets.GPG_SECRET }}
-    - name: Create APT repository
-      uses: patrick-zippenfenig/apt-repo-action@master
-      with:
-        repo_supported_arch: amd64
-        repo_supported_version: jammy
-        file: 'swiftlang-slim_5.7.1-01-ubuntu-jammy_amd64.deb'
-        file_target_version: jammy
-        public_key: ${{ secrets.GPG_PUBLIC }}
-        private_key: ${{ secrets.GPG_PRIVATE }}
-        key_passphrase: ${{ secrets.GPG_SECRET }}
+    #- name: Create APT repository
+    #  uses: patrick-zippenfenig/apt-repo-action@master
+    #  with:
+    #    repo_supported_arch: amd64
+    #    repo_supported_version: jammy
+    #    file: 'swiftlang-slim_5.7.1-01-ubuntu-jammy_amd64.deb'
+    #    file_target_version: jammy
+    #    public_key: ${{ secrets.GPG_PUBLIC }}
+    #    private_key: ${{ secrets.GPG_PRIVATE }}
+    #    key_passphrase: ${{ secrets.GPG_SECRET }}
     - name: Upload to FTP
       uses: SamKirkland/FTP-Deploy-Action@4.3.0
       with:
