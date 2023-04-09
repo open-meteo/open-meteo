@@ -38,7 +38,8 @@ WORKDIR /app
 
 # Copy build artifacts
 COPY --from=build --chown=vapor:vapor /build/.build/release /app
-COPY --from=build --chown=vapor:vapor /build/Resources /app/Resources
+RUN mkdir -p /app/Resources
+# COPY --from=build --chown=vapor:vapor /build/Resources /app/Resources
 COPY --from=build --chown=vapor:vapor /build/.build/release/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources /app/Resources/
 COPY --from=build --chown=vapor:vapor /build/Public /app/Public
 
