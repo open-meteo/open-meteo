@@ -1,7 +1,7 @@
 # ================================
 # Build image
 # ================================
-FROM swift:5.7.1-jammy as build
+FROM swift:5.7.0-jammy as build
 EXPOSE 8080
 USER root
 
