@@ -30,9 +30,9 @@ In contrast to other weather APIs, Open-Meteo provides complete access to its so
 The API is available for non-commercial use at no cost. Despite being free of charge, the forecast accuracy is top-notch. The API utilizes a vast array of local weather models with rapid updates, ensuring that the most precise forecast is generated for any location globally.
 
 ## Resources
-- All API documentation can be found on [https://open-meteo.com](https://open-meteo.com). The source code for the website, documentation and API generator is available here: [https://github.com/open-meteo/open-meteo-website](https://github.com/open-meteo/open-meteo-website)
+- All API documentation can be found on https://open-meteo.com. The source code for the website, documentation and API generator is available here: https://github.com/open-meteo/open-meteo-website
 - The free non-commerical API is hosted at [https://api.open-meteo.com](https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&hourly=temperature_2m) using to GeoDNS to servers in Europe and North America (HTTPS is optional). The API source code is in this current repository.
-- The geocoding API source code is available in a separate repository [https://github.com/open-meteo/geocoding-api](https://github.com/open-meteo/geocoding-api)
+- The geocoding API source code is available in a separate repository https://github.com/open-meteo/geocoding-api
 - Larger changes are announced in the [Open-Meteo Blog](https://openmeteo.substack.com)
 
 ## Who is using Open-Meteo?
