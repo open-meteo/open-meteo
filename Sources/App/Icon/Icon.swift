@@ -137,9 +137,18 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             } else {
                 return 180+1
             }
-        case .iconEu: return 120+1
-        case .iconD2_15min: return 48*4
-        case .iconD2: return 48+1
+        case .iconEu:
+            if run % 6 == 0 {
+                // full runs
+                return 120+1
+            } else {
+                // ICON-EU sideruns at 3,9,15,21 have 31x 1-hourly values and 3x 6-hourly steps (6 hourly steps are ignored)
+                return 30+1
+            }
+        case .iconD2_15min:
+            return 48*4
+        case .iconD2:
+            return 48+1
         }
     }
     
@@ -155,9 +164,16 @@ enum IconDomains: String, CaseIterable, GenericDomain {
                 // full 180
                 return Array(0...78) + Array(stride(from: 81, through: 180, by: 3))
             }
-        case .iconEu: return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
-        case .iconD2_15min: return Array(0...48*4-1)
-        case .iconD2: return Array(0...48)
+        case .iconEu:
+            if run % 6 == 0 {
+                return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
+            }
+            // side runs
+            return Array(0...30)
+        case .iconD2_15min:
+            return Array(0...48*4-1)
+        case .iconD2:
+            return Array(0...48)
         }
     }
 
