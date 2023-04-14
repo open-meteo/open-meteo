@@ -43,6 +43,7 @@ Apps:
 - [omWeather](https://github.com/woheller69/omweather) Android Weather App
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
+- [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
