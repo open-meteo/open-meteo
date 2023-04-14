@@ -130,7 +130,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         let logger = application.logger
         /// Up to 7 hours download times are possible for arpege europe 12z run, after Meteofrance open-data limitations on the 12. February 2023
         let deadLineHours = domain == .arpege_europe && run.hour == 12 ? 7 : 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
                 
         /// world 0-24, 27-48, 51-72, 75-102
         let fileTimes = domain.getForecastHoursPerFile(run: run.hour, hourlyForArpegeEurope: false)
