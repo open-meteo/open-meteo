@@ -5,6 +5,29 @@ import XCTest
 
 
 final class DomainTests: XCTestCase {
+    func testIconGrid() {
+        let r2b04 = IcosahedralGrid(n: 2, k: 4)
+        let r2b05 = IcosahedralGrid(n: 2, k: 5)
+        let r2b06 = IcosahedralGrid(n: 2, k: 6)
+        let r3b06 = IcosahedralGrid(n: 3, k: 6)
+        let r2b07 = IcosahedralGrid(n: 2, k: 7)
+        let r3b07 = IcosahedralGrid(n: 3, k: 7)
+        
+        XCTAssertEqual(r2b04.gridResolutionMeters, 157_812.5)
+        XCTAssertEqual(r2b05.gridResolutionMeters, 78_906.25)
+        XCTAssertEqual(r2b06.gridResolutionMeters, 39_453.125)
+        XCTAssertEqual(r3b06.gridResolutionMeters, 26_302.084)
+        XCTAssertEqual(r2b07.gridResolutionMeters, 19_726.562)
+        XCTAssertEqual(r3b07.gridResolutionMeters, 13_151.042)
+        
+        XCTAssertEqual(r2b04.count, 20480)
+        XCTAssertEqual(r2b05.count, 81920)
+        XCTAssertEqual(r2b06.count, 327680)
+        XCTAssertEqual(r3b06.count, 737280)
+        XCTAssertEqual(r2b07.count, 1310720)
+        XCTAssertEqual(r3b07.count, 2949120)
+    }
+    
     func testMeteoFrance() {
         XCTAssertEqual(MeteoFranceDomain.arpege_europe.getForecastHoursPerFile(run: 0, hourlyForArpegeEurope: false).map{$0.file}, ["00H12H", "13H24H", "25H36H", "37H48H", "49H60H", "61H72H", "73H84H", "85H96H", "97H102H"])
         XCTAssertEqual(MeteoFranceDomain.arpege_europe.getForecastHoursPerFile(run: 6, hourlyForArpegeEurope: false).map{$0.file}, ["00H12H", "13H24H", "25H36H", "37H48H", "49H60H", "61H72H"])
