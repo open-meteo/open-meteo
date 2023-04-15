@@ -26,6 +26,8 @@ final class DomainTests: XCTestCase {
         XCTAssertEqual(r3b06.count, 737280)
         XCTAssertEqual(r2b07.count, 1310720)
         XCTAssertEqual(r3b07.count, 2949120)
+        
+        XCTAssertEqual(r3b07.findPoint(latitude: -85, longitude: 44.9688), 10)
     }
     
     func testMeteoFrance() {
