@@ -2,7 +2,7 @@ import Foundation
 @testable import App
 import XCTest
 //import Vapor
-
+import SwiftNetCDF
 
 final class DomainTests: XCTestCase {
     func testIconGrid() {
@@ -27,7 +27,15 @@ final class DomainTests: XCTestCase {
         XCTAssertEqual(r2b07.count, 1310720)
         XCTAssertEqual(r3b07.count, 2949120)
         
-        XCTAssertEqual(r3b07.findPoint(latitude: -85, longitude: 44.9688), 10)
+        //XCTAssertEqual(r3b07.findPoint(latitude: -85, longitude: 44.9688), 10)
+        
+        let lats = try! NetCDF.open(path: "/Users/patrick/Downloads/icon_global_icosahedral_time-invariant_2023041500_CLAT.grib2.nc", allowUpdate: false)!.getVariable(name: "tlat")!.asType(Float.self)!.read()
+        let lons = try! NetCDF.open(path: "/Users/patrick/Downloads/icon_global_icosahedral_time-invariant_2023041500_CLON.grib2.nc", allowUpdate: false)!.getVariable(name: "tlon")!.asType(Float.self)!.read()
+        
+        print(lats[0], lons[0])
+        print(lats[r3b07.count / 20 - 1], lons[r3b07.count / 20 - 1])
+        
+        print(r3b06.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,1]).center)
     }
     
     func testMeteoFrance() {

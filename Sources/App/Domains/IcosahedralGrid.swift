@@ -46,6 +46,63 @@ struct IcosahedralGrid {
         fatalError()
     }
     
+    struct Triangle {
+        let latitudeNorth: Float
+        let latitudeSouth: Float
+        let longitudeWest: Float
+        let longitudeEast: Float
+        
+        var longitudeCenter: Float {
+            (longitudeWest + longitudeEast) / 2
+        }
+        var latitudeCenter: Float {
+            (latitudeNorth + latitudeSouth) / 2
+        }
+        
+        /// divide Triangle by 3 ( = 9 new triangles)
+        func divide3(n: Int) -> Triangle {
+            let dLon = (longitudeEast - longitudeWest) / 3
+            let dLat = (latitudeNorth - latitudeSouth) / 3
+            if n == 0 {
+                return Triangle(latitudeNorth: latitudeNorth, latitudeSouth: latitudeNorth - dLat, longitudeWest: longitudeWest, longitudeEast: longitudeEast)
+            }
+            fatalError()
+        }
+        
+        /// divide Triangle by 2 ( = 4 new triangles)
+        func divide2(n: Int) -> Triangle {
+            let dLon = (longitudeEast - longitudeWest) / 2
+            let dLat = (latitudeNorth - latitudeSouth) / 2
+            if n == 0 {
+                return Triangle(latitudeNorth: latitudeNorth, latitudeSouth: latitudeNorth - dLat, longitudeWest: longitudeWest, longitudeEast: longitudeEast)
+            }
+            if n == 1 {
+                return Triangle(latitudeNorth: latitudeNorth - dLat, latitudeSouth: latitudeSouth, longitudeWest: longitudeWest, longitudeEast: longitudeWest + dLon)
+            }
+            fatalError()
+        }
+        
+        var center: (latitude: Float, longitude: Float) {
+            return (latitudeCenter, longitudeCenter)
+        }
+    }
+    
+    /**
+     t = 0..<20 outer tirangle
+     n = innter triangle .. e.g. 0..<9
+     k = seq 0..<4
+     */
+    func p(t_: Int, n_: Int, k_: [Int]) -> Triangle {
+        var triangle = Triangle(latitudeNorth: 90, latitudeSouth: 27.195, longitudeWest: 36, longitudeEast: 36+72)
+        
+        triangle = triangle.divide3(n: t_)
+        triangle = triangle.divide2(n: n_)
+        for k in k_ {
+            triangle = triangle.divide2(n: k)
+        }
+        return triangle
+    }
+    
     func findPoint(latitude: Float, longitude: Float) -> Int {
         let verticies = getVertices()
         print(verticies)
