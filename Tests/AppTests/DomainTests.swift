@@ -36,15 +36,17 @@ final class DomainTests: XCTestCase {
         
         r3b07.test()
         
-        print(lats[0], lons[0], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,0]).centeroid.getLatLon())
-        print(lats[1], lons[1], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,1]).centeroid.getLatLon())
-        print(lats[2], lons[2], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,2]).centeroid.getLatLon())
-        print(lats[3], lons[3], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,3]).centeroid.getLatLon())
-        print(lats[4], lons[4], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,1,0]).centeroid.getLatLon())
-        print(lats[5], lons[5], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,1,1]).centeroid.getLatLon())
-        print(lats[6], lons[6], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,1,2]).centeroid.getLatLon())
-        print(lats[7], lons[7], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,1,3]).centeroid.getLatLon())
-        print(lats[8], lons[8], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,2,1]).centeroid.getLatLon())
+        for a in 0..<4 {
+            for b in 0..<4 {
+                for c in 0..<4 {
+                    let lat = lats[a*4*4+b*4+c]
+                    let lon = lons[a*4*4+b*4+c]
+                    let pos = r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,a,b,c]).centeroid.getLatLon()
+                    let d = sqrt(pow(lat-Float(pos.latitude), 2) + pow(lon-Float(pos.longitude), 2))
+                    print(lat, lon, pos, "delta=\(d)")
+                }
+            }
+        }
     }
     
     func testMeteoFrance() {

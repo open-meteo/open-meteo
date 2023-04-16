@@ -82,11 +82,10 @@ struct IcosahedralGrid {
                 )
             }
             if n == 2 {
-                // TODO check order
                 return Triangle(
-                    v1: v1.add(v2).normalize(),
-                    v2: v2.add(v3).normalize(),
-                    v3: v3.add(v1).normalize()
+                    v1: v2.add(v3).normalize(),
+                    v2: v3.add(v1).normalize(),
+                    v3: v1.add(v2).normalize()
                 )
             }
             if n == 3 {
