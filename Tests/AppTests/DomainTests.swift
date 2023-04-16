@@ -37,14 +37,18 @@ final class DomainTests: XCTestCase {
         
         r3b07.test()
         
-        for p in 0..<Int(pow(Double(4),7))*6  {
+        for p in 0..<Int(pow(Double(4),7))*9  {
             let lat = lats[p]
             let lon = lons[p]
-            let pos = r3b07.p(t_: 0, n_: (p/(4096*4))%9, k_: [(p/4096)%4,(p/1024)%4,(p/256)%4,(p/64)%4,(p/16)%4,(p/4)%4,p%4]).centeroid.getLatLon()
+            let triangle = r3b07.p(t_: 0, n_: (p/(4096*4))%9, k_: [(p/4096)%4,(p/1024)%4,(p/256)%4,(p/64)%4,(p/16)%4,(p/4)%4,p%4])
+            let pos = triangle.circumcenter.getLatLon()
             let delta = sqrt(pow(lat-Float(pos.latitude), 2) + pow(lon-Float(pos.longitude), 2))
             //if lon == 72 {
-            if delta > 1.7{
+            if delta > 1.4 {
                 print(p,lat, lon, pos, "delta=\(delta)")
+                print(triangle.v1.getLatLon())
+                print(triangle.v2.getLatLon())
+                print(triangle.v3.getLatLon())
             }
         }
         

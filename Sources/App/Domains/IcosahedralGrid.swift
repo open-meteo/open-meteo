@@ -73,16 +73,11 @@ struct IcosahedralGrid {
                     v3: v1.add(v1).add(v2).normalize()
                 )
             case 3:
-                let t = Triangle(
+                return Triangle(
                     v1: v1.add(v1).add(v3).normalize(),
                     v2: v1.add(v2).add(v3).normalize(),
                     v3: v1.add(v3).add(v3).normalize()
                 )
-                /*print(t.v1.getLatLon())
-                print(t.v2.getLatLon())
-                print(t.v3.getLatLon())
-                fatalError()*/
-                return t
             case 4:
                 return Triangle(
                     v1: v1.add(v2).add(v2).normalize(),
@@ -94,6 +89,24 @@ struct IcosahedralGrid {
                     v1: v2.add(v2).add(v3).normalize(),
                     v2: v1.add(v2).add(v3).normalize(),
                     v3: v2.add(v2).add(v1).normalize()
+                )
+            case 6:
+                return Triangle(
+                    v1: v1.add(v2).add(v3).normalize(),
+                    v2: v2.add(v2).add(v3).normalize(),
+                    v3: v2.add(v3).add(v3).normalize()
+                )
+            case 7:
+                return Triangle(
+                    v1: v2.add(v3).add(v3).normalize(),
+                    v2: v1.add(v3).add(v3).normalize(),
+                    v3: v1.add(v2).add(v3).normalize()
+                )
+            case 8:
+                return Triangle(
+                    v1: v1.add(v3).add(v3).normalize(),
+                    v2: v2.add(v3).add(v3).normalize(),
+                    v3: v3
                 )
             default:
                 fatalError()
@@ -139,6 +152,25 @@ struct IcosahedralGrid {
                 y: (v1.y + v2.y + v3.y) / 3.0,
                 z: (v1.z + v2.z + v3.z) / 3.0
             )
+        }
+        
+        var circumcenter: Vector3 {
+            let e1 = v2.subtract(v1)
+            let e2 = v3.subtract(v1)
+            var cu0 = e1.cross(e2).normalize()
+            if cu0.dot(v1) < 0.0 { cu0 = cu0.multiply(-1) }
+            
+            let e3 = v3.subtract(v2)
+            let e4 = v1.subtract(v2)
+            var cu1 = e3.cross(e4).normalize()
+            if cu1.dot(v2) < 0.0 { cu1 = cu1.multiply(-1) }
+            
+            let e5 = v1.subtract(v3)
+            let e6 = v2.subtract(v3)
+            var cu2 = e5.cross(e6).normalize()
+            if cu2.dot(v3) < 0.0 { cu2 = cu2.multiply(-1) }
+            
+            return cu0.add(cu1).add(cu2).normalize()
         }
     }
     
@@ -289,6 +321,10 @@ struct Vector3 {
         return Vector3(x: self.x - other.x, y: self.y - other.y, z: self.z - other.z)
     }
     
+    func multiply(_ value: Double) -> Vector3 {
+        return Vector3(x: x * value, y: y * value, z: z * value)
+    }
+    
     func add(_ other: Vector3) -> Vector3 {
         return Vector3(x: x + other.x, y: y + other.y, z: z + other.z)
     }
@@ -297,8 +333,18 @@ struct Vector3 {
         return self.x * other.x + self.y * other.y + self.z * other.z
     }
     
+    func cross(_ other: Vector3) -> Vector3 {
+        let x = self.y * other.z - self.z * other.y
+        let y = self.z * other.x - self.x * other.z
+        let z = self.x * other.y - self.y * other.x
+        return Vector3(x: x, y: y, z: z)
+    }
+    
+    var length: Double {
+        sqrt(x * x + y * y + z * z)
+    }
+    
     func normalize() -> Vector3 {
-        let length = sqrt(x * x + y * y + z * z)
         return Vector3(x: x/length, y: y/length, z: z/length)
     }
     
