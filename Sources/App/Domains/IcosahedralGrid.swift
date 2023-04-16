@@ -47,44 +47,77 @@ struct IcosahedralGrid {
     }
     
     struct Triangle {
-        let latitudeNorth: Float
-        let latitudeSouth: Float
-        let longitudeWest: Float
-        let longitudeEast: Float
-        
-        var longitudeCenter: Float {
-            (longitudeWest + longitudeEast) / 2
-        }
-        var latitudeCenter: Float {
-            (latitudeNorth + latitudeSouth) / 2
-        }
+        let v1: Vector3
+        let v2: Vector3
+        let v3: Vector3
         
         /// divide Triangle by 3 ( = 9 new triangles)
         func divide3(n: Int) -> Triangle {
-            let dLon = (longitudeEast - longitudeWest) / 3
-            let dLat = (latitudeNorth - latitudeSouth) / 3
             if n == 0 {
-                return Triangle(latitudeNorth: latitudeNorth, latitudeSouth: latitudeNorth - dLat, longitudeWest: longitudeWest, longitudeEast: longitudeEast)
+                let t = Triangle(
+                    v1: v1,
+                    v2: v1.add(v1).add(v2).normalize(),
+                    v3: v1.add(v1).add(v3).normalize()
+                )
+                //print("divide3 ", t.v1.getLatLon(), t.v2.getLatLon(), t.v3.getLatLon())
+                return t
             }
             fatalError()
         }
         
         /// divide Triangle by 2 ( = 4 new triangles)
         func divide2(n: Int) -> Triangle {
-            let dLon = (longitudeEast - longitudeWest) / 2
-            let dLat = (latitudeNorth - latitudeSouth) / 2
             if n == 0 {
-                return Triangle(latitudeNorth: latitudeNorth, latitudeSouth: latitudeNorth - dLat, longitudeWest: longitudeWest, longitudeEast: longitudeEast)
+                return Triangle(
+                    v1: v1,
+                    v2: v1.add(v2).normalize(),
+                    v3: v1.add(v3).normalize()
+                )
             }
             if n == 1 {
-                return Triangle(latitudeNorth: latitudeNorth - dLat, latitudeSouth: latitudeSouth, longitudeWest: longitudeWest, longitudeEast: longitudeWest + dLon)
+                return Triangle(
+                    v1: v2.add(v1).normalize(),
+                    v2: v2,
+                    v3: v2.add(v3).normalize()
+                )
+            }
+            if n == 2 {
+                // TODO check order
+                return Triangle(
+                    v1: v1.add(v2).normalize(),
+                    v2: v2.add(v3).normalize(),
+                    v3: v3.add(v1).normalize()
+                )
+            }
+            if n == 3 {
+                return Triangle(
+                    v1: v3.add(v1).normalize(),
+                    v2: v3.add(v2).normalize(),
+                    v3: v3
+                )
             }
             fatalError()
         }
         
-        var center: (latitude: Float, longitude: Float) {
-            return (latitudeCenter, longitudeCenter)
+        var centeroid: Vector3 {
+            return Vector3(
+                x: (v1.x + v2.x + v3.x) / 3.0,
+                y: (v1.y + v2.y + v3.y) / 3.0,
+                z: (v1.z + v2.z + v3.z) / 3.0
+            )
         }
+    }
+    
+    func test() {
+        print(Vector3.from(latitude: 90, longitude: 8).normalize().getLatLon())
+        let verticies = getVertices()
+        for i in 0...2 {
+            print(i, verticies[i].getLatLon())
+        }
+        
+        print(verticies[0].add(verticies[1]).normalize().getLatLon())
+        print(verticies[1].add(verticies[2]).normalize().getLatLon())
+        print(verticies[0].add(verticies[2]).normalize().getLatLon())
     }
     
     /**
@@ -93,10 +126,10 @@ struct IcosahedralGrid {
      k = seq 0..<4
      */
     func p(t_: Int, n_: Int, k_: [Int]) -> Triangle {
-        var triangle = Triangle(latitudeNorth: 90, latitudeSouth: 27.195, longitudeWest: 36, longitudeEast: 36+72)
+        let verticies = getVertices()
+        var triangle = Triangle(v1: verticies[0], v2: verticies[1], v3: verticies[2])
         
-        triangle = triangle.divide3(n: t_)
-        triangle = triangle.divide2(n: n_)
+        triangle = triangle.divide3(n: n_)
         for k in k_ {
             triangle = triangle.divide2(n: k)
         }
@@ -184,7 +217,8 @@ struct IcosahedralGrid {
           // toggle the hemisphere
           let i_msgn = (j >= 6) ? -1.0 : 1.0
           // compute the meridian angle for the base vertex.
-          let z_rlon = (1.0 + Double(i_mdist[j - 1])) * pi_5
+            // +.pi/2 becuase ICON shifts everything apparently...
+            let z_rlon = (1.0 + Double(i_mdist[j - 1])) * pi_5 + .pi/5
           // now initialize the coordinates
           vertices[j] = Vector3(x: sin(z_w) * cos(z_rlon), y: sin(z_w) * sin(z_rlon), z: cos(z_w) * i_msgn)
         }
@@ -200,24 +234,48 @@ struct Vector3 {
     var z: Double
     
     static func from(latitude: Float, longitude: Float) -> Vector3 {
-        let latRad: Double = Double(latitude) * Double.pi / 180.0
-        let lonRad: Double = Double(longitude) * Double.pi / 180.0
-        // Compute the Cartesian coordinates of the point on the sphere
-        let x: Double = cos(latRad) * cos(lonRad)
-        let y: Double = cos(latRad) * sin(lonRad)
-        let z: Double = sin(latRad)
+        let latRadians = Double(latitude) * Double.pi / 180.0
+        let lonRadians = Double(longitude) * Double.pi / 180.0
+        
+        let x = cos(latRadians) * cos(lonRadians)
+        let y = cos(latRadians) * sin(lonRadians)
+        let z = sin(latRadians)
         
         return Vector3(x: x, y: y, z: z)
+    }
+    
+    func getLatLon() -> (latitude: Double, longitude: Double) {
+        let latitude = 90 - acos(z) * (180.0 / Double.pi)
+        let longitude = atan2(y, x) * (180.0 / Double.pi)
+        
+        return (latitude, longitude)
     }
     
     func subtract(_ other: Vector3) -> Vector3 {
         return Vector3(x: self.x - other.x, y: self.y - other.y, z: self.z - other.z)
     }
     
+    func add(_ other: Vector3) -> Vector3 {
+        return Vector3(x: x + other.x, y: y + other.y, z: z + other.z)
+    }
+    
     func dot(_ other: Vector3) -> Double {
         return self.x * other.x + self.y * other.y + self.z * other.z
     }
+    
+    func normalize() -> Vector3 {
+        let length = sqrt(x * x + y * y + z * z)
+        return Vector3(x: x/length, y: y/length, z: z/length)
+    }
+    
+    mutating func normalized() {
+        let length = sqrt(x * x + y * y + z * z)
+        x /= length
+        y /= length
+        z /= length
+    }
 }
+
 
 func getBarycentricCoordinates(point: Vector3, v0: Vector3, v1: Vector3, v2: Vector3) -> Vector3 {
     let edge1 = v1.subtract(v0)

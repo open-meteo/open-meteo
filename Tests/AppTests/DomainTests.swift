@@ -32,10 +32,19 @@ final class DomainTests: XCTestCase {
         let lats = try! NetCDF.open(path: "/Users/patrick/Downloads/icon_global_icosahedral_time-invariant_2023041500_CLAT.grib2.nc", allowUpdate: false)!.getVariable(name: "tlat")!.asType(Float.self)!.read()
         let lons = try! NetCDF.open(path: "/Users/patrick/Downloads/icon_global_icosahedral_time-invariant_2023041500_CLON.grib2.nc", allowUpdate: false)!.getVariable(name: "tlon")!.asType(Float.self)!.read()
         
-        print(lats[0], lons[0])
-        print(lats[r3b07.count / 20 - 1], lons[r3b07.count / 20 - 1])
+        //print(lats[r3b07.count / 20 - 1], lons[r3b07.count / 20 - 1])
         
-        print(r3b06.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,1]).center)
+        r3b07.test()
+        
+        print(lats[0], lons[0], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,0]).centeroid.getLatLon())
+        print(lats[1], lons[1], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,1]).centeroid.getLatLon())
+        print(lats[2], lons[2], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,2]).centeroid.getLatLon())
+        print(lats[3], lons[3], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,0,3]).centeroid.getLatLon())
+        print(lats[4], lons[4], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,1,0]).centeroid.getLatLon())
+        print(lats[5], lons[5], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,1,1]).centeroid.getLatLon())
+        print(lats[6], lons[6], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,1,2]).centeroid.getLatLon())
+        print(lats[7], lons[7], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,1,3]).centeroid.getLatLon())
+        print(lats[8], lons[8], r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,0,2,1]).centeroid.getLatLon())
     }
     
     func testMeteoFrance() {
