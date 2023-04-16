@@ -32,21 +32,40 @@ final class DomainTests: XCTestCase {
         let lats = try! NetCDF.open(path: "/Users/patrick/Downloads/icon_global_icosahedral_time-invariant_2023041500_CLAT.grib2.nc", allowUpdate: false)!.getVariable(name: "tlat")!.asType(Float.self)!.read()
         let lons = try! NetCDF.open(path: "/Users/patrick/Downloads/icon_global_icosahedral_time-invariant_2023041500_CLON.grib2.nc", allowUpdate: false)!.getVariable(name: "tlon")!.asType(Float.self)!.read()
         
-        //print(lats[r3b07.count / 20 - 1], lons[r3b07.count / 20 - 1])
+        print(lats[r3b07.count / 20 - 1], lons[r3b07.count / 20 - 1])
+        print(lats.count)
         
         r3b07.test()
         
-        for a in 0..<4 {
-            for b in 0..<4 {
-                for c in 0..<4 {
-                    let lat = lats[a*4*4+b*4+c]
-                    let lon = lons[a*4*4+b*4+c]
-                    let pos = r3b07.p(t_: 0, n_: 0, k_: [0,0,0,0,a,b,c]).centeroid.getLatLon()
-                    let d = sqrt(pow(lat-Float(pos.latitude), 2) + pow(lon-Float(pos.longitude), 2))
-                    print(lat, lon, pos, "delta=\(d)")
-                }
+        for p in 0..<Int(pow(Double(4),7))*6  {
+            let lat = lats[p]
+            let lon = lons[p]
+            let pos = r3b07.p(t_: 0, n_: (p/(4096*4))%9, k_: [(p/4096)%4,(p/1024)%4,(p/256)%4,(p/64)%4,(p/16)%4,(p/4)%4,p%4]).centeroid.getLatLon()
+            let delta = sqrt(pow(lat-Float(pos.latitude), 2) + pow(lon-Float(pos.longitude), 2))
+            //if lon == 72 {
+            if delta > 1.7{
+                print(p,lat, lon, pos, "delta=\(delta)")
             }
         }
+        
+        /*for a in 0..<4 {
+            for b in 0..<4 {
+                for c in 0..<4 {
+                    for d in 0..<4 {
+                        for e in 0..<4 {
+                            let lat = lats[((a*4*4+b*4+c)*4+d)*4+e]
+                            let lon = lons[((a*4*4+b*4+c)*4+d)*4+e]
+                            let pos = r3b07.p(t_: 0, n_: 0, k_: [0,0,a,b,c,d,e]).centeroid.getLatLon()
+                            let delta = sqrt(pow(lat-Float(pos.latitude), 2) + pow(lon-Float(pos.longitude), 2))
+                            if lon == 72 {
+                                //if delta > 1{
+                                print(a,b,c,d,e,lat, lon, pos, "delta=\(delta)")
+                            }
+                        }
+                    }
+                }
+            }
+        }*/
     }
     
     func testMeteoFrance() {

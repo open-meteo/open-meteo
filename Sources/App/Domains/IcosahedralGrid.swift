@@ -53,16 +53,51 @@ struct IcosahedralGrid {
         
         /// divide Triangle by 3 ( = 9 new triangles)
         func divide3(n: Int) -> Triangle {
-            if n == 0 {
-                let t = Triangle(
+            switch n {
+            case 0:
+                return Triangle(
                     v1: v1,
                     v2: v1.add(v1).add(v2).normalize(),
                     v3: v1.add(v1).add(v3).normalize()
                 )
-                //print("divide3 ", t.v1.getLatLon(), t.v2.getLatLon(), t.v3.getLatLon())
+            case 1:
+                return Triangle(
+                    v1: v1.add(v1).add(v2).normalize(),
+                    v2: v1.add(v2).add(v2).normalize(),
+                    v3: v1.add(v2).add(v3).normalize()
+                )
+            case 2:
+                return Triangle(
+                    v1: v1.add(v2).add(v3).normalize(),
+                    v2: v1.add(v1).add(v3).normalize(),
+                    v3: v1.add(v1).add(v2).normalize()
+                )
+            case 3:
+                let t = Triangle(
+                    v1: v1.add(v1).add(v3).normalize(),
+                    v2: v1.add(v2).add(v3).normalize(),
+                    v3: v1.add(v3).add(v3).normalize()
+                )
+                /*print(t.v1.getLatLon())
+                print(t.v2.getLatLon())
+                print(t.v3.getLatLon())
+                fatalError()*/
                 return t
+            case 4:
+                return Triangle(
+                    v1: v1.add(v2).add(v2).normalize(),
+                    v2: v2,
+                    v3: v2.add(v2).add(v3).normalize()
+                )
+            case 5:
+                return Triangle(
+                    v1: v2.add(v2).add(v3).normalize(),
+                    v2: v1.add(v2).add(v3).normalize(),
+                    v3: v2.add(v2).add(v1).normalize()
+                )
+            default:
+                fatalError()
             }
-            fatalError()
         }
         
         /// divide Triangle by 2 ( = 4 new triangles)
@@ -244,7 +279,7 @@ struct Vector3 {
     }
     
     func getLatLon() -> (latitude: Double, longitude: Double) {
-        let latitude = 90 - acos(z) * (180.0 / Double.pi)
+        let latitude = asin(z) * (180.0 / Double.pi)
         let longitude = atan2(y, x) * (180.0 / Double.pi)
         
         return (latitude, longitude)
