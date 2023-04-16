@@ -186,6 +186,12 @@ struct IcosahedralGrid {
         print(verticies[0].add(verticies[2]).normalize().getLatLon())
     }
     
+    func get(point p: Int) -> Triangle {
+        let n_ = (p/(4096*4))%9
+        let k_ = [(p/4096)%4,(p/1024)%4,(p/256)%4,(p/64)%4,(p/16)%4,(p/4)%4,p%4]
+        return self.p(t_: 0, n_: n_ , k_: k_)
+    }
+    
     /**
      t = 0..<20 outer tirangle
      n = innter triangle .. e.g. 0..<9

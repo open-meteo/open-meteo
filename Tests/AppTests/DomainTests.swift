@@ -35,16 +35,24 @@ final class DomainTests: XCTestCase {
         print(lats[r3b07.count / 20 - 1], lons[r3b07.count / 20 - 1])
         print(lats.count)
         
+        print(lats[0..<20])
+        print(lons[0..<20])
+        
+        print((0..<20).map({r3b07.get(point: $0).circumcenter.getLatLon().latitude}))
+        print((0..<20).map({r3b07.get(point: $0).circumcenter.getLatLon().longitude}))
+        
         r3b07.test()
         
         for p in 0..<Int(pow(Double(4),7))*9  {
             let lat = lats[p]
             let lon = lons[p]
-            let triangle = r3b07.p(t_: 0, n_: (p/(4096*4))%9, k_: [(p/4096)%4,(p/1024)%4,(p/256)%4,(p/64)%4,(p/16)%4,(p/4)%4,p%4])
+            let n_ = (p/(4096*4))%9
+            let k_ = [(p/4096)%4,(p/1024)%4,(p/256)%4,(p/64)%4,(p/16)%4,(p/4)%4,p%4]
+            let triangle = r3b07.p(t_: 0, n_: n_ , k_: k_)
             let pos = triangle.circumcenter.getLatLon()
             let delta = sqrt(pow(lat-Float(pos.latitude), 2) + pow(lon-Float(pos.longitude), 2))
             //if lon == 72 {
-            if delta > 1.4 {
+            if p % 16384 == 0 {
                 print(p,lat, lon, pos, "delta=\(delta)")
                 print(triangle.v1.getLatLon())
                 print(triangle.v2.getLatLon())
