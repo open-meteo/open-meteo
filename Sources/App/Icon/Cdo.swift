@@ -91,7 +91,10 @@ struct CdoIconGlobal {
         }
 
         logger.info("Generating weights file \(weightsFile)")
-        let terminationStatus = try Process.spawnWithExitCode(cmd: "cdo", args: ["-s","gennn,\(gridFile)", localUncompressed, weightsFile])
+        let args = domain == .iconD2Eps ?
+            ["-s","gennn,\(gridFile)", "-selgrid,2", localUncompressed, weightsFile] :
+            ["-s","gennn,\(gridFile)", localUncompressed, weightsFile]
+        let terminationStatus = try Process.spawnWithExitCode(cmd: "cdo", args: args)
         guard terminationStatus == 0 else {
             fatalError("Cdo gennn failed")
         }
