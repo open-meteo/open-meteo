@@ -21,20 +21,46 @@ extension Process {
     }
 }
 
+extension IconDomains {
+    fileprivate var iconGridName: String? {
+        switch self {
+        case .icon:
+            return "0026_R03B07_G"
+        case .iconEu:
+            return nil
+        case .iconD2:
+            return nil
+        case .iconD2_15min:
+            return nil
+        case .iconEps:
+            return "0036_R03B06_G"
+        case .iconEuEps:
+            return "0028_R02B07_N02"
+        case .iconD2Eps:
+            return "0047_R19B07_L"
+        }
+    }
+}
+
 struct CdoIconGlobal {
     let gridFile: String
     let weightsFile: String
     let logger: Logger
 
     /// Download and prepare weights for icon global is missing
-    public init(logger: Logger, workDirectory: String, client: HTTPClient) async throws {
+    public init?(logger: Logger, workDirectory: String, client: HTTPClient, domain: IconDomains) async throws {
         self.logger = logger
-        let fileName = "icon_grid_0026_R03B07_G.nc"
+        guard let iconGridName = domain.iconGridName else {
+            return nil
+        }
+        let fileName = "icon_grid_\(iconGridName).nc"
         let remoteFile = "http://opendata.dwd.de/weather/lib/cdo/\(fileName).bz2"
         let localUncompressed = "\(workDirectory)\(fileName)"
         gridFile = "\(workDirectory)grid_icogl2world_0125.txt"
         weightsFile = "\(workDirectory)weights_icogl2world_0125.nc"
         let fm = FileManager.default
+        
+        let grid = domain.grid as! RegularGrid
 
         if fm.fileExists(atPath: gridFile) && fm.fileExists(atPath: weightsFile) {
             return
@@ -49,12 +75,12 @@ struct CdoIconGlobal {
             # Resolution: 0.125 x 0.125 degrees (approx. 13km)
 
             gridtype = lonlat
-            xsize    = 2879
-            ysize    = 1441
-            xfirst   = -180
-            xinc     = 0.125
-            yfirst   = -90
-            yinc     = 0.125
+            xsize    = \(grid.nx)
+            ysize    = \(grid.ny)
+            xfirst   = \(grid.lonMin)
+            xinc     = \(grid.dx)
+            yfirst   = \(grid.latMin)
+            yinc     = \(grid.dy)
             """
             try gridContext.write(toFile: gridFile, atomically: true, encoding: .utf8)
         }

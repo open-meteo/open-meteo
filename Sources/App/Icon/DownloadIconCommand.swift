@@ -11,9 +11,13 @@ struct CdoHelper {
     let grid: Gridable
     let domain: IconDomains
     
+    var needsRemapping: Bool {
+        return cdo != nil
+    }
+    
     init(domain: IconDomains, logger: Logger, client: HTTPClient) async throws {
         // icon global needs resampling to plate carree
-        cdo = domain == .icon ? try await CdoIconGlobal(logger: logger, workDirectory: domain.downloadDirectory, client: client) : nil
+        cdo = try await CdoIconGlobal(logger: logger, workDirectory: domain.downloadDirectory, client: client, domain: domain)
         grid = domain.grid
         self.domain = domain
     }
@@ -110,7 +114,8 @@ struct DownloadIconCommand: AsyncCommandFix {
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .iconD2 ? 2 : 5)
+        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         // surface elevation
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
         if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
@@ -202,7 +207,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 }
                 
                 var data: [Float]
-                if domain == .icon {
+                if cdo.needsRemapping {
                     // regrid from icosahedral to regular lat-lon
                     let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2"
                     try await curl.download(
@@ -419,12 +424,18 @@ extension IconDomains {
     fileprivate var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
+        case .iconEps:
+            fallthrough
         case .icon:
             // Icon has a delay of 2-3 hours after initialisation  with 4 runs a day
             return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
+        case .iconEuEps:
+            fallthrough
         case .iconEu:
             // Icon-eu has a delay of 2:40 hours after initialisation with 8 runs a day
             return t.with(hour: ((t.hour - 2 + 24) % 24) / 3 * 3)
+        case .iconD2Eps:
+            fallthrough
         case .iconD2:
             // Icon d2 has a delay of 44 minutes and runs every 3 hours
             return t.with(hour: t.hour / 3 * 3)
