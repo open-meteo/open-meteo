@@ -46,10 +46,12 @@ struct CdoIconGlobal {
     let gridFile: String
     let weightsFile: String
     let logger: Logger
+    let domain: IconDomains
 
     /// Download and prepare weights for icon global is missing
     public init?(logger: Logger, workDirectory: String, client: HTTPClient, domain: IconDomains) async throws {
         self.logger = logger
+        self.domain = domain
         guard let iconGridName = domain.iconGridName else {
             return nil
         }
@@ -91,14 +93,14 @@ struct CdoIconGlobal {
         }
 
         logger.info("Generating weights file \(weightsFile)")
-        let args = domain == .iconD2Eps ?
-            ["-s","gennn,\(gridFile)", "-selgrid,2", localUncompressed, weightsFile] :
-            ["-s","gennn,\(gridFile)", localUncompressed, weightsFile]
-        let terminationStatus = try Process.spawnWithExitCode(cmd: "cdo", args: args)
-        guard terminationStatus == 0 else {
-            fatalError("Cdo gennn failed")
+        if domain == .iconD2Eps {
+            try Process.spawn(cmd: "cdo", args: ["-s","gennn,\(gridFile)", localUncompressed, weightsFile])
+            //try Process.spawn(cmd: "cdo", args: ["-selgrid,2", localUncompressed, "\(localUncompressed)_selgrid"])
+            //try FileManager.default.moveFileOverwrite(from: "\(localUncompressed)~", to: localUncompressed)
+            //try Process.spawn(cmd: "cdo", args: ["-s","gennn,\(gridFile)", "-setgrid,\(localUncompressed)_selgrid", weightsFile])
+        } else {
+            try Process.spawn(cmd: "cdo", args: ["-s","gennn,\(gridFile)", localUncompressed, weightsFile])
         }
-
         try FileManager.default.removeItem(atPath: localUncompressed)
     }
 

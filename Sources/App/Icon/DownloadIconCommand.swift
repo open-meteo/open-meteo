@@ -102,13 +102,13 @@ struct DownloadIconCommand: AsyncCommandFix {
             return
         }
         
-        let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger, client: application.dedicatedHttpClient)
+        let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
@@ -120,7 +120,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
         if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             let file: String
-            if domain == .iconD2 {
+            if domain == .iconD2 || domain == .iconD2Eps {
                 file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_hsurf.grib2.bz2"
             } else {
                 file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_HSURF.grib2.bz2"
@@ -133,7 +133,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         
             // land fraction
             let file2: String
-            if domain == .iconD2 {
+            if domain == .iconD2 || domain == .iconD2Eps {
                 file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_fr_land.grib2.bz2"
             } else {
                 file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_FR_LAND.grib2.bz2"
@@ -164,18 +164,19 @@ struct DownloadIconCommand: AsyncCommandFix {
     /// Download ICON global, eu and d2 *.grid2.bz2 files
     func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable]) async throws {
         let logger = application.logger
-        let gridType = domain == .icon ? "icosahedral" : "regular-lat-lon"
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger, client: application.dedicatedHttpClient)
+        let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .iconD2 ? 2 : 5, waitAfterLastModified: 120)
+        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: 120)
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -195,7 +196,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 }
                 let level = v.level.map({"_\($0)"}) ?? ""
                 let leveld2 = v.level.map({"_\($0)"}) ?? "_2d"
-                let filenameFrom = domain != .iconD2 ?
+                let filenameFrom = (domain != .iconD2 && domain != .iconD2Eps) ?
                     "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable.uppercased()).grib2.bz2" :
                     "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(leveld2)_\(v.variable).grib2.bz2"
                 
@@ -441,6 +442,19 @@ extension IconDomains {
             return t.with(hour: t.hour / 3 * 3)
         case .iconD2_15min:
             fatalError("ICON-D2 15minute data can not be downloaded individually")
+        }
+    }
+    
+    var ensembleMembers: Int? {
+        switch self {
+        case .iconEps:
+            return 31
+        case .iconEuEps:
+            return 31
+        case .iconD2Eps:
+            return 31
+        default:
+            return nil
         }
     }
 }

@@ -215,11 +215,14 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconD2_15min: fallthrough
         case .iconD2: return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         case .iconEps:
+            // R03B06 avg 26.5 km
             return RegularGrid(nx: 2879/2+1, ny: 1441/2+1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .iconEuEps:
-            return RegularGrid(nx: 1377/2+1, ny: 657/2+1, latMin: 29.5, lonMin: -23.5, dx: 0.125, dy: 0.125)
+            // R2B07 avg 19.7 km
+            return RegularGrid(nx: 431, ny: 206, latMin: 29.4, lonMin: -23.6, dx: 0.2, dy: 0.2)
         case .iconD2Eps:
-            return RegularGrid(nx: 1215/2+1, ny: 746/2+1, latMin: 43.18, lonMin: -3.94, dx: 0.04, dy: 0.04)
+            // R19B07 avg 2 km
+            return RegularGrid(nx: 1214, ny: 745, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         }
     }
     
