@@ -75,7 +75,8 @@ struct JmaDownload: AsyncCommandFix {
     /// MSM or GSM domain
     func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 3)
+        let deadLineHours: Double = domain == .gsm ? 2.9 : 4
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)

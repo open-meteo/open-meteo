@@ -117,8 +117,8 @@ struct GloFasDownloader: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        let downloadTimeHours = domain == .forecastv3 ? 5 : 14
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: 3600*downloadTimeHours)
+        let downloadTimeHours: Double = domain == .forecastv3 ? 5 : 14
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: Int(3600*downloadTimeHours))
         let directory = domain == .forecastv3 ? "fc_grib" : "seasonal_fc_grib"
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
         

@@ -138,7 +138,7 @@ struct GfsDownload: AsyncCommandFix {
         let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0)
         try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         
-        let deadLineHours = domain == .gfs025 ? 4 : 2
+        let deadLineHours: Double = domain == .gfs025 ? 4 : 2
         let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
         let forecastHours = domain.forecastHours(run: run.hour)
