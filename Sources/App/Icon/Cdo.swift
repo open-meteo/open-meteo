@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import SwiftEccodes
 
 
 extension Process {
@@ -7,7 +8,7 @@ extension Process {
         try spawn(cmd: "bunzip2", args: ["--keep", "-f", file])
     }*/
     
-    static public func grib2ToNetcdf(in inn: String, out: String) throws {
+    /*static public func grib2ToNetcdf(in inn: String, out: String) throws {
         try spawn(cmd: "cdo", args: ["-s","-f", "nc", "copy", inn, out])
     }
     
@@ -18,6 +19,45 @@ extension Process {
     
     static public func grib2ToNetCDFInvertLatitude(in inn: String, out: String) throws {
         try spawn(cmd: "cdo", args: ["-s","-f", "nc", "invertlat", inn, out])
+    }*/
+}
+
+struct CdoHelper {
+    let cdo: CdoIconGlobal?
+    let grid: Gridable
+    let domain: IconDomains
+    let curl: Curl
+    
+    var needsRemapping: Bool {
+        return cdo != nil
+    }
+    
+    init(domain: IconDomains, logger: Logger, curl: Curl) async throws {
+        // icon global needs resampling to plate carree
+        self.curl = curl
+        cdo = try await CdoIconGlobal(logger: logger, workDirectory: domain.downloadDirectory, curl: curl, domain: domain)
+        grid = domain.grid
+        self.domain = domain
+    }
+    
+    // Uncompress bz2, reproject to regular grid and read into memory
+    func downloadAndRemap(_ url: String) async throws -> [GribMessage] {
+        guard let cdo else {
+            return try await curl.downloadGrib(url: url, bzip2Decode: true)
+        }
+        let gribFile = "\(domain.downloadDirectory)temp.grib2"
+        let gribFileRemapped = "\(domain.downloadDirectory)remapped.grib2"
+        try await curl.download(
+            url: url,
+            toFile: gribFile,
+            bzip2Decode: true
+        )
+        try cdo.remap(in: gribFile, out: gribFileRemapped)
+        
+        let messages = try SwiftEccodes.getMessages(fileName: gribFileRemapped, multiSupport: true)
+        try FileManager.default.removeItem(atPath: gribFile)
+        try FileManager.default.removeItem(atPath: gribFileRemapped)
+        return messages
     }
 }
 
@@ -49,7 +89,7 @@ struct CdoIconGlobal {
     let domain: IconDomains
 
     /// Download and prepare weights for icon global is missing
-    public init?(logger: Logger, workDirectory: String, client: HTTPClient, domain: IconDomains) async throws {
+    public init?(logger: Logger, workDirectory: String, curl: Curl, domain: IconDomains) async throws {
         self.logger = logger
         self.domain = domain
         guard let iconGridName = domain.iconGridName else {
@@ -88,7 +128,6 @@ struct CdoIconGlobal {
         }
 
         if !fm.fileExists(atPath: localUncompressed) {
-            let curl = Curl(logger: logger, client: client)
             try await curl.download(url: remoteFile, toFile: localUncompressed, bzip2Decode: true)
         }
 
@@ -105,7 +144,7 @@ struct CdoIconGlobal {
     }
 
     public func remap(in inn: String, out: String) throws {
-        logger.info("Remapping file \(inn)")
-        try Process.spawn(cmd: "cdo", args: ["-s", "-f", "nc", "remap,\(gridFile),\(weightsFile)", inn, out])
+        logger.debug("Remapping file \(inn)")
+        try Process.spawn(cmd: "cdo", args: ["-s", "-f", "grb2", "remap,\(gridFile),\(weightsFile)", inn, out])
     }
 }

@@ -1,66 +1,9 @@
 import Foundation
 import Vapor
-import SwiftNetCDF
 import SwiftPFor2D
 import Dispatch
 import CHelper
 
-
-struct CdoHelper {
-    let cdo: CdoIconGlobal?
-    let grid: Gridable
-    let domain: IconDomains
-    
-    var needsRemapping: Bool {
-        return cdo != nil
-    }
-    
-    init(domain: IconDomains, logger: Logger, client: HTTPClient) async throws {
-        // icon global needs resampling to plate carree
-        cdo = try await CdoIconGlobal(logger: logger, workDirectory: domain.downloadDirectory, client: client, domain: domain)
-        grid = domain.grid
-        self.domain = domain
-    }
-    
-    func readGrib2(_ filename: String) throws -> [Float] {
-        let tempNc = "\(filename).nc"
-        
-        if let cdo = cdo {
-            // resample to regular latlon (icon global)
-            try cdo.remap(in: filename, out: tempNc)
-        } else {
-            // just convert grib2 to netcdf
-            try Process.grib2ToNetcdf(in: filename, out: tempNc)
-        }
-        let data = try readNetCdf(path: tempNc)
-        try FileManager.default.removeItem(atPath: tempNc)
-        return data
-    }
-    
-    func readNetCdf(path: String) throws -> [Float] {
-        guard let nc = try NetCDF.open(path: path, allowUpdate: false) else {
-            fatalError("File \(path) does not exist")
-        }
-        guard let v = nc.getVariables().first(where: {$0.dimensions.count >= 3}) else {
-            fatalError("Could not find data variable with 3d/4d data")
-        }
-        precondition(v.dimensions[v.dimensions.count-1].length == grid.nx)
-        precondition(v.dimensions[v.dimensions.count-2].length == grid.ny)
-        guard let varFloat = v.asType(Float.self) else {
-            fatalError("Netcdf variable is not float type")
-        }
-        /// icon-d2 total precip, aswdir and aswdifd have 15 minutes values
-        let offset = v.dimensions.count == 3 ? [0,0,0] : [0,0,0,0]
-        let count = v.dimensions.count == 3 ? [1,grid.ny,grid.nx] : [1,1,grid.ny,grid.nx]
-        var d = try varFloat.read(offset: offset, count: count)
-        for x in d.indices {
-            if d[x] < -100000000 {
-                d[x] = .nan
-            }
-        }
-        return d
-    }
-}
 
 struct DownloadIconCommand: AsyncCommandFix {
     enum VariableGroup: String, RawRepresentable, CaseIterable {
@@ -106,48 +49,36 @@ struct DownloadIconCommand: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
+        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger, client: application.dedicatedHttpClient)
+        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
         let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+
         // surface elevation
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
-        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
-            let file: String
-            if domain == .iconD2 || domain == .iconD2Eps {
-                file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_hsurf.grib2.bz2"
-            } else {
-                file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_HSURF.grib2.bz2"
-            }
-            try await curl.download(
-                url: file,
-                toFile: "\(downloadDirectory)time-invariant_HSURF.grib2",
-                bzip2Decode: true
-            )
         
-            // land fraction
-            let file2: String
-            if domain == .iconD2 || domain == .iconD2Eps {
-                file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_fr_land.grib2.bz2"
-            } else {
-                file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_FR_LAND.grib2.bz2"
-            }
-            try await curl.download(
-                url: file2,
-                toFile: "\(downloadDirectory)time-invariant_FR_LAND.grib2",
-                bzip2Decode: true
-            )
+        let file: String
+        if domain == .iconD2 || domain == .iconD2Eps {
+            file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_hsurf.grib2.bz2"
+        } else {
+            file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_HSURF.grib2.bz2"
         }
+        var hsurf = try await cdo.downloadAndRemap(file)[0].getDouble().map(Float.init)
         
-        // use special numbers for SEA grid points?
-        var hsurf = try cdo.readGrib2("\(domain.downloadDirectory)time-invariant_HSURF.grib2")
-        let landFraction = try cdo.readGrib2("\(domain.downloadDirectory)time-invariant_FR_LAND.grib2")
+        
+        let file2: String
+        if domain == .iconD2 || domain == .iconD2Eps {
+            file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_fr_land.grib2.bz2"
+        } else {
+            file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_FR_LAND.grib2.bz2"
+        }
+        let landFraction = try await cdo.downloadAndRemap(file2)[0].getDouble().map(Float.init)
         
         // Set all sea grid points to -999
         precondition(hsurf.count == landFraction.count)
@@ -167,16 +98,18 @@ struct DownloadIconCommand: AsyncCommandFix {
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
         
+        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: 120)
+        
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
-        let cdo = try await CdoHelper(domain: domain, logger: logger, client: application.dedicatedHttpClient)
+        let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
         let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
         
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-        let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: 120)
+
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -207,43 +140,27 @@ struct DownloadIconCommand: AsyncCommandFix {
                     continue
                 }
                 
-                var data: [Float]
-                if cdo.needsRemapping {
-                    // regrid from icosahedral to regular lat-lon
-                    let gribFile = "\(downloadDirectory)\(variable.omFileName).grib2"
-                    try await curl.download(
-                        url: url,
-                        toFile: gribFile,
-                        bzip2Decode: true
-                    )
-                    // Uncompress bz2, reproject to regular grid, convert to netcdf and read into memory
-                    // Especially reprojecting is quite slow, therefore we can better utilise the download time waiting for the next file
-                    data = try cdo.readGrib2(gribFile)
-                    try FileManager.default.removeItem(atPath: gribFile)
-                } else {
-                    // Use async in-memory download and decoding -> 4 times faster, but cannot regrid icosahedral data
-                    let messages = try await curl.downloadGrib(url: url, bzip2Decode: true)
-                    if domain == .iconD2 && messages.count > 1 {
-                        // Write 15min D2 icon data
-                        let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
-                        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-                        for (i, message) in messages.enumerated() {
-                            let h3 = (hour*4+i).zeroPadded(len: 3)
-                            let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
-                            try grib2d.load(message: message)
-                            data = grib2d.array.data
-                            try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
-                            if let fma = variable.multiplyAdd {
-                                data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                            }
-                            let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                            try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
+                let messages = try await cdo.downloadAndRemap(url)
+                if domain == .iconD2 && messages.count > 1 {
+                    // Write 15min D2 icon data
+                    let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
+                    try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+                    for (i, message) in messages.enumerated() {
+                        let h3 = (hour*4+i).zeroPadded(len: 3)
+                        let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
+                        try grib2d.load(message: message)
+                        var data = grib2d.array.data
+                        try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
+                        if let fma = variable.multiplyAdd {
+                            data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
+                        let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                        try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
                     }
-                    let message = messages[0]
-                    try grib2d.load(message: message)
-                    data = grib2d.array.data
                 }
+                let message = messages[0]
+                try grib2d.load(message: message)
+                var data = grib2d.array.data
                 
                 // Write data as encoded floats to disk
                 try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
@@ -452,7 +369,7 @@ extension IconDomains {
         case .iconEuEps:
             return 31
         case .iconD2Eps:
-            return 31
+            return 21
         default:
             return nil
         }
