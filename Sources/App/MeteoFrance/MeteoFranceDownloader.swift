@@ -201,6 +201,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                         logger.info("Calculate gust speed from UGST and VGUST")
                         // Calculate gust speed
                         grib2d.array.data = zip(grib2d.array.data, windgust_u_component!).map(Meteorology.windspeed)
+                        windgust_u_component = nil
                     }
                     
                     //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
