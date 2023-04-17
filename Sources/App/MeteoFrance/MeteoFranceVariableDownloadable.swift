@@ -39,6 +39,8 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             fallthrough
         case .wind_v_component_10m:
             return true
+        case .windgusts_10m:
+            return true
         case .cape:
             return true
         default:

@@ -153,15 +153,23 @@ struct MeteoFranceDownload: AsyncCommandFix {
                     }
                     // Some varibales are hourly although the rest is 3/6 h
                     let time = (variable.isAlwaysHourlyInArgegeEurope && domain == .arpege_europe) ? fileTimeHourly.steps : fileTime.steps
-                    return time.compactMap { h in
+                    return time.flatMap { h -> [MfGribVariable] in
                         if h == 0 && variable.skipHour0(domain: domain) {
-                            return nil
+                            return []
                         }
                         let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(h).om"
                         if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
-                            return nil
+                            return []
                         }
-                        return MfGribVariable(hour: h, gribIndexName: variable.toGribIndexName(hour: h), variable: variable)
+                        let grib = variable.toGribIndexName(hour: h)
+                        // Arome HD splits gusts in U/V vectors
+                        if domain == .arome_france_hd && grib.starts(with: ":GUST:") {
+                            return [
+                                MfGribVariable(hour: h, gribIndexName: grib.replacingOccurrences(of: ":GUST:", with: ":UGUST:"), variable: variable),
+                                MfGribVariable(hour: h, gribIndexName: grib.replacingOccurrences(of: ":GUST:", with: ":VGUST:"), variable: variable)
+                            ]
+                        }
+                        return [MfGribVariable(hour: h, gribIndexName: grib, variable: variable)]
                     }
                 }
                                 
@@ -170,6 +178,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 let dmn = domain.rawValue.replacingOccurrences(of: "_", with: "-")
                 let url = "http://mf-nwp-models.s3.amazonaws.com/\(dmn)/v1/\(run.iso8601_YYYY_MM_dd)/\(run.hour.zeroPadded(len: 2))/\(package)/\(fileTime.file).grib2"
                 
+                var windgust_u_component: [Float]? = nil
                 for (variable, message) in try await curl.downloadIndexedGribSequential(url: url, variables: vars, extension: ".inv") { 
                     try grib2d.load(message: message)
                     if domain.isGlobal {
@@ -180,6 +189,18 @@ struct MeteoFranceDownload: AsyncCommandFix {
                     // Scaling before compression with scalefactor
                     if let fma = variable.variable.multiplyAdd {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    if variable.gribIndexName?.starts(with: ":UGUST:") ?? false {
+                        logger.info("Store UGUST in memory")
+                        // Store wind gust U component in memory
+                        windgust_u_component = grib2d.array.data
+                        continue
+                    }
+                    if variable.gribIndexName?.starts(with: ":VGUST:") ?? false {
+                        logger.info("Calculate gust speed from UGST and VGUST")
+                        // Calculate gust speed
+                        grib2d.array.data = zip(grib2d.array.data, windgust_u_component!).map(Meteorology.windspeed)
                     }
                     
                     //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
