@@ -120,11 +120,9 @@ struct DownloadIconCommand: AsyncCommandFix {
                 guard let v = variable.getVarAndLevel(domain: domain) else {
                     continue
                 }
-                let level = v.level.map({"_\($0)"}) ?? ""
-                let leveld2 = v.level.map({"_\($0)"}) ?? "_2d"
-                let filenameFrom = (domain != .iconD2 && domain != .iconD2Eps) ?
-                    "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(v.variable.uppercased()).grib2.bz2" :
-                    "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(leveld2)_\(v.variable).grib2.bz2"
+                let level = v.level.map({"_\($0)"}) ?? (domain == .iconD2 || domain == .iconD2Eps ? "_2d" : "")
+                let variableName = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? v.variable : v.variable.uppercased()
+                let filenameFrom = "\(domainPrefix)_\(gridType)_\(v.cat)_\(dateStr)_\(h3)\(level)_\(variableName).grib2.bz2"
                 
                 let url = "\(serverPrefix)\(v.variable)/\(filenameFrom)"
                 
@@ -238,6 +236,8 @@ struct DownloadIconCommand: AsyncCommandFix {
                     if variable.isAveragedOverForecastTime {
                         data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                     }
+                    
+                    // TODO: 6-hourly interpolation for ICON EPS
                     
                     // interpolate missing timesteps. We always fill 2 timesteps at once
                     // data looks like: DDDDDDDDDD--D--D--D--D--D
@@ -369,9 +369,9 @@ extension IconDomains {
     var ensembleMembers: Int? {
         switch self {
         case .iconEps:
-            return 31
+            return 40
         case .iconEuEps:
-            return 31
+            return 40
         case .iconD2Eps:
             return 20
         default:

@@ -182,7 +182,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         switch self {
         case .iconEps:
             // Note ICON-EPS has only 6 hourly data for 6/18z runs
-            fallthrough
+            // Hourly data until 48h, 3 hourly until 72, then 6 hourly until 120h (same as ICON-EU-EPS)
+            return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6))
         case .icon:
             if  run == 6 || run == 18  {
                 // only up to 120
@@ -192,7 +193,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
                 return Array(0...78) + Array(stride(from: 81, through: 180, by: 3))
             }
         case .iconEuEps:
-            fallthrough
+            // Hourly data until 48h, 3 hourly until 72, then 6 hourly until 120h (same as ICON-EPS)
+            // no side runs
+            return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6))
         case .iconEu:
             if run % 6 == 0 {
                 return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
