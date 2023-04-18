@@ -163,8 +163,8 @@ struct DownloadIconCommand: AsyncCommandFix {
                 // Contains more than 1 message for ensemble models
                 for (i, message) in messages.enumerated() {
                     try grib2d.load(message: message)
-                    
-                    let filenameDest = i > 0 ? "single-level_\(h3)_\(variable.omFileName.uppercased())_\(i).fpg" : "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
+                    let memberStr = i > 0 ? "_\(i)" : ""
+                    let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased())\(memberStr).fpg"
                     
                     // Write data as encoded floats to disk
                     try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
@@ -210,6 +210,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         
         var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
+        let members = domain.ensembleMembers ?? 1
 
         for variable in variables {
             guard variable.getVarAndLevel(domain: domain) != nil else {
@@ -217,53 +218,57 @@ struct DownloadIconCommand: AsyncCommandFix {
             }
             let v = variable.omFileName.uppercased()
             let skip = variable.skipHour0(domain: domain, forDownload: false) ? 1 : 0
-            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
-            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
-                if hour < skip {
-                    return nil
-                }
-                let reader = try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v).fpg")
-                try reader.willNeed()
-                return (hour, reader)
-            })
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            for i in 0..<members {
+                let memberStr = i > 0 ? "_\(i)" : ""
+                let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(memberStr)")
                 
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data2d.data.fillWithNaNs()
-                for reader in readers {
-                    try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                    data2d[0..<data2d.nLocations, reader.hour /*/ domain.dtHours*/] = readTemp
-                }
-                
-                // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
-                if variable.isAveragedOverForecastTime {
-                    data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-                }
-                
-                // interpolate missing timesteps. We always fill 2 timesteps at once
-                // data looks like: DDDDDDDDDD--D--D--D--D--D
-                let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
-                    if forecastSteps.contains(hour) || hour % 3 != 1 {
-                        // process 2 timesteps at once
+                let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
+                    if hour < skip {
                         return nil
                     }
-                    return hour
+                    let reader = try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v)\(memberStr).fpg")
+                    try reader.willNeed()
+                    return (hour, reader)
+                })
+                
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                    
+                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                    data2d.data.fillWithNaNs()
+                    for reader in readers {
+                        try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                        data2d[0..<data2d.nLocations, reader.hour /*/ domain.dtHours*/] = readTemp
+                    }
+                    
+                    // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
+                    if variable.isAveragedOverForecastTime {
+                        data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                    }
+                    
+                    // interpolate missing timesteps. We always fill 2 timesteps at once
+                    // data looks like: DDDDDDDDDD--D--D--D--D--D
+                    let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
+                        if forecastSteps.contains(hour) || hour % 3 != 1 {
+                            // process 2 timesteps at once
+                            return nil
+                        }
+                        return hour
+                    }
+                    
+                    // Fill in missing hourly values after switching to 3h
+                    data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                    
+                    // De-accumulate precipitation
+                    if variable.isAccumulatedSinceModelStart {
+                        data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                    }
+                    
+                    progress.add(locationRange.count)
+                    return data2d.data[0..<locationRange.count * nTime]
                 }
-                
-                // Fill in missing hourly values after switching to 3h
-                data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
-                
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
-                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-                }
-                
-                progress.add(locationRange.count)
-                return data2d.data[0..<locationRange.count * nTime]
+                progress.finish()
             }
-            progress.finish()
         }
         logger.info("write init.txt")
         try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)
