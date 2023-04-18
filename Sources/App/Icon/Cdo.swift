@@ -99,7 +99,7 @@ extension IconDomains {
         case .iconEps:
             return "0036_R03B06_G"
         case .iconEuEps:
-            return "0028_R02B07_N02"
+            return "0037_R03B07_N02"
         case .iconD2Eps:
             return "0047_R19B07_L"
         }

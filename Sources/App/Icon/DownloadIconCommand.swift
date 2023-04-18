@@ -63,21 +63,14 @@ struct DownloadIconCommand: AsyncCommandFix {
         // surface elevation
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/hsurf/icon_global_icosahedral_time-invariant_2022072400_HSURF.grib2.bz2
         
-        let file: String
-        if domain == .iconD2 || domain == .iconD2Eps {
-            file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_hsurf.grib2.bz2"
-        } else {
-            file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_HSURF.grib2.bz2"
-        }
+        let additionalTimeString = (domain == .iconD2 || domain == .iconD2Eps) ? "_000_0" : ""
+        let variableName = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "hsurf" : "HSURF"
+        let file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName).grib2.bz2"
         var hsurf = try await cdo.downloadAndRemap(file)[0].getDouble().map(Float.init)
         
         
-        let file2: String
-        if domain == .iconD2 || domain == .iconD2Eps {
-            file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_000_0_fr_land.grib2.bz2"
-        } else {
-            file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)_FR_LAND.grib2.bz2"
-        }
+        let variableName2 = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "fr_land" : "FR_LAND"
+        let file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName2).grib2.bz2"
         let landFraction = try await cdo.downloadAndRemap(file2)[0].getDouble().map(Float.init)
         
         // Set all sea grid points to -999
@@ -380,7 +373,7 @@ extension IconDomains {
         case .iconEuEps:
             return 31
         case .iconD2Eps:
-            return 21
+            return 20
         default:
             return nil
         }
