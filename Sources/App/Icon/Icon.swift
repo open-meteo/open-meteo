@@ -213,16 +213,20 @@ enum IconDomains: String, CaseIterable, GenericDomain {
 
     var grid: Gridable {
         switch self {
-        case .icon: return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
-        case .iconEu: return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
-        case .iconD2_15min: fallthrough
-        case .iconD2: return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
+        case .icon:
+            return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
+        case .iconEu:
+            return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
+        case .iconD2_15min:
+            fallthrough
+        case .iconD2:
+            return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         case .iconEps:
             // R03B06 avg 26.5 km
-            return RegularGrid(nx: 2879/2+1, ny: 1441/2+1, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+            return RegularGrid(nx: 1439, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .iconEuEps:
             // R03B07 avg 13.2 km
-            return RegularGrid(nx: 1377/2+1, ny: 657/2+1, latMin: 29.5, lonMin: -23.5, dx: 0.125, dy: 0.125)
+            return RegularGrid(nx: 689, ny: 329, latMin: 29.5, lonMin: -23.5, dx: 0.125, dy: 0.125)
         case .iconD2Eps:
             // R19B07 avg 2 km
             // Note: 1px difference to use the same weights as official
