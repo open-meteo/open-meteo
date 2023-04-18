@@ -45,13 +45,37 @@ struct CdoHelper {
         guard let cdo else {
             return try await curl.downloadGrib(url: url, bzip2Decode: true)
         }
+        // Multiple messages might be present in each grib fle
+        // DWD produces non-standard GRIB2 files for 15 minutes ensemble data
+        // GRIB messages need to be reordered by timestep
+        // Otherwise CDO does not work
+        let buffer = try await curl.downloadInMemoryAsync(url: url, minSize: nil, bzip2Decode: true)
+        
+        var m = [(ptr: UnsafeRawBufferPointer, endStep: Int)]()
+        try buffer.withUnsafeReadableBytes({
+            var ptr: UnsafeRawBufferPointer = $0
+            while let seek = GribAsyncStreamHelper.seekGrib(memory: ptr) {
+                //let file = try FileHandle.createNewFile(file: file.replacingOccurrences(of: "#", with: "\(i)"), size: seek.length)
+                //try file.write(contentsOf: ptr[seek.offset ..< seek.offset + seek.length])
+                let bytes: UnsafeRawBufferPointer = UnsafeRawBufferPointer(rebasing: ptr[seek.offset ..< seek.offset + seek.length])
+                let message = try SwiftEccodes.getMessages(memory: bytes, multiSupport: true)[0]
+                let endStep = message.get(attribute: "endStep").flatMap(Int.init) ?? 0
+                m.append((ptr: bytes, endStep: endStep))
+                ptr = UnsafeRawBufferPointer(rebasing: ptr[(seek.offset + seek.length)...])
+            }
+        })
+        m.sort(by: {$0.endStep < $1.endStep})
+        
         let gribFile = "\(domain.downloadDirectory)temp.grib2"
+        try {
+            let size = m.reduce(0, {$0 + $1.ptr.count})
+            let file = try FileHandle.createNewFile(file: gribFile, size: size)
+            for (ptr,_) in m {
+                try file.write(contentsOf: ptr)
+            }
+        }()
+        
         let gribFileRemapped = "\(domain.downloadDirectory)remapped.grib2"
-        try await curl.download(
-            url: url,
-            toFile: gribFile,
-            bzip2Decode: true
-        )
         try cdo.remap(in: gribFile, out: gribFileRemapped)
         
         let messages = try SwiftEccodes.getMessages(fileName: gribFileRemapped, multiSupport: true)

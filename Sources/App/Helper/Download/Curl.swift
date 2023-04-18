@@ -145,7 +145,7 @@ final class Curl {
     
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
-    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bool = false) async throws -> ByteBuffer {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
@@ -154,14 +154,23 @@ final class Curl {
             // Retry failed file transfers after this point
             do {
                 var buffer = ByteBuffer()
-                if let contentLength = try response.contentLength() {
+                let contentLength = try response.contentLength()
+                if let contentLength {
                     buffer.reserveCapacity(contentLength)
                 }
-                for try await fragement in response.body {
-                    try Task.checkCancellation()
-                    self.totalBytesTransfered += fragement.readableBytes
-                    buffer.writeImmutableBuffer(fragement)
+                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                if bzip2Decode {
+                    for try await fragement in response.body.tracker(tracker).decompressBzip2() {
+                        try Task.checkCancellation()
+                        buffer.writeImmutableBuffer(fragement)
+                    }
+                } else {
+                    for try await fragement in response.body.tracker(tracker) {
+                        try Task.checkCancellation()
+                        buffer.writeImmutableBuffer(fragement)
+                    }
                 }
+                self.totalBytesTransfered += tracker.transfered
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }

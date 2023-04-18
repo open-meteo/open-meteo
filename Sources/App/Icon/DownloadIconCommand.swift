@@ -140,7 +140,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     continue
                 }
                 
-                let messages = try await cdo.downloadAndRemap(url)
+                var messages = try await cdo.downloadAndRemap(url)
                 if domain == .iconD2 && messages.count > 1 {
                     // Write 15min D2 icon data
                     let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
@@ -157,23 +157,29 @@ struct DownloadIconCommand: AsyncCommandFix {
                         let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                         try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
                     }
-                }
-                let message = messages[0]
-                try grib2d.load(message: message)
-                var data = grib2d.array.data
-                
-                // Write data as encoded floats to disk
-                try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
-                
-                // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd {
-                    data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    messages = [messages[0]]
                 }
                 
-                //logger.info("Compressing and writing data to \(filenameDest)")
-                let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
-                
+                // Contains more than 1 message for ensemble models
+                for (i, message) in messages.enumerated() {
+                    try grib2d.load(message: message)
+                    
+                    let filenameDest = i > 0 ? "single-level_\(h3)_\(variable.omFileName.uppercased())_\(i).fpg" : "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
+                    
+                    // Write data as encoded floats to disk
+                    try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
+                    
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.multiplyAdd {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    //try grib2d.array.writeNetcdf(filename: "\(downloadDirectory)\(variable.omFileName)_\(h3).nc")
+                    
+                    //logger.info("Compressing and writing data to \(filenameDest)")
+                    let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                    try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                }
                 // icon global downloads tend to use a lot of memory due to numerous allocations
                 chelper_malloc_trim()
             }

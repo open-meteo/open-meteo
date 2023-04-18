@@ -12,43 +12,46 @@ extension AsyncSequence where Element == ByteBuffer {
     }
 }
 
-/// Detect a range of bytes in a byte stream if there is a grib header and returns it
-/// Note: The required length to decode a GRIB message is not checked of the input buffer
-fileprivate func seekGrib(memory: UnsafeRawBufferPointer) -> (offset: Int, length: Int)? {
-    let search = "GRIB"
-    guard let base = memory.baseAddress else {
-        return nil
-    }
-    guard let offset = search.withCString({memory.firstRange(of: UnsafeRawBufferPointer(start: $0, count: strlen($0)))})?.lowerBound else {
-        return nil
-    }
-    guard offset <= (1 << 40), offset + MemoryLayout<GribHeader>.size <= memory.count else {
-        return nil
-    }
-    struct GribHeader {
-        /// "GRIB"
-        let magic: UInt32
+struct GribAsyncStreamHelper {
+    /// Detect a range of bytes in a byte stream if there is a grib header and returns it
+    /// Note: The required length to decode a GRIB message is not checked of the input buffer
+    static func seekGrib(memory: UnsafeRawBufferPointer) -> (offset: Int, length: Int)? {
+        let search = "GRIB"
+        guard let base = memory.baseAddress else {
+            return nil
+        }
+        guard let offset = search.withCString({memory.firstRange(of: UnsafeRawBufferPointer(start: $0, count: strlen($0)))})?.lowerBound else {
+            return nil
+        }
+        guard offset <= (1 << 40), offset + MemoryLayout<GribHeader>.size <= memory.count else {
+            return nil
+        }
+        struct GribHeader {
+            /// "GRIB"
+            let magic: UInt32
+            
+            let reserved: UInt16
+            
+            /// 0 - for Meteorological Products, 2 for Land Surface Products, 10 - for Oceanographic Products
+            let type: UInt8
+            
+            /// Version 1 and 2 supported
+            let version: UInt8
+            
+            /// Endian needs to be swapped
+            let length: UInt64
+        }
         
-        let reserved: UInt16
+        let header = base.advanced(by: offset).assumingMemoryBound(to: GribHeader.self)
+        let length = header.pointee.length.bigEndian
         
-        /// 0 - for Meteorological Products, 2 for Land Surface Products, 10 - for Oceanographic Products
-        let type: UInt8
-        
-        /// Version 1 and 2 supported
-        let version: UInt8
-        
-        /// Endian needs to be swapped
-        let length: UInt64
+        guard (1...2).contains(header.pointee.version), length <= (1 << 40) else {
+            return nil
+        }
+        return (offset, Int(length))
     }
-    
-    let header = base.advanced(by: offset).assumingMemoryBound(to: GribHeader.self)
-    let length = header.pointee.length.bigEndian
-    
-    guard (1...2).contains(header.pointee.version), length <= (1 << 40) else {
-        return nil
-    }
-    return (offset, Int(length))
 }
+
 
 /**
  Decode incoming binary stream to grib messages
@@ -73,7 +76,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
         public func next() async throws -> [GribMessage]? {
             while true {
                 // repeat until GRIB header is found
-                guard let seek = buffer.withUnsafeReadableBytes(seekGrib) else {
+                guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                     guard let input = try await self.iterator.next() else {
                         return nil
                     }
