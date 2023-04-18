@@ -113,6 +113,38 @@ extension IconSurfaceVariable: IconVariableDownloadable {
     }
     
     func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)? {
+        if domain == .iconEps || domain == .iconEuEps || domain == .iconD2Eps {
+            switch self {
+            case .diffuse_radiation:
+                if domain == .iconEps {
+                    // TODO ICON-EPS offers asob (avg shortwave radiation)
+                    return nil
+                }
+                break
+            case .direct_radiation:
+                if domain == .iconEps {
+                    return nil // only 3h
+                }
+                break
+            case .cloudcover:
+                break
+            case .temperature_2m:
+                break
+            //case .dewpoint_2m: // no td2 in ICON-EU-EPS
+                // NOTE: relative humidity is only avaulable in 6h resolution
+                //break
+            case .precipitation:
+                break
+            case .wind_u_component_10m:
+                break
+            case .wind_v_component_10m:
+                break
+            default:
+                return nil
+                // All other variables are not in ICON-D2 15 minutes
+            }
+        }
+        
         if domain == .iconD2_15min {
             switch self {
             case .direct_radiation:
