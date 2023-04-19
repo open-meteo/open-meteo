@@ -44,19 +44,45 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
     }
 }
 
-/// Combine weather variable and member to be used in `GenericReader`
-/// For control (member=0) do not add a member number
-struct VariableAndMemberAndControl<Variable: GenericVariable & Hashable>: GenericVariable, Hashable {
-    let variable: Variable
-    let member: Int
+
+/// Represent a variable combined with a pressure level and helps decoding it
+struct VariableAndMemberAndControl<Variable: RawRepresentableString>: RawRepresentableString {
+    var variable: Variable
+    var member: Int
     
-    public init(_ variable: Variable, _ member: Int) {
+    init(_ variable: Variable, _ member: Int) {
         self.variable = variable
         self.member = member
     }
+
+    init?(rawValue: String) {
+        fatalError()
+    }
     
+    var rawValue: String {
+        if member == 0 {
+            return variable.rawValue
+        }
+        return "\(variable.rawValue)_member\(member.zeroPadded(len: 2))"
+    }
+    
+    init(from decoder: Decoder) throws {
+        fatalError()
+    }
+    
+    func encode(to encoder: Encoder) throws {
+        var e = encoder.singleValueContainer()
+        try e.encode(rawValue)
+    }
+}
+
+extension VariableAndMemberAndControl: Hashable, Equatable where Variable: Hashable {
+    
+}
+
+extension VariableAndMemberAndControl: GenericVariable where Variable: GenericVariable {
     var omFileName: String {
-        return rawValue
+        variable.omFileName
     }
     
     var scalefactor: Float {
@@ -74,22 +100,14 @@ struct VariableAndMemberAndControl<Variable: GenericVariable & Hashable>: Generi
     var isElevationCorrectable: Bool {
         variable.isElevationCorrectable
     }
-    
-    init?(rawValue: String) {
-        fatalError()
-    }
-    
-    var rawValue: String {
-        if member == 0 {
-            return variable.omFileName
-        }
-        return "\(variable.omFileName)_member\(member.zeroPadded(len: 2))"
-    }
-    
+}
+
+extension VariableAndMemberAndControl: GenericVariableMixable where Variable: GenericVariableMixable {
     var requiresOffsetCorrectionForMixing: Bool {
-        return variable.requiresOffsetCorrectionForMixing
+        variable.requiresOffsetCorrectionForMixing
     }
 }
+
 
 typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableDerived>
 

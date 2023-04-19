@@ -26,6 +26,7 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.get("gem", use: GemController().query)
         categoriesRoute.get("flood", use: GloFasController().query)
         categoriesRoute.get("climate", use: CmipController().query)
+        categoriesRoute.get("ensemble", use: EnsembleApiController().query)
     }
     
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
@@ -354,6 +355,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .gem_hrdps_continental:
             return try GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
+    }
+    
+    var countEnsembleMember: Int {
+        return 1
     }
 }
 

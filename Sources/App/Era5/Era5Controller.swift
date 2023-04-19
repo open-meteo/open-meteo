@@ -134,6 +134,10 @@ enum CdsDomainApi: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [try Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode)]
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 }
 
 enum CdsVariable: String, GenericVariableMixable {

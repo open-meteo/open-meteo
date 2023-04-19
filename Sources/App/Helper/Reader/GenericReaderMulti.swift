@@ -2,6 +2,8 @@ import Foundation
 
 
 protocol MultiDomainMixerDomain: RawRepresentableString {
+    var countEnsembleMember: Int { get }
+    
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol]
 }
 
