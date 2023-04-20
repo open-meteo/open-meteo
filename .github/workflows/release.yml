@@ -45,7 +45,7 @@ jobs:
     - name: Get eccodes
       run: |
         curl -L https://github.com/patrick-zippenfenig/ecCodes-ubuntu/releases/download/2.30.0/openmeteo-eccodes_2.30.0_jammy_amd64.deb -o openmeteo-eccodes_2.30.0_jammy_amd64.deb
-        dpkg -i ./openmeteo-eccodes_2.30.0_jammy_amd64.deb
+        apt install -y ./openmeteo-eccodes_2.30.0_jammy_amd64.deb
     - name: Build
       run: |
         ${{ env.swift_build }}
