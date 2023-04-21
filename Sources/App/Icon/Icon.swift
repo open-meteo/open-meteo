@@ -150,7 +150,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     func nForecastHours(run: Int) -> Int {
         switch self {
         case .iconEps:
-            return 120+1
+            // currently we only use 120, but keep omfile-length at 180
+            return 180+1
         case .icon:
             if  run == 6 || run == 18 {
                 return 120+1
