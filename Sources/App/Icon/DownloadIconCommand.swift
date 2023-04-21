@@ -246,7 +246,6 @@ struct DownloadIconCommand: AsyncCommandFix {
                         }
                         return hour
                     }
-                    print(forecastStepsToInterpolate6h)
                     data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid, locationRange: locationRange)
                     
                     
