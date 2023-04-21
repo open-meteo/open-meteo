@@ -186,6 +186,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         let nTime = domain.nForecastHours(run: run.hour)
+        let time = TimerangeDt(start: run, nTime: nTime * domain.dtHours, dtSeconds: domain.dtSeconds)
         let nLocations = grid.count
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
@@ -237,7 +238,17 @@ struct DownloadIconCommand: AsyncCommandFix {
                         data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                     }
                     
-                    // TODO: 6-hourly interpolation for ICON EPS
+                    // EPS ensemble models have 6-hourly data after 2 or 3 days of forecast
+                    // Interpolate 6h steps to 3h steps before 1h
+                    let forecastStepsToInterpolate6h = (0..<nTime).compactMap { hour -> Int? in
+                        if forecastSteps.contains(hour) || hour % 3 != 0 {
+                            return nil
+                        }
+                        return hour
+                    }
+                    print(forecastStepsToInterpolate6h)
+                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid, locationRange: locationRange)
+                    
                     
                     // interpolate missing timesteps. We always fill 2 timesteps at once
                     // data looks like: DDDDDDDDDD--D--D--D--D--D

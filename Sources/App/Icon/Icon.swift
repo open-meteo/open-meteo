@@ -150,7 +150,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     func nForecastHours(run: Int) -> Int {
         switch self {
         case .iconEps:
-            fallthrough
+            return 120+1
         case .icon:
             if  run == 6 || run == 18 {
                 return 120+1
@@ -158,7 +158,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
                 return 180+1
             }
         case .iconEuEps:
-            fallthrough
+            return 120+1
         case .iconEu:
             if run % 6 == 0 {
                 // full runs
