@@ -66,7 +66,8 @@ struct CdoHelper {
         })
         m.sort(by: {$0.endStep < $1.endStep})
         
-        let gribFile = "\(domain.downloadDirectory)temp.grib2"
+        let pid = ProcessInfo.processInfo.processIdentifier
+        let gribFile = "\(domain.downloadDirectory)temp_\(pid).grib2"
         try {
             let size = m.reduce(0, {$0 + $1.ptr.count})
             let file = try FileHandle.createNewFile(file: gribFile, size: size)
@@ -75,7 +76,7 @@ struct CdoHelper {
             }
         }()
         
-        let gribFileRemapped = "\(domain.downloadDirectory)remapped.grib2"
+        let gribFileRemapped = "\(domain.downloadDirectory)remapped_\(pid).grib2"
         try cdo.remap(in: gribFile, out: gribFileRemapped)
         
         let messages = try SwiftEccodes.getMessages(fileName: gribFileRemapped, multiSupport: true)
