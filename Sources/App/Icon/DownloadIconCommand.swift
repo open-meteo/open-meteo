@@ -238,16 +238,25 @@ struct DownloadIconCommand: AsyncCommandFix {
                         data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                     }
                     
+                    // ICON-EPS ensemble model has 12-hourly data after 120 hours of forecast
+                    // Interpolate 12h steps to 6h steps.... Obviously this not not really accurate
+                    let forecastStepsToInterpolate12h = (0..<nTime).compactMap { hour -> Int? in
+                        if forecastSteps.contains(hour) || hour % 6 != 0 {
+                            return nil
+                        }
+                        return hour
+                    }
+                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate12h, width: 6, time: time, grid: grid, locationRange: locationRange)
+                    
                     // EPS ensemble models have 6-hourly data after 2 or 3 days of forecast
                     // Interpolate 6h steps to 3h steps before 1h
                     let forecastStepsToInterpolate6h = (0..<nTime).compactMap { hour -> Int? in
-                        if forecastSteps.contains(hour) || hour % 3 != 0 {
+                        if forecastSteps.contains(hour) || hour % 3 != 0 || hour % 6 == 0 {
                             return nil
                         }
                         return hour
                     }
                     data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid, locationRange: locationRange)
-                    
                     
                     // interpolate missing timesteps. We always fill 2 timesteps at once
                     // data looks like: DDDDDDDDDD--D--D--D--D--D

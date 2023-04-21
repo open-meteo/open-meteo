@@ -150,7 +150,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     func nForecastHours(run: Int) -> Int {
         switch self {
         case .iconEps:
-            // currently we only use 120, but keep omfile-length at 180
             return 180+1
         case .icon:
             if  run == 6 || run == 18 {
@@ -182,9 +181,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     func getDownloadForecastSteps(run: Int) -> [Int] {
         switch self {
         case .iconEps:
-            // Note ICON-EPS has only 6 hourly data for 6/18z runs
-            // Hourly data until 48h, 3 hourly until 72, then 6 hourly until 120h (same as ICON-EU-EPS)
-            return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6))
+            // Note ICON-EPS has only 6 hourly data for 6/18z runs, not used here
+            // Hourly data until 48h, 3 hourly until 72, 6 hourly until 120h (same as ICON-EU-EPS) and 12 hourly until 180h
+            return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6)) + Array(stride(from: 132, through: 180, by: 12))
         case .icon:
             if  run == 6 || run == 18  {
                 // only up to 120
