@@ -17,7 +17,7 @@ public struct EnsembleApiController {
         let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         
         let hourlyTime = time.range.range(dtSeconds: 3600)
-        let dailyTime = time.range.range(dtSeconds: 3600*24)
+        //let dailyTime = time.range.range(dtSeconds: 3600*24)
         
         let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
         
