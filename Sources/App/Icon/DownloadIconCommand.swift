@@ -73,6 +73,9 @@ struct DownloadIconCommand: AsyncCommandFix {
         let file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName2).grib2.bz2"
         let landFraction = try await cdo.downloadAndRemap(file2)[0].getDouble().map(Float.init)
         
+        //try Array2D(data: hsurf, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(downloadDirectory)hsurf.nc")
+        //try Array2D(data: landFraction, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(downloadDirectory)fr_land.nc")
+
         // Set all sea grid points to -999
         precondition(hsurf.count == landFraction.count)
         for i in hsurf.indices {

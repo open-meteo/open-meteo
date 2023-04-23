@@ -93,7 +93,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             case .iconEps:
                 return Self.iconEpsElevataion
             case .iconEuEps:
-                return Self.iconEpsElevataion
+                return Self.iconEuEpsElevataion
             case .iconD2Eps:
                 return Self.iconD2EpsElevataion
             }
