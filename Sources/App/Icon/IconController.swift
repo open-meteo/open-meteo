@@ -35,20 +35,34 @@ public struct IconController {
         let paramsHourly = try IconApiVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try DailyWeatherVariable.load(commaSeparatedOptional: params.daily)
         if let minutelyVariables = paramsMinutely {
-            try readerMinutely.prefetchData(variables: minutelyVariables, time: minutelyTime)
+            for variable in minutelyVariables {
+                switch variable {
+                case .raw(let raw):
+                    try readerMinutely.prefetchData(variable: .raw(.init(raw, 0)), time: minutelyTime)
+                case .derived(let derived):
+                    try readerMinutely.prefetchData(variable: .derived(.init(derived, 0)), time: minutelyTime)
+                }
+            }
         }
         if let hourlyVariables = paramsHourly {
-            try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+            for variable in hourlyVariables {
+                switch variable {
+                case .raw(let raw):
+                    try reader.prefetchData(variable: .raw(.init(raw, 0)), time: hourlyTime)
+                case .derived(let derived):
+                    try reader.prefetchData(variable: .derived(.init(derived, 0)), time: hourlyTime)
+                }
+            }
         }
         if let dailyVariables = paramsDaily {
-            try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+            try reader.prefetchData(variables: dailyVariables, member: 0, time: dailyTime)
         }
         
         let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
-                let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
+                let d = try reader.get(variable: variable, member: 0, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
                 assert(hourlyTime.count == d.data.count)
                 res.append(d)
             }
@@ -58,7 +72,7 @@ public struct IconController {
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
-                let d = try readerMinutely.get(variable: variable, time: minutelyTime).convertAndRound(params: params).toApi(name: variable.name)
+                let d = try readerMinutely.get(variable: variable, member: 0, time: minutelyTime).convertAndRound(params: params).toApi(name: variable.name)
                 assert(minutelyTime.count == d.data.count)
                 res.append(d)
             }
@@ -69,16 +83,16 @@ public struct IconController {
         if params.current_weather == true {
             let starttime = currentTime.floor(toNearest: 3600/4)
             let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600/4)
-            let temperature = try readerMinutely.get(raw: .temperature_2m, time: time).convertAndRound(params: params)
-            let winddirection = try readerMinutely.get(derived: .winddirection_10m, time: time).convertAndRound(params: params)
-            let windspeed = try readerMinutely.get(derived: .windspeed_10m, time: time).convertAndRound(params: params)
-            let weathercode = try readerMinutely.get(raw: .weathercode, time: time).convertAndRound(params: params)
+            let temperature = try readerMinutely.get(raw: .temperature_2m, member: 0, time: time).convertAndRound(params: params)
+            let winddirection = try readerMinutely.get(derived: .winddirection_10m, member: 0, time: time).convertAndRound(params: params)
+            let windspeed = try readerMinutely.get(derived: .windspeed_10m, member: 0, time: time).convertAndRound(params: params)
+            let weathercode = try readerMinutely.get(raw: .weathercode, member: 0, time: time).convertAndRound(params: params)
             currentWeather = ForecastapiResult.CurrentWeather(
                 temperature: temperature.data[0],
                 windspeed: windspeed.data[0],
                 winddirection: winddirection.data[0],
                 weathercode: weathercode.data[0],
-                is_day: try reader.get(derived: .is_day, time: time).convertAndRound(params: params).data[0],
+                is_day: try reader.get(derived: .is_day, member: 0, time: time).convertAndRound(params: params).data[0],
                 temperature_unit: temperature.unit,
                 windspeed_unit: windspeed.unit,
                 winddirection_unit: winddirection.unit,
@@ -106,7 +120,7 @@ public struct IconController {
                     }
                     continue
                 }
-                let d = try reader.getDaily(variable: variable, params: params, time: dailyTime).toApi(name: variable.rawValue)
+                let d = try reader.getDaily(variable: variable, member: 0, params: params, time: dailyTime).toApi(name: variable.rawValue)
                 assert(dailyTime.count == d.data.count)
                 res.append(d)
             }

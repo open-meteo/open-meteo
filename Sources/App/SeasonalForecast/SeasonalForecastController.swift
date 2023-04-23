@@ -56,7 +56,23 @@ struct VariableAndMemberAndControl<Variable: RawRepresentableString>: RawReprese
     }
 
     init?(rawValue: String) {
-        fatalError()
+        guard
+            let pos = rawValue.lastIndex(of: "_"),
+                let startPos = rawValue.index(pos, offsetBy: 7, limitedBy: rawValue.endIndex),
+                let member = Int(rawValue[startPos..<rawValue.endIndex])
+        else {
+            guard let variable = Variable(rawValue: rawValue) else {
+                return nil
+            }
+            self.variable = variable
+            self.member = 0
+            return
+        }
+        guard let variable = Variable(rawValue: String(rawValue[rawValue.startIndex..<pos])) else {
+            return nil
+        }
+        self.variable = variable
+        self.member = member
     }
     
     var rawValue: String {
@@ -82,7 +98,10 @@ extension VariableAndMemberAndControl: Hashable, Equatable where Variable: Hasha
 
 extension VariableAndMemberAndControl: GenericVariable where Variable: GenericVariable {
     var omFileName: String {
-        variable.omFileName
+        if member == 0 {
+            return variable.rawValue
+        }
+        return "\(variable.omFileName)_\(member)"
     }
     
     var scalefactor: Float {
