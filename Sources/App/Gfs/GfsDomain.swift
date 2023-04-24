@@ -18,7 +18,11 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     //case nam_conus // disabled because it only add 12 forecast hours
     case hrrr_conus
     
+    /// Only used for precipitation probability on the fly
     case gfs025_ensemble
+    
+    /// Actually contains raw member data
+    case gfs025_ens
     
     var omfileDirectory: String {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
@@ -49,6 +53,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             switch self {
             case .gfs013:
                 return Self.gfs013ElevationFile
+            case .gfs025_ens:
+                fallthrough
             case .gfs025_ensemble:
                 fallthrough
             case .gfs025:
@@ -65,6 +71,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
+        case .gfs025_ens:
+            fallthrough
         case .gfs025_ensemble:
             fallthrough
         case .gfs013:
@@ -91,8 +99,19 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         "\(omfileDirectory)HSURF.om"
     }
     
+    var ensembleMembers: Int? {
+        switch self {
+        case .gfs025_ens:
+            return 30+1
+        default:
+            return 1
+        }
+    }
+    
     func forecastHours(run: Int) -> [Int] {
         switch self {
+        case .gfs025_ens:
+            fallthrough
         case .gfs025_ensemble:
             return Array(stride(from: 0, to: 240, by: 3))
         case .gfs013:
@@ -112,6 +131,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     var levels: [Int] {
         switch self {
+        case .gfs025_ens:
+            fallthrough
         case .gfs025_ensemble:
             return []
         case .gfs013:
@@ -131,6 +152,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     var omFileLength: Int {
         switch self {
+        case .gfs025_ens:
+            fallthrough
         case .gfs025_ensemble:
             return (240 + 4*24)/3 + 1 //113
         //case .nam_conus:
@@ -149,6 +172,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfs013:
             // Coordinates confirmed with eccodes coordinate output
             return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536-1) / 2, lonMin: -180, dx: 360/3072, dy: 0.11714935)
+        case .gfs025_ens:
+            fallthrough
         case .gfs025_ensemble:
             fallthrough
         case .gfs025:
@@ -163,7 +188,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    func getGribUrl(run: Timestamp, forecastHour: Int) -> String {
+    func getGribUrl(run: Timestamp, forecastHour: Int, member: Int) -> String {
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20220813/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.20220818/nam.t00z.conusnest.hiresf00.tm00.grib2.idx
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.20220818/conus/hrrr.t00z.wrfnatf00.grib2
@@ -174,20 +199,25 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         /// 4 week archive
         let gfsAws = "https://noaa-gfs-bdp-pds.s3.amazonaws.com/"
         let gfsNomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
+        let yyyymmdd = run.format_YYYYMMdd
+        let hh = run.hh
         switch self {
         case .gfs025_ensemble:
-            fatalError("not supported, as it needs a member string")
+            fallthrough
+        case .gfs025_ens:
+            let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
+            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2sp25/\(memberString).t\(hh)z.pgrb2s.0p25.f\(fHHH)"
         case .gfs013:
-            return "\(useArchive ? gfsAws : gfsNomads)gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.sfluxgrbf\(fHHH).grib2"
+            return "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.sfluxgrbf\(fHHH).grib2"
         case .gfs025:
-            return "\(useArchive ? gfsAws : gfsNomads)gfs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/gfs.t\(run.hh)z.pgrb2.0p25.f\(fHHH)"
+            return "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.pgrb2.0p25.f\(fHHH)"
         //case .nam_conus:
         //    return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
         case .hrrr_conus:
             let nomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"
             //let google = "https://storage.googleapis.com/high-resolution-rapid-refresh/"
             let aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
-            return "\(useArchive ? aws : nomads)hrrr.\(run.format_YYYYMMdd)/conus/hrrr.t\(run.hh)z.wrfprsf\(fHH).grib2"
+            return "\(useArchive ? aws : nomads)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfprsf\(fHH).grib2"
         }
     }
 }
@@ -375,7 +405,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
 /**
  Types of pressure level variables
  */
-enum GfsPressureVariableType: String, CaseIterable {
+enum GfsPressureVariableType: String, CaseIterable, RawRepresentableString {
     case temperature
     case wind_u_component
     case wind_v_component

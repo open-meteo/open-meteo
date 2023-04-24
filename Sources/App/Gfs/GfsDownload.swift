@@ -45,6 +45,8 @@ struct GfsDownload: AsyncCommandFix {
         case .gfs025_ensemble:
             try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
             try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf)
+        case .gfs025_ens:
+            fallthrough
         case .gfs013:
             fallthrough
         case .hrrr_conus:
@@ -135,8 +137,10 @@ struct GfsDownload: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let logger = application.logger
-        let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0)
-        try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
+        let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0, member: 0)
+        if domain != .gfs025_ens {
+            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
+        }
         
         let deadLineHours: Double = domain == .gfs025 ? 4 : 2
         let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
@@ -168,92 +172,97 @@ struct GfsDownload: AsyncCommandFix {
             logger.info("Downloading forecastHour \(forecastHour)")
             /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
             let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
-            let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
-                let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
-                return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
-            }
-            let url = domain.getGribUrl(run: run, forecastHour: forecastHour)
             
-            for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables) {
-                try grib2d.load(message: message)
-                if domain.isGlobal {
-                    grib2d.array.shift180LongitudeAndFlipLatitude()
+            for member in 0..<(domain.ensembleMembers ?? 1) {
+                let memberStr = member > 0 ? "_\(member)" : ""
+                let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
+                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(memberStr)\(prefix).fpg"
+                    return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
                 }
-                //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
+                let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
                 
-                guard let shortName = message.get(attribute: "shortName"),
-                      let stepRange = message.get(attribute: "stepRange"),
-                        let stepType = message.get(attribute: "stepType") else {
-                    fatalError("could not get step range or type")
-                }
-                
-                // Deaverage data
-                if stepType == "avg" {
-                    let startStep = Int(stepRange.split(separator: "-")[0])!
-                    let currentStep = Int(stepRange.split(separator: "-")[1])!
-                    let previous = previousData[variable.variable.rawValue]
-                    // Store data for averaging in next run
-                    previousData[variable.variable.rawValue] = (currentStep, grib2d.array.data)
-                    // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-                    if let previous, previous.step != startStep {
-                        let deltaHours = Float(currentStep - startStep)
-                        let deltaHoursPrevious = Float(previous.step - startStep)
-                        for l in previous.data.indices {
-                            grib2d.array.data[l] = (grib2d.array.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious) / (deltaHours - deltaHoursPrevious)
+                for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables) {
+                    try grib2d.load(message: message)
+                    if domain.isGlobal {
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                    }
+                    //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
+                    
+                    guard let shortName = message.get(attribute: "shortName"),
+                          let stepRange = message.get(attribute: "stepRange"),
+                          let stepType = message.get(attribute: "stepType") else {
+                        fatalError("could not get step range or type")
+                    }
+                    
+                    // Deaverage data
+                    if stepType == "avg" {
+                        let startStep = Int(stepRange.split(separator: "-")[0])!
+                        let currentStep = Int(stepRange.split(separator: "-")[1])!
+                        let previous = previousData["\(variable.variable.rawValue)\(memberStr)"]
+                        // Store data for averaging in next run
+                        previousData["\(variable.variable.rawValue)\(memberStr)"] = (currentStep, grib2d.array.data)
+                        // For the overall first timestep or the first step of each repeating section, deaveraging is not required
+                        if let previous, previous.step != startStep {
+                            let deltaHours = Float(currentStep - startStep)
+                            let deltaHoursPrevious = Float(previous.step - startStep)
+                            for l in previous.data.indices {
+                                grib2d.array.data[l] = (grib2d.array.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious) / (deltaHours - deltaHoursPrevious)
+                            }
                         }
                     }
-                }
-                
-                if stepType == "acc" {
-                    fatalError("stepType=acc not supported")
-                }
-                
-                // Convert specific humidity to relative humidity
-                if let variable = variable.variable as? GfsSurfaceVariable,
-                    variable == .relativehumidity_2m,
-                    shortName == "2sh"
-                {
-                    guard let temperature = previousData[GfsSurfaceVariable.temperature_2m.rawValue],
-                            temperature.step == forecastHour else {
-                        fatalError("Could not get temperature 2m to convert specific humidity")
+                    
+                    if stepType == "acc" {
+                        fatalError("stepType=acc not supported")
                     }
-                    guard let surfacePressure = previousData[GfsSurfaceVariable.surface_pressure.rawValue],
-                            surfacePressure.step == forecastHour else {
-                        fatalError("Could not get surface_pressure to convert specific humidity")
+                    
+                    // Convert specific humidity to relative humidity
+                    if let variable = variable.variable as? GfsSurfaceVariable,
+                       variable == .relativehumidity_2m,
+                       shortName == "2sh"
+                    {
+                        guard let temperature = previousData["\(GfsSurfaceVariable.temperature_2m.rawValue)\(memberStr)"],
+                              temperature.step == forecastHour else {
+                            fatalError("Could not get temperature 2m to convert specific humidity")
+                        }
+                        guard let surfacePressure = previousData["\(GfsSurfaceVariable.surface_pressure.rawValue)\(memberStr)"],
+                              surfacePressure.step == forecastHour else {
+                            fatalError("Could not get surface_pressure to convert specific humidity")
+                        }
+                        grib2d.array.data.multiplyAdd(multiply: 1000, add: 0) // kg/kg to g/kg
+                        grib2d.array.data = Meteorology.specificToRelativeHumidity(specificHumidity: grib2d.array.data, temperature: temperature.data, pressure: surfacePressure.data)
                     }
-                    grib2d.array.data.multiplyAdd(multiply: 1000, add: 0) // kg/kg to g/kg
-                    grib2d.array.data = Meteorology.specificToRelativeHumidity(specificHumidity: grib2d.array.data, temperature: temperature.data, pressure: surfacePressure.data)
-                }
-                
-                // Convert pressure vertical velocity to geometric velocity in HRRR
-                if let variable = variable.variable as? GfsPressureVariable,
-                    variable.variable == .vertical_velocity,
-                    shortName == "w"
-                {
-                    guard let temperature = previousData[GfsPressureVariable(variable: .temperature, level: variable.level).rawValue], temperature.step == forecastHour else {
-                        fatalError("Could not get temperature 2m to convert pressure vertical velocity to geometric velocity")
+                    
+                    // Convert pressure vertical velocity to geometric velocity in HRRR
+                    if let variable = variable.variable as? GfsPressureVariable,
+                       variable.variable == .vertical_velocity,
+                       shortName == "w"
+                    {
+                        let t = GfsPressureVariable(variable: .temperature, level: variable.level)
+                        guard let temperature = previousData["\(t.rawValue)\(memberStr)"], temperature.step == forecastHour else {
+                            fatalError("Could not get temperature 2m to convert pressure vertical velocity to geometric velocity")
+                        }
+                        grib2d.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: grib2d.array.data, temperature: temperature.data, pressureLevel: Float(variable.level))
                     }
-                    grib2d.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: grib2d.array.data, temperature: temperature.data, pressureLevel: Float(variable.level))
+                    
+                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
+                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
+                    try FileManager.default.removeItemIfExists(at: file)
+                    
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.variable.multiplyAdd {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    // Keep temperature and pressure in memory to relative humidity conversion
+                    if let variable = variable.variable as? GfsSurfaceVariable, keepVariableInMemory.contains(variable) {
+                        previousData["\(variable.rawValue)\(memberStr)"] = (forecastHour, grib2d.array.data)
+                    }
+                    if let variable = variable.variable as? GfsPressureVariable, keepVariableInMemoryPressure.contains(variable.variable) {
+                        previousData["\(variable.rawValue)\(memberStr)"] = (forecastHour, grib2d.array.data)
+                    }
+                    
+                    try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                 }
-                
-                //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
-                try FileManager.default.removeItemIfExists(at: file)
-                
-                // Scaling before compression with scalefactor
-                if let fma = variable.variable.multiplyAdd {
-                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-                
-                // Keep temperature and pressure in memory to relative humidity conversion
-                if let variable = variable.variable as? GfsSurfaceVariable, keepVariableInMemory.contains(variable) {
-                    previousData[variable.rawValue] = (forecastHour, grib2d.array.data)
-                }
-                if let variable = variable.variable as? GfsPressureVariable, keepVariableInMemoryPressure.contains(variable.variable) {
-                    previousData[variable.rawValue] = (forecastHour, grib2d.array.data)
-                }
-                
-                try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
             }
         }
         curl.printStatistics()
@@ -280,62 +289,66 @@ struct GfsDownload: AsyncCommandFix {
             }
             
             let skip = variable.skipHour0(for: domain) ? 1 : 0
-            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
-            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
-                if hour == 0 && variable.skipHour0(for: domain) {
-                    return nil
-                }
-                /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
-                let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(hour)\(prefix).fpg"
-                let reader = try OmFileReader(file: file)
-                try reader.willNeed()
-                return (hour, reader)
-            })
-            
-            // Create netcdf file for debugging
-            if createNetcdf {
-                let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName).nc", overwriteExisting: true)
-                try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
-                var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                    try ncFile.createDimension(name: "time", length: nTime),
-                    try ncFile.createDimension(name: "LAT", length: grid.ny),
-                    try ncFile.createDimension(name: "LON", length: grid.nx)
-                ])
-                for reader in readers {
-                    let data = try reader.reader.readAll()
-                    try ncVariable.write(data, offset: [reader.hour/domain.dtHours, 0, 0], count: [1, grid.ny, grid.nx])
-                }
-            }
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            for member in 0..<(domain.ensembleMembers ?? 1) {
+                let memberStr = member > 0 ? "_\(member)" : ""
+                let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(memberStr)")
                 
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data2d.data.fillWithNaNs()
-                for reader in readers {
-                    try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
-                }
-                
-                // interpolate missing timesteps. We always fill 2 timesteps at once
-                // data looks like: DDDDDDDDDD--D--D--D--D--D
-                let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
-                    let forecastHour = hour * domain.dtHours
-                    if forecastHours.contains(forecastHour) || forecastHour % 3 != 1 {
-                        // process 2 timesteps at once
+                let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
+                    if hour == 0 && variable.skipHour0(for: domain) {
                         return nil
                     }
-                    return forecastHour
+                    /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
+                    let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
+                    let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(hour)\(memberStr)\(prefix).fpg"
+                    let reader = try OmFileReader(file: file)
+                    try reader.willNeed()
+                    return (hour, reader)
+                })
+                
+                // Create netcdf file for debugging
+                if createNetcdf {
+                    let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName).nc", overwriteExisting: true)
+                    try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
+                    var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
+                        try ncFile.createDimension(name: "time", length: nTime),
+                        try ncFile.createDimension(name: "LAT", length: grid.ny),
+                        try ncFile.createDimension(name: "LON", length: grid.nx)
+                    ])
+                    for reader in readers {
+                        let data = try reader.reader.readAll()
+                        try ncVariable.write(data, offset: [reader.hour/domain.dtHours, 0, 0], count: [1, grid.ny, grid.nx])
+                    }
                 }
                 
-                // Fill in missing hourly values after switching to 3h
-                data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
-                
-                progress.add(locationRange.count)
-                return data2d.data[0..<locationRange.count * nTime]
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                    
+                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                    data2d.data.fillWithNaNs()
+                    for reader in readers {
+                        try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                        data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                    }
+                    
+                    // interpolate missing timesteps. We always fill 2 timesteps at once
+                    // data looks like: DDDDDDDDDD--D--D--D--D--D
+                    let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
+                        let forecastHour = hour * domain.dtHours
+                        if forecastHours.contains(forecastHour) || forecastHour % 3 != 1 {
+                            // process 2 timesteps at once
+                            return nil
+                        }
+                        return forecastHour
+                    }
+                    
+                    // Fill in missing hourly values after switching to 3h
+                    data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                    
+                    progress.add(locationRange.count)
+                    return data2d.data[0..<locationRange.count * nTime]
+                }
+                progress.finish()
             }
-            progress.finish()
         }
     }
     
@@ -377,8 +390,7 @@ struct GfsDownload: AsyncCommandFix {
             var greater01 = [Float](repeating: 0, count: grid.count)
             // Download all members, and increase precipitation probability
             for member in members {
-                let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
-                let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(run.format_YYYYMMdd)/\(run.hh)/atmos/pgrb2sp25/\(memberString).t\(run.hh)z.pgrb2s.0p25.f\(forecastHour.zeroPadded(len: 3))"
+                let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
                 let grib = try await curl.downloadIndexedGrib(url: url, variables: EnsembleVariable.allCases)[0]
                 try grib2d.load(message: grib.message)
                 grib2d.array.shift180LongitudeAndFlipLatitude()

@@ -35,6 +35,49 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             }
         }
         
+        if domain == .gfs025_ens {
+            switch self {
+            case .visibility:
+                return ":VIS:surface:"
+            case .windgusts_10m:
+                return ":GUST:surface:"
+            case .surface_pressure:
+                return ":PRES:surface:"
+            case .soil_temperature_0_to_10cm:
+                return ":TSOIL:0-0.1 m below ground:"
+            case .soil_moisture_0_to_10cm:
+                return ":SOILW:0-0.1 m below ground:"
+            case .snow_depth:
+                return ":SNOD:surface:"
+            case .temperature_2m:
+                return ":TMP:2 m above ground:"
+            case .relativehumidity_2m:
+                return ":RH:2 m above ground:"
+            case .wind_u_component_10m:
+                return ":UGRD:10 m above ground:"
+            case .wind_v_component_10m:
+                return ":VGRD:10 m above ground:"
+            case .frozen_precipitation_percent:
+                return ":CPOFP:surface:"
+            case .precipitation:
+                return ":APCP:surface:"
+            case .categorical_freezing_rain:
+                return ":CFRZR:surface:"
+            case .latent_heatflux:
+                return ":LHTFL:surface:"
+            case .sensible_heatflux:
+                return ":SHTFL:surface:"
+            case .cape:
+                return ":CAPE:surface:"
+            case .cloudcover:
+                return ":TCDC:entire atmosphere:"
+            case .shortwave_radiation:
+                return ":DSWRF:surface:"
+            default:
+                return nil
+            }
+        }
+        
         if domain == .hrrr_conus {
             switch self {
             case .lifted_index:
@@ -191,7 +234,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .cloudcover: fallthrough // cloud cover not available in hour 0 in GFS013
         case .cloudcover_low: fallthrough
         case .cloudcover_mid: fallthrough
-        case .cloudcover_high: return domain == .gfs013
+        case .cloudcover_high: return domain == .gfs013 || domain == .gfs025_ens
         default: return false
         }
     }
@@ -301,6 +344,8 @@ extension GfsPressureVariable: GfsVariableDownloadable {
                 // Vertical Velocity (Pressure) [Pa/s]
                 // Converted later while downlading
                 return ":VVEL:\(level) mb:"
+            case .gfs025_ens:
+                return nil
             case .gfs025_ensemble:
                 return nil
             }
