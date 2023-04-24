@@ -140,7 +140,7 @@ struct GfsDownload: AsyncCommandFix {
         
         let logger = application.logger
         let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0, member: 0)
-        if domain != .gfs025_ens {
+        if domain != .gfs025_ens && domain != .gfs05_ens {
             try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         }
         
