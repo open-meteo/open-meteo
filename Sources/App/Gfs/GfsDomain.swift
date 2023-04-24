@@ -21,7 +21,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// Only used for precipitation probability on the fly
     case gfs025_ensemble
     
-    /// Actually contains raw member data
+    /// Actually contains raw member data.
+    /// Contains up to 35 days of forecast, BUT the first 16 days are calculated at first, followed by day 16-25 18 hours later and only for 0z run.
     case gfs025_ens
     
     /// 0.5° ensemble version for up to 25 days of forecast... Low forecast skill obviously.
@@ -121,6 +122,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     var ensembleMembers: Int? {
         switch self {
+        case .gfs05_ens:
+            return 30+1
         case .gfs025_ens:
             return 30+1
         default:
