@@ -177,6 +177,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
     case icon_global
     case icon_eu
     case icon_d2
+    
+    case ifs04
 
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -192,6 +194,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return try IconReader(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .icon_d2:
             return try IconReader(domain: .iconD2Eps, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .ifs04:
+            return try EcmwfReader(domain: .ifs04_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
     
@@ -207,6 +211,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return 40
         case .icon_d2:
             return 20
+        case .ifs04:
+            return 50+5
         }
     }
 }

@@ -23,15 +23,27 @@ struct EcmwfController {
         // Start data prefetch to boooooooost API speed :D
         let paramsHourly = try EcmwfHourlyVariable.load(commaSeparatedOptional: params.hourly)
         if let hourlyVariables = paramsHourly {
-            try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+            for variable in hourlyVariables {
+                switch variable {
+                case .raw(let raw):
+                    try reader.prefetchData(variable: .raw(.init(raw, 0)), time: hourlyTime)
+                case .derived(let derived):
+                    try reader.prefetchData(variable: .derived(.init(derived, 0)), time: hourlyTime)
+                }
+                
+            }
         }
         
         let hourly: ApiSection? = try paramsHourly.map { variables in
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
-                let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
-                res.append(d)
+                switch variable {
+                case .raw(let raw):
+                    res.append(try reader.get(variable: .raw(.init(raw, 0)), time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name))
+                case .derived(let derived):
+                    res.append(try reader.get(variable: .derived(.init(derived, 0)), time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name))
+                }
             }
             return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
         }

@@ -15,6 +15,9 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         @Option(name: "run")
         var run: String?
         
+        @Option(name: "domain")
+        var domain: String?
+        
         @Option(name: "server", help: "Root server path. Default: 'https://data.ecmwf.int/forecasts/'")
         var server: String?
 
@@ -27,7 +30,13 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        let domain = EcmwfDomain.ifs04
+        let domain = signature.domain.map {
+            guard let domain = EcmwfDomain(rawValue: $0) else {
+                fatalError("Could not initialise domain from \($0)")
+            }
+            return domain
+        } ?? EcmwfDomain.ifs04
+        
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         let logger = context.application.logger
@@ -36,13 +45,12 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
-        try await downloadEcmwf(application: context.application, base: base, run: run, skipFilesIfExisting: signature.skipExisting)
-        try convertEcmwf(logger: logger, run: run)
+        try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, skipFilesIfExisting: signature.skipExisting)
+        try convertEcmwf(logger: logger, domain: domain, run: run)
     }
     
-    func downloadEcmwf(application: Application, base: String, run: Timestamp, skipFilesIfExisting: Bool) async throws {
+    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
-        let domain = EcmwfDomain.ifs04
         
         
         let dateStr = run.format_YYYYMMdd
@@ -52,7 +60,16 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         
-        let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+        let product: String
+        let productType: String
+        switch domain {
+        case .ifs04:
+            product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            productType = "fc"
+        case .ifs04_ensemble:
+            product = "enfo"
+            productType = "ef"
+        }
         let runStr = run.hour.zeroPadded(len: 2)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -74,11 +91,12 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-0h-oper-fc.grib2
             //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-12h-oper-fc.grib2
-            let url = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
+            let url = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-\(productType).grib2"
             
             for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                 let shortName = message.get(attribute: "shortName")!
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
+                let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                 
                 if ["lsm"].contains(shortName) {
                     continue
@@ -113,7 +131,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
-                let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
+                let memberStr = member > 0 ? "_\(member)" : ""
+                let file = "\(downloadDirectory)\(variable.omFileName)_\(hour)\(memberStr).om"
                 try FileManager.default.removeItemIfExists(at: file)
                 
                 
@@ -124,8 +143,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         curl.printStatistics()
     }
     
-    func convertEcmwf(logger: Logger, run: Timestamp) throws {
-        let domain = EcmwfDomain.ifs04
+    func convertEcmwf(logger: Logger, domain: EcmwfDomain, run: Timestamp) throws {
         let downloadDirectory = domain.downloadDirectory
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
@@ -143,43 +161,48 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
+        let members = domain.ensembleMembers ?? 1
+        
         for variable in EcmwfVariable.allCases {
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             let skip = 0
             
-            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
-                let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(hour).om")
-                try reader.willNeed()
-                return (hour, reader)
-            })
-            
-            let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
-                if forecastSteps.contains(hour * domain.dtHours) {
-                    return nil
+            for member in 0..<members {
+                let memberStr = member > 0 ? "_\(member)" : ""
+                let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
+                    let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(hour)\(memberStr).om")
+                    try reader.willNeed()
+                    return (hour, reader)
+                })
+                
+                let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
+                    if forecastSteps.contains(hour * domain.dtHours) {
+                        return nil
+                    }
+                    return hour
                 }
-                return hour
+                
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                    
+                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                    data2d.data.fillWithNaNs()
+                    for reader in readers {
+                        try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                        data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                    }
+                    
+                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
+                    
+                    // De-accumulate precipitation
+                    if variable.isAccumulatedSinceModelStart {
+                        data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
+                    }
+                    
+                    progress.add(locationRange.count)
+                    return data2d.data[0..<locationRange.count * nTime]
+                }
+                progress.finish()
             }
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
-                
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data2d.data.fillWithNaNs()
-                for reader in readers {
-                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
-                }
-                
-                data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
-                
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
-                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 0)
-                }
-                
-                progress.add(locationRange.count)
-                return data2d.data[0..<locationRange.count * nTime]
-            }
-            progress.finish()
         }
         
         var indexTimeEnd = run.timeIntervalSince1970 + 241 * 3600
@@ -199,6 +222,8 @@ extension EcmwfDomain {
         let twoHoursAgo = Timestamp.now().add(-7200)
         let t = Timestamp.now()
         switch self {
+        case .ifs04_ensemble:
+            fallthrough
         case .ifs04:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)

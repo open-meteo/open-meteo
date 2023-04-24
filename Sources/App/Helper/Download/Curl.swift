@@ -191,7 +191,7 @@ final class Curl {
             
             // Retry failed file transfers after this point
             do {
-                return try await withThrowingTaskGroup(of: Void.self) { group in
+                //return try await withThrowingTaskGroup(of: Void.self) { group in
                     var messages = [GribMessage]()
                     let contentLength = try response.contentLength()
                     let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
@@ -214,7 +214,7 @@ final class Curl {
                     }
                     try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                     return messages
-                }
+                //}
             } catch {
                 try await timeout.check(error: error)
             }
