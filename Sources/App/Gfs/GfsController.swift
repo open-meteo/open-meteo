@@ -281,6 +281,11 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             fatalError("gfs025 should not been initilised in GfsMixer025_013")
         case .gfs025_ensemble:
             fatalError("gfs025_ensemble should not been initilised in GfsMixer025_013")
+        case .gfs025_ens:
+            guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
         case .hrrr_conus:
             guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 return nil
