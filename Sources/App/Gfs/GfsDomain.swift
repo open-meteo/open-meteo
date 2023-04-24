@@ -24,6 +24,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// Actually contains raw member data
     case gfs025_ens
     
+    /// 0.5° ensemble version for up to 25 days of forecast... Low forecast skill obviously.
+    case gfs05_ens
+    
     var omfileDirectory: String {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
@@ -38,7 +41,20 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        return self == .gfs025_ensemble ? 3*3600 : 3600
+        switch self {
+        case .gfs013:
+            return 3600
+        case .gfs025:
+            return 3600
+        case .hrrr_conus:
+            return 3600
+        case .gfs025_ensemble:
+            return 3*3600
+        case .gfs025_ens:
+            return 3*3600
+        case .gfs05_ens:
+            return 3*3600
+        }
     }
     
     var isGlobal: Bool {
@@ -51,6 +67,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return nil
         case .elevation:
             switch self {
+            case .gfs05_ens:
+                return nil
             case .gfs013:
                 return Self.gfs013ElevationFile
             case .gfs025_ens:
@@ -71,6 +89,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
+        case .gfs05_ens:
+            fallthrough
         case .gfs025_ens:
             fallthrough
         case .gfs025_ensemble:
@@ -110,6 +130,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     func forecastHours(run: Int) -> [Int] {
         switch self {
+        case .gfs05_ens:
+            return Array(stride(from: 0, to: 240, by: 3)) + Array(stride(from: 246, through: 840, by: 6))
         case .gfs025_ens:
             fallthrough
         case .gfs025_ensemble:
@@ -131,6 +153,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     var levels: [Int] {
         switch self {
+        case .gfs05_ens:
+            fallthrough
         case .gfs025_ens:
             fallthrough
         case .gfs025_ensemble:
@@ -152,10 +176,12 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     var omFileLength: Int {
         switch self {
+        case .gfs05_ens:
+            return (840 + 4*24)/3 + 1 // 313
         case .gfs025_ens:
             fallthrough
         case .gfs025_ensemble:
-            return (240 + 4*24)/3 + 1 //113
+            return (240 + 4*24)/3 + 1 // 113
         //case .nam_conus:
             //return 60 + 4*24
         case .gfs013:
@@ -169,6 +195,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     var grid: Gridable {
         switch self {
+        case .gfs05_ens:
+            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .gfs013:
             // Coordinates confirmed with eccodes coordinate output
             return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536-1) / 2, lonMin: -180, dx: 360/3072, dy: 0.11714935)
@@ -202,6 +230,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         let yyyymmdd = run.format_YYYYMMdd
         let hh = run.hh
         switch self {
+        case .gfs05_ens:
+            let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
+            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2ap5/\(memberString).t\(hh)z.pgrb2a.0p50.f\(fHHH)"
         case .gfs025_ensemble:
             fallthrough
         case .gfs025_ens:

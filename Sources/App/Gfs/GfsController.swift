@@ -286,6 +286,11 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return nil
             }
             self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
+        case .gfs05_ens:
+            guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
         case .hrrr_conus:
             guard let reader = try GenericReader<GfsDomain, GfsVariable>(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 return nil
