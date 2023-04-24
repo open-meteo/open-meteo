@@ -45,6 +45,8 @@ struct GfsDownload: AsyncCommandFix {
         case .gfs025_ensemble:
             try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
             try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf)
+        case .gfs05_ens:
+            fallthrough
         case .gfs025_ens:
             fallthrough
         case .gfs013:
