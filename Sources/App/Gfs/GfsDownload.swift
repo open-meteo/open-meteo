@@ -146,8 +146,21 @@ struct GfsDownload: AsyncCommandFix {
         if domain != .gfs025_ens && domain != .gfs05_ens {
             try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         }
-        
-        let deadLineHours: Double = domain == .gfs025 ? 4 : 2
+        let deadLineHours: Double
+        switch domain {
+        case .gfs013:
+            deadLineHours = 4
+        case .gfs025:
+            deadLineHours = 4
+        case .hrrr_conus:
+            deadLineHours = 2
+        case .gfs025_ensemble:
+            deadLineHours = 4
+        case .gfs025_ens:
+            deadLineHours = 4
+        case .gfs05_ens:
+            deadLineHours = 5
+        }
         let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
         let forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
