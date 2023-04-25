@@ -131,10 +131,14 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    func forecastHours(run: Int) -> [Int] {
+    /// `SecondFlush` is used to download the hours 240-840 from GFS ensemble 0.5° which are 18 hours later available
+    func forecastHours(run: Int, secondFlush: Bool) -> [Int] {
         switch self {
         case .gfs05_ens:
-            return Array(stride(from: 0, to: 240, by: 3)) + Array(stride(from: 246, through: 840, by: 6))
+            if secondFlush {
+                return Array(stride(from: 240, through: 840, by: 6))
+            }
+            return Array(stride(from: 0, to: 240, by: 3))
         case .gfs025_ens:
             fallthrough
         case .gfs025_ensemble:
