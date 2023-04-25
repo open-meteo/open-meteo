@@ -21,7 +21,7 @@ struct GfsDownload: AsyncCommandFix {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
-        @Flag(name: "second-flush", help: "For GFS05 ensemble to download hours 240-840")
+        @Flag(name: "second-flush", help: "For GFS05 ensemble to download hours 390-840")
         var secondFlush: Bool
         
         @Option(name: "only-variables")
@@ -84,7 +84,7 @@ struct GfsDownload: AsyncCommandFix {
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
-    func downloadNcepElevation(application: Application, url: String, surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) async throws {
+    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) async throws {
         let logger = application.logger
         
         /// download seamask and height
@@ -168,7 +168,7 @@ struct GfsDownload: AsyncCommandFix {
         var previousData = [String: (step: Int, data: [Float])]()
         
         /// Variables that are kept in memory
-        /// For GFS013, keep ressure and temperature in memory to convert specific humidity to relative
+        /// For GFS013, keep pressure and temperature in memory to convert specific humidity to relative
         let keepVariableInMemory: [GfsSurfaceVariable] = domain == .gfs013 ? [.temperature_2m, .surface_pressure] : []
         /// Keep pressure level temperature in memory to convert pressure vertical velocity (Pa/s) to geometric velocity (m/s)
         let keepVariableInMemoryPressure: [GfsPressureVariableType] = domain == .hrrr_conus ? [.temperature] : []

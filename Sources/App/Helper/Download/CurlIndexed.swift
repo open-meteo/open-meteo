@@ -12,36 +12,47 @@ protocol CurlIndexedVariable {
 extension Curl {
     
     /// Download index file and match against curl variable
-    func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: String, variables: [Variable]) async throws -> (matches: [Variable], range: String, minSize: Int)? {
+    func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: [String], variables: [Variable]) async throws -> [(matches: [Variable], range: String, minSize: Int)] {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
-            return nil
+            return []
         }
         
-        guard let index = try await downloadInMemoryAsync(url: url, minSize: nil).readStringImmutable() else {
-            fatalError("Could not decode index to string")
+        var indices = [String]()
+        indices.reserveCapacity(url.count)
+        for url in url {
+            guard let index = try await downloadInMemoryAsync(url: url, minSize: nil).readStringImmutable() else {
+                fatalError("Could not decode index to string")
+            }
+            indices.append(index)
         }
 
-        var matches = [Variable]()
-        matches.reserveCapacity(count)
-        guard let range = index.split(separator: "\n").indexToRange(include: { idx in
-            guard let match = variables.first(where: {
-                guard let gribIndexName = $0.gribIndexName else {
+        var result = [(matches: [Variable], range: String, minSize: Int)]()
+        result.reserveCapacity(url.count)
+        
+        for index in indices {
+            var matches = [Variable]()
+            matches.reserveCapacity(count)
+            guard let range = index.split(separator: "\n").indexToRange(include: { idx in
+                guard let match = variables.first(where: {
+                    guard let gribIndexName = $0.gribIndexName else {
+                        return false
+                    }
+                    return idx.contains(gribIndexName)
+                }) else {
                     return false
                 }
-                return idx.contains(gribIndexName)
+                guard !matches.contains(where: {$0.gribIndexName == match.gribIndexName}) else {
+                    logger.info("Grib variable \(match) matched twice for \(idx)")
+                    return false
+                }
+                //logger.debug("Matched \(match) with \(idx)")
+                matches.append(match)
+                return true
             }) else {
-                return false
+                throw CurlError.noGribMessagesMatch
             }
-            guard !matches.contains(where: {$0.gribIndexName == match.gribIndexName}) else {
-                logger.info("Grib variable \(match) matched twice for \(idx)")
-                return false
-            }
-            //logger.debug("Matched \(match) with \(idx)")
-            matches.append(match)
-            return true
-        }) else {
-            throw CurlError.noGribMessagesMatch
+            result.append((matches, range.range, range.minSize))
         }
         
         var missing = false
@@ -49,7 +60,7 @@ extension Curl {
             guard let gribIndexName = variable.gribIndexName else {
                 continue
             }
-            if !matches.contains(where: {$0.gribIndexName == gribIndexName}) {
+            if !result.contains(where: { $0.matches.contains(where: {$0.gribIndexName == gribIndexName}) }) {
                 logger.error("Variable \(variable) '\(gribIndexName)' missing")
                 missing = true
             }
@@ -58,15 +69,17 @@ extension Curl {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
-        return (matches, range.range, range.minSize)
+        return result
     }
     
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") async throws -> [(variable: Variable, message: GribMessage)] {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: [String], variables: [Variable], extension: String = ".idx") async throws -> [(variable: Variable, message: GribMessage)] {
         
-        guard let inventory = try await downloadIndexAndDecode(url: "\(url)\(`extension`)", variables: variables) else {
+        let urlIndex = url.map({"\($0)\(`extension`)"})
+        let inventories = try await downloadIndexAndDecode(url: urlIndex, variables: variables)
+        guard !inventories.isEmpty else {
             return []
         }
         
@@ -74,12 +87,18 @@ extension Curl {
         var retries = 0
         while true {
             do {
-                let messages = try await downloadGrib(url: url, bzip2Decode: false, range: inventory.range, minSize: inventory.minSize)
-                if messages.count != inventory.matches.count {
-                    logger.error("Grib reader did not get all matched variables. Matches count \(inventory.matches.count). Grib count \(messages.count)")
-                    throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: inventory.matches.count)
+                var result = [(variable: Variable, message: GribMessage)]()
+                result.reserveCapacity(variables.count)
+                for (url,inventory) in zip(url,inventories) {
+                    let messages = try await downloadGrib(url: url, bzip2Decode: false, range: inventory.range, minSize: inventory.minSize)
+                    
+                    if messages.count != inventory.matches.count {
+                        logger.error("Grib reader did not get all matched variables. Matches count \(inventory.matches.count). Grib count \(messages.count)")
+                        throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: inventory.matches.count)
+                    }
+                    zip(inventory.matches, messages).forEach({ result.append(($0,$1))})
                 }
-                return zip(inventory.matches, messages).map({($0,$1)})
+                return result
             } catch {
                 retries += 1
                 if retries >= 20 {
@@ -94,7 +113,7 @@ extension Curl {
     /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
     func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") async throws -> [(variable: Variable, message: GribMessage)] {
         
-        guard let inventory = try await downloadIndexAndDecode(url: "\(url)\(`extension`)", variables: variables) else {
+        guard let inventory = try await downloadIndexAndDecode(url: ["\(url)\(`extension`)"], variables: variables).first else {
             return []
         }
         
