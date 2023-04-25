@@ -73,6 +73,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":TCDC:entire atmosphere:"
             case .shortwave_radiation:
                 return ":DSWRF:surface:"
+            case .lifted_index:
+                return ":LFTX:surface:"
+            case .freezinglevel_height:
+                return ":HGT:0C isotherm:"
             default:
                 return nil
             }

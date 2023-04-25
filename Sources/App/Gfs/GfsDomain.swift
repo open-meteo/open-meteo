@@ -120,7 +120,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         "\(omfileDirectory)HSURF.om"
     }
     
-    var ensembleMembers: Int? {
+    var ensembleMembers: Int {
         switch self {
         case .gfs05_ens:
             return 30+1

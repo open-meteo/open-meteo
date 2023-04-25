@@ -178,7 +178,7 @@ struct GfsDownload: AsyncCommandFix {
             /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
             let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
             
-            for member in 0..<(domain.ensembleMembers ?? 1) {
+            for member in 0..<domain.ensembleMembers {
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
                     let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(memberStr)\(prefix).fpg"
@@ -296,7 +296,7 @@ struct GfsDownload: AsyncCommandFix {
             
             let skip = variable.skipHour0(for: domain) ? 1 : 0
             
-            for member in 0..<(domain.ensembleMembers ?? 1) {
+            for member in 0..<domain.ensembleMembers {
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(memberStr)")
                 
