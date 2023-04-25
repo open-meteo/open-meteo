@@ -292,13 +292,11 @@ struct GfsDownload: AsyncCommandFix {
         let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         let nTime = forecastHours.max()! / domain.dtHours + 1
-        let time = TimerangeDt(start: run, nTime: nTime * domain.dtHours, dtSeconds: domain.dtSeconds)
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         
         let grid = domain.grid
         let nLocations = grid.count
-        
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
-        
+                
         var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
@@ -340,7 +338,7 @@ struct GfsDownload: AsyncCommandFix {
                     }
                 }
                 
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                     
                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                     data2d.data.fillWithNaNs()

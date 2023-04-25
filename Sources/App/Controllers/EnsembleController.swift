@@ -180,6 +180,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
     
     case ecmwf_ifs04
     
+    case gem_global
+    
     case gfs025
     case gfs05
     case gfs_seamless
@@ -206,6 +208,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return try GfsReader(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gfs_seamless:
             return try GfsMixer(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+        case .gem_global:
+            return try GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
     
@@ -229,6 +233,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return GfsDomain.gfs05_ens.ensembleMembers
         case .gfs_seamless:
             return GfsDomain.gfs05_ens.ensembleMembers
+        case .gem_global:
+            return GemDomain.gem_global_ensemble.ensembleMembers
         }
     }
 }

@@ -116,7 +116,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let nTime = domain.countForecastHours
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         
         var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
@@ -133,7 +133,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
                 return (hour, reader)
             })
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 data2d.data.fillWithNaNs()

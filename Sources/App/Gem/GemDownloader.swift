@@ -201,12 +201,12 @@ struct GemDownload: AsyncCommandFix {
         
         let forecastHours = domain.forecastHours
         let nTime = forecastHours.max()! / domain.dtHours + 1
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         let nLocations = grid.nx * grid.ny
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
         
         var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
@@ -216,10 +216,10 @@ struct GemDownload: AsyncCommandFix {
                 continue
             }
             let skip = variable.skipHour0 ? 1 : 0
-            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
 
             for member in 0..<domain.ensembleMembers {
                 let memberStr = member > 0 ? "_\(member)" : ""
+                let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(memberStr)")
                 let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
                     if hour == 0 && variable.skipHour0 {
                         return nil
@@ -233,13 +233,24 @@ struct GemDownload: AsyncCommandFix {
                     return (hour, reader)
                 })
                 
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                     
                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                     data2d.data.fillWithNaNs()
                     for reader in readers {
                         try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
                         data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                    }
+                    
+                    if domain.dtHours == 3 {
+                        /// interpolate 6 to 3 hours for ensemble 0.5°
+                        let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
+                            if forecastHours.contains(hour * domain.dtHours) {
+                                return nil
+                            }
+                            return hour
+                        }
+                        data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
                     }
                     
                     // De-accumulate precipitation

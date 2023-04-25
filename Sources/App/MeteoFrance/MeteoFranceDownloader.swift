@@ -226,10 +226,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         let dtHours = domain.dtHours
         
         let nTime = forecastHours.max()! / dtHours + 1
-        
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
-        
-        let time = TimerangeDt(start: run, nTime: nTime * domain.dtHours, dtSeconds: domain.dtSeconds)
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         
         let grid = domain.grid
         let nLocations = grid.count
@@ -253,7 +250,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 return (hour, reader)
             })
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 data2d.data.fillWithNaNs()
