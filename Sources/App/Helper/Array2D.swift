@@ -26,6 +26,10 @@ struct Array2D {
         data.shift180LongitudeAndFlipLatitude(nt: 1, ny: ny, nx: nx)
     }
     
+    mutating func shift180Longitudee() {
+        data.shift180Longitude(nt: 1, ny: ny, nx: nx)
+    }
+    
     mutating func flipLatitude() {
         data.flipLatitude(nt: 1, ny: ny, nx: nx)
     }

@@ -168,9 +168,13 @@ struct GemDownload: AsyncCommandFix {
                     let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                     let memberStr = member > 0 ? "_\(member)" : ""
                     let filenameDest = "\(downloadDirectory)\(variable.omFileName)_\(h3)\(memberStr).om"
-                    //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
+                    //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
                     //fatalError()
                     try grib2d.load(message: message)
+                    if domain == .gem_global_ensemble {
+                        // Only ensemble model is shifted by 180°
+                        grib2d.array.shift180Longitudee()
+                    }
                     
                     try FileManager.default.removeItemIfExists(at: filenameDest)
                     // Scaling before compression with scalefactor
@@ -178,14 +182,7 @@ struct GemDownload: AsyncCommandFix {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    /// Correct wind direction for true north -> GEM winddirection is already true north corrected....
-                    /*if let trueNorthDirection, variable.unit == .degreeDirection {
-                        for i in trueNorthDirection.indices {
-                            grib2d.array.data[i] = (grib2d.array.data[i] - trueNorthDirection[i] + 360).truncatingRemainder(dividingBy: 360)
-                        }
-                    }*/
-                    
-                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(h3).nc")
+                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(h3)\(memberStr).nc")
                     let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                     try writer.write(file: filenameDest, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 }
