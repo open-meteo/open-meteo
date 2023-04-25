@@ -400,11 +400,77 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .precipitation_probability:
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .cloudcover:
             return .linear
-        default:
-            // fatalError("Gfs interpolation not required for reader. Already 1h")
-            // Because GFS025 ensemble is 3 hours and in the GFS mixer, wen need this code path
+        case .cloudcover_low:
+            return .linear
+        case .cloudcover_mid:
+            return .linear
+        case .cloudcover_high:
+            return .linear
+        case .surface_pressure:
+            return .hermite(bounds: nil)
+        case .relativehumidity_2m:
+            return .hermite(bounds: 0...100)
+        case .precipitation:
+            return .backwards_sum
+        case .wind_v_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_v_component_80m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_80m:
+            return .hermite(bounds: nil)
+        case .soil_temperature_0_to_10cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_10_to_40cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_40_to_100cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_100_to_200cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_0_to_10cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_10_to_40cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_40_to_100cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_100_to_200cm:
+            return .hermite(bounds: nil)
+        case .snow_depth:
+            return .linear
+        case .sensible_heatflux:
+            return .hermite(bounds: nil)
+        case .latent_heatflux:
+            return .hermite(bounds: nil)
+        case .showers:
+            return .backwards_sum
+        case .frozen_precipitation_percent:
+            return .nearest
+        case .categorical_freezing_rain:
+            return .nearest
+        case .windgusts_10m:
+            return .hermite(bounds: nil)
+        case .freezinglevel_height:
+            return .linear
+        case .shortwave_radiation:
+            return .solar_backwards_averaged
+        case .diffuse_radiation:
+            return .solar_backwards_averaged
+        case .uv_index:
+            return .hermite(bounds: 0...1000)
+        case .uv_index_clear_sky:
+            return .hermite(bounds: 0...1000)
+        case .cape:
+            return .hermite(bounds: nil)
+        case .lifted_index:
+            return .hermite(bounds: nil)
+        case .visibility:
+            return .linear
+        case .precipitation_probability:
             return .linear
         }
     }
@@ -507,9 +573,22 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
     }
     
     var interpolation: ReaderInterpolation {
-        return .linear
-        // possible due to gfs025 ensemble
-        //fatalError("Gfs interpolation not required for reader. Already 1h")
+        switch variable {
+        case .temperature:
+            return .hermite(bounds: nil)
+        case .wind_u_component:
+            return .hermite(bounds: nil)
+        case .wind_v_component:
+            return .hermite(bounds: nil)
+        case .geopotential_height:
+            return .linear
+        case .cloudcover:
+            return .linear
+        case .relativehumidity:
+            return .hermite(bounds: 0...100)
+        case .vertical_velocity:
+            return .hermite(bounds: nil)
+        }
     }
     
     var unit: SiUnit {
