@@ -139,7 +139,7 @@ struct JmaDownload: AsyncCommandFix {
         let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour)
         let nTime = forecastHours.max()! / domain.dtHours + 1
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         
         let grid = domain.grid
         let nLocations = grid.count
@@ -160,7 +160,7 @@ struct JmaDownload: AsyncCommandFix {
                 return (hour, reader)
             })
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 data2d.data.fillWithNaNs()

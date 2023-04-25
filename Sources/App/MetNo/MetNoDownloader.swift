@@ -116,7 +116,7 @@ struct MetNoDownloader: AsyncCommandFix {
             return
         }*/
         
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         let nLocations = nx*ny
         let nLocationsPerChunk = om.nLocationsPerChunk
         
@@ -135,7 +135,7 @@ struct MetNoDownloader: AsyncCommandFix {
             
             /// Create chunked time-series arrays instead of transposing the entire array
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)

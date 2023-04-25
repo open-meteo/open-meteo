@@ -126,7 +126,7 @@ struct GloFasDownloader: AsyncCommandFix {
         
         // forecast day 0 is valid for the next day
         let timerange = TimerangeDt(start: run.add(24*3600), nTime: nTime, dtSeconds: 24*3600)
-        let ringtime = timerange.toIndexTime()
+        let indexTime = timerange.toIndexTime()
         let nLocationsPerChunk = om.nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: nx*ny, chunk0: 1, chunk1: nLocationsPerChunk)
         
@@ -201,7 +201,7 @@ struct GloFasDownloader: AsyncCommandFix {
                                 var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
                                 /// Reused read buffer
                                 var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-                                try om.updateFromTimeOrientedStreaming(variable: name, ringtime: ringtime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic) { d0offset in
+                                try om.updateFromTimeOrientedStreaming(variable: name, indexTime: indexTime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic) { d0offset in
                                     
                                     try Task.checkCancellation()
                                     
@@ -318,7 +318,7 @@ struct GloFasDownloader: AsyncCommandFix {
         }
         logger.info("Update om database")
         let indextime = timeinterval.toIndexTime()
-        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, ringtime: indextime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, indexTime: indextime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
     }
     
     /// Convert a single file

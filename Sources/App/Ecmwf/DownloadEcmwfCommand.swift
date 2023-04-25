@@ -151,10 +151,9 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         let nTime = forecastSteps.max()! / domain.dtHours + 1
         
-        let time = TimerangeDt(start: run, nTime: nTime * domain.dtHours, dtSeconds: domain.dtSeconds)
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         
         let nLocations = domain.grid.nx * domain.grid.ny
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
@@ -184,7 +183,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     return hour
                 }
                 
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                     
                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                     data2d.data.fillWithNaNs()

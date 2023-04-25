@@ -188,15 +188,14 @@ struct DownloadIconCommand: AsyncCommandFix {
         let grid = domain.grid
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        let nTime = (forecastSteps.max() ?? -1) + 1 // domain.nForecastHours(run: run.hour)
-        let time = TimerangeDt(start: run, nTime: nTime * domain.dtHours, dtSeconds: domain.dtSeconds)
+        let nTime = forecastSteps.max()! / domain.dtHours + 1
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         let nLocations = grid.count
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         //print("nLocationsPerChunk \(nLocationsPerChunk)... \(nLocations/nLocationsPerChunk) iterations")
-        let ringtime = run.timeIntervalSince1970 / domain.dtSeconds ..< run.timeIntervalSince1970 / domain.dtSeconds + nTime
 
         // ICON global + eu only have 3h data after 78 hours
         // ICON global 6z and 18z have 120 instead of 180 forecast hours
@@ -227,7 +226,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     return (hour, reader)
                 })
                 
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                     
                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                     data2d.data.fillWithNaNs()
