@@ -30,6 +30,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
+        disableIdleSleep()
+        
         let domain = signature.domain.map {
             guard let domain = EcmwfDomain(rawValue: $0) else {
                 fatalError("Could not initialise domain from \($0)")

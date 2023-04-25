@@ -247,7 +247,7 @@ struct GfsDownload: AsyncCommandFix {
                     }
                     
                     //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
-                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(prefix).fpg"
+                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(memberStr)\(prefix).fpg"
                     try FileManager.default.removeItemIfExists(at: file)
                     
                     // Scaling before compression with scalefactor
