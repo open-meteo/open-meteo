@@ -179,6 +179,10 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
     case icon_d2
     
     case ecmwf_ifs04
+    
+    case gfs025
+    case gfs05
+    case gfs_seamless
 
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -196,6 +200,12 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return try IconReader(domain: .iconD2Eps, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .ecmwf_ifs04:
             return try EcmwfReader(domain: .ifs04_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .gfs025:
+            return try GfsReader(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .gfs05:
+            return try GfsReader(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .gfs_seamless:
+            return try GfsMixer(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         }
     }
     
@@ -213,6 +223,12 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return 20
         case .ecmwf_ifs04:
             return 50+1
+        case .gfs025:
+            return GfsDomain.gfs025_ens.ensembleMembers
+        case .gfs05:
+            return GfsDomain.gfs05_ens.ensembleMembers
+        case .gfs_seamless:
+            return GfsDomain.gfs05_ens.ensembleMembers
         }
     }
 }
