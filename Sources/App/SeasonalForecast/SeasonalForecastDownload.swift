@@ -73,7 +73,7 @@ struct SeasonalForecastDownload: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
-        try await GfsDownload().downloadNcepElevation(application: application, url: url, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
+        try await GfsDownload().downloadNcepElevation(application: application, url: [url], surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
     }
     
     func downloadCfs(application: Application, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool) async throws {

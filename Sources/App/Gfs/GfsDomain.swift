@@ -131,18 +131,18 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// `SecondFlush` is used to download the hours 240-840 from GFS ensemble 0.5° which are 18 hours later available
+    /// `SecondFlush` is used to download the hours 390-840 from GFS ensemble 0.5° which are 18 hours later available
     func forecastHours(run: Int, secondFlush: Bool) -> [Int] {
         switch self {
         case .gfs05_ens:
             if secondFlush {
-                return Array(stride(from: 240, through: 840, by: 6))
+                return Array(stride(from: 390, through: 840, by: 6))
             }
-            return Array(stride(from: 0, to: 240, by: 3))
+            return Array(stride(from: 0, to: 240, by: 3)) + Array(stride(from: 240, through: 384, by: 6))
         case .gfs025_ens:
             fallthrough
         case .gfs025_ensemble:
-            return Array(stride(from: 0, to: 240, by: 3))
+            return Array(stride(from: 0, through: 240, by: 3))
         case .gfs013:
             fallthrough
         case .gfs025:
@@ -223,7 +223,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    func getGribUrl(run: Timestamp, forecastHour: Int, member: Int) -> String {
+    /// Returns two grib files, in case grib messages are split in two differnent files
+    func getGribUrl(run: Timestamp, forecastHour: Int, member: Int) -> [String] {
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20220813/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.20220818/nam.t00z.conusnest.hiresf00.tm00.grib2.idx
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.20220818/conus/hrrr.t00z.wrfnatf00.grib2
@@ -239,23 +240,24 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gfs05_ens:
             let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
-            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2ap5/\(memberString).t\(hh)z.pgrb2a.0p50.f\(fHHH)"
+            return ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2ap5/\(memberString).t\(hh)z.pgrb2a.0p50.f\(fHHH)",
+                    "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2bp5/\(memberString).t\(hh)z.pgrb2b.0p50.f\(fHHH)"]
         case .gfs025_ensemble:
             fallthrough
         case .gfs025_ens:
             let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
-            return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2sp25/\(memberString).t\(hh)z.pgrb2s.0p25.f\(fHHH)"
+            return ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2sp25/\(memberString).t\(hh)z.pgrb2s.0p25.f\(fHHH)"]
         case .gfs013:
-            return "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.sfluxgrbf\(fHHH).grib2"
+            return ["\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.sfluxgrbf\(fHHH).grib2"]
         case .gfs025:
-            return "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.pgrb2.0p25.f\(fHHH)"
+            return ["\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.pgrb2.0p25.f\(fHHH)"]
         //case .nam_conus:
         //    return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
         case .hrrr_conus:
             let nomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"
             //let google = "https://storage.googleapis.com/high-resolution-rapid-refresh/"
             let aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
-            return "\(useArchive ? aws : nomads)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfprsf\(fHH).grib2"
+            return ["\(useArchive ? aws : nomads)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfprsf\(fHH).grib2"]
         }
     }
 }

@@ -36,12 +36,11 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         }
         
         if domain == .gfs05_ens {
-            // Note there a A and B files
             switch self {
-            //case .visibility: only B file
-            //    return ":VIS:surface:"
-            //case .windgusts_10m: only B file
-            //    return ":GUST:surface:"
+            case .visibility:
+                return ":VIS:surface:"
+            case .windgusts_10m:
+                return ":GUST:surface:"
             case .surface_pressure:
                 return ":PRES:surface:"
             case .soil_temperature_0_to_10cm:
@@ -58,8 +57,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":UGRD:10 m above ground:"
             case .wind_v_component_10m:
                 return ":VGRD:10 m above ground:"
-            //case .frozen_precipitation_percent: // only B file
-            //    return ":CPOFP:surface:"
+            case .frozen_precipitation_percent:
+                return ":CPOFP:surface:"
             case .precipitation:
                 return ":APCP:surface:"
             case .categorical_freezing_rain:
@@ -68,8 +67,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":LHTFL:surface:"
             case .sensible_heatflux:
                 return ":SHTFL:surface:"
-            //case .cape: // only b file, 0-180m would be in A file
-            //    return ":CAPE:surface:"
+            case .cape:
+                return ":CAPE:surface:"
             case .cloudcover:
                 return ":TCDC:entire atmosphere:"
             case .shortwave_radiation:
