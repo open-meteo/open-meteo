@@ -97,39 +97,37 @@ struct GemDownload: AsyncCommandFix {
         
         logger.info("Downloading height and elevation data")
         
-        let server = "https://hpfx.collab.science.gc.ca/\(run.format_YYYYMMdd)/WXO-DD/\(domain.gribFileGridResolution)/\(run.hh)/"
-        
-        let yyyymmddhh = run.format_YYYYMMddHH
-        let hhhmm = domain == .gem_hrdps_continental ? "000-00" : "000"
-        
-        
         var height: Array2D? = nil
-        var landmask: Array2D? = nil
+        
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        let terrainUrl = "\(server)000/CMC_\(domain.gribFileDomainName)_HGT_SFC_0_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
+        let terrainUrl = domain.getUrl(run: run, hour: 0, gribName: "HGT_SFC_0")
         for message in try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false) {
             try grib2d.load(message: message)
             height = grib2d.array
             //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         }
         
-        let landmaskUrl = "\(server)000/CMC_\(domain.gribFileDomainName)_LAND_SFC_0_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(hhhmm).grib2"
-        for message in try await curl.downloadGrib(url: landmaskUrl, bzip2Decode: false) {
-            try grib2d.load(message: message)
-            landmask = grib2d.array
-            //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
+        if domain != .gem_global_ensemble {
+            let landmaskUrl = domain.getUrl(run: run, hour: 0, gribName: "LAND_SFC_0")
+            var landmask: Array2D? = nil
+            for message in try await curl.downloadGrib(url: landmaskUrl, bzip2Decode: false) {
+                try grib2d.load(message: message)
+                landmask = grib2d.array
+                //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
+            }
+            if height != nil, let landmask {
+                for i in landmask.data.indices {
+                    // landmask: 0=sea, 1=land
+                    height!.data[i] = landmask.data[i] >= 0.5 ? height!.data[i] : -999
+                }
+            }
         }
         
-        guard var height = height, let landmask = landmask else {
+        guard let height else {
             fatalError("Could not download land and sea mask")
-        }
-        
-        for i in height.data.indices {
-            // landmask: 0=sea, 1=land
-            height.data[i] = landmask.data[i] >= 0.5 ? height.data[i] : -999
         }
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
     }
@@ -144,16 +142,13 @@ struct GemDownload: AsyncCommandFix {
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-        
-        let server = "https://hpfx.collab.science.gc.ca/\(run.format_YYYYMMdd)/WXO-DD/\(domain.gribFileGridResolution)/\(run.hh)/"
-        
+                
         let forecastHours = domain.forecastHours
         for hour in forecastHours {
             logger.info("Downloading hour \(hour)")
             let h3 = hour.zeroPadded(len: 3)
-            let yyyymmddhh = run.format_YYYYMMddHH
             for variable in variables {
-                if !variable.availableFor(domain: domain) {
+                guard let gribName = variable.gribName(domain: domain) else {
                     continue
                 }
                 if hour == 0 && variable.skipHour0 {
@@ -166,10 +161,13 @@ struct GemDownload: AsyncCommandFix {
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameDest) {
                     continue
                 }
-                /// 003/CMC_glb_CIN_SFC_0_latlon.15x.15_2022112100_P003.grib2
-                let gribName = variable.gribName(domain: domain)
-                let url = domain == .gem_hrdps_continental ? "\(server)\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_HRDPS_\(gribName)_RLatLon0.0225_PT\(h3)H.grib2" : "\(server)\(h3)/CMC_\(domain.gribFileDomainName)_\(gribName)_\(domain.gribFileGridName)_\(yyyymmddhh)_P\(h3).grib2"
+                
+                let url = domain.getUrl(run: run, hour: hour, gribName: gribName)
+                
                 for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
+                    let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
+                    let memberStr = member > 0 ? "_\(member)" : ""
+                    let filenameDest = "\(downloadDirectory)\(variable.omFileName)_\(h3)\(memberStr).om"
                     //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                     //fatalError()
                     try grib2d.load(message: message)
@@ -214,43 +212,46 @@ struct GemDownload: AsyncCommandFix {
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
 
         for variable in variables {
-            if !variable.availableFor(domain: domain) {
+            guard variable.gribName(domain: domain) != nil else {
                 continue
             }
             let skip = variable.skipHour0 ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
 
-            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
-                if hour == 0 && variable.skipHour0 {
-                    return nil
-                }
-                if !variable.includedFor(hour: hour) {
-                    return nil
-                }
-                let h3 = hour.zeroPadded(len: 3)
-                let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(h3).om")
-                try reader.willNeed()
-                return (hour, reader)
-            })
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            for member in 0..<domain.ensembleMembers {
+                let memberStr = member > 0 ? "_\(member)" : ""
+                let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
+                    if hour == 0 && variable.skipHour0 {
+                        return nil
+                    }
+                    if !variable.includedFor(hour: hour) {
+                        return nil
+                    }
+                    let h3 = hour.zeroPadded(len: 3)
+                    let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(h3)\(memberStr).om")
+                    try reader.willNeed()
+                    return (hour, reader)
+                })
                 
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data2d.data.fillWithNaNs()
-                for reader in readers {
-                    try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", ringtime: ringtime, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                    
+                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                    data2d.data.fillWithNaNs()
+                    for reader in readers {
+                        try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                        data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
+                    }
+                    
+                    // De-accumulate precipitation
+                    if variable.isAccumulatedSinceModelStart {
+                        data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
+                    }
+                    
+                    progress.add(locationRange.count)
+                    return data2d.data[0..<locationRange.count * nTime]
                 }
-                
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
-                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
-                }
-                
-                progress.add(locationRange.count)
-                return data2d.data[0..<locationRange.count * nTime]
+                progress.finish()
             }
-            progress.finish()
         }
     }
 }
@@ -259,9 +260,8 @@ protocol GemVariableDownloadable: GenericVariable {
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     var skipHour0: Bool { get }
     func includedFor(hour: Int) -> Bool
-    func gribName(domain: GemDomain) -> String
+    func gribName(domain: GemDomain) -> String?
     var isAccumulatedSinceModelStart: Bool { get }
-    func availableFor(domain: GemDomain) -> Bool
 }
 
 enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericVariableMixable {
@@ -304,9 +304,52 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     
     //case lifted_index
     
-    func gribName(domain: GemDomain) -> String {
+    func gribName(domain: GemDomain) -> String? {
+        if domain == .gem_global_ensemble {
+            switch self {
+            case .dewpoint_2m:
+                return nil
+            case .showers:
+                return nil
+            case .winddirection_10m:
+                return nil
+            case .winddirection_40m:
+                return nil
+            case .winddirection_80m:
+                return nil
+            case .winddirection_120m:
+                return nil
+            case .windspeed_40m:
+                return nil
+            case .windspeed_80m:
+                return nil
+            case .windspeed_120m:
+                return nil
+            case .windgusts_10m:
+                return nil
+            case .temperature_2m:
+                return "TMP_TGL_2m"
+            case .temperature_40m:
+                return nil
+            case .temperature_80m:
+                return nil
+            case .temperature_120m:
+                return nil
+            case .snowfall_water_equivalent:
+                return "ASNOW_SFC_0"
+            case .soil_temperature_0_to_10cm:
+                return nil
+            case .soil_moisture_0_to_10cm:
+                return nil
+            default:
+                break
+            }
+        }
+        
         if domain == .gem_hrdps_continental {
             switch self {
+            case .showers:
+                return nil
             case .temperature_2m:
                 return "TMP_AGL-2m"
             case .temperature_40m:
@@ -341,8 +384,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return "WDIR_AGL-120m"
             case .windgusts_10m:
                 return "GUST_AGL-10m"
-            case .showers:
-                return "ACPCP_Sfc"
+            //case .showers:
+            //    return "ACPCP_Sfc"
             case .snowfall_water_equivalent:
                 return "WEASN_Sfc"
             case .soil_temperature_0_to_10cm:
@@ -430,15 +473,6 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         default:
             return false
         }
-    }
-    
-    func availableFor(domain: GemDomain) -> Bool {
-        if domain == .gem_hrdps_continental {
-            if self == .showers {
-                return false
-            }
-        }
-        return true
     }
     
     var omFileName: String {
@@ -667,7 +701,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
     var omFileName: String {
         return rawValue
     }
-    func gribName(domain: GemDomain) -> String {
+    func gribName(domain: GemDomain) -> String? {
         let isbl = domain == .gem_hrdps_continental ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
         switch variable {
         case .temperature:
@@ -687,10 +721,6 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         if hour >= 171 && ![1000, 925, 850, 700, 500, 5, 1].contains(level) {
             return false
         }
-        return true
-    }
-    
-    func availableFor(domain: GemDomain) -> Bool {
         return true
     }
     
@@ -777,6 +807,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_regional
     case gem_hrdps_continental
     
+    case gem_global_ensemble
+    
     var omfileDirectory: String {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
@@ -791,18 +823,34 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        if self == .gem_global {
+        switch self {
+        case .gem_global:
+            return 3*3600
+        case .gem_regional:
+            return 3600
+        case .gem_hrdps_continental:
+            return 3600
+        case .gem_global_ensemble:
             return 3*3600
         }
-        return 3600
     }
     var isGlobal: Bool {
-        return self == .gem_global
+        switch self {
+        case .gem_global:
+            return true
+        case .gem_regional:
+            return false
+        case .gem_hrdps_continental:
+            return false
+        case .gem_global_ensemble:
+            return true
+        }
     }
 
     private static var gemGlobalElevationFile = try? OmFileReader(file: Self.gem_global.surfaceElevationFileOm)
     private static var gemRegionalElevationFile = try? OmFileReader(file: Self.gem_regional.surfaceElevationFileOm)
     private static var gemHrdpsContinentalElevationFile = try? OmFileReader(file: Self.gem_hrdps_continental.surfaceElevationFileOm)
+    private static var gemGlobalEnsembleElevationFile = try? OmFileReader(file: Self.gem_global_ensemble.surfaceElevationFileOm)
     
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
         switch type {
@@ -816,6 +864,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
                 return Self.gemRegionalElevationFile
             case .gem_hrdps_continental:
                 return Self.gemHrdpsContinentalElevationFile
+            case .gem_global_ensemble:
+                return Self.gemGlobalEnsembleElevationFile
             }
         }
     }
@@ -836,6 +886,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             // Delay of 3:08 hours to init
             // every 6 hours
             return t.add(-2*3600).floor(toNearest: 6*3600)
+        case .gem_global_ensemble:
+            return t.add(-3*3600).floor(toNearest: 12*3600)
         }
     }
     
@@ -852,47 +904,51 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return Array(stride(from: 0, through: 84, by: 1))
         case .gem_hrdps_continental:
             return Array(stride(from: 0, through: 48, by: 1))
+        case .gem_global_ensemble:
+            return Array(stride(from: 0, to: 192, by: 3)) + Array(stride(from: 192, through: 384, by: 6))
         }
     }
     
     /// pressure levels
     var levels: [Int] {
-        if self == .gem_hrdps_continental {
+        switch self {
+        case .gem_global:
+            fallthrough
+        case .gem_regional:
+            return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50, 30, 20, 10/*, 5, 1*/].reversed() // 5 and 1 not available for dewpoint
+        case .gem_hrdps_continental:
             return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50].reversed()
-        }
-        return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50, 30, 20, 10/*, 5, 1*/].reversed() // 5 and 1 not available for dewpoint
-    }
-    
-    var gribFileDomainName: String {
-        switch self {
-        case .gem_global:
-            return "glb"
-        case .gem_regional:
-            return "reg"
-        case .gem_hrdps_continental:
-            return "hrdps_continental"
+        case .gem_global_ensemble:
+            return []
         }
     }
     
-    var gribFileGridName: String {
+    var ensembleMembers: Int {
         switch self {
         case .gem_global:
-            return "latlon.15x.15"
+            return 1
         case .gem_regional:
-            return "ps10km"
+            return 1
         case .gem_hrdps_continental:
-            return "RLatLon0.0225"
+            return 1
+        case .gem_global_ensemble:
+            return 20+1
         }
     }
     
-    var gribFileGridResolution: String {
+    func getUrl(run: Timestamp, hour: Int, gribName: String) -> String {
+        let h3 = hour.zeroPadded(len: 3)
+        let yyyymmddhh = run.format_YYYYMMddHH
+        let server = "https://hpfx.collab.science.gc.ca/\(run.format_YYYYMMdd)/WXO-DD/"
         switch self {
         case .gem_global:
-            return "model_\(rawValue)/15km/grib2/lat_lon"
+            return "\(server)model_gem_global/15km/grib2/lat_lon/\(run.hh)/\(h3)/CMC_glb_\(gribName)_latlon.15x.15_\(yyyymmddhh)_P\(h3).grib2"
         case .gem_regional:
-            return "model_\(rawValue)/10km/grib2"
+            return "\(server)model_gem_regional/10km/grib2/\(run.hh)/\(h3)/CMC_reg_\(gribName)_ps10km_\(yyyymmddhh)_P\(h3).grib2"
         case .gem_hrdps_continental:
-            return "model_hrdps/continental/2.5km"
+            return "\(server)model_hrdps/continental/2.5km/\(run.hh)/\(h3)/\(run.format_YYYYMMdd)T\(run.hh)Z_MSC_HRDPS_\(gribName)_RLatLon0.0225_PT\(h3)H.grib2"
+        case .gem_global_ensemble:
+            return "\(server)ensemble/geps/grib2/raw/\(run.hh)/\(h3)/CMC_geps-raw_\(gribName)_latlon0p5x0p5_\(yyyymmddhh)_P\(h3)_allmbrs.grib2"
         }
     }
     
@@ -904,6 +960,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return 78+36
         case .gem_hrdps_continental:
             return 48+36
+        case .gem_global_ensemble:
+            return 384/3 + 48/3 // 144
         }
     }
     
@@ -915,6 +973,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
         case .gem_hrdps_continental:
             return ProjectionGrid(nx: 2540, ny: 1290, latitude: 39.626034...47.876457, longitude: -133.62952...(-40.708557), projection: RotatedLatLonProjection(latitude: -36.0885, longitude: 245.305))
+        case .gem_global_ensemble:
+            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         }
     }
 }
