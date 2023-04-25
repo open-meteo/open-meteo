@@ -284,6 +284,9 @@ struct OmFileSplitter {
                         if nRingtime - tArray <= skipLast {
                             continue
                         }
+                        if data[data.startIndex + l * nRingtime + tArray].isNaN {
+                            continue
+                        }
                         fileData[nTimePerFile * l + tFile] = data[data.startIndex + l * nRingtime + tArray]
                     }
                 }
