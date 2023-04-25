@@ -21,6 +21,9 @@ struct GfsDownload: AsyncCommandFix {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
+        @Flag(name: "second-flush", help: "For GFS05 ensemble to download hours 240-840")
+        var secondFlush: Bool
+        
         @Option(name: "only-variables")
         var onlyVariables: String?
         
@@ -44,7 +47,7 @@ struct GfsDownload: AsyncCommandFix {
         switch domain {
         case .gfs025_ensemble:
             try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf)
+            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -74,8 +77,8 @@ struct GfsDownload: AsyncCommandFix {
             
             let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
             
-            try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+            try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush)
+            try convertGfs(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush)
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -134,7 +137,7 @@ struct GfsDownload: AsyncCommandFix {
     }
     
     /// download GFS025 and NAM CONUS
-    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool) async throws {
+    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool, secondFlush: Bool) async throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
@@ -147,7 +150,7 @@ struct GfsDownload: AsyncCommandFix {
         let deadLineHours: Double = domain == .gfs025 ? 4 : 2
         let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
-        let forecastHours = domain.forecastHours(run: run.hour)
+        let forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -271,11 +274,12 @@ struct GfsDownload: AsyncCommandFix {
     }
     
     /// Process each variable and update time-series optimised files
-    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
+    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool, secondFlush: Bool) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
-        let forecastHours = domain.forecastHours(run: run.hour)
+        let forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         let nTime = forecastHours.max()! / domain.dtHours + 1
+        let time = TimerangeDt(start: run, nTime: nTime * domain.dtHours, dtSeconds: domain.dtSeconds)
         
         let grid = domain.grid
         let nLocations = grid.count
@@ -332,19 +336,33 @@ struct GfsDownload: AsyncCommandFix {
                         data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
                     }
                     
-                    // interpolate missing timesteps. We always fill 2 timesteps at once
-                    // data looks like: DDDDDDDDDD--D--D--D--D--D
-                    let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
-                        let forecastHour = hour * domain.dtHours
-                        if forecastHours.contains(forecastHour) || forecastHour % 3 != 1 {
-                            // process 2 timesteps at once
-                            return nil
+                    if domain.dtHours == 1 {
+                        // interpolate missing timesteps. We always fill 2 timesteps at once
+                        // data looks like: DDDDDDDDDD--D--D--D--D--D
+                        let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
+                            let forecastHour = hour * domain.dtHours
+                            if forecastHours.contains(forecastHour) || forecastHour % 3 != 1 {
+                                // process 2 timesteps at once
+                                return nil
+                            }
+                            return forecastHour
                         }
-                        return forecastHour
+                        
+                        // Fill in missing hourly values after switching to 3h
+                        data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
                     }
                     
-                    // Fill in missing hourly values after switching to 3h
-                    data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                    if domain.dtHours == 3 {
+                        /// interpolate 6 to 3 hours for gfs ensemble 0.5°
+                        let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
+                            if forecastHours.contains(hour * domain.dtHours) {
+                                return nil
+                            }
+                            return hour
+                        }
+                        data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
+                    }
+
                     
                     progress.add(locationRange.count)
                     return data2d.data[0..<locationRange.count * nTime]
@@ -375,7 +393,7 @@ struct GfsDownload: AsyncCommandFix {
             case precipitation
         }
         let members = 0...30
-        let forecastHours = domain.forecastHours(run: run.hour)
+        let forecastHours = domain.forecastHours(run: run.hour, secondFlush: false)
         var previous = [Int: [Float]]()
         previous.reserveCapacity(members.count)
         let threshold = Float(0.3)
