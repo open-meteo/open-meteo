@@ -59,7 +59,20 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     }
     
     var isGlobal: Bool {
-        return self == .gfs025 || self == .gfs013
+        switch self {
+        case .gfs013:
+            return true
+        case .gfs025:
+            return true
+        case .hrrr_conus:
+            return false
+        case .gfs025_ensemble:
+            return true
+        case .gfs025_ens:
+            return true
+        case .gfs05_ens:
+            return true
+        }
     }
     
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
