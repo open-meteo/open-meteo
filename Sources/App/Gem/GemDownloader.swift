@@ -135,7 +135,7 @@ struct GemDownload: AsyncCommandFix {
     /// Download data and store as compressed files for each timestep
     func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, skipFilesIfExisting: Bool) async throws {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 5)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .gem_global_ensemble ? 10 : 5)
         let downloadDirectory = domain.downloadDirectory
         
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
@@ -143,7 +143,7 @@ struct GemDownload: AsyncCommandFix {
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 
-        let forecastHours = domain.forecastHours
+        let forecastHours = domain.getForecastHours(run: run)
         for hour in forecastHours {
             logger.info("Downloading hour \(hour)")
             let h3 = hour.zeroPadded(len: 3)
@@ -196,7 +196,7 @@ struct GemDownload: AsyncCommandFix {
         let downloadDirectory = domain.downloadDirectory
         let grid = domain.grid
         
-        let forecastHours = domain.forecastHours
+        let forecastHours = domain.getForecastHours(run: run)
         let nTime = forecastHours.max()! / domain.dtHours + 1
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         let nLocations = grid.nx * grid.ny
@@ -904,7 +904,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         "\(omfileDirectory)HSURF.om"
     }
     
-    var forecastHours: [Int] {
+    func getForecastHours(run: Timestamp) -> [Int] {
         switch self {
         case .gem_global:
             return Array(stride(from: 0, through: 240, by: 3))
@@ -913,7 +913,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_hrdps_continental:
             return Array(stride(from: 0, through: 48, by: 1))
         case .gem_global_ensemble:
-            return Array(stride(from: 0, to: 192, by: 3)) + Array(stride(from: 192, through: 384, by: 6))
+            let through = run.weekday == .thursday ? 768 : 384
+            return Array(stride(from: 0, to: 192, by: 3)) + Array(stride(from: 192, through: through, by: 6))
         }
     }
     

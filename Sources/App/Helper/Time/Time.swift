@@ -117,6 +117,24 @@ public struct Timestamp: Hashable {
         return IsoDate(timeIntervalSince1970: timeIntervalSince1970)
     }
     
+    enum Weekday: Int8 {
+        case sunday = 0
+        case monday = 1
+        case tuesday = 2
+        case wednesday = 3
+        case thursday = 4
+        case friday = 5
+        case saturday = 6
+    }
+    
+    /// Day of the week
+    var weekday: Weekday {
+        var time = timeIntervalSince1970
+        var t = tm()
+        gmtime_r(&time, &t)
+        return Weekday(rawValue: Int8(t.tm_wday))!
+    }
+    
     /// With format `yyyy-MM-dd'T'HH:mm'`
     var iso8601_YYYY_MM_dd_HH_mm: String {
         var time = timeIntervalSince1970
