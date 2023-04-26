@@ -66,9 +66,9 @@ struct CronjobCommand: Command {
         
         
         # Ensemble models
-        37 2,14  * * * /usr/local/bin/openmeteo-api download icon_eps > ~/log/icon-eps.log 2>&1 || cat ~/log/icon-eps.log
-        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu_eps > ~/log/icon-eu-eps.log 2>&1 || cat ~/log/icon-eu-eps.log
-        30 1,4,7,10,13,16,19,22  * * * /usr/local/bin/openmeteo-api download icon_d2_eps > ~/log/icon-d2-eps.log 2>&1 || cat ~/log/icon-d2-eps.log
+        37 2,14  * * * /usr/local/bin/openmeteo-api download icon-eps > ~/log/icon-eps.log 2>&1 || cat ~/log/icon-eps.log
+        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu-eps > ~/log/icon-eu-eps.log 2>&1 || cat ~/log/icon-eu-eps.log
+        30 1,4,7,10,13,16,19,22  * * * /usr/local/bin/openmeteo-api download icon-d2-eps > ~/log/icon-d2-eps.log 2>&1 || cat ~/log/icon-d2-eps.log
         
         45 7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs04_ensemble > ~/log/ifs04_ensemble.log 2>&1 || cat ~/log/ifs04_ensemble.log
         0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs04_ensemble > ~/log/ifs04_ensemble.log 2>&1 || cat ~/log/ifs04_ensemble.log
