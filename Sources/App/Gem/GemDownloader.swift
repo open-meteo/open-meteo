@@ -14,6 +14,10 @@ Gem regional and global Downloader
 
  TODO:
  - elevation and sea mask for hrdps
+ 
+ TODO ensemble:
+ - relative humidity (has no dewpoint, but RH directly)
+ - wind direction (has only wind sped and u/v components)
  */
 struct GemDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
