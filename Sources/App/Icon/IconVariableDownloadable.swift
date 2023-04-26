@@ -141,7 +141,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 break
             default:
                 return nil
-                // All other variables are not in ICON-D2 15 minutes
             }
         }
         

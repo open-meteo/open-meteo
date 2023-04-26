@@ -2,56 +2,13 @@ import Foundation
 import NIOConcurrencyHelpers
 import SwiftPFor2D
 
-
-/// Singleton class to keep state for icon domains. E.g. keep files open for fast access.
-/*final class IconDomain {
-    static let icon = IconDomain(.icon)
-    static let iconEu = IconDomain(.iconEu)
-    static let iconD2 = IconDomain(.iconD2)
-    
-    let domain: IconDomains
-    
-    public let elevationFile: OmFileReader
-    
-    private let inittimeLock = Lock()
-    private var inittime = 0
-    private var inittimeUpdate: TimeInterval = 0
-    
-    private init(_ domain: IconDomains) {
-        self.domain = domain
-        self.elevationFile = try! OmFileReader(file: domain.surfaceElevationFileOm)
-    }
-    
-    /// The last updated init time as unix timestamp. Read from init file. Updated every 10 seconds.
-    func getInitTime() -> Int {
-        inittimeLock.withLock {
-            let now = Date().timeIntervalSince1970
-            if inittimeUpdate + 10 >= now {
-                return inittime
-            }
-            let timeString = try! String(contentsOfFile: domain.initFileNameOm, encoding: .utf8).replacingOccurrences(of: "\n", with: "")
-            inittime = Int(timeString)!
-            inittimeUpdate = now
-            return inittime
-        }
-    }
-    
-    /// Get the start and end time of the current run
-    func getInitTimerange() -> Range<Timestamp> {
-        let initTime = getInitTime()
-        let run = initTime / 3600 % 24
-        var nHours = domain.nForecastHours(run: run)
-        if domain == .icon && nHours == 121 {
-            // 6z und 12z icon runs are only 120 instead of 180 fcst hours
-            nHours += 60 - 6
-        }
-        let end = initTime + nHours * 3600
-        let start = end - (domain.omFileLength + 24) * 3600
-        return Timestamp(start) ..< Timestamp(end)
-    }
-}*/
-
-/// Static information about a domain
+/**
+ ICON Domains including ensemble
+ 
+ TODO:
+ - solar radiation in ICON-EPS
+ - dewpoint/rh in EPS
+ */
 enum IconDomains: String, CaseIterable, GenericDomain {
     /// hourly data until forecast hour 78, then 3 h until 180
     case icon
