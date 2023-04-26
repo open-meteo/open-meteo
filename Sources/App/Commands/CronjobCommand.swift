@@ -27,7 +27,7 @@ struct CronjobCommand: Command {
         44 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download icon-d2 --group modelLevel > ~/log/icon-d2_model-level.log 2>&1 || cat ~/log/icon-d2_model-level.log
         
         45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
-        0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
+        0   1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
         
         40  3,15 * * * /usr/local/bin/openmeteo-api download-iconwave gwam > ~/log/iconwave_gwam.log 2>&1 || cat ~/log/iconwave_gwam.log
         30  3,15 * * * /usr/local/bin/openmeteo-api download-iconwave ewam > ~/log/iconwave_ewam.log 2>&1 || cat ~/log/iconwave_ewam.log
@@ -62,6 +62,22 @@ struct CronjobCommand: Command {
         7 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gem gem_hrdps_continental > ~/log/gem_hrdps_continental.log 2>&1 || cat ~/log/gem_hrdps_continental.log
         47 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-gem gem_regional > ~/log/gem_regional.log 2>&1 || cat ~/log/gem_regional.log
         39 3,15 * * * /usr/local/bin/openmeteo-api download-gem gem_global > ~/log/gem_global.log 2>&1 || cat ~/log/gem_global.log
+        
+        
+        
+        # Ensemble models
+        37 2,14  * * * /usr/local/bin/openmeteo-api download icon_eps > ~/log/icon-eps.log 2>&1 || cat ~/log/icon-eps.log
+        37 2,8,14,20  * * * /usr/local/bin/openmeteo-api download icon-eu_eps > ~/log/icon-eu-eps.log 2>&1 || cat ~/log/icon-eu-eps.log
+        30 1,4,7,10,13,16,19,22  * * * /usr/local/bin/openmeteo-api download icon_d2_eps > ~/log/icon-d2-eps.log 2>&1 || cat ~/log/icon-d2-eps.log
+        
+        45 7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs04_ensemble > ~/log/ifs04_ensemble.log 2>&1 || cat ~/log/ifs04_ensemble.log
+        0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs04_ensemble > ~/log/ifs04_ensemble.log 2>&1 || cat ~/log/ifs04_ensemble.log
+        
+        45 4,16 * * * /usr/local/bin/openmeteo-api download-gem gem_global_ensemble > ~/log/gem_global_ensemble.log 2>&1 || cat ~/log/gem_global_ensemble.log
+        
+        40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs025_ens > ~/log/gfs025_ens.log 2>&1 || cat ~/log/gfs025_ens.log
+        40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens > ~/log/gfs05_ens.log 2>&1 || cat ~/log/gfs05_ens.log
+        55 23 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens --second-flush --run 0 > ~/log/gfs05_ens-second-flush.log 2>&1 || cat ~/log/gfs05_ens-second-flush.log
         """)
     }
 }
