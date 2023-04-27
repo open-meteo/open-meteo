@@ -1,7 +1,7 @@
 
 /// Define functions to download surface and pressure level variables for ICON
 protocol IconVariableDownloadable: GenericVariable {
-    func skipHour0(domain: IconDomains, forDownload: Bool) -> Bool
+    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool) -> Bool
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
@@ -11,7 +11,14 @@ protocol IconVariableDownloadable: GenericVariable {
 
 extension IconSurfaceVariable: IconVariableDownloadable {
     /// Vmax and precip always are empty in the first hour. Weather codes differ a lot in hour 0.
-    func skipHour0(domain: IconDomains, forDownload: Bool) -> Bool {
+    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool) -> Bool {
+        if self == .direct_radiation && domain == .iconEps && hour % 3 != 0 {
+            // ICON-EPS only has 3-hourly data for direct radiation
+            return true
+        }
+        if hour != 0 {
+            return false
+        }
         // download hour0 from ICON-D2, because it still contains 15 min data
         if forDownload && domain == .iconD2 && self != .weathercode {
             return false
@@ -117,15 +124,13 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             switch self {
             case .diffuse_radiation:
                 if domain == .iconEps {
-                    // TODO ICON-EPS offers asob (avg shortwave radiation)
-                    return nil
+                    // ICON-EPS does not have diffuse radiation
+                    // Put regular shortwave radiation into this field
+                    return ("asob_s", "single-level", nil)
                 }
                 break
             case .direct_radiation:
-                if domain == .iconEps {
-                    return nil // only 3h
-                }
-                break
+                break // ICON-EPS has only 3-hourly data
             case .cloudcover:
                 break
             case .temperature_2m:
@@ -268,7 +273,7 @@ extension IconPressureVariable: IconVariableDownloadable {
         return false
     }
     
-    func skipHour0(domain: IconDomains, forDownload: Bool) -> Bool {
+    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool) -> Bool {
         return false
     }
     

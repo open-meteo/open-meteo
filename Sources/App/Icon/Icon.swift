@@ -6,7 +6,6 @@ import SwiftPFor2D
  ICON Domains including ensemble
  
  TODO:
- - solar radiation in ICON-EPS
  - dewpoint/rh in EPS
  */
 enum IconDomains: String, CaseIterable, GenericDomain {

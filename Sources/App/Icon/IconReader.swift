@@ -42,6 +42,14 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
         
+        // ICON-EPS stores total shortwave radiation in diffuse_radiation
+        // It would be possible to only use `shortwave_radiation`, but this would invalidate all archives
+        if reader.domain == .iconEps, case let .surface(surface) = raw.variable, surface == .diffuse_radiation {
+            let ghi = try reader.get(variable: raw, time: time)
+            let direct = try reader.get(variable: .init(.surface(.direct_radiation), member), time: time)
+            return DataAndUnit(zip(ghi.data, direct.data).map({max($0-$1,0)}), ghi.unit)
+        }
+        
         // icon global and EU lack level 975
         if reader.domain != .iconD2, case let .pressure(pressure) = raw.variable, pressure.level == 975  {
             return try self.interpolatePressureLevel(variable: pressure.variable, level: pressure.level, member: member, lowerLevel: 950, upperLevel: 1000, time: time)
@@ -68,6 +76,13 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 return
             default: break
             }
+        }
+        
+        // ICON-EPS stores total shortwave radiation in diffuse_radiation
+        if reader.domain == .iconEps, case let .surface(surface) = raw.variable, surface == .diffuse_radiation {
+            try reader.prefetchData(variable: raw, time: time)
+            try reader.prefetchData(variable: .init(.surface(.direct_radiation), member), time: time)
+            return
         }
         
         // icon global and EU lack level 975

@@ -117,7 +117,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             logger.info("Downloading hour \(hour)")
             let h3 = hour.zeroPadded(len: 3)
             for variable in variables {
-                if hour == 0 && variable.skipHour0(domain: domain, forDownload: true) {
+                if variable.skipHour(hour: hour, domain: domain, forDownload: true) {
                     continue
                 }
                 guard let v = variable.getVarAndLevel(domain: domain) else {
@@ -211,7 +211,12 @@ struct DownloadIconCommand: AsyncCommandFix {
                 continue
             }
             let v = variable.omFileName.uppercased()
-            let skip = variable.skipHour0(domain: domain, forDownload: false) ? 1 : 0
+            let skip = variable.skipHour(hour: 0, domain: domain, forDownload: false) ? 1 : 0
+            
+            // For ICON-EPS, `direct radiation` only contains 3-hourly data. Remove them from `forecastSteps` for interpolation
+            let forecastSteps = forecastSteps.filter({
+                $0 == 0 || !variable.skipHour(hour: $0, domain: domain, forDownload: false)
+            })
             
             for i in 0..<members {
                 let memberStr = i > 0 ? "_\(i)" : ""
