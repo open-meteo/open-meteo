@@ -135,9 +135,12 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 break
             case .temperature_2m:
                 break
-            //case .dewpoint_2m: // no td2 in ICON-EU-EPS
-                // NOTE: relative humidity is only avaulable in 6h resolution
-                //break
+            case .dewpoint_2m:
+                if domain == .iconEuEps {
+                    // No dewpoint or relative humidity available in EU-EPS
+                    return nil
+                }
+                break
             case .precipitation:
                 break
             case .wind_u_component_10m:
