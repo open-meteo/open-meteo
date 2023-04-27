@@ -10,7 +10,7 @@ public struct EnsembleApiController {
         let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
         let currentTime = Timestamp.now()
         
-        let allowedRange = Timestamp(2030, 4, 1) ..< currentTime.add(86400 * 35)
+        let allowedRange = Timestamp(2023, 4, 1) ..< currentTime.add(86400 * 35)
         let timezone = try params.resolveTimezone()
         let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, allowedRange: allowedRange)
         /// For fractional timezones, shift data to show only for full timestamps

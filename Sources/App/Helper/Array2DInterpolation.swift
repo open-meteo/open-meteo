@@ -265,24 +265,42 @@ extension Array2DFastTime {
             /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
             for i in 0..<locationRange.count {
                 for hour in interpolationHours {
-                    let sHour = hour - solarHours.lowerBound
+                    let sHour = (hour - solarHours.lowerBound) / width
                     // point C and D are still 2 step averages
-                    let solC1 = solar2d[i, sHour / width + 0]
-                    let solC2 = solar2d[i, sHour / width + 1]
-                    let solC = (solC1 + solC2) / 3
-                    // At low radiaiton levels it is impossible to estimate KT indices
-                    let C = solC <= 0.005 ? 0 : min(self[i, hour+1*width] / solC, 1100)
+                    let solC1 = solar2d[i, sHour + 0]
+                    let solC2 = solar2d[i, sHour + 1]
+                    let solC = (solC1 + solC2) / 2
+                    // At low radiation levels it is impossible to estimate KT indices
+                    var C = solC <= 0.005 ? 0 : min(self[i, hour+1*width] / solC, 1100)
                     
-                    let solB = solar2d[i, sHour / width - 1]
-                    let B = solB <= 0.005 ? 0 : min(self[i, hour-1*width] / solB, 1100)
+                    let solB = solar2d[i, sHour - 1]
+                    var B = solB <= 0.005 ? C : min(self[i, hour-1*width] / solB, 1100)
                     
-                    let solA = solar2d[i, sHour / width - 3]
-                    let A = solA <= 0.005 ? 0 : hour-3 < 0 ? B : min((self[i, hour-3*width] / solA), 1100)
+                    if C == 0 && B > 0 {
+                        C = B
+                    }
                     
-                    let solD1 = solar2d[i, sHour / width + 2]
-                    let solD2 = solar2d[i, sHour / width + 3]
+                    let solA = solar2d[i, sHour - 3]
+                    var A = solA <= 0.005 ? B : hour-3 < 0 ? B : min((self[i, hour-3*width] / solA), 1100)
+                    
+                    if C == 0 && A > 0 {
+                        B = A
+                        C = A
+                    }
+                    
+                    let solD1 = solar2d[i, sHour + 2]
+                    let solD2 = solar2d[i, sHour + 3]
                     let solD = (solD1 + solD2) / 2
-                    let D = solD <= 0.005 ? 0 : hour+3 > nTime ? C : min((self[i, hour+3*width] / solD), 1100)
+                    let D = solD <= 0.005 ? C : hour+3 > nTime ? C : min((self[i, hour+3*width] / solD), 1100)
+                    
+                    // Espcially for 6h values, aggressively try to find any KT index that works
+                    // As a future improvement, the clearsky radiation could be approximated by cloud cover total as an additional input
+                    // This could improve morning/evening kt approximations
+                    if C == 0 && D > 0 {
+                        A = D
+                        B = D
+                        C = D
+                    }
                     
                     let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                     let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
