@@ -4,9 +4,6 @@ import SwiftPFor2D
 
 /**
  ICON Domains including ensemble
- 
- TODO:
- - dewpoint/rh in EPS
  */
 enum IconDomains: String, CaseIterable, GenericDomain {
     /// hourly data until forecast hour 78, then 3 h until 180

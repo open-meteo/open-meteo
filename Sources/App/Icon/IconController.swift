@@ -264,6 +264,7 @@ typealias IconVariableDerived = SurfaceAndPressureVariable<IconSurfaceVariableDe
 
 enum IconSurfaceVariableDerived: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
+    case relativehumidity_2m
     case relativehumitidy_2m
     case windspeed_10m
     case winddirection_10m

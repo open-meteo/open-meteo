@@ -58,7 +58,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .cloudcover_low: return .linear
         case .cloudcover_mid: return .linear
         case .cloudcover_high: return .linear
-        case .relativehumidity_2m: return .hermite(bounds: 0...100)
         case .precipitation: return .linear
         case .weathercode: return .nearest
         case .wind_v_component_10m: return .hermite(bounds: nil)
@@ -231,7 +230,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .cloudcover_low: return ("clcl", "single-level", nil)
         case .cloudcover_mid: return ("clcm", "single-level", nil)
         case .cloudcover_high: return ("clch", "single-level", nil)
-        case .relativehumidity_2m: return ("relhum_2m", "single-level", nil)
         case .precipitation: return ("tot_prec", "single-level", nil)
         case .weathercode: return ("ww", "single-level", nil)
         case .wind_v_component_10m: return ("v_10m", "single-level", nil)

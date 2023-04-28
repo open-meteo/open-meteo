@@ -96,8 +96,6 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     
     /// pressure reduced to sea level
     case pressure_msl
-
-    case relativehumidity_2m
     
     /// Total precipitation accumulated sinve model start. First hour is always 0.
     case precipitation
@@ -201,7 +199,6 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .cloudcover_low: return 1
         case .cloudcover_mid: return 1
         case .cloudcover_high: return 1
-        case .relativehumidity_2m: return 1
         case .precipitation: return 10
         case .weathercode: return 1
         case .wind_v_component_10m: return 10
@@ -259,7 +256,6 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .cloudcover_low: return .percent
         case .cloudcover_mid: return .percent
         case .cloudcover_high: return .percent
-        case .relativehumidity_2m: return .percent
         case .precipitation: return .millimeter
         case .weathercode: return .wmoCode
         case .wind_v_component_10m: return .ms
@@ -341,8 +337,6 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return .linear
         case .pressure_msl:
             return .hermite(bounds: nil)
-        case .relativehumidity_2m:
-            return .hermite(bounds: 0...100)
         case .precipitation:
             return .backwards_sum
         case .weathercode:

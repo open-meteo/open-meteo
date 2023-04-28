@@ -153,11 +153,14 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
                 try prefetchData(raw: .wind_u_component_10m, member: member, time: time)
                 try prefetchData(raw: .wind_v_component_10m, member: member, time: time)
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+                try prefetchData(raw: .dewpoint_2m, member: member, time: time)
                 try prefetchData(raw: .direct_radiation, member: member, time: time)
                 try prefetchData(raw: .diffuse_radiation, member: member, time: time)
+            case .relativehumidity_2m:
+                fallthrough
             case .relativehumitidy_2m:
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+                try prefetchData(raw: .dewpoint_2m, member: member, time: time)
+                try prefetchData(raw: .temperature_2m, member: member, time: time)
             case .windspeed_10m:
                 try prefetchData(raw: .wind_u_component_10m, member: member, time: time)
                 try prefetchData(raw: .wind_v_component_10m, member: member, time: time)
@@ -291,7 +294,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .apparent_temperature:
                 let windspeed = try get(derived: .init(.surface(.windspeed_10m), member), time: time).data
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
-                let relhum = try get(raw: .relativehumidity_2m, member: member, time: time).data
+                let relhum = try get(derived: .init(.surface(.relativehumidity_2m), member), time: time).data
                 let radiation = try get(derived: .init(.surface(.shortwave_radiation), member), time: time).data
                 return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
             case .shortwave_radiation:
@@ -329,8 +332,12 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     ($0 + $1) * 0.7
                 })
                 return DataAndUnit(snowfall, SiUnit.centimeter)
+            case .relativehumidity_2m:
+                fallthrough
             case .relativehumitidy_2m:
-                return try get(raw: .relativehumidity_2m, member: member, time: time)
+                let temperature = try get(raw: .temperature_2m, member: member, time: time).data
+                let dewpoint = try get(raw: .dewpoint_2m, member: member, time: time).data
+                return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.relativeHumidity), .percent)
             case .surface_pressure:
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
                 let pressure = try get(raw: .pressure_msl, member: member, time: time)
@@ -505,7 +512,7 @@ extension IconMixer {
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
                 try prefetchData(raw: .wind_u_component_10m, member: member, time: time)
                 try prefetchData(raw: .wind_v_component_10m, member: member, time: time)
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+                try prefetchData(raw: .dewpoint_2m, member: member, time: time)
                 try prefetchData(raw: .direct_radiation, member: member, time: time)
                 try prefetchData(raw: .diffuse_radiation, member: member, time: time)
             case .precipitation_sum:
@@ -533,7 +540,7 @@ extension IconMixer {
                 try prefetchData(raw: .direct_radiation, member: member, time: time)
                 try prefetchData(raw: .diffuse_radiation, member: member, time: time)
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+                try prefetchData(raw: .dewpoint_2m, member: member, time: time)
                 try prefetchData(raw: .wind_u_component_10m, member: member, time: time)
                 try prefetchData(raw: .wind_v_component_10m, member: member, time: time)
             case .snowfall_sum:
