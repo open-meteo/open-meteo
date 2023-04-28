@@ -132,13 +132,13 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 fallthrough
             case .wind_v_component_80m:
                 fallthrough
-            case .wind_u_component_120m:
-                fallthrough
-            case .wind_v_component_120m:
-                fallthrough
+            //case .wind_u_component_120m:
+                //fallthrough
+            //case .wind_v_component_120m:
+                //fallthrough
             case .temperature_80m:
-                fallthrough
-            case .temperature_120m:
+                //fallthrough
+            //case .temperature_120m:
                 if domain == .iconEps {
                     // 80 and 120m model levels only in EU and D2, not in global model
                     return nil
