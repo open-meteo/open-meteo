@@ -14,10 +14,6 @@ Gem regional and global Downloader
 
  TODO:
  - elevation and sea mask for hrdps
- 
- TODO ensemble:
- - relative humidity (has no dewpoint, but RH directly)
- - wind direction (has only wind sped and u/v components)
  */
 struct GemDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
@@ -36,8 +32,8 @@ struct GemDownload: AsyncCommandFix {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
-        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
-        var upperLevel: Bool
+        //@Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
+        //var upperLevel: Bool
         
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -281,20 +277,20 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     case temperature_40m
     case temperature_80m
     case temperature_120m
-    case dewpoint_2m
+    case relativehumidity_2m
     case cloudcover
     case pressure_msl
     
     case shortwave_radiation
     
-    case windspeed_10m
-    case winddirection_10m
-    case windspeed_40m
-    case winddirection_40m
-    case windspeed_80m
-    case winddirection_80m
-    case windspeed_120m
-    case winddirection_120m
+    case wind_u_component_10m
+    case wind_v_component_10m
+    case wind_u_component_40m
+    case wind_v_component_40m
+    case wind_u_component_80m
+    case wind_v_component_80m
+    case wind_u_component_120m
+    case wind_v_component_120m
     
     /// there is also min/max
     case windgusts_10m
@@ -330,24 +326,24 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return "TMP_TGL_80"
             case .temperature_120m:
                 return "TMP_TGL_120"
-            case .windspeed_10m:
-                return "WIND_TGL_10"
-            case.winddirection_10m:
-                return "WDIR_TGL_10"
-            case .windspeed_40m:
-                return "WIND_TGL_40"
-            case .winddirection_40m:
-                return "WDIR_TGL_40"
-            case .windspeed_80m:
-                return "WIND_TGL_80"
-            case .winddirection_80m:
-                return "WDIR_TGL_80"
-            case .windspeed_120m:
-                return "WIND_TGL_120"
-            case.winddirection_120m:
-                return "WDIR_TGL_120"
-            case .dewpoint_2m:
-                return "DPT_TGL_2"
+            case .wind_u_component_10m:
+                return "UGRD_TGL_10"
+            case .wind_v_component_10m:
+                return "VGRD_TGL_10"
+            case .wind_u_component_40m:
+                return "UGRD_TGL_40"
+            case .wind_v_component_40m:
+                return "VGRD_TGL_40"
+            case .wind_u_component_80m:
+                return "UGRD_TGL_80"
+            case .wind_v_component_80m:
+                return "VGRD_TGL_80"
+            case .wind_u_component_120m:
+                return "UGRD_TGL_120"
+            case .wind_v_component_120m:
+                return "VGRD_TGL_120"
+            case .relativehumidity_2m:
+                return "RH_TGL_2"
             case .showers:
                 return "ACPCP_SFC_0"
             case .cloudcover:
@@ -375,8 +371,6 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             }
         case .gem_hrdps_continental:
             switch self {
-            case .showers:
-                return nil
             case .temperature_2m:
                 return "TMP_AGL-2m"
             case .temperature_40m:
@@ -385,34 +379,34 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return "TMP_AGL-80m"
             case .temperature_120m:
                 return "TMP_AGL-120m"
-            case .dewpoint_2m:
-                return "DPT_AGL-2m"
+            case .relativehumidity_2m:
+                return "RH_AGL-2m"
             case .cloudcover:
                 return "TCDC_Sfc"
             case .pressure_msl:
                 return "PRMSL_MSL"
             case .shortwave_radiation:
                 return "DSWRF_Sfc"
-            case .windspeed_10m:
-                return "WIND_AGL-10m"
-            case .winddirection_10m:
-                return "WDIR_AGL-10m"
-            case .windspeed_40m:
-                return "WIND_AGL-40m"
-            case .winddirection_40m:
-                return "WDIR_AGL-40m"
-            case .windspeed_80m:
-                return "WIND_AGL-80m"
-            case .winddirection_80m:
-                return "WDIR_AGL-80m"
-            case .windspeed_120m:
-                return "WIND_AGL-120m"
-            case .winddirection_120m:
-                return "WDIR_AGL-120m"
+            case .wind_u_component_10m:
+                return "UGRD_AGL-10m"
+            case .wind_v_component_10m:
+                return "VGRD_AGL-10m"
+            case .wind_u_component_40m:
+                return "UGRD_AGL-40m"
+            case .wind_v_component_40m:
+                return "VGRD_AGL-40m"
+            case .wind_u_component_80m:
+                return "UGRD_AGL-80m"
+            case .wind_v_component_80m:
+                return "VGRD_AGL-80m"
+            case .wind_u_component_120m:
+                return "UGRD_AGL-120m"
+            case .wind_v_component_120m:
+                return "VGRD_AGL-120m"
             case .windgusts_10m:
                 return "GUST_AGL-10m"
-            //case .showers:
-            //    return "ACPCP_Sfc"
+            case .showers:
+                return "ACPCP_Sfc"
             case .snowfall_water_equivalent:
                 return "WEASN_Sfc"
             case .soil_temperature_0_to_10cm:
@@ -426,25 +420,25 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             }
         case .gem_global_ensemble:
             switch self {
-            case .dewpoint_2m:
-                return nil
+            case .relativehumidity_2m:
+                return "RH_TGL_2m"
             case .showers:
                 return nil
-            case .winddirection_10m:
+            case .wind_u_component_10m:
+                return "UGRD_TGL_10m"
+            case .wind_v_component_10m:
+                return "VGRD_TGL_10m"
+            case .wind_u_component_40m:
                 return nil
-            case .winddirection_40m:
+            case .wind_v_component_40m:
                 return nil
-            case .winddirection_80m:
+            case .wind_u_component_80m:
                 return nil
-            case .winddirection_120m:
+            case .wind_v_component_80m:
                 return nil
-            case .windspeed_40m:
+            case .wind_u_component_120m:
                 return nil
-            case .windspeed_80m:
-                return nil
-            case .windspeed_120m:
-                return nil
-            case .windgusts_10m:
+            case .wind_v_component_120m:
                 return nil
             case .temperature_2m:
                 return "TMP_TGL_2m"
@@ -460,8 +454,6 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return nil
             case .soil_moisture_0_to_10cm:
                 return nil
-            case .windspeed_10m:
-                return "WIND_TGL_10"
             case .cloudcover:
                 return "TCDC_SFC_0"
             case .pressure_msl:
@@ -472,6 +464,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return "APCP_SFC_0"
             case .cape:
                 return "CAPE_SFC_0"
+            case .windgusts_10m:
+                return nil
             }
         }
     }
@@ -512,22 +506,22 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return 10
         case .pressure_msl:
             return 10
-        case .windspeed_10m:
+        case .wind_u_component_10m:
+            fallthrough
+        case .wind_v_component_10m:
+            fallthrough
+        case .wind_u_component_40m:
+            fallthrough
+        case .wind_v_component_40m:
+            fallthrough
+        case .wind_u_component_80m:
+            fallthrough
+        case .wind_v_component_80m:
+            fallthrough
+        case .wind_u_component_120m:
+            fallthrough
+        case .wind_v_component_120m:
             return 10
-        case .winddirection_10m:
-            return 1
-        case .windspeed_40m:
-            return 8
-        case .winddirection_40m:
-            return 0.5
-        case .windspeed_80m:
-            return 8
-        case .winddirection_80m:
-            return 0.5
-        case .windspeed_120m:
-            return 8
-        case .winddirection_120m:
-            return 0.5
         case .soil_temperature_0_to_10cm:
             return 20
         case .soil_moisture_0_to_10cm:
@@ -540,8 +534,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return 20
         case .temperature_120m:
             return 20
-        case .dewpoint_2m:
-            return 20
+        case .relativehumidity_2m:
+            return 1
         case .windgusts_10m:
             return 10
         case .showers:
@@ -563,8 +557,6 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .temperature_80m:
             fallthrough
         case .temperature_120m:
-            fallthrough
-        case .dewpoint_2m:
             fallthrough
         case .soil_temperature_0_to_10cm:
             return (1, -273.15)
@@ -595,24 +587,24 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return .hermite(bounds: nil)
         case .temperature_120m:
             return .hermite(bounds: nil)
-        case .dewpoint_2m:
+        case .relativehumidity_2m:
+            return .hermite(bounds: 0...100)
+        case .wind_u_component_10m:
+            fallthrough
+        case .wind_v_component_10m:
+            fallthrough
+        case .wind_u_component_40m:
+            fallthrough
+        case .wind_v_component_40m:
+            fallthrough
+        case .wind_u_component_80m:
+            fallthrough
+        case .wind_v_component_80m:
+            fallthrough
+        case .wind_u_component_120m:
+            fallthrough
+        case .wind_v_component_120m:
             return .hermite(bounds: nil)
-        case .windspeed_10m:
-            return .hermite(bounds: nil)
-        case .winddirection_10m:
-            return .hermite(bounds: 0...360)
-        case .windspeed_40m:
-            return .hermite(bounds: nil)
-        case .winddirection_40m:
-            return .hermite(bounds: 0...360)
-        case .windspeed_80m:
-            return .hermite(bounds: nil)
-        case .winddirection_80m:
-            return .hermite(bounds: 0...360)
-        case .windspeed_120m:
-            return .hermite(bounds: nil)
-        case .winddirection_120m:
-            return .hermite(bounds: 0...360)
         case .windgusts_10m:
             return .hermite(bounds: nil)
         case .showers:
@@ -646,24 +638,24 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return .celsius
         case .temperature_120m:
             return .celsius
-        case .dewpoint_2m:
-            return .celsius
-        case .windspeed_10m:
-            return .ms
-        case .winddirection_10m:
-            return .degreeDirection
-        case .windspeed_40m:
-            return .ms
-        case .winddirection_40m:
-            return .degreeDirection
-        case .windspeed_80m:
-            return .ms
-        case .winddirection_80m:
-            return .degreeDirection
-        case .windspeed_120m:
-            return .ms
-        case .winddirection_120m:
-            return .degreeDirection
+        case .relativehumidity_2m:
+            return .percent
+        case .wind_u_component_10m:
+            fallthrough
+        case .wind_v_component_10m:
+            fallthrough
+        case .wind_u_component_40m:
+            fallthrough
+        case .wind_v_component_40m:
+            fallthrough
+        case .wind_u_component_80m:
+            fallthrough
+        case .wind_v_component_80m:
+            fallthrough
+        case .wind_u_component_120m:
+            fallthrough
+        case .wind_v_component_120m:
+            fallthrough
         case .windgusts_10m:
             return .ms
         case .showers:
@@ -953,7 +945,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_hrdps_continental:
             return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50].reversed()
         case .gem_global_ensemble:
-            /// Smaler selection, same as ECMWF IFS04
+            /// Smaller selection, same as ECMWF IFS04
             return [50, 200, 250, 300, 500, 700, 850, 925, 1000]
         }
     }
