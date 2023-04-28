@@ -50,7 +50,8 @@ extension Curl {
                 matches.append(match)
                 return true
             }) else {
-                throw CurlError.noGribMessagesMatch
+                result.append((matches, "", 0))
+                continue
             }
             result.append((matches, range.range, range.minSize))
         }
@@ -90,6 +91,9 @@ extension Curl {
                 var result = [(variable: Variable, message: GribMessage)]()
                 result.reserveCapacity(variables.count)
                 for (url,inventory) in zip(url,inventories) {
+                    if inventory.matches.isEmpty {
+                        continue
+                    }
                     let messages = try await downloadGrib(url: url, bzip2Decode: false, range: inventory.range, minSize: inventory.minSize)
                     
                     if messages.count != inventory.matches.count {

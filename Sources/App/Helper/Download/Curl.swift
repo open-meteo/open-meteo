@@ -6,7 +6,7 @@ import CHelper
 
 
 enum CurlError: Error {
-    case noGribMessagesMatch
+    //case noGribMessagesMatch
     case didNotFindAllVariablesInGribIndex
     case gribIndexMatchedTwice
     case sizeTooSmall

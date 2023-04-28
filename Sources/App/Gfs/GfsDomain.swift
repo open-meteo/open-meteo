@@ -280,6 +280,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
  */
 enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
+    case temperature_80m
+    case temperature_100m
+    
     case cloudcover
     case cloudcover_low
     case cloudcover_mid
@@ -295,6 +298,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case wind_u_component_10m
     case wind_v_component_80m
     case wind_u_component_80m
+    case wind_v_component_100m
+    case wind_u_component_100m
     
     case soil_temperature_0_to_10cm
     case soil_temperature_10_to_40cm
@@ -360,6 +365,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     var scalefactor: Float {
         switch self {
         case .temperature_2m: return 20
+        case .temperature_80m: return 20
+        case .temperature_100m: return 20
         case .cloudcover: return 1
         case .cloudcover_low: return 1
         case .cloudcover_mid: return 1
@@ -370,6 +377,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .wind_u_component_10m: return 10
         case .wind_v_component_80m: return 10
         case .wind_u_component_80m: return 10
+        case .wind_u_component_100m: return 10
+        case .wind_v_component_100m: return 10
         case .soil_temperature_0_to_10cm: return 20
         case .soil_temperature_10_to_40cm: return 20
         case .soil_temperature_40_to_100cm: return 20
@@ -402,6 +411,10 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m:
             return .hermite(bounds: nil)
+        case .temperature_80m:
+            return .hermite(bounds: nil)
+        case .temperature_100m:
+            return .hermite(bounds: nil)
         case .cloudcover:
             return .linear
         case .cloudcover_low:
@@ -423,6 +436,10 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .wind_v_component_80m:
             return .hermite(bounds: nil)
         case .wind_u_component_80m:
+            return .hermite(bounds: nil)
+        case .wind_v_component_100m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_100m:
             return .hermite(bounds: nil)
         case .soil_temperature_0_to_10cm:
             return .hermite(bounds: nil)
@@ -478,6 +495,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     var unit: SiUnit {
         switch self {
         case .temperature_2m: return .celsius
+        case .temperature_80m: return .celsius
+        case .temperature_100m: return .celsius
         case .cloudcover: return .percent
         case .cloudcover_low: return .percent
         case .cloudcover_mid: return .percent
@@ -488,6 +507,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .wind_u_component_10m: return .ms
         case .wind_v_component_80m: return .ms
         case .wind_u_component_80m: return .ms
+        case .wind_v_component_100m: return .ms
+        case .wind_u_component_100m: return .ms
         case .soil_temperature_0_to_10cm: return .celsius
         case .soil_temperature_10_to_40cm: return .celsius
         case .soil_temperature_40_to_100cm: return .celsius

@@ -198,10 +198,11 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case winddirection_10m
     case windspeed_80m
     case winddirection_80m
-    /*case windspeed_120m
+    case windspeed_100m
+    case winddirection_100m
+    // Map 100m wind to 120m level
+    case windspeed_120m
     case winddirection_120m
-    case windspeed_180m
-    case winddirection_180m*/
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -358,6 +359,16 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .winddirection_80m:
                 try prefetchData(raw: .init(.surface(.wind_u_component_80m), member), time: time)
                 try prefetchData(raw: .init(.surface(.wind_v_component_80m), member), time: time)
+            case .windspeed_120m:
+                fallthrough
+            case .windspeed_100m:
+                try prefetchData(raw: .init(.surface(.wind_u_component_100m), member), time: time)
+                try prefetchData(raw: .init(.surface(.wind_v_component_100m), member), time: time)
+            case .winddirection_120m:
+                fallthrough
+            case .winddirection_100m:
+                try prefetchData(raw: .init(.surface(.wind_u_component_100m), member), time: time)
+                try prefetchData(raw: .init(.surface(.wind_v_component_100m), member), time: time)
             case .evapotranspiration:
                 try prefetchData(raw: .init(.surface(.latent_heatflux), member), time: time)
             case .vapor_pressure_deficit:
@@ -450,6 +461,20 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .winddirection_80m:
                 let u = try get(raw: .init(.surface(.wind_u_component_80m), member), time: time).data
                 let v = try get(raw: .init(.surface(.wind_v_component_80m), member), time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .windspeed_120m:
+                fallthrough
+            case .windspeed_100m:
+                let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
+                let v = try get(raw: .init(.surface(.wind_v_component_100m), member), time: time).data
+                let speed = zip(u,v).map(Meteorology.windspeed)
+                return DataAndUnit(speed, .ms)
+            case .winddirection_120m:
+                fallthrough
+            case .winddirection_100m:
+                let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
+                let v = try get(raw: .init(.surface(.wind_v_component_100m), member), time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
             case .apparent_temperature:

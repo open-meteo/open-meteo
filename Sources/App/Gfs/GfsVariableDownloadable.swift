@@ -51,12 +51,24 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":SNOD:surface:"
             case .temperature_2m:
                 return ":TMP:2 m above ground:"
+            case .temperature_80m:
+                return ":TMP:80 m above ground:"
+            case .temperature_100m:
+                return ":TMP:100 m above ground:"
             case .relativehumidity_2m:
                 return ":RH:2 m above ground:"
             case .wind_u_component_10m:
                 return ":UGRD:10 m above ground:"
             case .wind_v_component_10m:
                 return ":VGRD:10 m above ground:"
+            case .wind_u_component_80m:
+                return ":UGRD:80 m above ground:"
+            case .wind_v_component_80m:
+                return ":VGRD:80 m above ground:"
+            case .wind_u_component_100m:
+                return ":UGRD:100 m above ground:"
+            case .wind_v_component_100m:
+                return ":VGRD:100 m above ground:"
             case .frozen_precipitation_percent:
                 return ":CPOFP:surface:"
             case .precipitation:
@@ -263,6 +275,14 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return nil
         case .categorical_freezing_rain:
             return ":CFRZR:"
+        case .temperature_80m:
+            return nil // TODO check for GFS012
+        case .temperature_100m:
+            return nil
+        case .wind_v_component_100m:
+            return nil
+        case .wind_u_component_100m:
+            return nil
         }
     }
     
@@ -289,6 +309,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
     var interpolationType: Interpolation2StepType {
         switch self {
         case .temperature_2m: return .hermite(bounds: nil)
+        case .temperature_80m: return .hermite(bounds: nil)
+        case .temperature_100m: return .hermite(bounds: nil)
         case .cloudcover: return .hermite(bounds: 0...100)
         case .cloudcover_low: return .hermite(bounds: 0...100)
         case .cloudcover_mid: return .hermite(bounds: 0...100)
@@ -297,6 +319,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .precipitation: return .nearest
         case .wind_v_component_10m: return .hermite(bounds: nil)
         case .wind_u_component_10m: return .hermite(bounds: nil)
+        case .wind_v_component_80m: return .hermite(bounds: nil)
+        case .wind_u_component_80m: return .hermite(bounds: nil)
+        case .wind_v_component_100m: return .hermite(bounds: nil)
+        case .wind_u_component_100m: return .hermite(bounds: nil)
         case .snow_depth: return .linear
         case .sensible_heatflux: return .hermite_backwards_averaged(bounds: nil)
         case .latent_heatflux: return .hermite_backwards_averaged(bounds: nil)
@@ -313,8 +339,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .soil_moisture_10_to_40cm: return .hermite(bounds: nil)
         case .soil_moisture_40_to_100cm: return .hermite(bounds: nil)
         case .soil_moisture_100_to_200cm: return .hermite(bounds: nil)
-        case .wind_v_component_80m: return .hermite(bounds: nil)
-        case .wind_u_component_80m: return .hermite(bounds: nil)
         case .showers: return .nearest
         case .surface_pressure: return .hermite(bounds: nil)
         case .frozen_precipitation_percent: return .nearest
@@ -330,6 +354,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
+            fallthrough
+        case .temperature_80m:
+            fallthrough
+        case .temperature_100m:
             return (1, -273.15)
         case .surface_pressure:
             return (1/100, 0)
