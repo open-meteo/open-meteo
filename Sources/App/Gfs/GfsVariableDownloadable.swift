@@ -8,24 +8,6 @@ protocol GfsVariableDownloadable: GenericVariable {
 
 extension GfsSurfaceVariable: GfsVariableDownloadable {
     func gribIndexName(for domain: GfsDomain) -> String? {
-        // NAM has different definitons
-        /*if domain == .nam_conus {
-            switch variable {
-            case .lifted_index:
-                return ":LFTX:500-1000 mb:"
-            case .cloudcover:
-                return ":TCDC:entire atmosphere (considered as a single layer):"
-            case .precipitation:
-                // only 3h accumulation is availble
-                return ":APCP:surface:"
-            case .showers:
-                // there is no parameterised convective precipitation field
-                // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
-                return nil
-            default: break
-            }
-        }*/
-        
         if domain == .gfs025_ensemble {
             switch self {
             case .precipitation_probability:
@@ -104,7 +86,22 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":SOILW:0.4-1 m below ground:"
             case .soil_moisture_100_to_200cm:
                 return ":SOILW:1-2 m below ground:"
-            default:
+            case .uv_index:
+                return ":DUVB:surface:"
+            case .uv_index_clear_sky:
+                return ":CDUVB:surface:"
+            case .cloudcover_low:
+                return nil
+            case .cloudcover_mid:
+                return nil
+            case .cloudcover_high:
+                return nil
+            case .showers:
+                // would be available, but not in 0.25° grid
+                return nil
+            case .diffuse_radiation:
+                return nil
+            case .precipitation_probability:
                 return nil
             }
         }
@@ -148,10 +145,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":TCDC:entire atmosphere:"
             case .shortwave_radiation:
                 return ":DSWRF:surface:"
-            case .uv_index:
-                return ":DUVB:surface:"
-            case .uv_index_clear_sky:
-                return ":CDUVB:surface:"
             default:
                 return nil
             }
