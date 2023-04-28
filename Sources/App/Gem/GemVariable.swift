@@ -41,6 +41,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     
     case snowfall_water_equivalent
     
+    case snow_depth
+    
     case soil_temperature_0_to_10cm
     case soil_moisture_0_to_10cm
     
@@ -110,6 +112,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return "TSOIL_SFC_0"
             case .soil_moisture_0_to_10cm:
                 return "SOILW_DBLY_10"
+            case .snow_depth:
+                return "SNOD_SFC_0"
             }
         case .gem_hrdps_continental:
             switch self {
@@ -159,6 +163,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return "APCP_Sfc"
             case .cape:
                 return "CAPE_Sfc"
+            case .snow_depth:
+                return "SNOD_Sfc"
             }
         case .gem_global_ensemble:
             switch self {
@@ -208,6 +214,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return "CAPE_SFC_0"
             case .windgusts_10m:
                 return nil
+            case .snow_depth:
+                return "SNOD_SFC_0"
             }
         }
     }
@@ -286,6 +294,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return 10
         case .cape:
             return 0.1
+        case .snow_depth:
+            return 100 // 1cm res
         }
     }
     
@@ -359,6 +369,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return .hermite(bounds: nil)
         case .cape:
             return .hermite(bounds: 0...10e9)
+        case .snow_depth:
+            return .linear
         }
     }
     
@@ -410,6 +422,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return .qubicMeterPerQubicMeter
         case .cape:
             return .joulesPerKilogram
+        case .snow_depth:
+            return .meter
         }
     }
     
@@ -418,7 +432,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     }
     
     var requiresOffsetCorrectionForMixing: Bool {
-        return self == .soil_moisture_0_to_10cm
+        return self == .soil_moisture_0_to_10cm || self == .snow_depth
     }
     
     var skipHour0: Bool {
