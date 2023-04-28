@@ -546,6 +546,24 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case cloudcover_250hPa
     case cloudcover_200hPa
     case cloudcover_50hPa
+    case relativehumidity_1000hPa
+    case relativehumidity_925hPa
+    case relativehumidity_850hPa
+    case relativehumidity_700hPa
+    case relativehumidity_500hPa
+    case relativehumidity_300hPa
+    case relativehumidity_250hPa
+    case relativehumidity_200hPa
+    case relativehumidity_50hPa
+    case dewpoint_1000hPa
+    case dewpoint_925hPa
+    case dewpoint_850hPa
+    case dewpoint_700hPa
+    case dewpoint_500hPa
+    case dewpoint_300hPa
+    case dewpoint_250hPa
+    case dewpoint_200hPa
+    case dewpoint_50hPa
     case soil_temperature_0_7cm
     case weathercode
     case cloudcover

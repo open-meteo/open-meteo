@@ -272,14 +272,18 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable {
     case snowfall
     case snow_depth
     case surface_pressure
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
+    //case terrestrial_radiation
+    //case terrestrial_radiation_instant
     case shortwave_radiation_instant
     case diffuse_radiation_instant
     case direct_radiation_instant
     case direct_normal_irradiance_instant
     case is_day
     case visibility
+    case freezinglevel_height
+    case uv_index
+    case uv_index_clear_sky
+    case cape
     
     /// Currently only from icon-d2
     case lightning_potential
@@ -301,6 +305,7 @@ enum EnsemblePressureVariableType: String, GenericVariableMixable {
     case winddirection
     case dewpoint
     case cloudcover
+    case vertical_velocity
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

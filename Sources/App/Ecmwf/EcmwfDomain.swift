@@ -257,6 +257,60 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
+        case .relativehumidity_1000hPa:
+            return try get(raw: .init(.relative_humidity_1000hPa, member), time: time)
+        case .relativehumidity_925hPa:
+            return try get(raw: .init(.relative_humidity_925hPa, member), time: time)
+        case .relativehumidity_850hPa:
+            return try get(raw: .init(.relative_humidity_850hPa, member), time: time)
+        case .relativehumidity_700hPa:
+            return try get(raw: .init(.relative_humidity_700hPa, member), time: time)
+        case .relativehumidity_500hPa:
+            return try get(raw: .init(.relative_humidity_500hPa, member), time: time)
+        case .relativehumidity_300hPa:
+            return try get(raw: .init(.relative_humidity_300hPa, member), time: time)
+        case .relativehumidity_250hPa:
+            return try get(raw: .init(.relative_humidity_250hPa, member), time: time)
+        case .relativehumidity_200hPa:
+            return try get(raw: .init(.relative_humidity_200hPa, member), time: time)
+        case .relativehumidity_50hPa:
+            return try get(raw: .init(.relative_humidity_50hPa, member), time: time)
+        case .dewpoint_1000hPa:
+            let temperature = try get(raw: .init(.temperature_1000hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_1000hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dewpoint_925hPa:
+            let temperature = try get(raw: .init(.temperature_925hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_925hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dewpoint_850hPa:
+            let temperature = try get(raw: .init(.temperature_850hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_850hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dewpoint_700hPa:
+            let temperature = try get(raw: .init(.temperature_700hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_700hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dewpoint_500hPa:
+            let temperature = try get(raw: .init(.temperature_500hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_500hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dewpoint_300hPa:
+            let temperature = try get(raw: .init(.temperature_300hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_300hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dewpoint_250hPa:
+            let temperature = try get(raw: .init(.temperature_250hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_250hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dewpoint_200hPa:
+            let temperature = try get(raw: .init(.temperature_200hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_200hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dewpoint_50hPa:
+            let temperature = try get(raw: .init(.temperature_50hPa, member), time: time)
+            let rh = try get(raw: .init(.relative_humidity_50hPa, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         }
     }
     
@@ -367,6 +421,51 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .init(.precipitation, member), time: time)
         case .is_day:
             break
+        case .relativehumidity_1000hPa:
+            try prefetchData(raw: .init(.relative_humidity_1000hPa, member), time: time)
+        case .relativehumidity_925hPa:
+            try prefetchData(raw: .init(.relative_humidity_925hPa, member), time: time)
+        case .relativehumidity_850hPa:
+            try prefetchData(raw: .init(.relative_humidity_850hPa, member), time: time)
+        case .relativehumidity_700hPa:
+            try prefetchData(raw: .init(.relative_humidity_700hPa, member), time: time)
+        case .relativehumidity_500hPa:
+            try prefetchData(raw: .init(.relative_humidity_500hPa, member), time: time)
+        case .relativehumidity_300hPa:
+            try prefetchData(raw: .init(.relative_humidity_300hPa, member), time: time)
+        case .relativehumidity_250hPa:
+            try prefetchData(raw: .init(.relative_humidity_250hPa, member), time: time)
+        case .relativehumidity_200hPa:
+            try prefetchData(raw: .init(.relative_humidity_200hPa, member), time: time)
+        case .relativehumidity_50hPa:
+            try prefetchData(raw: .init(.relative_humidity_50hPa, member), time: time)
+        case .dewpoint_1000hPa:
+            try prefetchData(raw: .init(.temperature_1000hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_1000hPa, member), time: time)
+        case .dewpoint_925hPa:
+            try prefetchData(raw: .init(.temperature_925hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_925hPa, member), time: time)
+        case .dewpoint_850hPa:
+            try prefetchData(raw: .init(.temperature_850hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_850hPa, member), time: time)
+        case .dewpoint_700hPa:
+            try prefetchData(raw: .init(.temperature_700hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_700hPa, member), time: time)
+        case .dewpoint_500hPa:
+            try prefetchData(raw: .init(.temperature_500hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_500hPa, member), time: time)
+        case .dewpoint_300hPa:
+            try prefetchData(raw: .init(.temperature_300hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_300hPa, member), time: time)
+        case .dewpoint_250hPa:
+            try prefetchData(raw: .init(.temperature_250hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_250hPa, member), time: time)
+        case .dewpoint_200hPa:
+            try prefetchData(raw: .init(.temperature_200hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_200hPa, member), time: time)
+        case .dewpoint_50hPa:
+            try prefetchData(raw: .init(.temperature_50hPa, member), time: time)
+            try prefetchData(raw: .init(.relative_humidity_50hPa, member), time: time)
         }
     }
 }
