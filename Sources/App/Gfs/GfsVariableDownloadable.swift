@@ -36,6 +36,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         }
         
         if domain == .gfs05_ens {
+            // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20230427/00/atmos/pgrb2bp5/gec00.t00z.pgrb2b.0p50.f003.idx
             switch self {
             case .visibility:
                 return ":VIS:surface:"
@@ -43,10 +44,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":GUST:surface:"
             case .surface_pressure:
                 return ":PRES:surface:"
-            case .soil_temperature_0_to_10cm:
-                return ":TSOIL:0-0.1 m below ground:"
-            case .soil_moisture_0_to_10cm:
-                return ":SOILW:0-0.1 m below ground:"
             case .snow_depth:
                 return ":SNOD:surface:"
             case .temperature_2m:
@@ -89,12 +86,29 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":LFTX:surface:"
             case .freezinglevel_height:
                 return ":HGT:0C isotherm:"
+            case .soil_temperature_0_to_10cm:
+                return ":TSOIL:0-0.1 m below ground:"
+            case .soil_temperature_10_to_40cm:
+                return ":TSOIL:0.1-0.4 m below ground:"
+            case .soil_temperature_40_to_100cm:
+                return ":TSOIL:0.4-1 m below ground:"
+            case .soil_temperature_100_to_200cm:
+                return ":TSOIL:1-2 m below ground:"
+            case .soil_moisture_0_to_10cm:
+                return ":SOILW:0-0.1 m below ground:"
+            case .soil_moisture_10_to_40cm:
+                return ":SOILW:0.1-0.4 m below ground:"
+            case .soil_moisture_40_to_100cm:
+                return ":SOILW:0.4-1 m below ground:"
+            case .soil_moisture_100_to_200cm:
+                return ":SOILW:1-2 m below ground:"
             default:
                 return nil
             }
         }
         
         if domain == .gfs025_ens {
+            // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20230427/00/atmos/pgrb2sp25/geavg.t00z.pgrb2s.0p25.f003.idx
             switch self {
             case .visibility:
                 return ":VIS:surface:"
@@ -132,6 +146,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":TCDC:entire atmosphere:"
             case .shortwave_radiation:
                 return ":DSWRF:surface:"
+            case .uv_index:
+                return ":DUVB:surface:"
+            case .uv_index_clear_sky:
+                return ":CDUVB:surface:"
             default:
                 return nil
             }
@@ -424,13 +442,13 @@ extension GfsPressureVariable: GfsVariableDownloadable {
             return ":RH:\(level) mb:"
         case .vertical_velocity:
             switch domain {
-            case .gfs05_ens:
-                return nil
             case .gfs013:
                 return nil
             case .gfs025:
                 // Vertical Velocity (Geometric) [m/s]
                 return ":DZDT:\(level) mb:"
+            case .gfs05_ens:
+                fallthrough
             case .hrrr_conus:
                 // Vertical Velocity (Pressure) [Pa/s]
                 // Converted later while downlading
