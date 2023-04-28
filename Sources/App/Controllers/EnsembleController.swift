@@ -242,13 +242,11 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
 
 /// Define all available surface weather variables
 enum EnsembleSurfaceVariable: String, GenericVariableMixable {
+    case weathercode
     case temperature_2m
     case temperature_80m
     case temperature_120m
     case cloudcover
-    case cloudcover_low
-    case cloudcover_mid
-    case cloudcover_high
     case pressure_msl
     case relativehumidity_2m
     case precipitation
