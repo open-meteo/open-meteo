@@ -33,6 +33,10 @@ final class MeteorologyTests: XCTestCase {
         XCTAssertEqual(Meteorology.relativeHumidityToCloudCover(relativeHumidity: 95, pressureHPa: 200), 59.17517)
     }
     
+    func testElevationFromPressure() {
+        XCTAssertEqual(Meteorology.elevation(sealevelPressure: 1020, surfacePressure: 806, temperature_2m: 0.1), 1926.2726)
+    }
+    
     func testWinddirection() {
         XCTAssertEqualArray(Meteorology.windirectionFast(u: [.nan, 0, 1, -1, 1, -1], v: [0, 0, -1, -1, 1, 1]), [.nan, 180.0, 315.00012, 44.999893, 224.99991, 135.00009], accuracy: 0.0001)
         XCTAssertEqual(Meteorology.windirectionFast(u: [-1,-0,0,1,2,3,4,5,6], v: [-3,-2,-1,-0,0,1,2,3,4]), [18.435053, 360.0, 360.0, 270.0, 270.0, 251.56496, 243.43501, 239.0363, 236.3099])

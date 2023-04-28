@@ -32,9 +32,22 @@ enum EcmwfDomain: String, GenericDomain {
         return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
     }
     
+    private static var ifs04ElevationFile = try? OmFileReader(file: Self.ifs04.surfaceElevationFileOm)
+    private static var ifs04ensembleElevationFile = try? OmFileReader(file: Self.ifs04_ensemble.surfaceElevationFileOm)
+    
     /// There is no elevation file for ECMWF
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        return nil
+        switch type {
+        case .soilType:
+            return nil
+        case .elevation:
+            switch self {
+            case .ifs04:
+                return Self.ifs04ElevationFile
+            case .ifs04_ensemble:
+                return Self.ifs04ensembleElevationFile
+            }
+        }
     }
     
     var omfileArchive: String? {

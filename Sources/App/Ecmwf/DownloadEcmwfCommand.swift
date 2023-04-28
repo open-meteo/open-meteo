@@ -59,6 +59,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         
@@ -82,6 +83,10 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             
+            /// Generate model elevation from sealevel and surface pressure
+            var generateElevationFile = !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm)
+            var generateElevationFileData: (lsm: [Float]?, surfacePressure: [Float]?, sealevelPressure: [Float]?, temperature_2m: [Float]?) = (nil, nil, nil, nil)
+            
             let variables = EcmwfVariable.allCases.filter { variable in
                 let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
                 return !skipFilesIfExisting || FileManager.default.fileExists(atPath: file)
@@ -100,7 +105,12 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                 
-                if ["lsm"].contains(shortName) {
+                if shortName == "lsm" {
+                    if generateElevationFile {
+                        try grib2d.load(message: message)
+                        grib2d.array.flipLatitude()
+                        generateElevationFileData.lsm = grib2d.array.data
+                    }
                     continue
                 }
                 
@@ -133,6 +143,16 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
+                if variable == .temperature_2m && generateElevationFile && member == 0 {
+                    generateElevationFileData.temperature_2m = grib2d.array.data
+                }
+                if variable == .pressure_msl && generateElevationFile && member == 0 {
+                    generateElevationFileData.sealevelPressure = grib2d.array.data
+                }
+                if variable == .surface_air_pressure && generateElevationFile && member == 0 {
+                    generateElevationFileData.surfacePressure = grib2d.array.data
+                }
+                
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let file = "\(downloadDirectory)\(variable.omFileName)_\(hour)\(memberStr).om"
                 try FileManager.default.removeItemIfExists(at: file)
@@ -140,6 +160,26 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                 try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+            }
+            
+            if generateElevationFile {
+                logger.info("Generating elevation file")
+                guard let lsm = generateElevationFileData.lsm else {
+                    fatalError("Did not get LSM data")
+                }
+                guard let surfacePressure = generateElevationFileData.surfacePressure,
+                      let sealevelPressure = generateElevationFileData.sealevelPressure,
+                      let temperature_2m = generateElevationFileData.temperature_2m else {
+                    fatalError("Did not get pressure data")
+                }
+                let elevation: [Float] = zip(zip(surfacePressure, sealevelPressure), zip(temperature_2m, lsm)).map {
+                    let ((surfacePressure, sealevelPressure), (temperature_2m, landmask)) = $0
+                    return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
+                }
+                //try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
+                try writer.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+                generateElevationFile = false
+                generateElevationFileData = (nil, nil, nil, nil)
             }
         }
         curl.printStatistics()
