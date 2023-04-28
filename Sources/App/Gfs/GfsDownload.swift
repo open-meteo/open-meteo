@@ -267,7 +267,7 @@ struct GfsDownload: AsyncCommandFix {
                     try FileManager.default.removeItemIfExists(at: file)
                     
                     // Scaling before compression with scalefactor
-                    if let fma = variable.variable.multiplyAdd {
+                    if let fma = variable.variable.multiplyAdd(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
