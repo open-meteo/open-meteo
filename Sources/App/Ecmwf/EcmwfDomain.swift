@@ -317,6 +317,8 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             fallthrough
         case .surface_temperature:
             return try get(raw: .init(.skin_temperature, member), time: time)
+        case .surface_pressure:
+            return try get(raw: .init(.surface_air_pressure, member), time: time)
         }
     }
     
@@ -478,6 +480,8 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             fallthrough
         case .soil_temperature_0cm:
             try prefetchData(raw: .init(.skin_temperature, member), time: time)
+        case .surface_pressure:
+            try prefetchData(raw: .init(.surface_air_pressure, member), time: time)
         }
     }
 }
