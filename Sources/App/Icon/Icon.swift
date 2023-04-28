@@ -96,9 +96,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconEps:
             return []
         case .iconEuEps:
-            return []
+            return [] // 300, 500, 850 only temperature and wind
         case .iconD2Eps:
-            return []
+            return [] // 500, 700, 850, 950, 975, 1000
         }
     }
 

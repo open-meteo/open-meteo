@@ -164,6 +164,18 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 break
             case .wind_v_component_10m:
                 break
+            case .windgusts_10m:
+                if domain == .iconEps {
+                    return nil // not in global
+                }
+                break
+            case .snowfall_convective_water_equivalent:
+                fallthrough
+            case .snowfall_water_equivalent:
+                if domain == .iconEps {
+                    return nil // not in global
+                }
+                break
             default:
                 return nil
             }

@@ -184,7 +184,7 @@ struct GfsDownload: AsyncCommandFix {
         /// For GFS013, keep pressure and temperature in memory to convert specific humidity to relative
         let keepVariableInMemory: [GfsSurfaceVariable] = domain == .gfs013 ? [.temperature_2m, .surface_pressure] : []
         /// Keep pressure level temperature in memory to convert pressure vertical velocity (Pa/s) to geometric velocity (m/s)
-        let keepVariableInMemoryPressure: [GfsPressureVariableType] = domain == .hrrr_conus ? [.temperature] : []
+        let keepVariableInMemoryPressure: [GfsPressureVariableType] = (domain == .hrrr_conus || domain == .gfs05_ens) ? [.temperature] : []
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")

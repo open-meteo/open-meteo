@@ -77,6 +77,7 @@ struct CronjobCommand: Command {
         
         40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs025_ens > ~/log/gfs025_ens.log 2>&1 || cat ~/log/gfs025_ens.log
         40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens > ~/log/gfs05_ens.log 2>&1 || cat ~/log/gfs05_ens.log
+        40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens --upper-level > ~/log/gfs05_ens_upper-level.log 2>&1 || cat ~/log/gfs05_ens_upper-level.log
         55 23 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens --second-flush --run 0 > ~/log/gfs05_ens-second-flush.log 2>&1 || cat ~/log/gfs05_ens-second-flush.log
         """)
     }

@@ -174,7 +174,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     var levels: [Int] {
         switch self {
         case .gfs05_ens:
-            fallthrough
+            /// Smaler selection, same as ECMWF IFS04
+            return [50, 200, 250, 300, 500, 700, 850, 925, 1000]
         case .gfs025_ens:
             fallthrough
         case .gfs025_ensemble:
