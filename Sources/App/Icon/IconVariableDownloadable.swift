@@ -129,6 +129,22 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                     return ("asob_s", "single-level", nil)
                 }
                 break
+            case .wind_u_component_80m:
+                fallthrough
+            case .wind_v_component_80m:
+                fallthrough
+            case .wind_u_component_120m:
+                fallthrough
+            case .wind_v_component_120m:
+                fallthrough
+            case .temperature_80m:
+                fallthrough
+            case .temperature_120m:
+                if domain == .iconEps {
+                    // 80 and 120m model levels only in EU and D2, not in global model
+                    return nil
+                }
+                break
             //case .pressure_msl pressure only on surface level
             case .direct_radiation:
                 break // ICON-EPS has only 3-hourly data

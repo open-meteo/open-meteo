@@ -243,6 +243,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
 /// Define all available surface weather variables
 enum EnsembleSurfaceVariable: String, GenericVariableMixable {
     case temperature_2m
+    case temperature_80m
+    case temperature_120m
     case cloudcover
     case cloudcover_low
     case cloudcover_mid
@@ -250,7 +252,7 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable {
     case pressure_msl
     case relativehumidity_2m
     case precipitation
-    case showers
+    //case showers
     case rain
     case windgusts_10m
     case dewpoint_2m
@@ -259,11 +261,16 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable {
     case apparent_temperature
     case windspeed_10m
     case winddirection_10m
+    case windspeed_80m
+    case winddirection_80m
+    case windspeed_120m
+    case winddirection_120m
     case direct_normal_irradiance
     case et0_fao_evapotranspiration
     case vapor_pressure_deficit
     case shortwave_radiation
     case snowfall
+    case snow_depth
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
@@ -272,6 +279,7 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable {
     case direct_radiation_instant
     case direct_normal_irradiance_instant
     case is_day
+    case visibility
     
     /// Currently only from icon-d2
     case lightning_potential
