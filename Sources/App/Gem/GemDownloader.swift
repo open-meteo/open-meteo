@@ -158,7 +158,7 @@ struct GemDownload: AsyncCommandFix {
                 if hour == 0 && variable.skipHour0 {
                     continue
                 }
-                if !variable.includedFor(hour: hour) {
+                if !variable.includedFor(hour: hour, domain: domain) {
                     continue
                 }
                 let filenameDest = "\(downloadDirectory)\(variable.omFileName)_\(h3).om"
@@ -225,7 +225,7 @@ struct GemDownload: AsyncCommandFix {
                     if hour == 0 && variable.skipHour0 {
                         return nil
                     }
-                    if !variable.includedFor(hour: hour) {
+                    if !variable.includedFor(hour: hour, domain: domain) {
                         return nil
                     }
                     let h3 = hour.zeroPadded(len: 3)
@@ -271,7 +271,7 @@ struct GemDownload: AsyncCommandFix {
 protocol GemVariableDownloadable: GenericVariable {
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     var skipHour0: Bool { get }
-    func includedFor(hour: Int) -> Bool
+    func includedFor(hour: Int, domain: GemDomain) -> Bool
     func gribName(domain: GemDomain) -> String?
     var isAccumulatedSinceModelStart: Bool { get }
 }
@@ -317,48 +317,63 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     //case lifted_index
     
     func gribName(domain: GemDomain) -> String? {
-        if domain == .gem_global_ensemble {
+        switch domain {
+        case .gem_global:
+            fallthrough
+        case .gem_regional:
             switch self {
-            case .dewpoint_2m:
-                return nil
-            case .showers:
-                return nil
-            case .winddirection_10m:
-                return nil
-            case .winddirection_40m:
-                return nil
-            case .winddirection_80m:
-                return nil
-            case .winddirection_120m:
-                return nil
-            case .windspeed_40m:
-                return nil
-            case .windspeed_80m:
-                return nil
-            case .windspeed_120m:
-                return nil
-            case .windgusts_10m:
-                return nil
             case .temperature_2m:
-                return "TMP_TGL_2m"
+                return "TMP_TGL_2"
             case .temperature_40m:
-                return nil
+                return "TMP_TGL_40"
             case .temperature_80m:
-                return nil
+                return "TMP_TGL_80"
             case .temperature_120m:
-                return nil
+                return "TMP_TGL_120"
+            case .windspeed_10m:
+                return "WIND_TGL_10"
+            case.winddirection_10m:
+                return "WDIR_TGL_10"
+            case .windspeed_40m:
+                return "WIND_TGL_40"
+            case .winddirection_40m:
+                return "WDIR_TGL_40"
+            case .windspeed_80m:
+                return "WIND_TGL_80"
+            case .winddirection_80m:
+                return "WDIR_TGL_80"
+            case .windspeed_120m:
+                return "WIND_TGL_120"
+            case.winddirection_120m:
+                return "WDIR_TGL_120"
+            case .dewpoint_2m:
+                return "DPT_TGL_2"
+            case .showers:
+                return "ACPCP_SFC_0"
+            case .cloudcover:
+                return "TCDC_SFC_0"
+            case .pressure_msl:
+                return "PRMSL_MSL_0"
+            case .shortwave_radiation:
+                return "DSWRF_SFC_0"
+            case .windgusts_10m:
+                return "GUST_TGL_10"
+            case .precipitation:
+                return "APCP_SFC_0"
             case .snowfall_water_equivalent:
-                return "ASNOW_SFC_0"
+                return "WEASN_SFC_0"
+            case .cape:
+                return "CAPE_SFC_0"
+            //case .cin:
+            //    return "CIN_SFC_0"
+            //case .lifted_index:
+            //    return "4LFTX_SFC_0"
             case .soil_temperature_0_to_10cm:
-                return nil
+                return "TSOIL_SFC_0"
             case .soil_moisture_0_to_10cm:
-                return nil
-            default:
-                break
+                return "SOILW_DBLY_10"
             }
-        }
-        
-        if domain == .gem_hrdps_continental {
+        case .gem_hrdps_continental:
             switch self {
             case .showers:
                 return nil
@@ -409,63 +424,59 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             case .cape:
                 return "CAPE_Sfc"
             }
-        }
-        
-        switch self {
-        case .temperature_2m:
-            return "TMP_TGL_2"
-        case .temperature_40m:
-            return "TMP_TGL_40"
-        case .temperature_80m:
-            return "TMP_TGL_80"
-        case .temperature_120m:
-            return "TMP_TGL_120"
-        case .windspeed_10m:
-            return "WIND_TGL_10"
-        case.winddirection_10m:
-            return "WDIR_TGL_10"
-        case .windspeed_40m:
-            return "WIND_TGL_40"
-        case .winddirection_40m:
-            return "WDIR_TGL_40"
-        case .windspeed_80m:
-            return "WIND_TGL_80"
-        case.winddirection_80m:
-            return "WDIR_TGL_80"
-        case .windspeed_120m:
-            return "WIND_TGL_120"
-        case.winddirection_120m:
-            return "WDIR_TGL_120"
-        case .dewpoint_2m:
-            return "DPT_TGL_2"
-        case .showers:
-            return "ACPCP_SFC_0"
-        case .cloudcover:
-            return "TCDC_SFC_0"
-        case .pressure_msl:
-            return "PRMSL_MSL_0"
-        case .shortwave_radiation:
-            return "DSWRF_SFC_0"
-        case .windgusts_10m:
-            return "GUST_TGL_10"
-        case .precipitation:
-            return "APCP_SFC_0"
-        case .snowfall_water_equivalent:
-            return "WEASN_SFC_0"
-        case .cape:
-            return "CAPE_SFC_0"
-        //case .cin:
-        //    return "CIN_SFC_0"
-        //case .lifted_index:
-        //    return "4LFTX_SFC_0"
-        case .soil_temperature_0_to_10cm:
-            return "TSOIL_SFC_0"
-        case .soil_moisture_0_to_10cm:
-            return "SOILW_DBLY_10"
+        case .gem_global_ensemble:
+            switch self {
+            case .dewpoint_2m:
+                return nil
+            case .showers:
+                return nil
+            case .winddirection_10m:
+                return nil
+            case .winddirection_40m:
+                return nil
+            case .winddirection_80m:
+                return nil
+            case .winddirection_120m:
+                return nil
+            case .windspeed_40m:
+                return nil
+            case .windspeed_80m:
+                return nil
+            case .windspeed_120m:
+                return nil
+            case .windgusts_10m:
+                return nil
+            case .temperature_2m:
+                return "TMP_TGL_2m"
+            case .temperature_40m:
+                return nil
+            case .temperature_80m:
+                return nil
+            case .temperature_120m:
+                return nil
+            case .snowfall_water_equivalent:
+                return "ASNOW_SFC_0"
+            case .soil_temperature_0_to_10cm:
+                return nil
+            case .soil_moisture_0_to_10cm:
+                return nil
+            case .windspeed_10m:
+                return "WIND_TGL_10"
+            case .cloudcover:
+                return "TCDC_SFC_0"
+            case .pressure_msl:
+                return "PRMSL_MSL_0"
+            case .shortwave_radiation:
+                return "DSWRF_SFC_0"
+            case .precipitation:
+                return "APCP_SFC_0"
+            case .cape:
+                return "CAPE_SFC_0"
+            }
         }
     }
     
-    func includedFor(hour: Int) -> Bool {
+    func includedFor(hour: Int, domain: GemDomain) -> Bool {
         if self == .cape && hour >= 171 {
             return false
         }
@@ -692,10 +703,13 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
  */
 enum GemPressureVariableType: String, CaseIterable {
     case temperature
-    case windspeed
-    case winddirection
+    //case windspeed
+    //case winddirection
+    case wind_u_component
+    case wind_v_component
     case geopotential_height
-    case dewpoint_depression
+    //case dewpoint_depression
+    case relativehumidity
 }
 
 
@@ -714,22 +728,29 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         return rawValue
     }
     func gribName(domain: GemDomain) -> String? {
-        let isbl = domain == .gem_hrdps_continental ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
+        let isbl = (domain == .gem_hrdps_continental || domain == .gem_global_ensemble) ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
         switch variable {
         case .temperature:
             return "TMP_\(isbl)"
-        case .windspeed:
-            return "WIND_\(isbl)"
-        case .winddirection:
-            return "WDIR_\(isbl)"
+        case .wind_u_component:
+            return "UGRD_\(isbl)"
+        case .wind_v_component:
+            return "VGRD_\(isbl)"
         case .geopotential_height:
             return "HGT_\(isbl)"
-        case .dewpoint_depression:
-            return "DEPR_\(isbl)"
+        case .relativehumidity:
+            return "RH_\(isbl)"
         }
     }
     
-    func includedFor(hour: Int) -> Bool {
+    func includedFor(hour: Int, domain: GemDomain) -> Bool {
+        if domain == .gem_global_ensemble {
+            // temperature and RH is missing for level 300 hpa
+            if (variable == .temperature || variable == .relativehumidity) && level == 300 {
+                return false
+            }
+            return true
+        }
         if hour >= 171 && ![1000, 925, 850, 700, 500, 5, 1].contains(level) {
             return false
         }
@@ -740,15 +761,15 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
         case .temperature:
-            fallthrough
-        case .dewpoint_depression:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case.winddirection:
-            return (0.2..<0.5).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
-        case .windspeed:
+        case .relativehumidity:
+            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
+        case .wind_u_component:
+            fallthrough
+        case .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
-            return (3..<8).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+            return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
@@ -762,13 +783,13 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         switch variable {
         case .temperature:
             return .hermite(bounds: nil)
-        case .windspeed:
+        case .relativehumidity:
+            return .hermite(bounds: 0...100)
+        case .wind_u_component:
             return .hermite(bounds: nil)
-        case .winddirection:
-            return .hermite(bounds: 0...360)
+        case .wind_v_component:
+            return .hermite(bounds: nil)
         case .geopotential_height:
-            return .hermite(bounds: nil)
-        case .dewpoint_depression:
             return .hermite(bounds: nil)
         }
     }
@@ -789,14 +810,14 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         switch variable {
         case .temperature:
             return .celsius
-        case .windspeed:
+        case .wind_u_component:
             return .ms
-        case .winddirection:
-            return .degreeDirection
+        case .wind_v_component:
+            return .ms
         case .geopotential_height:
             return .meter
-        case .dewpoint_depression:
-            return .kelvin
+        case .relativehumidity:
+            return .percent
         }
     }
     
@@ -932,7 +953,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_hrdps_continental:
             return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50].reversed()
         case .gem_global_ensemble:
-            return []
+            /// Smaler selection, same as ECMWF IFS04
+            return [50, 200, 250, 300, 500, 700, 850, 925, 1000]
         }
     }
     

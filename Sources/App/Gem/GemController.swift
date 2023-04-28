@@ -209,7 +209,8 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
 enum GemPressureVariableDerivedType: String, CaseIterable {
     case dewpoint
     case cloudcover
-    case relativehumidity
+    case windspeed
+    case winddirection
 }
 
 /**
@@ -316,13 +317,16 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .relativehumidity:
-                fallthrough
             case .dewpoint:
-                fallthrough
-            case .cloudcover:
                 try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .temperature, level: v.level)), member), time: time)
-                try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .dewpoint_depression, level: v.level)), member), time: time)
+                try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
+            case .cloudcover:
+                try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
+            case .windspeed:
+                fallthrough
+            case .winddirection:
+                try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time)
+                try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time)
             }
         }
     }
@@ -453,15 +457,21 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             switch v.variable {
             case .dewpoint:
                 let temperature = try get(raw: .init(.pressure(GemPressureVariable(variable: .temperature, level: v.level)), member), time: time)
-                let depression = try get(raw: .init(.pressure(GemPressureVariable(variable: .dewpoint_depression, level: v.level)), member), time: time)
-                return DataAndUnit(zip(temperature.data, depression.data).map(-), temperature.unit)
-            case .relativehumidity:
-                let temperature = try get(raw: .init(.pressure(GemPressureVariable(variable: .temperature, level: v.level)), member), time: time)
-                let dewpoint = try get(derived: .init(.pressure(GemPressureVariableDerived(variable: .dewpoint, level: v.level)), member), time: time)
-                return DataAndUnit(zip(temperature.data, dewpoint.data).map(Meteorology.relativeHumidity), .percent)
+                let rh = try get(raw: .init(.pressure(GemPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloudcover:
-                let rh = try get(derived: .init(.pressure(GemPressureVariableDerived(variable: .relativehumidity, level: v.level)), member), time: time)
+                let rh = try get(raw: .init(.pressure(GemPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
                 return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percent)
+            case .windspeed:
+                let u = try get(raw: .init(.pressure(GemPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time)
+                let v = try get(raw: .init(.pressure(GemPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time)
+                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+                return DataAndUnit(speed, u.unit)
+            case .winddirection:
+                let u = try get(raw: .init(.pressure(GemPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time).data
+                let v = try get(raw: .init(.pressure(GemPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
             }
         }
     }
