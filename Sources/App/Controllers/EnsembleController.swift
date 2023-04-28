@@ -285,8 +285,16 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable {
     case uv_index_clear_sky
     case cape
     
-    /// Currently only from icon-d2
-    case lightning_potential
+    case surface_temperature
+    case soil_temperature_0_to_10cm
+    case soil_temperature_10_to_40cm
+    case soil_temperature_40_to_100cm
+    case soil_temperature_100_to_200cm
+    
+    case soil_moisture_0_to_10cm
+    case soil_moisture_10_to_40cm
+    case soil_moisture_40_to_100cm
+    case soil_moisture_100_to_200cm
     
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {

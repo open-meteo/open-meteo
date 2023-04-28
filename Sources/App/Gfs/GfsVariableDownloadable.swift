@@ -86,6 +86,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":LFTX:surface:"
             case .freezinglevel_height:
                 return ":HGT:0C isotherm:"
+            case .surface_temperature:
+                return ":TMP:surface:"
             case .soil_temperature_0_to_10cm:
                 return ":TSOIL:0-0.1 m below ground:"
             case .soil_temperature_10_to_40cm:
@@ -297,6 +299,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return nil // TODO check for GFS012
         case .temperature_100m:
             return nil
+        case .surface_temperature:
+            return nil
         case .wind_v_component_100m:
             return nil
         case .wind_u_component_100m:
@@ -349,6 +353,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .shortwave_radiation: return .solar_backwards_averaged
         case .uv_index: return .solar_backwards_averaged
         case .uv_index_clear_sky: return .solar_backwards_averaged
+        case .surface_temperature: return .hermite(bounds: nil)
         case .soil_temperature_0_to_10cm: return .hermite(bounds: nil)
         case .soil_temperature_10_to_40cm: return .hermite(bounds: nil)
         case .soil_temperature_40_to_100cm: return .hermite(bounds: nil)
@@ -379,6 +384,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (1, -273.15)
         case .surface_pressure:
             return (1/100, 0)
+        case .surface_temperature:
+            fallthrough
         case .soil_temperature_0_to_10cm:
             return (1, -273.15)
         case .soil_temperature_10_to_40cm:

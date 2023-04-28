@@ -187,6 +187,8 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let u = try get(raw: .init(.eastward_wind_50hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
+        case .soil_temperature_0_10cm:
+            fallthrough
         case .soil_temperature_0_7cm:
             return try get(raw: .init(.soil_temperature_0_to_7cm, member), time: time)
         case .weathercode:
@@ -311,6 +313,10 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let temperature = try get(raw: .init(.temperature_50hPa, member), time: time)
             let rh = try get(raw: .init(.relative_humidity_50hPa, member), time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .soil_temperature_0cm:
+            fallthrough
+        case .surface_temperature:
+            return try get(raw: .init(.skin_temperature, member), time: time)
         }
     }
     
@@ -377,6 +383,8 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .winddirection_50hPa:
             try prefetchData(raw: .init(.northward_wind_50hPa, member), time: time)
             try prefetchData(raw: .init(.eastward_wind_50hPa, member), time: time)
+        case .soil_temperature_0_10cm:
+            fallthrough
         case .soil_temperature_0_7cm:
             try prefetchData(raw: .init(.soil_temperature_0_to_7cm, member), time: time)
         case .cloudcover_1000hPa:
@@ -466,6 +474,10 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .dewpoint_50hPa:
             try prefetchData(raw: .init(.temperature_50hPa, member), time: time)
             try prefetchData(raw: .init(.relative_humidity_50hPa, member), time: time)
+        case .surface_temperature:
+            fallthrough
+        case .soil_temperature_0cm:
+            try prefetchData(raw: .init(.skin_temperature, member), time: time)
         }
     }
 }

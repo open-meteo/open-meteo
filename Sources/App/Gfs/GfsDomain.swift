@@ -302,6 +302,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case wind_v_component_100m
     case wind_u_component_100m
     
+    case surface_temperature
     case soil_temperature_0_to_10cm
     case soil_temperature_10_to_40cm
     case soil_temperature_40_to_100cm
@@ -380,6 +381,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .wind_u_component_80m: return 10
         case .wind_u_component_100m: return 10
         case .wind_v_component_100m: return 10
+        case .surface_temperature: return 20
         case .soil_temperature_0_to_10cm: return 20
         case .soil_temperature_10_to_40cm: return 20
         case .soil_temperature_40_to_100cm: return 20
@@ -441,6 +443,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .wind_v_component_100m:
             return .hermite(bounds: nil)
         case .wind_u_component_100m:
+            return .hermite(bounds: nil)
+        case .surface_temperature:
             return .hermite(bounds: nil)
         case .soil_temperature_0_to_10cm:
             return .hermite(bounds: nil)
@@ -510,6 +514,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .wind_u_component_80m: return .ms
         case .wind_v_component_100m: return .ms
         case .wind_u_component_100m: return .ms
+        case .surface_temperature: return .celsius
         case .soil_temperature_0_to_10cm: return .celsius
         case .soil_temperature_10_to_40cm: return .celsius
         case .soil_temperature_40_to_100cm: return .celsius
