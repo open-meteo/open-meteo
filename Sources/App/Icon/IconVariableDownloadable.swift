@@ -1,7 +1,7 @@
 
 /// Define functions to download surface and pressure level variables for ICON
 protocol IconVariableDownloadable: GenericVariable {
-    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool) -> Bool
+    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool, run: Timestamp) -> Bool
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
@@ -11,7 +11,7 @@ protocol IconVariableDownloadable: GenericVariable {
 
 extension IconSurfaceVariable: IconVariableDownloadable {
     /// Vmax and precip always are empty in the first hour. Weather codes differ a lot in hour 0.
-    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool) -> Bool {
+    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool, run: Timestamp) -> Bool {
         if self == .direct_radiation && domain == .iconEps && hour % 3 != 0 {
             // ICON-EPS only has 3-hourly data for direct radiation
             return true
@@ -20,6 +20,12 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             [.wind_u_component_80m, .wind_v_component_80m, .temperature_80m].contains(self) &&
             [57, 63, 69].contains(hour) {
             // Upper levels have fewer timestamps
+            return false
+        }
+        if domain == .iconEuEps &&
+            [Self.snowfall_convective_water_equivalent, .snowfall_water_equivalent].contains(self) &&
+            [6,18].contains(run.hour) &&
+            hour % 6 != 0 {
             return false
         }
         if hour != 0 {
@@ -309,7 +315,7 @@ extension IconPressureVariable: IconVariableDownloadable {
         return false
     }
     
-    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool) -> Bool {
+    func skipHour(hour: Int, domain: IconDomains, forDownload: Bool, run: Timestamp) -> Bool {
         return false
     }
     
