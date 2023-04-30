@@ -16,6 +16,12 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             // ICON-EPS only has 3-hourly data for direct radiation
             return true
         }
+        if domain == .iconEuEps &&
+            [.wind_u_component_80m, .wind_v_component_80m, .temperature_80m].contains(self) &&
+            [57, 63, 69].contains(hour) {
+            // Upper levels have fewer timestamps
+            return false
+        }
         if hour != 0 {
             return false
         }
