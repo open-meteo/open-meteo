@@ -20,13 +20,13 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             [.wind_u_component_80m, .wind_v_component_80m, .temperature_80m].contains(self) &&
             [57, 63, 69].contains(hour) {
             // Upper levels have fewer timestamps
-            return false
+            return true
         }
         if domain == .iconEuEps &&
             [Self.snowfall_convective_water_equivalent, .snowfall_water_equivalent].contains(self) &&
             [6,18].contains(run.hour) &&
             hour % 6 != 0 {
-            return false
+            return true
         }
         if hour != 0 {
             return false
