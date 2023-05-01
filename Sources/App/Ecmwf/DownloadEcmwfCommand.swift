@@ -177,7 +177,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
                 }
                 //try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-                try writer.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+                try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
                 generateElevationFile = false
                 generateElevationFileData = (nil, nil, nil, nil)
             }
