@@ -24,8 +24,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         @Flag(name: "skip-existing")
         var skipExisting: Bool
         
-        //@Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
-        //var upperLevel: Bool
+        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels for ensemble model")
+        var upperLevel: Bool
         
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -53,7 +53,9 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let surfaceVariables = EcmwfVariable.allCases.filter({$0.level == nil})
-        let variables = onlyVariables ?? (domain == .ifs04_ensemble ? surfaceVariables : EcmwfVariable.allCases)
+        let pressureVariables = EcmwfVariable.allCases.filter({$0.level != nil})
+        let defaultVariables = domain == .ifs04_ensemble ? (signature.upperLevel ? pressureVariables : surfaceVariables) : EcmwfVariable.allCases
+        let variables = onlyVariables ?? defaultVariables
         
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
@@ -80,7 +82,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         logger.info("Downloading height and elevation data")
         let url = domain.getUrl(base: base, run: run, hour: 0)
         for message in try await curl.downloadEcmwfIndexed(url: url, isIncluded: { entry in
-            if let member = entry.number, member != "1" {
+            guard entry.number == nil else {
+                // ignore ensemble members, only use control
                 return false
             }
             return entry.levtype == .sfc && ["lsm", "2t", "sp", "msl"].contains(entry.param)
