@@ -41,13 +41,29 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             default: break
             }
         }
-        
-        // ICON-EPS stores total shortwave radiation in diffuse_radiation
-        // It would be possible to only use `shortwave_radiation`, but this would invalidate all archives
-        if reader.domain == .iconEps, case let .surface(surface) = raw.variable, surface == .diffuse_radiation {
-            let ghi = try reader.get(variable: raw, time: time)
-            let direct = try reader.get(variable: .init(.surface(.direct_radiation), member), time: time)
-            return DataAndUnit(zip(ghi.data, direct.data).map({max($0-$1,0)}), ghi.unit)
+        if case let .surface(surface) = raw.variable {
+            // ICON-EPS stores total shortwave radiation in diffuse_radiation
+            // It would be possible to only use `shortwave_radiation`, but this would invalidate all archives
+            if reader.domain == .iconEps,surface == .diffuse_radiation {
+                let ghi = try reader.get(variable: raw, time: time)
+                let direct = try reader.get(variable: .init(.surface(.direct_radiation), member), time: time)
+                return DataAndUnit(zip(ghi.data, direct.data).map({max($0-$1,0)}), ghi.unit)
+            }
+            
+            // no dedicated rain field in ICON EU EPS
+            if reader.domain == .iconEuEps, surface == .rain {
+                let precipitation = try get(raw: .precipitation, member: member, time: time).data
+                let snow_gsp = try get(raw: .snowfall_water_equivalent, member: member, time: time).data
+                let snow_con = try get(raw: .snowfall_convective_water_equivalent, member: member, time: time).data
+                return DataAndUnit(zip(precipitation, zip(snow_con, snow_gsp)).map({$0 - $1.0 - $1.1}), .millimeter)
+            }
+            
+            // no dedicated rain field in ICON EPS and no snow, use temperautre
+            if reader.domain == .iconEps, surface == .rain {
+                let precipitation = try get(raw: .precipitation, member: member, time: time).data
+                let temperature = try get(raw: .temperature_2m, member: member, time: time).data
+                return DataAndUnit(zip(precipitation, temperature).map({$0 * $1 <= 0 ? 0 : 1}), .millimeter)
+            }
         }
         
         // icon global and EU lack level 975
@@ -78,11 +94,28 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
         
-        // ICON-EPS stores total shortwave radiation in diffuse_radiation
-        if reader.domain == .iconEps, case let .surface(surface) = raw.variable, surface == .diffuse_radiation {
-            try reader.prefetchData(variable: raw, time: time)
-            try reader.prefetchData(variable: .init(.surface(.direct_radiation), member), time: time)
-            return
+        if case let .surface(surface) = raw.variable {
+            // ICON-EPS stores total shortwave radiation in diffuse_radiation
+            if reader.domain == .iconEps, surface == .diffuse_radiation {
+                try reader.prefetchData(variable: raw, time: time)
+                try reader.prefetchData(variable: .init(.surface(.direct_radiation), member), time: time)
+                return
+            }
+            
+            // no dedicated rain field in ICON EU EPS
+            if reader.domain == .iconEuEps, surface == .rain {
+                try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
+                try reader.prefetchData(variable: .init(.surface(.snowfall_water_equivalent), member), time: time)
+                try reader.prefetchData(variable: .init(.surface(.snowfall_convective_water_equivalent), member), time: time)
+                return
+            }
+            
+            // no dedicated rain field in ICON EPS and no snow, use temperautre
+            if reader.domain == .iconEps, surface == .rain {
+                try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
+                try reader.prefetchData(variable: .init(.surface(.temperature_2m), member), time: time)
+                return
+            }
         }
         
         // icon global and EU lack level 975
