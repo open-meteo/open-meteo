@@ -62,7 +62,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             if reader.domain == .iconEps, surface == .rain {
                 let precipitation = try get(raw: .precipitation, member: member, time: time).data
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
-                return DataAndUnit(zip(precipitation, temperature).map({$0 * $1 <= 0 ? 0 : 1}), .millimeter)
+                return DataAndUnit(zip(precipitation, temperature).map({$0 * ($1 <= 0 ? 0 : 1)}), .millimeter)
             }
             
             // ICON EPS + EU EPS store surface pressure in sealevel pressure field
