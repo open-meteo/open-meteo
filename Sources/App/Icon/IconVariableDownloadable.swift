@@ -140,16 +140,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                     return ("asob_s", "single-level", nil)
                 }
                 break
-            case .wind_u_component_80m:
-                fallthrough
-            case .wind_v_component_80m:
-                fallthrough
-            case .temperature_80m:
-                if domain == .iconEps {
-                    // 80 model levels only in EU and D2, not in global model
-                    return nil
-                }
-                break
             case .wind_u_component_120m:
                 fallthrough
             case .wind_v_component_120m:
@@ -185,14 +175,20 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 break
             case .wind_v_component_10m:
                 break
+                // all variables below are not in the global EPS model
+            case .wind_u_component_80m:
+                fallthrough
+            case .wind_v_component_80m:
+                fallthrough
+            case .temperature_80m:
+                fallthrough
             case .windgusts_10m:
-                if domain == .iconEps {
-                    return nil // not in global
-                }
-                break
+                fallthrough
             case .snowfall_convective_water_equivalent:
                 fallthrough
             case .snowfall_water_equivalent:
+                fallthrough
+            case .cape:
                 if domain == .iconEps {
                     return nil // not in global
                 }
