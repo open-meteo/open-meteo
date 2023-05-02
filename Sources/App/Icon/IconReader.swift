@@ -155,13 +155,17 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             
             // EPS models do not have weather codes
             if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weathercode {
-                try reader.prefetchData(variable: .init(.surface(.temperature_2m), member), time: time)
                 try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
+                try reader.prefetchData(variable: .init(.surface(.cloudcover), member), time: time)
                 if reader.domain != .iconEuEps {
                     try reader.prefetchData(variable: .init(.surface(.snowfall_water_equivalent), member), time: time)
                     try reader.prefetchData(variable: .init(.surface(.snowfall_convective_water_equivalent), member), time: time)
                     try reader.prefetchData(variable: .init(.surface(.windgusts_10m), member), time: time)
                     try reader.prefetchData(variable: .init(.surface(.cape), member), time: time)
+                }
+                if reader.domain == .iconEps {
+                    // use temperature for snowfall
+                    try reader.prefetchData(variable: .init(.surface(.temperature_2m), member), time: time)
                 }
                 if reader.domain == .iconD2Eps {
                     try reader.prefetchData(variable: .init(.surface(.showers), member), time: time)
