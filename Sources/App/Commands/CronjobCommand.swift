@@ -74,11 +74,13 @@ struct CronjobCommand: Command {
         0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs04_ensemble > ~/log/ifs04_ensemble.log 2>&1 || cat ~/log/ifs04_ensemble.log
         
         45 4,16 * * * /usr/local/bin/openmeteo-api download-gem gem_global_ensemble > ~/log/gem_global_ensemble.log 2>&1 || cat ~/log/gem_global_ensemble.log
+        #45 4,16 * * * /usr/local/bin/openmeteo-api download-gem gem_global_ensemble --upper-level > ~/log/gem_global_ensemble.log 2>&1 || cat ~/log/gem_global_ensemble.log
         
         40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs025_ens > ~/log/gfs025_ens.log 2>&1 || cat ~/log/gfs025_ens.log
         40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens > ~/log/gfs05_ens.log 2>&1 || cat ~/log/gfs05_ens.log
-        40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens --upper-level > ~/log/gfs05_ens_upper-level.log 2>&1 || cat ~/log/gfs05_ens_upper-level.log
+        #40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens --upper-level > ~/log/gfs05_ens_upper-level.log 2>&1 || cat ~/log/gfs05_ens_upper-level.log
         55 23 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens --second-flush --run 0 > ~/log/gfs05_ens-second-flush.log 2>&1 || cat ~/log/gfs05_ens-second-flush.log
+        #55 23 * * * /usr/local/bin/openmeteo-api download-gfs gfs05_ens --second-flush --run 0 --upper-level > ~/log/gfs05_ens-second-flush_upper-level.log 2>&1 || cat ~/log/gfs05_ens-second-flush_upper-level.log
         """)
     }
 }

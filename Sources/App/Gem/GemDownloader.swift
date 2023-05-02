@@ -32,8 +32,8 @@ struct GemDownload: AsyncCommandFix {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
-        //@Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
-        //var upperLevel: Bool
+        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
+        var upperLevel: Bool
         
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -62,13 +62,18 @@ struct GemDownload: AsyncCommandFix {
             }
         }
         
-        let variablesAll: [GemVariableDownloadable] = GemSurfaceVariable.allCases + domain.levels.flatMap {
+        let variablesSurface: [GemVariableDownloadable] = GemSurfaceVariable.allCases
+        
+        let variablesPressure: [GemVariableDownloadable] = domain.levels.flatMap {
             level in GemPressureVariableType.allCases.compactMap { variable in
                 return GemPressureVariable(variable: variable, level: level)
             }
         }
         
-        let variables = onlyVariables ?? variablesAll
+        /// For GEM ensemble, only download pressure levels if `--upper-level` is set
+        let variablesDefault = domain == .gem_global_ensemble ? (signature.upperLevel ? variablesPressure : variablesSurface) : (variablesSurface+variablesPressure)
+        
+        let variables = onlyVariables ?? variablesDefault
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
