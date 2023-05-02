@@ -140,7 +140,12 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                     return ("asob_s", "single-level", nil)
                 }
                 break
-            //case .pressure_msl pressure only on surface level
+            case .pressure_msl:
+                if domain == .iconEps || domain == .iconEuEps {
+                    // use surface pressure instead of sea level pressure
+                    return ("ps", "single-level", nil)
+                }
+                break
             case .direct_radiation:
                 break // ICON-EPS has only 3-hourly data
             case .cloudcover:
