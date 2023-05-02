@@ -71,6 +71,28 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
                 return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: surface_pressure, elevation: reader.targetElevation), .hectoPascal)
             }
+            
+            // EPS models do not have weather codes
+            if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weathercode {
+                let cloudcover = try get(raw: .cloudcover, member: member, time: time).data
+                let precipitation = try get(raw: .precipitation, member: member, time: time).data
+                let snowfall = try get(variable: .derived(.surface(.snowfall)), member: member, time: time).data
+                let showers = reader.domain != .iconD2Eps ? nil : try get(raw: .init(.surface(.showers), member), time: time).data
+                let cape = reader.domain == .iconEps ? nil : try get(raw: .init(.surface(.cape), member), time: time).data
+                let gusts = reader.domain == .iconEps ? nil : try get(raw: .init(.surface(.windgusts_10m), member), time: time).data
+                return DataAndUnit(WeatherCode.calculate(
+                    cloudcover: cloudcover,
+                    precipitation: precipitation,
+                    convectivePrecipitation: showers,
+                    snowfallCentimeters: snowfall,
+                    gusts: gusts,
+                    cape: cape,
+                    liftedIndex: nil,
+                    visibilityMeters: nil,
+                    categoricalFreezingRain: nil,
+                    modelDtHours: time.dtSeconds / 3600), .wmoCode
+                )
+            }
         }
         
         // icon global and EU lack level 975
@@ -128,6 +150,22 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             if [.iconEuEps, .iconEps].contains(reader.domain), surface == .pressure_msl {
                 try reader.prefetchData(variable: raw, time: time)
                 try reader.prefetchData(variable: .init(.surface(.temperature_2m), member), time: time)
+                return
+            }
+            
+            // EPS models do not have weather codes
+            if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weathercode {
+                try reader.prefetchData(variable: .init(.surface(.temperature_2m), member), time: time)
+                try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
+                if reader.domain != .iconEuEps {
+                    try reader.prefetchData(variable: .init(.surface(.snowfall_water_equivalent), member), time: time)
+                    try reader.prefetchData(variable: .init(.surface(.snowfall_convective_water_equivalent), member), time: time)
+                    try reader.prefetchData(variable: .init(.surface(.windgusts_10m), member), time: time)
+                    try reader.prefetchData(variable: .init(.surface(.cape), member), time: time)
+                }
+                if reader.domain == .iconD2Eps {
+                    try reader.prefetchData(variable: .init(.surface(.showers), member), time: time)
+                }
                 return
             }
         }
