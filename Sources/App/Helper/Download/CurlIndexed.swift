@@ -11,6 +11,40 @@ protocol CurlIndexedVariable {
 
 extension Curl {
     
+    /// {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "fc", "stream": "oper", "step": "102", "levelist": "300", "levtype": "pl", "param": "t", "_offset": 6699726, "_length": 609046}
+    /// {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levelist": "925", "levtype": "pl", "number": "4", "param": "u", "_offset": 291741552, "_length": 609069}
+    struct EcmwfIndexEntry: Decodable {
+        enum LevelType: String, Decodable {
+            case sfc
+            case pl
+        }
+        /// pressure or surface level
+        let levtype: LevelType
+        /// For pressure level, strings like "925"
+        let levelist: String?
+        /// ensemle member number
+        let number: String?
+        /// Short grib name like `u` or `t2`
+        let param: String
+        let _offset: Int
+        let _length: Int
+        
+        var level: Int? {
+            return levelist.flatMap(Int.init)
+        }
+    }
+    
+    /// Download a ECMWF grib file from the opendata server, but selectively get messages and download only partial file
+    func downloadEcmwfIndexed(url: String, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> [GribMessage] {
+        let urlIndex = url.replacingOccurrences(of: ".grib2", with: ".index")
+        let index = try await downloadInMemoryAsync(url: urlIndex, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
+        guard !index.isEmpty else {
+            fatalError("Empty grib selection")
+        }
+        let range = index.indexToRange()
+        return try await downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize)
+    }
+    
     /// Download index file and match against curl variable
     func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: [String], variables: [Variable]) async throws -> [(matches: [Variable], range: String, minSize: Int)] {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
@@ -141,6 +175,55 @@ extension ByteBuffer {
     public func readStringImmutable() -> String? {
         var b = self
         return b.readString(length: b.readableBytes)
+    }
+    /// Decode ECMWF JSON index file
+    func readEcmwfIndexEntries() throws -> [Curl.EcmwfIndexEntry] {
+        var b = self
+        var results = [Curl.EcmwfIndexEntry]()
+        while let pos = b.readableBytesView.firstIndex(of: 10) {
+            let length = pos - b.readerIndex
+            guard let entry = try b.readJSONDecodable(Curl.EcmwfIndexEntry.self, length: length) else {
+                fatalError("Could not decode index")
+            }
+            b.moveReaderIndex(forwardBy: 1)
+            results.append(entry)
+        }
+        if b.readableBytes > 50 {
+            guard let entry = try b.readJSONDecodable(Curl.EcmwfIndexEntry.self, length: b.readableBytes) else {
+                fatalError("Could not decode index end")
+            }
+            results.append(entry)
+        }
+        return results
+    }
+}
+
+extension Array where Element == Curl.EcmwfIndexEntry {
+    /// Convert grib entries to http range download command
+    func indexToRange() -> (range: String, minSize: Int) {
+        var range = ""
+        var i = 0
+        var size = 0
+        var end = 0
+        while i < count {
+            let entry = self[i]
+            range += "\(entry._offset)-"
+            size += entry._length
+            end = entry._offset + entry._length
+            i += 1
+            while i < count {
+                let entry = self[i]
+                if entry._offset != end {
+                    range += "\(end),"
+                    break
+                }
+                size += entry._length
+                end = entry._offset + entry._length
+                i += 1
+            }
+        }
+        range += "\(end)"
+        return (range,size)
     }
 }
 

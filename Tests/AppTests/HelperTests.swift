@@ -1,6 +1,7 @@
 import Foundation
 @testable import App
 import XCTest
+import NIO
 //import Vapor
 
 
@@ -48,6 +49,38 @@ final class HelperTests: XCTestCase {
         try! curl.downloadIndexedGrib(url: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/00/6hrly_grib_01/flxf2022080812.01.2022080800.grb2", to: "/Users/patrick/Downloads/test.grib", include: { line in
             line.contains(":")
         })*/
+    }
+    
+    func testDecodeEcmwfIndex() throws {
+        var buffer = ByteBuffer()
+        buffer.writeString("""
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "levtype": "sfc", "number": "21", "step": "102", "param": "tp", "_offset": 0, "_length": 812043}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "30", "param": "10v", "_offset": 812043, "_length": 609069}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "31", "param": "10v", "_offset": 1421112, "_length": 609069}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "16", "param": "10v", "_offset": 2030181, "_length": 609069}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "16", "param": "10u", "_offset": 2639250, "_length": 609069}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "41", "param": "10v", "_offset": 3248319, "_length": 609069}
+        """)
+        let index = try buffer.readEcmwfIndexEntries()
+        XCTAssertEqual(index.count, 6)
+        let range = index.indexToRange()
+        XCTAssertEqual(range.range, "0-3857388")
+        XCTAssertEqual(range.minSize, 3857388)
+        
+        var buffer2 = ByteBuffer()
+        buffer2.writeString("""
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "levtype": "sfc", "number": "21", "step": "102", "param": "tp", "_offset": 0, "_length": 812043}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "30", "param": "10v", "_offset": 812044, "_length": 609068}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "31", "param": "10v", "_offset": 1421112, "_length": 609069}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "16", "param": "10v", "_offset": 2030181, "_length": 609069}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "16", "param": "10u", "_offset": 2639249, "_length": 609068}
+        {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "step": "102", "levtype": "sfc", "number": "41", "param": "10v", "_offset": 3248319, "_length": 609069}
+        """)
+        let index2 = try buffer2.readEcmwfIndexEntries()
+        XCTAssertEqual(index2.count, 6)
+        let range2 = index2.indexToRange()
+        XCTAssertEqual(range2.range, "0-812043,812044-2639250,2639249-3248317,3248319-3857388")
+        XCTAssertEqual(range2.minSize, 3857386)
     }
     
     /*func testSpawn() async throws {

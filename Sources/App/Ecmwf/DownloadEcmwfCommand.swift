@@ -23,6 +23,12 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
 
         @Flag(name: "skip-existing")
         var skipExisting: Bool
+        
+        //@Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
+        //var upperLevel: Bool
+        
+        @Option(name: "only-variables")
+        var onlyVariables: String?
     }
 
     var help: String {
@@ -45,74 +51,110 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
 
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
+        let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
+        let surfaceVariables = EcmwfVariable.allCases.filter({$0.level == nil})
+        let variables = onlyVariables ?? (domain == .ifs04_ensemble ? surfaceVariables : EcmwfVariable.allCases)
+        
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
-        try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, skipFilesIfExisting: signature.skipExisting)
-        try convertEcmwf(logger: logger, domain: domain, run: run)
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
+        try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables)
+        try convertEcmwf(logger: logger, domain: domain, run: run, variables: variables)
     }
     
-    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, skipFilesIfExisting: Bool) async throws {
+    /// Download elevation file
+    func downloadEcmwfElevation(application: Application, domain: EcmwfDomain, base: String, run: Timestamp) async throws {
         let logger = application.logger
-        
-        
-        let dateStr = run.format_YYYYMMdd
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
-        let downloadDirectory = domain.downloadDirectory
-        try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        
-        let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        
-        let product: String
-        let productType: String
-        switch domain {
-        case .ifs04:
-            product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
-            productType = "fc"
-        case .ifs04_ensemble:
-            product = "enfo"
-            productType = "ef"
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
+            return
         }
-        let runStr = run.hour.zeroPadded(len: 2)
+        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         
+        var generateElevationFileData: (lsm: [Float]?, surfacePressure: [Float]?, sealevelPressure: [Float]?, temperature_2m: [Float]?) = (nil, nil, nil, nil)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
+        logger.info("Downloading height and elevation data")
+        let url = domain.getUrl(base: base, run: run, hour: 0)
+        for message in try await curl.downloadEcmwfIndexed(url: url, isIncluded: { entry in
+            if let member = entry.number, member != "1" {
+                return false
+            }
+            return entry.levtype == .sfc && ["lsm", "2t", "sp", "msl"].contains(entry.param)
+        }) {
+            let shortName = message.get(attribute: "shortName")!
+            try grib2d.load(message: message)
+            grib2d.array.flipLatitude()
+            
+            switch shortName {
+            case "lsm":
+                generateElevationFileData.lsm = grib2d.array.data
+            case "2t":
+                grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
+                generateElevationFileData.temperature_2m = grib2d.array.data
+            case "sp":
+                grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
+                generateElevationFileData.surfacePressure = grib2d.array.data
+            case "msl":
+                grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
+                generateElevationFileData.sealevelPressure = grib2d.array.data
+            default:
+                fatalError("Received too many grib messages \(shortName)")
+            }
+        }
+        logger.info("Generating elevation file")
+        guard let lsm = generateElevationFileData.lsm else {
+            fatalError("Did not get LSM data")
+        }
+        guard let surfacePressure = generateElevationFileData.surfacePressure,
+              let sealevelPressure = generateElevationFileData.sealevelPressure,
+              let temperature_2m = generateElevationFileData.temperature_2m else {
+            fatalError("Did not get pressure data")
+        }
+        let elevation: [Float] = zip(zip(surfacePressure, sealevelPressure), zip(temperature_2m, lsm)).map {
+            let ((surfacePressure, sealevelPressure), (temperature_2m, landmask)) = $0
+            return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
+        }
+        try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(domain.downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+    }
+    
+    /// Download ECMWF ifs open data
+    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, skipFilesIfExisting: Bool, variables: [EcmwfVariable]) async throws {
+        let logger = application.logger
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        let downloadDirectory = domain.downloadDirectory
+        let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             
-            /// Generate model elevation from sealevel and surface pressure
-            var generateElevationFile = !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm)
-            var generateElevationFileData: (lsm: [Float]?, surfacePressure: [Float]?, sealevelPressure: [Float]?, temperature_2m: [Float]?) = (nil, nil, nil, nil)
-            
-            let variables = EcmwfVariable.allCases.filter { variable in
+            let variables = variables.filter { variable in
                 let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
                 return !skipFilesIfExisting || FileManager.default.fileExists(atPath: file)
             }
-            
             if variables.isEmpty {
                 continue
             }
-            
-            //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-0h-oper-fc.grib2
-            //https://data.ecmwf.int/forecasts/20220831/00z/0p4-beta/oper/20220831000000-12h-oper-fc.grib2
-            let url = "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-\(productType).grib2"
-            
-            for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
+            let url = domain.getUrl(base: base, run: run, hour: hour)
+            for message in try await curl.downloadEcmwfIndexed(url: url, isIncluded: { entry in
+                return variables.contains(where: { variable in
+                    if let level = entry.level {
+                        // entry is a pressure level variable
+                        return variable.level == level && entry.param == variable.gribName
+                    }
+                    return entry.param == variable.gribName
+                })
+            }) {
                 let shortName = message.get(attribute: "shortName")!
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
-                
-                if shortName == "lsm" {
-                    if generateElevationFile {
-                        try grib2d.load(message: message)
-                        grib2d.array.flipLatitude()
-                        generateElevationFileData.lsm = grib2d.array.data
-                    }
-                    continue
-                }
                 
                 guard let variable = variables.first(where: { variable in
                     if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
@@ -134,6 +176,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     }
                     fatalError("Got unknown variable \(shortName) \(levelhPa)")
                 }
+                //logger.info("Processing \(variable)")
                 
                 try grib2d.load(message: message)
                 grib2d.array.flipLatitude()
@@ -143,49 +186,18 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
-                if variable == .temperature_2m && generateElevationFile && member == 0 {
-                    generateElevationFileData.temperature_2m = grib2d.array.data
-                }
-                if variable == .pressure_msl && generateElevationFile && member == 0 {
-                    generateElevationFileData.sealevelPressure = grib2d.array.data
-                }
-                if variable == .surface_air_pressure && generateElevationFile && member == 0 {
-                    generateElevationFileData.surfacePressure = grib2d.array.data
-                }
-                
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let file = "\(downloadDirectory)\(variable.omFileName)_\(hour)\(memberStr).om"
                 try FileManager.default.removeItemIfExists(at: file)
                 
-                
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                 try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
-            }
-            
-            if generateElevationFile {
-                logger.info("Generating elevation file")
-                guard let lsm = generateElevationFileData.lsm else {
-                    fatalError("Did not get LSM data")
-                }
-                guard let surfacePressure = generateElevationFileData.surfacePressure,
-                      let sealevelPressure = generateElevationFileData.sealevelPressure,
-                      let temperature_2m = generateElevationFileData.temperature_2m else {
-                    fatalError("Did not get pressure data")
-                }
-                let elevation: [Float] = zip(zip(surfacePressure, sealevelPressure), zip(temperature_2m, lsm)).map {
-                    let ((surfacePressure, sealevelPressure), (temperature_2m, landmask)) = $0
-                    return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
-                }
-                //try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-                try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
-                generateElevationFile = false
-                generateElevationFileData = (nil, nil, nil, nil)
             }
         }
         curl.printStatistics()
     }
     
-    func convertEcmwf(logger: Logger, domain: EcmwfDomain, run: Timestamp) throws {
+    func convertEcmwf(logger: Logger, domain: EcmwfDomain, run: Timestamp, variables: [EcmwfVariable]) throws {
         let downloadDirectory = domain.downloadDirectory
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
@@ -195,7 +207,6 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         
         let nLocations = domain.grid.nx * domain.grid.ny
         
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         
@@ -204,7 +215,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         
         let members = domain.ensembleMembers ?? 1
         
-        for variable in EcmwfVariable.allCases {
+        for variable in variables {
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             let skip = 0
             
@@ -268,6 +279,18 @@ extension EcmwfDomain {
         case .ifs04:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
+        }
+    }
+    /// Get download url for a given domain and timestep
+    fileprivate func getUrl(base: String, run: Timestamp, hour: Int) -> String {
+        let runStr = run.hour.zeroPadded(len: 2)
+        let dateStr = run.format_YYYYMMdd
+        switch self {
+        case .ifs04:
+            let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            return "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
+        case .ifs04_ensemble:
+            return "\(base)\(dateStr)/\(runStr)z/0p4-beta/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
         }
     }
 }
