@@ -140,22 +140,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                     return ("asob_s", "single-level", nil)
                 }
                 break
-            case .wind_u_component_120m:
-                fallthrough
-            case .wind_v_component_120m:
-                fallthrough
-            case .temperature_120m:
-                fallthrough
-            case .wind_u_component_180m:
-                fallthrough
-            case .wind_v_component_180m:
-                fallthrough
-            case .temperature_180m:
-                if domain != .iconD2 {
-                    // levels 120 and 180 are only in d2
-                    return nil
-                }
-                break
             //case .pressure_msl pressure only on surface level
             case .direct_radiation:
                 break // ICON-EPS has only 3-hourly data
@@ -191,6 +175,27 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             case .cape:
                 if domain == .iconEps {
                     return nil // not in global
+                }
+                break
+                
+                // all variables below are only in the D2 EPS model
+            case .wind_u_component_120m:
+                fallthrough
+            case .wind_v_component_120m:
+                fallthrough
+            case .temperature_120m:
+                fallthrough
+            case .wind_u_component_180m:
+                fallthrough
+            case .wind_v_component_180m:
+                fallthrough
+            case .rain:
+                fallthrough
+            case .showers:
+                fallthrough
+            case .temperature_180m:
+                if domain != .iconD2 {
+                    return nil
                 }
                 break
             default:

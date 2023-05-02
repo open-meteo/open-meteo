@@ -205,8 +205,13 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .wind_u_component_10m, member: member, time: time)
                 try prefetchData(raw: .wind_v_component_10m, member: member, time: time)
             case .snowfall:
-                try prefetchData(raw: .snowfall_water_equivalent, member: member, time: time)
-                try prefetchData(raw: .snowfall_convective_water_equivalent, member: member, time: time)
+                if reader.domain == .iconEps {
+                    try prefetchData(raw: .precipitation, member: member, time: time)
+                    try prefetchData(raw: .temperature_2m, member: member, time: time)
+                } else {
+                    try prefetchData(raw: .snowfall_water_equivalent, member: member, time: time)
+                    try prefetchData(raw: .snowfall_convective_water_equivalent, member: member, time: time)
+                }
             case .surface_pressure:
                 try prefetchData(raw: .pressure_msl, member: member, time: time)
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
@@ -326,6 +331,15 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 }
                 return DataAndUnit(et0, .millimeter)
             case .snowfall:
+                if reader.domain == .iconEps {
+                    let precipitation = try get(raw: .precipitation, member: member, time: time).data
+                    let temperature = try get(raw: .temperature_2m, member: member, time: time).data
+                    // snowfall if temperature below 0°C
+                    let snowfall = zip(precipitation, temperature).map({
+                        $0 * ($1 < 0 ? 0.7 : 0)
+                    })
+                    return DataAndUnit(snowfall, SiUnit.centimeter)
+                }
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, member: member, time: time).data
                 let snow_con = try get(raw: .snowfall_convective_water_equivalent, member: member, time: time).data
                 let snowfall = zip(snow_gsp, snow_con).map({
