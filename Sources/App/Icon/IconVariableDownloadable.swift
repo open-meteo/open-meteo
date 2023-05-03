@@ -29,9 +29,11 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             return true
         }
         // only 6h pressure in icon
-        if domain == .iconEps && self == .pressure_msl &&
-            [6,18].contains(run.hour) &&
-            hour % 6 != 0 {
+        if domain == .iconEps && self == .pressure_msl && hour % 6 != 0 {
+            return true
+        }
+        // only 6h cape in icon-eu for 6 and 18z run
+        if domain == .iconEuEps && self == .cape && [6,18].contains(run.hour) && (hour % 6 != 0 || hour == 0) {
             return true
         }
         if hour != 0 {
