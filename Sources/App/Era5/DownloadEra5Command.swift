@@ -229,7 +229,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         let binsPerYear = 6
         let nLocationChunks = 200
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: nLocationChunks, chunk1: binsPerYear)
-        let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm)
+        let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm, length_unit: .metric)
         let variables: [Cmip6VariableOrDerived] = Cmip6Variable.allCases.map{.raw($0)} + Cmip6VariableDerivedBiasCorrected.allCases.map{.derived($0)}
         let availableForEra5Land: [Cmip6VariableOrDerived] = [
             Cmip6Variable.temperature_2m_min,

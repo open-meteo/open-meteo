@@ -342,6 +342,7 @@ struct SeasonalQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
     let precipitation_unit: PrecipitationUnit?
+    let length_unit: LengthUnit?
     let timeformat: Timeformat?
     let past_days: Int?
     let forecast_days: Int?
