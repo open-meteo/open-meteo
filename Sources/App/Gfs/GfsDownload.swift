@@ -159,7 +159,7 @@ struct GfsDownload: AsyncCommandFix {
         case .gfs025_ens:
             deadLineHours = 4
         case .gfs05_ens:
-            deadLineHours = 5
+            deadLineHours = secondFlush ? 10 : 5
         }
         let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)

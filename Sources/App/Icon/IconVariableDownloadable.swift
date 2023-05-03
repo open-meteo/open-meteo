@@ -28,6 +28,12 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             hour % 6 != 0 {
             return true
         }
+        // only 6h pressure in icon
+        if domain == .iconEps && self == .pressure_msl &&
+            [6,18].contains(run.hour) &&
+            hour % 6 != 0 {
+            return true
+        }
         if hour != 0 {
             return false
         }
