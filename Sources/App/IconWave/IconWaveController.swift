@@ -35,7 +35,7 @@ struct IconWaveController {
             var res = [ApiColumn]()
             res.reserveCapacity(variables.count)
             for variable in variables {
-                let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.rawValue)
+                let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.rawValue)
                 res.append(d)
             }
             return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
