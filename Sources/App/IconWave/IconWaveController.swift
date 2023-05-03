@@ -43,7 +43,7 @@ struct IconWaveController {
         
         let daily: ApiSection? = try paramsDaily.map { dailyVariables in
             return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.map { variable in
-                let d = try reader.getDaily(variable: variable, time: dailyTime).toApi(name: variable.rawValue)
+                let d = try reader.getDaily(variable: variable, time: dailyTime).convertAndRound(params: params).toApi(name: variable.rawValue)
                 assert(dailyTime.count == d.data.count)
                 return d
             })
@@ -75,14 +75,15 @@ struct IconWaveMixer: GenericReaderMixer {
     }
 }
 
-struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone {
+struct IconWaveQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
     let hourly: [String]?
     let daily: [String]?
-    //let temperature_unit: TemperatureUnit?
-    //let windspeed_unit: WindspeedUnit?
-    //let precipitation_unit: PrecipitationUnit?
+    let temperature_unit: TemperatureUnit?
+    let windspeed_unit: WindspeedUnit?
+    let precipitation_unit: PrecipitationUnit?
+    let length_unit: LengthUnit?
     let timeformat: Timeformat?
     let past_days: Int?
     let format: ForecastResultFormat?

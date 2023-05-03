@@ -151,16 +151,23 @@ enum PrecipitationUnit: String, Codable {
     case inch
 }
 
+enum LengthUnit: String, Codable {
+    case metric
+    case imperial
+}
+
 struct ApiUnits: ApiUnitsSelectable {
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
     let precipitation_unit: PrecipitationUnit?
+    let length_unit: LengthUnit?
 }
 
 protocol ApiUnitsSelectable {
     var temperature_unit: TemperatureUnit? { get }
     var windspeed_unit: WindspeedUnit? { get }
     var precipitation_unit: PrecipitationUnit? { get }
+    var length_unit: LengthUnit? { get }
 }
 
 struct DataAndUnit {
@@ -172,17 +179,14 @@ struct DataAndUnit {
         self.unit = unit
     }
     
+    /// Convert a given array to target units
     func convertAndRound<Query: ApiUnitsSelectable>(params: Query) -> DataAndUnit {
-        return convertAndRound(temperatureUnit: params.temperature_unit, windspeedUnit: params.windspeed_unit, precipitationUnit: params.precipitation_unit)
-    }
-
-    /// Convert a given array to target unit
-    func convertAndRound(temperatureUnit: TemperatureUnit?, windspeedUnit: WindspeedUnit?, precipitationUnit: PrecipitationUnit?) -> DataAndUnit {
-        
         var data = self.data
         var unit = self.unit
         
-        let windspeedUnit = windspeedUnit ?? .kmh
+        let windspeedUnit = params.windspeed_unit ?? .kmh
+        let temperatureUnit = params.temperature_unit
+        let precipitationUnit = params.precipitation_unit ?? (params.length_unit == .imperial ? .inch : nil)
         if unit == .celsius && temperatureUnit == .fahrenheit {
             
             for i in data.indices {

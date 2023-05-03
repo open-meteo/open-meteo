@@ -134,7 +134,8 @@ struct GloFasController {
         let daily = ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
             try zip(readers, domains).compactMap { (reader, domain) in
                 let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
-                let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(temperatureUnit: .celsius, windspeedUnit: .ms, precipitationUnit: .mm).toApi(name: name)
+                let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm, length_unit: .metric)
+                let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: units).toApi(name: name)
                 assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
                 return d
             }
