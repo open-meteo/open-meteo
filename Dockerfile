@@ -43,7 +43,7 @@ RUN pip3 install cdsapi
 WORKDIR /app
 
 # Copy build artifacts
-COPY --from=build --chown=vapor:vapor /build/.build/release /app
+COPY --from=build --chown=vapor:vapor /build/.build/release/openmeteo-api /app
 RUN mkdir -p /app/Resources
 # COPY --from=build --chown=vapor:vapor /build/Resources /app/Resources
 COPY --from=build --chown=vapor:vapor /build/.build/release/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources /app/Resources/
