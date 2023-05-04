@@ -1,7 +1,7 @@
 # ================================
-# Build image
+# Build image contains swift compiler and libraries like netcdf or eccodes
 # ================================
-FROM swift:5.8.0-jammy as build
+FROM ghcr.io/open-meteo/docker-container-build:latest as build
 WORKDIR /build
 
 # First just resolve dependencies.
@@ -14,44 +14,35 @@ RUN swift package resolve
 # Copy entire repo into container
 COPY . .
 
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y wget gpg
-RUN wget -qO - https://patrick-zippenfenig.github.io/ecCodes-ubuntu/public.key | gpg --dearmor -o /etc/apt/trusted.gpg.d/ecCodes-ubuntu.gpg
-RUN echo "deb https://patrick-zippenfenig.github.io/ecCodes-ubuntu/ jammy main" > /etc/apt/sources.list.d/ecCodes-ubuntu.list
-RUN apt update && apt install -y libnetcdf-dev libeccodes0 libbz2-dev build-essential && rm -rf /var/lib/apt/lists/*
-
 # Compile with optimizations
-RUN swift build --enable-test-discovery -c release
+RUN swift build -c release
+
 
 # ================================
-# Run image
+# Run image contains swift runtime libraries, netcdf, eccodes, cdo and cds utilities
 # ================================
-FROM swift:5.8.0-jammy-slim
+FROM ghcr.io/open-meteo/docker-container-build:latest
 
-# Create a vapor user and group with /app as its home directory
-RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app vapor
-
-
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt update && apt install -y wget gpg
-RUN wget -qO - https://patrick-zippenfenig.github.io/ecCodes-ubuntu/public.key | gpg --dearmor -o /etc/apt/trusted.gpg.d/ecCodes-ubuntu.gpg
-RUN echo "deb https://patrick-zippenfenig.github.io/ecCodes-ubuntu/ jammy main" > /etc/apt/sources.list.d/ecCodes-ubuntu.list
-RUN apt update && apt install -y libnetcdf19 libeccodes0 bzip2 cdo curl python3-pip && rm -rf /var/lib/apt/lists/*
-RUN pip3 install cdsapi
+# Create a openmeteo user and group with /app as its home directory
+RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app openmeteo
 
 # Switch to the new home directory
 WORKDIR /app
 
 # Copy build artifacts
-COPY --from=build --chown=vapor:vapor /build/.build/release/openmeteo-api /app
+COPY --from=build --chown=openmeteo:openmeteo /build/.build/release/openmeteo-api /app
 RUN mkdir -p /app/Resources
-# COPY --from=build --chown=vapor:vapor /build/Resources /app/Resources
-COPY --from=build --chown=vapor:vapor /build/.build/release/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources /app/Resources/
-COPY --from=build --chown=vapor:vapor /build/Public /app/Public
+# COPY --from=build --chown=openmeteo:openmeteo /build/Resources /app/Resources
+COPY --from=build --chown=openmeteo:openmeteo /build/.build/release/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources /app/Resources/
+COPY --from=build --chown=openmeteo:openmeteo /build/Public /app/Public
 
-# Ensure all further commands run as the vapor user
-USER vapor:vapor
+# Attach a volumne
+RUN mkdir /app/data && chown openmeteo:openmeteo /app/data
+VOLUME /app/data
 
-# Start the Vapor service when the image is run, default to listening on 8080 in production environment 
+# Ensure all further commands run as the openmeteo user
+USER openmeteo:openmeteo
+
+# Start the service when the image is run, default to listening on 8080 in production environment 
 ENTRYPOINT ["./openmeteo-api"]
 CMD ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8080"]
