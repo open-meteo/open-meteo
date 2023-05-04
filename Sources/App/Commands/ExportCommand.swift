@@ -37,6 +37,9 @@ struct ExportCommand: AsyncCommandFix {
         @Option(name: "calculate_daily_normals_over_n_years")
         var dailyNormalsOverNYears: Int?
         
+        @Option(name: "rain-day-distribution")
+        var rainDayDistribution: String?
+        
         @Option(name: "output", short: "o", help: "Output file name. Default: ./output.nc")
         var outputFilename: String?
         
@@ -97,12 +100,13 @@ struct ExportCommand: AsyncCommandFix {
             targetGridDomain: regriddingDomain,
             outputCoordinates: signature.outputCoordinates,
             outputElevation: signature.outputElevation,
-            dailyNormalsOverNYears: signature.dailyNormalsOverNYears
+            dailyNormalsOverNYears: signature.dailyNormalsOverNYears,
+            rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution)
         )
         try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
     }
     
-    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, dailyNormalsOverNYears: Int?) throws {
+    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, dailyNormalsOverNYears: Int?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
         
         /// needs to be evenly dividable by grid.nx
@@ -160,7 +164,7 @@ struct ExportCommand: AsyncCommandFix {
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data.data)) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data))
+                    let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data.data), rainDayDistribution: rainDayDistribution ?? .end) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data))
                     try ncVariable.write(normals, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
                     progress.add(time.count * 4)
                 }
@@ -174,7 +178,7 @@ struct ExportCommand: AsyncCommandFix {
                 guard let data = try reader.get(mixed: variable, time: time)?.data else {
                     fatalError("Invalid variable \(variable)")
                 }
-                let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data)) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data))
+                let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data), rainDayDistribution: rainDayDistribution ?? .end) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data))
                 try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
                 progress.add(time.count * 4)
             }
@@ -269,13 +273,22 @@ struct DailyNormalsCalculator {
         return sum
     }
     
+    
+    enum RainDayDistribution: String, CaseIterable {
+        /// Place all rainy days at the beginning of each week
+        case end
+        
+        /// Distribute rainy days throughout the week
+        case mixed
+    }
+    
     /// Calculate daily mean values, but preserve events below a certain threshold. E.g. for precipitation. Approach:
     /// - Split a year into 52 parts (each 7 days long)
     /// - For each "part" calculate sum, count and the number below a threshold
     /// - Also distribute each "value" into 5 parts to reduce outliners. Effectivly calcualting 35 days sliding values
     /// - To restore daily normals, calculate the average for each part and distribute according to "days below threshold"
-    /// - Days below threhold (dry days) will be at the bedinning of each 11-day part
-    func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, lowerThanThreshold: Float = 0.3) -> [Float] {
+    /// - Days below threhold (dry days) will be at the beginning of each 11-day part
+    func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, lowerThanThreshold: Float = 0.3, rainDayDistribution: RainDayDistribution) -> [Float] {
         /// Number of parts to split a year into. 365.25 / 52 = ~7.02 days
         let partPerYear = 52
         /// Sum of all values
@@ -313,8 +326,34 @@ struct DailyNormalsCalculator {
             let dryDays = Int(round(fractionBelowThreshold * Float(daysPerPart)))
             let wetDays = max(daysPerPart - dryDays, 1)
             let dayOfPart = i % daysPerPart
-            if dayOfPart < dryDays {
-                return 0
+            switch rainDayDistribution {
+            case .end:
+                if dayOfPart < dryDays {
+                    return 0
+                }
+            case .mixed:
+                let rainDayPositions: [Int]
+                switch wetDays {
+                case 1:
+                    rainDayPositions = [3]
+                case 2:
+                    rainDayPositions = [1, 4]
+                case 3:
+                    rainDayPositions = [1, 3, 5]
+                case 4:
+                    rainDayPositions = [0, 2, 4, 6]
+                case 5:
+                    rainDayPositions = [0, 2, 4, 5, 6]
+                case 6:
+                    rainDayPositions = [0, 1, 2, 4, 5, 6]
+                case 7:
+                    rainDayPositions = [0, 1, 2, 3, 4, 5, 6]
+                default:
+                    fatalError("Not reachable")
+                }
+                if !rainDayPositions.contains(dayOfPart) {
+                    return 0
+                }
             }
             return partsSum[index] / partsCount[index] / (Float(wetDays) / Float(daysPerPart))
         }
