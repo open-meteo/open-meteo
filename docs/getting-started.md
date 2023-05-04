@@ -4,7 +4,7 @@
 Open-Meteo has 3 components:
 - HTTP server for APIs and simple web-interfaces
 - Download commands for weather datasets
-- File-based database to store all downloaded datasets
+- File-based database to store all downloaded datasets. Literally just the `./data` directory
 
 The HTTP server and download commands are developed using the Vapor Swift framework and compile to a single binary `openmeteo-api`. 
 
@@ -16,69 +16,28 @@ Hardware requirements:
 - For all forecast data, 150 GB disk space are recommended. If only a small selection for weather variables is used, just a couple of GB are fine.
 
 ## Running the API
-There are different option to run Open-Meteo: Docker, native and with prebuilt ubuntu jammy packages.
+There are different option to run Open-Meteo: Docker or with prebuilt ubuntu jammy packages.
 
-### Running on docker
-To quickly compile and run Open-Meteo, docker can be used. It will run an container which exposes the open-meteo API to http://127.0.0.1:8080. Afterwards weather datasets can be downloaded.
+### Running on Docker
+To quickly run Open-Meteo, Docker can be used. It will run an container which exposes the Open-Meteo API to http://127.0.0.1:8080. Afterwards weather datasets can be downloaded. 
 
 ```bash
-git clone https://github.com/open-meteo/open-meteo.git
-cd open-meteo
-docker-compose up
+# Get the latest image
+docker pull ghcr.io/open-meteo/open-meteo
 
-# Download ECMWF
-docker-compose run open-meteo download-ecmwf --run 00
+# Create a local data directory
+mkdir data
+chmod o+w data
+
+# Start the API service on http://127.0.0.1:8080
+docker run -d --rm -v ${PWD}/data:/app/data -p 8080:8080 ghcr.io/open-meteo/open-meteo
+
+# Download ECMWF IFS temperature forecast 
+docker run -it --rm -v ${PWD}/data:/app/data ghcr.io/open-meteo/open-meteo download-ecmwf --run 00 --only-variables temperature_2m
+
+# Get your forecast
+curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs04&hourly=temperature_2m"
 ```
-
-To stop running containers: `docker-compose down (add -v to wipe data)`
-
-Compile and build new images: `docker-compose build`
-
-### Development
-Using docker helps to run Open-Meteo, but all changes require a new image build, which slows down development. The Vapor development guide for [macOS](https://docs.vapor.codes/install/macos/) and [linux](https://docs.vapor.codes/install/linux/) help to get started.
-
-Develop with Docker:
-```bash
-git clone https://github.com/open-meteo/open-meteo.git
-cd open-meteo
-
-# Install docker
-docker build -f Dockerfile.development -t open-meteo-development .
-docker run -it --security-opt seccomp=unconfined -p 8080:8080 -v ${PWD}:/app -t open-meteo-development /bin/bash
-# Run commands inside docker container:
-swift run
-swift run openmeteo-api download-ecmwf --run 00
-```
-
-Develop on macOS:
-```bash
-git clone https://github.com/open-meteo/open-meteo.git
-cd open-meteo
-
-# Install Xcode from the App store
-# Install brew
-brew install netcdf cdo bzip2
-pip3 install cdsapi
-open Package.swift
-# `swift run` works as well
-```
-
-
-Develop on Linux natively:
-```bash
-git clone https://github.com/open-meteo/open-meteo.git
-cd open-meteo
-
-# Install the swift compiler as pointed out in the Vapor development guide
-apt install libnetcdf-dev libeccodes-dev libbz2-dev build-essential cdo python3-pip curl
-pip3 install cdsapi
-swift run
-swift run openmeteo-api download-ecmwf --run 00
-```
-
-Notes: 
-- To restart `swift run` press `ctrl+c` and run `swift run` again
-- Add `-c release` to swift run to switch to a faster release build
 
 ### Using prebuilt Ubuntu jammy packages
 If you are running Ubuntu 22.04 jammy, you can use prebuilt binaries.
@@ -93,10 +52,10 @@ sudo apt install openmeteo-api
 # Download ECMWF
 sudo chown -R $(id -u):$(id -g) /var/lib/openmeteo-api
 cd /var/lib/openmeteo-api
-openmeteo-api download-ecmwf --run 00
+openmeteo-api download-ecmwf --run 00 --only-variables temperature_2m
 ```
 
-This will automatically install and run an empty API instance at `http://your-ip:8080`. It can be checked with:
+This will automatically install and run an empty API instance at `http://127.0.0.1:8080`. It can be checked with:
 ```bash
 sudo systemctl status openmeteo-api
 sudo systemctl restart openmeteo-api
@@ -135,10 +94,10 @@ Additionally all download instructions as a cronjob file are available [here](ht
 ### DWD ICON
 The DWD ICON models are the most important source for the 7 days weather API. There are 3 different domains available:
 - ICON global at 11 km resolution, runs `00,06,12,18`
-- ICON EU with 7 km, runs `00,06,12,18`
+- ICON EU with 7 km, runs `00,03,06,09,12,15,18,21`
 - ICON D2 Central Europe with 2 km resolution, runs `00,03,06,09,12,15,18,21`
 
-As a minimum requirement, ICON global should be downloaded. To download the 00 run: `<exe> download icon --run 00 --only-variables temperature_2m,weathercode`. If `onlyVariables` is omitted, all ICON weather variables are downloaded, which could take a couple of hours.
+As a minimum requirement, ICON global should be downloaded. To download the 00 run: `<exe> download icon --run 00 --only-variables temperature_2m,weathercode`. If `only-variables` is omitted, all ICON weather variables are downloaded, which could take a couple of hours.
 
 For the first run, the ICON downloader will download additional domain geometry information and prepare reproduction weights. It might take a while.
 
