@@ -107,7 +107,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_hrdps_continental:
             return Array(stride(from: 0, through: 48, by: 1))
         case .gem_global_ensemble:
-            let thr7ough = run.hour == 0 && run.weekday == .thursday ? 768 : 384
+            let through = run.hour == 0 && run.weekday == .thursday ? 768 : 384
             return Array(stride(from: 0, to: 192, by: 3)) + Array(stride(from: 192, through: through, by: 6))
         }
     }
