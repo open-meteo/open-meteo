@@ -310,6 +310,13 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))}), .percent)
         }
         
+        /// Adjust surface pressure to target elevation. Surface pressure is stored for `modelElevation`, but we want to get the pressure on `targetElevation`
+        if case let .surface(variable) = raw.variable, variable == .surface_pressure {
+            let pressure = try reader.get(variable: raw, time: time)
+            let factor = Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.modelElevation.numeric) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation)
+            return DataAndUnit(pressure.data.map({$0*factor}), pressure.unit)
+        }
+        
         /// GFS ensemble has no diffuse radiation
         if (domain == .gfs025_ens || domain == .gfs05_ens), case let .surface(variable) = raw.variable, variable == .diffuse_radiation {
             let ghi = try reader.get(variable: .init(.surface(.shortwave_radiation), member), time: time)
@@ -536,7 +543,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .pressure_msl:
                 let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time).data
                 let pressure_surface = try get(raw: .init(.surface(.surface_pressure), member), time: time)
-                return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: pressure_surface.data, elevation: reader.targetElevation), pressure_surface.unit)
+                return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: pressure_surface.data, elevation: reader.modelElevation.numeric), pressure_surface.unit)
             case .terrestrial_radiation:
                 /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
