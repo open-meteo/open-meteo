@@ -111,6 +111,10 @@ struct GemDownload: AsyncCommandFix {
         let terrainUrl = domain.getUrl(run: run, hour: 0, gribName: "HGT_SFC_0")
         for message in try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false) {
             try grib2d.load(message: message)
+            if domain == .gem_global_ensemble {
+                // Only ensemble model is shifted by 180°
+                grib2d.array.shift180Longitudee()
+            }
             height = grib2d.array
             //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         }
