@@ -69,7 +69,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             if [.iconEuEps, .iconEps].contains(reader.domain), surface == .pressure_msl {
                 let surface_pressure = try reader.get(variable: raw, time: time).data
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
-                return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: surface_pressure, elevation: reader.targetElevation), .hectoPascal)
+                return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: surface_pressure, elevation: reader.modelElevation.numeric), .hectoPascal)
             }
             
             // EPS models do not have weather codes
