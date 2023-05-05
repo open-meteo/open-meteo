@@ -195,6 +195,7 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumitidy_2m
     case dewpoint_2m
+    case temperature_120m
     case windspeed_10m
     case winddirection_10m
     case windspeed_80m
@@ -431,6 +432,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.lifted_index), member), time: time)
             case .is_day:
                 break
+            case .temperature_120m:
+                try prefetchData(raw: .init(.surface(.temperature_100m), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -604,6 +607,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
+            case .temperature_120m:
+                return try get(raw: .init(.surface(.temperature_100m), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
