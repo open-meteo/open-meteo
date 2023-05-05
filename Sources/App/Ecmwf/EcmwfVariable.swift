@@ -566,6 +566,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case dewpoint_50hPa
     case soil_temperature_0_7cm
     case soil_temperature_0_10cm
+    case soil_temperature_0_to_10cm
     case weathercode
     case cloudcover
     case cloudcover_low

@@ -200,6 +200,8 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let u = try get(raw: .init(.eastward_wind_50hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
+        case .soil_temperature_0_to_10cm:
+            fallthrough
         case .soil_temperature_0_10cm:
             fallthrough
         case .soil_temperature_0_7cm:
@@ -398,6 +400,8 @@ struct EcmwfReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .winddirection_50hPa:
             try prefetchData(raw: .init(.northward_wind_50hPa, member), time: time)
             try prefetchData(raw: .init(.eastward_wind_50hPa, member), time: time)
+        case .soil_temperature_0_to_10cm:
+            fallthrough
         case .soil_temperature_0_10cm:
             fallthrough
         case .soil_temperature_0_7cm:
