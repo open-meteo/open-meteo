@@ -70,7 +70,7 @@ enum EcmwfDomain: String, GenericDomain {
         return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360/900, dy: 180/450)
     }
     
-    var ensembleMembers: Int? {
+    var ensembleMembers: Int {
         switch self {
         case .ifs04:
             return 1
