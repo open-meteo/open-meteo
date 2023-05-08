@@ -11,8 +11,8 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
         self.member = member
     }
     
-    var omFileName: String {
-        return "\(variable.omFileName)_\(member)"
+    var omFileName: (file: String, level: Int) {
+        return variable.omFileName
     }
     
     var scalefactor: Float {
@@ -36,7 +36,7 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
     }
     
     var rawValue: String {
-        "\(variable.omFileName)_\(member)"
+        "\(variable.omFileName.file)_\(member)"
     }
     
     var requiresOffsetCorrectionForMixing: Bool {
@@ -97,11 +97,8 @@ extension VariableAndMemberAndControl: Hashable, Equatable where Variable: Hasha
 }
 
 extension VariableAndMemberAndControl: GenericVariable where Variable: GenericVariable {
-    var omFileName: String {
-        if member == 0 {
-            return variable.rawValue
-        }
-        return "\(variable.omFileName)_member\(member)"
+    var omFileName: (file: String, level: Int) {
+        return (variable.omFileName.file, member)
     }
     
     var scalefactor: Float {

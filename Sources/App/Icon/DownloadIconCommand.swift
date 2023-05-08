@@ -129,7 +129,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 
                 let url = "\(serverPrefix)\(v.variable)/\(filenameFrom)"
                 
-                let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
+                let filenameDest = "single-level_\(h3)_\(variable.omFileName.file.uppercased()).fpg"
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
                     continue
                 }
@@ -141,7 +141,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
                     for (i, message) in messages.enumerated() {
                         let h3 = (hour*4+i).zeroPadded(len: 3)
-                        let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased()).fpg"
+                        let filenameDest = "single-level_\(h3)_\(variable.omFileName.file.uppercased()).fpg"
                         try grib2d.load(message: message)
                         var data = grib2d.array.data
                         try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
@@ -158,7 +158,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 for (i, message) in messages.enumerated() {
                     try grib2d.load(message: message)
                     let memberStr = i > 0 ? "_\(i)" : ""
-                    let filenameDest = "single-level_\(h3)_\(variable.omFileName.uppercased())\(memberStr).fpg"
+                    let filenameDest = "single-level_\(h3)_\(variable.omFileName.file.uppercased())\(memberStr).fpg"
                     
                     // Write data as encoded floats to disk
                     try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
@@ -210,7 +210,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             guard variable.getVarAndLevel(domain: domain) != nil else {
                 continue
             }
-            let v = variable.omFileName.uppercased()
+            let v = variable.omFileName.file.uppercased()
             let skip = variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run) ? 1 : 0
             
             // For ICON-EPS, `direct radiation` only contains 3-hourly data. Remove them from `forecastSteps` for interpolation
@@ -231,7 +231,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                     return (hour, reader)
                 })
                 
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName.file)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                     
                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                     data2d.data.fillWithNaNs()

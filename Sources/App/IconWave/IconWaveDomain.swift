@@ -101,8 +101,8 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
         return false
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     /// Name used on the dwd open data server

@@ -290,3 +290,81 @@ public struct Array2DFastTime {
         }
     }
 }
+
+public struct Array3DFastTime {
+    public var data: [Float]
+    public let nLocations: Int
+    public let nLevel: Int
+    public let nTime: Int
+    
+    public init(data: [Float], nLocations: Int, nLevel: Int, nTime: Int) {
+        if (data.count != nLocations * nTime * nLevel) {
+            fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nLevel=\(nLevel) nTime=\(nTime) count=\(data.count)")
+        }
+        self.data = data
+        self.nLocations = nLocations
+        self.nLevel = nLevel
+        self.nTime = nTime
+    }
+    
+    public init(nLocations: Int, nLevel: Int, nTime: Int) {
+        self.data = .init(repeating: .nan, count: nLocations * nTime * nLevel)
+        self.nLocations = nLocations
+        self.nTime = nTime
+        self.nLevel = nLevel
+    }
+    
+    @inlinable subscript(location: Int, level: Int, time: Int) -> Float {
+        get {
+            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
+            precondition(time < nTime, "time subscript invalid: \(time) with nTime=\(nTime)")
+            return data[location * nTime * nLevel + level * nTime + time]
+        }
+        set {
+            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
+            precondition(time < nTime, "time subscript invalid: \(time) with nTime=\(nTime)")
+            data[location * nTime * nLevel + level * nTime + time] = newValue
+        }
+    }
+    
+    @inlinable subscript(location: Int, level: Int, time: Range<Int>) -> ArraySlice<Float> {
+        get {
+            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
+            precondition(time.upperBound <= nTime, "time subscript invalid: \(time) with nTime=\(nTime)")
+            return data[time.add(location * nTime * nLevel + level * nTime)]
+        }
+        set {
+            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
+            precondition(time.upperBound <= nTime, "time subscript invalid: \(time) with nTime=\(nTime)")
+            data[time.add(location * nTime * nLevel + level * nTime)] = newValue
+        }
+    }
+    
+    /// One spatial field into time-series array
+    @inlinable subscript(location: Range<Int>, level: Int, time: Int) -> [Float] {
+        get {
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            var out = [Float]()
+            out.reserveCapacity(location.count)
+            for loc in location {
+                out.append(self[loc, level, time])
+            }
+            return out
+        }
+        set {
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            precondition(newValue.count == location.count, "Array and location count do not match")
+            for (loc, value) in zip(location, newValue) {
+                data[loc * nTime * nLevel + level * nTime + time] = value
+            }
+        }
+    }
+}

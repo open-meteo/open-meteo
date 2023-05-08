@@ -157,7 +157,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                         if h == 0 && variable.skipHour0(domain: domain) {
                             return []
                         }
-                        let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(h).om"
+                        let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(h).om"
                         if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
                             return []
                         }
@@ -205,10 +205,10 @@ struct MeteoFranceDownload: AsyncCommandFix {
                     }
                     
                     //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
-                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).om"
+                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).om"
                     try FileManager.default.removeItemIfExists(at: file)
                     
-                    logger.info("Compressing and writing data to \(variable.variable.omFileName)_\(variable.hour).om")
+                    logger.info("Compressing and writing data to \(variable.variable.omFileName.file)_\(variable.hour).om")
                     let compression = variable.variable.isAveragedOverForecastTime || variable.variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                     try writer.write(file: file, compressionType: compression, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                 }
@@ -245,12 +245,12 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 if hour == 0 && skipHour0 {
                     return nil
                 }
-                let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om")
+                let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om")
                 try reader.willNeed()
                 return (hour, reader)
             })
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 data2d.data.fillWithNaNs()

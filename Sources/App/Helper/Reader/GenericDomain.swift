@@ -38,8 +38,8 @@ extension GenericDomain {
  Generic variable for the reader implementation
  */
 protocol GenericVariable: GenericVariableMixable {
-    /// The filename of the variable. Typically just `temperature_2m`
-    var omFileName: String { get }
+    /// The filename of the variable. Typically just `temperature_2m`. Level is used to store mutliple levels or ensemble members in one file
+    var omFileName: (file: String, level: Int) { get }
     
     /// The scalefactor to compress data
     var scalefactor: Float { get }

@@ -514,8 +514,8 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
 enum GloFasVariable: String, GenericVariable {
     case river_discharge
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var scalefactor: Float {

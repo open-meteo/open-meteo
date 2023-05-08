@@ -135,7 +135,7 @@ struct MetNoDownloader: AsyncCommandFix {
             
             /// Create chunked time-series arrays instead of transposing the entire array
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
@@ -159,7 +159,7 @@ struct MetNoDownloader: AsyncCommandFix {
             progress.finish()
             
             if createNetcdf {
-                try spatial.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName).nc", nx: nx, ny: ny)
+                try spatial.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", nx: nx, ny: ny)
             }
         }
     }

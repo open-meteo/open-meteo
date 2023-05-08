@@ -83,8 +83,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     case olive_pollen
     case ragweed_pollen
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var interpolation: ReaderInterpolation {
