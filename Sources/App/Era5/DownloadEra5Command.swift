@@ -871,7 +871,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             }
             
             // chunk 6 locations and 21 days of data
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, indexTime: indexTime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { dim0 in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: indexTime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { dim0 in
                 /// Process around 20 MB memory at once
                 let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, domain.grid.count)
                 

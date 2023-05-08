@@ -227,8 +227,8 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         return false
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var scalefactor: Float {
@@ -359,8 +359,8 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
         return false
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var scalefactor: Float {

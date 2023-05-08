@@ -349,8 +349,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         return false
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var interpolation: ReaderInterpolation {

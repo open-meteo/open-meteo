@@ -17,8 +17,8 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
         return false
     }
     
-    var omFileName: String {
-        rawValue
+    var omFileName: (file: String, level: Int) {
+        (rawValue, 0)
     }
     
     var scalefactor: Float {
@@ -319,8 +319,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     }
     
     /// Name in dwd filenames
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var interpolation: ReaderInterpolation {

@@ -166,7 +166,7 @@ struct GemDownload: AsyncCommandFix {
                 if !variable.includedFor(hour: hour, domain: domain) {
                     continue
                 }
-                let filenameDest = "\(downloadDirectory)\(variable.omFileName)_\(h3).om"
+                let filenameDest = "\(downloadDirectory)\(variable.omFileName.file)_\(h3).om"
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameDest) {
                     continue
                 }
@@ -176,7 +176,7 @@ struct GemDownload: AsyncCommandFix {
                 for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                     let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                     let memberStr = member > 0 ? "_\(member)" : ""
-                    let filenameDest = "\(downloadDirectory)\(variable.omFileName)_\(h3)\(memberStr).om"
+                    let filenameDest = "\(downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).om"
                     //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
                     //fatalError()
                     try grib2d.load(message: message)
@@ -191,7 +191,7 @@ struct GemDownload: AsyncCommandFix {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName)_\(h3)\(memberStr).nc")
+                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).nc")
                     let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                     try writer.write(file: filenameDest, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 }
@@ -234,12 +234,12 @@ struct GemDownload: AsyncCommandFix {
                         return nil
                     }
                     let h3 = hour.zeroPadded(len: 3)
-                    let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(h3)\(memberStr).om")
+                    let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).om")
                     try reader.willNeed()
                     return (hour, reader)
                 })
                 
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName.file)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                     
                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                     data2d.data.fillWithNaNs()

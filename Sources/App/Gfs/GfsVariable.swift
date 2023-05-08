@@ -85,8 +85,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         }
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var scalefactor: Float {
@@ -298,8 +298,8 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
         return false
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var scalefactor: Float {

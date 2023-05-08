@@ -242,8 +242,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         }
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var scalefactor: Float {
@@ -469,8 +469,8 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         return false
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     func gribName(domain: GemDomain) -> String? {
         let isbl = (domain == .gem_hrdps_continental || domain == .gem_global_ensemble) ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"

@@ -139,7 +139,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             logger.info("Downloading hour \(hour)")
             
             let variables = variables.filter { variable in
-                let file = "\(downloadDirectory)\(variable.omFileName)_\(hour).om"
+                let file = "\(downloadDirectory)\(variable.omFileName.file)_\(hour).om"
                 return !skipFilesIfExisting || FileManager.default.fileExists(atPath: file)
             }
             if variables.isEmpty {
@@ -190,7 +190,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 }
                 
                 let memberStr = member > 0 ? "_\(member)" : ""
-                let file = "\(downloadDirectory)\(variable.omFileName)_\(hour)\(memberStr).om"
+                let file = "\(downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr).om"
                 try FileManager.default.removeItemIfExists(at: file)
                 
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
@@ -225,7 +225,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             for member in 0..<members {
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
-                    let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName)_\(hour)\(memberStr).om")
+                    let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr).om")
                     try reader.willNeed()
                     return (hour, reader)
                 })
@@ -237,7 +237,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     return hour
                 }
                 
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName.file)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                     
                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                     data2d.data.fillWithNaNs()

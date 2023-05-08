@@ -91,7 +91,7 @@ extension SurfaceAndPressureVariable: GenericVariable where Surface: GenericVari
         }
     }
     
-    var omFileName: String {
+    var omFileName: (file: String, level: Int) {
         asGenericVariable.omFileName
     }
     

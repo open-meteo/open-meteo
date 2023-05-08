@@ -194,7 +194,7 @@ struct GfsDownload: AsyncCommandFix {
             for member in 0..<domain.ensembleMembers {
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
-                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(memberStr)\(prefix).fpg"
+                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr)\(prefix).fpg"
                     return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
                 }
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
@@ -263,7 +263,7 @@ struct GfsDownload: AsyncCommandFix {
                     }
                     
                     //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
-                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(forecastHour)\(memberStr)\(prefix).fpg"
+                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr)\(prefix).fpg"
                     try FileManager.default.removeItemIfExists(at: file)
                     
                     // Scaling before compression with scalefactor
@@ -288,7 +288,8 @@ struct GfsDownload: AsyncCommandFix {
     
     /// Process each variable and update time-series optimised files
     func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool, secondFlush: Bool) throws {
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let nMembers = domain.ensembleMembers
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count * nMembers, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         let nTime = forecastHours.max()! / domain.dtHours + 1
@@ -297,7 +298,7 @@ struct GfsDownload: AsyncCommandFix {
         let grid = domain.grid
         let nLocations = grid.count
                 
-        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for variable in variables {            
@@ -306,80 +307,82 @@ struct GfsDownload: AsyncCommandFix {
             }
             
             let skip = variable.skipHour0(for: domain) ? 1 : 0
+            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
-            for member in 0..<domain.ensembleMembers {
-                let memberStr = member > 0 ? "_\(member)" : ""
-                let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(memberStr)")
-                
-                let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
-                    if hour == 0 && variable.skipHour0(for: domain) {
-                        return nil
-                    }
-                    /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
-                    let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
-                    let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(hour)\(memberStr)\(prefix).fpg"
-                    let reader = try OmFileReader(file: file)
-                    try reader.willNeed()
-                    return (hour, reader)
-                })
-                
-                // Create netcdf file for debugging
-                if createNetcdf {
-                    let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName).nc", overwriteExisting: true)
-                    try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
-                    var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                        try ncFile.createDimension(name: "time", length: nTime),
-                        try ncFile.createDimension(name: "LAT", length: grid.ny),
-                        try ncFile.createDimension(name: "LON", length: grid.nx)
-                    ])
-                    for reader in readers {
-                        let data = try reader.reader.readAll()
-                        try ncVariable.write(data, offset: [reader.hour/domain.dtHours, 0, 0], count: [1, grid.ny, grid.nx])
-                    }
+            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try forecastHours.compactMap({ hour in
+                if hour == 0 && variable.skipHour0(for: domain) {
+                    return nil
                 }
-                
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
-                    
-                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                    data2d.data.fillWithNaNs()
-                    for reader in readers {
-                        try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
-                    }
-                    
-                    if domain.dtHours == 1 {
-                        // interpolate missing timesteps. We always fill 2 timesteps at once
-                        // data looks like: DDDDDDDDDD--D--D--D--D--D
-                        let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
-                            let forecastHour = hour * domain.dtHours
-                            if forecastHours.contains(forecastHour) || forecastHour % 3 != 1 {
-                                // process 2 timesteps at once
-                                return nil
-                            }
-                            return forecastHour
-                        }
-                        
-                        // Fill in missing hourly values after switching to 3h
-                        data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
-                    }
-                    
-                    if domain.dtHours == 3 {
-                        /// interpolate 6 to 3 hours for gfs ensemble 0.5°
-                        let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
-                            if forecastHours.contains(hour * domain.dtHours) {
-                                return nil
-                            }
-                            return hour
-                        }
-                        data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
-                    }
-
-                    
-                    progress.add(locationRange.count)
-                    return data2d.data[0..<locationRange.count * nTime]
+                /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
+                let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
+                let readers = try (0..<nMembers).map { member in
+                    let memberStr = member > 0 ? "_\(member)" : ""
+                    let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr)\(prefix).fpg"
+                    return try OmFileReader(file: file)
                 }
-                progress.finish()
+                //try reader.willNeed()
+                return (hour, readers)
+            })
+            
+            // Create netcdf file for debugging
+            if createNetcdf {
+                let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", overwriteExisting: true)
+                try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
+                var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
+                    try ncFile.createDimension(name: "time", length: nTime),
+                    try ncFile.createDimension(name: "LAT", length: grid.ny),
+                    try ncFile.createDimension(name: "LON", length: grid.nx)
+                ])
+                for reader in readers {
+                    let data = try reader.reader[0].readAll()
+                    try ncVariable.write(data, offset: [reader.hour/domain.dtHours, 0, 0], count: [1, grid.ny, grid.nx])
+                }
             }
+            
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { offset in
+                let d0offset = offset / nMembers
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                data3d.data.fillWithNaNs()
+                for reader in readers {
+                    for (i, memberReader) in reader.reader.enumerated() {
+                        try memberReader.read(into: &readTemp, arrayDim1Range: (0..<locationRange.count), arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                        data3d[0..<locationRange.count, i, reader.hour / domain.dtHours] = readTemp
+                    }
+                }
+                
+                if domain.dtHours == 1 {
+                    // interpolate missing timesteps. We always fill 2 timesteps at once
+                    // data looks like: DDDDDDDDDD--D--D--D--D--D
+                    let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
+                        let forecastHour = hour * domain.dtHours
+                        if forecastHours.contains(forecastHour) || forecastHour % 3 != 1 {
+                            // process 2 timesteps at once
+                            return nil
+                        }
+                        return forecastHour
+                    }
+                    
+                    // Fill in missing hourly values after switching to 3h
+                    data3d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                }
+                
+                if domain.dtHours == 3 {
+                    /// interpolate 6 to 3 hours for gfs ensemble 0.5°
+                    let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
+                        if forecastHours.contains(hour * domain.dtHours) {
+                            return nil
+                        }
+                        return hour
+                    }
+                    data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
+                }
+
+                
+                progress.add(locationRange.count * nMembers)
+                return data3d.data[0..<(locationRange.count * nMembers) * nTime]
+            }
+            progress.finish()
         }
     }
     

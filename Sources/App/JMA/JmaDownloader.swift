@@ -121,11 +121,11 @@ struct JmaDownload: AsyncCommandFix {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName)_\(variable.hour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om"
+                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).nc")
+                let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om"
                 try FileManager.default.removeItemIfExists(at: file)
                 
-                logger.info("Compressing and writing data to \(variable.omFileName)_\(hour).om")
+                logger.info("Compressing and writing data to \(variable.omFileName.file)_\(hour).om")
                 //let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                 try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
@@ -155,12 +155,12 @@ struct JmaDownload: AsyncCommandFix {
                 if hour == 0 && variable.skipHour0 {
                     return nil
                 }
-                let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName)_\(hour).om")
+                let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om")
                 try reader.willNeed()
                 return (hour, reader)
             })
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 data2d.data.fillWithNaNs()
@@ -260,8 +260,8 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
     /// accumulated since forecast start
     case precipitation
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var isAccumulatedSinceModelStart: Bool {
@@ -406,8 +406,8 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
         return false
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var isAccumulatedSinceModelStart: Bool {

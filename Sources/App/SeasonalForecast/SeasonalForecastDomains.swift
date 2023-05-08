@@ -206,8 +206,8 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
     case relativehumidity_2m
     case pressure_msl
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var interpolation: ReaderInterpolation {

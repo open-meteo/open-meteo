@@ -84,7 +84,7 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
         let reader = OmFileSplitter(domain)
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
         for variable in variables {
-            let biasFile = domain.getBiasCorrectionFile(for: variable.omFileName).getFilePath()
+            let biasFile = domain.getBiasCorrectionFile(for: variable.omFileName.file).getFilePath()
             if FileManager.default.fileExists(atPath: biasFile) {
                 continue
             }
@@ -92,8 +92,8 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
-                try reader.willNeed(variable: variable.omFileName, location: locationRange, time: time)
-                let data = try reader.read2D(variable: variable.omFileName, location: locationRange, time: time)
+                try reader.willNeed(variable: variable.omFileName.file, location: locationRange, level: 0, time: time)
+                let data = try reader.read2D(variable: variable.omFileName.file, location: locationRange, level: 0, time: time)
                 for l in 0..<locationRange.count {
                     bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(data[l, 0..<time.count], time: time, binsPerYear: binsPerYear).meansPerYear)
                 }
@@ -156,8 +156,8 @@ enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVar
     case precipitation_sum
     
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var scalefactor: Float {
@@ -243,8 +243,8 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         return false
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var interpolation: ReaderInterpolation {

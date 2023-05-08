@@ -265,8 +265,8 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         return self == .temperature_2m
     }
     
-    var omFileName: String {
-        return rawValue
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
     }
     
     var interpolation: ReaderInterpolation {

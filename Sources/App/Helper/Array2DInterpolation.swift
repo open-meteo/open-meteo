@@ -14,6 +14,21 @@ enum Interpolation2StepType {
     case hermite_backwards_averaged(bounds: ClosedRange<Float>?)
 }
 
+extension Array3DFastTime {
+    mutating func interpolate2Steps(type: Interpolation2StepType, positions: [Int], grid: Gridable, locationRange: Range<Int>, run: Timestamp, dtSeconds: Int) {
+        var d2 = Array2DFastTime(data: data, nLocations: nLocations*nLevel, nTime: nTime)
+        d2.interpolate2Steps(type: type, positions: positions, grid: grid, locationRange: locationRange, run: run, dtSeconds: dtSeconds)
+        data = d2.data
+    }
+    
+    mutating func interpolate1Step(interpolation: ReaderInterpolation, interpolationHours: [Int], width: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+        var d2 = Array2DFastTime(data: data, nLocations: nLocations*nLevel, nTime: nTime)
+        d2.interpolate1Step(interpolation: interpolation, interpolationHours: interpolationHours, width: width, time: time, grid: grid, locationRange: locationRange)
+        data = d2.data
+    }
+}
+
+
 extension Array2DFastTime {
     /// Interpolate missing values for 1 hourly data that only has 3 hourly data at `positions`.
     mutating func interpolate2Steps(type: Interpolation2StepType, positions: [Int], grid: Gridable, locationRange: Range<Int>, run: Timestamp, dtSeconds: Int) {
@@ -166,37 +181,38 @@ extension Array2DFastTime {
         let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
         
         /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
-        for i in 0..<locationRange.count {
+        for l in 0..<nLocations {
             for hour in positions {
                 let sHour = hour - solarHours.lowerBound
+                let sPos = l % locationRange.count
                 // point C and D are still 3 h averages
-                let solC1 = solar2d[i, sHour + 0]
-                let solC2 = solar2d[i, sHour + 1]
-                let solC3 = solar2d[i, sHour + 2]
+                let solC1 = solar2d[sPos, sHour + 0]
+                let solC2 = solar2d[sPos, sHour + 1]
+                let solC3 = solar2d[sPos, sHour + 2]
                 let solC = (solC1 + solC2 + solC3) / 3
                 // At low radiaiton levels it is impossible to estimate KT indices
-                let C = solC <= 0.005 ? 0 : min(self[i, hour+2] / solC, 1100)
+                let C = solC <= 0.005 ? 0 : min(self[l, hour+2] / solC, 1100)
                 
-                let solB = solar2d[i, sHour - 1]
-                let B = solB <= 0.005 ? 0 : min(self[i, hour-1] / solB, 1100)
+                let solB = solar2d[sPos, sHour - 1]
+                let B = solB <= 0.005 ? 0 : min(self[l, hour-1] / solB, 1100)
                 
-                let solA = solar2d[i, sHour - 4]
-                let A = solA <= 0.005 ? 0 : hour-4 < 0 ? B : min((self[i, hour-4] / solA), 1100)
+                let solA = solar2d[sPos, sHour - 4]
+                let A = solA <= 0.005 ? 0 : hour-4 < 0 ? B : min((self[l, hour-4] / solA), 1100)
                 
-                let solD1 = solar2d[i, sHour + 3]
-                let solD2 = solar2d[i, sHour + 4]
-                let solD3 = solar2d[i, sHour + 5]
+                let solD1 = solar2d[sPos, sHour + 3]
+                let solD2 = solar2d[sPos, sHour + 4]
+                let solD3 = solar2d[sPos, sHour + 5]
                 let solD = (solD1 + solD2 + solD3) / 3
-                let D = solD <= 0.005 ? 0 : hour+4 >= nTime ? C : min((self[i, hour+5] / solD), 1100)
+                let D = solD <= 0.005 ? 0 : hour+4 >= nTime ? C : min((self[l, hour+5] / solD), 1100)
                 
                 let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                 let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                 let c = -A/2.0 + C/2.0
                 let d = B
                 
-                self[i, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
-                self[i, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
-                self[i, hour+2] = C * solC3
+                self[l, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
+                self[l, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
+                self[l, hour+2] = C * solC3
             }
         }
     }
@@ -263,35 +279,36 @@ extension Array2DFastTime {
             let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
             
             /// Instead of caiculating solar radiation for the entire grid, itterate through a smaller grid portion
-            for i in 0..<locationRange.count {
+            for l in 0..<nLocations {
                 for hour in interpolationHours {
                     let sHour = (hour - solarHours.lowerBound) / width
+                    let sPos = l % locationRange.count
                     // point C and D are still 2 step averages
-                    let solC1 = solar2d[i, sHour + 0]
-                    let solC2 = solar2d[i, sHour + 1]
+                    let solC1 = solar2d[sPos, sHour + 0]
+                    let solC2 = solar2d[sPos, sHour + 1]
                     let solC = (solC1 + solC2) / 2
                     // At low radiation levels it is impossible to estimate KT indices
-                    var C = solC <= 0.005 ? 0 : min(self[i, hour+1*width] / solC, 1100)
+                    var C = solC <= 0.005 ? 0 : min(self[l, hour+1*width] / solC, 1100)
                     
-                    let solB = solar2d[i, sHour - 1]
-                    var B = solB <= 0.005 ? C : min(self[i, hour-1*width] / solB, 1100)
+                    let solB = solar2d[sPos, sHour - 1]
+                    var B = solB <= 0.005 ? C : min(self[l, hour-1*width] / solB, 1100)
                     
                     if C == 0 && B > 0 {
                         C = B
                     }
                     
-                    let solA = solar2d[i, sHour - 3]
-                    var A = solA <= 0.005 ? B : hour-3 < 0 ? B : min((self[i, hour-3*width] / solA), 1100)
+                    let solA = solar2d[sPos, sHour - 3]
+                    var A = solA <= 0.005 ? B : hour-3 < 0 ? B : min((self[l, hour-3*width] / solA), 1100)
                     
                     if C == 0 && A > 0 {
                         B = A
                         C = A
                     }
                     
-                    let solD1 = solar2d[i, sHour + 2]
-                    let solD2 = solar2d[i, sHour + 3]
+                    let solD1 = solar2d[sPos, sHour + 2]
+                    let solD2 = solar2d[sPos, sHour + 3]
                     let solD = (solD1 + solD2) / 2
-                    let D = solD <= 0.005 ? C : hour+3 > nTime ? C : min((self[i, hour+3*width] / solD), 1100)
+                    let D = solD <= 0.005 ? C : hour+3 > nTime ? C : min((self[l, hour+3*width] / solD), 1100)
                     
                     // Espcially for 6h values, aggressively try to find any KT index that works
                     // As a future improvement, the clearsky radiation could be approximated by cloud cover total as an additional input
@@ -307,8 +324,8 @@ extension Array2DFastTime {
                     let c = -A/2.0 + C/2.0
                     let d = B
                     
-                    self[i, hour] = (a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d) * solC1
-                    self[i, hour+1*width] = C * solC2
+                    self[l, hour] = (a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d) * solC1
+                    self[l, hour+1*width] = C * solC2
                 }
             }
         }
