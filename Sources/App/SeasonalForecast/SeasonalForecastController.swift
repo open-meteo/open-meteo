@@ -101,7 +101,7 @@ extension VariableAndMemberAndControl: GenericVariable where Variable: GenericVa
         if member == 0 {
             return variable.rawValue
         }
-        return "\(variable.omFileName)_\(member)"
+        return "\(variable.omFileName)_member\(member)"
     }
     
     var scalefactor: Float {
