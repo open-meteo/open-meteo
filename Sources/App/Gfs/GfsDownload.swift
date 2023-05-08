@@ -380,7 +380,7 @@ struct GfsDownload: AsyncCommandFix {
 
                 
                 progress.add(locationRange.count * nMembers)
-                return data3d.data[0..<(locationRange.count * nMembers) * nTime]
+                return data3d.data[0..<locationRange.count * nMembers * nTime]
             }
             progress.finish()
         }

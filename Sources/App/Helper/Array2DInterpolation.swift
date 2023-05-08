@@ -26,6 +26,18 @@ extension Array3DFastTime {
         d2.interpolate1Step(interpolation: interpolation, interpolationHours: interpolationHours, width: width, time: time, grid: grid, locationRange: locationRange)
         data = d2.data
     }
+    
+    mutating func deaccumulateOverTime(slidingWidth: Int, slidingOffset: Int) {
+        var d2 = Array2DFastTime(data: data, nLocations: nLocations*nLevel, nTime: nTime)
+        d2.deaccumulateOverTime(slidingWidth: slidingWidth, slidingOffset: slidingOffset)
+        data = d2.data
+    }
+    
+    mutating func deavergeOverTime(slidingWidth: Int, slidingOffset: Int) {
+        var d2 = Array2DFastTime(data: data, nLocations: nLocations*nLevel, nTime: nTime)
+        d2.deavergeOverTime(slidingWidth: slidingWidth, slidingOffset: slidingOffset)
+        data = d2.data
+    }
 }
 
 

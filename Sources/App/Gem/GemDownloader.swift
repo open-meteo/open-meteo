@@ -204,6 +204,7 @@ struct GemDownload: AsyncCommandFix {
     func convert(logger: Logger, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let downloadDirectory = domain.downloadDirectory
         let grid = domain.grid
+        let nMembers = domain.ensembleMembers
         
         let forecastHours = domain.getForecastHours(run: run)
         let nTime = forecastHours.max()! / domain.dtHours + 1
@@ -211,10 +212,10 @@ struct GemDownload: AsyncCommandFix {
         let nLocations = grid.nx * grid.ny
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations * nMembers, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         
-        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
 
         for variable in variables {
@@ -223,52 +224,54 @@ struct GemDownload: AsyncCommandFix {
             }
             let skip = variable.skipHour0 ? 1 : 0
 
-            for member in 0..<domain.ensembleMembers {
-                let memberStr = member > 0 ? "_\(member)" : ""
-                let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(memberStr)")
-                let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
-                    if hour == 0 && variable.skipHour0 {
-                        return nil
-                    }
-                    if !variable.includedFor(hour: hour, domain: domain) {
-                        return nil
-                    }
-                    let h3 = hour.zeroPadded(len: 3)
-                    let reader = try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).om")
-                    try reader.willNeed()
-                    return (hour, reader)
-                })
-                
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName.file)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
-                    
-                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                    data2d.data.fillWithNaNs()
-                    for reader in readers {
-                        try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
-                    }
-                    
-                    if domain.dtHours == 3 {
-                        /// interpolate 6 to 3 hours for ensemble 0.5°
-                        let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
-                            if forecastHours.contains(hour * domain.dtHours) {
-                                return nil
-                            }
-                            return hour
-                        }
-                        data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
-                    }
-                    
-                    // De-accumulate precipitation
-                    if variable.isAccumulatedSinceModelStart {
-                        data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: 1)
-                    }
-                    
-                    progress.add(locationRange.count)
-                    return data2d.data[0..<locationRange.count * nTime]
+            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
+            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try forecastHours.compactMap({ hour in
+                if hour == 0 && variable.skipHour0 {
+                    return nil
                 }
-                progress.finish()
+                if !variable.includedFor(hour: hour, domain: domain) {
+                    return nil
+                }
+                let h3 = hour.zeroPadded(len: 3)
+                let readers = try (0..<nMembers).map { member in
+                    let memberStr = member > 0 ? "_\(member)" : ""
+                    return try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).om")
+                }
+                return (hour, readers)
+            })
+            
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { offset in
+                let d0offset = offset / nMembers
+                
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                data3d.data.fillWithNaNs()
+                for reader in readers {
+                    for (i, memberReader) in reader.reader.enumerated() {
+                        try memberReader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                        data3d[0..<locationRange.count, i, reader.hour / domain.dtHours] = readTemp
+                    }
+                }
+                
+                if domain.dtHours == 3 {
+                    /// interpolate 6 to 3 hours for ensemble 0.5°
+                    let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
+                        if forecastHours.contains(hour * domain.dtHours) {
+                            return nil
+                        }
+                        return hour
+                    }
+                    data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
+                }
+                
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
+                    data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 1)
+                }
+                
+                progress.add(locationRange.count * nMembers)
+                return data3d.data[0..<locationRange.count * nMembers * nTime]
             }
+            progress.finish()
         }
     }
 }

@@ -186,6 +186,7 @@ struct DownloadIconCommand: AsyncCommandFix {
     func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariableDownloadable]) throws {
         let downloadDirectory = domain.downloadDirectory
         let grid = domain.grid
+        let nMembers = domain.ensembleMembers
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         let nTime = forecastSteps.max()! / domain.dtHours + 1
@@ -193,7 +194,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         let nLocations = grid.count
         
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations * nMembers, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         //print("nLocationsPerChunk \(nLocationsPerChunk)... \(nLocations/nLocationsPerChunk) iterations")
 
@@ -202,9 +203,8 @@ struct DownloadIconCommand: AsyncCommandFix {
         // Stategy: Read each variable in a spatial array and interpolate missing values
         // Afterwards merge into temporal data files
         
-        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-        let members = domain.ensembleMembers ?? 1
 
         for variable in variables {
             guard variable.getVarAndLevel(domain: domain) != nil else {
@@ -218,76 +218,78 @@ struct DownloadIconCommand: AsyncCommandFix {
                 $0 == 0 || !variable.skipHour(hour: $0, domain: domain, forDownload: false, run: run)
             })
             
-            for i in 0..<members {
-                let memberStr = i > 0 ? "_\(i)" : ""
-                let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(memberStr)")
+            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
+            
+            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try forecastSteps.compactMap({ hour in
+                if hour < skip {
+                    return nil
+                }
+                let readers = try (0..<nMembers).map { member in
+                    let memberStr = member > 0 ? "_\(member)" : ""
+                    return try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v)\(memberStr).fpg")
+                }
+                return (hour, readers)
+            })
+            
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { offset in
+                let d0offset = offset / nMembers
                 
-                let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastSteps.compactMap({ hour in
-                    if hour < skip {
+                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                data3d.data.fillWithNaNs()
+                for reader in readers {
+                    for (i, memberReader) in reader.reader.enumerated() {
+                        try memberReader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                        data3d[0..<data3d.nLocations, i, reader.hour /*/ domain.dtHours*/] = readTemp
+                    }
+                }
+                
+                // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
+                if variable.isAveragedOverForecastTime {
+                    data3d.deavergeOverTime(slidingWidth: data3d.nTime, slidingOffset: skip)
+                }
+                
+                // ICON-EPS ensemble model has 12-hourly data after 120 hours of forecast
+                // Interpolate 12h steps to 6h steps.... Obviously this not not really accurate
+                let forecastStepsToInterpolate12h = (0..<nTime).compactMap { hour -> Int? in
+                    if forecastSteps.contains(hour) || hour % 6 != 0 {
                         return nil
                     }
-                    let reader = try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v)\(memberStr).fpg")
-                    try reader.willNeed()
-                    return (hour, reader)
-                })
-                
-                try om.updateFromTimeOrientedStreaming(variable: "\(variable.omFileName.file)\(memberStr)", indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
-                    
-                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                    data2d.data.fillWithNaNs()
-                    for reader in readers {
-                        try reader.reader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data2d[0..<data2d.nLocations, reader.hour /*/ domain.dtHours*/] = readTemp
-                    }
-                    
-                    // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
-                    if variable.isAveragedOverForecastTime {
-                        data2d.deavergeOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-                    }
-                    
-                    // ICON-EPS ensemble model has 12-hourly data after 120 hours of forecast
-                    // Interpolate 12h steps to 6h steps.... Obviously this not not really accurate
-                    let forecastStepsToInterpolate12h = (0..<nTime).compactMap { hour -> Int? in
-                        if forecastSteps.contains(hour) || hour % 6 != 0 {
-                            return nil
-                        }
-                        return hour
-                    }
-                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate12h, width: 6, time: time, grid: grid, locationRange: locationRange)
-                    
-                    // EPS ensemble models have 6-hourly data after 2 or 3 days of forecast
-                    // Interpolate 6h steps to 3h steps before 1h
-                    let forecastStepsToInterpolate6h = (0..<nTime).compactMap { hour -> Int? in
-                        if forecastSteps.contains(hour) || hour % 3 != 0 || hour % 6 == 0 {
-                            return nil
-                        }
-                        return hour
-                    }
-                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid, locationRange: locationRange)
-                    
-                    // interpolate missing timesteps. We always fill 2 timesteps at once
-                    // data looks like: DDDDDDDDDD--D--D--D--D--D
-                    let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
-                        if forecastSteps.contains(hour) || hour % 3 != 1 {
-                            // process 2 timesteps at once
-                            return nil
-                        }
-                        return hour
-                    }
-                    
-                    // Fill in missing hourly values after switching to 3h
-                    data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
-                    
-                    // De-accumulate precipitation
-                    if variable.isAccumulatedSinceModelStart {
-                        data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
-                    }
-                    
-                    progress.add(locationRange.count)
-                    return data2d.data[0..<locationRange.count * nTime]
+                    return hour
                 }
-                progress.finish()
+                data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate12h, width: 6, time: time, grid: grid, locationRange: locationRange)
+                
+                // EPS ensemble models have 6-hourly data after 2 or 3 days of forecast
+                // Interpolate 6h steps to 3h steps before 1h
+                let forecastStepsToInterpolate6h = (0..<nTime).compactMap { hour -> Int? in
+                    if forecastSteps.contains(hour) || hour % 3 != 0 || hour % 6 == 0 {
+                        return nil
+                    }
+                    return hour
+                }
+                data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid, locationRange: locationRange)
+                
+                // interpolate missing timesteps. We always fill 2 timesteps at once
+                // data looks like: DDDDDDDDDD--D--D--D--D--D
+                let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
+                    if forecastSteps.contains(hour) || hour % 3 != 1 {
+                        // process 2 timesteps at once
+                        return nil
+                    }
+                    return hour
+                }
+                
+                // Fill in missing hourly values after switching to 3h
+                data3d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
+                    data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: skip)
+                }
+                
+                progress.add(locationRange.count * nMembers)
+                return data3d.data[0..<locationRange.count * nTime * nMembers]
             }
+            progress.finish()
         }
         logger.info("write init.txt")
         try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)
@@ -392,7 +394,7 @@ extension IconDomains {
         }
     }
     
-    var ensembleMembers: Int? {
+    var ensembleMembers: Int {
         switch self {
         case .iconEps:
             return 40
@@ -401,7 +403,7 @@ extension IconDomains {
         case .iconD2Eps:
             return 20
         default:
-            return nil
+            return 1
         }
     }
 }
