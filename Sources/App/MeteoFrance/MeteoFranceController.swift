@@ -147,7 +147,7 @@ struct MeteoFranceQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
         if longitude > 180 || longitude < -180 || longitude.isNaN {
             throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
         }
-        if let forecast_days = forecast_days, forecast_days <= 0 || forecast_days > 16 {
+        if let forecast_days = forecast_days, forecast_days < 0 || forecast_days > 16 {
             throw ForecastapiError.forecastDaysInvalid(given: forecast_days, allowed: 0...16)
         }
         if daily?.count ?? 0 > 0 && timezone == nil {
