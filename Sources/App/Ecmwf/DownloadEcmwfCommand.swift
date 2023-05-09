@@ -52,8 +52,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
-        let surfaceVariables = EcmwfVariable.allCases.filter({$0.level == nil})
-        let pressureVariables = EcmwfVariable.allCases.filter({$0.level != nil})
+        let surfaceVariables = EcmwfVariable.allCases.filter({($0.level ?? 0) < 50})
+        let pressureVariables = EcmwfVariable.allCases.filter({($0.level ?? 0) >= 50})
         let defaultVariables = domain == .ifs04_ensemble ? (signature.upperLevel ? pressureVariables : surfaceVariables) : EcmwfVariable.allCases
         let variables = onlyVariables ?? defaultVariables
         
