@@ -11,9 +11,6 @@ Gem regional and global Downloader
  High perf server
  - Global https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_global/15km/grib2/lat_lon/00/
  - Regional https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_regional/10km/grib2/00/
-
- TODO:
- - elevation and sea mask for hrdps
  */
 struct GemDownload: AsyncCommandFix {
     struct Signature: CommandSignature {
@@ -88,11 +85,6 @@ struct GemDownload: AsyncCommandFix {
     
     // download seamask and height
     func downloadElevation(application: Application, domain: GemDomain, run: Timestamp) async throws {
-        if domain == .gem_hrdps_continental {
-            // HGT_SFC_0 file is missing... no idea why
-            return
-        }
-        
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -102,43 +94,58 @@ struct GemDownload: AsyncCommandFix {
         
         logger.info("Downloading height and elevation data")
         
-        var height: Array2D? = nil
-        
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        let terrainUrl = domain.getUrl(run: run, hour: 0, gribName: "HGT_SFC_0")
-        for message in try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false) {
+        var height: [Float]
+        if domain == .gem_hrdps_continental {
+            // HRDPS has no HGT_SFC_0 file
+            // Download temperature, pressure and calculate it manually
+            try grib2d.load(message: try await curl.downloadGrib(url: domain.getUrl(run: run, hour: 0, gribName: "TMP_AGL-2m"), bzip2Decode: false)[0])
+            grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
+            let temperature_2m = grib2d.array.data
+            try grib2d.load(message: try await curl.downloadGrib(url: domain.getUrl(run: run, hour: 0, gribName: "PRES_Sfc"), bzip2Decode: false)[0])
+            grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
+            let surfacePressure = grib2d.array.data
+            try grib2d.load(message: try await curl.downloadGrib(url: domain.getUrl(run: run, hour: 0, gribName: "PRMSL_MSL"), bzip2Decode: false)[0])
+            grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
+            let sealevelPressure = grib2d.array.data
+            height = zip(zip(surfacePressure, sealevelPressure), temperature_2m).map {
+                let ((surfacePressure, sealevelPressure), temperature_2m) = $0
+                return Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
+            }
+        } else {
+            let terrainUrl = domain.getUrl(run: run, hour: 0, gribName: "HGT_SFC_0")
+            let message = try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false)[0]
             try grib2d.load(message: message)
             if domain == .gem_global_ensemble {
                 // Only ensemble model is shifted by 180°
                 grib2d.array.shift180Longitudee()
             }
-            height = grib2d.array
-            //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
+            height = grib2d.array.data
         }
         
         if domain != .gem_global_ensemble {
-            let landmaskUrl = domain.getUrl(run: run, hour: 0, gribName: "LAND_SFC_0")
+            let gribName = domain == .gem_hrdps_continental ? "LAND_Sfc" : "LAND_SFC_0"
+            let landmaskUrl = domain.getUrl(run: run, hour: 0, gribName: gribName)
             var landmask: Array2D? = nil
             for message in try await curl.downloadGrib(url: landmaskUrl, bzip2Decode: false) {
                 try grib2d.load(message: message)
                 landmask = grib2d.array
                 //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
             }
-            if height != nil, let landmask {
+            if let landmask {
                 for i in landmask.data.indices {
                     // landmask: 0=sea, 1=land
-                    height!.data[i] = landmask.data[i] >= 0.5 ? height!.data[i] : -999
+                    height[i] = landmask.data[i] >= 0.5 ? height[i] : -999
                 }
             }
         }
         
-        guard let height else {
-            fatalError("Could not download land and sea mask")
-        }
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
+        //try Array2D(data: height, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
+        
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height)
     }
     
     /// Download data and store as compressed files for each timestep
