@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 
-typealias GloFasVariableMember = VariableAndMemberAndControl<GloFasVariable>
+typealias GloFasVariableMember = VariableAndMemberAndControlSplitFiles<GloFasVariable>
 
 struct GloFasMixer: GenericReaderMixer {
     var reader: [GloFasReader]
