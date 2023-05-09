@@ -44,6 +44,7 @@ Apps:
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
 - [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
+- [WeatherAI](https://play.google.com/store/apps/details?id=com.kingfu.weatherai) Introducing WeatherAI - the ultimate weather app that combines modern design, advanced technology, and AI elements to provide you with the most accurate weather forecast. With a sleek and clean interface, WeatherAI offers an intuitive user experience that makes checking the weather a breeze. 
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
