@@ -65,13 +65,6 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(precipitation, temperature).map({$0 * ($1 <= 0 ? 0 : 1)}), .millimeter)
             }
             
-            // ICON EPS + EU EPS store surface pressure in sealevel pressure field
-            if [.iconEuEps, .iconEps].contains(reader.domain), surface == .pressure_msl {
-                let surface_pressure = try reader.get(variable: raw, time: time).data
-                let temperature = try get(raw: .temperature_2m, member: member, time: time).data
-                return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: surface_pressure, elevation: reader.modelElevation.numeric), .hectoPascal)
-            }
-            
             // EPS models do not have weather codes
             if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weathercode {
                 let cloudcover = try get(raw: .cloudcover, member: member, time: time).data
@@ -142,13 +135,6 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             // no dedicated rain field in ICON EPS and no snow, use temperautre
             if reader.domain == .iconEps, surface == .rain {
                 try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
-                try reader.prefetchData(variable: .init(.surface(.temperature_2m), member), time: time)
-                return
-            }
-            
-            // ICON EPS + EU EPS store surface pressure in sealevel pressure field
-            if [.iconEuEps, .iconEps].contains(reader.domain), surface == .pressure_msl {
-                try reader.prefetchData(variable: raw, time: time)
                 try reader.prefetchData(variable: .init(.surface(.temperature_2m), member), time: time)
                 return
             }

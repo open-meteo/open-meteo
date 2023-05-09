@@ -145,7 +145,7 @@ struct OmFileSplitter {
                 continue
             }
             let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-            try omFile.willNeed(dim0Slow: location, dim1: offsets.file)
+            try omFile.willNeed(dim0Slow: dim0, dim1: offsets.file)
         }
     }
     

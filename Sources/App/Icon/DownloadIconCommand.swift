@@ -4,7 +4,10 @@ import SwiftPFor2D
 import Dispatch
 import CHelper
 
-
+/**
+ TODO:
+ - Elevation files should not mask out sea level locations -> this breaks surface pressure correction as a lake can be above sea level
+ */
 struct DownloadIconCommand: AsyncCommandFix {
     enum VariableGroup: String, RawRepresentable, CaseIterable {
         case all
@@ -111,11 +114,23 @@ struct DownloadIconCommand: AsyncCommandFix {
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
+        /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
+        lazy var domainElevation = {
+            guard let elevation = try? domain.getStaticFile(type: .elevation)?.readAll() else {
+                fatalError("cannot read elevation for domain \(domain)")
+            }
+            return elevation
+        }()
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             let h3 = hour.zeroPadded(len: 3)
+            
+            /// Keep temperature 2m in memory if required for sea level pressure conversion
+            var temperature2m = [Int: Array2D]()
+            
             for variable in variables {
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
                     continue
@@ -168,7 +183,24 @@ struct DownloadIconCommand: AsyncCommandFix {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    //try grib2d.array.writeNetcdf(filename: "\(downloadDirectory)\(variable.omFileName)_\(h3).nc")
+                    if let variable = variable as? IconSurfaceVariable {
+                        if [.iconEps, .iconEuEps].contains(domain) {
+                            if variable == .temperature_2m {
+                                // store in memory for this member
+                                temperature2m[i] = grib2d.array
+                            }
+                            if variable == .pressure_msl {
+                                // ICON EPC is actually downloading surface level pressure
+                                // calculate sea level presure using temperature and elevation
+                                guard let t2m = temperature2m[i] else {
+                                    fatalError("Sea level pressure calculation required temperature 2m")
+                                }
+                                grib2d.array.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: grib2d.array.data, elevation: domainElevation)
+                            }
+                        }
+                    }
+                    
+                    //try grib2d.array.writeNetcdf(filename: "\(downloadDirectory)\(variable.omFileName.file)\(memberStr)_\(h3).nc")
                     
                     //logger.info("Compressing and writing data to \(filenameDest)")
                     let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256

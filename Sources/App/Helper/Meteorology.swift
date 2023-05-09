@@ -69,6 +69,15 @@ struct Meteorology {
         }
     }
     
+    /// Calculate mean sea level pressure, corrected by temperature for an entire field
+    static func sealevelPressureSpatial(temperature: [Float], pressure: [Float], elevation: [Float]) -> [Float] {
+        return zip(elevation, zip(temperature, pressure)).map {
+            let (elevation, (t, p)) = $0
+            let e = elevation <= -999 ? 0 : elevation
+            return p * Meteorology.sealevelPressureFactor(temperature: t, elevation: e)
+        }
+    }
+    
     /// Calculate mea nsea level pressure, corrected by temperature.
     static func sealevelPressure(temperature2m: Array2DFastTime, surfacePressure: Array2DFastTime, elevation: [Float]) -> [Float] {
         return zip(temperature2m.data, surfacePressure.data).enumerated().map { (i, arg1) -> Float in
