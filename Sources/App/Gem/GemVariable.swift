@@ -428,7 +428,18 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m
+        switch self {
+        case .temperature_2m:
+            fallthrough
+        case .temperature_40m:
+            fallthrough
+        case .temperature_80m:
+            fallthrough
+        case .temperature_120m:
+            return true
+        default:
+            return false
+        }
     }
     
     var requiresOffsetCorrectionForMixing: Bool {
