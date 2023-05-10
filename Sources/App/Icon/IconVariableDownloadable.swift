@@ -87,7 +87,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .latent_heatflux: return .hermite_backwards_averaged(bounds: nil)
         case .windgusts_10m: return .linear
         case .freezinglevel_height: return .hermite(bounds: nil)
-        case .dewpoint_2m: return .hermite(bounds: nil)
+        case .relativehumidity_2m: return .hermite(bounds: 0...100)
         case .diffuse_radiation: return .solar_backwards_averaged
         case .direct_radiation: return .solar_backwards_averaged
         case .soil_temperature_0cm: return .hermite(bounds: nil)
@@ -160,7 +160,11 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 break
             case .temperature_2m:
                 break
-            case .dewpoint_2m:
+            case .relativehumidity_2m:
+                if domain == .iconEps {
+                    // use dewpoint, because relative humidity is only 6 hourly
+                    return ("td_2m", "single-level", nil)
+                }
                 if domain == .iconEuEps {
                     // No dewpoint or relative humidity available in EU-EPS
                     return nil
@@ -277,7 +281,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .rain: return ("rain_gsp", "single-level", nil)
         case .windgusts_10m: return ("vmax_10m", "single-level", nil)
         case .freezinglevel_height: return ("hzerocl", "single-level", nil)
-        case .dewpoint_2m: return ("td_2m", "single-level", nil)
+        case .relativehumidity_2m: return ("relhum_2m", "single-level", nil)
         case .pressure_msl: return ("pmsl", "single-level", nil)
         case .diffuse_radiation: return ("aswdifd_s", "single-level", nil)
         case .direct_radiation: return ("aswdir_s", "single-level", nil)
@@ -299,7 +303,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .temperature_80m: fallthrough
         case .temperature_120m: fallthrough
         case .temperature_180m: fallthrough
-        case .dewpoint_2m: fallthrough
         case .soil_temperature_0cm: fallthrough
         case .soil_temperature_6cm: fallthrough
         case .soil_temperature_18cm: fallthrough

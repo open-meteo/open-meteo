@@ -178,9 +178,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     /// If the temperature is below 0◦ C throughout the entire atmospheric column, HZEROCL is set equal to the topography height (fill value).
     case freezinglevel_height
     
-    /// Dew point temperature at 2m above ground, i.e. the temperature to which the air must be cooled, keeping its vapour pressure e constant, such that e equals the saturation (or equilibrium) vapour pressure es.
-    ///        es(Td) = e
-    case dewpoint_2m
+    /// Relative humidity on 2 meters
+    case relativehumidity_2m
     
     /// Downward solar diffuse radiation flux at the surface, averaged over forecast time.
     case diffuse_radiation
@@ -223,7 +222,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .latent_heatflux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
         case .windgusts_10m: return 10
         case .freezinglevel_height:  return 0.1 // zero height 10 meter resolution
-        case .dewpoint_2m: return 20
+        case .relativehumidity_2m: return 1
         case .diffuse_radiation: return 1
         case .direct_radiation: return 1
         case .showers: return 10
@@ -282,7 +281,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .rain: return .millimeter
         case .windgusts_10m: return .ms
         case .freezinglevel_height: return .meter
-        case .dewpoint_2m: return .celsius
+        case .relativehumidity_2m: return .percent
         case .diffuse_radiation: return .wattPerSquareMeter
         case .snowfall_convective_water_equivalent: return .millimeter
         case .snowfall_water_equivalent: return .millimeter
@@ -405,8 +404,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return .linear
         case .freezinglevel_height:
             return .linear
-        case .dewpoint_2m:
-            return .hermite(bounds: nil)
+        case .relativehumidity_2m:
+            return .hermite(bounds: 0...100)
         case .diffuse_radiation:
             return .solar_backwards_averaged
         case .direct_radiation:
@@ -417,6 +416,6 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .temperature_80m || self == .temperature_120m || self == .temperature_180m || self == .dewpoint_2m
+        return self == .temperature_2m || self == .temperature_80m || self == .temperature_120m || self == .temperature_180m
     }
 }

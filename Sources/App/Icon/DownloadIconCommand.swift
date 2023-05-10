@@ -198,6 +198,14 @@ struct DownloadIconCommand: AsyncCommandFix {
                                 grib2d.array.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: grib2d.array.data, elevation: domainElevation)
                             }
                         }
+                        if domain == .iconEps && variable == .relativehumidity_2m {
+                            // ICON EPS is using dewpoint, convert to relative humidity
+                            guard let t2m = temperature2m[i] else {
+                                fatalError("Relative humidity calculation requires temperature 2m")
+                            }
+                            grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
+                            grib2d.array.data = zip(t2m.data, grib2d.array.data).map(Meteorology.relativeHumidity)
+                        }
                     }
                     
                     //try grib2d.array.writeNetcdf(filename: "\(downloadDirectory)\(variable.omFileName.file)\(memberStr)_\(h3).nc")
