@@ -25,7 +25,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         /// Adjust surface pressure to target elevation. Surface pressure is stored for `modelElevation`, but we want to get the pressure on `targetElevation`
         if raw.variable == .surface_air_pressure {
             let pressure = try reader.get(variable: raw, time: time)
-            let factor = Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.modelElevation.numeric)
+            let factor = Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.modelElevation.numeric) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation)
             return DataAndUnit(pressure.data.map({$0*factor}), pressure.unit)
         }
         return try reader.get(variable: raw, time: time)
