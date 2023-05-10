@@ -394,7 +394,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .rain:
                 try prefetchData(raw: .init(.surface(.frozen_precipitation_percent), member), time: time)
                 try prefetchData(raw: .init(.surface(.precipitation), member), time: time)
-                if domain != .hrrr_conus {
+                if domain == .gfs013 {
                     try prefetchData(raw: .init(.surface(.showers), member), time: time)
                 }
             case .snowfall:
@@ -527,8 +527,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .rain:
                 let frozen_precipitation_percent = try get(raw: .init(.surface(.frozen_precipitation_percent), member), time: time).data
                 let precipitation = try get(raw: .init(.surface(.precipitation), member), time: time).data
-                if domain == .hrrr_conus {
-                    // showers are not available in HRRR
+                if domain != .gfs013 {
+                    // showers are only in gfs013
                     let rain = zip(frozen_precipitation_percent, precipitation).map({ (frozen_precipitation_percent, precipitation) in
                         let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
                         return max(precipitation - snowfallWaterEqivalent , 0)
