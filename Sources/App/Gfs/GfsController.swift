@@ -314,7 +314,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         /// Adjust surface pressure to target elevation. Surface pressure is stored for `modelElevation`, but we want to get the pressure on `targetElevation`
         if case let .surface(variable) = raw.variable, variable == .surface_pressure {
             let pressure = try reader.get(variable: raw, time: time)
-            let factor = Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.modelElevation.numeric) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation)
+            let factor = Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.modelElevation.numeric)
             return DataAndUnit(pressure.data.map({$0*factor}), pressure.unit)
         }
         
