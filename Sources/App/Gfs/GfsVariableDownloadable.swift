@@ -14,7 +14,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             switch self {
             case .temperature_2m:
                 return ":TMP:2 m above ground:"
-            case.surface_temperature:
+            case .surface_temperature:
                 return ":TMP:surface:"
             case .cloudcover:
                 return ":TCDC:entire atmosphere:"
@@ -25,7 +25,11 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .cloudcover_high:
                 return ":HCDC:high cloud layer:"
             case .relativehumidity_2m:
-                return ":RH:2 m above ground:"
+                // use specific humidity and convert to relative humidity
+                return ":SPFH:2 m above ground:"
+            case .pressure_msl:
+                // only used temporaily to convert specific humidity
+                return ":PRES:surface:"
             case .precipitation:
                 // PRATE:surface:6-7 hour ave fcst:
                 return ":PRATE:surface:"

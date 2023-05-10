@@ -200,6 +200,10 @@ struct GfsDownload: AsyncCommandFix {
                     return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
                 }
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
+                               
+                /// Keep data from previous timestep in memory to deaverage the next timestep
+                var inMemorySurface = [GfsSurfaceVariable: [Float]]()
+                var inMemoryPressure = [GfsPressureVariable: [Float]]()
                 
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables) {
                     try grib2d.load(message: message)
@@ -240,16 +244,15 @@ struct GfsDownload: AsyncCommandFix {
                        variable == .relativehumidity_2m,
                        shortName == "2sh"
                     {
-                        guard let temperature = previousData["\(GfsSurfaceVariable.temperature_2m.rawValue)\(memberStr)"],
-                              temperature.step == forecastHour else {
+                        guard let temperature = inMemorySurface[.temperature_2m] else {
                             fatalError("Could not get temperature 2m to convert specific humidity")
                         }
-                        guard let surfacePressure = previousData["\(GfsSurfaceVariable.pressure_msl.rawValue)\(memberStr)"],
-                              surfacePressure.step == forecastHour else {
+                        // gfs013 loads surface pressure instead of msl, however we do not use it, because it is not corrected
+                        guard let surfacePressure = inMemorySurface[.pressure_msl] else {
                             fatalError("Could not get surface_pressure to convert specific humidity")
                         }
                         grib2d.array.data.multiplyAdd(multiply: 1000, add: 0) // kg/kg to g/kg
-                        grib2d.array.data = Meteorology.specificToRelativeHumidity(specificHumidity: grib2d.array.data, temperature: temperature.data, pressure: surfacePressure.data)
+                        grib2d.array.data = Meteorology.specificToRelativeHumidity(specificHumidity: grib2d.array.data, temperature: temperature, pressure: surfacePressure)
                     }
                     
                     // Convert pressure vertical velocity to geometric velocity in HRRR
@@ -257,14 +260,13 @@ struct GfsDownload: AsyncCommandFix {
                        variable.variable == .vertical_velocity,
                        shortName == "w"
                     {
-                        let t = GfsPressureVariable(variable: .temperature, level: variable.level)
-                        guard let temperature = previousData["\(t.rawValue)\(memberStr)"], temperature.step == forecastHour else {
+                        guard let temperature = inMemoryPressure[.init(variable: .temperature, level: variable.level)] else {
                             fatalError("Could not get temperature 2m to convert pressure vertical velocity to geometric velocity")
                         }
-                        grib2d.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: grib2d.array.data, temperature: temperature.data, pressureLevel: Float(variable.level))
+                        grib2d.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: grib2d.array.data, temperature: temperature, pressureLevel: Float(variable.level))
                     }
                     
-                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
+                    try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr)\(prefix).fpg"
                     try FileManager.default.removeItemIfExists(at: file)
                     
@@ -274,11 +276,18 @@ struct GfsDownload: AsyncCommandFix {
                     }
                     
                     // Keep temperature and pressure in memory to relative humidity conversion
-                    if let variable = variable.variable as? GfsSurfaceVariable, keepVariableInMemory.contains(variable) {
-                        previousData["\(variable.rawValue)\(memberStr)"] = (forecastHour, grib2d.array.data)
+                    if let variable = variable.variable as? GfsSurfaceVariable,
+                        keepVariableInMemory.contains(variable) {
+                        inMemorySurface[variable] = grib2d.array.data
                     }
-                    if let variable = variable.variable as? GfsPressureVariable, keepVariableInMemoryPressure.contains(variable.variable) {
-                        previousData["\(variable.rawValue)\(memberStr)"] = (forecastHour, grib2d.array.data)
+                    if let variable = variable.variable as? GfsPressureVariable,
+                        keepVariableInMemoryPressure.contains(variable.variable) {
+                        inMemoryPressure[variable] = grib2d.array.data
+                    }
+                    
+                    if domain == .gfs013 && variable.variable as? GfsSurfaceVariable == .pressure_msl {
+                        // do not write pressure to disk
+                        continue
                     }
                     
                     try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
@@ -305,6 +314,10 @@ struct GfsDownload: AsyncCommandFix {
         
         for variable in variables {            
             if GfsVariableAndDomain(variable: variable, domain: domain).gribIndexName == nil {
+                continue
+            }
+            if domain == .gfs013 && variable as? GfsSurfaceVariable == .pressure_msl {
+                // do not write pressure to disk
                 continue
             }
             
