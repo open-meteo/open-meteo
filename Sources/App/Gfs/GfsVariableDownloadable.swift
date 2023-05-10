@@ -14,6 +14,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             switch self {
             case .temperature_2m:
                 return ":TMP:2 m above ground:"
+            case.surface_temperature:
+                return ":TMP:surface:"
             case .cloudcover:
                 return ":TCDC:entire atmosphere:"
             case .cloudcover_low:
@@ -65,18 +67,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":DUVB:surface:"
             case .uv_index_clear_sky:
                 return ":CDUVB:surface:"
-            case .precipitation_probability:
-                return nil
-            case .temperature_80m:
-                return nil // TODO check for GFS012
-            case .temperature_100m:
-                return nil
-            case .surface_temperature:
-                return nil
-            case .wind_v_component_100m:
-                return nil
-            case .wind_u_component_100m:
-                return nil
             default:
                 return nil
             }
@@ -89,10 +79,18 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":MSLET:mean sea level:"
             case .categorical_freezing_rain:
                 return ":CFRZR:"
+            case .temperature_80m:
+                return ":TMP:80 m above ground:"
+            case .temperature_100m:
+                return ":TMP:100 m above ground:"
             case .wind_v_component_80m:
                 return ":VGRD:80 m above ground:"
             case .wind_u_component_80m:
                 return ":UGRD:80 m above ground:"
+            case .wind_v_component_100m:
+                return ":VGRD:100 m above ground:"
+            case .wind_u_component_100m:
+                return ":UGRD:100 m above ground:"
             case .windgusts_10m:
                 return ":GUST:surface:"
             case .freezinglevel_height:
@@ -291,18 +289,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":DUVB:surface:"
             case .uv_index_clear_sky:
                 return ":CDUVB:surface:"
-            case .cloudcover_low:
-                return nil
-            case .cloudcover_mid:
-                return nil
-            case .cloudcover_high:
-                return nil
-            case .showers:
-                // would be available, but not in 0.25° grid
-                return nil
-            case .diffuse_radiation:
-                return nil
-            case .precipitation_probability:
+            default:
                 return nil
             }
         }
