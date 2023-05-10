@@ -140,12 +140,12 @@ struct GfsDownload: AsyncCommandFix {
     func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool, secondFlush: Bool) async throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        
         let logger = application.logger
-        let elevationUrl = domain.getGribUrl(run: run, forecastHour: 0, member: 0)
-        if domain != .gfs025_ens && domain != .gfs05_ens {
-            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
-        }
+        
+        // GFS025 ensemble does not have elevation information, use non-ensemble version
+        let elevationUrl = (domain == .gfs025_ens ? GfsDomain.gfs025 : domain).getGribUrl(run: run, forecastHour: 0, member: 0)
+        try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
+        
         let deadLineHours: Double
         switch domain {
         case .gfs013:
