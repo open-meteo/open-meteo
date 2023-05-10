@@ -120,8 +120,9 @@ struct GemDownload: AsyncCommandFix {
             let message = try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false)[0]
             try grib2d.load(message: message)
             if domain == .gem_global_ensemble {
-                // Only ensemble model is shifted by 180°
+                // Only ensemble model is shifted by 180° and uses geopotential
                 grib2d.array.shift180Longitudee()
+                grib2d.array.data.multiplyAdd(multiply: 9.80665, add: 0)
             }
             height = grib2d.array.data
         }
