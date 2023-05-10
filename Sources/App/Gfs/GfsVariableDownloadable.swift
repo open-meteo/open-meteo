@@ -8,16 +8,217 @@ protocol GfsVariableDownloadable: GenericVariable {
 
 extension GfsSurfaceVariable: GfsVariableDownloadable {
     func gribIndexName(for domain: GfsDomain) -> String? {
-        if domain == .gfs025_ensemble {
+        switch domain {
+        case .gfs013:
+            // gfs013 https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20230510/00/atmos/gfs.t00z.sfluxgrbf000.grib2.idx
+            switch self {
+            case .temperature_2m:
+                return ":TMP:2 m above ground:"
+            case .cloudcover:
+                return ":TCDC:entire atmosphere:"
+            case .cloudcover_low:
+                return ":LCDC:low cloud layer:"
+            case .cloudcover_mid:
+                return ":MCDC:middle cloud layer:"
+            case .cloudcover_high:
+                return ":HCDC:high cloud layer:"
+            case .relativehumidity_2m:
+                return ":RH:2 m above ground:"
+            case .precipitation:
+                // PRATE:surface:6-7 hour ave fcst:
+                return ":PRATE:surface:"
+            case .wind_v_component_10m:
+                return ":VGRD:10 m above ground:"
+            case .wind_u_component_10m:
+                return ":UGRD:10 m above ground:"
+            case .soil_temperature_0_to_10cm:
+                return ":TSOIL:0-0.1 m below ground:"
+            case .soil_temperature_10_to_40cm:
+                return ":TSOIL:0.1-0.4 m below ground:"
+            case .soil_temperature_40_to_100cm:
+                return ":TSOIL:0.4-1 m below ground:"
+            case .soil_temperature_100_to_200cm:
+                return ":TSOIL:1-2 m below ground:"
+            case .soil_moisture_0_to_10cm:
+                return ":SOILW:0-0.1 m below ground:"
+            case .soil_moisture_10_to_40cm:
+                return ":SOILW:0.1-0.4 m below ground:"
+            case .soil_moisture_40_to_100cm:
+                return ":SOILW:0.4-1 m below ground:"
+            case .soil_moisture_100_to_200cm:
+                return ":SOILW:1-2 m below ground:"
+            case .snow_depth:
+                return ":SNOD:surface:"
+            case .sensible_heatflux:
+                return ":SHTFL:surface:"
+            case .latent_heatflux:
+                return ":LHTFL:surface:"
+            case .showers:
+                return ":CPRAT:surface:"
+            case .shortwave_radiation:
+                return ":DSWRF:surface:"
+            case .frozen_precipitation_percent:
+                return ":CPOFP:surface"
+            case .diffuse_radiation:
+                return ":VDDSF:surface:"
+            case .uv_index:
+                return ":DUVB:surface:"
+            case .uv_index_clear_sky:
+                return ":CDUVB:surface:"
+            case .precipitation_probability:
+                return nil
+            case .temperature_80m:
+                return nil // TODO check for GFS012
+            case .temperature_100m:
+                return nil
+            case .surface_temperature:
+                return nil
+            case .wind_v_component_100m:
+                return nil
+            case .wind_u_component_100m:
+                return nil
+            default:
+                return nil
+            }
+        case .gfs025:
+            // gfs025 https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20230510/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
+            switch self {
+            case .pressure_msl:
+                // mean sea level pressure using eta reduction
+                // https://luckgrib.com/tutorials/2018/08/28/gfs-prmsl-vs-mslet.html
+                return ":MSLET:mean sea level:"
+            case .categorical_freezing_rain:
+                return ":CFRZR:"
+            case .wind_v_component_80m:
+                return ":VGRD:80 m above ground:"
+            case .wind_u_component_80m:
+                return ":UGRD:80 m above ground:"
+            case .windgusts_10m:
+                return ":GUST:surface:"
+            case .freezinglevel_height:
+                return ":HGT:0C isotherm:"
+            case .cape:
+                return ":CAPE:surface:"
+            case .lifted_index:
+                return ":LFTX:surface:"
+            case .visibility:
+                return ":VIS:surface:"
+            default:
+                return nil
+            }
+        case .hrrr_conus:
+            // hrrr https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.20230510/conus/hrrr.t00z.wrfnatf00.grib2.idx
+            // https://home.chpc.utah.edu/~u0553130/Brian_Blaylock/HRRR_archive/hrrr_sfc_table.html
+            switch self {
+            case .pressure_msl:
+                return ":MSLMA:mean sea level:"
+            case .lifted_index:
+                return ":LFTX:500-1000 mb:"
+            case .showers:
+                // there is no parameterised convective precipitation field
+                // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
+                return nil
+            case .temperature_2m:
+                return ":TMP:2 m above ground:"
+            case .cloudcover:
+                return ":TCDC:entire atmosphere:"
+            case .cloudcover_low:
+                return ":LCDC:low cloud layer:"
+            case .cloudcover_mid:
+                return ":MCDC:middle cloud layer:"
+            case .cloudcover_high:
+                return ":HCDC:high cloud layer:"
+            case .relativehumidity_2m:
+                return ":RH:2 m above ground:"
+            case .precipitation:
+                return ":PRATE:surface:"
+            case .wind_v_component_10m:
+                return ":VGRD:10 m above ground:"
+            case .wind_u_component_10m:
+                return ":UGRD:10 m above ground:"
+            case .wind_v_component_80m:
+                return ":VGRD:80 m above ground:"
+            case .wind_u_component_80m:
+                return ":UGRD:80 m above ground:"
+            case .surface_temperature:
+                return ":TMP:surface:"
+            case .snow_depth:
+                return ":SNOD:surface:"
+            case .sensible_heatflux:
+                return ":SHTFL:surface:"
+            case .latent_heatflux:
+                return ":LHTFL:surface:"
+            case .frozen_precipitation_percent:
+                return ":CPOFP:surface"
+            case .categorical_freezing_rain:
+                return ":CFRZR:"
+            case .windgusts_10m:
+                return ":GUST:surface:"
+            case .freezinglevel_height:
+                return ":HGT:0C isotherm:"
+            case .shortwave_radiation:
+                return ":DSWRF:surface:"
+            case .diffuse_radiation:
+                return ":VDDSF:surface:"
+            case .cape:
+                return ":CAPE:surface:"
+            case .visibility:
+                return ":VIS:surface:"
+            case .precipitation_probability:
+                return nil
+            default:
+                return nil
+            }
+        case .gfs025_ensemble:
             switch self {
             case .precipitation_probability:
                 return ":APCP:surface:"
             default:
                 return nil
             }
-        }
-        
-        if domain == .gfs05_ens {
+        case .gfs025_ens:
+            // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20230427/00/atmos/pgrb2sp25/geavg.t00z.pgrb2s.0p25.f003.idx
+            switch self {
+            case .visibility:
+                return ":VIS:surface:"
+            case .windgusts_10m:
+                return ":GUST:surface:"
+            case .pressure_msl:
+                return ":MSLET:mean sea level:"
+            case .soil_temperature_0_to_10cm:
+                return ":TSOIL:0-0.1 m below ground:"
+            case .soil_moisture_0_to_10cm:
+                return ":SOILW:0-0.1 m below ground:"
+            case .snow_depth:
+                return ":SNOD:surface:"
+            case .temperature_2m:
+                return ":TMP:2 m above ground:"
+            case .relativehumidity_2m:
+                return ":RH:2 m above ground:"
+            case .wind_u_component_10m:
+                return ":UGRD:10 m above ground:"
+            case .wind_v_component_10m:
+                return ":VGRD:10 m above ground:"
+            case .frozen_precipitation_percent:
+                return ":CPOFP:surface:"
+            case .precipitation:
+                return ":APCP:surface:"
+            case .categorical_freezing_rain:
+                return ":CFRZR:surface:"
+            case .latent_heatflux:
+                return ":LHTFL:surface:"
+            case .sensible_heatflux:
+                return ":SHTFL:surface:"
+            case .cape:
+                return ":CAPE:surface:"
+            case .cloudcover:
+                return ":TCDC:entire atmosphere:"
+            case .shortwave_radiation:
+                return ":DSWRF:surface:"
+            default:
+                return nil
+            }
+        case .gfs05_ens:
             // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20230427/00/atmos/pgrb2bp5/gec00.t00z.pgrb2b.0p50.f003.idx
             switch self {
             case .visibility:
@@ -104,239 +305,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .precipitation_probability:
                 return nil
             }
-        }
-        
-        if domain == .gfs025_ens {
-            // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20230427/00/atmos/pgrb2sp25/geavg.t00z.pgrb2s.0p25.f003.idx
-            switch self {
-            case .visibility:
-                return ":VIS:surface:"
-            case .windgusts_10m:
-                return ":GUST:surface:"
-            case .pressure_msl:
-                return ":MSLET:mean sea level:"
-            case .soil_temperature_0_to_10cm:
-                return ":TSOIL:0-0.1 m below ground:"
-            case .soil_moisture_0_to_10cm:
-                return ":SOILW:0-0.1 m below ground:"
-            case .snow_depth:
-                return ":SNOD:surface:"
-            case .temperature_2m:
-                return ":TMP:2 m above ground:"
-            case .relativehumidity_2m:
-                return ":RH:2 m above ground:"
-            case .wind_u_component_10m:
-                return ":UGRD:10 m above ground:"
-            case .wind_v_component_10m:
-                return ":VGRD:10 m above ground:"
-            case .frozen_precipitation_percent:
-                return ":CPOFP:surface:"
-            case .precipitation:
-                return ":APCP:surface:"
-            case .categorical_freezing_rain:
-                return ":CFRZR:surface:"
-            case .latent_heatflux:
-                return ":LHTFL:surface:"
-            case .sensible_heatflux:
-                return ":SHTFL:surface:"
-            case .cape:
-                return ":CAPE:surface:"
-            case .cloudcover:
-                return ":TCDC:entire atmosphere:"
-            case .shortwave_radiation:
-                return ":DSWRF:surface:"
-            default:
-                return nil
-            }
-        }
-        
-        if domain == .hrrr_conus {
-            // hrrr https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.20230510/conus/hrrr.t00z.wrfnatf00.grib2.idx
-            // https://home.chpc.utah.edu/~u0553130/Brian_Blaylock/HRRR_archive/hrrr_sfc_table.html
-            switch self {
-            case .pressure_msl:
-                return ":MSLMA:mean sea level:"
-            case .lifted_index:
-                return ":LFTX:500-1000 mb:"
-            case .showers:
-                // there is no parameterised convective precipitation field
-                // NAM and HRRR are convection-allowing models https://learningweather.psu.edu/node/90
-                return nil
-            case .temperature_2m:
-                return ":TMP:2 m above ground:"
-            case .cloudcover:
-                return ":TCDC:entire atmosphere:"
-            case .cloudcover_low:
-                return ":LCDC:low cloud layer:"
-            case .cloudcover_mid:
-                return ":MCDC:middle cloud layer:"
-            case .cloudcover_high:
-                return ":HCDC:high cloud layer:"
-            case .relativehumidity_2m:
-                return ":RH:2 m above ground:"
-            case .precipitation:
-                return ":PRATE:surface:"
-            case .wind_v_component_10m:
-                return ":VGRD:10 m above ground:"
-            case .wind_u_component_10m:
-                return ":UGRD:10 m above ground:"
-            case .wind_v_component_80m:
-                return ":VGRD:80 m above ground:"
-            case .wind_u_component_80m:
-                return ":UGRD:80 m above ground:"
-            case .surface_temperature:
-                return ":TMP:surface:"
-            case .snow_depth:
-                return ":SNOD:surface:"
-            case .sensible_heatflux:
-                return ":SHTFL:surface:"
-            case .latent_heatflux:
-                return ":LHTFL:surface:"
-            case .frozen_precipitation_percent:
-                return ":CPOFP:surface"
-            case .categorical_freezing_rain:
-                return ":CFRZR:"
-            case .windgusts_10m:
-                return ":GUST:surface:"
-            case .freezinglevel_height:
-                return ":HGT:0C isotherm:"
-            case .shortwave_radiation:
-                return ":DSWRF:surface:"
-            case .diffuse_radiation:
-                return ":VDDSF:surface:"
-            case .cape:
-                return ":CAPE:surface:"
-            case .visibility:
-                return ":VIS:surface:"
-            case .precipitation_probability:
-                return nil
-            default:
-                return nil
-            }
-        }
-        
-        if domain == .gfs013 {
-            switch self {
-            case .pressure_msl:
-                return nil
-            case .relativehumidity_2m:
-                // Download specific humidity and convert it later
-                return ":SPFH:2 m above ground:"
-            case .categorical_freezing_rain:
-                return nil
-            case .wind_u_component_80m:
-                return nil
-            case .wind_v_component_80m:
-                return nil
-            case .windgusts_10m:
-                return nil
-            case .freezinglevel_height:
-                return nil
-            case .cape:
-                return nil
-            case .lifted_index:
-                return nil
-            case .visibility:
-                return nil
-            default: break
-            }
-        }
-        
-        if domain == .gfs025 {
-            // if variable is in gfs013, it is not required for gfs025
-            if self.gribIndexName(for: .gfs013) != nil {
-                return nil
-            }
-        }
-
-        // gfs013 https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20230510/00/atmos/gfs.t00z.sfluxgrbf000.grib2.idx
-        // gfs025 https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20230510/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
-        switch self {
-        case .temperature_2m:
-            return ":TMP:2 m above ground:"
-        case .cloudcover:
-            return ":TCDC:entire atmosphere:"
-        case .cloudcover_low:
-            return ":LCDC:low cloud layer:"
-        case .cloudcover_mid:
-            return ":MCDC:middle cloud layer:"
-        case .cloudcover_high:
-            return ":HCDC:high cloud layer:"
-        case .pressure_msl:
-            // mean sea level pressure using eta reduction
-            // https://luckgrib.com/tutorials/2018/08/28/gfs-prmsl-vs-mslet.html
-            return ":MSLET:mean sea level:"
-        case .relativehumidity_2m:
-            return ":RH:2 m above ground:"
-        case .precipitation:
-            // PRATE:surface:6-7 hour ave fcst:
-            return ":PRATE:surface:"
-        case .wind_v_component_10m:
-            return ":VGRD:10 m above ground:"
-        case .wind_u_component_10m:
-            return ":UGRD:10 m above ground:"
-        case .wind_v_component_80m:
-            return ":VGRD:80 m above ground:"
-        case .wind_u_component_80m:
-            return ":UGRD:80 m above ground:"
-        case .soil_temperature_0_to_10cm:
-            return ":TSOIL:0-0.1 m below ground:"
-        case .soil_temperature_10_to_40cm:
-            return ":TSOIL:0.1-0.4 m below ground:"
-        case .soil_temperature_40_to_100cm:
-            return ":TSOIL:0.4-1 m below ground:"
-        case .soil_temperature_100_to_200cm:
-            return ":TSOIL:1-2 m below ground:"
-        case .soil_moisture_0_to_10cm:
-            return ":SOILW:0-0.1 m below ground:"
-        case .soil_moisture_10_to_40cm:
-            return ":SOILW:0.1-0.4 m below ground:"
-        case .soil_moisture_40_to_100cm:
-            return ":SOILW:0.4-1 m below ground:"
-        case .soil_moisture_100_to_200cm:
-            return ":SOILW:1-2 m below ground:"
-        case .snow_depth:
-            return ":SNOD:surface:"
-        case .sensible_heatflux:
-            return ":SHTFL:surface:"
-        case .latent_heatflux:
-            return ":LHTFL:surface:"
-        case .showers:
-            return ":CPRAT:surface:"
-        case .windgusts_10m:
-            return ":GUST:surface:"
-        case .freezinglevel_height:
-            return ":HGT:0C isotherm:"
-        case .shortwave_radiation:
-            return ":DSWRF:surface:"
-        case .frozen_precipitation_percent:
-            return ":CPOFP:surface"
-        case .cape:
-            return ":CAPE:surface:"
-        case .lifted_index:
-            return ":LFTX:surface:"
-        case .visibility:
-            return ":VIS:surface:"
-        case .diffuse_radiation:
-            return ":VDDSF:surface:"
-        case .uv_index:
-            return ":DUVB:surface:"
-        case .uv_index_clear_sky:
-            return ":CDUVB:surface:"
-        case .precipitation_probability:
-            return nil
-        case .categorical_freezing_rain:
-            return ":CFRZR:"
-        case .temperature_80m:
-            return nil // TODO check for GFS012
-        case .temperature_100m:
-            return nil
-        case .surface_temperature:
-            return nil
-        case .wind_v_component_100m:
-            return nil
-        case .wind_u_component_100m:
-            return nil
         }
     }
     
