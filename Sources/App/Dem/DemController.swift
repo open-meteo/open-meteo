@@ -28,7 +28,7 @@ struct DemController {
         }
     }
 
-    func query(_ req: Request) throws -> String {
+    func query(_ req: Request) throws -> Response {
         if req.headers[.host].contains(where: { $0 == "open-meteo.com"}) {
             throw Abort.init(.notFound)
         }
@@ -37,9 +37,11 @@ struct DemController {
         let elevation = try zip(params.latitude, params.longitude).map { (latitude, longitude) in
             try Dem90.read(lat: latitude, lon: longitude)
         }
-        return """
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "application/json")
+        return Response(status: .ok, headers: headers, body: .init(string: """
         {"elevation":\(elevation)}
-        """
+        """))
     }
 }
 
