@@ -305,6 +305,9 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             case .rain:
                 try prefetchData(raw: .init(.surface(.precipitation), member), time: time)
                 try prefetchData(raw: .init(.surface(.snowfall_water_equivalent), member), time: time)
+                if reader.domain != .gem_global_ensemble {
+                    try prefetchData(raw: .init(.surface(.showers), member), time: time)
+                }
             case .cloudcover_low:
                 try prefetchData(derived: .init(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 1000)), member), time: time)
                 try prefetchData(derived: .init(.pressure(GemPressureVariableDerived(variable: .cloudcover, level: 950)), member), time: time)
@@ -442,6 +445,10 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             case .rain:
                 let snowwater = try get(raw: .init(.surface(.snowfall_water_equivalent), member), time: time).data
                 let total = try get(raw: .init(.surface(.precipitation), member), time: time).data
+                if reader.domain == .gem_global_ensemble {
+                    // no showers in ensemble
+                    return DataAndUnit(zip(total, snowwater).map(-), .millimeter)
+                }
                 let showers = try get(raw: .init(.surface(.showers), member), time: time).data
                 let rain = zip(zip(total, snowwater), showers).map { (arg0, showers) in
                     let (total, snowwater) = arg0
