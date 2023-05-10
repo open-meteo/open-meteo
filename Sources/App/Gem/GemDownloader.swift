@@ -261,6 +261,13 @@ struct GemDownload: AsyncCommandFix {
                 }
                 
                 if domain.dtHours == 3 {
+                    let isShortwaveRadiation = variable as? GemSurfaceVariable == .shortwave_radiation
+                    if isShortwaveRadiation {
+                        // Shortwave radiation needs to be deaveraged before
+                        // It would be better to do deaccumulation in the download phase
+                        data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 1)
+                    }
+                    
                     /// interpolate 6 to 3 hours for ensemble 0.5°
                     let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
                         if forecastHours.contains(hour * domain.dtHours) {
@@ -269,12 +276,18 @@ struct GemDownload: AsyncCommandFix {
                         return hour
                     }
                     data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
+                    
+                    if variable.isAccumulatedSinceModelStart && !isShortwaveRadiation {
+                        data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 1)
+                    }
+                } else {
+                    // De-accumulate precipitation
+                    if variable.isAccumulatedSinceModelStart {
+                        data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 1)
+                    }
                 }
                 
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
-                    data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 1)
-                }
+
                 
                 progress.add(locationRange.count * nMembers)
                 return data3d.data[0..<locationRange.count * nMembers * nTime]
