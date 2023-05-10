@@ -577,6 +577,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case surface_pressure
     case surface_temperature
     case soil_temperature_0cm
+    case rain
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
