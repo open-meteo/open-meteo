@@ -123,7 +123,6 @@ struct GfsDownload: AsyncCommandFix {
             case .landmask:
                 landmask = grib2d.array
             }
-            //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc")
         }
         
         guard var height = height, let landmask = landmask else {
@@ -133,6 +132,9 @@ struct GfsDownload: AsyncCommandFix {
             // landmask: 0=sea, 1=land
             height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
         }
+        
+        //try height.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
+        
         try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
     }
     

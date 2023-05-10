@@ -82,11 +82,11 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .elevation:
             switch self {
             case .gfs05_ens:
-                return nil
+                return Self.gfs05ensElevationFile
             case .gfs013:
                 return Self.gfs013ElevationFile
             case .gfs025_ens:
-                fallthrough
+                return Self.gfs025ensElevationFile
             case .gfs025_ensemble:
                 fallthrough
             case .gfs025:
@@ -127,6 +127,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     private static var gfs025ElevationFile = try? OmFileReader(file: Self.gfs025.surfaceElevationFileOm)
     //private static var namConusElevationFile = try? OmFileReader(file: Self.nam_conus.surfaceElevationFileOm)
     private static var hrrrConusElevationFile = try? OmFileReader(file: Self.hrrr_conus.surfaceElevationFileOm)
+    private static var gfs025ensElevationFile = try? OmFileReader(file: Self.gfs025_ens.surfaceElevationFileOm)
+    private static var gfs05ensElevationFile = try? OmFileReader(file: Self.gfs05_ens.surfaceElevationFileOm)
     
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
