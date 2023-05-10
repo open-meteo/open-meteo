@@ -474,7 +474,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .surface_pressure:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let pressure = try get(raw: .pressure_msl, time: time)
-            return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: modelElevation.numeric), pressure.unit)
+            return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: targetElevation), pressure.unit)
         case .cloudcover:
             let low = try get(raw: .cloudcover_low, time: time).data
             let mid = try get(raw: .cloudcover_mid, time: time).data

@@ -216,7 +216,7 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case vapor_pressure_deficit
     case snowfall
     case rain
-    case pressure_msl
+    case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case weathercode
@@ -312,11 +312,13 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         }
         
         /// Adjust surface pressure to target elevation. Surface pressure is stored for `modelElevation`, but we want to get the pressure on `targetElevation`
-        if case let .surface(variable) = raw.variable, variable == .surface_pressure {
+        /*if case let .surface(variable) = raw.variable, variable == .pressure_msl {
             let pressure = try reader.get(variable: raw, time: time)
-            let factor = Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.modelElevation.numeric) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation)
+            
+            let factor = Meteorology.sealevelPressureFactor(temperature: 20 - 0.0065 * (reader.modelElevation.numeric - reader.modelElevation.numeric), elevation: reader.modelElevation.numeric) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation)
+            print("target \(reader.targetElevation) model \(reader.modelElevation.numeric) factor \(factor)")
             return DataAndUnit(pressure.data.map({$0*factor}), pressure.unit)
-        }
+        }*/
         
         /// GFS ensemble has no diffuse radiation
         if (domain == .gfs025_ens || domain == .gfs05_ens), case let .surface(variable) = raw.variable, variable == .diffuse_radiation {
@@ -398,8 +400,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .snowfall:
                 try prefetchData(raw: .init(.surface(.frozen_precipitation_percent), member), time: time)
                 try prefetchData(raw: .init(.surface(.precipitation), member), time: time)
-            case .pressure_msl:
-                try prefetchData(raw: .init(.surface(.surface_pressure), member), time: time)
+            case .surface_pressure:
+                try prefetchData(raw: .init(.surface(.pressure_msl), member), time: time)
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
             case .terrestrial_radiation:
                 break
@@ -543,10 +545,10 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 }
             case .relativehumitidy_2m:
                 return try get(raw: .init(.surface(.relativehumidity_2m), member), time: time)
-            case .pressure_msl:
+            case .surface_pressure:
                 let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time).data
-                let pressure_surface = try get(raw: .init(.surface(.surface_pressure), member), time: time)
-                return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: pressure_surface.data, elevation: reader.modelElevation.numeric), pressure_surface.unit)
+                let pressure_msl = try get(raw: .init(.surface(.pressure_msl), member), time: time)
+                return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure_msl.data, elevation: reader.targetElevation), pressure_msl.unit)
             case .terrestrial_radiation:
                 /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)

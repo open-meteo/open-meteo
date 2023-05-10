@@ -24,8 +24,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":VIS:surface:"
             case .windgusts_10m:
                 return ":GUST:surface:"
-            case .surface_pressure:
-                return ":PRES:surface:"
+            case .pressure_msl:
+                return ":MSLET:mean sea level:"
             case .snow_depth:
                 return ":SNOD:surface:"
             case .temperature_2m:
@@ -113,8 +113,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":VIS:surface:"
             case .windgusts_10m:
                 return ":GUST:surface:"
-            case .surface_pressure:
-                return ":PRES:surface:"
+            case .pressure_msl:
+                return ":MSLET:mean sea level:"
             case .soil_temperature_0_to_10cm:
                 return ":TSOIL:0-0.1 m below ground:"
             case .soil_moisture_0_to_10cm:
@@ -152,6 +152,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         
         if domain == .hrrr_conus {
             switch self {
+            case .pressure_msl:
+                return ":MSLMA:mean sea level:"
             case .lifted_index:
                 return ":LFTX:500-1000 mb:"
             case .showers:
@@ -184,6 +186,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         
         if domain == .gfs013 {
             switch self {
+            case .pressure_msl:
+                return nil
             case .relativehumidity_2m:
                 // Download specific humidity and convert it later
                 return ":SPFH:2 m above ground:"
@@ -213,7 +217,9 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return nil
             }
         }
-        
+        // hrrr https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.20230510/conus/hrrr.t00z.wrfnatf00.grib2.idx
+        // gfs013 https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20230510/00/atmos/gfs.t00z.sfluxgrbf000.grib2.idx
+        // gfs025 https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20230510/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
         switch self {
         case .temperature_2m:
             return ":TMP:2 m above ground:"
@@ -225,8 +231,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return ":MCDC:middle cloud layer:"
         case .cloudcover_high:
             return ":HCDC:high cloud layer:"
-        case .surface_pressure:
-            return ":PRES:surface:"
+        case .pressure_msl:
+            // mean sea level pressure using eta reduction
+            // https://luckgrib.com/tutorials/2018/08/28/gfs-prmsl-vs-mslet.html
+            return ":MSLET:mean sea level:"
         case .relativehumidity_2m:
             return ":RH:2 m above ground:"
         case .precipitation:
@@ -356,7 +364,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .soil_moisture_40_to_100cm: return .hermite(bounds: nil)
         case .soil_moisture_100_to_200cm: return .hermite(bounds: nil)
         case .showers: return .nearest
-        case .surface_pressure: return .hermite(bounds: nil)
+        case .pressure_msl: return .hermite(bounds: nil)
         case .frozen_precipitation_percent: return .nearest
         case .diffuse_radiation: return .solar_backwards_averaged
         case .cape: return .hermite(bounds: 0...1e9)
@@ -375,7 +383,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             fallthrough
         case .temperature_100m:
             return (1, -273.15)
-        case .surface_pressure:
+        case .pressure_msl:
             return (1/100, 0)
         case .surface_temperature:
             fallthrough

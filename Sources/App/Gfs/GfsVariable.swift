@@ -13,7 +13,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case cloudcover_low
     case cloudcover_mid
     case cloudcover_high
-    case surface_pressure
+    case pressure_msl
     
     case relativehumidity_2m
     
@@ -121,7 +121,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .windgusts_10m: return 10
         case .freezinglevel_height:  return 0.1 // zero height 10 meter resolution
         case .showers: return 10
-        case .surface_pressure: return 10
+        case .pressure_msl: return 10
         case .shortwave_radiation: return 1
         case .frozen_precipitation_percent: return 1
         case .cape: return 0.1
@@ -151,7 +151,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .linear
         case .cloudcover_high:
             return .linear
-        case .surface_pressure:
+        case .pressure_msl:
             return .hermite(bounds: nil)
         case .relativehumidity_2m:
             return .hermite(bounds: 0...100)
@@ -254,7 +254,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .showers: return .millimeter
         case .windgusts_10m: return .ms
         case .freezinglevel_height: return .meter
-        case .surface_pressure: return .hectoPascal
+        case .pressure_msl: return .hectoPascal
         case .shortwave_radiation: return .wattPerSquareMeter
         case .frozen_precipitation_percent: return .percent
         case .cape: return .joulesPerKilogram

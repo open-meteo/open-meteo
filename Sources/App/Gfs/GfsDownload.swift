@@ -184,7 +184,7 @@ struct GfsDownload: AsyncCommandFix {
         
         /// Variables that are kept in memory
         /// For GFS013, keep pressure and temperature in memory to convert specific humidity to relative
-        let keepVariableInMemory: [GfsSurfaceVariable] = domain == .gfs013 ? [.temperature_2m, .surface_pressure] : []
+        let keepVariableInMemory: [GfsSurfaceVariable] = domain == .gfs013 ? [.temperature_2m, .pressure_msl] : []
         /// Keep pressure level temperature in memory to convert pressure vertical velocity (Pa/s) to geometric velocity (m/s)
         let keepVariableInMemoryPressure: [GfsPressureVariableType] = (domain == .hrrr_conus || domain == .gfs05_ens) ? [.temperature] : []
         
@@ -244,7 +244,7 @@ struct GfsDownload: AsyncCommandFix {
                               temperature.step == forecastHour else {
                             fatalError("Could not get temperature 2m to convert specific humidity")
                         }
-                        guard let surfacePressure = previousData["\(GfsSurfaceVariable.surface_pressure.rawValue)\(memberStr)"],
+                        guard let surfacePressure = previousData["\(GfsSurfaceVariable.pressure_msl.rawValue)\(memberStr)"],
                               surfacePressure.step == forecastHour else {
                             fatalError("Could not get surface_pressure to convert specific humidity")
                         }
