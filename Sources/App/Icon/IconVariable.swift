@@ -395,7 +395,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .snowfall_water_equivalent:
             return .backwards_sum
         case .cape:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .lightning_potential:
             return .linear
         case .windgusts_10m:

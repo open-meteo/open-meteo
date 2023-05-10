@@ -212,7 +212,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index_clear_sky:
             return .hermite(bounds: 0...1000)
         case .cape:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .lifted_index:
             return .hermite(bounds: nil)
         case .visibility:
