@@ -222,9 +222,9 @@ extension Array2DFastTime {
                 let c = -A/2.0 + C/2.0
                 let d = B
                 
-                self[l, hour] = (a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d) * solC1
-                self[l, hour+1] = (a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d) * solC2
-                self[l, hour+2] = C * solC3
+                self[l, hour] = max(a*0.3*0.3*0.3 + b*0.3*0.3 + c*0.3 + d, 0) * solC1
+                self[l, hour+1] = max(a*0.6*0.6*0.6 + b*0.6*0.6 + c*0.6 + d, 0) * solC2
+                self[l, hour+2] = max(C, 0) * solC3
             }
         }
     }
@@ -336,8 +336,8 @@ extension Array2DFastTime {
                     let c = -A/2.0 + C/2.0
                     let d = B
                     
-                    self[l, hour] = (a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d) * solC1
-                    self[l, hour+1*width] = C * solC2
+                    self[l, hour] = max(a*0.5*0.5*0.5 + b*0.5*0.5 + c*0.5 + d, 0) * solC1
+                    self[l, hour+1*width] = max(C, 0) * solC2
                 }
             }
         }
