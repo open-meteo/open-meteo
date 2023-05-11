@@ -355,6 +355,113 @@ extension Array where Element == Float {
             }
         }
     }
+    
+    /// Interpolate missing values by seeking for the next valid value and perform a solar backwards interpolation
+    /// Calculates the solar position backwards averages over `dt` and estimates the clearness index `kt` which is then hermite interpolated
+    ///
+    /// Assumes that the first value after a series of missing values is the average solar radiation for all missing steps (including self)
+    /// Values after missing values will afterwards deaveraged as well
+    mutating func interpolateInplaceSolarBackwards(nTime: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+        let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: time)
+        
+        precondition(nTime <= self.count)
+        precondition(self.count % nTime == 0)
+        let nLocations = self.count / nTime
+        for l in 0..<nLocations {
+            let sPos = l / (nLocations / locationRange.count)
+            
+            /// At  the boundary, it wont be possible to detect a valid spacing for 4 points
+            /// Reuse the previously good known spacing
+            var width = 0
+            for t in 0..<nTime {
+                guard self[l * nTime + t].isNaN else {
+                    continue
+                }
+                var C = Float.nan
+                var D = Float.nan
+                var posC = 0
+                var posD = 0
+                // Seek next 2 valid values, point C and D
+                for t2 in t..<nTime {
+                    let value = self[l * nTime + t2]
+                    guard !value.isNaN else  {
+                        continue
+                    }
+                    if C.isNaN {
+                        C = value
+                        posC = t2
+                        continue
+                    }
+                    D = value
+                    posD = t2
+                    break
+                }
+                if C.isNaN {
+                    // not possible to to any interpolation
+                    break
+                }
+                if D.isNaN {
+                    // At the boundary, replicate point C
+                    D = C
+                    posD = posC
+                } else {
+                    width = posD - posC
+                }
+                let posB = Swift.max(posC - width, 0)
+                // Replicate point B if A would be outside
+                let posA = (posB - width) >= 0 ? posB - width : posB
+                let B = self[posB]
+                let A = self[posA]
+                
+                // The solar factor is already deaveraged at point A and B
+                let solA = solar2d[sPos, posA]
+                let solB = solar2d[sPos, posB]
+                
+                /// solC is an average of the solar factor from posB until posC
+                let solC = solar2d[sPos, posB+1..<posC+1].mean()
+                /// solC is an average of the solar factor from posC until posD
+                let solD = solar2d[sPos, posC+1..<posD+1].mean()
+                
+                // At low radiation levels it is impossible to estimate KT indices
+                var ktC = solC <= 0.005 ? 0 : Swift.min(C / solC, 1100)
+                var ktB = solB <= 0.005 ? ktC : Swift.min(B / solB, 1100)
+                if ktC == 0 && ktB > 0 {
+                    ktC = ktB
+                }
+                var ktA = solA <= 0.005 ? ktB : Swift.min(A / solA, 1100)
+                if ktC == 0 && ktA > 0 {
+                    ktB = ktA
+                    ktC = ktA
+                }
+                let ktD = solD <= 0.005 ? ktC : Swift.min(D / solD, 1100)
+                // Espcially for 6h values, aggressively try to find any KT index that works
+                // As a future improvement, the clearsky radiation could be approximated by cloud cover total as an additional input
+                // This could improve morning/evening kt approximations
+                if ktC == 0 && ktD > 0 {
+                    ktA = ktD
+                    ktB = ktD
+                    ktC = ktD
+                }
+                
+                let a = -ktA/2.0 + (3.0*ktB)/2.0 - (3.0*ktC)/2.0 + ktD/2.0
+                let b = ktA - (5.0*ktB)/2.0 + 2.0*ktC - ktD / 2.0
+                let c = -ktA/2.0 + ktC/2.0
+                let d = ktB
+                
+                // Fill up all missing values until point C
+                for t in t..<posC {
+                    // fractional position of the missing value in relation to points B and C
+                    let f = Float(t - posB) / Float(posC - posB)
+                    // Interpolated clearness index at missing value position
+                    let kt = a*f*f*f + b*f*f + c*f + d
+                    self[l * nTime + t] = Swift.max(kt, 0) * solar2d[sPos, t]
+                }
+                
+                // Deaverage point C
+                self[l * nTime + posC] = Swift.max(ktC, 0) * solar2d[sPos, posC]
+            }
+        }
+    }
 }
 
 
