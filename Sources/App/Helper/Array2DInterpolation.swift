@@ -400,50 +400,54 @@ extension Array where Element == Float {
                     // not possible to to any interpolation
                     break
                 }
-                if D.isNaN {
-                    // At the boundary, replicate point C
-                    D = C
-                    posD = posC
-                } else {
+                if !D.isNaN {
                     width = posD - posC
                 }
                 let posB = Swift.max(posC - width, 0)
-
                 let B = self[l * nTime + posB]
                 let solB = solar2d[sPos, posB]
                 
                 /// solC is an average of the solar factor from posB until posC
                 let solC = solar2d[sPos, posB+1..<posC+1].mean()
-                /// solC is an average of the solar factor from posC until posD
-                let solD = solar2d[sPos, posC+1..<posD+1].mean()
-                
-                // At low radiation levels it is impossible to estimate KT indices
-                var ktC = solC <= 0.005 ? 0 : Swift.min(C / solC, 1100)
+
+                /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
+                var ktC = solC <= 0.005 ? .nan : Swift.min(C / solC, 1100)
+                /// Clearness index at point B, or use `ktC` for low radiation levels
                 var ktB = solB <= 0.005 ? ktC : Swift.min(B / solB, 1100)
-                if ktC == 0 && ktB > 0 {
+                if ktC.isNaN && ktB > 0 {
                     ktC = ktB
                 }
                 
                 var ktA: Float
-                if (posB - width) >= 0 {
-                    let posA = posB - width
-                    // The solar factor is already deaveraged at point A and B
-                    let solA = solar2d[sPos, posA]
-                    ktA = solA <= 0.005 ? ktB : Swift.min(self[l * nTime + posA] / solA, 1100)
-                } else {
+                if posB - width < 0 {
                     // Replicate point B if A would be outside
                     ktA = ktB
+                } else {
+                    let posA = posB - width
+                    /// Solar factor for point A is already deaveraged unlike point C and D
+                    let solA = solar2d[sPos, posA]
+                    ktA = solA <= 0.005 ? ktB : Swift.min(self[l * nTime + posA] / solA, 1100)
                 }
 
-                if ktC == 0 && ktA > 0 {
+                if ktC.isNaN && ktA > 0 {
                     ktB = ktA
                     ktC = ktA
                 }
-                let ktD = solD <= 0.005 ? ktC : Swift.min(D / solD, 1100)
+                
+                let ktD: Float
+                if D.isNaN {
+                    // Replicate point C if D is outside boundary
+                    ktD = ktC
+                } else {
+                    /// solC is an average of the solar factor from posC until posD
+                    let solD = solar2d[sPos, posC+1..<posD+1].mean()
+                    ktD = solD <= 0.005 ? ktC : Swift.min(D / solD, 1100)
+                }
+                
                 // Espcially for 6h values, aggressively try to find any KT index that works
                 // As a future improvement, the clearsky radiation could be approximated by cloud cover total as an additional input
                 // This could improve morning/evening kt approximations
-                if ktC == 0 && ktD > 0 {
+                if ktC.isNaN && ktD > 0 {
                     ktA = ktD
                     ktB = ktD
                     ktC = ktD
