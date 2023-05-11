@@ -12,6 +12,17 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqual(spatial2.data, spatial.data)
     }
     
+    func testBackwardInterpolate() {
+        var a: [Float] = [0,1,.nan,.nan,.nan,5]
+        a.interpolateBackwards(nTime: 6)
+        XCTAssertEqual(a, [0,1,5,5,5,5])
+        
+        // Make sure nTime is honored correctly
+        a = [0,.nan,1,.nan,.nan,.nan, 0,.nan,1,.nan,.nan,.nan]
+        a.interpolateBackwards(nTime: 6)
+        XCTAssertEqualArray(a, [0,1,1,.nan,.nan,.nan, 0,1,1,.nan,.nan,.nan], accuracy: 0.0001)
+    }
+    
     func testRangeFraction() {
         XCTAssertEqual((100..<1000).interpolated(atFraction: 0.5), 550)
         XCTAssertEqual((100..<1000).interpolated(atFraction: 0), 100)

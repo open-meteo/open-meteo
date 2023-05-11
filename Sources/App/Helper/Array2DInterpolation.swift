@@ -231,6 +231,31 @@ extension Array2DFastTime {
 }
 
 
+extension Array where Element == Float {
+    /// Interpolate missing values, but taking the next valid value
+    mutating func interpolateBackwards(nTime: Int) {
+        precondition(nTime <= self.count)
+        precondition(self.count % nTime == 0)
+        let nLocations = self.count / nTime
+        for l in 0..<nLocations {
+            for t in 0..<nTime {
+                guard self[l * nTime + t].isNaN else {
+                    continue
+                }
+                // Seek next valid value
+                for t2 in t..<nTime {
+                    let value = self[l * nTime + t2]
+                    if !value.isNaN {
+                        self[l * nTime + t] = value
+                        break
+                    }
+                }
+            }
+        }
+    }
+}
+
+
 extension Array2DFastTime {
     /// Used in ECMWF and MeteoFrance
     ///
