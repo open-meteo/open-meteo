@@ -233,7 +233,7 @@ extension Array2DFastTime {
 
 extension Array where Element == Float {
     /// Interpolate missing values, but taking the next valid value
-    mutating func interpolateBackwards(nTime: Int) {
+    mutating func interpolateInplaceBackwards(nTime: Int) {
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
         let nLocations = self.count / nTime
@@ -247,6 +247,35 @@ extension Array where Element == Float {
                     let value = self[l * nTime + t2]
                     if !value.isNaN {
                         self[l * nTime + t] = value
+                        break
+                    }
+                }
+            }
+        }
+    }
+    
+    /// Interpolate missing values by seeking for the next valid value and perform a linear interpolation
+    mutating func interpolateInplaceLinear(nTime: Int) {
+        precondition(nTime <= self.count)
+        precondition(self.count % nTime == 0)
+        let nLocations = self.count / nTime
+        for l in 0..<nLocations {
+            /// Previous value that was not NaN
+            var previousValue = Float.nan
+            var previousIndex = 0
+            for t in 0..<nTime {
+                guard self[l * nTime + t].isNaN else {
+                    previousValue = self[l * nTime + t]
+                    previousIndex = t
+                    continue
+                }
+                // Seek next valid value
+                for t2 in t..<nTime {
+                    let value = self[l * nTime + t2]
+                    if !value.isNaN {
+                        /// Calculate fraction from 0-1 for linear interpolation
+                        let fraction = Float(t - previousIndex) / Float(t2 - previousIndex)
+                        self[l * nTime + t] = value * fraction + previousValue * (1 - fraction)
                         break
                     }
                 }
