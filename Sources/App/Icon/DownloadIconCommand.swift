@@ -291,7 +291,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 
                 // ICON-EPS ensemble model has 12-hourly data after 120 hours of forecast
                 // Interpolate 12h steps to 6h steps.... Obviously this not not really accurate
-                let forecastStepsToInterpolate12h = (0..<nTime).compactMap { hour -> Int? in
+                /*let forecastStepsToInterpolate12h = (0..<nTime).compactMap { hour -> Int? in
                     if forecastSteps.contains(hour) || hour % 6 != 0 {
                         return nil
                     }
@@ -321,11 +321,15 @@ struct DownloadIconCommand: AsyncCommandFix {
                 
                 // Fill in missing hourly values after switching to 3h
                 data3d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
+                 */
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {
                     data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: skip)
                 }
+                
+                // Interpolate all missing values
+                data3d.interpolateInplace(type: variable.interpolation, skipFirst: skip, time: time, grid: domain.grid, locationRange: locationRange)
                 
                 progress.add(locationRange.count * nMembers)
                 return data3d.data[0..<locationRange.count * nTime * nMembers]

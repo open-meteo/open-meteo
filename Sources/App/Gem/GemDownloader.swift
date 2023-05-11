@@ -284,15 +284,15 @@ struct GemDownload: AsyncCommandFix {
                 
                 if domain.dtHours == 3 {
                     /// interpolate 6 to 3 hours for ensemble 0.5°
-                    let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
-                        if forecastHours.contains(hour * domain.dtHours) {
-                            return nil
-                        }
-                        return hour
-                    }
-                    data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
+                    let skip = variable.skipHour0 ? 1 : 0
+                    data3d.interpolateInplace(
+                        type: variable.interpolation,
+                        skipFirst: skip,
+                        time: time,
+                        grid: domain.grid,
+                        locationRange: locationRange
+                    )
                 }
-
                 
                 progress.add(locationRange.count * nMembers)
                 return data3d.data[0..<locationRange.count * nMembers * nTime]
