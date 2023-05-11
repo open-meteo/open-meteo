@@ -153,10 +153,7 @@ struct DownloadCamsCommand: AsyncCommandFix {
             
             // Multi level has only 3h data, interpolate to 1h using hermite interpolation
             if meta.isMultiLevel {
-                let forecastStepsToInterpolate = (0..<domain.forecastHours).compactMap { hour in
-                    hour % 3 == 1 ? hour : nil
-                }
-                data2d.interpolate2StepsHermite(positions: forecastStepsToInterpolate, bounds: 0...Float.infinity)
+                data2d.data.interpolateInplaceHermite(nTime: domain.forecastHours, bounds: 0...Float.infinity)
             }
             
             logger.info("Create om file")

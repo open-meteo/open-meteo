@@ -1,6 +1,5 @@
 /// Required additions to a MeteoFrance variable to make it downloadable
 protocol MeteoFranceVariableDownloadable: GenericVariable {
-    var interpolationType: Interpolation2StepType { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     func skipHour0(domain: MeteoFranceDomain) -> Bool
     var isAveragedOverForecastTime: Bool { get }
@@ -143,39 +142,6 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         }
     }
     
-    var interpolationType: Interpolation2StepType {
-        switch self {
-        case .temperature_2m:
-            return .hermite(bounds: nil)
-        case .cloudcover:
-            return .hermite(bounds: 0...100)
-        case .cloudcover_low:
-            return .hermite(bounds: 0...100)
-        case .cloudcover_mid:
-            return .hermite(bounds: 0...100)
-        case .cloudcover_high:
-            return .hermite(bounds: 0...100)
-        case .relativehumidity_2m:
-            return .hermite(bounds: 0...100)
-        case .precipitation:
-            return .linear
-        case .windgusts_10m:
-            return .linear
-        case .shortwave_radiation:
-            return .solar_backwards_averaged
-        case .pressure_msl:
-            return .hermite(bounds: nil)
-        case .cape:
-            return .hermite(bounds: 0...1e9)
-        case .wind_v_component_10m:
-            return .hermite(bounds: nil)
-        case .wind_u_component_10m:
-            return .hermite(bounds: nil)
-        case .snowfall_water_equivalent:
-            return .linear
-        }
-    }
-    
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
@@ -252,14 +218,6 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
     
     func skipHour0(domain: MeteoFranceDomain) -> Bool {
         return false
-    }
-    
-    var interpolationType: Interpolation2StepType {
-        switch variable {
-        case .cloudcover: fallthrough
-        case .relativehumidity: return .hermite(bounds: 0...100)
-        default: return .hermite(bounds: nil)
-        }
     }
     
     var multiplyAdd: (multiply: Float, add: Float)? {

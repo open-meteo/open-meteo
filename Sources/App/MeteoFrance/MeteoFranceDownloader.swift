@@ -270,41 +270,19 @@ struct MeteoFranceDownload: AsyncCommandFix {
                     data2d.data.multiplyAdd(multiply: 3, add: 0)
                 }
                 
-                if dtHours == 1 {
-                    // Interpolate 6h steps to 3h steps before 1h
-                    let forecastStepsToInterpolate6h = (0..<nTime).compactMap { hour -> Int? in
-                        if forecastHours.contains(hour) || hour % 3 != 0 {
-                            return nil
-                        }
-                        return hour
-                    }
-                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 3, time: time, grid: grid, locationRange: locationRange)
-                    
-                    // interpolate missing timesteps. We always fill 2 timesteps at once
-                    // data looks like: DDDDDDDDDD--D--D--D--D--D
-                    let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
-                        if forecastHours.contains(hour) || hour % 3 != 1 {
-                            // process 2 timesteps at once
-                            return nil
-                        }
-                        return hour
-                    }
-                    
-                    // Fill in missing hourly values after switching to 3h
-                    data2d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
-                } else {
-                    // Arpege world with dtHours=3. Interpolate 6h to 3h values (actually only the last timestep)
-                    let forecastStepsToInterpolate6h = stride(from: 0, to: nTime * dtHours, by: dtHours).compactMap { hour -> Int? in
-                        return forecastHours.contains(hour) ? nil : hour / dtHours
-                    }
-
-                    data2d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: forecastStepsToInterpolate6h, width: 1, time: time, grid: grid, locationRange: locationRange)
-                }
-                
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart, !variable.interpolation.isSolarInterpolation {
                     data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                 }
+                
+                // Interpolate all missing values
+                data2d.interpolateInplace(
+                    type: variable.interpolation,
+                    skipFirst: skip,
+                    time: time,
+                    grid: grid,
+                    locationRange: locationRange
+                )
                 
                 progress.add(locationRange.count)
                 return data2d.data[0..<locationRange.count * nTime]

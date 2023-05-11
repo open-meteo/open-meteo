@@ -367,33 +367,14 @@ struct GfsDownload: AsyncCommandFix {
                     }
                 }
                 
-                if domain.dtHours == 1 {
-                    // interpolate missing timesteps. We always fill 2 timesteps at once
-                    // data looks like: DDDDDDDDDD--D--D--D--D--D
-                    let forecastStepsToInterpolate = (0..<nTime).compactMap { hour -> Int? in
-                        let forecastHour = hour * domain.dtHours
-                        if forecastHours.contains(forecastHour) || forecastHour % 3 != 1 {
-                            // process 2 timesteps at once
-                            return nil
-                        }
-                        return forecastHour
-                    }
-                    
-                    // Fill in missing hourly values after switching to 3h
-                    data3d.interpolate2Steps(type: variable.interpolationType, positions: forecastStepsToInterpolate, grid: domain.grid, locationRange: locationRange, run: run, dtSeconds: domain.dtSeconds)
-                }
-                
-                if domain.dtHours == 3 {
-                    /// interpolate 6 to 3 hours for gfs ensemble 0.5°
-                    let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
-                        if forecastHours.contains(hour * domain.dtHours) {
-                            return nil
-                        }
-                        return hour
-                    }
-                    data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
-                }
-
+                // Interpolate all missing values
+                data3d.interpolateInplace(
+                    type: variable.interpolation,
+                    skipFirst: skip,
+                    time: time,
+                    grid: domain.grid,
+                    locationRange: locationRange
+                )
                 
                 progress.add(locationRange.count * nMembers)
                 return data3d.data[0..<locationRange.count * nMembers * nTime]

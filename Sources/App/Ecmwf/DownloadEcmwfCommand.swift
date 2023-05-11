@@ -230,13 +230,6 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 return (hour, readers)
             })
             
-            let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
-                if forecastSteps.contains(hour * domain.dtHours) {
-                    return nil
-                }
-                return hour
-            }
-            
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { offset in
                 let d0offset = offset / nMembers
                 
@@ -249,7 +242,14 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     }
                 }
                 
-                data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
+                // Interpolate all missing values
+                data3d.interpolateInplace(
+                    type: variable.interpolation,
+                    skipFirst: skip,
+                    time: time,
+                    grid: domain.grid,
+                    locationRange: locationRange
+                )
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {

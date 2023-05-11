@@ -284,7 +284,6 @@ struct GemDownload: AsyncCommandFix {
                 
                 if domain.dtHours == 3 {
                     /// interpolate 6 to 3 hours for ensemble 0.5°
-                    let skip = variable.skipHour0 ? 1 : 0
                     data3d.interpolateInplace(
                         type: variable.interpolation,
                         skipFirst: skip,

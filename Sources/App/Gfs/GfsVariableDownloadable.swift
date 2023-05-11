@@ -2,7 +2,6 @@
 protocol GfsVariableDownloadable: GenericVariable {
     func gribIndexName(for domain: GfsDomain) -> String?
     func skipHour0(for domain: GfsDomain) -> Bool
-    var interpolationType: Interpolation2StepType { get }
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)?
 }
 
@@ -319,52 +318,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         }
     }
     
-    var interpolationType: Interpolation2StepType {
-        switch self {
-        case .temperature_2m: return .hermite(bounds: nil)
-        case .temperature_80m: return .hermite(bounds: nil)
-        case .temperature_100m: return .hermite(bounds: nil)
-        case .cloudcover: return .hermite(bounds: 0...100)
-        case .cloudcover_low: return .hermite(bounds: 0...100)
-        case .cloudcover_mid: return .hermite(bounds: 0...100)
-        case .cloudcover_high: return .hermite(bounds: 0...100)
-        case .relativehumidity_2m: return .hermite(bounds: 0...100)
-        case .precipitation: return .nearest
-        case .wind_v_component_10m: return .hermite(bounds: nil)
-        case .wind_u_component_10m: return .hermite(bounds: nil)
-        case .wind_v_component_80m: return .hermite(bounds: nil)
-        case .wind_u_component_80m: return .hermite(bounds: nil)
-        case .wind_v_component_100m: return .hermite(bounds: nil)
-        case .wind_u_component_100m: return .hermite(bounds: nil)
-        case .snow_depth: return .linear
-        case .sensible_heatflux: return .hermite_backwards_averaged(bounds: nil)
-        case .latent_heatflux: return .hermite_backwards_averaged(bounds: nil)
-        case .windgusts_10m: return .linear
-        case .freezinglevel_height: return .hermite(bounds: nil)
-        case .shortwave_radiation: return .solar_backwards_averaged
-        case .uv_index: return .solar_backwards_averaged
-        case .uv_index_clear_sky: return .solar_backwards_averaged
-        case .surface_temperature: return .hermite(bounds: nil)
-        case .soil_temperature_0_to_10cm: return .hermite(bounds: nil)
-        case .soil_temperature_10_to_40cm: return .hermite(bounds: nil)
-        case .soil_temperature_40_to_100cm: return .hermite(bounds: nil)
-        case .soil_temperature_100_to_200cm: return .hermite(bounds: nil)
-        case .soil_moisture_0_to_10cm: return .hermite(bounds: nil)
-        case .soil_moisture_10_to_40cm: return .hermite(bounds: nil)
-        case .soil_moisture_40_to_100cm: return .hermite(bounds: nil)
-        case .soil_moisture_100_to_200cm: return .hermite(bounds: nil)
-        case .showers: return .nearest
-        case .pressure_msl: return .hermite(bounds: nil)
-        case .frozen_precipitation_percent: return .nearest
-        case .diffuse_radiation: return .solar_backwards_averaged
-        case .cape: return .hermite(bounds: 0...1e9)
-        case .lifted_index: return .hermite(bounds: 0...1e9)
-        case .visibility: return .hermite(bounds: 0...1e9)
-        case .precipitation_probability: return .linear
-        case .categorical_freezing_rain: return .nearest
-        }
-    }
-    
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
@@ -461,14 +414,6 @@ extension GfsPressureVariable: GfsVariableDownloadable {
     
     func skipHour0(for domain: GfsDomain) -> Bool {
         return false
-    }
-    
-    var interpolationType: Interpolation2StepType {
-        switch variable {
-        case .cloudcover: fallthrough
-        case .relativehumidity: return .hermite(bounds: 0...100)
-        default: return .hermite(bounds: nil)
-        }
     }
     
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {

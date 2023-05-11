@@ -5,7 +5,6 @@ protocol IconVariableDownloadable: GenericVariable {
     var isAveragedOverForecastTime: Bool { get }
     var isAccumulatedSinceModelStart: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
-    var interpolationType: Interpolation2StepType { get }
     func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)?
 }
 
@@ -68,62 +67,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .sensible_heatflux: return true
         case .latent_heatflux: return true
         default: return false
-        }
-    }
-    
-    var interpolationType: Interpolation2StepType {
-        switch self {
-        case .temperature_2m: return .hermite(bounds: nil)
-        case .cloudcover: return .linear
-        case .cloudcover_low: return .linear
-        case .cloudcover_mid: return .linear
-        case .cloudcover_high: return .linear
-        case .precipitation: return .linear
-        case .weathercode: return .nearest
-        case .wind_v_component_10m: return .hermite(bounds: nil)
-        case .wind_u_component_10m: return .hermite(bounds: nil)
-        case .snow_depth: return .linear
-        case .sensible_heatflux: return .hermite_backwards_averaged(bounds: nil)
-        case .latent_heatflux: return .hermite_backwards_averaged(bounds: nil)
-        case .windgusts_10m: return .linear
-        case .freezinglevel_height: return .hermite(bounds: nil)
-        case .relativehumidity_2m: return .hermite(bounds: 0...100)
-        case .diffuse_radiation: return .solar_backwards_averaged
-        case .direct_radiation: return .solar_backwards_averaged
-        case .soil_temperature_0cm: return .hermite(bounds: nil)
-        case .soil_temperature_6cm: return .hermite(bounds: nil)
-        case .soil_temperature_18cm: return .hermite(bounds: nil)
-        case .soil_temperature_54cm: return .hermite(bounds: nil)
-        case .soil_moisture_0_1cm: return .hermite(bounds: nil)
-        case .soil_moisture_1_3cm: return .hermite(bounds: nil)
-        case .soil_moisture_3_9cm: return .hermite(bounds: nil)
-        case .soil_moisture_9_27cm: return .hermite(bounds: nil)
-        case .soil_moisture_27_81cm: return .hermite(bounds: nil)
-        case .wind_v_component_80m: return .hermite(bounds: nil)
-        case .wind_u_component_80m: return .hermite(bounds: nil)
-        case .wind_v_component_120m: return .hermite(bounds: nil)
-        case .wind_u_component_120m: return .hermite(bounds: nil)
-        case .wind_v_component_180m: return .hermite(bounds: nil)
-        case .snowfall_convective_water_equivalent: return .linear
-        case .snowfall_water_equivalent: return .linear
-        case .wind_u_component_180m: return .hermite(bounds: nil)
-        case .showers: return .linear
-        case .pressure_msl: return .hermite(bounds: nil)
-        case .rain: return .linear
-        case .temperature_80m:
-            return .hermite(bounds: nil)
-        case .temperature_120m:
-            return .hermite(bounds: nil)
-        case .temperature_180m:
-            return .hermite(bounds: nil)
-        case .cape:
-            return .hermite(bounds: nil)
-        case .lightning_potential:
-            return .hermite(bounds: nil)
-        case .snowfall_height:
-            return .hermite(bounds: nil)
-        case .updraft:
-            return .hermite(bounds: nil)
         }
     }
     
@@ -326,14 +269,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
     }
 }
 
-extension IconPressureVariable: IconVariableDownloadable {
-    var interpolationType: Interpolation2StepType {
-        switch variable {
-        case .relativehumidity: return .hermite(bounds: 0...100)
-        default: return .hermite(bounds: nil)
-        }
-    }
-    
+extension IconPressureVariable: IconVariableDownloadable {    
     var isAveragedOverForecastTime: Bool {
         return false
     }
