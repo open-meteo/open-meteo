@@ -14,13 +14,18 @@ final class ArrayTests: XCTestCase {
     
     func testBackwardInterpolateInplace() {
         var a: [Float] = [0,1,.nan,.nan,.nan,5]
-        a.interpolateInplaceBackwards(nTime: 6)
+        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 0)
         XCTAssertEqual(a, [0,1,5,5,5,5])
         
         // Make sure nTime is honored correctly
         a = [0,.nan,1,.nan,.nan,.nan, 0,.nan,1,.nan,.nan,.nan]
-        a.interpolateInplaceBackwards(nTime: 6)
+        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 0)
         XCTAssertEqualArray(a, [0,1,1,.nan,.nan,.nan, 0,1,1,.nan,.nan,.nan], accuracy: 0.0001)
+        
+        // Make sure nTime is honored correctly
+        a = [.nan,.nan,1,.nan,.nan,.nan, .nan,.nan,1,.nan,.nan,.nan]
+        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 1)
+        XCTAssertEqualArray(a, [.nan,1,1,.nan,.nan,.nan, .nan,1,1,.nan,.nan,.nan], accuracy: 0.0001)
     }
     
     func testLinearInterpolateInplace() {
@@ -32,6 +37,26 @@ final class ArrayTests: XCTestCase {
         a = [0,.nan,1,.nan,.nan,.nan, 0,.nan,1,.nan,.nan,.nan]
         a.interpolateInplaceLinear(nTime: 6)
         XCTAssertEqualArray(a, [0,0.5,1,.nan,.nan,.nan, 0,0.5,1,.nan,.nan,.nan], accuracy: 0.0001)
+    }
+    
+    func testHermiteInterpolateInplace() {
+        var a: [Float] = [0,1,.nan,3,.nan,5,.nan,0]
+        a.interpolateInplaceHermite(nTime: 8)
+        XCTAssertEqual(a, [0.0, 1.0, 1.875, 3.0, 4.4375, 5.0, 2.625, 0.0])
+        
+        a = [0,1,.nan,.nan,3,.nan,.nan,5,.nan,.nan,0]
+        a.interpolateInplaceHermite(nTime: 11)
+        XCTAssertEqualArray(a, [0.0, 1.0, 1.5185186, 2.2592592, 3.0, 3.925926, 4.851852, 5.0, 3.6666665, 1.5555556, 0.0], accuracy: 0.0001)
+        
+        // Ensure left boundary is stable
+        a = [.nan,1,.nan,.nan,3,.nan,.nan,5,.nan,.nan,0]
+        a.interpolateInplaceHermite(nTime: 11)
+        XCTAssertEqualArray(a, [.nan, 1.0, 1.5185186, 2.2592592, 3.0, 3.925926, 4.851852, 5.0, 3.6666665, 1.5555556, 0.0], accuracy: 0.0001)
+        
+        // Ensure mixed point spacing works. First 1x NaN, then switch to 2x NaN spacing
+        a = [.nan,1,.nan,3,.nan,5,.nan,0,.nan,.nan,10,.nan,.nan,5]
+        a.interpolateInplaceHermite(nTime: a.count)
+        XCTAssertEqualArray(a, [.nan, 1.0, 1.875, 3.0, 4.4375, 5.0, 0.7013891, 0.0, 2.8194444, 7.2430553, 10.0, 9.259259, 6.8518515, 5.0], accuracy: 0.0001)
     }
     
     func testRangeFraction() {

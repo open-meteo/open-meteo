@@ -233,12 +233,14 @@ extension Array2DFastTime {
 
 extension Array where Element == Float {
     /// Interpolate missing values, but taking the next valid value
-    mutating func interpolateInplaceBackwards(nTime: Int) {
+    /// `skipFirst` set skip first to prevent filling the frist hour of precipitation
+    mutating func interpolateInplaceBackwards(nTime: Int, skipFirst: Int) {
         precondition(nTime <= self.count)
+        precondition(skipFirst <= nTime)
         precondition(self.count % nTime == 0)
         let nLocations = self.count / nTime
         for l in 0..<nLocations {
-            for t in 0..<nTime {
+            for t in skipFirst..<nTime {
                 guard self[l * nTime + t].isNaN else {
                     continue
                 }
@@ -279,6 +281,66 @@ extension Array where Element == Float {
                         break
                     }
                 }
+            }
+        }
+    }
+    
+    /// Interpolate missing values by seeking for the next valid value and perform a hermite interpolation
+    mutating func interpolateInplaceHermite(nTime: Int) {
+        precondition(nTime <= self.count)
+        precondition(self.count % nTime == 0)
+        let nLocations = self.count / nTime
+        for l in 0..<nLocations {
+            /// At  the boundary, it wont be possible to detect a valid spacing for 4 points
+            /// Reuse the previously good known spacing
+            var width = 0
+            for t in 0..<nTime {
+                guard self[l * nTime + t].isNaN else {
+                    continue
+                }
+                var C = Float.nan
+                var D = Float.nan
+                var posC = 0
+                var posD = 0
+                // Seek next 2 valid values, point C and D
+                for t2 in t..<nTime {
+                    let value = self[l * nTime + t2]
+                    guard !value.isNaN else  {
+                        continue
+                    }
+                    if C.isNaN {
+                        C = value
+                        posC = t2
+                        continue
+                    }
+                    D = value
+                    posD = t2
+                    break
+                }
+                if C.isNaN {
+                    // not possible to to any interpolation
+                    break
+                }
+                if D.isNaN {
+                    // At the boundary, replicate point C
+                    D = C
+                    posD = posC
+                } else {
+                    width = posD - posC
+                }
+                let posB = Swift.max(posC - width, 0)
+                // Replicate point B if A would be outside
+                let posA = (posB - width) >= 0 ? posB - width : posB
+                let B = self[posB]
+                let A = self[posA]
+                let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+                let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+                let c = -A/2.0 + C/2.0
+                let d = B
+                
+                // fractional position of the missing value in relation to points B and C
+                let f = Float(t - posB) / Float(posC - posB)
+                self[l * nTime + t] = a*f*f*f + b*f*f + c*f + d
             }
         }
     }
