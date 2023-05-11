@@ -247,10 +247,14 @@ extension Array where Element == Float {
                 // Seek next valid value
                 for t2 in t..<nTime {
                     let value = self[l * nTime + t2]
-                    if !value.isNaN {
-                        self[l * nTime + t] = value
-                        break
+                    guard !value.isNaN else {
+                        continue
                     }
+                    // Fill up all values until the first valid value
+                    for t in t..<t2 {
+                        self[l * nTime + t] = value
+                    }
+                    break
                 }
             }
         }
@@ -274,12 +278,16 @@ extension Array where Element == Float {
                 // Seek next valid value
                 for t2 in t..<nTime {
                     let value = self[l * nTime + t2]
-                    if !value.isNaN {
+                    guard !value.isNaN else {
+                        continue
+                    }
+                    // Fill up all values until the first valid value
+                    for t in t..<t2 {
                         /// Calculate fraction from 0-1 for linear interpolation
                         let fraction = Float(t - previousIndex) / Float(t2 - previousIndex)
                         self[l * nTime + t] = value * fraction + previousValue * (1 - fraction)
-                        break
                     }
+                    break
                 }
             }
         }
@@ -338,9 +346,12 @@ extension Array where Element == Float {
                 let c = -A/2.0 + C/2.0
                 let d = B
                 
-                // fractional position of the missing value in relation to points B and C
-                let f = Float(t - posB) / Float(posC - posB)
-                self[l * nTime + t] = a*f*f*f + b*f*f + c*f + d
+                // Fill up all missing values until point C
+                for t in t..<posC {
+                    // fractional position of the missing value in relation to points B and C
+                    let f = Float(t - posB) / Float(posC - posB)
+                    self[l * nTime + t] = a*f*f*f + b*f*f + c*f + d
+                }
             }
         }
     }
