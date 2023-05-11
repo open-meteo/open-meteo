@@ -233,21 +233,25 @@ extension Array2DFastTime {
 
 extension Array2DFastTime {
     /// Used in ECMWF and MeteoFrance
+    ///
+    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
+    ///
     /// interpolate 1 missing step.. E.g. `DDDDDD-D-D-D-D-D`
     /// `dt` can be used to set element spacing E.g. `DxDxDxDxDxDx-xDx-xDx-xDx-xDx-xD` whith dt=1 all `x` positions will be ignored
     mutating func interpolate1Step(interpolation: ReaderInterpolation, interpolationHours: [Int], width: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+        
+        precondition(nLocations % locationRange.count == 0)
+        
         switch interpolation {
-        case .nearest:
-            // take previous hour
+        case .backwards:
+            fallthrough
+        case .backwards_sum:
+            // take the next hour
             for l in 0..<nLocations {
                 for hour in interpolationHours {
-                    let prev = self[l, hour-1*width]
-                    self[l, hour] = prev
+                    self[l, hour] = self[l, hour+1*width]
                 }
             }
-        case .backwards_sum:
-            // do not divide precip amount, because data is still averaged at this point
-            fallthrough
         case .linear:
             for l in 0..<nLocations {
                 for hour in interpolationHours {

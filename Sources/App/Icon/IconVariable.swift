@@ -339,7 +339,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .precipitation:
             return .backwards_sum
         case .weathercode:
-            return .nearest
+            return .backwards
         case .wind_v_component_10m:
             return .hermite(bounds: nil)
         case .wind_u_component_10m:

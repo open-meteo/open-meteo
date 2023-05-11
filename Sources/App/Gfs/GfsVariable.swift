@@ -196,9 +196,9 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .showers:
             return .backwards_sum
         case .frozen_precipitation_percent:
-            return .nearest
+            return .backwards
         case .categorical_freezing_rain:
-            return .nearest
+            return .backwards
         case .windgusts_10m:
             return .hermite(bounds: nil)
         case .freezinglevel_height:

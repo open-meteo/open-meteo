@@ -5,7 +5,7 @@ extension Array where Element == Float {
     /// bounds: Apply min and max after interpolation
     func interpolate(type: ReaderInterpolation, timeOld: TimerangeDt, timeNew: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
         switch type {
-        case .nearest:
+        case .backwards:
             return interpolateNearest(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         case .linear:
             return interpolateLinear(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
@@ -68,16 +68,14 @@ extension Array where Element == Float {
         }
     }
     
+    /// Take the next value and devide it by dt. Used for precipitation, snow, etc
     func backwardsSum(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
         let multiply = Float(time.dtSeconds) / Float(timeLow.dtSeconds)
         return time.map { t in
-            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
-            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
-            let A = self[index]
-            let B = index+1 >= self.count ? A : self[index+1]
-            let h = A * (1-fraction) + B * fraction
+            /// Take the next array element, except it it is the same timestamp
+            let index = Swift.min((t.timeIntervalSince1970 - time.dtSeconds) / timeLow.dtSeconds + 1 - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds, self.count-1)
             /// adjust it to scalefactor, otherwise interpolated values show more level of detail
-            return roundf(h * multiply * scalefactor) / scalefactor
+            return roundf(self[index] * multiply * scalefactor) / scalefactor
         }
     }
     

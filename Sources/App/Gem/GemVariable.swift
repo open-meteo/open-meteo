@@ -314,7 +314,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .precipitation:
-            return .linear
+            return .backwards_sum
         case .shortwave_radiation:
             return .solar_backwards_averaged
         case .temperature_40m:

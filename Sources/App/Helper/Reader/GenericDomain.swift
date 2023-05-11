@@ -63,9 +63,11 @@ enum ReaderInterpolation {
     
     case solar_backwards_averaged
     
+    /// Take the next hour, and devide by `dt` to preserve sums like precipitation
     case backwards_sum
     
-    case nearest
+    /// Take the next hour. E.g. used in weathercode, frozen precipitation percent
+    case backwards
     
     /// How many timesteps on the left and right side are used for interpolation
     var padding: Int {
@@ -78,7 +80,7 @@ enum ReaderInterpolation {
             return 2
         case .backwards_sum:
             return 1
-        case .nearest:
+        case .backwards:
             return 1
         }
     }
