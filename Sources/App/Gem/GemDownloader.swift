@@ -154,11 +154,15 @@ struct GemDownload: AsyncCommandFix {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .gem_global_ensemble ? 10 : 5)
         let downloadDirectory = domain.downloadDirectory
+        let nMembers = domain.ensembleMembers
         
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
+        /// Keep data from previous timestep in memory to deaccumulate the next timestep
+        var previousData = [String: (step: Int, data: [Float])]()
                 
         let forecastHours = domain.getForecastHours(run: run)
         for hour in forecastHours {
@@ -193,15 +197,33 @@ struct GemDownload: AsyncCommandFix {
                         grib2d.array.shift180Longitudee()
                     }
                     
-                    try FileManager.default.removeItemIfExists(at: filenameDest)
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
+                    guard let stepRange = message.get(attribute: "stepRange") else {
+                        fatalError("could not get step range")
+                    }
+                    if stepRange.contains("-") {
+                        // data is accumulated since model start
+                        let startStep = Int(stepRange.split(separator: "-")[0])!
+                        let currentStep = Int(stepRange.split(separator: "-")[1])!
+                        let previous = previousData["\(variable.rawValue)\(memberStr)"]
+                        // Store data for the next run
+                        previousData["\(variable.rawValue)\(memberStr)"] = (currentStep, grib2d.array.data)
+                        if let previous, previous.step != startStep {
+                            /// For 6 hourly, divide it by 2, so interpolation does not need to care about precip sums
+                            let deltaHours = Float((currentStep - previous.step) / domain.dtHours)
+                            for l in previous.data.indices {
+                                grib2d.array.data[l] = (grib2d.array.data[l] - previous.data[l]) / deltaHours
+                            }
+                        }
+                    }
+                    
                     //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).nc")
-                    let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    try writer.write(file: filenameDest, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    try FileManager.default.removeItemIfExists(at: filenameDest)
+                    try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 }
             }
         }
@@ -261,13 +283,6 @@ struct GemDownload: AsyncCommandFix {
                 }
                 
                 if domain.dtHours == 3 {
-                    let isShortwaveRadiation = variable as? GemSurfaceVariable == .shortwave_radiation
-                    if isShortwaveRadiation {
-                        // Shortwave radiation needs to be deaveraged before
-                        // It would be better to do deaccumulation in the download phase
-                        data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 1)
-                    }
-                    
                     /// interpolate 6 to 3 hours for ensemble 0.5°
                     let interpolationHours = (0..<nTime).compactMap { hour -> Int? in
                         if forecastHours.contains(hour * domain.dtHours) {
@@ -276,17 +291,7 @@ struct GemDownload: AsyncCommandFix {
                         return hour
                     }
                     data3d.interpolate1Step(interpolation: variable.interpolation, interpolationHours: interpolationHours, width: 1, time: time, grid: domain.grid, locationRange: locationRange)
-                    
-                    if variable.isAccumulatedSinceModelStart && !isShortwaveRadiation {
-                        data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 1)
-                    }
-                } else {
-                    // De-accumulate precipitation
-                    if variable.isAccumulatedSinceModelStart {
-                        data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 1)
-                    }
                 }
-                
 
                 
                 progress.add(locationRange.count * nMembers)

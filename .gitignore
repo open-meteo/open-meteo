@@ -9,3 +9,4 @@ db.sqlite
 .env
 data/
 data
+.cache

@@ -40,6 +40,11 @@ final class Curl {
     let waitAfterLastModified: TimeInterval?
     
     let client: HTTPClient
+    
+    /// If the environment varibale `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
+    static var cacheDirectory: String? {
+        Environment.get("HTTP_CACHE")
+    }
 
     public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil) {
         self.logger = logger
@@ -66,7 +71,13 @@ final class Curl {
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-    func initiateDownload(url _url: String, range: String?, minSize: Int?) async throws -> HTTPClientResponse {
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, cacheDirectory: String? = Curl.cacheDirectory) async throws -> HTTPClientResponse {
+        
+        // Check in cache
+        if let cacheDirectory {
+            return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory)
+        }
+        
         // URL might contain password, strip them from logging
         let url: String
         let auth: String?
@@ -113,14 +124,30 @@ final class Curl {
         }
     }
     
+    /// Cache all HTTP download in temporary files. Only used for debugging.
+    private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String) async throws -> HTTPClientResponse {
+        try FileManager.default.createDirectory(atPath: cacheDirectory, withIntermediateDirectories: true)
+        try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
+        let cacheFile = cacheDirectory + "/" + url.base32String() + (range?.base32String() ?? "")
+        if !FileManager.default.fileExists(atPath: cacheFile) {
+            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, cacheDirectory: nil)
+        }
+        guard let data = try FileHandle(forReadingAtPath: cacheFile)?.readToEnd() else {
+            fatalError("Could not read cached file")
+        }
+        var headers = HTTPHeaders()
+        headers.add(name: "content-length", value: "\(data.count)")
+        return HTTPClientResponse(status: .ok, headers: headers, body: .bytes(ByteBuffer(data: data)))
+    }
+    
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     /// Data is first downloaded to a tempoary tilde file and then moved to its final location atomically
-    func download(url: String, toFile: String, bzip2Decode: Bool, atomic: Bool = false) async throws {
+    func download(url: String, toFile: String, bzip2Decode: Bool, atomic: Bool = false, cacheDirectory: String? = Curl.cacheDirectory) async throws {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         let fileTemp = "\(toFile)~"
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: nil, minSize: nil)
+            let response = try await initiateDownload(url: url, range: nil, minSize: nil, cacheDirectory: cacheDirectory)
             
             // Retry failed file transfers after this point
             do {

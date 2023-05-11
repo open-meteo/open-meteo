@@ -167,7 +167,8 @@ struct GfsDownload: AsyncCommandFix {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
         let forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let nMembers = domain.ensembleMembers
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -193,7 +194,7 @@ struct GfsDownload: AsyncCommandFix {
             /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
             let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
             
-            for member in 0..<domain.ensembleMembers {
+            for member in 0..<nMembers {
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
                     let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr)\(prefix).fpg"

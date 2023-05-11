@@ -196,7 +196,7 @@ extension Array2DFastTime {
         for l in 0..<nLocations {
             for hour in positions {
                 let sHour = hour - solarHours.lowerBound
-                let sPos = l % locationRange.count
+                let sPos = l / (nLocations / locationRange.count)
                 // point C and D are still 3 h averages
                 let solC1 = solar2d[sPos, sHour + 0]
                 let solC2 = solar2d[sPos, sHour + 1]
@@ -294,7 +294,7 @@ extension Array2DFastTime {
             for l in 0..<nLocations {
                 for hour in interpolationHours {
                     let sHour = (hour - solarHours.lowerBound) / width
-                    let sPos = l % locationRange.count
+                    let sPos = l / (nLocations / locationRange.count)
                     // point C and D are still 2 step averages
                     let solC1 = solar2d[sPos, sHour + 0]
                     let solC2 = solar2d[sPos, sHour + 1]

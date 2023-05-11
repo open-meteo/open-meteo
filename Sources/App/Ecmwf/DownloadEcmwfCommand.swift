@@ -132,7 +132,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         let downloadDirectory = domain.downloadDirectory
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let nMembers = domain.ensembleMembers
+        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         for hour in forecastSteps {

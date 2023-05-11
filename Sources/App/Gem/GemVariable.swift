@@ -8,7 +8,6 @@ protocol GemVariableDownloadable: GenericVariable {
     var skipHour0: Bool { get }
     func includedFor(hour: Int, domain: GemDomain) -> Bool
     func gribName(domain: GemDomain) -> String?
-    var isAccumulatedSinceModelStart: Bool { get }
 }
 
 /**
@@ -225,21 +224,6 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return false
         }
         return true
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        switch self {
-        case .shortwave_radiation:
-            fallthrough
-        case .precipitation:
-            fallthrough
-        case .showers:
-            fallthrough
-        case .snowfall_water_equivalent:
-            return true
-        default:
-            return false
-        }
     }
     
     var omFileName: (file: String, level: Int) {
@@ -529,10 +513,6 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        return false
     }
     
     var interpolation: ReaderInterpolation {
