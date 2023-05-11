@@ -230,8 +230,42 @@ extension Array2DFastTime {
     }
 }
 
+extension Array3DFastTime {
+    mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+        precondition(nTime == time.count)
+        data.interpolateInplace(type: type, skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
+    }
+}
+extension Array2DFastTime {
+    mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+        precondition(nTime == time.count)
+        data.interpolateInplace(type: type, skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
+    }
+}
+
 
 extension Array where Element == Float {
+    /// Fill in missing data by interpolating using differnet interpolation types
+    ///
+    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
+    ///
+    /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
+    mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+        switch type {
+        case .linear:
+            interpolateInplaceLinear(nTime: time.count)
+        case .hermite(let bounds):
+            interpolateInplaceHermite(nTime: time.count, bounds: bounds)
+        case .solar_backwards_averaged:
+            interpolateInplaceSolarBackwards(skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
+        case .backwards_sum:
+            interpolateInplaceBackwards(nTime: time.count, skipFirst: skipFirst)
+        case .backwards:
+            interpolateInplaceBackwards(nTime: time.count, skipFirst: skipFirst)
+        }
+    }
+    
+    
     /// Interpolate missing values, but taking the next valid value
     /// `skipFirst` set skip first to prevent filling the frist hour of precipitation
     mutating func interpolateInplaceBackwards(nTime: Int, skipFirst: Int) {
@@ -294,7 +328,7 @@ extension Array where Element == Float {
     }
     
     /// Interpolate missing values by seeking for the next valid value and perform a hermite interpolation
-    mutating func interpolateInplaceHermite(nTime: Int) {
+    mutating func interpolateInplaceHermite(nTime: Int, bounds: ClosedRange<Float>?) {
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
         let nLocations = self.count / nTime
@@ -350,7 +384,10 @@ extension Array where Element == Float {
                 for t in t..<posC {
                     // fractional position of the missing value in relation to points B and C
                     let f = Float(t - posB) / Float(posC - posB)
-                    self[l * nTime + t] = a*f*f*f + b*f*f + c*f + d
+                    let interpolated = a*f*f*f + b*f*f + c*f + d
+                    self[l * nTime + t] = bounds.map({
+                        Swift.min( Swift.max(interpolated, $0.lowerBound), $0.upperBound)
+                    }) ?? interpolated
                 }
             }
         }
@@ -365,7 +402,8 @@ extension Array where Element == Float {
     /// The interpolation can handle mixed missing values e.g. switching from 1 to 3 and then to 6 hourly values
     ///
     ///`skipFirst` set skip first to prevent filling the frist hours
-    mutating func interpolateInplaceSolarBackwards(nTime: Int, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+    mutating func interpolateInplaceSolarBackwards(skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+        let nTime = time.count
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
         precondition(skipFirst <= nTime)
