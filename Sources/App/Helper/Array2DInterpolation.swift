@@ -408,13 +408,8 @@ extension Array where Element == Float {
                     width = posD - posC
                 }
                 let posB = Swift.max(posC - width, 0)
-                // Replicate point B if A would be outside
-                let posA = (posB - width) >= 0 ? posB - width : posB
-                let B = self[posB]
-                let A = self[posA]
-                
-                // The solar factor is already deaveraged at point A and B
-                let solA = solar2d[sPos, posA]
+
+                let B = self[l * nTime + posB]
                 let solB = solar2d[sPos, posB]
                 
                 /// solC is an average of the solar factor from posB until posC
@@ -428,7 +423,18 @@ extension Array where Element == Float {
                 if ktC == 0 && ktB > 0 {
                     ktC = ktB
                 }
-                var ktA = solA <= 0.005 ? ktB : Swift.min(A / solA, 1100)
+                
+                var ktA: Float
+                if (posB - width) >= 0 {
+                    let posA = posB - width
+                    // The solar factor is already deaveraged at point A and B
+                    let solA = solar2d[sPos, posA]
+                    ktA = solA <= 0.005 ? ktB : Swift.min(self[l * nTime + posA] / solA, 1100)
+                } else {
+                    // Replicate point B if A would be outside
+                    ktA = ktB
+                }
+
                 if ktC == 0 && ktA > 0 {
                     ktB = ktA
                     ktC = ktA
