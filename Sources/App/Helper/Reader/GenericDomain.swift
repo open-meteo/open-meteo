@@ -85,15 +85,6 @@ enum ReaderInterpolation {
         }
     }
     
-    var isSolarInterpolation: Bool {
-        switch self {
-        case .solar_backwards_averaged:
-            return true
-        default:
-            return false
-        }
-    }
-    
     var bounds: ClosedRange<Float>? {
         switch self {
         case .hermite(let bounds):

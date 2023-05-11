@@ -259,20 +259,14 @@ struct MeteoFranceDownload: AsyncCommandFix {
                     data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
                 }
                 
-                // Deaverage radiation. Not really correct for 3h or 6h data, but solar interpolation will correct it afterwards
-                // radiation in meteofrance is aggregated and not averaged!
-                if variable.interpolation.isSolarInterpolation {
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
                     data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                 }
                 
                 /// somehow radiation for ARPEGE EUROPE and AROME FRANCE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?
                 if let variable = variable as? MeteoFranceSurfaceVariable, variable == .shortwave_radiation, domain != .arpege_world {
                     data2d.data.multiplyAdd(multiply: 3, add: 0)
-                }
-                
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart, !variable.interpolation.isSolarInterpolation {
-                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
                 }
                 
                 // Interpolate all missing values
