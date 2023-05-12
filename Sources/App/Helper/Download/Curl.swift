@@ -130,7 +130,7 @@ final class Curl {
         try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
         let cacheFile = cacheDirectory + "/" + SHA256.hash(data: (url + (range ?? "")).data(using: .utf8) ?? Data()).hex
         if !FileManager.default.fileExists(atPath: cacheFile) {
-            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, cacheDirectory: nil)
+            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil)
         }
         guard let data = try FileHandle(forReadingAtPath: cacheFile)?.readToEnd() else {
             fatalError("Could not read cached file")
@@ -142,18 +142,18 @@ final class Curl {
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     /// Data is first downloaded to a tempoary tilde file and then moved to its final location atomically
-    func download(url: String, toFile: String, bzip2Decode: Bool, atomic: Bool = false, cacheDirectory: String? = Curl.cacheDirectory) async throws {
+    func download(url: String, toFile: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, cacheDirectory: String? = Curl.cacheDirectory) async throws {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         let fileTemp = "\(toFile)~"
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: nil, minSize: nil, cacheDirectory: cacheDirectory)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory)
             
             // Retry failed file transfers after this point
             do {
                 let lastModified = response.headers.lastModified?.value
                 try FileManager.default.removeItemIfExists(at: fileTemp)
-                let contentLength = try response.contentLength()
+                let contentLength = try response.contentLength() ?? minSize
                 let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
                     try await response.body.tracker(tracker).decompressBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)

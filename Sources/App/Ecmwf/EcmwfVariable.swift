@@ -91,6 +91,61 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     case cloudcover_mid
     case cloudcover_high
     
+    
+    enum DownloadOrProcess {
+        /// Only download the selected variable, bu to not create a om database
+        case downloadOnly
+        /// Download and reate database
+        case downloadAndProcess
+    }
+    
+    /// If true, download
+    var includeInEnsemble: DownloadOrProcess? {
+        switch self {
+        case .precipitation:
+            fallthrough
+        case .runoff:
+            fallthrough
+        case .soil_temperature_0_to_7cm:
+            fallthrough
+        case .skin_temperature:
+            fallthrough
+        case .relative_humidity_1000hPa:
+            fallthrough
+        case .surface_air_pressure:
+            fallthrough
+        case .pressure_msl:
+            fallthrough
+        case .northward_wind_10m:
+            fallthrough
+        case .eastward_wind_10m:
+            fallthrough
+        case .temperature_2m:
+            fallthrough
+        case .divergence_of_wind_50hPa:
+            fallthrough
+        case .cloudcover:
+            return .downloadAndProcess
+        case .relative_humidity_925hPa:
+            fallthrough
+        case .relative_humidity_850hPa:
+            fallthrough
+        case .relative_humidity_700hPa:
+            fallthrough
+        case .relative_humidity_500hPa:
+            fallthrough
+        case .relative_humidity_300hPa:
+            fallthrough
+        case .relative_humidity_250hPa:
+            fallthrough
+        case .relative_humidity_200hPa:
+            fallthrough
+        case .relative_humidity_50hPa:
+            return .downloadOnly
+        default: return nil
+        }
+    }
+    
     var isElevationCorrectable: Bool {
         return self == .temperature_2m
     }

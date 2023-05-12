@@ -24,9 +24,6 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         @Flag(name: "skip-existing")
         var skipExisting: Bool
         
-        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels for ensemble model")
-        var upperLevel: Bool
-        
         @Option(name: "only-variables")
         var onlyVariables: String?
     }
@@ -52,10 +49,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
-        /// Also include all relative humidity levels for clouds
-        let surfaceVariables = EcmwfVariable.allCases.filter({($0.level ?? 0) < 50 || $0.gribName == "r"})
-        let pressureVariables = EcmwfVariable.allCases.filter({($0.level ?? 0) >= 50 && $0.gribName != "r"})
-        let defaultVariables = domain == .ifs04_ensemble ? (signature.upperLevel ? pressureVariables : surfaceVariables) : EcmwfVariable.allCases
+        let ensembleVariables = EcmwfVariable.allCases.filter({$0.includeInEnsemble != nil})
+        let defaultVariables = domain == .ifs04_ensemble ? ensembleVariables : EcmwfVariable.allCases
         let variables = onlyVariables ?? defaultVariables
         
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
@@ -201,6 +196,11 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     inMemory[.init(variable, member)] = grib2d.array.data
                 }
                 
+                if domain == .ifs04_ensemble && variable.includeInEnsemble != .downloadAndProcess {
+                    // do not generate some database files for ensemble
+                    continue
+                }
+                
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let file = "\(downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr).om"
                 
@@ -209,8 +209,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             }
             
             // Calculate mid/low/high/total cloudocover
+            logger.info("Calculating cloud cover")
             for member in 0..<domain.ensembleMembers {
-                logger.info("Calculating cloud cover on low/mid/high member \(member)")
                 guard let rh1000 = inMemory[.init(.relative_humidity_1000hPa, member)],
                       let rh925 = inMemory[.init(.relative_humidity_925hPa, member)],
                       let rh850 = inMemory[.init(.relative_humidity_850hPa, member)],
@@ -267,12 +267,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for variable in variables {
-            if domain == .ifs04_ensemble && variable.gribName == "r" && variable != .relative_humidity_1000hPa {
-                // do not generate om files for upper level rh, except relativehumidity_1000hPa for ifs ensemble
-                continue
-            }
-            if domain == .ifs04_ensemble && [.cloudcover_low, .cloudcover_mid, .cloudcover_high].contains(variable) {
-                // no mid/low/high cloud cover for ifs ensemble.. only total cloudcover
+            if domain == .ifs04_ensemble && variable.includeInEnsemble != .downloadAndProcess {
+                // do not generate some database files for ensemble
                 continue
             }
             
