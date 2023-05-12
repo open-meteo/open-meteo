@@ -267,8 +267,12 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for variable in variables {
-            // do not generate om files for upper level rh, except relativehumidity_1000hPa for ifs ensemble
             if domain == .ifs04_ensemble && variable.gribName == "r" && variable != .relative_humidity_1000hPa {
+                // do not generate om files for upper level rh, except relativehumidity_1000hPa for ifs ensemble
+                continue
+            }
+            if domain == .ifs04_ensemble && [.cloudcover_low, .cloudcover_mid, .cloudcover_high].contains(variable) {
+                // no mid/low/high cloud cover for ifs ensemble.. only total cloudcover
                 continue
             }
             
