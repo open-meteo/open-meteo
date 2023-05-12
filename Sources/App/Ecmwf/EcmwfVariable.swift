@@ -517,6 +517,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
 }
 
 enum EcmwfVariableDerived: String, GenericVariableMixable {
+    case relativehumidity_2m
+    case dewpoint_2m
+    case apparent_temperature
+    case vapor_pressure_deficit
     case windspeed_10m
     case windspeed_1000hPa
     case windspeed_925hPa

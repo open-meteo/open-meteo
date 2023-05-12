@@ -272,6 +272,22 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return try get(raw: .init(.skin_temperature, member), time: time)
         case .surface_pressure:
             return try get(raw: .init(.surface_air_pressure, member), time: time)
+        case .relativehumidity_2m:
+            return try get(raw: .init(.relative_humidity_1000hPa, member), time: time)
+        case .dewpoint_2m:
+            let temperature = try get(raw: .init(.temperature_2m, member), time: time)
+            let rh = try get(derived: .init(.relativehumidity_2m, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .apparent_temperature:
+            let windspeed = try get(derived: .init(.windspeed_10m, member), time: time).data
+            let temperature = try get(raw: .init(.temperature_2m, member), time: time).data
+            let relhum = try get(derived: .init(.relativehumidity_2m, member), time: time).data
+            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: nil), .celsius)
+        case .vapor_pressure_deficit:
+            let temperature = try get(raw: .init(.temperature_2m, member), time: time).data
+            let rh = try get(derived: .init(.relativehumidity_2m, member), time: time).data
+            let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
+            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
         }
     }
     
@@ -439,6 +455,17 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .init(.skin_temperature, member), time: time)
         case .surface_pressure:
             try prefetchData(raw: .init(.surface_air_pressure, member), time: time)
+        case .relativehumidity_2m:
+            try prefetchData(raw: .init(.relative_humidity_1000hPa, member), time: time)
+        case .dewpoint_2m:
+            try prefetchData(raw: .init(.relative_humidity_1000hPa, member), time: time)
+        case .apparent_temperature:
+            try prefetchData(derived: .init(.relativehumidity_2m, member), time: time)
+            try prefetchData(raw: .init(.temperature_2m, member), time: time)
+            try prefetchData(derived: .init(.windspeed_10m, member), time: time)
+        case .vapor_pressure_deficit:
+            try prefetchData(derived: .init(.relativehumidity_2m, member), time: time)
+            try prefetchData(raw: .init(.temperature_2m, member), time: time)
         }
     }
 }
