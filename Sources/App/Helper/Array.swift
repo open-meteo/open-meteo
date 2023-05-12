@@ -15,12 +15,12 @@ extension Sequence where Element == Float {
 extension Array where Element == Float {
     func max(by: Int) -> [Float] {
         return stride(from: 0, through: count-by, by: by).map { i in
-            return self[i..<i+by].max()!
+            return self[i..<i+by].max() ?? .nan
         }
     }
     func min(by: Int) -> [Float] {
         return stride(from: 0, through: count-by, by: by).map { i in
-            return self[i..<i+by].min()!
+            return self[i..<i+by].min() ?? .nan
         }
     }
     func sum(by: Int) -> [Float] {
