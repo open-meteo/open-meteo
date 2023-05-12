@@ -128,7 +128,7 @@ final class Curl {
     private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String) async throws -> HTTPClientResponse {
         try FileManager.default.createDirectory(atPath: cacheDirectory, withIntermediateDirectories: true)
         try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
-        let cacheFile = cacheDirectory + "/" + url.base32String() + (range?.base32String() ?? "")
+        let cacheFile = cacheDirectory + "/" + SHA256.hash(data: (url + (range ?? "")).data(using: .utf8) ?? Data()).hex
         if !FileManager.default.fileExists(atPath: cacheFile) {
             try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, cacheDirectory: nil)
         }
