@@ -147,6 +147,8 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
             if variables.isEmpty {
                 continue
             }
+            var inMemory = [VariableAndMemberAndControl<EcmwfVariable>: [Float]]()
+            
             let url = domain.getUrl(base: base, run: run, hour: hour)
             for message in try await curl.downloadEcmwfIndexed(url: url, isIncluded: { entry in
                 return variables.contains(where: { variable in
@@ -158,6 +160,9 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 })
             }) {
                 let shortName = message.get(attribute: "shortName")!
+                if shortName == "lsm" {
+                    continue
+                }
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                 
@@ -191,12 +196,54 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
+                // Keep relative humidity in memory to generate total cloud cover files
+                if variable.gribName == "r" {
+                    inMemory[.init(variable, member)] = grib2d.array.data
+                }
+                
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let file = "\(downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr).om"
-                try FileManager.default.removeItemIfExists(at: file)
                 
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
+            }
+            
+            // Calculate mid/low/high/total cloudocover
+            for member in 0..<domain.ensembleMembers {
+                logger.info("Calculating cloud cover on low/mid/high member \(member)")
+                guard let rh1000 = inMemory[.init(.relative_humidity_1000hPa, member)],
+                      let rh925 = inMemory[.init(.relative_humidity_925hPa, member)],
+                      let rh850 = inMemory[.init(.relative_humidity_850hPa, member)],
+                      let rh700 = inMemory[.init(.relative_humidity_700hPa, member)],
+                      let rh500 = inMemory[.init(.relative_humidity_500hPa, member)],
+                      let rh300 = inMemory[.init(.relative_humidity_300hPa, member)],
+                      let rh250 = inMemory[.init(.relative_humidity_250hPa, member)],
+                      let rh200 = inMemory[.init(.relative_humidity_200hPa, member)],
+                      let rh50 = inMemory[.init(.relative_humidity_50hPa, member)] else {
+                    logger.warning("Pressure level relative humidity unavailable")
+                    continue
+                }
+                let cloudcoverLow = zip(rh1000, zip(rh925, rh850)).map {
+                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 1000),
+                               max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 925),
+                                   Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 850)))
+                }
+                let cloudcoverMid = zip(rh700, zip(rh500, rh300)).map {
+                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 700),
+                               max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 500),
+                                   Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 300)))
+                }
+                let cloudcoverHigh = zip(rh250, zip(rh200, rh50)).map {
+                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 250),
+                               max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 200),
+                                   Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 50)))
+                }
+                let memberStr = member > 0 ? "_\(member)" : ""
+                try writer.write(file: "\(downloadDirectory)cloudcover_low_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverLow, overwrite: true)
+                try writer.write(file: "\(downloadDirectory)cloudcover_mid_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverMid, overwrite: true)
+                try writer.write(file: "\(downloadDirectory)cloudcover_high_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverHigh, overwrite: true)
+                let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
+                try writer.write(file: "\(downloadDirectory)cloudcover_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover, overwrite: true)
             }
         }
         curl.printStatistics()
@@ -220,6 +267,11 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for variable in variables {
+            // do not generate om files for upper level rh, except relativehumidity_1000hPa for ifs ensemble
+            if domain == .ifs04_ensemble && variable.gribName == "r" && variable != .relative_humidity_1000hPa {
+                continue
+            }
+            
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             let skip = 0
         

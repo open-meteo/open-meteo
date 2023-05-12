@@ -141,7 +141,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .soil_temperature_0_7cm:
             return try get(raw: .init(.soil_temperature_0_to_7cm, member), time: time)
         case .weathercode:
-            let cloudcover = try get(derived: .init(.cloudcover, member), time: time).data
+            let cloudcover = try get(raw: .init(.cloudcover, member), time: time).data
             let precipitation = try get(raw: .init(.precipitation, member), time: time).data
             let snowfall = try get(derived: .init(.snowfall, member), time: time).data
             return DataAndUnit(WeatherCode.calculate(
@@ -156,25 +156,6 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
                 categoricalFreezingRain: nil,
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
             )
-        case .cloudcover:
-            let low = try get(derived: .init(.cloudcover_low, member), time: time).data
-            let mid = try get(derived: .init(.cloudcover_mid, member), time: time).data
-            let high = try get(derived: .init(.cloudcover_high, member), time: time).data
-            return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percent)
-        case .cloudcover_low:
-            let cl0 = try get(derived: .init(.cloudcover_1000hPa, member), time: time)
-            let cl1 = try get(derived: .init(.cloudcover_925hPa, member), time: time)
-            let cl2 = try get(derived: .init(.cloudcover_850hPa, member), time: time)
-            return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
-        case .cloudcover_mid:
-            let cl0 = try get(derived: .init(.cloudcover_700hPa, member), time: time)
-            let cl1 = try get(derived: .init(.cloudcover_500hPa, member), time: time)
-            return DataAndUnit(zip(cl0.data, cl1.data).map(max), .percent)
-        case .cloudcover_high:
-            let cl0 = try get(derived: .init(.cloudcover_300hPa, member), time: time)
-            let cl1 = try get(derived: .init(.cloudcover_250hPa, member), time: time)
-            let cl2 = try get(derived: .init(.cloudcover_200hPa, member), time: time)
-            return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percent)
         case .cloudcover_1000hPa:
             let rh = try get(raw: .init(.relative_humidity_1000hPa, member), time: time)
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 1000)}), .percent)
@@ -379,24 +360,9 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .cloudcover_50hPa:
             try prefetchData(raw: .init(.relative_humidity_50hPa, member), time: time)
         case .weathercode:
-            try prefetchData(derived: .init(.cloudcover, member), time: time)
+            try prefetchData(raw: .init(.cloudcover, member), time: time)
             try prefetchData(derived: .init(.snowfall, member), time: time)
             try prefetchData(raw: .init(.precipitation, member), time: time)
-        case .cloudcover:
-            try prefetchData(derived: .init(.cloudcover_low, member), time: time)
-            try prefetchData(derived: .init(.cloudcover_mid, member), time: time)
-            try prefetchData(derived: .init(.cloudcover_high, member), time: time)
-        case .cloudcover_low:
-            try prefetchData(derived: .init(.cloudcover_1000hPa, member), time: time)
-            try prefetchData(derived: .init(.cloudcover_925hPa, member), time: time)
-            try prefetchData(derived: .init(.cloudcover_850hPa, member), time: time)
-        case .cloudcover_mid:
-            try prefetchData(derived: .init(.cloudcover_700hPa, member), time: time)
-            try prefetchData(derived: .init(.cloudcover_500hPa, member), time: time)
-        case .cloudcover_high:
-            try prefetchData(derived: .init(.cloudcover_300hPa, member), time: time)
-            try prefetchData(derived: .init(.cloudcover_250hPa, member), time: time)
-            try prefetchData(derived: .init(.cloudcover_200hPa, member), time: time)
         case .rain:
             fallthrough
         case .snowfall:

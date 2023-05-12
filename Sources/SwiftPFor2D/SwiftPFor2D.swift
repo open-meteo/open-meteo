@@ -386,7 +386,10 @@ public final class OmFileWriter {
     }
     
     /// Write all data at once without any streaming
-    public func write(file: String, compressionType: CompressionType, scalefactor: Float, all: [Float]) throws {
+    public func write(file: String, compressionType: CompressionType, scalefactor: Float, all: [Float], overwrite: Bool = false) throws {
+        if overwrite {
+            try FileManager.default.removeItemIfExists(at: file)
+        }
         try write(file: file, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { range in
             return ArraySlice(all)
         })

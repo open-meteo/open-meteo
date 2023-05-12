@@ -85,6 +85,12 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     case divergence_of_wind_200hPa
     case divergence_of_wind_50hPa
     
+    // Cloudcover is calculated while downloading
+    case cloudcover
+    case cloudcover_low
+    case cloudcover_mid
+    case cloudcover_high
+    
     var isElevationCorrectable: Bool {
         return self == .temperature_2m
     }
@@ -187,6 +193,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .divergence_of_wind_250hPa: fallthrough
         case .divergence_of_wind_200hPa: fallthrough
         case .divergence_of_wind_50hPa: return .perSecond
+        case .cloudcover:
+            return .percent
+        case .cloudcover_low:
+            return .percent
+        case .cloudcover_mid:
+            return .percent
+        case .cloudcover_high:
+            return .percent
         }
     }
     
@@ -275,10 +289,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .divergence_of_wind_250hPa: return 250
         case .divergence_of_wind_200hPa: return 200
         case .divergence_of_wind_50hPa: return 50
+        case .cloudcover:
+            return nil
+        case .cloudcover_low:
+            return nil
+        case .cloudcover_mid:
+            return nil
+        case .cloudcover_high:
+            return nil
         }
     }
     
-    var gribName: String {
+    var gribName: String? {
         switch self {
         case .precipitation: return "tp"
         case .runoff: return "ro"
@@ -362,6 +384,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .divergence_of_wind_250hPa: return "d"
         case .divergence_of_wind_200hPa: return "d"
         case .divergence_of_wind_50hPa: return "d"
+        case .cloudcover:
+            return nil
+        case .cloudcover_low:
+            return nil
+        case .cloudcover_mid:
+            return nil
+        case .cloudcover_high:
+            return nil
         }
     }
     
@@ -449,6 +479,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .divergence_of_wind_250hPa: fallthrough
         case .divergence_of_wind_200hPa: fallthrough
         case .divergence_of_wind_50hPa: return 100
+        case .cloudcover:
+            return 1
+        case .cloudcover_low:
+            return 1
+        case .cloudcover_mid:
+            return 1
+        case .cloudcover_high:
+            return 1
         }
     }
     
@@ -502,6 +540,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         switch self {
         case .precipitation: fallthrough
         case .runoff: return .backwards_sum
+        case .cloudcover: fallthrough
+        case .cloudcover_low: fallthrough
+        case .cloudcover_mid: fallthrough
+        case .cloudcover_high: fallthrough
         case .relative_humidity_1000hPa: fallthrough
         case .relative_humidity_925hPa: fallthrough
         case .relative_humidity_850hPa: fallthrough
@@ -572,10 +614,6 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case soil_temperature_0_10cm
     case soil_temperature_0_to_10cm
     case weathercode
-    case cloudcover
-    case cloudcover_low
-    case cloudcover_mid
-    case cloudcover_high
     case snowfall
     case is_day
     case surface_pressure
