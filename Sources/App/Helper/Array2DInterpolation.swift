@@ -203,8 +203,8 @@ extension Array where Element == Float {
                 let posB = Swift.max(posC - width, 0)
                 // Replicate point B if A would be outside
                 let posA = (posB - width) >= 0 ? posB - width : posB
-                let B = self[posB]
-                let A = self[posA]
+                let B = self[l * nTime + posB]
+                let A = self[l * nTime + posA]
                 let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
                 let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
                 let c = -A/2.0 + C/2.0
