@@ -2,33 +2,74 @@ import Foundation
 
 
 extension Array3DFastTime {
-    /// Take a running mean and deaverage over time
+    /// Deaverages a running mean over time.
+    ///
+    /// - Parameters:
+    ///   - slidingWidth: The width of the sliding window used to calculate the running mean.
+    ///   - slidingOffset: The offset of the sliding window used to calculate the running mean.
+    ///
+    /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
+    /// The function modifies the input array in place, deaveraging a running mean over time for each sliding window within each location in the array.
     mutating func deavergeOverTime(slidingWidth: Int, slidingOffset: Int) {
         data.deavergeOverTime(nTime: nTime, slidingWidth: slidingWidth, slidingOffset: slidingOffset)
     }
     
-    /// Take running sum and deaccumulate it over time.
-    /// Note: Enforces >0
+    /// Deaccumulates a time series by subtracting the previous value from the current value.
+    ///
+    /// - Parameters:
+    ///   - slidingWidth: The width of the sliding window used to deaccumulate the time series.
+    ///   - slidingOffset: The offset of the sliding window used to deaccumulate the time series.
+    ///
+    /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
+    /// The function modifies the input array in place, subtracting the previous value from the current value for each element in the sliding window within each location in the array.
+    /// If the previous value is `NaN`, the function replaces it with the value of the element two time steps before or with 0 if it's negative.
+    /// The deaccumulation process ensures that the time series is transformed from a cumulative sum to a series of differences.
     mutating func deaccumulateOverTime(slidingWidth: Int, slidingOffset: Int) {
         data.deaccumulateOverTime(nTime: nTime, slidingWidth: slidingWidth, slidingOffset: slidingOffset)
     }
 }
 
 extension Array2DFastTime {
-    /// Take a running mean and deaverage over time
+    /// Deaverages a running mean over time.
+    ///
+    /// - Parameters:
+    ///   - slidingWidth: The width of the sliding window used to calculate the running mean.
+    ///   - slidingOffset: The offset of the sliding window used to calculate the running mean.
+    ///
+    /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
+    /// The function modifies the input array in place, deaveraging a running mean over time for each sliding window within each location in the array.
     mutating func deavergeOverTime(slidingWidth: Int, slidingOffset: Int) {
         data.deavergeOverTime(nTime: nTime, slidingWidth: slidingWidth, slidingOffset: slidingOffset)
     }
     
-    /// Take running sum and deaccumulate it over time.
-    /// Note: Enforces >0
+    /// Deaccumulates a time series by subtracting the previous value from the current value.
+    ///
+    /// - Parameters:
+    ///   - slidingWidth: The width of the sliding window used to deaccumulate the time series.
+    ///   - slidingOffset: The offset of the sliding window used to deaccumulate the time series.
+    ///
+    /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
+    /// The function modifies the input array in place, subtracting the previous value from the current value for each element in the sliding window within each location in the array.
+    /// If the previous value is `NaN`, the function replaces it with the value of the element two time steps before or with 0 if it's negative.
+    /// The deaccumulation process ensures that the time series is transformed from a cumulative sum to a series of differences.
     mutating func deaccumulateOverTime(slidingWidth: Int, slidingOffset: Int) {
         data.deaccumulateOverTime(nTime: nTime, slidingWidth: slidingWidth, slidingOffset: slidingOffset)
     }
 }
 
 extension Array where Element == Float {
-    /// Take a running mean and deaverage over time
+    /// Deaverages a running mean over time.
+    ///
+    /// - Parameters:
+    ///   - nTime: The number of time intervals in the time series.
+    ///   - slidingWidth: The width of the sliding window used to calculate the running mean.
+    ///   - slidingOffset: The offset of the sliding window used to calculate the running mean.
+    ///
+    /// - Precondition: `nTime` must be less than or equal to the length of the input array.
+    /// - Precondition: The length of the input array must be divisible by `nTime`.
+    ///
+    /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
+    /// The function modifies the input array in place, deaveraging a running mean over time for each sliding window within each location in the array.
     mutating func deavergeOverTime(nTime: Int, slidingWidth: Int, slidingOffset: Int) {
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
@@ -54,8 +95,20 @@ extension Array where Element == Float {
         }
     }
     
-    /// Take running sum and deaccumulate it over time.
-    /// Note: Enforces >0
+    /// Deaccumulates a time series by subtracting the previous value from the current value.
+    ///
+    /// - Parameters:
+    ///   - nTime: The number of time intervals in the time series.
+    ///   - slidingWidth: The width of the sliding window used to deaccumulate the time series.
+    ///   - slidingOffset: The offset of the sliding window used to deaccumulate the time series.
+    ///
+    /// - Precondition: `nTime` must be less than or equal to the length of the input array.
+    /// - Precondition: The length of the input array must be divisible by `nTime`.
+    ///
+    /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
+    /// The function modifies the input array in place, subtracting the previous value from the current value for each element in the sliding window within each location in the array.
+    /// If the previous value is `NaN`, the function replaces it with the value of the element two time steps before or with 0 if it's negative.
+    /// The deaccumulation process ensures that the time series is transformed from a cumulative sum to a series of differences.
     mutating func deaccumulateOverTime(nTime: Int, slidingWidth: Int, slidingOffset: Int) {
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
