@@ -1,72 +1,23 @@
 import Foundation
 
-extension Array3DFastTime {
-    mutating func deaccumulateOverTime(slidingWidth: Int, slidingOffset: Int) {
-        var d2 = Array2DFastTime(data: data, nLocations: nLocations*nLevel, nTime: nTime)
-        d2.deaccumulateOverTime(slidingWidth: slidingWidth, slidingOffset: slidingOffset)
-        data = d2.data
-    }
-    
-    mutating func deavergeOverTime(slidingWidth: Int, slidingOffset: Int) {
-        var d2 = Array2DFastTime(data: data, nLocations: nLocations*nLevel, nTime: nTime)
-        d2.deavergeOverTime(slidingWidth: slidingWidth, slidingOffset: slidingOffset)
-        data = d2.data
-    }
-}
-
-
-extension Array2DFastTime {
-    mutating func deavergeOverTime(slidingWidth: Int, slidingOffset: Int) {
-        for l in 0..<nLocations {
-            for start in stride(from: slidingOffset, to: nTime, by: slidingWidth) {
-                var prev = self[l, start].isNaN ? 0 : self[l, start]
-                var prevH = 1
-                var skipped = 0
-                for hour in start+1 ..< min(start+slidingWidth, nTime) {
-                    let d = self[l, hour]
-                    let h = hour-start+1
-                    if d.isNaN {
-                        skipped += 1
-                        continue
-                    }
-                    self[l, hour] = (d * Float(h / (skipped+1)) - prev * Float(prevH / (skipped+1)))
-                    prev = d
-                    prevH = h
-                    skipped = 0
-                }
-            }
-        }
-    }
-    
-    /// Note: Enforces >0
-    mutating func deaccumulateOverTime(slidingWidth: Int, slidingOffset: Int) {
-        for l in 0..<nLocations {
-            for start in stride(from: slidingOffset, to: nTime, by: slidingWidth) {
-                for hour in stride(from: min(start + slidingWidth, nTime) - 1, through: start + 1, by: -1) {
-                    let current = self[l, hour]
-                    let previous = self[l, hour-1]
-                    if previous.isNaN, hour-2 >= 0 {
-                        // allow 1x missing value
-                        // This is a bit hacky, but the case is only present for a single timestep at the end of ARPEGE WORLD
-                        let previous = self[l, hour-2]
-                        self[l, hour] = previous.isNaN ? current : max(current - previous, 0) / 2
-                        continue
-                    }
-                    // due to floating point precision, it can become negative
-                    self[l, hour] = previous.isNaN ? current : max(current - previous, 0)
-                }
-            }
-        }
-    }
-}
 
 extension Array3DFastTime {
+    /// Fill in missing data by interpolating using differnet interpolation types
+    ///
+    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
+    ///
+    /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
         precondition(nTime == time.count)
         data.interpolateInplace(type: type, skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
     }
 }
 extension Array2DFastTime {
+    /// Fill in missing data by interpolating using differnet interpolation types
+    ///
+    /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
+    ///
+    /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
         precondition(nTime == time.count)
         data.interpolateInplace(type: type, skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
