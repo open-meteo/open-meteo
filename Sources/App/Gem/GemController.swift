@@ -254,7 +254,6 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             case .apparent_temperature:
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.windspeed_10m), member), time: time)
-                try prefetchData(raw: .init(.surface(.winddirection_10m), member), time: time)
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.shortwave_radiation), member), time: time)
             case .dewpoint_2m:
@@ -268,7 +267,6 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.windspeed_10m), member), time: time)
-                try prefetchData(raw: .init(.surface(.winddirection_10m), member), time: time)
             case .surface_pressure:
                 try prefetchData(raw: .init(.surface(.pressure_msl), member), time: time)
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
@@ -564,7 +562,6 @@ extension GemMixer {
             case .apparent_temperature_min:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .windspeed_10m, time: time)
-                try prefetchData(variable: .winddirection_10m, time: time)
                 try prefetchData(variable: .relativehumidity_2m, time: time)
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .precipitation_sum:
@@ -573,7 +570,6 @@ extension GemMixer {
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .windspeed_10m_max:
                 try prefetchData(variable: .windspeed_10m, time: time)
-                try prefetchData(variable: .winddirection_10m, time: time)
             case .windgusts_10m_max:
                 try prefetchData(variable: .windgusts_10m, time: time)
             case .winddirection_10m_dominant:
@@ -590,7 +586,6 @@ extension GemMixer {
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relativehumidity_2m, time: time)
                 try prefetchData(variable: .windspeed_10m, time: time)
-                try prefetchData(variable: .winddirection_10m, time: time)
             case .snowfall_sum:
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .rain_sum:
