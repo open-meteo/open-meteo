@@ -168,6 +168,10 @@ struct GemDownload: AsyncCommandFix {
         for hour in forecastHours {
             logger.info("Downloading hour \(hour)")
             let h3 = hour.zeroPadded(len: 3)
+            
+            /// Keep wind vectors in memory to calculate wind speed / direction for ensemble
+            var inMemory = [VariableAndMemberAndControl<GemSurfaceVariable>: [Float]]()
+            
             for variable in variables {
                 guard let gribName = variable.gribName(domain: domain) else {
                     continue
@@ -220,10 +224,25 @@ struct GemDownload: AsyncCommandFix {
                             }
                         }
                     }
+                    // GEM ensemble does not have wind speed and direction directly, calculate from u/v components
+                    if domain == .gem_global_ensemble, let variable = variable as? GemSurfaceVariable {
+                        // keep wind speed in memory, which actually contains wind U-component
+                        if [.windspeed_10m, .windspeed_40m, .windspeed_80m, .windspeed_120m].contains(variable) {
+                            inMemory[.init(variable, member)] = grib2d.array.data
+                            continue
+                        }
+                        if let windspeedVariable = variable.winddirectionCounterPartVariable {
+                            guard let u = inMemory[.init(windspeedVariable, member)] else {
+                                fatalError("Wind speed calculation requires \(windspeedVariable) to download")
+                            }
+                            let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
+                            try writer.write(file: "\(downloadDirectory)\(windspeedVariable.omFileName.file)_\(h3)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: windspeedVariable.scalefactor, all: windspeed, overwrite: true)
+                            grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
+                        }
+                    }
                     
                     //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).nc")
-                    try FileManager.default.removeItemIfExists(at: filenameDest)
-                    try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
                 }
             }
         }

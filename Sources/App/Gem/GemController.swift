@@ -182,14 +182,6 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_low
     case cloudcover_mid
     case cloudcover_high
-    case windspeed_10m
-    case winddirection_10m
-    case windspeed_40m
-    case winddirection_40m
-    case windspeed_80m
-    case winddirection_80m
-    case windspeed_120m
-    case winddirection_120m
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -218,8 +210,6 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
 enum GemPressureVariableDerivedType: String, CaseIterable {
     case dewpoint
     case cloudcover
-    case windspeed
-    case winddirection
 }
 
 /**
@@ -263,8 +253,8 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             switch surface {
             case .apparent_temperature:
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
-                try prefetchData(raw: .init(.surface(.wind_u_component_10m), member), time: time)
-                try prefetchData(raw: .init(.surface(.wind_v_component_10m), member), time: time)
+                try prefetchData(raw: .init(.surface(.windspeed_10m), member), time: time)
+                try prefetchData(raw: .init(.surface(.winddirection_10m), member), time: time)
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.shortwave_radiation), member), time: time)
             case .dewpoint_2m:
@@ -277,8 +267,8 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.shortwave_radiation), member), time: time)
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
-                try prefetchData(raw: .init(.surface(.wind_u_component_10m), member), time: time)
-                try prefetchData(raw: .init(.surface(.wind_v_component_10m), member), time: time)
+                try prefetchData(raw: .init(.surface(.windspeed_10m), member), time: time)
+                try prefetchData(raw: .init(.surface(.winddirection_10m), member), time: time)
             case .surface_pressure:
                 try prefetchData(raw: .init(.surface(.pressure_msl), member), time: time)
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
@@ -329,26 +319,6 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.windgusts_10m), member), time: time)
             case .is_day:
                 break
-            case .windspeed_10m:
-                fallthrough
-            case .winddirection_10m:
-                try prefetchData(raw: .init(.surface(.wind_u_component_10m), member), time: time)
-                try prefetchData(raw: .init(.surface(.wind_v_component_10m), member), time: time)
-            case .windspeed_40m:
-                fallthrough
-            case .winddirection_40m:
-                try prefetchData(raw: .init(.surface(.wind_u_component_40m), member), time: time)
-                try prefetchData(raw: .init(.surface(.wind_v_component_40m), member), time: time)
-            case .windspeed_80m:
-                fallthrough
-            case .winddirection_80m:
-                try prefetchData(raw: .init(.surface(.wind_u_component_80m), member), time: time)
-                try prefetchData(raw: .init(.surface(.wind_v_component_80m), member), time: time)
-            case .windspeed_120m:
-                fallthrough
-            case .winddirection_120m:
-                try prefetchData(raw: .init(.surface(.wind_u_component_120m), member), time: time)
-                try prefetchData(raw: .init(.surface(.wind_v_component_120m), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -357,11 +327,6 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
             case .cloudcover:
                 try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
-            case .windspeed:
-                fallthrough
-            case .winddirection:
-                try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time)
-                try prefetchData(raw: .init(.pressure(GemPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time)
             }
         }
     }
@@ -372,7 +337,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .surface(let variableDerivedSurface):
             switch variableDerivedSurface {
             case .apparent_temperature:
-                let windspeed = try get(derived: .init(.surface(.windspeed_10m), member), time: time).data
+                let windspeed = try get(raw: .init(.surface(.windspeed_10m), member), time: time).data
                 let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time).data
                 let relhum = try get(raw: .init(.surface(.relativehumidity_2m), member), time: time).data
                 let radiation = try get(raw: .init(.surface(.shortwave_radiation), member), time: time).data
@@ -386,7 +351,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 let swrad = try get(raw: .init(.surface(.shortwave_radiation), member), time: time).data
                 let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time).data
-                let windspeed = try get(derived: .init(.surface(.windspeed_10m), member), time: time).data
+                let windspeed = try get(raw: .init(.surface(.windspeed_10m), member), time: time).data
                 let rh = try get(raw: .init(.surface(.relativehumidity_2m), member), time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 
@@ -491,46 +456,6 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
-            case .windspeed_10m:
-                let u = try get(raw: .init(.surface(.wind_u_component_10m), member), time: time).data
-                let v = try get(raw: .init(.surface(.wind_v_component_10m), member), time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
-            case .winddirection_10m:
-                let u = try get(raw: .init(.surface(.wind_u_component_10m), member), time: time).data
-                let v = try get(raw: .init(.surface(.wind_v_component_10m), member), time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .windspeed_40m:
-                let u = try get(raw: .init(.surface(.wind_u_component_40m), member), time: time).data
-                let v = try get(raw: .init(.surface(.wind_v_component_40m), member), time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
-            case .winddirection_40m:
-                let u = try get(raw: .init(.surface(.wind_u_component_40m), member), time: time).data
-                let v = try get(raw: .init(.surface(.wind_v_component_40m), member), time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .windspeed_80m:
-                let u = try get(raw: .init(.surface(.wind_u_component_80m), member), time: time).data
-                let v = try get(raw: .init(.surface(.wind_v_component_80m), member), time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
-            case .winddirection_80m:
-                let u = try get(raw: .init(.surface(.wind_u_component_80m), member), time: time).data
-                let v = try get(raw: .init(.surface(.wind_v_component_80m), member), time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .windspeed_120m:
-                let u = try get(raw: .init(.surface(.wind_u_component_120m), member), time: time).data
-                let v = try get(raw: .init(.surface(.wind_v_component_120m), member), time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
-            case .winddirection_120m:
-                let u = try get(raw: .init(.surface(.wind_u_component_120m), member), time: time).data
-                let v = try get(raw: .init(.surface(.wind_v_component_120m), member), time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
             }
         case .pressure(let v):
             switch v.variable {
@@ -541,16 +466,6 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             case .cloudcover:
                 let rh = try get(raw: .init(.pressure(GemPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
                 return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percent)
-            case .windspeed:
-                let u = try get(raw: .init(.pressure(GemPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time)
-                let v = try get(raw: .init(.pressure(GemPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time)
-                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-                return DataAndUnit(speed, u.unit)
-            case .winddirection:
-                let u = try get(raw: .init(.pressure(GemPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time).data
-                let v = try get(raw: .init(.pressure(GemPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
             }
         }
     }
@@ -608,8 +523,8 @@ extension GemMixer {
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .winddirection_10m_dominant:
             // vector addition
-            let u = try get(variable: .wind_u_component_10m, time: time).data.sum(by: 24)
-            let v = try get(variable: .wind_v_component_10m, time: time).data.sum(by: 24)
+            let u = try get(variable: .windspeed_10m, time: time).data.sum(by: 24)
+            let v = try get(variable: .winddirection_10m, time: time).data.sum(by: 24)
             return DataAndUnit(Meteorology.windirectionFast(u: u, v: v), .degreeDirection)
         case .precipitation_hours:
             let data = try get(variable: .precipitation, time: time).convertAndRound(params: params)
@@ -648,8 +563,8 @@ extension GemMixer {
                 fallthrough
             case .apparent_temperature_min:
                 try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .windspeed_10m, time: time)
+                try prefetchData(variable: .winddirection_10m, time: time)
                 try prefetchData(variable: .relativehumidity_2m, time: time)
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .precipitation_sum:
@@ -657,13 +572,13 @@ extension GemMixer {
             case .shortwave_radiation_sum:
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .windspeed_10m_max:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .windspeed_10m, time: time)
+                try prefetchData(variable: .winddirection_10m, time: time)
             case .windgusts_10m_max:
                 try prefetchData(variable: .windgusts_10m, time: time)
             case .winddirection_10m_dominant:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .windspeed_10m, time: time)
+                try prefetchData(variable: .winddirection_10m, time: time)
             case .precipitation_hours:
                 try prefetchData(variable: .precipitation, time: time)
             case .sunrise:
@@ -674,8 +589,8 @@ extension GemMixer {
                 try prefetchData(variable: .shortwave_radiation, time: time)
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relativehumidity_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .windspeed_10m, time: time)
+                try prefetchData(variable: .winddirection_10m, time: time)
             case .snowfall_sum:
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .rain_sum:
