@@ -242,6 +242,11 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     }
                 }
                 
+                // De-accumulate precipitation
+                if variable.isAccumulatedSinceModelStart {
+                    data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 0)
+                }
+                
                 // Interpolate all missing values
                 data3d.interpolateInplace(
                     type: variable.interpolation,
@@ -250,11 +255,6 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                     grid: domain.grid,
                     locationRange: locationRange
                 )
-                
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
-                    data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: 0)
-                }
                 
                 progress.add(locationRange.count * nMembers)
                 return data3d.data[0..<locationRange.count * nTime * nMembers]
