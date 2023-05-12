@@ -3,12 +3,25 @@ import SwiftNetCDF
 
 
 struct Array2D {
+    /// The underlying data storage for the 2D array.
     var data: [Float]
+    
+    /// The number of elements in x dimension
     let nx: Int
+    
+    /// The number of elements in y dimension
     let ny: Int
     
+    /// The total number of elements in this array
     var count: Int {
         return nx * ny
+    }
+    
+    init(data: [Float], nx: Int, ny: Int) {
+        precondition(data.count == nx * ny)
+        self.data = data
+        self.nx = nx
+        self.ny = ny
     }
     
     func writeNetcdf(filename: String) throws {
@@ -35,57 +48,31 @@ struct Array2D {
     }
 }
 
-struct Array3D {
-    var data: [Float]
-    
-    /// slowest
-    let dim0: Int
-    let dim1: Int
-    /// Fastest dim
-    let dim2: Int
-    
-    var count: Int {
-        return dim0 * dim1 * dim2
-    }
-    
-    public init(data: [Float], dim0: Int, dim1: Int, dim2: Int) {
-        if (data.count != dim0 * dim1 * dim2) {
-            fatalError("Wrong Array3D dimensions. dim0=\(dim0) dim1=\(dim1) dim2=\(dim2) count=\(data.count)")
-        }
-        self.data = data
-        self.dim0 = dim0
-        self.dim1 = dim1
-        self.dim2 = dim2
-    }
-    
-    public init(repeating: Float, dim0: Int, dim1: Int, dim2: Int) {
-        self.data = [Float](repeating: repeating, count: dim0 * dim1 * dim2)
-        self.dim0 = dim0
-        self.dim1 = dim1
-        self.dim2 = dim2
-    }
-    
-    @inlinable subscript(d0: Int, d1: Int, d2: Int) -> Float {
-        get {
-            assert(d0 < dim0, "dim0 subscript invalid: \(d0) with dim0=\(dim0)")
-            assert(d1 < dim1, "dim1 subscript invalid: \(d1) with dim1=\(dim1)")
-            assert(d2 < dim2, "dim2 subscript invalid: \(d2) with dim2=\(dim2)")
-            return data[d0 * dim1 * dim2 + d1 * dim2 + d2]
-        }
-        set {
-            assert(d0 < dim0, "dim0 subscript invalid: \(d0) with dim0=\(dim0)")
-            assert(d1 < dim1, "dim1 subscript invalid: \(d1) with dim1=\(dim1)")
-            assert(d2 < dim2, "dim2 subscript invalid: \(d2) with dim2=\(dim2)")
-            data[d0 * dim1 * dim2 + d1 * dim2 + d2] = newValue
-        }
-    }
-}
-
+/**
+ `Array2DFastSpace` is a struct that represents a 2D array of Float values with fast space indexing. It allows accessing and modifying individual elements using subscript notation.
+ 
+ Data is stored to be accessed quickly for multiple locatios in a row, while accessing timesteps is slower
+*/
 struct Array2DFastSpace {
+    /// The underlying data storage for the 2D array.
     var data: [Float]
+    
+    /// The number of spatial locations in the array.
     let nLocations: Int
+    
+    /// The number of time steps in the array.
     let nTime: Int
     
+    /**
+     Initializes a new instance of `Array2DFastSpace`.
+     
+     - Parameters:
+        - data: The data to be used as the underlying storage of the 2D array. Its count should be equal to `nLocations * nTime`.
+        - nLocations: The number of spatial locations in the array.
+        - nTime: The number of time steps in the array.
+     
+     - Precondition: `data.count` should be equal to `nLocations * nTime`, otherwise the initializer will fatalError.
+     */
     public init(data: [Float], nLocations: Int, nTime: Int) {
         if (data.count != nLocations * nTime) {
             fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nTime=\(nTime) count=\(data.count)")
@@ -95,12 +82,29 @@ struct Array2DFastSpace {
         self.nTime = nTime
     }
     
+    /**
+     Initializes a new instance of `Array2DFastSpace` with all elements set to `NaN`.
+     
+     - Parameters:
+        - nLocations: The number of spatial locations in the array.
+        - nTime: The number of time steps in the array.
+     */
     public init(nLocations: Int, nTime: Int) {
         self.data = .init(repeating: .nan, count: nLocations * nTime)
         self.nLocations = nLocations
         self.nTime = nTime
     }
 
+    /**
+     Writes the 2D array data to a NetCDF file.
+     
+     - Parameters:
+        - filename: The name of the file to write to.
+        - nx: The number of grid points in the x (longitude) direction.
+        - ny: The number of grid points in the y (latitude) direction.
+     
+     - Throws: An error of type `NetCDFError` if the write operation fails.
+     */
     func writeNetcdf(filename: String, nx: Int, ny: Int) throws {
         let file = try NetCDF.create(path: filename, overwriteExisting: true)
 
@@ -116,6 +120,16 @@ struct Array2DFastSpace {
         try variable.write(data)
     }
     
+    /// Accesses the element at the specified time and location in the 2D array.
+    ///
+    /// - Parameters:
+    ///   - time: The time index of the element to access.
+    ///   - location: The location index of the element to access.
+    ///
+    /// - Precondition: `location` must be less than `nLocations`.
+    /// - Precondition: `time` must be less than `nTime`.
+    ///
+    /// - Returns: The element at the specified time and location in the 2D array.
     @inlinable subscript(time: Int, location: Int) -> Float {
         get {
             precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
@@ -129,6 +143,22 @@ struct Array2DFastSpace {
         }
     }
     
+    /// Accesses a range of values in the array for a specific time.
+    ///
+    /// Use this subscript to access a range of values from the `Array2DFastSpace` array
+    /// for a specific time. The range of locations is specified as a `Range` object.
+    ///
+    /// - Parameters:
+    ///   - time: The time to access the range of values for.
+    ///   - location: The range of locations to access.
+    ///
+    /// - Returns: An array slice that contains the values of the specified range
+    ///   of locations for the specified time.
+    ///
+    /// - Precondition: `time` must be less than `nTime` and `location.upperBound` must
+    ///   be less than or equal to `nLocations`.
+    ///
+    /// - SeeAlso: `subscript(time: Int, location: Int) -> Float`
     @inlinable subscript(time: Int, location: Range<Int>) -> ArraySlice<Float> {
         get {
             precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
@@ -155,6 +185,160 @@ struct Array2DFastSpace {
                 initializedCount += data.count
             }
             return Array2DFastTime(data: out, nLocations: nLocations, nTime: nTime)
+        }
+    }
+}
+
+
+/**
+ `Array2DFastTime` is a struct that represents a 2D array of Float values with fast time indexing. It allows accessing and modifying individual elements using subscript notation.
+ 
+ Data is stored to be accessed quickly for multiple time temps in a row, while accessing locations is slower
+*/
+public struct Array2DFastTime {
+    /// The underlying data storage for the 2D array.
+    public var data: [Float]
+    
+    /// The number of spatial locations in the array.
+    public let nLocations: Int
+    
+    /// The number of time steps in the array.
+    public let nTime: Int
+    
+    /**
+     Initializes a new instance of `Array2DFastTime`.
+     
+     - Parameters:
+        - data: The data to be used as the underlying storage of the 2D array. Its count should be equal to `nLocations * nTime`.
+        - nLocations: The number of spatial locations in the array.
+        - nTime: The number of time steps in the array.
+     
+     - Precondition: `data.count` should be equal to `nLocations * nTime`, otherwise the initializer will fatalError.
+     */
+    public init(data: [Float], nLocations: Int, nTime: Int) {
+        if (data.count != nLocations * nTime) {
+            fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nTime=\(nTime) count=\(data.count)")
+        }
+        self.data = data
+        self.nLocations = nLocations
+        self.nTime = nTime
+    }
+    
+    /**
+     Initializes a new instance of `Array2DFastTime` with all elements set to `NaN`.
+     
+     - Parameters:
+        - nLocations: The number of spatial locations in the array.
+        - nTime: The number of time steps in the array.
+     */
+    public init(nLocations: Int, nTime: Int) {
+        self.data = .init(repeating: .nan, count: nLocations * nTime)
+        self.nLocations = nLocations
+        self.nTime = nTime
+    }
+    
+    /// Accesses the element at the specified time and location in the 2D array.
+    ///
+    /// - Parameters:
+    ///   - location: The location index of the element to access.
+    ///   - time: The time index of the element to access.
+    ///
+    /// - Precondition: `location` must be less than `nLocations`.
+    /// - Precondition: `time` must be less than `nTime`.
+    ///
+    /// - Returns: The element at the specified time and location in the 2D array.
+    @inlinable subscript(location: Int, time: Int) -> Float {
+        get {
+            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            return data[location * nTime + time]
+        }
+        set {
+            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            data[location * nTime + time] = newValue
+        }
+    }
+    
+    /// Accesses a range of values in the array for a specific location.
+    ///
+    /// Use this subscript to access a range of values from the `Array2DFastTime` array
+    /// for a specific location. The range of time steps is specified as a `Range` object.
+    ///
+    /// - Parameters:
+    ///   - location: The location to access the range of values for.
+    ///   - time: The range of time steps to access.
+    ///
+    /// - Returns: An array slice that contains the values of the specified range
+    ///   of timesteps for the specified location.
+    ///
+    /// - Precondition: `location` must be less than `nLocations` and `time.upperBound` must
+    ///   be less than or equal to `nTime`.
+    ///
+    /// - SeeAlso: `subscript(time: Int, location: Int) -> Float`
+    @inlinable subscript(location: Int, time: Range<Int>) -> ArraySlice<Float> {
+        get {
+            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(time.upperBound <= nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            return data[time.add(location * nTime)]
+        }
+        set {
+            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(time.upperBound <= nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            data[time.add(location * nTime)] = newValue
+        }
+    }
+    
+    /// Accesses a range of values in the array for a specific time. This function is relatively slow, because data needs to be transposed.
+    ///
+    /// Use this subscript to access a range of values from the `Array2DFastTime` array
+    /// for a specific time. The range of locations is specified as a `Range` object.
+    ///
+    /// - Parameters:
+    ///   - time: The time to access the range of values for.
+    ///   - location: The range of locations to access.
+    ///
+    /// - Returns: An array slice that contains the values of the specified range
+    ///   of locations for the specified time.
+    ///
+    /// - Precondition: `time` must be less than `nTime` and `location.upperBound` must
+    ///   be less than or equal to `nLocations`.
+    ///
+    /// - SeeAlso: `subscript(time: Int, location: Int) -> Float`
+    @inlinable subscript(location: Range<Int>, time: Int) -> [Float] {
+        get {
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            var out = [Float]()
+            out.reserveCapacity(location.count)
+            for loc in location {
+                out.append(self[loc, time])
+            }
+            return out
+        }
+        set {
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            precondition(newValue.count == location.count, "Array and location count do not match")
+            for (loc, value) in zip(location, newValue) {
+                data[loc * nTime + time] = value
+            }
+        }
+    }
+    
+    /// Transpose to fast space
+    func transpose() -> Array2DFastSpace {
+        precondition(data.count == nLocations * nTime)
+        return data.withUnsafeBufferPointer { data in
+            let out = [Float](unsafeUninitializedCapacity: data.count) { buffer, initializedCount in
+                for t in 0..<nTime {
+                    for l in 0..<nLocations {
+                        buffer[t * nLocations + l] = data[l * nTime + t]
+                    }
+                }
+                initializedCount += data.count
+            }
+            return Array2DFastSpace(data: out, nLocations: nLocations, nTime: nTime)
         }
     }
 }
@@ -204,167 +388,3 @@ struct Array2DFastSpace {
         }
     }
 }*/
-
-
-public struct Array2DFastTime {
-    public var data: [Float]
-    public let nLocations: Int
-    public let nTime: Int
-    
-    public init(data: [Float], nLocations: Int, nTime: Int) {
-        if (data.count != nLocations * nTime) {
-            fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nTime=\(nTime) count=\(data.count)")
-        }
-        self.data = data
-        self.nLocations = nLocations
-        self.nTime = nTime
-    }
-    
-    public init(nLocations: Int, nTime: Int) {
-        self.data = .init(repeating: .nan, count: nLocations * nTime)
-        self.nLocations = nLocations
-        self.nTime = nTime
-    }
-    
-    @inlinable subscript(location: Int, time: Int) -> Float {
-        get {
-            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            return data[location * nTime + time]
-        }
-        set {
-            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            data[location * nTime + time] = newValue
-        }
-    }
-    
-    @inlinable subscript(location: Int, time: Range<Int>) -> ArraySlice<Float> {
-        get {
-            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(time.upperBound <= nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            return data[time.add(location * nTime)]
-        }
-        set {
-            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(time.upperBound <= nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            data[time.add(location * nTime)] = newValue
-        }
-    }
-    
-    /// One spatial field into time-series array
-    @inlinable subscript(location: Range<Int>, time: Int) -> [Float] {
-        get {
-            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            var out = [Float]()
-            out.reserveCapacity(location.count)
-            for loc in location {
-                out.append(self[loc, time])
-            }
-            return out
-        }
-        set {
-            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            precondition(newValue.count == location.count, "Array and location count do not match")
-            for (loc, value) in zip(location, newValue) {
-                data[loc * nTime + time] = value
-            }
-        }
-    }
-    
-    /// Transpose to fast space
-    func transpose() -> Array2DFastSpace {
-        precondition(data.count == nLocations * nTime)
-        return data.withUnsafeBufferPointer { data in
-            let out = [Float](unsafeUninitializedCapacity: data.count) { buffer, initializedCount in
-                for t in 0..<nTime {
-                    for l in 0..<nLocations {
-                        buffer[t * nLocations + l] = data[l * nTime + t]
-                    }
-                }
-                initializedCount += data.count
-            }
-            return Array2DFastSpace(data: out, nLocations: nLocations, nTime: nTime)
-        }
-    }
-}
-
-public struct Array3DFastTime {
-    public var data: [Float]
-    public let nLocations: Int
-    public let nLevel: Int
-    public let nTime: Int
-    
-    public init(data: [Float], nLocations: Int, nLevel: Int, nTime: Int) {
-        if (data.count != nLocations * nTime * nLevel) {
-            fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nLevel=\(nLevel) nTime=\(nTime) count=\(data.count)")
-        }
-        self.data = data
-        self.nLocations = nLocations
-        self.nLevel = nLevel
-        self.nTime = nTime
-    }
-    
-    public init(nLocations: Int, nLevel: Int, nTime: Int) {
-        self.data = .init(repeating: .nan, count: nLocations * nTime * nLevel)
-        self.nLocations = nLocations
-        self.nTime = nTime
-        self.nLevel = nLevel
-    }
-    
-    @inlinable subscript(location: Int, level: Int, time: Int) -> Float {
-        get {
-            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
-            precondition(time < nTime, "time subscript invalid: \(time) with nTime=\(nTime)")
-            return data[location * nTime * nLevel + level * nTime + time]
-        }
-        set {
-            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
-            precondition(time < nTime, "time subscript invalid: \(time) with nTime=\(nTime)")
-            data[location * nTime * nLevel + level * nTime + time] = newValue
-        }
-    }
-    
-    @inlinable subscript(location: Int, level: Int, time: Range<Int>) -> ArraySlice<Float> {
-        get {
-            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
-            precondition(time.upperBound <= nTime, "time subscript invalid: \(time) with nTime=\(nTime)")
-            return data[time.add(location * nTime * nLevel + level * nTime)]
-        }
-        set {
-            precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
-            precondition(time.upperBound <= nTime, "time subscript invalid: \(time) with nTime=\(nTime)")
-            data[time.add(location * nTime * nLevel + level * nTime)] = newValue
-        }
-    }
-    
-    /// One spatial field into time-series array
-    @inlinable subscript(location: Range<Int>, level: Int, time: Int) -> [Float] {
-        get {
-            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
-            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            var out = [Float]()
-            out.reserveCapacity(location.count)
-            for loc in location {
-                out.append(self[loc, level, time])
-            }
-            return out
-        }
-        set {
-            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
-            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
-            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
-            precondition(newValue.count == location.count, "Array and location count do not match")
-            for (loc, value) in zip(location, newValue) {
-                data[loc * nTime * nLevel + level * nTime + time] = value
-            }
-        }
-    }
-}
