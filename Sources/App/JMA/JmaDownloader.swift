@@ -171,7 +171,7 @@ struct JmaDownload: AsyncCommandFix {
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {
-                    data2d.deaccumulateOverTime(slidingOffset: 1)
+                    data2d.deaccumulateOverTime()
                 }
                 
                 progress.add(locationRange.count)

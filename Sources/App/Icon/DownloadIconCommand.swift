@@ -292,7 +292,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {
-                    data3d.deaccumulateOverTime(slidingOffset: skip)
+                    data3d.deaccumulateOverTime()
                 }
                 
                 // Interpolate all missing values

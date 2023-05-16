@@ -297,7 +297,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {
-                    data3d.deaccumulateOverTime(slidingOffset: 0)
+                    data3d.deaccumulateOverTime()
                 }
                 
                 // Interpolate all missing values
