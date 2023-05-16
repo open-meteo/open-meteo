@@ -416,6 +416,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .temperature_80m || self == .temperature_120m || self == .temperature_180m
+        return self == .temperature_2m || self == .temperature_80m ||
+            self == .temperature_120m || self == .temperature_180m ||
+            self == .soil_temperature_0cm || self == .soil_temperature_6cm ||
+            self == .soil_temperature_18cm || self == .soil_temperature_54cm
     }
 }

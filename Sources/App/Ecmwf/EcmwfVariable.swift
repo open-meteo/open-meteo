@@ -147,7 +147,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m
+        return self == .temperature_2m || self == .skin_temperature || self == .soil_temperature_0_to_7cm
     }
     
     static let pressure_levels = [1000, 925, 850, 700, 500, 300, 250, 200, 50]

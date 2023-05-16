@@ -270,6 +270,16 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var isElevationCorrectable: Bool {
         switch self {
+        case .surface_temperature:
+            fallthrough
+        case .soil_temperature_0_to_10cm:
+            fallthrough
+        case .soil_temperature_10_to_40cm:
+            fallthrough
+        case .soil_temperature_40_to_100cm:
+            fallthrough
+        case .soil_temperature_100_to_200cm:
+            fallthrough
         case .temperature_2m:
             fallthrough
         case .temperature_80m:

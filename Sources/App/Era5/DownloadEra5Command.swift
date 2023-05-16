@@ -151,7 +151,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         var onlyVariables: String?
         
         /// Get the specified timerange in the command, or use the last 7 days as range
-        func getTimeinterval() -> TimerangeDt {
+        func getTimeinterval(domain: CdsDomain) -> TimerangeDt {
             let dt = 3600*24
             if let timeinterval = timeinterval {
                 guard timeinterval.count == 17, timeinterval.contains("-") else {
@@ -164,7 +164,9 @@ struct DownloadEra5Command: AsyncCommandFix {
             // Era5 has a typical delay of 5 days
             // Per default, check last 14 days for new data. If data is already downloaded, downloading is skipped
             let lastDays = 14
-            let time0z = Timestamp.now().add(days: -6).with(hour: 0)
+            // 6 days delay for ERA5, 1 day for ECMWF IFS
+            let daysBack = domain == .ecmwf_ifs ? -1 : -6
+            let time0z = Timestamp.now().add(days: daysBack).with(hour: 0)
             return TimerangeDt(start: time0z.add(days: -1 * lastDays), to: time0z.add(days: 1), dtSeconds: dt)
         }
     }
@@ -403,7 +405,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
                 let shortName = message.get(attribute: "shortName")!
                 var data = try message.getDouble().map(Float.init)
-                if domain.isGlobal {
+                if domain.isGlobal && domain != .ecmwf_ifs {
                     data.shift180LongitudeAndFlipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
                 }
                 switch shortName {
@@ -451,6 +453,9 @@ struct DownloadEra5Command: AsyncCommandFix {
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         if let tempDownloadGribFile2 {
             try FileManager.default.removeItemIfExists(at: tempDownloadGribFile2)
+        }
+        if let tempDownloadGribFile3 {
+            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile3)
         }
     }
     

@@ -430,6 +430,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     
     var isElevationCorrectable: Bool {
         switch self {
+        case .soil_temperature_0_to_10cm:
+            fallthrough
         case .temperature_2m:
             fallthrough
         case .temperature_40m:

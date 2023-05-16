@@ -28,7 +28,9 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     case direct_radiation
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .dewpoint_2m
+        return self == .temperature_2m || self == .dewpoint_2m ||
+            self == .soil_temperature_0_to_7cm || self == .soil_temperature_7_to_28cm ||
+            self == .soil_temperature_28_to_100cm || self == .soil_temperature_100_to_255cm
     }
     
     var omFileName: (file: String, level: Int) {
