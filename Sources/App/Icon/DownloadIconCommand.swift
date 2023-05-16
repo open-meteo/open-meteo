@@ -286,13 +286,13 @@ struct DownloadIconCommand: AsyncCommandFix {
                 
                 // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
                 if variable.isAveragedOverForecastTime {
-                    data3d.deavergeOverTime(slidingWidth: data3d.nTime, slidingOffset: skip)
+                    data3d.deavergeOverTime(slidingOffset: skip)
                 }
 
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {
-                    data3d.deaccumulateOverTime(slidingWidth: data3d.nTime, slidingOffset: skip)
+                    data3d.deaccumulateOverTime(slidingOffset: skip)
                 }
                 
                 // Interpolate all missing values

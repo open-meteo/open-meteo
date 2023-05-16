@@ -212,13 +212,13 @@ struct DownloadEra5Command: AsyncCommandFix {
                 guard let year = Int(yearStr) else {
                     fatalError("Could not convert year to integer")
                 }
-                try runYear(logger: logger, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: signature.force, timeintervalDaily: signature.force ? signature.getTimeinterval() : nil)
+                try runYear(logger: logger, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: signature.force, timeintervalDaily: signature.force ? signature.getTimeinterval(domain: domain) : nil)
             }
             return
         }
         
         /// Select the desired timerange, or use last 14 day
-        let timeinterval = signature.getTimeinterval()
+        let timeinterval = signature.getTimeinterval(domain: domain)
         let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables)
         try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain, variables: variables)
     }

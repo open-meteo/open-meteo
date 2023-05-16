@@ -261,7 +261,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
                 
                 // De-accumulate precipitation
                 if variable.isAccumulatedSinceModelStart {
-                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                    data2d.deaccumulateOverTime(slidingOffset: skip)
                 }
                 
                 /// somehow radiation for ARPEGE EUROPE and AROME FRANCE is stored with a factor of 3... Maybe to be compatible with ARPEGE WORLD?

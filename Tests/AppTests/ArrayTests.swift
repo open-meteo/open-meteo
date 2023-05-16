@@ -97,28 +97,23 @@ final class ArrayTests: XCTestCase {
     }
     
     func testDeaccumulate() {
-        var data = Array2DFastTime(data: [1,2,3,1,2,3], nLocations: 1, nTime: 6)
-        data.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 0)
+        var data = Array2DFastTime(data: [1,2,3,1,2,3], nLocations: 2, nTime: 3)
+        data.deaccumulateOverTime(slidingOffset: 0)
         XCTAssertEqual(data.data, [1, 1, 1, 1, 1, 1])
         
-        var data2 = Array2DFastTime(data: [.nan,1,2,1,2,3], nLocations: 1, nTime: 6)
-        data2.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 0)
+        var data2 = Array2DFastTime(data: [.nan,1,2,1,2,3], nLocations: 2, nTime: 3)
+        data2.deaccumulateOverTime(slidingOffset: 0)
         XCTAssertTrue(data2.data[0].isNaN)
         XCTAssertEqual(data2.data[1..<6], [1, 1, 1, 1, 1])
         
-        var data3 = Array2DFastTime(data: [.nan,1,2,3,1,2,3], nLocations: 1, nTime: 7)
-        data3.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 1)
-        XCTAssertTrue(data3.data[0].isNaN)
-        XCTAssertEqual(data3.data[1..<7], [1, 1, 1, 1, 1, 1])
-        
         var data4 = Array2DFastTime(data: [.nan,1,2,3,3.1,3.3,3.9], nLocations: 1, nTime: 7)
-        data4.deaccumulateOverTime(slidingWidth: data4.nTime, slidingOffset: 1)
+        data4.deaccumulateOverTime(slidingOffset: 1)
         XCTAssertTrue(data4.data[0].isNaN)
         XCTAssertEqualArray(data4.data[1..<7], [1.0, 1.0, 1.0, 0.1, 0.2, 0.6], accuracy: 0.001)
         
         // Allow one missing value to be ignored
-        var data5 = Array2DFastTime(data: [5,.nan,9,5,.nan,9], nLocations: 1, nTime: 6)
-        data5.deaccumulateOverTime(slidingWidth: 3, slidingOffset: 0)
+        var data5 = Array2DFastTime(data: [5,.nan,9,5,.nan,9], nLocations: 2, nTime: 3)
+        data5.deaccumulateOverTime(slidingOffset: 0)
         XCTAssertEqualArray(data5.data, [5, .nan, 2, 5, .nan, 2], accuracy: 0.001)
     }
     

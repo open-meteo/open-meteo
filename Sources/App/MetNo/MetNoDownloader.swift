@@ -151,7 +151,7 @@ struct MetNoDownloader: AsyncCommandFix {
                 }
                 
                 if variable.isAccumulatedSinceModelStart {
-                    data2d.deaccumulateOverTime(slidingWidth: data2d.nTime, slidingOffset: skip)
+                    data2d.deaccumulateOverTime(slidingOffset: skip)
                 }
                 progress.add(locationRange.count)
                 return data2d.data[0..<locationRange.count * nTime]
