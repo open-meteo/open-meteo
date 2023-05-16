@@ -105,9 +105,17 @@ final class ArrayTests: XCTestCase {
         data.deavergeOverTime()
         XCTAssertEqualArray(data.data, [.nan, 2.0, 4.0, .nan, 2.0, 4.0], accuracy: 0.001)
         
+        data = Array2DFastTime(data: [.nan,.nan,2,3, .nan,.nan,2,3], nLocations: 2, nTime: 4)
+        data.deavergeOverTime()
+        XCTAssertEqualArray(data.data, [.nan, .nan, 2.0, 4.0, .nan, .nan, 2.0, 4.0], accuracy: 0.001)
+        
         data = Array2DFastTime(data: [1,2,.nan,3.25,1,2,.nan,3.25], nLocations: 2, nTime: 4)
         data.deavergeOverTime()
         XCTAssertEqualArray(data.data, [1.0, 3.0, .nan, 4.5, 1.0, 3.0, .nan, 4.5], accuracy: 0.001)
+        
+        data = Array2DFastTime(data: [1,2,3.25,3.25,1,2,3.25,3.25], nLocations: 2, nTime: 4)
+        data.deavergeOverTime()
+        XCTAssertEqualArray(data.data, [1.0, 3.0, 5.75, 3.25, 1.0, 3.0, 5.75, 3.25], accuracy: 0.001)
         
         data = Array2DFastTime(data: [10 ,10,.nan,10,10,10,.nan,10], nLocations: 2, nTime: 4)
         data.deavergeOverTime()
