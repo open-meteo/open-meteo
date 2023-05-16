@@ -286,7 +286,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                 
                 // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
                 if variable.isAveragedOverForecastTime {
-                    data3d.deavergeOverTime(slidingOffset: skip)
+                    data3d.deavergeOverTime()
                 }
 
                 

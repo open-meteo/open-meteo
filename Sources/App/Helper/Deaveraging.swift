@@ -4,13 +4,10 @@ import Foundation
 extension Array3DFastTime {
     /// Deaverages a running mean over time.
     ///
-    /// - Parameters:
-    ///   - slidingOffset: The offset of the sliding window used to calculate the running mean.
-    ///
     /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
-    /// The function modifies the input array in place, deaveraging a running mean over time for each sliding window within each location in the array.
-    mutating func deavergeOverTime(slidingOffset: Int) {
-        data.deavergeOverTime(nTime: nTime, slidingOffset: slidingOffset)
+    /// The function modifies the input array in place, deaveraging a running mean over time for each location in the array.
+    mutating func deavergeOverTime() {
+        data.deavergeOverTime(nTime: nTime)
     }
     
     /// Deaccumulates a time series by subtracting the previous value from the current value.
@@ -30,13 +27,10 @@ extension Array3DFastTime {
 extension Array2DFastTime {
     /// Deaverages a running mean over time.
     ///
-    /// - Parameters:
-    ///   - slidingOffset: The offset of the sliding window used to calculate the running mean.
-    ///
     /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
-    /// The function modifies the input array in place, deaveraging a running mean over time for each sliding window within each location in the array.
-    mutating func deavergeOverTime(slidingOffset: Int) {
-        data.deavergeOverTime(nTime: nTime, slidingOffset: slidingOffset)
+    /// The function modifies the input array in place, deaveraging a running mean over time for each location in the array.
+    mutating func deavergeOverTime() {
+        data.deavergeOverTime(nTime: nTime)
     }
     
     /// Deaccumulates a time series by subtracting the previous value from the current value.
@@ -58,32 +52,38 @@ extension Array where Element == Float {
     ///
     /// - Parameters:
     ///   - nTime: The number of time intervals in the time series.
-    ///   - slidingOffset: The offset of the sliding window used to calculate the running mean.
     ///
     /// - Precondition: `nTime` must be less than or equal to the length of the input array.
     /// - Precondition: The length of the input array must be divisible by `nTime`.
     ///
     /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
-    /// The function modifies the input array in place, deaveraging a running mean over time for each sliding window within each location in the array.
-    mutating func deavergeOverTime(nTime: Int, slidingOffset: Int) {
+    /// The function modifies the input array in place, deaveraging a running mean over time for each location in the array.
+    mutating func deavergeOverTime(nTime: Int) {
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
         let nLocations = self.count / nTime
         for l in 0..<nLocations {
-            var prev = self[l * nTime + slidingOffset].isNaN ? 0 : self[l * nTime + slidingOffset]
-            var prevH = 1
-            var skipped = 0
-            for hour in slidingOffset+1 ..< Swift.min(slidingOffset+nTime, nTime) {
+            var startStep = 0
+            var prev = Float.nan
+            var prevH = 0
+            for hour in 0 ..< nTime {
                 let d = self[l * nTime + hour]
-                let h = hour-slidingOffset+1
-                if d.isNaN {
-                    skipped += 1
+                if prev.isNaN {
+                    // seek to first valid value
+                    prev = d
+                    startStep = hour
+                    prevH = hour
                     continue
                 }
-                self[l * nTime + hour] = (d * Float(h / (skipped+1)) - prev * Float(prevH / (skipped+1)))
+                if d.isNaN {
+                    // ignore missing values
+                    continue
+                }
+                let deltaHours = Float(hour - startStep + 1)
+                let deltaHoursPrevious = Float(prevH - startStep + 1)
+                self[l * nTime + hour] = (d * deltaHours - prev * deltaHoursPrevious) / (deltaHours - deltaHoursPrevious)
                 prev = d
-                prevH = h
-                skipped = 0
+                prevH = hour
             }
         }
     }

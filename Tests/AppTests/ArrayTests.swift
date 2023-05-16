@@ -96,6 +96,24 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqual((100..<1000).fraction(of: 1010), 1)
     }
     
+    func testDeaverage() {
+        var data = Array2DFastTime(data: [1,2,3,1,2,3], nLocations: 2, nTime: 3)
+        data.deavergeOverTime()
+        XCTAssertEqual(data.data, [1.0, 3.0, 5.0, 1.0, 3.0, 5.0])
+        
+        data = Array2DFastTime(data: [.nan,2,3,.nan,2,3], nLocations: 2, nTime: 3)
+        data.deavergeOverTime()
+        XCTAssertEqualArray(data.data, [.nan, 2.0, 4.0, .nan, 2.0, 4.0], accuracy: 0.001)
+        
+        data = Array2DFastTime(data: [1,2,.nan,3.25,1,2,.nan,3.25], nLocations: 2, nTime: 4)
+        data.deavergeOverTime()
+        XCTAssertEqualArray(data.data, [1.0, 3.0, .nan, 4.5, 1.0, 3.0, .nan, 4.5], accuracy: 0.001)
+        
+        data = Array2DFastTime(data: [10 ,10,.nan,10,10,10,.nan,10], nLocations: 2, nTime: 4)
+        data.deavergeOverTime()
+        XCTAssertEqualArray(data.data, [10.0, 10.0, .nan, 10.0, 10.0, 10.0, .nan, 10.0], accuracy: 0.001)
+    }
+    
     func testDeaccumulate() {
         var data = Array2DFastTime(data: [1,2,3,1,2,3], nLocations: 2, nTime: 3)
         data.deaccumulateOverTime(slidingOffset: 0)
