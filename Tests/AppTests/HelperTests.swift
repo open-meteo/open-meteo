@@ -63,7 +63,7 @@ final class HelperTests: XCTestCase {
         """)
         let index = try buffer.readEcmwfIndexEntries()
         XCTAssertEqual(index.count, 6)
-        let range = index.indexToRange()
+        let range = index.indexToRange()[0]
         XCTAssertEqual(range.range, "0-3857388")
         XCTAssertEqual(range.minSize, 3857388)
         
@@ -78,7 +78,7 @@ final class HelperTests: XCTestCase {
         """)
         let index2 = try buffer2.readEcmwfIndexEntries()
         XCTAssertEqual(index2.count, 6)
-        let range2 = index2.indexToRange()
+        let range2 = index2.indexToRange()[0]
         XCTAssertEqual(range2.range, "0-812043,812044-2639250,2639249-3248317,3248319-3857388")
         XCTAssertEqual(range2.minSize, 3857386)
     }

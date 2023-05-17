@@ -41,8 +41,12 @@ extension Curl {
         guard !index.isEmpty else {
             fatalError("Empty grib selection")
         }
-        let range = index.indexToRange()
-        return try await downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize)
+        let ranges = index.indexToRange()
+        var results = [GribMessage]()
+        for range in ranges {
+            results.append(contentsOf: try await downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize))
+        }
+        return results
     }
     
     /// Download index file and match against curl variable
@@ -200,7 +204,9 @@ extension ByteBuffer {
 
 extension Array where Element == Curl.EcmwfIndexEntry {
     /// Convert grib entries to http range download command
-    func indexToRange() -> (range: String, minSize: Int) {
+    /// Split large range downloads to multiple individual downloads to prevent `request header too large` error
+    func indexToRange() -> [(range: String, minSize: Int)] {
+        var results = [(range: String, minSize: Int)]()
         var range = ""
         var i = 0
         var size = 0
@@ -214,7 +220,14 @@ extension Array where Element == Curl.EcmwfIndexEntry {
             while i < count {
                 let entry = self[i]
                 if entry._offset != end {
-                    range += "\(end),"
+                    range += "\(end)"
+                    if range.count > 4000 || size > 64*1024*1024 {
+                        results.append((range,size))
+                        range = ""
+                        size = 0
+                        break
+                    }
+                    range += ","
                     break
                 }
                 size += entry._length
@@ -223,7 +236,8 @@ extension Array where Element == Curl.EcmwfIndexEntry {
             }
         }
         range += "\(end)"
-        return (range,size)
+        results.append((range,size))
+        return results
     }
 }
 
