@@ -514,7 +514,10 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         if domain == .gem_hrdps_continental && hour == 46 && variable == .geopotential_height && [175, 200].contains(level) {
             return false
         }
-        if hour >= 171 && ![1000, 925, 850, 700, 500, 5, 1].contains(level) {
+        if hour >= 171 && hour % 6 != 0 && variable == .relativehumidity {
+            return false
+        }
+        if hour >= 171 && hour % 6 != 0 && ![1000, 925, 850, 700, 500, 5, 1].contains(level) {
             return false
         }
         return true
