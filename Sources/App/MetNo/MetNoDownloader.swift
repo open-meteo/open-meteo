@@ -140,7 +140,7 @@ struct MetNoDownloader: AsyncCommandFix {
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
                 for (i,l) in locationRange.enumerated() {
-                    for h in 0..<nTime {
+                    for h in skip..<nTime {
                         data2d[i, h] = spatial[h, l]
                     }
                 }
