@@ -510,6 +510,10 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
             }
             return true
         }
+        // Since 2003-05-16, upper level geopotenial is missing for hour 46...
+        if domain == .gem_hrdps_continental && hour == 46 && variable == .geopotential_height && [175, 200].contains(level) {
+            return false
+        }
         if hour >= 171 && ![1000, 925, 850, 700, 500, 5, 1].contains(level) {
             return false
         }
