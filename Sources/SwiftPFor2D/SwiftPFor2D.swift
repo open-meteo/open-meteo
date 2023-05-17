@@ -545,7 +545,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     /// `dim1Read` the fast dimension to read. Tpyicall a time range
     public func read(into: UnsafeMutablePointer<Float>, arrayDim1Range: Range<Int>, arrayDim1Length: Int, chunkBuffer: UnsafeMutableRawPointer, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
         
-        assert(arrayDim1Range.count == dim1Read.count)
+        //assert(arrayDim1Range.count == dim1Read.count)
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
             throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)

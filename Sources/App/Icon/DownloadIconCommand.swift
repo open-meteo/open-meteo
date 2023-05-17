@@ -230,7 +230,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         let nMembers = domain.ensembleMembers
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        let nTime = forecastSteps.max()! / domain.dtHours + 1
+        let nTime = forecastSteps.max()! * 3600 / domain.dtSeconds + 1
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         let nLocations = grid.count
         
