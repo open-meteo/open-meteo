@@ -21,7 +21,7 @@ RUN swift build -c release
 # ================================
 # Run image contains swift runtime libraries, netcdf, eccodes, cdo and cds utilities
 # ================================
-FROM ghcr.io/open-meteo/docker-container-build:latest
+FROM ghcr.io/open-meteo/docker-container-run:latest
 
 # Create a openmeteo user and group with /app as its home directory
 RUN useradd --user-group --create-home --system --skel /dev/null --home-dir /app openmeteo
