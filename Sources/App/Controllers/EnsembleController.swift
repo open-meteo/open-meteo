@@ -1,6 +1,11 @@
 import Foundation
 import Vapor
 
+/**
+ API controller to return ensemble models data from ICON, GFS, IFS and GEM ensemble models
+ 
+ Endpoint https://ensemble-api.open-meteo.com/v1/ensemble?latitude=52.52&longitude=13.41&models=icon_seamless&hourly=temperature_2m
+ */
 public struct EnsembleApiController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("ensemble-api")
@@ -19,7 +24,7 @@ public struct EnsembleApiController {
         let hourlyTime = time.range.range(dtSeconds: 3600)
         //let dailyTime = time.range.range(dtSeconds: 3600*24)
         
-        let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
+        let domains = try EnsembleMultiDomains.load(commaSeparated: params.models)
         
         let readers = try domains.compactMap {
             try GenericReaderMulti<EnsembleVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
@@ -122,7 +127,6 @@ struct EnsembleApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
     let longitude: Float
     let hourly: [String]?
     let daily: [String]?
-    let current_weather: Bool?
     let elevation: Float?
     let timezone: String?
     let temperature_unit: TemperatureUnit?
@@ -133,7 +137,7 @@ struct EnsembleApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
     let past_days: Int?
     let forecast_days: Int?
     let format: ForecastResultFormat?
-    let models: [String]?
+    let models: [String]
     let cell_selection: GridSelectionMode?
     
     /// iso starting date `2022-02-01`
@@ -162,18 +166,9 @@ struct EnsembleApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
 }
 
 /**
- Automatic domain selection rules:
- - If HRRR domain matches, use HRRR+GFS+ICON
- - If Western Europe, use Arome + ICON_EU+ ICON + GFS
- - If Central Europe, use ICON_D2, ICON_EU, ICON + GFS
- - If Japan, use JMA_MSM + ICON + GFS
- - default ICON + GFS
- 
- Note Nov 2022: Use the term `seamless` instead of `mix`
+List of ensemble models. "Seamless" models combine global with local models. A best_match model is not possible, as all models are too different to give any advice
  */
 enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixerDomain {
-    case best_match
-
     case icon_seamless
     case icon_global
     case icon_eu
@@ -183,16 +178,15 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
     
     case gem_global
     
+    case gfs_seamless
     case gfs025
     case gfs05
-    case gfs_seamless
+    
 
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol] {
         switch self {
-        case .best_match:
-            return try IconMixer(domains: [.iconEps, .iconEuEps, .iconD2Eps], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .icon_seamless:
             return try IconMixer(domains: [.iconEps, .iconEuEps, .iconD2Eps], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .icon_global:
@@ -214,20 +208,19 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
         }
     }
     
+    /// Number of ensenble members including control
     var countEnsembleMember: Int {
         switch self {
-        case .best_match:
-            return 40
         case .icon_seamless:
-            return 40
+            return IconDomains.icon.ensembleMembers
         case .icon_global:
-            return 40
+            return IconDomains.icon.ensembleMembers
         case .icon_eu:
-            return 40
+            return IconDomains.iconEuEps.ensembleMembers
         case .icon_d2:
-            return 20
+            return IconDomains.iconD2Eps.ensembleMembers
         case .ecmwf_ifs04:
-            return 50+1
+            return EcmwfDomain.ifs04_ensemble.ensembleMembers
         case .gfs025:
             return GfsDomain.gfs025_ens.ensembleMembers
         case .gfs05:
