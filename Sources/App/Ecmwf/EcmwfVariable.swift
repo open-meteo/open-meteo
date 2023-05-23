@@ -408,7 +408,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .relative_humidity_50hPa: return "r"
         case .surface_air_pressure: return "sp"
         case .pressure_msl: return "msl"
-        case .total_column_integrated_water_vapour: return "tciwv"
+        case .total_column_integrated_water_vapour: return "tcwv"
         case .northward_wind_10m: return "10v"
         case .eastward_wind_10m: return "10u"
         case .specific_humidity_1000hPa: return "q"
