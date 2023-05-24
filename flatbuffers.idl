@@ -1,0 +1,56 @@
+namespace OpenMeteo;
+
+enum Variable : byte { temperature = 1, precipitation, windspeed }
+
+enum Unit : byte {celsius = 1, fahrenheit}
+
+enum Model : byte {best_match = 1, icon_seamless}
+
+enum Aggregation : byte {min = 1, max, mean, sum, dominant}
+
+table PerVariable {
+    name: Variable;
+    unit: Unit;
+    aggregation: Aggregation;
+    meters_above_ground: int;
+    pressure_above_sea_level: int;
+    ensemble_member: int;
+    below_ground_depth: int;
+    below_ground_depth_to: int;
+    gdd_stuff: int;
+    values: [float];
+}
+
+table PerTime {
+    dt_seconds: int8;
+    unixtime_start: int64;
+    variables: [PerVariable];
+}
+
+table PerModel {
+    model: Model;
+    lat: float;
+    lon: float;
+    elevation: float;
+    last_update_time: int64;
+    current_weather: string;
+    times: [PerTime];
+}
+
+
+table WeatherResult {
+    gnerationtime_ms: float;
+    utc_offset_seconds: int;
+    models: [PerModel];
+}
+
+root_type WeatherResult;
+
+/*
+Pro: 
+- very speaking (could make sense internally)
+Con: 
+- GET query will still use temperature_2m
+- more complicated to understand structure
+- not inherent with JSON
+*/

@@ -1,0 +1,43 @@
+namespace OpenMeteo;
+
+enum Unit : byte {celsius = 1, fahrenheit}
+
+table PerVariable {
+    name: string;
+    unit: Unit;
+    values: [float];
+}
+
+table PerTime {
+    dt_seconds: int8;
+    unixtime_start: int64;
+    variables: [PerVariable];
+}
+
+table PerModel {
+    name: string;
+    current_weather: string; // ?
+    lat: float;
+    lon: float;
+    elevation: float;
+    model_run: init64;
+    last_update_time: int64;
+    times: [PerTime];
+}
+
+table WeatherResult {
+    gnerationtime_ms: float;
+    utc_offset_seconds: int;
+    results: [PerModel];
+}
+
+root_type WeatherResult;
+
+/*
+Pro: 
+- close to existing JSON
+Con: 
+- very long variables names...
+
+
+*/
