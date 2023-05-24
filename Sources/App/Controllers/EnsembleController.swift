@@ -212,9 +212,9 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
     var countEnsembleMember: Int {
         switch self {
         case .icon_seamless:
-            return IconDomains.icon.ensembleMembers
+            return IconDomains.iconEps.ensembleMembers
         case .icon_global:
-            return IconDomains.icon.ensembleMembers
+            return IconDomains.iconEps.ensembleMembers
         case .icon_eu:
             return IconDomains.iconEuEps.ensembleMembers
         case .icon_d2:
