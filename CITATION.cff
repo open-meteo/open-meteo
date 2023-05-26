@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: Open-Meteo Weather API
+title: Open-Meteo.com Weather API
 message: >-
   If you are using the Open-Meteo weather API, please cite
   using the metadata given in this file
@@ -9,6 +9,7 @@ authors:
     family-names: Zippenfenig
     email: patrick@zippenfenig.de
     affiliation: Open-Meteo.com
+    orcid: "https://orcid.org/0009-0007-1128-7915"
 identifiers:
   - type: doi
     value: 10.5281/zenodo.7970649
@@ -16,7 +17,7 @@ identifiers:
 repository-code: 'https://github.com/open-meteo/open-meteo'
 url: 'https://open-meteo.com/'
 abstract: >-
-  Open-Meteo, an open-source weather API, provides free
+  Open-Meteo.com, an open-source weather API, provides free
   access for non-commercial use. This comprehensive API
   grants users immediate access to hourly weather forecasts
   spanning up to 16 days ahead, as well as historical
