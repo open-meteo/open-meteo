@@ -170,7 +170,8 @@ struct JmaDownload: AsyncCommandFix {
                 }
                 
                 // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
+                // Precipitation in MSM is not accumulated
+                if variable.isAccumulatedSinceModelStart && domain != .msm {
                     data2d.deaccumulateOverTime()
                 }
                 
