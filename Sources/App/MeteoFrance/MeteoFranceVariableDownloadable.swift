@@ -217,6 +217,16 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
+        case .temperature_20m:
+            fallthrough
+        case .temperature_50m:
+            fallthrough
+        case .temperature_100m:
+            fallthrough
+        case .temperature_150m:
+            fallthrough
+        case .temperature_200m:
+            fallthrough
         case .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
