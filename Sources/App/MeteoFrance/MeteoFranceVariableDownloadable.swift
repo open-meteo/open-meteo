@@ -22,6 +22,7 @@ enum MfVariablePackages: String, CaseIterable {
     case IP1
     case IP2
     case IP3
+    case HP1
 }
 
 extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
@@ -37,6 +38,18 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         case .wind_u_component_10m:
             fallthrough
         case .wind_v_component_10m:
+            return true
+        case .wind_u_component_20m:
+            fallthrough
+        case .wind_v_component_20m:
+            return true
+        case .wind_u_component_50m:
+            fallthrough
+        case .wind_v_component_50m:
+            return true
+        case .wind_u_component_100m:
+            fallthrough
+        case .wind_v_component_100m:
             return true
         case .windgusts_10m:
             return true
@@ -90,6 +103,36 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             return .SP2
         case .shortwave_radiation:
             return .SP1
+        case .wind_v_component_20m:
+            fallthrough
+        case .wind_u_component_20m:
+            fallthrough
+        case .wind_v_component_50m:
+            fallthrough
+        case .wind_u_component_50m:
+            fallthrough
+        case .wind_v_component_100m:
+            fallthrough
+        case .wind_u_component_100m:
+            fallthrough
+        case .wind_v_component_150m:
+            fallthrough
+        case .wind_u_component_150m:
+            fallthrough
+        case .wind_v_component_200m:
+            fallthrough
+        case .wind_u_component_200m:
+            fallthrough
+        case .temperature_20m:
+            fallthrough
+        case .temperature_50m:
+            fallthrough
+        case .temperature_100m:
+            fallthrough
+        case .temperature_150m:
+            fallthrough
+        case .temperature_200m:
+            return .HP1
         }
     }
     
@@ -125,6 +168,36 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             return ":DSWRF:surface:0-\(hourOrDay) acc fcst:"
         case .cape:
             return ":CAPE:surface - 3000 m above ground:\(hourStr):"
+        case .wind_v_component_20m:
+            return "VGRD:20 m above ground:\(hourStr):"
+        case .wind_u_component_20m:
+            return "UGRD:20 m above ground:\(hourStr):"
+        case .wind_v_component_50m:
+            return "VGRD:50 m above ground:\(hourStr):"
+        case .wind_u_component_50m:
+            return "UGRD:50 m above ground:\(hourStr):"
+        case .wind_v_component_100m:
+            return "VGRD:100 m above ground:\(hourStr):"
+        case .wind_u_component_100m:
+            return "UGRD:100 m above ground:\(hourStr):"
+        case .wind_v_component_150m:
+            return "VGRD:150 m above ground:\(hourStr):"
+        case .wind_u_component_150m:
+            return "UGRD:150 m above ground:\(hourStr):"
+        case .wind_v_component_200m:
+            return "VGRD:200 m above ground:\(hourStr):"
+        case .wind_u_component_200m:
+            return "UGRD:200 m above ground:\(hourStr):"
+        case .temperature_20m:
+            return ":TMP:20 m above ground:\(hourStr):"
+        case .temperature_50m:
+            return ":TMP:50 m above ground:\(hourStr):"
+        case .temperature_100m:
+            return ":TMP:100 m above ground:\(hourStr):"
+        case .temperature_150m:
+            return ":TMP:150 m above ground:\(hourStr):"
+        case .temperature_200m:
+            return ":TMP:200 m above ground:\(hourStr):"
         }
     }
     

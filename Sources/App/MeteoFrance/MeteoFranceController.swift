@@ -190,12 +190,28 @@ enum MeteoFranceVariableDerivedSurface: String, CaseIterable, GenericVariableMix
     case dewpoint_2m
     case windspeed_10m
     case winddirection_10m
-    //case windspeed_80m
-    //case winddirection_80m
-    /*case windspeed_120m
+    case windspeed_20m
+    case winddirection_20m
+    case windspeed_50m
+    case winddirection_50m
+    case windspeed_100m
+    case winddirection_100m
+    case windspeed_150m
+    case winddirection_150m
+    case windspeed_200m
+    case winddirection_200m
+    /// Is using 100m wind
+    case windspeed_80m
+    case winddirection_80m
+    /// Is using 150m wind
+    case windspeed_120m
     case winddirection_120m
+    /// Is using 200m wind
     case windspeed_180m
-    case winddirection_180m*/
+    case winddirection_180m
+    case temperature_80m
+    case temperature_120m
+    case temperature_180m
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -399,6 +415,49 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .windgusts_10m, time: time)
             case .is_day:
                 break
+            case .windspeed_20m:
+                fallthrough
+            case .winddirection_20m:
+                try prefetchData(variable: .wind_u_component_20m, time: time)
+                try prefetchData(variable: .wind_v_component_20m, time: time)
+            case .windspeed_50m:
+                fallthrough
+            case .winddirection_50m:
+                try prefetchData(variable: .wind_u_component_50m, time: time)
+                try prefetchData(variable: .wind_v_component_50m, time: time)
+            case .windspeed_80m:
+                fallthrough
+            case .winddirection_80m:
+                fallthrough
+            case .windspeed_100m:
+                fallthrough
+            case .winddirection_100m:
+                try prefetchData(variable: .wind_u_component_100m, time: time)
+                try prefetchData(variable: .wind_v_component_100m, time: time)
+            case .windspeed_120m:
+                fallthrough
+            case .winddirection_120m:
+                fallthrough
+            case .windspeed_150m:
+                fallthrough
+            case .winddirection_150m:
+                try prefetchData(variable: .wind_u_component_150m, time: time)
+                try prefetchData(variable: .wind_v_component_150m, time: time)
+            case .windspeed_180m:
+                fallthrough
+            case .winddirection_180m:
+                fallthrough
+            case .windspeed_200m:
+                fallthrough
+            case .winddirection_200m:
+                try prefetchData(variable: .wind_u_component_200m, time: time)
+                try prefetchData(variable: .wind_v_component_200m, time: time)
+            case .temperature_80m:
+                try prefetchData(variable: .temperature_100m, time: time)
+            case .temperature_120m:
+                try prefetchData(variable: .temperature_150m, time: time)
+            case .temperature_180m:
+                try prefetchData(variable: .temperature_200m, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -521,6 +580,74 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
+            case .windspeed_20m:
+                let u = try get(raw: .wind_u_component_20m, time: time).data
+                let v = try get(raw: .wind_v_component_20m, time: time).data
+                let speed = zip(u,v).map(Meteorology.windspeed)
+                return DataAndUnit(speed, .ms)
+            case .winddirection_20m:
+                let u = try get(raw: .wind_u_component_20m, time: time).data
+                let v = try get(raw: .wind_v_component_20m, time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .windspeed_50m:
+                let u = try get(raw: .wind_u_component_50m, time: time).data
+                let v = try get(raw: .wind_v_component_50m, time: time).data
+                let speed = zip(u,v).map(Meteorology.windspeed)
+                return DataAndUnit(speed, .ms)
+            case .winddirection_50m:
+                let u = try get(raw: .wind_u_component_50m, time: time).data
+                let v = try get(raw: .wind_v_component_50m, time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .windspeed_80m:
+                fallthrough
+            case .windspeed_100m:
+                let u = try get(raw: .wind_u_component_100m, time: time).data
+                let v = try get(raw: .wind_v_component_100m, time: time).data
+                let speed = zip(u,v).map(Meteorology.windspeed)
+                return DataAndUnit(speed, .ms)
+            case .winddirection_80m:
+                fallthrough
+            case .winddirection_100m:
+                let u = try get(raw: .wind_u_component_100m, time: time).data
+                let v = try get(raw: .wind_v_component_100m, time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .windspeed_120m:
+                fallthrough
+            case .windspeed_150m:
+                let u = try get(raw: .wind_u_component_150m, time: time).data
+                let v = try get(raw: .wind_v_component_150m, time: time).data
+                let speed = zip(u,v).map(Meteorology.windspeed)
+                return DataAndUnit(speed, .ms)
+            case .winddirection_120m:
+                fallthrough
+            case .winddirection_150m:
+                let u = try get(raw: .wind_u_component_150m, time: time).data
+                let v = try get(raw: .wind_v_component_150m, time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .windspeed_180m:
+                fallthrough
+            case .windspeed_200m:
+                let u = try get(raw: .wind_u_component_200m, time: time).data
+                let v = try get(raw: .wind_v_component_200m, time: time).data
+                let speed = zip(u,v).map(Meteorology.windspeed)
+                return DataAndUnit(speed, .ms)
+            case .winddirection_180m:
+                fallthrough
+            case .winddirection_200m:
+                let u = try get(raw: .wind_u_component_200m, time: time).data
+                let v = try get(raw: .wind_v_component_200m, time: time).data
+                let direction = Meteorology.windirectionFast(u: u, v: v)
+                return DataAndUnit(direction, .degreeDirection)
+            case .temperature_80m:
+                return try get(raw: .temperature_100m, time: time)
+            case .temperature_120m:
+                return try get(raw: .temperature_150m, time: time)
+            case .temperature_180m:
+                return try get(raw: .temperature_200m, time: time)
             }
         case .pressure(let v):
             switch v.variable {
