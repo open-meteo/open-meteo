@@ -1055,7 +1055,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                         let elevation = try domain.getStaticFile(type: .elevation)!.readAll()
                         
                         let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(omFile)")
-                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
+                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
                             let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, domain.grid.count)
 
                             var specificHumidity = try monthlyReader.combine(locationRange: locationRange)
@@ -1245,7 +1245,7 @@ struct DownloadCmipCommand: AsyncCommandFix {
                 continue
             }
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
-            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
+            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 for (l,gridpoint) in locationRange.enumerated() {
@@ -1286,10 +1286,10 @@ extension Array2DFastTime {
 
 extension OmFileWriter {
     /// Take an array of `OmFileReader` and combine them to a continous time series
-    func write(logger: Logger, file: String, compressionType: CompressionType, scalefactor: Float, nLocationsPerChunk: Int, chunkedFiles: [OmFileReader<MmapFile>], dataCallback: ((_ data: inout Array2DFastTime, _ locationRange: Range<Int>) throws -> ())?) throws {
+    func write(logger: Logger, file: String, compressionType: CompressionType, scalefactor: Float, nLocationsPerChunk: Int, chunkedFiles: [OmFileReader<MmapFile>], overwrite: Bool = false, dataCallback: ((_ data: inout Array2DFastTime, _ locationRange: Range<Int>) throws -> ())?) throws {
         let progress = ProgressTracker(logger: logger, total: self.dim0, label: "Convert \(file)")
 
-        try write(file: file, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { dim0 in
+        try write(file: file, compressionType: compressionType, scalefactor: scalefactor, overwrite: overwrite, supplyChunk: { dim0 in
             let locationRange = dim0..<min(dim0+nLocationsPerChunk, self.dim0)
 
             var fasttime = try chunkedFiles.combine(locationRange: locationRange)

@@ -89,7 +89,7 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
                 continue
             }
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
-            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
+            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 try reader.willNeed(variable: variable.omFileName.file, location: locationRange, level: 0, time: time)

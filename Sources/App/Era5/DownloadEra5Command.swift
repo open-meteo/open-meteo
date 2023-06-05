@@ -258,7 +258,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             }
             let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
-            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, supplyChunk: { dim0 in
+            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 
@@ -292,7 +292,7 @@ struct DownloadEra5Command: AsyncCommandFix {
         let read = try OmFileReader(file: readFilePath)
         
         var percent = 0
-        try OmFileWriter(dim0: read.dim0, dim1: read.dim1, chunk0: read.chunk0, chunk1: read.chunk1).write(file: writeFilePath, compressionType: .p4nzdec256, scalefactor: read.scalefactor) { dim0 in
+        try OmFileWriter(dim0: read.dim0, dim1: read.dim1, chunk0: read.chunk0, chunk1: read.chunk1).write(file: writeFilePath, compressionType: .p4nzdec256, scalefactor: read.scalefactor, overwrite: false) { dim0 in
             let ratio = Int(Float(dim0) / (Float(read.dim0)) * 100)
             if percent != ratio {
                 logger.info("\(ratio) %")
@@ -931,7 +931,7 @@ struct DownloadEra5Command: AsyncCommandFix {
             try FileManager.default.removeItemIfExists(at: writeFile)
             
             // chunk 6 locations and 21 days of data
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, supplyChunk: { dim0 in
+            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, nx*ny)
                 
                 var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)

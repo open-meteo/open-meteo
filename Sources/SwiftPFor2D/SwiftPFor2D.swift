@@ -354,8 +354,9 @@ public final class OmFileWriter {
     
     /// Write new file. Throw error is file exists
     /// Uses a temporary file and then atomic move
-    public func write(file: String, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
-        if FileManager.default.fileExists(atPath: file) {
+    /// If `overwrite` is set, overwrite existing files atomically
+    public func write(file: String, compressionType: CompressionType, scalefactor: Float, overwrite: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+        if !overwrite && FileManager.default.fileExists(atPath: file) {
             throw SwiftPFor2DError.fileExistsAlready(filename: file)
         }
         let fileTemp = "\(file)~"
@@ -386,11 +387,9 @@ public final class OmFileWriter {
     }
     
     /// Write all data at once without any streaming
+    /// If `overwrite` is set, overwrite existing files atomically
     public func write(file: String, compressionType: CompressionType, scalefactor: Float, all: [Float], overwrite: Bool = false) throws {
-        if overwrite {
-            try FileManager.default.removeItemIfExists(at: file)
-        }
-        try write(file: file, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { range in
+        try write(file: file, compressionType: compressionType, scalefactor: scalefactor, overwrite: overwrite, supplyChunk: { range in
             return ArraySlice(all)
         })
     }

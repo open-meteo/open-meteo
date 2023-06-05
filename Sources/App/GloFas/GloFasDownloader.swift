@@ -392,7 +392,7 @@ struct GloFasDownloader: AsyncCommandFix {
         var looptime = DispatchTime.now()
         // Scale logarithmic. Max discharge around 400_000 m3/s
         // Note: delta 2d coding (chunk0=6) save around 15% space
-        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, supplyChunk: { dim0 in
+        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
             
             let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
             if percent != ratio {
