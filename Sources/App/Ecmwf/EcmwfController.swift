@@ -20,47 +20,51 @@ struct EcmwfController {
         guard let reader = try EcmwfReader(domain: EcmwfDomain.ifs04, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        // Start data prefetch to boooooooost API speed :D
-        let paramsHourly = try EcmwfHourlyVariable.load(commaSeparatedOptional: params.hourly)
-        if let hourlyVariables = paramsHourly {
-            for variable in hourlyVariables {
-                switch variable {
-                case .raw(let raw):
-                    try reader.prefetchData(variable: .raw(.init(raw, 0)), time: hourlyTime)
-                case .derived(let derived):
-                    try reader.prefetchData(variable: .derived(.init(derived, 0)), time: hourlyTime)
-                }
-                
-            }
-        }
         
-        let hourly: ApiSection? = try paramsHourly.map { variables in
-            var res = [ApiColumn]()
-            res.reserveCapacity(variables.count)
-            for variable in variables {
-                switch variable {
-                case .raw(let raw):
-                    res.append(try reader.get(variable: .raw(.init(raw, 0)), time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name))
-                case .derived(let derived):
-                    res.append(try reader.get(variable: .derived(.init(derived, 0)), time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name))
+        // Run query on separat thread pool to not block the main pool
+        return ForecastapiController.runLoop.next().submit({
+            // Start data prefetch to boooooooost API speed :D
+            let paramsHourly = try EcmwfHourlyVariable.load(commaSeparatedOptional: params.hourly)
+            if let hourlyVariables = paramsHourly {
+                for variable in hourlyVariables {
+                    switch variable {
+                    case .raw(let raw):
+                        try reader.prefetchData(variable: .raw(.init(raw, 0)), time: hourlyTime)
+                    case .derived(let derived):
+                        try reader.prefetchData(variable: .derived(.init(derived, 0)), time: hourlyTime)
+                    }
+                    
                 }
             }
-            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-        }
-        
-        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-        let out = ForecastapiResult(
-            latitude: reader.reader.modelLat,
-            longitude: reader.reader.modelLon,
-            elevation: nil,
-            generationtime_ms: generationTimeMs,
-            utc_offset_seconds: utcOffsetSecondsActual,
-            timezone: timezone,
-            current_weather: nil,
-            sections: [hourly].compactMap({$0}),
-            timeformat: params.timeformatOrDefault
-        )
-        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
+            
+            let hourly: ApiSection? = try paramsHourly.map { variables in
+                var res = [ApiColumn]()
+                res.reserveCapacity(variables.count)
+                for variable in variables {
+                    switch variable {
+                    case .raw(let raw):
+                        res.append(try reader.get(variable: .raw(.init(raw, 0)), time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name))
+                    case .derived(let derived):
+                        res.append(try reader.get(variable: .derived(.init(derived, 0)), time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name))
+                    }
+                }
+                return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
+            }
+            
+            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+            let out = ForecastapiResult(
+                latitude: reader.reader.modelLat,
+                longitude: reader.reader.modelLon,
+                elevation: nil,
+                generationtime_ms: generationTimeMs,
+                utc_offset_seconds: utcOffsetSecondsActual,
+                timezone: timezone,
+                current_weather: nil,
+                sections: [hourly].compactMap({$0}),
+                timeformat: params.timeformatOrDefault
+            )
+            return try out.response(format: params.format ?? .json)
+        })
     }
 }
 

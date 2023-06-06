@@ -2,6 +2,9 @@ import Foundation
 import Vapor
 
 public struct ForecastapiController: RouteCollection {
+    /// Dedicated thread pool for API calls reading data from disk. Prevents blocking of the main thread pools.
+    static var runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+    
     public func boot(routes: RoutesBuilder) throws {
         let cors = CORSMiddleware(configuration: .init(
             allowedOrigin: .all,
@@ -59,104 +62,107 @@ public struct ForecastapiController: RouteCollection {
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
         
-        // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = paramsHourly {
-            for reader in readers {
-                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
-            }
-        }
-        if let dailyVariables = paramsDaily {
-            for reader in readers {
-                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
-            }
-        }
-        
-        let hourly: ApiSection? = try paramsHourly.map { variables in
-            var res = [ApiColumn]()
-            res.reserveCapacity(variables.count * readers.count)
-            for reader in readers {
-                for variable in variables {
-                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                    guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params).toApi(name: name) else {
-                        continue
-                    }
-                    assert(hourlyTime.count == d.data.count)
-                    res.append(d)
+        // Run query on separat thread pool to not block the main pool
+        return ForecastapiController.runLoop.next().submit({
+            // Start data prefetch to boooooooost API speed :D
+            if let hourlyVariables = paramsHourly {
+                for reader in readers {
+                    try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
                 }
             }
-            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-        }
-        
-        let currentWeather: ForecastapiResult.CurrentWeather?
-        if params.current_weather == true {
-            let starttime = currentTime.floor(toNearest: 3600)
-            let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-            guard let reader = try GenericReaderMulti<ForecastVariable>(domain: MultiDomains.best_match, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
+            if let dailyVariables = paramsDaily {
+                for reader in readers {
+                    try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+                }
             }
-            let temperature = try reader.get(variable: .surface(.temperature_2m), time: time)!.convertAndRound(params: params)
-            let winddirection = try reader.get(variable: .surface(.winddirection_10m), time: time)!.convertAndRound(params: params)
-            let windspeed = try reader.get(variable: .surface(.windspeed_10m), time: time)!.convertAndRound(params: params)
-            let weathercode = try reader.get(variable: .surface(.weathercode), time: time)!.convertAndRound(params: params)
-            currentWeather = ForecastapiResult.CurrentWeather(
-                temperature: temperature.data[0],
-                windspeed: windspeed.data[0],
-                winddirection: winddirection.data[0],
-                weathercode: weathercode.data[0],
-                is_day: try reader.get(variable: .surface(.is_day), time: time)!.convertAndRound(params: params).data[0],
-                temperature_unit: temperature.unit,
-                windspeed_unit: windspeed.unit,
-                winddirection_unit: winddirection.unit,
-                weathercode_unit: weathercode.unit,
-                time: starttime
-            )
-        } else {
-            currentWeather = nil
-        }
-        
-        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
-            var res = [ApiColumn]()
-            res.reserveCapacity(dailyVariables.count * readers.count)
-            var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
             
-            for reader in readers {
-                for variable in dailyVariables {
-                    if variable == .sunrise || variable == .sunset {
-                        // only calculate sunrise/set once
-                        let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
-                        riseSet = times
-                        if variable == .sunset {
-                            res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
-                        } else {
-                            res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
+            let hourly: ApiSection? = try paramsHourly.map { variables in
+                var res = [ApiColumn]()
+                res.reserveCapacity(variables.count * readers.count)
+                for reader in readers {
+                    for variable in variables {
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                        guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params).toApi(name: name) else {
+                            continue
                         }
-                        continue
+                        assert(hourlyTime.count == d.data.count)
+                        res.append(d)
                     }
-                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                    guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime)?.toApi(name: name) else {
-                        continue
-                    }
-                    assert(dailyTime.count == d.data.count)
-                    res.append(d)
                 }
+                return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
             }
             
-            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: res)
-        }
-        
-        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-        let out = ForecastapiResult(
-            latitude: readers[0].modelLat,
-            longitude: readers[0].modelLon,
-            elevation: readers[0].targetElevation,
-            generationtime_ms: generationTimeMs,
-            utc_offset_seconds: utcOffsetSecondsActual,
-            timezone: timezone,
-            current_weather: currentWeather,
-            sections: [hourly, daily].compactMap({$0}),
-            timeformat: params.timeformatOrDefault
-        )
-        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
+            let currentWeather: ForecastapiResult.CurrentWeather?
+            if params.current_weather == true {
+                let starttime = currentTime.floor(toNearest: 3600)
+                let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
+                guard let reader = try GenericReaderMulti<ForecastVariable>(domain: MultiDomains.best_match, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                let temperature = try reader.get(variable: .surface(.temperature_2m), time: time)!.convertAndRound(params: params)
+                let winddirection = try reader.get(variable: .surface(.winddirection_10m), time: time)!.convertAndRound(params: params)
+                let windspeed = try reader.get(variable: .surface(.windspeed_10m), time: time)!.convertAndRound(params: params)
+                let weathercode = try reader.get(variable: .surface(.weathercode), time: time)!.convertAndRound(params: params)
+                currentWeather = ForecastapiResult.CurrentWeather(
+                    temperature: temperature.data[0],
+                    windspeed: windspeed.data[0],
+                    winddirection: winddirection.data[0],
+                    weathercode: weathercode.data[0],
+                    is_day: try reader.get(variable: .surface(.is_day), time: time)!.convertAndRound(params: params).data[0],
+                    temperature_unit: temperature.unit,
+                    windspeed_unit: windspeed.unit,
+                    winddirection_unit: winddirection.unit,
+                    weathercode_unit: weathercode.unit,
+                    time: starttime
+                )
+            } else {
+                currentWeather = nil
+            }
+            
+            let daily: ApiSection? = try paramsDaily.map { dailyVariables in
+                var res = [ApiColumn]()
+                res.reserveCapacity(dailyVariables.count * readers.count)
+                var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
+                
+                for reader in readers {
+                    for variable in dailyVariables {
+                        if variable == .sunrise || variable == .sunset {
+                            // only calculate sunrise/set once
+                            let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
+                            riseSet = times
+                            if variable == .sunset {
+                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
+                            } else {
+                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
+                            }
+                            continue
+                        }
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                        guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime)?.toApi(name: name) else {
+                            continue
+                        }
+                        assert(dailyTime.count == d.data.count)
+                        res.append(d)
+                    }
+                }
+                
+                return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: res)
+            }
+            
+            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+            let out = ForecastapiResult(
+                latitude: readers[0].modelLat,
+                longitude: readers[0].modelLon,
+                elevation: readers[0].targetElevation,
+                generationtime_ms: generationTimeMs,
+                utc_offset_seconds: utcOffsetSecondsActual,
+                timezone: timezone,
+                current_weather: currentWeather,
+                sections: [hourly, daily].compactMap({$0}),
+                timeformat: params.timeformatOrDefault
+            )
+            return try out.response(format: params.format ?? .json)
+        })
     }
 }
 

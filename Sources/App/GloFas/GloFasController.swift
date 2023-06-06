@@ -125,35 +125,37 @@ struct GloFasController {
         /// Variables wih 51 members if requested
         let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
         
-        
-        // Start data prefetch to boooooooost API speed :D
-        for reader in readers {
-            try reader.prefetchData(variables: variables, time: dailyTime)
-        }
-        
-        let daily = ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
-            try zip(readers, domains).compactMap { (reader, domain) in
-                let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
-                let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm, length_unit: .metric)
-                let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: units).toApi(name: name)
-                assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
-                return d
+        // Run query on separat thread pool to not block the main pool
+        return ForecastapiController.runLoop.next().submit({
+            // Start data prefetch to boooooooost API speed :D
+            for reader in readers {
+                try reader.prefetchData(variables: variables, time: dailyTime)
             }
+            
+            let daily = ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
+                try zip(readers, domains).compactMap { (reader, domain) in
+                    let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                    let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm, length_unit: .metric)
+                    let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: units).toApi(name: name)
+                    assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
+                    return d
+                }
+            })
+            
+            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+            let out = ForecastapiResult(
+                latitude: readers[0].modelLat,
+                longitude: readers[0].modelLon,
+                elevation: nil,
+                generationtime_ms: generationTimeMs,
+                utc_offset_seconds: utcOffsetSecondsActual,
+                timezone: timezone,
+                current_weather: nil,
+                sections: [daily],
+                timeformat: params.timeformatOrDefault
+            )
+            return try out.response(format: params.format ?? .json)
         })
-        
-        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-        let out = ForecastapiResult(
-            latitude: readers[0].modelLat,
-            longitude: readers[0].modelLon,
-            elevation: nil,
-            generationtime_ms: generationTimeMs,
-            utc_offset_seconds: utcOffsetSecondsActual,
-            timezone: timezone,
-            current_weather: nil,
-            sections: [daily],
-            timeformat: params.timeformatOrDefault
-        )
-        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
     }
 }
 

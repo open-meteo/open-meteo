@@ -26,45 +26,39 @@ struct CamsController {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
-        // Start data prefetch to boooooooost API speed :D
-        if let hourlyVariables = paramsHourly {
-            try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
-        }
-        /*if let dailyVariables = params.daily {
-            try reader.prefetchData(variables: dailyVariables)
-        }*/
         
-        let hourly: ApiSection? = try paramsHourly.map { variables in
-            var res = [ApiColumn]()
-            res.reserveCapacity(variables.count)
-            for variable in variables {
-                let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.name)
-                res.append(d)
+        
+        // Run query on separat thread pool to not block the main pool
+        return ForecastapiController.runLoop.next().submit({
+            // Start data prefetch to boooooooost API speed :D
+            if let hourlyVariables = paramsHourly {
+                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
-            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-        }
-        
-        /*let daily: ApiSection? = try params.daily.map { dailyVariables in
-            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.map { variable in
-                let d = try reader.getDaily(variable: variable).toApi(name: variable.rawValue)
-                assert(dailyTime.count == d.data.count)
-                return d
-            })
-        }*/
-        
-        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-        let out = ForecastapiResult(
-            latitude: reader.modelLat,
-            longitude: reader.modelLon,
-            elevation: nil,
-            generationtime_ms: generationTimeMs,
-            utc_offset_seconds: utcOffsetSecondsActual,
-            timezone: timezone,
-            current_weather: nil,
-            sections: [hourly /*, daily*/].compactMap({$0}),
-            timeformat: params.timeformatOrDefault
-        )
-        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
+            
+            let hourly: ApiSection? = try paramsHourly.map { variables in
+                var res = [ApiColumn]()
+                res.reserveCapacity(variables.count)
+                for variable in variables {
+                    let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.name)
+                    res.append(d)
+                }
+                return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
+            }
+            
+            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+            let out = ForecastapiResult(
+                latitude: reader.modelLat,
+                longitude: reader.modelLon,
+                elevation: nil,
+                generationtime_ms: generationTimeMs,
+                utc_offset_seconds: utcOffsetSecondsActual,
+                timezone: timezone,
+                current_weather: nil,
+                sections: [hourly /*, daily*/].compactMap({$0}),
+                timeformat: params.timeformatOrDefault
+            )
+            return try out.response(format: params.format ?? .json)
+        })
     }
 }
 
