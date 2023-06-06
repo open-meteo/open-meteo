@@ -1,11 +1,7 @@
 import Foundation
 import Vapor
 
-/**
- TODO:
- - weather code
- - No 120/180m wind
- */
+
 public struct MeteoFranceController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("api")
@@ -24,33 +20,45 @@ public struct MeteoFranceController {
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
-        let domains = [MeteoFranceDomain.arpege_world, .arpege_europe, .arome_france, .arome_france_hd] //[MeteoFranceDomain.arome_france]
-        
-        guard let reader = try MeteoFranceMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+        let domains = try MeteoFranceQuery.Domains.load(commaSeparatedOptional: params.models) ?? [.best_match]
+
+        let readers = try domains.map {
+            guard let reader = try MeteoFranceMixer(domains: $0.domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return reader
+        }
+        guard !readers.isEmpty else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         
-        
-        // Start data prefetch to boooooooost API speed :D
         let paramsHourly = try MeteoFranceVariableCombined.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try MeteoFranceDailyWeatherVariable.load(commaSeparatedOptional: params.daily)
         
         // Run query on separat thread pool to not block the main pool
         return ForecastapiController.runLoop.next().submit({
+            // Start data prefetch to boooooooost API speed :D
             if let hourlyVariables = paramsHourly {
-                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                for reader in readers {
+                    try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                }
             }
             if let dailyVariables = paramsDaily {
-                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+                for reader in readers {
+                    try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+                }
             }
             
             let hourly: ApiSection? = try paramsHourly.map { variables in
                 var res = [ApiColumn]()
-                res.reserveCapacity(variables.count)
-                for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
-                    assert(hourlyTime.count == d.data.count)
-                    res.append(d)
+                res.reserveCapacity(variables.count * readers.count)
+                for (reader, domain) in zip(readers, domains) {
+                    for variable in variables {
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                        let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: name)
+                        assert(hourlyTime.count == d.data.count)
+                        res.append(d)
+                    }
                 }
                 return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
             }
@@ -59,16 +67,19 @@ public struct MeteoFranceController {
             if params.current_weather == true {
                 let starttime = currentTime.floor(toNearest: 3600)
                 let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                let temperature = try reader.get(raw: .temperature_2m, time: time).convertAndRound(params: params)
-                let winddirection = try reader.get(derived: .winddirection_10m, time: time).convertAndRound(params: params)
-                let windspeed = try reader.get(derived: .windspeed_10m, time: time).convertAndRound(params: params)
-                let weathercode = try reader.get(derived: .weathercode, time: time).convertAndRound(params: params)
+                guard let reader = try MeteoFranceMixer(domains: MeteoFranceQuery.Domains.best_match.domains, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                let temperature = try reader.get(variable: .raw(.surface(.temperature_2m)), time: time).convertAndRound(params: params)
+                let winddirection = try reader.get(variable: .derived(.surface(.winddirection_10m)), time: time).convertAndRound(params: params)
+                let windspeed = try reader.get(variable: .derived(.surface(.windspeed_10m)), time: time).convertAndRound(params: params)
+                let weathercode = try reader.get(variable: .derived(.surface(.weathercode)), time: time).convertAndRound(params: params)
                 currentWeather = ForecastapiResult.CurrentWeather(
                     temperature: temperature.data[0],
                     windspeed: windspeed.data[0],
                     winddirection: winddirection.data[0],
                     weathercode: weathercode.data[0],
-                    is_day: try reader.get(derived: .is_day, time: time).convertAndRound(params: params).data[0],
+                    is_day: try reader.get(variable: .derived(.surface(.is_day)), time: time).convertAndRound(params: params).data[0],
                     temperature_unit: temperature.unit,
                     windspeed_unit: windspeed.unit,
                     winddirection_unit: winddirection.unit,
@@ -81,33 +92,37 @@ public struct MeteoFranceController {
             
             let daily: ApiSection? = try paramsDaily.map { dailyVariables in
                 var res = [ApiColumn]()
-                res.reserveCapacity(dailyVariables.count)
+                res.reserveCapacity(dailyVariables.count * readers.count)
                 var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
                 
-                for variable in dailyVariables {
-                    if variable == .sunrise || variable == .sunset {
-                        // only calculate sunrise/set once
-                        let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
-                        riseSet = times
-                        if variable == .sunset {
-                            res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
-                        } else {
-                            res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
+                for (reader, domain) in zip(readers, domains) {
+                    for variable in dailyVariables {
+                        if variable == .sunrise || variable == .sunset {
+                            // only calculate sunrise/set once
+                            let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: params.latitude, lon: params.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
+                            riseSet = times
+                            if variable == .sunset {
+                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
+                            } else {
+                                res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
+                            }
+                            continue
                         }
-                        continue
+                        let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                        let d = try reader.getDaily(variable: variable, params: params, time: dailyTime).toApi(name: name)
+                        assert(dailyTime.count == d.data.count)
+                        res.append(d)
                     }
-                    let d = try reader.getDaily(variable: variable, params: params, time: dailyTime).toApi(name: variable.rawValue)
-                    assert(dailyTime.count == d.data.count)
-                    res.append(d)
                 }
+                
                 return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: res)
             }
             
             let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
             let out = ForecastapiResult(
-                latitude: reader.modelLat,
-                longitude: reader.modelLon,
-                elevation: reader.targetElevation,
+                latitude: readers[0].modelLat,
+                longitude: readers[0].modelLon,
+                elevation: readers[0].targetElevation,
                 generationtime_ms: generationTimeMs,
                 utc_offset_seconds: utcOffsetSecondsActual,
                 timezone: timezone,
@@ -138,6 +153,36 @@ struct MeteoFranceQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelecta
     let forecast_days: Int?
     let format: ForecastResultFormat?
     let cell_selection: GridSelectionMode?
+    let models: [String]?
+    
+    enum Domains: String, Codable, RawRepresentableString, CaseIterable {
+        case best_match
+        case arpege_seamless
+        case arpege_world
+        case arpege_europe
+        case arome_seamless
+        case arome_france
+        case arome_france_hd
+        
+        var domains: [MeteoFranceDomain] {
+            switch self {
+            case .best_match:
+                return [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd]
+            case .arpege_world:
+                return [.arpege_world]
+            case .arpege_europe:
+                return [.arpege_europe]
+            case .arome_france:
+                return [.arome_france]
+            case .arome_france_hd:
+                return [.arome_france_hd]
+            case .arpege_seamless:
+                return [.arome_france, .arome_france_hd]
+            case .arome_seamless:
+                return [.arpege_world, .arpege_europe]
+            }
+        }
+    }
     
     /// iso starting date `2022-02-01`
     let start_date: IsoDate?
