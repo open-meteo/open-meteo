@@ -24,44 +24,48 @@ struct IconWaveController {
         // Start data prefetch to boooooooost API speed :D
         let paramsHourly = try IconWaveVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try IconWaveVariableDaily.load(commaSeparatedOptional: params.daily)
-        if let hourlyVariables = paramsHourly {
-            try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
-        }
-        if let dailyVariables = paramsDaily {
-            try reader.prefetchData(variables: dailyVariables, time: dailyTime)
-        }
         
-        let hourly: ApiSection? = try paramsHourly.map { variables in
-            var res = [ApiColumn]()
-            res.reserveCapacity(variables.count)
-            for variable in variables {
-                let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.rawValue)
-                res.append(d)
+        // Run query on separat thread pool to not block the main pool
+        return ForecastapiController.runLoop.next().submit({
+            if let hourlyVariables = paramsHourly {
+                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
             }
-            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-        }
-        
-        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
-            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.map { variable in
-                let d = try reader.getDaily(variable: variable, time: dailyTime).convertAndRound(params: params).toApi(name: variable.rawValue)
-                assert(dailyTime.count == d.data.count)
-                return d
-            })
-        }
-        
-        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-        let out = ForecastapiResult(
-            latitude: reader.modelLat,
-            longitude: reader.modelLon,
-            elevation: nil,
-            generationtime_ms: generationTimeMs,
-            utc_offset_seconds: utcOffsetSecondsActual,
-            timezone: timezone,
-            current_weather: nil,
-            sections: [hourly, daily].compactMap({$0}),
-            timeformat: params.timeformatOrDefault
-        )
-        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
+            if let dailyVariables = paramsDaily {
+                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+            }
+            
+            let hourly: ApiSection? = try paramsHourly.map { variables in
+                var res = [ApiColumn]()
+                res.reserveCapacity(variables.count)
+                for variable in variables {
+                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.rawValue)
+                    res.append(d)
+                }
+                return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
+            }
+            
+            let daily: ApiSection? = try paramsDaily.map { dailyVariables in
+                return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.map { variable in
+                    let d = try reader.getDaily(variable: variable, time: dailyTime).convertAndRound(params: params).toApi(name: variable.rawValue)
+                    assert(dailyTime.count == d.data.count)
+                    return d
+                })
+            }
+            
+            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
+            let out = ForecastapiResult(
+                latitude: reader.modelLat,
+                longitude: reader.modelLon,
+                elevation: nil,
+                generationtime_ms: generationTimeMs,
+                utc_offset_seconds: utcOffsetSecondsActual,
+                timezone: timezone,
+                current_weather: nil,
+                sections: [hourly, daily].compactMap({$0}),
+                timeformat: params.timeformatOrDefault
+            )
+            return try out.response(format: params.format ?? .json)
+        })
     }
 }
 
