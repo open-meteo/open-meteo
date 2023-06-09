@@ -309,11 +309,12 @@ extension Array where Element == Float {
                     let f = Float(t - posB) / Float(posC - posB)
                     // Interpolated clearness index at missing value position
                     let kt = a*f*f*f + b*f*f + c*f + d
-                    self[l * nTime + t] = Swift.max(kt, 0) * solar2d[sPos, t - sLow]
+                    // kt can still be NaN at night
+                    self[l * nTime + t] = Swift.max(0, kt) * solar2d[sPos, t - sLow]
                 }
                 
-                // Deaverage point C
-                self[l * nTime + posC] = Swift.max(ktC, 0) * solar2d[sPos, posC - sLow]
+                // Deaverage point C, ktC could be NaN at night, therefore `max(0, ktC)` instead of `max(ktC, 0)`
+                self[l * nTime + posC] = Swift.max(0, ktC) * solar2d[sPos, posC - sLow]
             }
         }
     }
