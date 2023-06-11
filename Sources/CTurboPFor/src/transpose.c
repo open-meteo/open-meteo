@@ -312,7 +312,7 @@ void tpini(int id) {
   if(tpset) return;
   tpset++;
   i = id?id:cpuisa();
-    #if defined(__i386__) || defined(__x86_64__)
+    #if (defined(__i386__) || defined(__x86_64__)) && defined(AVX2)
   if(i >= IS_AVX2) {
     _tpe[2] = tpenc128v2; _tpd[2] = tpdec256v2; _tp4e[2] = tp4enc256v2; _tp4d[2] = tp4dec256v2; //SSE encoding _tpe[2] is faster
     _tpe[4] = tpenc128v4; _tpd[4] = tpdec256v4; _tp4e[4] = tp4enc256v4; _tp4d[4] = tp4dec256v4; //SSE encoding _tpe[4] is faster
@@ -1008,7 +1008,7 @@ void TEMPLATE2(TPENC128V, ESIZE)(unsigned char *in, unsigned n, unsigned char *o
 
       #elif defined(__SSE2__)
         #if ESIZE == 2
-    iv[0] = LD128(ip   );  iv[1] = LD128(ip+16));
+    iv[0] = LD128(ip   );  iv[1] = LD128(ip+16);
 
     ov[0] = _mm_unpacklo_epi8(iv[0], iv[1]); ov[1] = _mm_unpackhi_epi8(iv[0], iv[1]);
     iv[0] = _mm_unpacklo_epi8(ov[0], ov[1]); iv[1] = _mm_unpackhi_epi8(ov[0], ov[1]);
