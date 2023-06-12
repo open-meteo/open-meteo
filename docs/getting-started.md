@@ -129,16 +129,21 @@ ERA5 is driving the Historical Weather API and can be downloaded for the past. Y
 
 From your Copernicus account, you need an API key in form `234234:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`. The CDS key is a required argument in the next step.
 
-To download most recent ERA5 data, simply run `<exe> download-era5 --cdskey 234234:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`. This will download the last 2 weeks of era5 data.
+To download most recent ERA5 data, simply run `<exe> download-era5 <domain> --cdskey 234234:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`. This will download the last 2 weeks of era5 data,
+where domain must be one of the following options.
+- era5
+- era5_land
+- cerra
+- ecmwf_ifs
 
-To download a various time-range, specify additionally the parameter time-interval: `<exe> download-era5 --timeinterval 20220101-20220131 --cdskey ...`
+To download a various time-range, specify additionally the parameter time-interval: `<exe> download-era5 <domain> --timeinterval 20220101-20220131 --cdskey ...`
 
-To download an entire year: `<exe> download-era5 --year 2021 --cdskey`. Per year of data, roughly 60 GB of disk space are required.
+To download an entire year: `<exe> download-era5 <domain> --year 2021 --cdskey`. Per year of data, roughly 60 GB of disk space are required.
 
 All arguments for the `<exe> download-era5` command:
 ```
 # openmeteo-api download-era5 --help
-Usage: openmeteo-api download-era5 [--timeinterval,-t] [--year,-y] [--stripseaYear,-s] [--cdskey,-k]
+Usage: openmeteo-api download-era5 <domain> [--timeinterval,-t] [--year,-y] [--stripseaYear,-s] [--cdskey,-k]
 
 Download ERA5 from the ECMWF climate data store and convert
 
