@@ -1,6 +1,7 @@
 // swift-tools-version:5.6
 
 import PackageDescription
+import Foundation
 
 #if arch(x86_64)
 let flagsCTurbo = ["-march=skylake", "-w"]
@@ -9,6 +10,9 @@ let flagsHelper = ["-march=skylake"]
 let flagsCTurbo = ["-w"]
 let flagsHelper = [String]()
 #endif
+
+/// Conditional support for Apache Arrow Parquet files
+let enableParquet = ProcessInfo.processInfo.environment["ENABLE_PARQUET"] == "TRUE"
 
 let package = Package(
   name: "OpenMeteoApi",
@@ -22,7 +26,7 @@ let package = Package(
     .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.1"),
     .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "0.1.5"),
     .package(url: "https://github.com/orlandos-nl/IkigaJSON.git", from: "2.0.0"),
-  ],
+  ] + (enableParquet ? [.package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "0.0.0")] : []),
   targets: [
     .target(
       name: "App",
@@ -36,10 +40,10 @@ let package = Package(
         "IkigaJSON",
         "CZlib",
         "CBz2lib"
-      ],
+      ] + (enableParquet ? [.product(name: "SwiftArrowParquet", package: "SwiftArrowParquet")] : []),
       swiftSettings: [
         .unsafeFlags(["-cross-module-optimization", "-Ounchecked"], .when(configuration: .release))
-      ]
+      ] + (enableParquet ? [.define("ENABLE_PARQUET")] : [])
     ),
     .systemLibrary(name: "CZlib", pkgConfig: "z", providers: [.brew(["zlib"]), .apt(["libz-dev"])]),
     .systemLibrary(name: "CBz2lib", pkgConfig: "bz2", providers: [.brew(["bzip2"]), .apt(["libbz2-dev"])]),
