@@ -31,12 +31,10 @@ final class BiasCorrectionTests: XCTestCase {
     
     func testDailyNormals() {
         let time = TimerangeDt(start: Timestamp(2020,01,01), to: Timestamp(2030,01,01), dtSeconds: 86400)
-        let normalsCalc = DailyNormalsCalculator(time: time, dailyNormalsOverNYears: 5)
-        XCTAssertEqual(normalsCalc.numYearBins, 2)
-        // years after 1970
-        XCTAssertEqual(normalsCalc.yearStart, 50)
+        let normalsCalc = DailyNormalsCalculator(years: [2022, 2027], normalsWidthInYears: 5)
+        XCTAssertEqual(normalsCalc.timeBins.count, 2)
         let data = (0..<time.count).map { Float($0/10).truncatingRemainder(dividingBy: 100) }
-        let normals = normalsCalc.calculateDailyNormals(values: ArraySlice(data))
+        let normals = normalsCalc.calculateDailyNormals(values: ArraySlice(data), time: time)
         XCTAssertEqualArray(normals[0..<10], [33.16129, 34.73077, 32.92, 33.0, 33.08, 33.16, 33.24, 33.36, 33.48, 33.6], accuracy: 0.001)
     }
 }

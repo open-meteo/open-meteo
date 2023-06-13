@@ -3,6 +3,11 @@ import SwiftPFor2D
 import Vapor
 import SwiftNetCDF
 
+#if ENABLE_PARQUET
+import SwiftArrowParquet
+#endif
+
+
 /**
  Export a dataset to NetCDF. `Time` is the column major orientation. Use the following command to transpose a NetCDF file
  `brew install nco`
@@ -37,6 +42,15 @@ struct ExportCommand: AsyncCommandFix {
         @Option(name: "calculate_daily_normals_over_n_years")
         var dailyNormalsOverNYears: Int?
         
+        @Option(name: "normals_years")
+        var normalsYears: String?
+        
+        @Option(name: "normals_width")
+        var normalsWith: Int?
+        
+        @Option(name: "format")
+        var format: String?
+        
         @Option(name: "rain-day-distribution")
         var rainDayDistribution: String?
         
@@ -67,7 +81,9 @@ struct ExportCommand: AsyncCommandFix {
         let logger = context.application.logger
         let domain = try ExportDomain.load(rawValue: signature.domain)
         let regriddingDomain = try TargetGridDomain.load(rawValueOptional: signature.regriddingDomain)
-        let filePath = signature.outputFilename ?? "./output.nc"
+        let format = try ExportFormat.load(rawValueOptional: signature.format) ?? .netcdf
+        
+        let filePath = signature.outputFilename ?? (format == .netcdf ? "./output.nc" : "./output.parquet")
         
         /*let om = try OmFileReader(file: "/Volumes/2TB_1GBs/data/master-MRI_AGCM3_2_S/temperature_2m_max_linear_bias_seasonal.om")
         
@@ -90,23 +106,51 @@ struct ExportCommand: AsyncCommandFix {
         }
         logger.info("Exporing variable \(signature.variable) for dataset \(domain) to file '\(filePath)'")
         
-        try generateNetCdf(
-            logger: logger,
-            file: "\(filePath)~",
-            domain: domain,
-            variable: signature.variable,
-            time: time,
-            compressionLevel: signature.compressionLevel,
-            targetGridDomain: regriddingDomain,
-            outputCoordinates: signature.outputCoordinates,
-            outputElevation: signature.outputElevation,
-            dailyNormalsOverNYears: signature.dailyNormalsOverNYears,
-            rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution)
-        )
-        try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
+        switch format {
+        case .netcdf:
+            try generateNetCdf(
+                logger: logger,
+                file: "\(filePath)~",
+                domain: domain,
+                variable: signature.variable,
+                time: time,
+                compressionLevel: signature.compressionLevel,
+                targetGridDomain: regriddingDomain,
+                outputCoordinates: signature.outputCoordinates,
+                outputElevation: signature.outputElevation,
+                normals: signature.normalsYears.map { ($0.split(separator: ",").map({Int($0)! }), signature.normalsWith ?? 10) },
+                rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution)
+            )
+            try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
+        case .parquet:
+            try generateNetCdf(
+                logger: logger,
+                file: filePath,
+                domain: domain,
+                variable: signature.variable,
+                time: time,
+                compressionLevel: signature.compressionLevel,
+                targetGridDomain: regriddingDomain,
+                outputCoordinates: signature.outputCoordinates,
+                outputElevation: signature.outputElevation,
+                normals: signature.normalsYears.map { ($0.split(separator: ",").map({Int($0)! }), signature.normalsWith ?? 10) },
+                rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution)
+            )
+        }
     }
     
-    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, dailyNormalsOverNYears: Int?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
+    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
+        #if ENABLE_PARQUET
+        
+        fatalError("Parquet export not yet implemented")
+        
+        #else
+        fatalError("Apache Parquet support not enabled")
+        #endif
+        
+    }
+    
+    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
         
         /// needs to be evenly dividable by grid.nx
@@ -125,6 +169,8 @@ struct ExportCommand: AsyncCommandFix {
             try ncLat.write((0..<grid.ny).map{ grid.getCoordinates(gridpoint: $0 * grid.nx).latitude })
             try ncLon.write((0..<grid.nx).map{ grid.getCoordinates(gridpoint: $0).longitude })
         }
+
+        
         if outputElevation {
             logger.info("Writing elevation information")
             var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
@@ -136,19 +182,20 @@ struct ExportCommand: AsyncCommandFix {
         }
         
         // Calculate daily normals
-        if let dailyNormalsOverNYears {
+        if let normals {
             let variablesPrecipitation = ["precipitation_sum", "snowfall_water_equivalent_sum"]
             
             let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
-            let normalsCalculator = DailyNormalsCalculator(time: time, dailyNormalsOverNYears: dailyNormalsOverNYears)
-            let timeDimension = try ncFile.createDimension(name: "time", length: normalsCalculator.numYearBins * 365)
+            let normalsCalculator = DailyNormalsCalculator(years: normals.years, normalsWidthInYears: normals.width)
+            let nTimeNormals = normalsCalculator.timeBins.count * 365
+            let timeDimension = try ncFile.createDimension(name: "time", length: nTimeNormals)
             var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
             if let compressionLevel, compressionLevel > 0 {
                 try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
-                try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, normalsCalculator.numYearBins * 365])
+                try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, nTimeNormals])
             }
             
-            logger.info("Calculating daily normals. numYearBins=\(normalsCalculator.numYearBins). Total raw size \((grid.count * normalsCalculator.numYearBins * 365 * 4).bytesHumanReadable)")
+            logger.info("Calculating daily normals. years=\(normals.years) width=\(normals.width) years. Total raw size \((grid.count * nTimeNormals * 4).bytesHumanReadable)")
             
             if let targetGridDomain {
                 let targetDomain = targetGridDomain.genericDomain
@@ -164,7 +211,7 @@ struct ExportCommand: AsyncCommandFix {
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data.data), rainDayDistribution: rainDayDistribution ?? .end) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data))
+                    let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data), time: time)
                     try ncVariable.write(normals, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
                     progress.add(time.count * 4)
                 }
@@ -178,7 +225,7 @@ struct ExportCommand: AsyncCommandFix {
                 guard let data = try reader.get(mixed: variable, time: time)?.data else {
                     fatalError("Invalid variable \(variable)")
                 }
-                let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data), rainDayDistribution: rainDayDistribution ?? .end) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data))
+                let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data), time: time)
                 try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
                 progress.add(time.count * 4)
             }
@@ -237,34 +284,34 @@ struct ExportCommand: AsyncCommandFix {
 
 /// Calculate daily normals. Combine 5 days to have some sort of statistical significance.
 struct DailyNormalsCalculator {
-    let time: TimerangeDt
-    let yearStart: Int
-    let numYearBins: Int
-    let dailyNormalsOverNYears: Int
+    /// Timerange of individual ranges that may overlap. E.g.  `2025-2034`, `2030-2039`, `2035-2044`, `2040-2049`
+    let timeBins: [Range<Timestamp>]
     
-    init(time: TimerangeDt, dailyNormalsOverNYears: Int) {
-        yearStart = Int(round(Float(time.range.lowerBound.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear)))
-        /// not included end
-        let yearEnd = Int(round(Float(time.range.upperBound.timeIntervalSince1970) / Float(Timestamp.secondsPerAverageYear)))
-        numYearBins = (yearEnd - yearStart) / dailyNormalsOverNYears
-        self.dailyNormalsOverNYears = dailyNormalsOverNYears
-        self.time = time
+    /// Create normals over a given timespan
+    init(years: [Int], normalsWidthInYears: Int) {
+        timeBins = years.map { year in
+            // in case 5 years with, use the year 2022 as center and form 2020-2024 normals
+            Timestamp(year - normalsWidthInYears / 2, 1, 1) ..< Timestamp(year + normalsWidthInYears / 2 + normalsWidthInYears % 2, 1, 1)
+        }
     }
     
     /// Calculate mean daily normals
-    func calculateDailyNormals(values: ArraySlice<Float>) -> [Float] {
-        var sum = [Float](repeating: 0, count: numYearBins * 365)
-        var count = [Float](repeating: 0, count: numYearBins * 365)
+    /// Total `time` of entire data series... e.g. `2025-2049`
+    func calculateDailyNormals(values: ArraySlice<Float>, time: TimerangeDt) -> [Float] {
+        let nBins = timeBins.count
+        var sum = [Float](repeating: 0, count: nBins * 365)
+        var count = [Float](repeating: 0, count: nBins * 365)
         for (t, value) in zip(time, values) {
-            let yearIndex = (t.timeIntervalSince1970 / Timestamp.secondsPerAverageYear - yearStart) / dailyNormalsOverNYears
-            guard yearIndex >= 0 && yearIndex < numYearBins else {
-                continue
-            }
-            for i in -2...2 {
-                /// 0-364
-                let dayOfYear = Int(Float(t.add(days: i).timeIntervalSince1970 / 86400).truncatingRemainder(dividingBy: 365.25)) % 365
-                sum[yearIndex * 365 + dayOfYear] += value
-                count[yearIndex * 365 + dayOfYear] += 1
+            for (bin, binTime) in timeBins.enumerated() {
+                guard binTime.contains(t) else {
+                    continue
+                }
+                for i in -2...2 {
+                    /// 0-364
+                    let dayOfYear = Int(Float(t.add(days: i).timeIntervalSince1970 / 86400).truncatingRemainder(dividingBy: 365.25)) % 365
+                    sum[bin * 365 + dayOfYear] += value
+                    count[bin * 365 + dayOfYear] += 1
+                }
             }
         }
         for i in sum.indices {
@@ -288,36 +335,41 @@ struct DailyNormalsCalculator {
     /// - Also distribute each "value" into 5 parts to reduce outliners. Effectivly calcualting 35 days sliding values
     /// - To restore daily normals, calculate the average for each part and distribute according to "days below threshold"
     /// - Days below threhold (dry days) will be at the beginning of each 11-day part
-    func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, lowerThanThreshold: Float = 0.3, rainDayDistribution: RainDayDistribution) -> [Float] {
+    ///
+    /// Total `time` of entire data series... e.g. `2025-2049`
+    func calculateDailyNormalsPreserveDryDays(values: ArraySlice<Float>, time: TimerangeDt, lowerThanThreshold: Float = 0.3, rainDayDistribution: RainDayDistribution) -> [Float] {
+        let nBins = timeBins.count
+        
         /// Number of parts to split a year into. 365.25 / 52 = ~7.02 days
         let partPerYear = 52
         /// Sum of all values
-        var partsSum = [Float](repeating: 0, count: numYearBins * partPerYear)
+        var partsSum = [Float](repeating: 0, count: nBins * partPerYear)
         /// Sum of all events where value is below threshold
-        var partsEvents = [Float](repeating: 0, count: numYearBins * partPerYear)
+        var partsEvents = [Float](repeating: 0, count: nBins * partPerYear)
         /// Number of values accumulated for this part
-        var partsCount = [Float](repeating: 0, count: numYearBins * partPerYear)
+        var partsCount = [Float](repeating: 0, count: nBins * partPerYear)
         /// Number of seconds in e.g. ~7 days
         let secondsPerPart = Timestamp.secondsPerAverageYear / partPerYear
         
         // Calculate statistics for each part
         for (t, value) in zip(time, values) {
-            let yearIndex = (t.timeIntervalSince1970 / Timestamp.secondsPerAverageYear - yearStart) / dailyNormalsOverNYears
-            guard yearIndex >= 0 && yearIndex < numYearBins else {
-                continue
-            }
-            let partIndex = (t.timeIntervalSince1970 / secondsPerPart) % partPerYear
-            // Distribute the value also to the previous and next bin
-            for i in -2...2 {
-                partsSum[yearIndex * partPerYear + ((partIndex+i) % partPerYear)] += value
-                partsCount[yearIndex * partPerYear + ((partIndex+i) % partPerYear)] += 1
-                if value < lowerThanThreshold {
-                    partsEvents[yearIndex * partPerYear + ((partIndex+i) % partPerYear)] += 1
+            for (bin, binTime) in timeBins.enumerated() {
+                guard binTime.contains(t) else {
+                    continue
+                }
+                let partIndex = (t.timeIntervalSince1970 / secondsPerPart) % partPerYear
+                // Distribute the value also to the previous and next bin
+                for i in -2...2 {
+                    partsSum[bin * partPerYear + ((partIndex+i) % partPerYear)] += value
+                    partsCount[bin * partPerYear + ((partIndex+i) % partPerYear)] += 1
+                    if value < lowerThanThreshold {
+                        partsEvents[bin * partPerYear + ((partIndex+i) % partPerYear)] += 1
+                    }
                 }
             }
         }
         // Restore 365 daily normals. The first days of a part will always be "dry days"
-        return (0..<365*numYearBins).map { i in
+        return (0..<365*nBins).map { i in
             let daysPerPart = 365 / partPerYear
             let yearIndex = i / 365
             let partIndex = min((i % 365) / daysPerPart, partPerYear-1)
@@ -377,6 +429,11 @@ enum TargetGridDomain: String, CaseIterable {
             return SatelliteDomain.imerg_daily
         }
     }
+}
+
+enum ExportFormat: String, RawRepresentableString, CaseIterable {
+    case netcdf
+    case parquet
 }
 
 enum ExportDomain: String, CaseIterable {
