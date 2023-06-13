@@ -123,38 +123,182 @@ struct ExportCommand: AsyncCommandFix {
             )
             try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
         case .parquet:
-            try generateNetCdf(
+            try generateParquet(
                 logger: logger,
                 file: filePath,
                 domain: domain,
-                variable: signature.variable,
+                variables: signature.variable.split(separator: ",").map(String.init),
                 time: time,
-                compressionLevel: signature.compressionLevel,
+                //compressionLevel: signature.compressionLevel,
                 targetGridDomain: regriddingDomain,
-                outputCoordinates: signature.outputCoordinates,
-                outputElevation: signature.outputElevation,
+                //outputCoordinates: signature.outputCoordinates,
+                //outputElevation: signature.outputElevation,
                 normals: signature.normalsYears.map { ($0.split(separator: ",").map({Int($0)! }), signature.normalsWith ?? 10) },
                 rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution)
             )
         }
     }
     
-    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
+    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
         #if ENABLE_PARQUET
         
-        fatalError("Parquet export not yet implemented")
+        let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
+        
+        let columns = [
+            ("location_id", .int64),
+            ("latitude", .float),
+            ("longitude", .float),
+            ("elevation", .float),
+            ("time", .timestamp(unit: .second))
+        ] + variables.map({($0, ArrowDataType.float)})
+        
+        let schema = try ArrowSchema(columns)
+        let properties = ParquetWriterProperties()
+        // Enable compression on all columns
+        columns.forEach({properties.setCompression(type: .lz4, path: $0.0)})
+        
+        let writer = try ParquetFileWriter(path: file, schema: schema, properties: properties)
+        
+        logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
+        
+        // Calculate daily normals
+        if let normals {
+            let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4 * variables.count, name: "Processed")
+            let normalsCalculator = DailyNormalsCalculator(years: normals.years, normalsWidthInYears: normals.width)
+            let nTimeNormals = normalsCalculator.timeBins.count * 365
+            let arrowTime = try ArrowArray(timestamp: normals.years.flatMap { TimerangeDt(start: Timestamp($0,1,1), nTime: 365, dtSeconds: 24*3600).map({Int64($0.timeIntervalSince1970)}) }, unit: .second)
+            logger.info("Calculating daily normals. years=\(normals.years) width=\(normals.width) years. Total raw size \((grid.count * nTimeNormals * 4).bytesHumanReadable)")
+            
+            if let targetGridDomain {
+                let targetDomain = targetGridDomain.genericDomain
+                guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
+                    fatalError("Could not read elevation file for domain \(targetDomain)")
+                }
+                for l in 0..<grid.count {
+                    let coords = grid.getCoordinates(gridpoint: l)
+                    let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
+                    
+                    // Read data
+                    let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
+                    let rows = try variables.map { variable in
+                        guard let data = try reader.get(mixed: variable, time: time) else {
+                            fatalError("Invalid variable \(variable)")
+                        }
+                        return try ArrowArray(float: normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end))
+                    }
+                    let table = try ArrowTable(schema: schema, arrays: [
+                        try ArrowArray(int64: [Int64](repeating: Int64(l), count: nTimeNormals)),
+                        try ArrowArray(float: [Float](repeating: coords.latitude, count: nTimeNormals)),
+                        try ArrowArray(float: [Float](repeating: coords.longitude, count: nTimeNormals)),
+                        try ArrowArray(float: [Float](repeating: elevation.numeric, count: nTimeNormals)),
+                        arrowTime
+                    ] + rows)
+                    try writer.write(table: table, chunkSize: 1024)
+                    progress.add(time.count * 4 * variables.count)
+                }
+                progress.finish()
+                return
+            }
+            // Loop over locations, read and write
+            guard let elevationFile = domain.genericDomain.getStaticFile(type: .elevation) else {
+                fatalError("Could not read elevation file for domain \(domain)")
+            }
+            for gridpoint in 0..<grid.count {
+                // Read data
+                let reader = try domain.getReader(position: gridpoint)
+                let coords = grid.getCoordinates(gridpoint: gridpoint)
+                let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
+                let rows = try variables.map { variable in
+                    guard let data = try reader.get(mixed: variable, time: time)?.data else {
+                        fatalError("Invalid variable \(variable)")
+                    }
+                    return try ArrowArray(float: normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end))
+                }
+                let table = try ArrowTable(schema: schema, arrays: [
+                    try ArrowArray(int64: [Int64](repeating: Int64(gridpoint), count: nTimeNormals)),
+                    try ArrowArray(float: [Float](repeating: coords.latitude, count: nTimeNormals)),
+                    try ArrowArray(float: [Float](repeating: coords.longitude, count: nTimeNormals)),
+                    try ArrowArray(float: [Float](repeating: elevation.numeric, count: nTimeNormals)),
+                    arrowTime
+                ] + rows)
+                try writer.write(table: table, chunkSize: 1024)
+                progress.add(time.count * 4 * variables.count)
+            }
+            progress.finish()
+            return
+        }
+
+        logger.info("Writing data. Total raw size \((grid.count * time.count * 4 * variables.count).bytesHumanReadable)")
+        let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
+        let arrowTime = try ArrowArray(timestamp: time.map({Int64($0.timeIntervalSince1970)}), unit: .second)
+        
+        /// Interpolate data from one grid to another and perform bias correction
+        if let targetGridDomain {
+            let targetDomain = targetGridDomain.genericDomain
+            guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
+                fatalError("Could not read elevation file for domain \(targetDomain)")
+            }
+            
+            for l in 0..<grid.count {
+                let coords = grid.getCoordinates(gridpoint: l)
+                let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
+                let rows = try variables.map { variable in
+                    // Read data
+                    let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
+                    guard let data = try reader.get(mixed: variable, time: time) else {
+                        fatalError("Invalid variable \(variable)")
+                    }
+                    return try ArrowArray(float: data.data)
+                }
+                let table = try ArrowTable(schema: schema, arrays: [
+                    try ArrowArray(int64: [Int64](repeating: Int64(l), count: time.count)),
+                    try ArrowArray(float: [Float](repeating: coords.latitude, count: time.count)),
+                    try ArrowArray(float: [Float](repeating: coords.longitude, count: time.count)),
+                    try ArrowArray(float: [Float](repeating: elevation.numeric, count: time.count)),
+                    arrowTime
+                ] + rows)
+                try writer.write(table: table, chunkSize: 1024)
+                progress.add(time.count * 4 * variables.count)
+            }
+            progress.finish()
+            return
+        }
+        
+        // Loop over locations, read and write
+        guard let elevationFile = domain.genericDomain.getStaticFile(type: .elevation) else {
+            fatalError("Could not read elevation file for domain \(domain)")
+        }
+        for gridpoint in 0..<grid.count {
+            // Read data
+            let reader = try domain.getReader(position: gridpoint)
+            let coords = grid.getCoordinates(gridpoint: gridpoint)
+            let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
+            let rows = try variables.map { variable in
+                guard let data = try reader.get(mixed: variable, time: time) else {
+                    fatalError("Invalid variable \(variable)")
+                }
+                return try ArrowArray(float: data.data)
+            }
+            let table = try ArrowTable(schema: schema, arrays: [
+                try ArrowArray(int64: [Int64](repeating: Int64(gridpoint), count: time.count)),
+                try ArrowArray(float: [Float](repeating: coords.latitude, count: time.count)),
+                try ArrowArray(float: [Float](repeating: coords.longitude, count: time.count)),
+                try ArrowArray(float: [Float](repeating: elevation.numeric, count: time.count)),
+                arrowTime
+            ] + rows)
+            try writer.write(table: table, chunkSize: 1024)
+            progress.add(time.count * 4 * variables.count)
+        }
+        
+        progress.finish()
         
         #else
         fatalError("Apache Parquet support not enabled")
         #endif
-        
     }
     
     func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
-        
-        /// needs to be evenly dividable by grid.nx
-        //let nLocationChunk = grid.nx / ((18...1).first(where: { grid.nx % $0 == 0 }) ?? 1)
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
@@ -183,8 +327,6 @@ struct ExportCommand: AsyncCommandFix {
         
         // Calculate daily normals
         if let normals {
-            let variablesPrecipitation = ["precipitation_sum", "snowfall_water_equivalent_sum"]
-            
             let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
             let normalsCalculator = DailyNormalsCalculator(years: normals.years, normalsWidthInYears: normals.width)
             let nTimeNormals = normalsCalculator.timeBins.count * 365
@@ -211,7 +353,7 @@ struct ExportCommand: AsyncCommandFix {
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data.data), time: time)
+                    let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                     try ncVariable.write(normals, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
                     progress.add(time.count * 4)
                 }
@@ -225,7 +367,7 @@ struct ExportCommand: AsyncCommandFix {
                 guard let data = try reader.get(mixed: variable, time: time)?.data else {
                     fatalError("Invalid variable \(variable)")
                 }
-                let normals = variablesPrecipitation.contains(variable) ? normalsCalculator.calculateDailyNormalsPreserveDryDays(values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end) : normalsCalculator.calculateDailyNormals(values: ArraySlice(data), time: time)
+                let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                 try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
                 progress.add(time.count * 4)
             }
@@ -290,9 +432,16 @@ struct DailyNormalsCalculator {
     /// Create normals over a given timespan
     init(years: [Int], normalsWidthInYears: Int) {
         timeBins = years.map { year in
-            // in case 5 years with, use the year 2022 as center and form 2020-2024 normals
+            // in case 5 years width, use the year 2022 as center and form 2020-2024 normals
             Timestamp(year - normalsWidthInYears / 2, 1, 1) ..< Timestamp(year + normalsWidthInYears / 2 + normalsWidthInYears % 2, 1, 1)
         }
+    }
+    
+    /// Switch to precipitation daily normals if required
+    func calculateDailyNormals(variable: String, values: ArraySlice<Float>, time: TimerangeDt, rainDayDistribution: RainDayDistribution) -> [Float] {
+        return ["precipitation_sum", "snowfall_water_equivalent_sum"].contains(variable) ?
+            calculateDailyNormalsPreserveDryDays(values: values, time: time, rainDayDistribution: rainDayDistribution) :
+            calculateDailyNormals(values: values, time: time)
     }
     
     /// Calculate mean daily normals
