@@ -117,6 +117,7 @@ enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, Cas
     case growing_degree_days_base_0_limit_50
     case soil_moisture_index_0_to_10cm_mean
     case soil_moisture_index_0_to_100cm_mean
+    case daylight_duration
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -578,6 +579,8 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
                 throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
             }
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .daylight_duration:
+            return DataAndUnit(Zensun.calculateDaylightDuration(timeRange: time.range, lat: modelLat, lon: modelLon, utcOffsetSeconds: 0), .second)
         }
     }
     
@@ -604,6 +607,8 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
         case .soil_moisture_index_0_to_100cm_mean:
             try prefetchData(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
+        case .daylight_duration:
+            break
         }
     }
 }

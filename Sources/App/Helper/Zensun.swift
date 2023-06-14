@@ -39,6 +39,20 @@ public struct Zensun {
         return (rises, sets)
     }
     
+    /// Calculate daylight duration in seconds
+    public static func calculateDaylightDuration(timeRange: Range<Timestamp>, lat: Float, lon: Float, utcOffsetSeconds: Int) -> [Float] {
+        return timeRange.stride(dtSeconds: 86400).map { time in
+            switch calculateSunTransit(date: time, lat: lat, lon: lon) {
+            case .polarNight:
+                return 0
+            case .polarDay:
+                return 24*3600
+            case .transit(rise: let rise, set: let set):
+                return Float(set - rise)
+            }
+        }
+    }
+    
     public enum SunTransit {
         case polarNight
         case polarDay
