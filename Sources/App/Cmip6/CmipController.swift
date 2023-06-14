@@ -125,11 +125,16 @@ enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, Cas
 }
 
 enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIterable, GenericVariableBiasCorrectable {
-
     case et0_fao_evapotranspiration_sum
     case leaf_wetness_probability_mean
     case soil_moisture_0_to_100cm_mean
+    case soil_moisture_0_to_7cm_mean
+    case soil_moisture_7_to_28cm_mean
+    case soil_moisture_28_to_100cm_mean
     case soil_temperature_0_to_100cm_mean
+    case soil_temperature_0_to_7cm_mean
+    case soil_temperature_7_to_28cm_mean
+    case soil_temperature_28_to_100cm_mean
     case vapor_pressure_deficit_max
     case windgusts_10m_mean
     case windgusts_10m_max
@@ -148,7 +153,19 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
             return .absoluteChage(bounds: 0...100)
         case .soil_moisture_0_to_100cm_mean:
             return .absoluteChage(bounds: 0...10e9)
+        case .soil_moisture_0_to_7cm_mean:
+            return .absoluteChage(bounds: 0...10e9)
+        case .soil_moisture_7_to_28cm_mean:
+            return .absoluteChage(bounds: 0...10e9)
+        case .soil_moisture_28_to_100cm_mean:
+            return .absoluteChage(bounds: 0...10e9)
         case .soil_temperature_0_to_100cm_mean:
+            return .absoluteChage(bounds: nil)
+        case .soil_temperature_0_to_7cm_mean:
+            return .absoluteChage(bounds: nil)
+        case .soil_temperature_7_to_28cm_mean:
+            return .absoluteChage(bounds: nil)
+        case .soil_temperature_28_to_100cm_mean:
             return .absoluteChage(bounds: nil)
         case .windgusts_10m_mean:
             return .relativeChange(maximum: nil)
@@ -712,6 +729,17 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                 let (sm0_10, (sm10_28, sm28_100)) = $0
                 return sm0_10 * 0.1 + sm10_28 * (0.28 - 0.1) + sm28_100 * (1 - 0.28)
             }), sm0_10.unit)
+        case .soil_moisture_0_to_7cm_mean:
+            return try get(raw: .soil_moisture_0_to_10cm_mean, time: time)
+        case .soil_moisture_7_to_28cm_mean:
+            let sm0_10 = try get(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            let sm10_28 = sm0_10.data.indices.map { return sm0_10.data[max(0, $0-5) ..< $0+1].mean() }
+            return DataAndUnit(sm10_28, sm0_10.unit)
+        case .soil_moisture_28_to_100cm_mean:
+            let sm0_10 = try get(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            let sm10_28 = sm0_10.data.indices.map { return sm0_10.data[max(0, $0-5) ..< $0+1].mean() }
+            let sm28_100 = sm10_28.indices.map { return sm10_28[max(0, $0-51) ..< $0+1].mean() }
+            return DataAndUnit(sm28_100, sm0_10.unit)
         case .soil_temperature_0_to_100cm_mean:
             let t2m = try get(raw: .temperature_2m_mean, time: time)
             let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0-3) ..< $0+1].mean() }
@@ -721,6 +749,21 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                 let (st0_7, (st7_28, st28_100)) = $0
                 return st0_7 * 0.07 + st7_28 * (0.28 - 0.07) + st28_100 * (1 - 0.28)
             }), t2m.unit)
+        case .soil_temperature_0_to_7cm_mean:
+            let t2m = try get(raw: .temperature_2m_mean, time: time)
+            let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0-3) ..< $0+1].mean() }
+            return DataAndUnit(st0_7, t2m.unit)
+        case .soil_temperature_7_to_28cm_mean:
+            let t2m = try get(raw: .temperature_2m_mean, time: time)
+            let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0-3) ..< $0+1].mean() }
+            let st7_28 = st0_7.indices.map { return st0_7[max(0, $0-5) ..< $0+1].mean() }
+            return DataAndUnit(st7_28, t2m.unit)
+        case .soil_temperature_28_to_100cm_mean:
+            let t2m = try get(raw: .temperature_2m_mean, time: time)
+            let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0-3) ..< $0+1].mean() }
+            let st7_28 = st0_7.indices.map { return st0_7[max(0, $0-5) ..< $0+1].mean() }
+            let st28_100 = st7_28.indices.map { return st7_28[max(0, $0-51) ..< $0+1].mean() }
+            return DataAndUnit(st28_100, t2m.unit)
         case .windgusts_10m_mean:
             return try get(raw: .windspeed_10m_mean, time: time)
         case .windgusts_10m_max:
@@ -766,8 +809,20 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             }
         case .soil_moisture_0_to_100cm_mean:
             try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
+        case .soil_moisture_0_to_7cm_mean:
+            try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
+        case .soil_moisture_7_to_28cm_mean:
+            try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
+        case .soil_moisture_28_to_100cm_mean:
+            try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
         case .soil_temperature_0_to_100cm_mean:
             try prefetchData(raw: .temperature_2m_mean, time: time)
+        case .soil_temperature_0_to_7cm_mean:
+            try prefetchData(raw: .temperature_2m_max, time: time)
+        case .soil_temperature_7_to_28cm_mean:
+            try prefetchData(raw: .temperature_2m_max, time: time)
+        case .soil_temperature_28_to_100cm_mean:
+            try prefetchData(raw: .temperature_2m_max, time: time)
         case .windgusts_10m_mean:
             try prefetchData(raw: .windspeed_10m_mean, time: time)
         case .windgusts_10m_max:
