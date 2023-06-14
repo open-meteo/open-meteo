@@ -5,6 +5,67 @@ import SwiftNetCDF
 
 #if ENABLE_PARQUET
 import SwiftArrowParquet
+
+/**
+ Helper structure to buffer data before writing to a parquet file. Parquet files are not very efficient for small arrays.
+ */
+final class BufferedParquetFileWriter {
+    var locations = [Int64]()
+    var latitudes = [Float]()
+    var longitudes = [Float]()
+    var elevations = [Float]()
+    var times = [Int64]()
+    var data: [[Float]]
+    let schema: ArrowSchema
+    let writer: ParquetFileWriter
+    
+    init(nVariables: Int, schema: ArrowSchema, writer: ParquetFileWriter) {
+        data = [[Float]](repeating: [Float](), count: nVariables)
+        self.schema = schema
+        self.writer = writer
+    }
+    
+    /// Append new data, if more than 4k rows, flush to writer
+    func add(data: [[Float]], timestamps: [Int64], location: Int, latitude: Float, longitude: Float, elevation: Float) throws {
+        let nt = timestamps.count
+        locations.append(contentsOf: [Int64](repeating: Int64(location), count: nt))
+        latitudes.append(contentsOf: [Float](repeating: latitude, count: nt))
+        longitudes.append(contentsOf: [Float](repeating: longitude, count: nt))
+        elevations.append(contentsOf: [Float](repeating: elevation, count: nt))
+        times.append(contentsOf: timestamps)
+        for (i,d) in data.enumerated() {
+            self.data[i].append(contentsOf: d)
+        }
+        let bytesPerRow = (8 + 4 + 4 + 4 + 8 + data.count * 4)
+        if locations.count >= 512*1024*1024 / bytesPerRow {
+            // flush after 512MB data, which is the recommended row size
+            try flush()
+        }
+    }
+    
+    func flush() throws {
+        if locations.isEmpty {
+            return
+        }
+        let table = try ArrowTable(schema: schema, arrays: [
+            try ArrowArray(int64: locations),
+            try ArrowArray(float: latitudes),
+            try ArrowArray(float: longitudes),
+            try ArrowArray(float: elevations),
+            try ArrowArray(timestamp: times, unit: .second)
+        ] + data.map( {try ArrowArray(float: $0)}))
+        try writer.write(table: table, chunkSize: locations.count)
+        
+        locations.removeAll(keepingCapacity: true)
+        latitudes.removeAll(keepingCapacity: true)
+        longitudes.removeAll(keepingCapacity: true)
+        elevations.removeAll(keepingCapacity: true)
+        times.removeAll(keepingCapacity: true)
+        for i in data.indices {
+            data[i].removeAll(keepingCapacity: true)
+        }
+    }
+}
 #endif
 
 
@@ -158,6 +219,7 @@ struct ExportCommand: AsyncCommandFix {
         columns.forEach({properties.setCompression(type: .lz4, path: $0.0)})
         
         let writer = try ParquetFileWriter(path: file, schema: schema, properties: properties)
+        let container = BufferedParquetFileWriter(nVariables: variables.count, schema: schema, writer: writer)
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
         
@@ -166,7 +228,8 @@ struct ExportCommand: AsyncCommandFix {
             let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4 * variables.count, name: "Processed")
             let normalsCalculator = DailyNormalsCalculator(years: normals.years, normalsWidthInYears: normals.width)
             let nTimeNormals = normalsCalculator.timeBins.count * 365
-            let arrowTime = try ArrowArray(timestamp: normals.years.flatMap { TimerangeDt(start: Timestamp($0,1,1), nTime: 365, dtSeconds: 24*3600).map({Int64($0.timeIntervalSince1970)}) }, unit: .second)
+            //properties.setDataPageSize(nTimeNormals*4)
+            let timestamps64 = normals.years.flatMap { TimerangeDt(start: Timestamp($0,1,1), nTime: 365, dtSeconds: 24*3600).map({Int64($0.timeIntervalSince1970)}) }
             logger.info("Calculating daily normals. years=\(normals.years) width=\(normals.width) years. Total raw size \((grid.count * nTimeNormals * 4).bytesHumanReadable)")
             
             if let targetGridDomain {
@@ -184,18 +247,13 @@ struct ExportCommand: AsyncCommandFix {
                         guard let data = try reader.get(mixed: variable, time: time) else {
                             fatalError("Invalid variable \(variable)")
                         }
-                        return try ArrowArray(float: normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end))
+                        return normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits)
                     }
-                    let table = try ArrowTable(schema: schema, arrays: [
-                        try ArrowArray(int64: [Int64](repeating: Int64(l), count: nTimeNormals)),
-                        try ArrowArray(float: [Float](repeating: coords.latitude, count: nTimeNormals)),
-                        try ArrowArray(float: [Float](repeating: coords.longitude, count: nTimeNormals)),
-                        try ArrowArray(float: [Float](repeating: elevation.numeric, count: nTimeNormals)),
-                        arrowTime
-                    ] + rows)
-                    try writer.write(table: table, chunkSize: 1024)
+                    try container.add(data: rows, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
                     progress.add(time.count * 4 * variables.count)
                 }
+                try container.flush()
+                try writer.close()
                 progress.finish()
                 return
             }
@@ -209,28 +267,23 @@ struct ExportCommand: AsyncCommandFix {
                 let coords = grid.getCoordinates(gridpoint: gridpoint)
                 let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
                 let rows = try variables.map { variable in
-                    guard let data = try reader.get(mixed: variable, time: time)?.data else {
+                    guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    return try ArrowArray(float: normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end))
+                    return normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits)
                 }
-                let table = try ArrowTable(schema: schema, arrays: [
-                    try ArrowArray(int64: [Int64](repeating: Int64(gridpoint), count: nTimeNormals)),
-                    try ArrowArray(float: [Float](repeating: coords.latitude, count: nTimeNormals)),
-                    try ArrowArray(float: [Float](repeating: coords.longitude, count: nTimeNormals)),
-                    try ArrowArray(float: [Float](repeating: elevation.numeric, count: nTimeNormals)),
-                    arrowTime
-                ] + rows)
-                try writer.write(table: table, chunkSize: 1024)
+                try container.add(data: rows, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
                 progress.add(time.count * 4 * variables.count)
             }
+            try container.flush()
+            try writer.close()
             progress.finish()
             return
         }
 
         logger.info("Writing data. Total raw size \((grid.count * time.count * 4 * variables.count).bytesHumanReadable)")
         let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
-        let arrowTime = try ArrowArray(timestamp: time.map({Int64($0.timeIntervalSince1970)}), unit: .second)
+        let timestamps64 = time.map({Int64($0.timeIntervalSince1970)})
         
         /// Interpolate data from one grid to another and perform bias correction
         if let targetGridDomain {
@@ -248,18 +301,13 @@ struct ExportCommand: AsyncCommandFix {
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    return try ArrowArray(float: data.data)
+                    return data.data
                 }
-                let table = try ArrowTable(schema: schema, arrays: [
-                    try ArrowArray(int64: [Int64](repeating: Int64(l), count: time.count)),
-                    try ArrowArray(float: [Float](repeating: coords.latitude, count: time.count)),
-                    try ArrowArray(float: [Float](repeating: coords.longitude, count: time.count)),
-                    try ArrowArray(float: [Float](repeating: elevation.numeric, count: time.count)),
-                    arrowTime
-                ] + rows)
-                try writer.write(table: table, chunkSize: 1024)
+                try container.add(data: rows, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
                 progress.add(time.count * 4 * variables.count)
             }
+            try container.flush()
+            try writer.close()
             progress.finish()
             return
         }
@@ -277,19 +325,13 @@ struct ExportCommand: AsyncCommandFix {
                 guard let data = try reader.get(mixed: variable, time: time) else {
                     fatalError("Invalid variable \(variable)")
                 }
-                return try ArrowArray(float: data.data)
+                return data.data
             }
-            let table = try ArrowTable(schema: schema, arrays: [
-                try ArrowArray(int64: [Int64](repeating: Int64(gridpoint), count: time.count)),
-                try ArrowArray(float: [Float](repeating: coords.latitude, count: time.count)),
-                try ArrowArray(float: [Float](repeating: coords.longitude, count: time.count)),
-                try ArrowArray(float: [Float](repeating: elevation.numeric, count: time.count)),
-                arrowTime
-            ] + rows)
-            try writer.write(table: table, chunkSize: 1024)
+            try container.add(data: rows, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
             progress.add(time.count * 4 * variables.count)
         }
-        
+        try container.flush()
+        try writer.close()
         progress.finish()
         
         #else
