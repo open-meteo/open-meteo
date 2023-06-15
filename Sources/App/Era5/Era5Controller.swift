@@ -279,6 +279,12 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
     case cloudcover_min
     case cloudcover_mean
     /// only for CMIP6 reference
+    case soil_moisture_0_to_7cm_mean
+    case soil_moisture_7_to_28cm_mean
+    case soil_moisture_28_to_100cm_mean
+    case soil_temperature_0_to_7cm_mean
+    case soil_temperature_7_to_28cm_mean
+    case soil_temperature_28_to_100cm_mean
     case soil_moisture_0_to_10cm_mean
     case soil_moisture_0_to_100cm_mean
     case soil_moisture_index_0_to_7cm_mean
@@ -393,6 +399,18 @@ enum Era5DailyWeatherVariable: String, RawRepresentableString, DailyVariableCalc
             return .mean(.soil_moisture_index_100_to_255cm)
         case .soil_moisture_index_0_to_100cm_mean:
             return .mean(.soil_moisture_index_0_to_100cm)
+        case .soil_moisture_0_to_7cm_mean:
+            return .mean(.soil_moisture_0_to_7cm)
+        case .soil_moisture_7_to_28cm_mean:
+            return .mean(.soil_moisture_7_to_28cm)
+        case .soil_moisture_28_to_100cm_mean:
+            return .mean(.soil_moisture_28_to_100cm)
+        case .soil_temperature_0_to_7cm_mean:
+            return .mean(.soil_temperature_0_to_7cm)
+        case .soil_temperature_7_to_28cm_mean:
+            return .mean(.soil_temperature_7_to_28cm)
+        case .soil_temperature_28_to_100cm_mean:
+            return .mean(.soil_temperature_28_to_100cm)
         }
     }
 }
