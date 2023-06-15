@@ -118,6 +118,8 @@ enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, Cas
     case soil_moisture_index_0_to_10cm_mean
     case soil_moisture_index_0_to_100cm_mean
     case daylight_duration
+    case windspeed_2m_max
+    case windspeed_2m_mean
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -356,7 +358,10 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     var _referenceElevation: ElevationOrSea? = nil
     
     func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        throw ForecastapiError.generic(message: "Cmip6BiasCorrectorInterpolatedWeights does not support static files")
+        guard let file = referenceDomain.getStaticFile(type: type) else {
+            return nil
+        }
+        return try file.readInterpolated(pos: referencePosition)
     }
     
     func getReferenceElevation() throws -> ElevationOrSea {
@@ -598,6 +603,14 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .daylight_duration:
             return DataAndUnit(Zensun.calculateDaylightDuration(timeRange: time.range, lat: modelLat, lon: modelLon, utcOffsetSeconds: 0), .second)
+        case .windspeed_2m_max:
+            let wind = try get(raw: .raw(.windspeed_10m_max), time: time)
+            let scale = Meteorology.scaleWindFactor(from: 10, to: 2)
+            return DataAndUnit(wind.data.map{$0*scale}, wind.unit)
+        case .windspeed_2m_mean:
+            let wind = try get(raw: .raw(.windspeed_10m_mean), time: time)
+            let scale = Meteorology.scaleWindFactor(from: 10, to: 2)
+            return DataAndUnit(wind.data.map{$0*scale}, wind.unit)
         }
     }
     
@@ -626,6 +639,10 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
         case .daylight_duration:
             break
+        case .windspeed_2m_max:
+            try prefetchData(raw: .raw(.windspeed_10m_max), time: time)
+        case .windspeed_2m_mean:
+            try prefetchData(raw: .raw(.windspeed_10m_mean), time: time)
         }
     }
 }

@@ -240,8 +240,16 @@ struct DownloadEra5Command: AsyncCommandFix {
             .relative_humidity_2m_max,
             .relative_humidity_2m_min,
             .relative_humidity_2m_mean,
-            .soil_moisture_0_to_10cm_mean
-        ].map{.raw($0)}
+            .soil_moisture_0_to_10cm_mean,
+        ].map{.raw($0)} + [
+            Cmip6VariableDerivedBiasCorrected.soil_moisture_0_to_7cm_mean,
+            .soil_moisture_7_to_28cm_mean,
+            .soil_moisture_28_to_100cm_mean,
+            .soil_temperature_0_to_7cm_mean,
+            .soil_temperature_7_to_28cm_mean,
+            .soil_temperature_28_to_100cm_mean,
+            .vapor_pressure_deficit_max
+        ].map{.derived($0)}
         
         for variable in variables {
             guard let era5Variable = Era5DailyWeatherVariable(rawValue: variable.rawValue) else {

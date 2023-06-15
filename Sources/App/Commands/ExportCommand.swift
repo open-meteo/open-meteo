@@ -37,8 +37,8 @@ final class BufferedParquetFileWriter {
             self.data[i].append(contentsOf: d)
         }
         let bytesPerRow = (8 + 4 + 4 + 4 + 8 + data.count * 4)
-        if locations.count >= 512*1024*1024 / bytesPerRow {
-            // flush after 512MB data, which is the recommended row size
+        if locations.count >= 64*1024*1024 / bytesPerRow {
+            // flush after 64MB data
             try flush()
         }
     }
@@ -218,6 +218,9 @@ struct ExportCommand: AsyncCommandFix {
         columns.forEach({properties.setCompression(type: .lz4, path: $0.0)})
         
         let writer = try ParquetFileWriter(path: file, schema: schema, properties: properties)
+        defer {
+            try! writer.close()
+        }
         let container = BufferedParquetFileWriter(nVariables: variables.count, schema: schema, writer: writer)
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
@@ -252,7 +255,6 @@ struct ExportCommand: AsyncCommandFix {
                     progress.add(time.count * 4 * variables.count)
                 }
                 try container.flush()
-                try writer.close()
                 progress.finish()
                 return
             }
@@ -275,7 +277,6 @@ struct ExportCommand: AsyncCommandFix {
                 progress.add(time.count * 4 * variables.count)
             }
             try container.flush()
-            try writer.close()
             progress.finish()
             return
         }
@@ -306,7 +307,6 @@ struct ExportCommand: AsyncCommandFix {
                 progress.add(time.count * 4 * variables.count)
             }
             try container.flush()
-            try writer.close()
             progress.finish()
             return
         }
@@ -330,7 +330,6 @@ struct ExportCommand: AsyncCommandFix {
             progress.add(time.count * 4 * variables.count)
         }
         try container.flush()
-        try writer.close()
         progress.finish()
         
         #else
@@ -748,17 +747,17 @@ enum ExportDomain: String, CaseIterable {
             guard let biasCorrector = try Cmip6BiasCorrectorInterpolatedWeights(domain: cmipDomain, referenceDomain: CdsDomain.era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return biasCorrector
+            return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         case .era5_land:
             guard let biasCorrector = try Cmip6BiasCorrectorEra5Seamless(domain: cmipDomain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return biasCorrector
+            return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         case .imerg:
             guard let biasCorrector = try Cmip6BiasCorrectorGenericDomain(domain: cmipDomain, referenceDomain: SatelliteDomain.imerg_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return biasCorrector
+            return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         }
     }
 }
