@@ -15,7 +15,7 @@ struct RegularGrid: Gridable {
         
         // Allow points on the border. Technically for global grids, this grid point now wrappes to the eastern side
         let xx = x == -1 ? 0 : (x == nx) ? (nx-1) : x
-        let yy = y == -1 ? 0 : (y == ny) ? (ny-1) : x
+        let yy = y == -1 ? 0 : (y == ny) ? (ny-1) : y
         if yy < 0 || xx < 0 || yy >= ny || xx >= nx {
             return nil
         }
