@@ -545,49 +545,49 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 return Meteorology.leafwetnessPorbability(temperature2mCelsius: temperature, dewpointCelsius: dewpoint, precipitation: precipitation)
             }), .percent)
         case .soil_moisture_index_0_to_7cm:
-            let soilMoisture = try get(raw: .soil_moisture_0_to_7cm, time: time)
             guard let soilType = try self.getStatic(type: .soilType) else {
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
+                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
             }
+            let soilMoisture = try get(raw: .soil_moisture_0_to_7cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_7_to_28cm:
-            let soilMoisture = try get(raw: .soil_moisture_7_to_28cm, time: time)
             guard let soilType = try self.getStatic(type: .soilType) else {
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
+                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
             }
+            let soilMoisture = try get(raw: .soil_moisture_7_to_28cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_28_to_100cm:
-            let soilMoisture = try get(raw: .soil_moisture_28_to_100cm, time: time)
             guard let soilType = try self.getStatic(type: .soilType) else {
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
+                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
             }
+            let soilMoisture = try get(raw: .soil_moisture_28_to_100cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_100_to_255cm:
-            let soilMoisture = try get(raw: .soil_moisture_100_to_255cm, time: time)
             guard let soilType = try self.getStatic(type: .soilType) else {
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
+                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
             }
+            let soilMoisture = try get(raw: .soil_moisture_100_to_255cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_0_to_100cm:
-            let soilMoisture = try get(derived: .soil_moisture_0_to_100cm, time: time)
             guard let soilType = try self.getStatic(type: .soilType) else {
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                throw ForecastapiError.generic(message: "Invalid ERA5 soil type '\(soilType)'")
+                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
             }
+            let soilMoisture = try get(derived: .soil_moisture_0_to_100cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
