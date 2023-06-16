@@ -144,8 +144,14 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
                     data[i] = .nan
                 }
             }
+            // lat and lon dimensions are flipped in original data. Transpose [lon,lat] to [lat,lon]
+            let transposed = Array2DFastTime(data: data, nLocations: nx, nTime: ny).transpose().data
+            
+            //try Array2DFastSpace(data: transposed, nLocations: nx*ny, nTime: 1).writeNetcdf(filename: "imerg.nc", nx: nx, ny: ny)
+            //fatalError()
+            
             try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
-                .write(file: destination, compressionType: .p4nzdec256, scalefactor: 10, all: data)
+                .write(file: destination, compressionType: .p4nzdec256, scalefactor: 10, all: transposed)
             progress.add(1)
         }
         progress.finish()
