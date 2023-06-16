@@ -7,10 +7,10 @@ import SwiftPFor2D
  Download satellite datasets like IMERG
  
  NASA auth:
- echo "machine urs.earthdata.nasa.gov login <uid> password <password>" >> ~/.netrc 
+ echo "machine urs.earthdata.nasa.gov login <uid> password <password>" >> ~/.netrc
  echo "HTTP.NETRC=/Users/patrick/.netrc\nHTTP.COOKIEJAR=/Users/patrick/.urs_cookies" > ~/.dodsrc
- chmod 0600 ~/.netrc 
- chmod 0600 ~/.dodsrc 
+ chmod 0600 ~/.netrc
+ chmod 0600 ~/.dodsrc
  */
 struct SatelliteDownloadCommand: AsyncCommandFix {
     /// 6k locations require around 200 MB memory for a yearly time-series
@@ -59,22 +59,22 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
             fatalError("no master file defined")
         }
         let masterFile = "\(master.path)precipitation_sum_0.om"
-        if FileManager.default.fileExists(atPath: masterFile) {
-            logger.info("Master file already present")
-            return
-        }
-        try downloadImergDaily(logger: logger, domain: .imerg_daily, timerange: master.time)
-        
-        try FileManager.default.createDirectory(atPath: master.path, withIntermediateDirectories: true)
-        logger.info("Generating master files")
-        let readers = try master.time.map { time in
-            let omFile = "\(domain.downloadDirectory)precipitation_\(time.format_YYYYMMdd).om"
-            return try OmFileReader(file: omFile)
-        }
-        try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512)
-            .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: 10, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: readers, dataCallback: nil)
+        if !FileManager.default.fileExists(atPath: masterFile) {
+            try downloadImergDaily(logger: logger, domain: .imerg_daily, timerange: master.time)
             
-        try generateBiasCorrectionFields(logger: logger, domain: domain, variables: [.precipitation_sum], time: master.time)
+            try FileManager.default.createDirectory(atPath: master.path, withIntermediateDirectories: true)
+            logger.info("Generating master files")
+            let readers = try master.time.map { time in
+                let omFile = "\(domain.downloadDirectory)precipitation_\(time.format_YYYYMMdd).om"
+                return try OmFileReader(file: omFile)
+            }
+            try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512)
+                .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: 10, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: readers, dataCallback: nil)
+        }
+        
+        if !FileManager.default.fileExists(atPath: domain.getBiasCorrectionFile(for: SatelliteVariable.precipitation_sum.omFileName.file).getFilePath()) {
+            try generateBiasCorrectionFields(logger: logger, domain: domain, variables: [.precipitation_sum], time: master.time)
+        }
     }
     
     /// Generate seasonal averages for bias corrections
