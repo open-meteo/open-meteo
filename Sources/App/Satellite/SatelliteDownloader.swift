@@ -26,6 +26,9 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
         @Option(name: "year", short: "y", help: "Download one year")
         var year: String?
         
+        @Flag(name: "create-fixed-file")
+        var createFixedFile: Bool
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() -> TimerangeDt {
             let dt = 3600*24
@@ -51,10 +54,10 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
     
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger  = context.application.logger
-        try createImergMaster(logger: logger, domain: .imerg_daily)
+        try createImergMaster(logger: logger, domain: .imerg_daily, createFixedFile: signature.createFixedFile)
     }
     
-    func createImergMaster(logger: Logger, domain: SatelliteDomain) throws {
+    func createImergMaster(logger: Logger, domain: SatelliteDomain, createFixedFile: Bool) throws {
         guard let master = domain.omFileMaster else {
             fatalError("no master file defined")
         }
@@ -70,6 +73,28 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
             }
             try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512)
                 .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: 10, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: readers, dataCallback: nil)
+        }
+        
+        /// Data was not transposed before
+        if createFixedFile {
+            let masterFileFixed = "\(master.path)precipitation_sum_fixed_0.om"
+            if !FileManager.default.fileExists(atPath: masterFileFixed) {
+                let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(masterFileFixed)")
+                let reader = try OmFileReader(file: masterFile)
+                try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512).write(file: masterFileFixed, compressionType: .p4nzdec256, scalefactor: 10, overwrite: false) { dim0 in
+                    let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, reader.dim0)
+                    var ret = Array2DFastTime(nLocations: locationRange.count, nTime: reader.dim1)
+                    for (i, location) in locationRange.enumerated() {
+                        let x = location % 3600
+                        let y = location / 3600
+                        let locationRotated = x * 1800 + y
+                        ret[i, 0..<ret.nTime] = ArraySlice(try reader.read(dim0Slow: locationRotated..<locationRotated+1, dim1: 0..<ret.nTime))
+                    }
+                    progress.add(locationRange.count)
+                    return ArraySlice(ret.data)
+                }
+                progress.finish()
+            }
         }
         
         if !FileManager.default.fileExists(atPath: domain.getBiasCorrectionFile(for: SatelliteVariable.precipitation_sum.omFileName.file).getFilePath()) {
