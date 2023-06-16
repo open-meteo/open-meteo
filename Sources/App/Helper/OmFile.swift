@@ -170,7 +170,7 @@ struct OmFileSplitter {
                let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: omFileMaster.path, variable: variable, timeChunk: 0)),
                 omFile.dim0 % nLocations == 0 {
                 let nLevels = omFile.dim0 / nLocations
-                if nLevels >= 0 && location.count > 1 {
+                if nLevels > 0 && location.count > 1 {
                     fatalError("Multi level and mutli location not supported")
                 }
                 if level < nLevels {
