@@ -29,7 +29,10 @@ struct ConvertOmCommand: Command {
     }
     
     func run(using context: CommandContext, signature: Signature) throws {
+        let logger = context.application.logger
         let om = try OmFileReader(file: signature.infile)
+        logger.info("dim0=\(om.dim0) dim1=\(om.dim1) chunk0=\(om.chunk0) chunk1=\(om.chunk1)")
+        
         let data = try om.readAll()
         
         let oufile = signature.outfile ?? "\(signature.infile).nc"
@@ -39,6 +42,7 @@ struct ConvertOmCommand: Command {
         if let nx = signature.nx {
             let ny = om.dim0 / nx
             if signature.transpose {
+                logger.info("Transpose to nx=\(nx) ny=\(ny)")
                 // to fast space
                 var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
                     try ncFile.createDimension(name: "time", length: om.dim1),
