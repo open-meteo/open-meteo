@@ -246,6 +246,8 @@ struct ExportCommand: AsyncCommandFix {
                     // Read data
                     let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
                     let rows = try variables.map { variable in
+                        let reader = variable == "precipitation_sum_imerg" ? try domain.getReader(targetGridDomain: .imerg, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land) : reader
+                        let variable = variable == "precipitation_sum_imerg" ? "precipitation_sum" : variable
                         guard let data = try reader.get(mixed: variable, time: time) else {
                             fatalError("Invalid variable \(variable)")
                         }
@@ -295,9 +297,10 @@ struct ExportCommand: AsyncCommandFix {
             for l in 0..<grid.count {
                 let coords = grid.getCoordinates(gridpoint: l)
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
+                let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
                 let rows = try variables.map { variable in
-                    // Read data
-                    let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
+                    let reader = variable == "precipitation_sum_imerg" ? try domain.getReader(targetGridDomain: .imerg, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land) : reader
+                    let variable = variable == "precipitation_sum_imerg" ? "precipitation_sum" : variable
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
