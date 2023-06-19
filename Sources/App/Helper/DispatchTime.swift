@@ -22,7 +22,7 @@ extension Double {
             return "\(milliseconds.round(digits: 1))ms"
         }
         if milliseconds < 800 {
-            return "\(milliseconds.round(digits: 0))ms"
+            return "\(Int(milliseconds.round(digits: 0)))ms"
         }
         if milliseconds < 5_000 {
             return "\(seconds.round(digits: 2))s"
@@ -31,10 +31,10 @@ extension Double {
             return "\(seconds.round(digits: 1))s"
         }
         if milliseconds < 180_000 {
-            return "\(seconds.round(digits: 0))s"
+            return "\(Int(seconds.round(digits: 0)))s"
         }
         if milliseconds < 1000 * 60 * 90 {
-            return "\(minutes.round(digits: 0))m"
+            return "\(Int(minutes.round(digits: 0)))m"
         }
         return "\(Int(hours).zeroPadded(len: 2)):\((Int(minutes) % 60).zeroPadded(len: 2))"
     }

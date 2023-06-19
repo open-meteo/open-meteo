@@ -32,7 +32,7 @@ final class TransferAmountTracker {
             let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
             let rate = (transfered - transferedLastPrint) / Int(deltaT)
             if let totalSize {
-                let percent = round(Float(transfered) / Float(totalSize) * 100)
+                let percent = Int(round(Float(transfered) / Float(totalSize) * 100))
                 let remainingTime = Double(totalSize - transfered) / (Double(transfered - transferedLastPrint) / deltaT)
                 logger.info("\(name) \(percent)% \(transfered.bytesHumanReadable) / \(totalSize.bytesHumanReadable) in \(timeElapsed), \(rate.bytesHumanReadable)/s remaining \(remainingTime.asSecondsPrettyPrint)")
             } else {
