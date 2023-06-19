@@ -140,10 +140,10 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    func getUrl(run: Timestamp, hour: Int, gribName: String) -> String {
+    func getUrl(run: Timestamp, hour: Int, gribName: String, server: String?) -> String {
         let h3 = hour.zeroPadded(len: 3)
         let yyyymmddhh = run.format_YYYYMMddHH
-        let server = "https://hpfx.collab.science.gc.ca/\(run.format_YYYYMMdd)/WXO-DD/"
+        let server = (server ?? "https://hpfx.collab.science.gc.ca/YYYYMMDD/WXO-DD/").replacingOccurrences(of: "YYYYMMDD", with: run.format_YYYYMMdd)
         switch self {
         case .gem_global:
             return "\(server)model_gem_global/15km/grib2/lat_lon/\(run.hh)/\(h3)/CMC_glb_\(gribName)_latlon.15x.15_\(yyyymmddhh)_P\(h3).grib2"
