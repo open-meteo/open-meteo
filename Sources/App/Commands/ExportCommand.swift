@@ -15,18 +15,37 @@ final class BufferedParquetFileWriter {
     var longitudes = [Float]()
     var elevations = [Float]()
     var times = [Int64]()
-    var data: [[Float]]
-    let schema: ArrowSchema
-    let writer: ParquetFileWriter
+    var data = [[Float]]()
+    var schema: ArrowSchema? = nil
+    var writer: ParquetFileWriter? = nil
+    let file: String
     
-    init(nVariables: Int, schema: ArrowSchema, writer: ParquetFileWriter) {
-        data = [[Float]](repeating: [Float](), count: nVariables)
-        self.schema = schema
-        self.writer = writer
+    init(file: String) {
+        self.file = file
     }
     
-    /// Append new data, if more than 4k rows, flush to writer
-    func add(data: [[Float]], timestamps: [Int64], location: Int, latitude: Float, longitude: Float, elevation: Float) throws {
+    /// Append new data, if more than 64 MB size rows, flush to writer
+    func add(data: [DataAndUnit], variables: [String], timestamps: [Int64], location: Int, latitude: Float, longitude: Float, elevation: Float) throws {
+        if self.data.isEmpty {
+            self.data = [[Float]](repeating: [Float](), count: data.count)
+            
+            let columns = [
+                ("location_id", .int64),
+                ("latitude", .float),
+                ("longitude", .float),
+                ("elevation", .float),
+                ("time", .timestamp(unit: .second))
+            ] + zip(variables, data).map{("\($0.0)_\($0.1.unit)", ArrowDataType.float)}
+            
+            let schema = try ArrowSchema(columns)
+            let properties = ParquetWriterProperties()
+            // Enable compression on all columns
+            columns.forEach({properties.setCompression(type: .snappy, path: $0.0)})
+            
+            writer = try ParquetFileWriter(path: file, schema: schema, properties: properties)
+            self.schema = schema
+        }
+        
         let nt = timestamps.count
         locations.append(contentsOf: [Int64](repeating: Int64(location), count: nt))
         latitudes.append(contentsOf: [Float](repeating: latitude, count: nt))
@@ -34,18 +53,21 @@ final class BufferedParquetFileWriter {
         elevations.append(contentsOf: [Float](repeating: elevation, count: nt))
         times.append(contentsOf: timestamps)
         for (i,d) in data.enumerated() {
-            self.data[i].append(contentsOf: d)
+            self.data[i].append(contentsOf: d.data)
         }
         let bytesPerRow = (8 + 4 + 4 + 4 + 8 + data.count * 4)
         if locations.count >= 64*1024*1024 / bytesPerRow {
             // flush after 64MB data
-            try flush()
+            try flush(closeFile: false)
         }
     }
     
-    func flush() throws {
+    func flush(closeFile: Bool) throws {
         if locations.isEmpty {
             return
+        }
+        guard let schema, let writer else {
+            fatalError("writer or schema not initialised")
         }
         let table = try ArrowTable(schema: schema, arrays: [
             try ArrowArray(int64: locations),
@@ -63,6 +85,12 @@ final class BufferedParquetFileWriter {
         times.removeAll(keepingCapacity: true)
         for i in data.indices {
             data[i].removeAll(keepingCapacity: true)
+        }
+        
+        if closeFile {
+            try writer.close()
+            self.writer = nil
+            self.data.removeAll()
         }
     }
 }
@@ -142,6 +170,7 @@ struct ExportCommand: AsyncCommandFix {
         let domain = try ExportDomain.load(rawValue: signature.domain)
         let regriddingDomain = try TargetGridDomain.load(rawValueOptional: signature.regriddingDomain)
         let format = try ExportFormat.load(rawValueOptional: signature.format) ?? .netcdf
+        disableIdleSleep()
         
         let filePath = signature.outputFilename ?? (format == .netcdf ? "./output.nc" : "./output.parquet")
         
@@ -203,25 +232,7 @@ struct ExportCommand: AsyncCommandFix {
         #if ENABLE_PARQUET
         
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
-        
-        let columns = [
-            ("location_id", .int64),
-            ("latitude", .float),
-            ("longitude", .float),
-            ("elevation", .float),
-            ("time", .timestamp(unit: .second))
-        ] + variables.map({($0, ArrowDataType.float)})
-        
-        let schema = try ArrowSchema(columns)
-        let properties = ParquetWriterProperties()
-        // Enable compression on all columns
-        columns.forEach({properties.setCompression(type: .lz4, path: $0.0)})
-        
-        let writer = try ParquetFileWriter(path: file, schema: schema, properties: properties)
-        defer {
-            try! writer.close()
-        }
-        let container = BufferedParquetFileWriter(nVariables: variables.count, schema: schema, writer: writer)
+        let writer = BufferedParquetFileWriter(file: file)
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
         
@@ -240,6 +251,11 @@ struct ExportCommand: AsyncCommandFix {
                     fatalError("Could not read elevation file for domain \(targetDomain)")
                 }
                 for l in 0..<grid.count {
+                //for l in [grid.findPoint(lat: 47.56, lon: 7.57)!, grid.findPoint(lat: 47.37, lon: 8.55)!] {
+                //for l in grid.findPoint(lat: 47.56, lon: 7.57)! ..< grid.findPoint(lat: 47.56, lon: 7.57)!+300 {
+                    //if l > 0 {
+                    //    break
+                    //}
                     let coords = grid.getCoordinates(gridpoint: l)
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
                     
@@ -251,12 +267,12 @@ struct ExportCommand: AsyncCommandFix {
                         guard let data = try reader.get(mixed: variable, time: time) else {
                             fatalError("Invalid variable \(variable)")
                         }
-                        return normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits)
+                        return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
                     }
-                    try container.add(data: rows, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
+                    try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
                     progress.add(time.count * 4 * variables.count)
                 }
-                try container.flush()
+                try writer.flush(closeFile: true)
                 progress.finish()
                 return
             }
@@ -273,12 +289,12 @@ struct ExportCommand: AsyncCommandFix {
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    return normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits)
+                    return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
                 }
-                try container.add(data: rows, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
+                try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
                 progress.add(time.count * 4 * variables.count)
             }
-            try container.flush()
+            try writer.flush(closeFile: true)
             progress.finish()
             return
         }
@@ -304,12 +320,12 @@ struct ExportCommand: AsyncCommandFix {
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    return data.data
+                    return data
                 }
-                try container.add(data: rows, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
+                try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
                 progress.add(time.count * 4 * variables.count)
             }
-            try container.flush()
+            try writer.flush(closeFile: true)
             progress.finish()
             return
         }
@@ -327,12 +343,12 @@ struct ExportCommand: AsyncCommandFix {
                 guard let data = try reader.get(mixed: variable, time: time) else {
                     fatalError("Invalid variable \(variable)")
                 }
-                return data.data
+                return data
             }
-            try container.add(data: rows, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
+            try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
             progress.add(time.count * 4 * variables.count)
         }
-        try container.flush()
+        try writer.flush(closeFile: true)
         progress.finish()
         
         #else
