@@ -194,6 +194,11 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .windgusts_10m, time: time)
         case .is_day:
             break
+        case .rain:
+            try prefetchData(raw: .precipitation, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
+        case .showers:
+            try prefetchData(raw: .precipitation, time: time)
         }
     }
     
@@ -295,6 +300,14 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
            )
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
+        case .rain:
+            let temperature = try get(raw: .temperature_2m, time: time)
+            let precipitation = try get(raw: .precipitation, time: time)
+            return DataAndUnit(zip(temperature.data, precipitation.data).map({ ($0 >= 0 ? $1 : 0) }), precipitation.unit)
+        case .showers:
+            // always 0, but only if any data is available in precipitation.
+            let precipitation = try get(raw: .precipitation, time: time)
+            return DataAndUnit(precipitation.data.map({ min($0, 0) }), precipitation.unit)
         }
     }
 }
@@ -322,6 +335,8 @@ enum MetNoVariableDerived: String, GenericVariableMixable {
     case snowfall
     case weathercode
     case is_day
+    case rain
+    case showers
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

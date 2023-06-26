@@ -181,7 +181,6 @@ enum MetNoVariable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     
     var isAccumulatedSinceModelStart: Bool {
         switch self {
-        case .precipitation: fallthrough
         case .shortwave_radiation: return true
         default: return false
         }
