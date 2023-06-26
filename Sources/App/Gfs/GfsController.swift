@@ -315,6 +315,12 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))}), .percent)
         }
         
+        /// Make sure showers are `0` instead of `NaN` in HRRR, otherwise it is mixed with GFS showers
+        if domain == .hrrr_conus, case let .surface(variable) = raw.variable, variable == .showers {
+            let precipitation = try reader.get(variable: .init(.surface(.precipitation), member), time: time)
+            return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
+        }
+        
         /// Adjust surface pressure to target elevation. Surface pressure is stored for `modelElevation`, but we want to get the pressure on `targetElevation`
         /*if case let .surface(variable) = raw.variable, variable == .pressure_msl {
             let pressure = try reader.get(variable: raw, time: time)
@@ -339,6 +345,11 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
         if domain == .hrrr_conus, case let .pressure(pressure) = raw.variable, pressure.variable == .cloudcover {
             return try reader.prefetchData(variable: .init(.pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)), member), time: time)
+        }
+        
+        /// Make sure showers are `0` in HRRR, otherwise it is mixed with GFS showers
+        if domain == .hrrr_conus, case let .surface(variable) = raw.variable, variable == .showers {
+            return try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
         }
         
         /// GFS ensemble has no diffuse radiation
