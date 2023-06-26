@@ -302,7 +302,7 @@ public struct Zensun {
     
     /// Calculate DNI using super sampling
     public static func calculateBackwardsDNISupersampled(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt, samples: Int = 60) -> [Float] {
-        // Shit timerange by dt and increase time resolution
+        // Shift timerange by dt and increase time resolution
         let timeSuperSampled = timerange.range.add(-timerange.dtSeconds).range(dtSeconds: timerange.dtSeconds / samples)
         let dhiBackwardsSuperSamled = directRadiation.interpolateSolarBackwards(timeOld: timerange, timeNew: timeSuperSampled, latitude: latitude, longitude: longitude, scalefactor: 1)
         
@@ -314,7 +314,10 @@ public struct Zensun {
         /// return instant values
         //return (0..<timerange.count).map { dhiBackwardsSuperSamled[Swift.min($0 * samples + samples, dhiBackwardsSuperSamled.count-1)] }
         
-        return dniSuperSampled.mean(by: samples)
+        let dni = dniSuperSampled.mean(by: samples)
+        
+        // There could be an issue in the DNI calcualtion at sunrise, resulting in 0 watts. Take direct radiation instead.
+        return zip(dni, directRadiation).map(max)
     }
     
     /// Calculate DNI based on zenith angle
