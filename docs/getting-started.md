@@ -62,6 +62,7 @@ sudo systemctl restart openmeteo-api
 sudo journalctl -u openmeteo-api.service
 ```
 
+Per default, port 8080 is bound to 127.0.0.1 and not exposed to the network. You can set `API_BIND="0.0.0.0:8080"` in `/etc/default/openmeteo-api.env` and restart the service to expose the service. However, it is recommended to use a proxy like NGINX.
 
 ## Downloading datasets
 The instruction above, setup an API instance, but do not download any weather data yet. Because data is consumed from different national weather services with different open-data servers and update times, many different downloader are available.
