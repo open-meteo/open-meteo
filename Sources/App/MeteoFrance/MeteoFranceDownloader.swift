@@ -36,6 +36,10 @@ struct MeteoFranceDownload: AsyncCommandFix {
         let logger = context.application.logger
         let domain = try MeteoFranceDomain.load(rawValue: signature.domain)
         
+        if signature.onlyVariables != nil && signature.upperLevel {
+            fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
+        }
+        
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         let onlyVariables: [MeteoFranceVariableDownloadable]? = try signature.onlyVariables.map {

@@ -41,6 +41,10 @@ struct GfsDownload: AsyncCommandFix {
         let domain = try GfsDomain.load(rawValue: signature.domain)
         disableIdleSleep()
         
+        if signature.onlyVariables != nil && signature.upperLevel {
+            fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
+        }
+        
         /// 18z run is available the day after starting 05:26
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         

@@ -50,6 +50,10 @@ struct GemDownload: AsyncCommandFix {
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
+        if signature.onlyVariables != nil && signature.upperLevel {
+            fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
+        }
+        
         let onlyVariables: [GemVariableDownloadable]? = signature.onlyVariables.map {
             $0.split(separator: ",").map {
                 if let variable = GemPressureVariable(rawValue: String($0)) {
