@@ -23,7 +23,7 @@ struct GemDownload: AsyncCommandFix {
         @Option(name: "past-days")
         var pastDays: Int?
         
-        @Flag(name: "skip-existing")
+        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
         var skipExisting: Bool
         
         @Flag(name: "create-netcdf")

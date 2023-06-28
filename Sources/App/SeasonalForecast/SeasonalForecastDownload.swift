@@ -22,7 +22,7 @@ struct SeasonalForecastDownload: AsyncCommandFix {
         @Option(name: "run")
         var run: String?
 
-        @Flag(name: "skip-existing")
+        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
         var skipExisting: Bool
         
         @Option(name: "only-variables")

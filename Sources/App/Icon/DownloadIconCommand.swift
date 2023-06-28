@@ -25,7 +25,7 @@ struct DownloadIconCommand: AsyncCommandFix {
         @Option(name: "run")
         var run: String?
 
-        @Flag(name: "skip-existing")
+        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
         var skipExisting: Bool
         
         @Option(name: "group")
@@ -315,6 +315,10 @@ struct DownloadIconCommand: AsyncCommandFix {
         let domain = try IconDomains.load(rawValue: signature.domain)
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
+        
+        if signature.onlyVariables != nil && signature.group != nil {
+            fatalError("Parameter 'onlyVariables' and 'groups' must not be used simultaneously")
+        }
         
         let group = try VariableGroup.load(rawValueOptional: signature.group) ?? .all
         
