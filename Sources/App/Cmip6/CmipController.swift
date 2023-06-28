@@ -581,7 +581,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             let tempmax = try get(raw: .raw(.temperature_2m_max), time: time).data
             let tempmin = try get(raw: .raw(.temperature_2m_min), time: time).data
             return DataAndUnit(zip(tempmax, tempmin).map({ (tmax, tmin) in
-                max(min((tmax - tmin) / 2, limit) - base, 0)
+                max(min((tmax + tmin) / 2, limit) - base, 0)
             }), .gddCelsius)
         case .soil_moisture_index_0_to_10cm_mean:
             guard let soilType = try self.getStatic(type: .soilType) else {
