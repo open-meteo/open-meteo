@@ -63,17 +63,24 @@ typedef struct
 {
     //----------------------INPUT VALUES------------------------
 
-    int year;            // 4-digit year,    valid range: -2000 to 6000, error code: 1
-    int month;           // 2-digit month,         valid range: 1 to 12, error code: 2
-    int day;             // 2-digit day,           valid range: 1 to 31, error code: 3
-    int hour;            // Observer local hour,   valid range: 0 to 24, error code: 4
-    int minute;          // Observer local minute, valid range: 0 to 59, error code: 5
-    int second;          // Observer local second, valid range: 0 to 59, error code: 6
+    int year;            // 4-digit year,      valid range: -2000 to 6000, error code: 1
+    int month;           // 2-digit month,         valid range: 1 to  12,  error code: 2
+    int day;             // 2-digit day,           valid range: 1 to  31,  error code: 3
+    int hour;            // Observer local hour,   valid range: 0 to  24,  error code: 4
+    int minute;          // Observer local minute, valid range: 0 to  59,  error code: 5
+    double second;       // Observer local second, valid range: 0 to <60,  error code: 6
+    
+    double delta_ut1;    // Fractional second difference between UTC and UT which is used
+                         // to adjust UTC for earth's irregular rotation rate and is derived
+                         // from observation only and is reported in this bulletin:
+                         // http://maia.usno.navy.mil/ser7/ser7.dat,
+                         // where delta_ut1 = DUT1
+                         // valid range: -1 to 1 second (exclusive), error code 17
 
     double delta_t;      // Difference between earth rotation time and terrestrial time
                          // It is derived from observation only and is reported in this
                          // bulletin: http://maia.usno.navy.mil/ser7/ser7.dat,
-                         // where delta_t = 32.184 + (TAI-UTC) + DUT1
+                         // where delta_t = 32.184 + (TAI-UTC) - DUT1
                          // valid range: -8000 to 8000 seconds, error code: 7
 
     double timezone;     // Observer time zone (negative west of Greenwich)
@@ -98,7 +105,7 @@ typedef struct
                          // valid range: -360 to 360 degrees, error code: 14
 
     double azm_rotation; // Surface azimuth rotation (measured from south to projection of
-                         //     surface normal on horizontal plane, negative west)
+                         //     surface normal on horizontal plane, negative east)
                          // valid range: -360 to 360 degrees, error code: 15
 
     double atmos_refract;// Atmospheric refraction at sunrise and sunset (0.5667 deg is typical)
@@ -159,16 +166,37 @@ typedef struct
 
     //---------------------Final OUTPUT VALUES------------------------
 
-    double zenith;      //topocentric zenith angle [degrees]
-    double azimuth180;  //topocentric azimuth angle (westward from south) [-180 to 180 degrees]
-    double azimuth;     //topocentric azimuth angle (eastward from north) [   0 to 360 degrees]
-    double incidence;   //surface incidence angle [degrees]
+    double zenith;       //topocentric zenith angle [degrees]
+    double azimuth_astro;//topocentric azimuth angle (westward from south) [for astronomers]
+    double azimuth;      //topocentric azimuth angle (eastward from north) [for navigators and solar radiation]
+    double incidence;    //surface incidence angle [degrees]
 
-    double suntransit;  //local sun transit time (or solar noon) [fractional hour]
-    double sunrise;     //local sunrise time (+/- 30 seconds) [fractional hour]
-    double sunset;      //local sunset time (+/- 30 seconds) [fractional hour]
+    double suntransit;   //local sun transit time (or solar noon) [fractional hour]
+    double sunrise;      //local sunrise time (+/- 30 seconds) [fractional hour]
+    double sunset;       //local sunset time (+/- 30 seconds) [fractional hour]
 
 } spa_data;
+
+//-------------- Utility functions for other applications (such as NREL's SAMPA) --------------
+double deg2rad(double degrees);
+double rad2deg(double radians);
+double limit_degrees(double degrees);
+double third_order_polynomial(double a, double b, double c, double d, double x);
+double geocentric_right_ascension(double lamda, double epsilon, double beta);
+double geocentric_declination(double beta, double epsilon, double lamda);
+double observer_hour_angle(double nu, double longitude, double alpha_deg);
+void   right_ascension_parallax_and_topocentric_dec(double latitude, double elevation,
+             double xi, double h, double delta, double *delta_alpha, double *delta_prime);
+double topocentric_right_ascension(double alpha_deg, double delta_alpha);
+double topocentric_local_hour_angle(double h, double delta_alpha);
+double topocentric_elevation_angle(double latitude, double delta_prime, double h_prime);
+double atmospheric_refraction_correction(double pressure, double temperature,
+                                         double atmos_refract, double e0);
+double topocentric_elevation_angle_corrected(double e0, double delta_e);
+double topocentric_zenith_angle(double e);
+double topocentric_azimuth_angle_astro(double h_prime, double latitude, double delta_prime);
+double topocentric_azimuth_angle(double azimuth_astro);
+
 
 //Calculate SPA output values (in structure) based on input values passed in structure
 int spa_calculate(spa_data *spa);

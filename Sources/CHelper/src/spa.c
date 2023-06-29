@@ -10,10 +10,10 @@
 //   Afshin Michael Andreas                //
 //   Afshin.Andreas@NREL.gov (303)384-6383 //
 //                                         //
-//   Measurement & Instrumentation Team    //
+//   Metrology Laboratory                  //
 //   Solar Radiation Research Laboratory   //
 //   National Renewable Energy Laboratory  //
-//   1617 Cole Blvd, Golden, CO 80401      //
+//   15013 Denver W Pkwy, Golden, CO 80401 //
 /////////////////////////////////////////////
 
 /////////////////////////////////////////////
@@ -52,9 +52,9 @@
 //OUT OF OR IN CONNECTION WITH THE ACCESS, USE OR PERFORMANCE OF THIS SOFTWARE.
 //
 //The Software is being provided for internal, noncommercial purposes only and shall not be
-//re-distributed. Please contact Anne Miller (Anne.Miller@nrel.gov) in the NREL
-//Commercialization and Technology Transfer Office for information concerning a commercial
-//license to use the Software.
+//re-distributed. Please contact the NREL Commercialization and Technology Transfer Office
+//for information concerning a commercial license to use the Software, visit:
+//http://midcdmz.nrel.gov/spa/ for the contact information.
 //
 //As a condition of using the Software in an application, the developer of the application
 //agrees to reference the use of the Software and make this Notice readily accessible to any
@@ -101,10 +101,22 @@
 //         Changed timezone bound check from +/-12 to +/-18 hours.
 // Revised 14-JAN-2009 Andreas
 //         Corrected a constant used to calculate ecliptic mean obliquity.
+// Revised 01-APR-2013 Andreas
+//           Replace floor with new integer function for tech. report consistency, no affect on results.
+//         Add "utility" function prototypes to header file for use with NREL's SAMPA.
+//         Rename 4 "utility" function names (remove "sun") for clarity with NREL's SAMPA.
+//           Added delta_ut1 as required input, which the fractional second difference between UT and UTC.
+//         Time must be input w/o delta_ut1 adjustment, instead of assuming adjustment was pre-applied.
+// Revised 10-JUL-2014 Andreas
+//         Change second in spa_data structure from an integer to double to allow fractional second
+// Revised 08-SEP-2014 Andreas
+//         Corrected description of azm_rotation in header file
+//         Limited azimuth180 to range of 0 to 360 deg (instead of -180 to 180) for tech report consistency
+//         Changed all variables names from azimuth180 to azimuth_astro
+//         Renamed 2 "utility" function names for consistency
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <math.h>
-//#include <avr/pgmspace.h>
 #include "spa.h"
 
 #define PI         3.1415926535897932384626433832795028841971
@@ -134,7 +146,7 @@ const int r_subcount[R_COUNT] = {40,10,6,2,1};
 ///////////////////////////////////////////////////
 ///  Earth Periodic Terms
 ///////////////////////////////////////////////////
-double L_TERMS[L_COUNT][L_MAX_SUBCOUNT][TERM_COUNT] =
+const double L_TERMS[L_COUNT][L_MAX_SUBCOUNT][TERM_COUNT]=
 {
     {
         {175347046.0,0,0},
@@ -279,7 +291,7 @@ double L_TERMS[L_COUNT][L_MAX_SUBCOUNT][TERM_COUNT] =
     }
 };
 
-double B_TERMS[B_COUNT][B_MAX_SUBCOUNT][TERM_COUNT] =
+const double B_TERMS[B_COUNT][B_MAX_SUBCOUNT][TERM_COUNT]=
 {
     {
         {280.0,3.199,84334.662},
@@ -294,7 +306,7 @@ double B_TERMS[B_COUNT][B_MAX_SUBCOUNT][TERM_COUNT] =
     }
 };
 
-double R_TERMS[R_COUNT][R_MAX_SUBCOUNT][TERM_COUNT] =
+const double R_TERMS[R_COUNT][R_MAX_SUBCOUNT][TERM_COUNT]=
 {
     {
         {100013989.0,0,0},
@@ -371,7 +383,7 @@ double R_TERMS[R_COUNT][R_MAX_SUBCOUNT][TERM_COUNT] =
 ///  Periodic Terms for the nutation in longitude and obliquity
 ////////////////////////////////////////////////////////////////
 
-int Y_TERMS[Y_COUNT][TERM_Y_COUNT] =
+const int Y_TERMS[Y_COUNT][TERM_Y_COUNT]=
 {
     {0,0,0,0,1},
     {-2,0,0,2,2},
@@ -438,7 +450,7 @@ int Y_TERMS[Y_COUNT][TERM_Y_COUNT] =
     {2,-1,0,2,2},
 };
 
-double PE_TERMS[Y_COUNT][TERM_PE_COUNT] ={
+const double PE_TERMS[Y_COUNT][TERM_PE_COUNT]={
     {-171996,-174.2,92025,8.9},
     {-13187,-1.6,5736,-3.1},
     {-2274,-0.2,977,-0.5},
@@ -516,6 +528,11 @@ double deg2rad(double degrees)
     return (PI/180.0)*degrees;
 }
 
+int integer(double value)
+{
+    return value;
+}
+
 double limit_degrees(double degrees)
 {
     double limited;
@@ -588,9 +605,10 @@ int validate_inputs(spa_data *spa)
     if ((spa->day         < 1    ) || (spa->day         > 31  )) return 3;
     if ((spa->hour        < 0    ) || (spa->hour        > 24  )) return 4;
     if ((spa->minute      < 0    ) || (spa->minute      > 59  )) return 5;
-    if ((spa->second      < 0    ) || (spa->second      > 59  )) return 6;
+    if ((spa->second      < 0    ) || (spa->second      >=60  )) return 6;
     if ((spa->pressure    < 0    ) || (spa->pressure    > 5000)) return 12;
     if ((spa->temperature <= -273) || (spa->temperature > 6000)) return 13;
+    if ((spa->delta_ut1   <= -1  ) || (spa->delta_ut1   >= 1  )) return 17;
     if ((spa->hour        == 24  ) && (spa->minute      > 0   )) return 5;
     if ((spa->hour        == 24  ) && (spa->second      > 0   )) return 6;
 
@@ -610,22 +628,22 @@ int validate_inputs(spa_data *spa)
     return 0;
 }
 ///////////////////////////////////////////////////////////////////////////////////////////////
-double julian_day (int year, int month, int day, int hour, int minute, int second, double tz)
+double julian_day (int year, int month, int day, int hour, int minute, double second, double dut1, double tz)
 {
     double day_decimal, julian_day, a;
 
-    day_decimal = day + (hour - tz + (minute + second/60.0)/60.0)/24.0;
+    day_decimal = day + (hour - tz + (minute + (second + dut1)/60.0)/60.0)/24.0;
 
     if (month < 3) {
         month += 12;
         year--;
     }
 
-    julian_day = floor(365.25*(year+4716.0)) + floor(30.6001*(month+1)) + day_decimal - 1524.5;
+    julian_day = integer(365.25*(year+4716.0)) + integer(30.6001*(month+1)) + day_decimal - 1524.5;
 
     if (julian_day > 2299160.0) {
-        a = floor(year/100);
-        julian_day += (2 - a + floor(a/4));
+        a = integer(year/100);
+        julian_day += (2 - a + integer(a/4));
     }
 
     return julian_day;
@@ -681,15 +699,8 @@ double earth_heliocentric_longitude(double jme)
     int i;
 
     for (i = 0; i < L_COUNT; i++)
-    {
-        int j;
-        double sum_epts=0;
+        sum[i] = earth_periodic_term_summation(L_TERMS[i], l_subcount[i], jme);
 
-        for (j = 0; j < l_subcount[i]; j++)
-            sum_epts += L_TERMS[i][j][TERM_A]*cos(L_TERMS[i][j][TERM_B]+L_TERMS[i][j][TERM_C]*jme);
-
-        sum[i] = sum_epts;
-    }
     return limit_degrees(rad2deg(earth_values(sum, L_COUNT, jme)));
 
 }
@@ -700,15 +711,8 @@ double earth_heliocentric_latitude(double jme)
     int i;
 
     for (i = 0; i < B_COUNT; i++)
-    {
-        int j;
-        double sum_epts=0;
+        sum[i] = earth_periodic_term_summation(B_TERMS[i], b_subcount[i], jme);
 
-        for (j = 0; j < b_subcount[i]; j++)
-            sum_epts += B_TERMS[i][j][TERM_A]*cos(B_TERMS[i][j][TERM_B]+B_TERMS[i][j][TERM_C]*jme);
-
-        sum[i] = sum_epts;
-    }
     return rad2deg(earth_values(sum, B_COUNT, jme));
 
 }
@@ -719,15 +723,8 @@ double earth_radius_vector(double jme)
     int i;
 
     for (i = 0; i < R_COUNT; i++)
-    {
-        int j;
-        double sum_epts=0;
+        sum[i] = earth_periodic_term_summation(R_TERMS[i], r_subcount[i], jme);
 
-        for (j = 0; j < r_subcount[i]; j++)
-            sum_epts += R_TERMS[i][j][TERM_A]*cos(R_TERMS[i][j][TERM_B]+R_TERMS[i][j][TERM_C]*jme);
-
-        sum[i] = sum_epts;
-    }
     return earth_values(sum, R_COUNT, jme);
 
 }
@@ -832,7 +829,7 @@ double greenwich_sidereal_time (double nu0, double delta_psi, double epsilon)
     return nu0 + delta_psi*cos(deg2rad(epsilon));
 }
 
-double geocentric_sun_right_ascension(double lamda, double epsilon, double beta)
+double geocentric_right_ascension(double lamda, double epsilon, double beta)
 {
     double lamda_rad   = deg2rad(lamda);
     double epsilon_rad = deg2rad(epsilon);
@@ -841,7 +838,7 @@ double geocentric_sun_right_ascension(double lamda, double epsilon, double beta)
                                        tan(deg2rad(beta))*sin(epsilon_rad), cos(lamda_rad))));
 }
 
-double geocentric_sun_declination(double beta, double epsilon, double lamda)
+double geocentric_declination(double beta, double epsilon, double lamda)
 {
     double beta_rad    = deg2rad(beta);
     double epsilon_rad = deg2rad(epsilon);
@@ -860,8 +857,8 @@ double sun_equatorial_horizontal_parallax(double r)
     return 8.794 / (3600.0 * r);
 }
 
-void sun_right_ascension_parallax_and_topocentric_dec(double latitude, double elevation,
-               double xi, double h, double delta, double *delta_alpha, double *delta_prime)
+void right_ascension_parallax_and_topocentric_dec(double latitude, double elevation,
+           double xi, double h, double delta, double *delta_alpha, double *delta_prime)
 {
     double delta_alpha_rad;
     double lat_rad   = deg2rad(latitude);
@@ -881,7 +878,7 @@ void sun_right_ascension_parallax_and_topocentric_dec(double latitude, double el
     *delta_alpha = rad2deg(delta_alpha_rad);
 }
 
-double topocentric_sun_right_ascension(double alpha_deg, double delta_alpha)
+double topocentric_right_ascension(double alpha_deg, double delta_alpha)
 {
     return alpha_deg + delta_alpha;
 }
@@ -922,28 +919,28 @@ double topocentric_zenith_angle(double e)
     return 90.0 - e;
 }
 
-double topocentric_azimuth_angle_neg180_180(double h_prime, double latitude, double delta_prime)
+double topocentric_azimuth_angle_astro(double h_prime, double latitude, double delta_prime)
 {
     double h_prime_rad = deg2rad(h_prime);
     double lat_rad     = deg2rad(latitude);
 
-    return rad2deg(atan2(sin(h_prime_rad),
-                         cos(h_prime_rad)*sin(lat_rad) - tan(deg2rad(delta_prime))*cos(lat_rad)));
+    return limit_degrees(rad2deg(atan2(sin(h_prime_rad),
+                         cos(h_prime_rad)*sin(lat_rad) - tan(deg2rad(delta_prime))*cos(lat_rad))));
 }
 
-double topocentric_azimuth_angle_zero_360(double azimuth180)
+double topocentric_azimuth_angle(double azimuth_astro)
 {
-    return azimuth180 + 180.0;
+    return limit_degrees(azimuth_astro + 180.0);
 }
 
-double surface_incidence_angle(double zenith, double azimuth180, double azm_rotation,
-                                                                 double slope)
+double surface_incidence_angle(double zenith, double azimuth_astro, double azm_rotation,
+                                                                    double slope)
 {
     double zenith_rad = deg2rad(zenith);
     double slope_rad  = deg2rad(slope);
 
     return rad2deg(acos(cos(zenith_rad)*cos(slope_rad)  +
-                        sin(slope_rad )*sin(zenith_rad) * cos(deg2rad(azimuth180 - azm_rotation))));
+                        sin(slope_rad )*sin(zenith_rad) * cos(deg2rad(azimuth_astro - azm_rotation))));
 }
 
 double sun_mean_longitude(double jme)
@@ -1048,8 +1045,8 @@ void calculate_geocentric_sun_right_ascension_and_declination(spa_data *spa)
     spa->nu0       = greenwich_mean_sidereal_time (spa->jd, spa->jc);
     spa->nu        = greenwich_sidereal_time (spa->nu0, spa->del_psi, spa->epsilon);
 
-    spa->alpha = geocentric_sun_right_ascension(spa->lamda, spa->epsilon, spa->beta);
-    spa->delta = geocentric_sun_declination(spa->beta, spa->epsilon, spa->lamda);
+    spa->alpha = geocentric_right_ascension(spa->lamda, spa->epsilon, spa->beta);
+    spa->delta = geocentric_declination(spa->beta, spa->epsilon, spa->lamda);
 }
 
 ////////////////////////////////////////////////////////////////////////
@@ -1071,10 +1068,10 @@ void calculate_eot_and_sun_rise_transit_set(spa_data *spa)
     spa->eot = eot(m, spa->alpha, spa->del_psi, spa->epsilon);
 
     sun_rts.hour = sun_rts.minute = sun_rts.second = 0;
-    sun_rts.timezone = 0.0;
+    sun_rts.delta_ut1 = sun_rts.timezone = 0.0;
 
-    sun_rts.jd = julian_day (sun_rts.year, sun_rts.month,  sun_rts.day,
-                             sun_rts.hour, sun_rts.minute, sun_rts.second, sun_rts.timezone);
+    sun_rts.jd = julian_day (sun_rts.year,   sun_rts.month,  sun_rts.day,       sun_rts.hour,
+                             sun_rts.minute, sun_rts.second, sun_rts.delta_ut1, sun_rts.timezone);
 
     calculate_geocentric_sun_right_ascension_and_declination(&sun_rts);
     nu = sun_rts.nu;
@@ -1137,18 +1134,18 @@ int spa_calculate(spa_data *spa)
 
     if (result == 0)
     {
-        spa->jd = julian_day (spa->year, spa->month,  spa->day,
-                              spa->hour, spa->minute, spa->second, spa->timezone);
+        spa->jd = julian_day (spa->year,   spa->month,  spa->day,       spa->hour,
+                              spa->minute, spa->second, spa->delta_ut1, spa->timezone);
 
         calculate_geocentric_sun_right_ascension_and_declination(spa);
 
         spa->h  = observer_hour_angle(spa->nu, spa->longitude, spa->alpha);
         spa->xi = sun_equatorial_horizontal_parallax(spa->r);
 
-        sun_right_ascension_parallax_and_topocentric_dec(spa->latitude, spa->elevation, spa->xi,
-                                    spa->h, spa->delta, &(spa->del_alpha), &(spa->delta_prime));
+        right_ascension_parallax_and_topocentric_dec(spa->latitude, spa->elevation, spa->xi,
+                                spa->h, spa->delta, &(spa->del_alpha), &(spa->delta_prime));
 
-        spa->alpha_prime = topocentric_sun_right_ascension(spa->alpha, spa->del_alpha);
+        spa->alpha_prime = topocentric_right_ascension(spa->alpha, spa->del_alpha);
         spa->h_prime     = topocentric_local_hour_angle(spa->h, spa->del_alpha);
 
         spa->e0      = topocentric_elevation_angle(spa->latitude, spa->delta_prime, spa->h_prime);
@@ -1156,13 +1153,13 @@ int spa_calculate(spa_data *spa)
                                                          spa->atmos_refract, spa->e0);
         spa->e       = topocentric_elevation_angle_corrected(spa->e0, spa->del_e);
 
-        spa->zenith     = topocentric_zenith_angle(spa->e);
-        spa->azimuth180 = topocentric_azimuth_angle_neg180_180(spa->h_prime, spa->latitude,
-                                                                             spa->delta_prime);
-        spa->azimuth    = topocentric_azimuth_angle_zero_360(spa->azimuth180);
+        spa->zenith        = topocentric_zenith_angle(spa->e);
+        spa->azimuth_astro = topocentric_azimuth_angle_astro(spa->h_prime, spa->latitude,
+                                                                           spa->delta_prime);
+        spa->azimuth       = topocentric_azimuth_angle(spa->azimuth_astro);
 
         if ((spa->function == SPA_ZA_INC) || (spa->function == SPA_ALL))
-            spa->incidence  = surface_incidence_angle(spa->zenith, spa->azimuth180,
+            spa->incidence  = surface_incidence_angle(spa->zenith, spa->azimuth_astro,
                                                       spa->azm_rotation, spa->slope);
 
         if ((spa->function == SPA_ZA_RTS) || (spa->function == SPA_ALL))
