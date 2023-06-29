@@ -11,17 +11,35 @@ final class ZensunTests: XCTestCase {
     }
     
     func testSunRiseSetLosAngeles() {
+        // https://www.timeanddate.com/sun/usa/los-angeles?month=11&year=2021
+        let utcOffsetSeconds = -25200
+        let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
+        let time = ForecastApiQuery.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
+        
+        // vancouver: lat: 49.25, lon: -123.12
+        let times = Zensun.calculateSunRiseSet(timeRange: time.range, lat: 34.05223, lon: -118.24368, utcOffsetSeconds: utcOffsetSeconds)
+        XCTAssertEqual(times.rise[0], Timestamp(1636208262))
+        XCTAssertEqual(times.set[0], Timestamp(1636246531))
+        let sunset = times.set.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
+        let sunrise = times.rise.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
+        XCTAssertEqual(sunrise[0], "2021-11-06T07:17") // supposed to be 07:17
+        XCTAssertEqual(sunset[0], "2021-11-06T17:55") // supposed to be 17:55
+    }
+    
+    
+    func testSunRiseSetVancouver() {
+        // https://www.timeanddate.com/sun/canada/vancouver?month=11&year=2021
         let utcOffsetSeconds = -25200
         let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
         let time = ForecastApiQuery.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
         
         let times = Zensun.calculateSunRiseSet(timeRange: time.range, lat: 49.25, lon: -123.12, utcOffsetSeconds: utcOffsetSeconds)
-        XCTAssertEqual(times.rise[0], Timestamp(1636211261))
-        XCTAssertEqual(times.set[0], Timestamp(1636245878))
+        XCTAssertEqual(times.rise[0], Timestamp(1636211367))
+        XCTAssertEqual(times.set[0], Timestamp(1636245767))
         let sunset = times.set.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
         let sunrise = times.rise.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
-        XCTAssertEqual(sunset[0], "2021-11-06T17:44")
-        XCTAssertEqual(sunrise[0], "2021-11-06T08:07")
+        XCTAssertEqual(sunset[0], "2021-11-06T17:42") // supposed to be 17:42
+        XCTAssertEqual(sunrise[0], "2021-11-06T08:09") // supposed to be 08:09
     }
     
     func testExtraTerrestrialRadiation() {
@@ -31,19 +49,52 @@ final class ZensunTests: XCTestCase {
         XCTAssertEqual(Zensun.extraTerrestrialRadiationBackwards(latitude: 23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 6, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1308.6616)
     }
     
+    func testDaylightDuration() {
+        // https://www.timeanddate.com/sun/usa/los-angeles?month=11&year=2021
+        // should be length 10:46:48 -> 10.78
+        let duration = Zensun.calculateDaylightDuration(utcMidnight: Timestamp(2021,11,01) ..< Timestamp(2021,11,02), lat: 34.05223, lon: -118.24368)
+        XCTAssertEqual(duration[0]/3600, 10.78, accuracy: 0.0001)
+    }
+    
     func testZensunDate() {
+        // https://en.wikipedia.org/wiki/June_solstice
+        XCTAssertEqual(Timestamp(2018, 03, 20, 16, 15).getSunDeclination(), 0, accuracy: 0.001)
+        XCTAssertEqual(Timestamp(2018, 06, 21, 10, 07).getSunDeclination() - 23.44, 0, accuracy: 0.01)
+        XCTAssertEqual(Timestamp(2018, 09, 23, 01, 54).getSunDeclination(), 0, accuracy: 0.001)
+        XCTAssertEqual(Timestamp(2018, 12, 21, 22, 22).getSunDeclination() + 23.44, 0, accuracy: 0.01)
+        
+        XCTAssertEqual(Timestamp(2019, 03, 20, 21, 58).getSunDeclination(), 0, accuracy: 0.001)
+        XCTAssertEqual(Timestamp(2019, 06, 21, 15, 54).getSunDeclination() - 23.44, 0, accuracy: 0.01)
+        XCTAssertEqual(Timestamp(2019, 09, 23, 07, 50).getSunDeclination(), 0, accuracy: 0.001)
+        XCTAssertEqual(Timestamp(2019, 12, 22, 04, 19).getSunDeclination() + 23.44, 0, accuracy: 0.01)
+        
+        XCTAssertEqual(Timestamp(2020, 03, 20, 03, 50).getSunDeclination(), 0, accuracy: 0.001)
+        XCTAssertEqual(Timestamp(2020, 06, 20, 21, 43).getSunDeclination() - 23.44, 0, accuracy: 0.01)
+        XCTAssertEqual(Timestamp(2020, 09, 22, 13, 31).getSunDeclination(), 0, accuracy: 0.001)
+        XCTAssertEqual(Timestamp(2020, 12, 21, 10, 03).getSunDeclination() + 23.44, 0, accuracy: 0.01)
+        
+        XCTAssertEqual(Timestamp(2021, 03, 20, 09, 37).getSunDeclination(), 0, accuracy: 0.001)
+        XCTAssertEqual(Timestamp(2021, 06, 21, 03, 32).getSunDeclination() - 23.44, 0, accuracy: 0.01)
+        XCTAssertEqual(Timestamp(2021, 09, 22, 19, 21).getSunDeclination(), 0, accuracy: 0.001)
+        XCTAssertEqual(Timestamp(2021, 12, 21, 15, 59).getSunDeclination() + 23.44, 0, accuracy: 0.01)
+        
+        XCTAssertEqual(Timestamp(2023, 3, 20, 12, 25).getSunDeclination(), -0.1483404, accuracy: 0.01)
+        
         // reference https://gml.noaa.gov/grad/solcalc/azel.html
         let p = Timestamp(2022,1,1,12).getSunDeclination()
-        XCTAssertEqual(p.decang, -22.962, accuracy: 0.001) // should be -22.96
-        XCTAssertEqual(p.eqtime * 60, -3.6820002, accuracy: 0.001) // should be -3.7
+        let e = Timestamp(2022,1,1,12).getSunEquationOfTime()
+        XCTAssertEqual(p, -22.977999, accuracy: 0.001)
+        XCTAssertEqual(e * 60, -3.5339856, accuracy: 0.001)
         
         let p2 = Timestamp(2024,1,1,12).getSunDeclination()
-        XCTAssertEqual(p2.decang, -23.011, accuracy: 0.001) // should be -23
-        XCTAssertEqual(p2.eqtime * 60, -3.4559999, accuracy: 0.001) // should be -3.47
+        let e2 = Timestamp(2024,1,1,12).getSunEquationOfTime()
+        XCTAssertEqual(p2, -23.018219, accuracy: 0.001)
+        XCTAssertEqual(e2 * 60, -3.3114738, accuracy: 0.001)
         
         let p3 = Timestamp(2022,7,1,12).getSunDeclination()
-        XCTAssertEqual(p3.decang, 23.066, accuracy: 0.001) // should be 23.06
-        XCTAssertEqual(p3.eqtime * 60, -3.8260005, accuracy: 0.001) // should be -3.95
+        let e3 = Timestamp(2022,7,1,12).getSunEquationOfTime()
+        XCTAssertEqual(p3, 23.08617, accuracy: 0.001)
+        XCTAssertEqual(e3 * 60, -3.9086208, accuracy: 0.001) // should be -3.95
         
         XCTAssertEqual(Timestamp(1970,1,1,12).fractionalDayMidday, 2.0)
         XCTAssertEqual(Timestamp(2022,1,1,12).fractionalDayMidday, 2.0)

@@ -29,6 +29,17 @@ extension Int {
     func zeroPadded(len: Int) -> String {
         return String(format: "%0\(len)d", self)
     }
+    
+    /// Performs mathematical module keeping the result positive
+    @inlinable func moduloPositive(_ devisor: Int) -> Int {
+        return self >= 0 ? (self % devisor) : ((self % devisor) + devisor)
+    }
+    
+    /// Devide the current number using integer devision, and report the reaming part as a fraction
+    @inlinable func moduloFraction(_ devisor: Int) -> (quotient: Int, fraction: Float) {
+        let fraction = Float(self.moduloPositive(devisor)) / Float(devisor)
+        return (self / devisor, fraction)
+    }
 }
 
 extension Range where Element == Int {
@@ -102,5 +113,37 @@ public extension RandomAccessCollection where Element == Float, Index == Int {
             return rightVal
         }
         return leftVal * (1-fraction) + rightVal * fraction
+    }
+    
+    /// Assume data is organised in a ring. E,g, the right hand side border will interpolate with the left side.
+    @inlinable func interpolateLinearRing(_ i: Int, _ fraction: Float) -> Float {
+        assert(self.count != 0)
+        assert(0 <= fraction && fraction <= 1)
+        let leftVal = self[i % count]
+        if fraction < 0.001 {
+            return leftVal
+        }
+        let rightVal = self[(i + 1) % count]
+        if fraction > 0.999 {
+            return rightVal
+        }
+        return leftVal * (1-fraction) + rightVal * fraction
+    }
+    
+    /// Assume data is organised in a ring. E,g, the right hand side border will interpolate with the left side.
+    @inlinable func interpolateHermiteRing(_ i: Int, _ fraction: Float) -> Float {
+        assert(self.count != 0)
+        assert(0 <= fraction && fraction <= 1)
+        
+        let A = self[(i - 1 + count) % count]
+        let B = self[i % count]
+        let C = self[(i+1) % count]
+        let D = self[(i+2) % count]
+        
+        let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
+        let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
+        let c = -A/2.0 + C/2.0
+        let d = B
+        return (a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d)
     }
 }

@@ -47,7 +47,7 @@ public struct Timestamp: Hashable {
     public init(_ year: Int, _ month: Int, _ day: Int, _ hour: Int = 0, _ minute: Int = 0, _ second: Int = 0) {
         assert(month > 0)
         assert(day > 0)
-        assert(year > 1900)
+        assert(year >= 1900)
         assert(month <= 12)
         assert(day <= 31)
         var t = tm(tm_sec: Int32(second), tm_min: Int32(minute), tm_hour: Int32(hour), tm_mday: Int32(day), tm_mon: Int32(month-1), tm_year: Int32(year-1900), tm_wday: 0, tm_yday: 0, tm_isdst: 0, tm_gmtoff: 0, tm_zone: nil)
