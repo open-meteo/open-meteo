@@ -104,7 +104,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <math.h>
-#include <avr/pgmspace.h>
+//#include <avr/pgmspace.h>
 #include "spa.h"
 
 #define PI         3.1415926535897932384626433832795028841971
@@ -134,7 +134,7 @@ const int r_subcount[R_COUNT] = {40,10,6,2,1};
 ///////////////////////////////////////////////////
 ///  Earth Periodic Terms
 ///////////////////////////////////////////////////
-double L_TERMS[L_COUNT][L_MAX_SUBCOUNT][TERM_COUNT] PROGMEM=
+double L_TERMS[L_COUNT][L_MAX_SUBCOUNT][TERM_COUNT] =
 {
     {
         {175347046.0,0,0},
@@ -279,7 +279,7 @@ double L_TERMS[L_COUNT][L_MAX_SUBCOUNT][TERM_COUNT] PROGMEM=
     }
 };
 
-double B_TERMS[B_COUNT][B_MAX_SUBCOUNT][TERM_COUNT] PROGMEM=
+double B_TERMS[B_COUNT][B_MAX_SUBCOUNT][TERM_COUNT] =
 {
     {
         {280.0,3.199,84334.662},
@@ -294,7 +294,7 @@ double B_TERMS[B_COUNT][B_MAX_SUBCOUNT][TERM_COUNT] PROGMEM=
     }
 };
 
-double R_TERMS[R_COUNT][R_MAX_SUBCOUNT][TERM_COUNT] PROGMEM=
+double R_TERMS[R_COUNT][R_MAX_SUBCOUNT][TERM_COUNT] =
 {
     {
         {100013989.0,0,0},
@@ -371,7 +371,7 @@ double R_TERMS[R_COUNT][R_MAX_SUBCOUNT][TERM_COUNT] PROGMEM=
 ///  Periodic Terms for the nutation in longitude and obliquity
 ////////////////////////////////////////////////////////////////
 
-int Y_TERMS[Y_COUNT][TERM_Y_COUNT] PROGMEM=
+int Y_TERMS[Y_COUNT][TERM_Y_COUNT] =
 {
     {0,0,0,0,1},
     {-2,0,0,2,2},
@@ -438,7 +438,7 @@ int Y_TERMS[Y_COUNT][TERM_Y_COUNT] PROGMEM=
     {2,-1,0,2,2},
 };
 
-double PE_TERMS[Y_COUNT][TERM_PE_COUNT] PROGMEM={
+double PE_TERMS[Y_COUNT][TERM_PE_COUNT] ={
     {-171996,-174.2,92025,8.9},
     {-13187,-1.6,5736,-3.1},
     {-2274,-0.2,977,-0.5},
@@ -686,7 +686,7 @@ double earth_heliocentric_longitude(double jme)
         double sum_epts=0;
 
         for (j = 0; j < l_subcount[i]; j++)
-            sum_epts += (double)pgm_read_dword(&(L_TERMS[i][j][TERM_A]))*cos((double)pgm_read_dword(&(L_TERMS[i][j][TERM_B]))+(double)pgm_read_dword(&(L_TERMS[i][j][TERM_C]))*jme);
+            sum_epts += L_TERMS[i][j][TERM_A]*cos(L_TERMS[i][j][TERM_B]+L_TERMS[i][j][TERM_C]*jme);
 
         sum[i] = sum_epts;
     }
@@ -705,7 +705,7 @@ double earth_heliocentric_latitude(double jme)
         double sum_epts=0;
 
         for (j = 0; j < b_subcount[i]; j++)
-            sum_epts += (double)pgm_read_dword(&(B_TERMS[i][j][TERM_A]))*cos((double)pgm_read_dword(&(B_TERMS[i][j][TERM_B]))+(double)pgm_read_dword(&(B_TERMS[i][j][TERM_C]))*jme);
+            sum_epts += B_TERMS[i][j][TERM_A]*cos(B_TERMS[i][j][TERM_B]+B_TERMS[i][j][TERM_C]*jme);
 
         sum[i] = sum_epts;
     }
@@ -724,7 +724,7 @@ double earth_radius_vector(double jme)
         double sum_epts=0;
 
         for (j = 0; j < r_subcount[i]; j++)
-            sum_epts += (double)pgm_read_dword(&(R_TERMS[i][j][TERM_A]))*cos((double)pgm_read_dword(&(R_TERMS[i][j][TERM_B]))+(double)pgm_read_dword(&(R_TERMS[i][j][TERM_C]))*jme);
+            sum_epts += R_TERMS[i][j][TERM_A]*cos(R_TERMS[i][j][TERM_B]+R_TERMS[i][j][TERM_C]*jme);
 
         sum[i] = sum_epts;
     }
@@ -777,7 +777,7 @@ double xy_term_summation(int i, double x[TERM_X_COUNT])
     double sum=0;
 
     for (j = 0; j < TERM_Y_COUNT; j++)
-        sum += x[j]*pgm_read_byte(&(Y_TERMS[i][j]));
+        sum += x[j]*Y_TERMS[i][j];
 
     return sum;
 }
@@ -790,8 +790,8 @@ void nutation_longitude_and_obliquity(double jce, double x[TERM_X_COUNT], double
 
     for (i = 0; i < Y_COUNT; i++) {
         xy_term_sum  = deg2rad(xy_term_summation(i, x));
-        sum_psi     += ((double)pgm_read_dword(&(PE_TERMS[i][TERM_PSI_A])) + jce*(double)pgm_read_dword(&(PE_TERMS[i][TERM_PSI_B])))*sin(xy_term_sum);
-        sum_epsilon += ((double)pgm_read_dword(&(PE_TERMS[i][TERM_EPS_C])) + jce*(double)pgm_read_dword(&(PE_TERMS[i][TERM_EPS_D])))*cos(xy_term_sum);
+        sum_psi     += (PE_TERMS[i][TERM_PSI_A] + jce*PE_TERMS[i][TERM_PSI_B])*sin(xy_term_sum);
+        sum_epsilon += (PE_TERMS[i][TERM_EPS_C] + jce*PE_TERMS[i][TERM_EPS_D])*cos(xy_term_sum);
     }
 
     *del_psi     = sum_psi     / 36000000.0;
