@@ -44,7 +44,9 @@ public struct SolarPositonFastLookup {
     let declination: [Float]
     let equationOfTime: [Float]
     
-    static let referenceTime = TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2050,1,1), dtSeconds: 86400)
+    /// Sample solar declination every 20 days over 200 years. With hermite interpolation, the error is less than a second in sunrise/set
+    /// Around 14k memory for each array
+    static let referenceTime = TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2050,1,1), dtSeconds: 86400*20)
     
     public init() {
         (declination, equationOfTime) = SolarPositionAlgorithm.sunPosition(timerange: Self.referenceTime)
@@ -62,13 +64,13 @@ public struct SolarPositonFastLookup {
     /// Get sun declination for a given time in DEGREE
     public func getDeclination(_ time: Timestamp) -> Float {
         let (index, fraction) = pos(time)
-        return declination.interpolateLinearRing(index, fraction)
+        return declination.interpolateHermiteRing(index, fraction)
     }
     
     /// Get sun equation of time for a given time in MINUTES
     public func getEquationOfTime(_ time: Timestamp) -> Float {
         let (index, fraction) = pos(time)
-        return equationOfTime.interpolateLinearRing(index, fraction)
+        return equationOfTime.interpolateHermiteRing(index, fraction)
     }
 }
 
