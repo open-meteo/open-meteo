@@ -345,10 +345,10 @@ extension EcmwfDomain {
         let dateStr = run.format_YYYYMMdd
         switch self {
         case .ifs04:
-            let product = run.hour == 0 || run.hour == 12 ? "oper-opendata" : "scda-opendata"
+            let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
             return "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
         case .ifs04_ensemble:
-            return "\(base)\(dateStr)/\(runStr)z/0p4-beta/enfo-opendata/\(dateStr)\(runStr)0000-\(hour)h-enfo-opendata-ef.grib2"
+            return "\(base)\(dateStr)/\(runStr)z/0p4-beta/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
         }
     }
 }
