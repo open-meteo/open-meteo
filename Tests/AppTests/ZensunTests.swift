@@ -152,5 +152,9 @@ final class ZensunTests: XCTestCase {
         let time = TimerangeDt(start: Timestamp(2022,7,31), nTime: 24, dtSeconds: 3600)
         let dni = Zensun.calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time, samples: 4)
         XCTAssertEqualArray(dni, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 94.52869, 510.3472, 726.8794, 836.6179, 888.55334, 908.3525, 907.0859, 842.14484, 752.32007, 655.86975, 405.88232, 23.293142, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+        
+        /// Analytical solution is fairly close to supersampled solution. Smaller difference at sun rise/set
+        let dni2 = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time)
+        XCTAssertEqualArray(dni2, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 75.31125, 525.6262, 730.035, 838.7038, 889.7469, 908.00757, 911.16675, 843.0275, 749.2078, 665.61414, 414.24997, 34.339397, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
     }
 }

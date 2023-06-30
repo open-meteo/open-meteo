@@ -319,35 +319,22 @@ public struct Zensun {
     
     /// Calculate DNI based on zenith angle
     public static func calculateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
-        return calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
+        //return calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
         
-        // For some reason, the code below deaverages data!
-        // Same issue with taylor series expansion
-        
-        /*var out = [Float]()
-        out.reserveCapacity(directRadiation.count)
-        
-        for (dhi, timestamp) in zip(directRadiation, timerange) {
-            // direct horizontal irradiation
+        return zip(directRadiation, timerange).map { (dhi, timestamp) in
             if dhi.isNaN {
-                out.append(.nan)
-                continue
+                return .nan
             }
             if dhi <= 0 {
-                out.append(0)
-                continue
+                return 0
             }
             
-            /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDayMidday
+            /// DNI is typically limted to 85° zenith. We apply 5° to the parallax in addition to atmospheric refraction
+            /// The parallax is then use to limit integral coefficients to sun rise/set
+            let alpha = Float(0.83333 - 5).degreesToRadians
 
-            let (eqtime, decang) = timestamp.getSunDeclination()
-            
-            /// earth-sun distance in AU
-            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
-            
-            /// solar disk half-angle
-            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
             
             let latsun=decang
             /// universal time
@@ -359,12 +346,13 @@ public struct Zensun {
             /// longitude of sun
             let p1 = lonsun.degreesToRadians
             
+            
             let ut0 = ut - (Float(timerange.dtSeconds)/3600)
             let lonsun0 = -15.0*(ut0-12.0+eqtime)
             
             let p10 = lonsun0.degreesToRadians
             
-            let t0=(90-latitude).degreesToRadians                     // colatitude of point
+            let t0=(90-latitude).degreesToRadians
 
             /// longitude of point
             var p0 = longitude.degreesToRadians
@@ -376,7 +364,7 @@ public struct Zensun {
             }
 
             // limit p1 and p10 to sunrise/set
-            let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+            let arg = -(sin(alpha)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
             let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
             let sunrise = p0 + carg
             let sunset = p0 - carg
@@ -387,16 +375,10 @@ public struct Zensun {
             // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
             let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-            /// sun elevation (`zz = sin(alpha) = cos(zenith)`)
             let zzBackwards = (left-right) / (p1_l - p10_l)
-            
-            // The 85° limit should be applied before the integral is calculated, but there seems not to be an easy mathematical solution
-            //let b = max(zz), cos(Float(85).degreesToRadians))
-            //let zenith = 90 - asin(zzBackwards).radiansToDegrees
             let dni = dhi / zzBackwards
-            out.append(dni)
+            return dni
         }
-        return out*/
     }
     
     /// Calculate DNI based on zenith angle
