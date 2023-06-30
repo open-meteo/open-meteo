@@ -44,16 +44,42 @@ final class ZensunTests: XCTestCase {
     
     func testExtraTerrestrialRadiation() {
         // jaunary 3rd sun is closest to earth
-        XCTAssertEqual(Zensun.extraTerrestrialRadiationBackwards(latitude: -23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 12, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1400.2303)
+        XCTAssertEqual(Zensun.extraTerrestrialRadiationBackwards(latitude: -23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 12, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1400.073)
         // on jyuly 4rd the sun is the farthest away from earth
-        XCTAssertEqual(Zensun.extraTerrestrialRadiationBackwards(latitude: 23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 6, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1308.6616)
+        XCTAssertEqual(Zensun.extraTerrestrialRadiationBackwards(latitude: 23.5, longitude: 0, timerange: TimerangeDt(start: Timestamp(2020, 6, 26, 12), nTime: 1, dtSeconds: 3600))[0], 1308.9365)
     }
+    
+    /*func testZenith() {
+        let z2 = SolarPositionAlgorithm.zenith(lat: 23.5, lon: 2, time: Timestamp(1636211364))
+        let z = Zensun.calculateZenithInstant(lat: 23.5, lon: 2, time: Timestamp(1636211364))
+        
+        XCTAssertEqual(z, z2)
+        // 65.556435 vs 65.53193
+    }*/
+    
+    func testSunRadius() {
+        XCTAssertEqual(Timestamp(2009, 12, 31).getSunRadius(), 0.9833197)
+        XCTAssertEqual(Timestamp(2010, 1, 2).getSunRadius(), 0.9832899)
+        XCTAssertEqual(Timestamp(2010, 1, 3).getSunRadius(), 0.98328245)
+        XCTAssertEqual(Timestamp(2010, 1, 4).getSunRadius(), 0.98328) // NASA 0.983297
+        XCTAssertEqual(Timestamp(2010, 1, 5).getSunRadius(), 0.98328245)
+        XCTAssertEqual(Timestamp(2010, 1, 6).getSunRadius(), 0.9832899)
+        XCTAssertEqual(Timestamp(2010, 7, 4).getSunRadius(), 1.0167135) // NASA 1.016705
+        XCTAssertEqual(Zensun.solarConstant * powf(0.9832855,2), 1322.3612) // should 1321
+        XCTAssertEqual(Zensun.solarConstant * powf(1.0167282,2), 1413.8408) // should 1412
+    }
+    
     
     func testDaylightDuration() {
         // https://www.timeanddate.com/sun/usa/los-angeles?month=11&year=2021
         // should be length 10:46:48 -> 10.78
         let duration = Zensun.calculateDaylightDuration(utcMidnight: Timestamp(2021,11,01) ..< Timestamp(2021,11,02), lat: 34.05223, lon: -118.24368)
         XCTAssertEqual(duration[0]/3600, 10.78, accuracy: 0.002)
+        
+        // https://www.timeanddate.com/sun/@3027582?month=1&year=2021
+        // should be 9:04:53 -> 9.08138888889
+        let duration2 = Zensun.calculateDaylightDuration(utcMidnight: Timestamp(2021,1,01) ..< Timestamp(2021,1,02), lat: 43, lon: 2)
+        XCTAssertEqual(duration2[0]/3600, 9.0787735, accuracy: 0.002)
     }
     
     func testZensunDate() {
@@ -95,24 +121,36 @@ final class ZensunTests: XCTestCase {
         let e3 = Timestamp(2022,7,1,12).getSunEquationOfTime()
         XCTAssertEqual(p3, 23.08617, accuracy: 0.001)
         XCTAssertEqual(e3 * 60, -3.9086208, accuracy: 0.02)
-        
-        XCTAssertEqual(Timestamp(1970,1,1,12).fractionalDayMidday, 2.0)
-        XCTAssertEqual(Timestamp(2022,1,1,12).fractionalDayMidday, 2.0)
-        XCTAssertEqual(Timestamp(2023,1,1,12).fractionalDayMidday, 1.75)
-        XCTAssertEqual(Timestamp(2024,1,1,12).fractionalDayMidday, 1.5)
-        XCTAssertEqual(Timestamp(2025,1,1,12).fractionalDayMidday, 2.25)
-        XCTAssertEqual(Timestamp(2026,1,1,12).fractionalDayMidday, 2.0)
     }
     
+    
+    func testSolarInterpolation() {
+        let samples = 4
+        let directRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 116.0, 305.0, 485.0, 615.0, 680.0, 681.0, 579.0, 428.0, 272.0, 87.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        let time = TimerangeDt(start: Timestamp(2022,7,31), nTime: 24, dtSeconds: 3600)
+        let dtNew = time.dtSeconds / samples
+        let timeNew = time.range.add(-time.dtSeconds + dtNew).range(dtSeconds: dtNew)
+        XCTAssertEqual(timeNew.range.lowerBound.iso8601_YYYY_MM_dd_HH_mm, "2022-07-30T23:15")
+        
+        // test coefficients
+        /*let position = RegularGrid(nx: 1, ny: 1, latMin: -22.5, lonMin: 17, dx: 1, dy: 1)
+        let solarLow = Zensun.calculateRadiationBackwardsAveraged(grid: position, locationRange: 0..<1, timerange: time).data
+        let solar = Zensun.calculateRadiationBackwardsAveraged(grid: position, locationRange: 0..<1, timerange: timeNew).data
+        let solb = solar.mean(by: samples)
+        // very small differences at sunrise/set
+        XCTAssertEqualArray(solb, solarLow, accuracy: 0.0001)*/
+        
+        let interpolated = directRadiation.interpolateSolarBackwards(timeOld: time, timeNew: timeNew, latitude: -22.5, longitude: 17, scalefactor: 10000)
+        let averaged = interpolated.mean(by: samples)
+        
+        // It is not the same, but it is relatively close without any time shift
+        XCTAssertEqualArray(averaged, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.903125, 117.9211, 305.77502, 484.58722, 614.3561, 680.2455, 677.99414, 578.95483, 430.6342, 270.31412, 90.66743, 3.6926, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+    }
     
     func testDNI() {
         let directRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 116.0, 305.0, 485.0, 615.0, 680.0, 681.0, 579.0, 428.0, 272.0, 87.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         let time = TimerangeDt(start: Timestamp(2022,7,31), nTime: 24, dtSeconds: 3600)
-        let dni = Zensun.calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time, samples: 60)
-        // Note: The 7 watts in the morning are just limited to direct radiation. Could be an underlaying bug in DNI calculation
-        XCTAssertEqualArray(dni, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 324.14078, 636.4932, 789.15875, 867.035, 900.33246, 912.8854, 881.52747, 797.36115, 714.4923, 552.5704, 97.66914, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
-        
-        //let dni2 = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time)
-        //XCTAssertEqual(dni2[1...], [0.0, 0.0, 0.0, 0.0, 0.0, 23.298893, 358.03854, 635.08167, 788.98944, 866.9147, 900.1934, 912.40094, 880.8849, 797.1055, 708.6094, 551.5554, 126.22124, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
+        let dni = Zensun.calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time, samples: 4)
+        XCTAssertEqualArray(dni, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 94.52869, 510.3472, 726.8794, 836.6179, 888.55334, 908.3525, 907.0859, 842.14484, 752.32007, 655.86975, 405.88232, 23.293142, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
     }
 }
