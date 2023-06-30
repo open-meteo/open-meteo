@@ -408,6 +408,18 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(derived: .soil_moisture_0_to_100cm, time: time)
         case .is_day:
             break
+        case .terrestrial_radiation:
+            break
+        case .terrestrial_radiation_instant:
+            break
+        case .shortwave_radiation_instant:
+            try prefetchData(raw: .shortwave_radiation, time: time)
+        case .diffuse_radiation_instant:
+            try prefetchData(derived: .diffuse_radiation, time: time)
+        case .direct_radiation_instant:
+            try prefetchData(raw: .direct_radiation, time: time)
+        case .direct_normal_irradiance_instant:
+            try prefetchData(raw: .direct_radiation, time: time)
         }
     }
     
@@ -591,6 +603,28 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
+        case .terrestrial_radiation:
+            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            return DataAndUnit(solar, .wattPerSquareMeter)
+        case .terrestrial_radiation_instant:
+            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            return DataAndUnit(solar, .wattPerSquareMeter)
+        case .shortwave_radiation_instant:
+            let sw = try get(raw: .shortwave_radiation, time: time)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
+        case .direct_normal_irradiance_instant:
+            let direct = try get(derived: .direct_radiation_instant, time: time)
+            let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            return DataAndUnit(dni, direct.unit)
+        case .direct_radiation_instant:
+            let direct = try get(raw: .direct_radiation, time: time)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
+        case .diffuse_radiation_instant:
+            let diff = try get(derived: .diffuse_radiation, time: time)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
         }
     }
 }

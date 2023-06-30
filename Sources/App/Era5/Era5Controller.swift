@@ -232,6 +232,12 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case soil_moisture_index_100_to_255cm
     case soil_moisture_index_0_to_100cm
     case is_day
+    case terrestrial_radiation
+    case terrestrial_radiation_instant
+    case shortwave_radiation_instant
+    case diffuse_radiation_instant
+    case direct_radiation_instant
+    case direct_normal_irradiance_instant
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
