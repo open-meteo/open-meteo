@@ -603,7 +603,8 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             let soilMoisture = try get(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .daylight_duration:
-            return DataAndUnit(Zensun.calculateDaylightDuration(timeRange: time.range, lat: modelLat, lon: modelLon, utcOffsetSeconds: 0), .second)
+            // note: time should aldign to UTC 0 midnight
+            return DataAndUnit(Zensun.calculateDaylightDuration(utcMidnight: time.range, lat: modelLat, lon: modelLon), .second)
         case .windspeed_2m_max:
             let wind = try get(raw: .raw(.windspeed_10m_max), time: time)
             let scale = Meteorology.scaleWindFactor(from: 10, to: 2)

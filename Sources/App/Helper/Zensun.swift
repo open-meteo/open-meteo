@@ -7,13 +7,11 @@ public struct Zensun {
     /// Watt per square meter
     static public let solarConstant = Float(1367.7)
     
-    /// eqation of time
-    public static let eqt: [Float] = [ -3.23, -5.49, -7.60, -9.48, -11.09, -12.39, -13.34, -13.95, -14.23, -14.19, -13.85, -13.22, -12.35, -11.26, -10.01, -8.64, -7.18, -5.67, -4.16, -2.69, -1.29, -0.02, 1.10, 2.05, 2.80, 3.33, 3.63, 3.68, 3.49, 3.09, 2.48, 1.71, 0.79, -0.24, -1.33, -2.41, -3.45, -4.39, -5.20, -5.84, -6.28, -6.49, -6.44, -6.15, -5.60, -4.82, -3.81, -2.60, -1.19, 0.36, 2.03, 3.76, 5.54, 7.31, 9.04, 10.69, 12.20, 13.53, 14.65, 15.52, 16.12, 16.41, 16.36, 15.95, 15.19, 14.09, 12.67, 10.93, 8.93, 6.70, 4.32, 1.86, -0.62, -3.23]
-
-    /// declination
-    public static let dec: [Float] = [-23.06, -22.57, -21.91, -21.06, -20.05, -18.88, -17.57, -16.13, -14.57, -12.91, -11.16, -9.34, -7.46, -5.54, -3.59, -1.62, 0.36, 2.33, 4.28, 6.19, 8.06, 9.88, 11.62, 13.29, 14.87, 16.34, 17.70, 18.94, 20.04, 21.00, 21.81, 22.47, 22.95, 23.28, 23.43, 23.40, 23.21, 22.85, 22.32, 21.63, 20.79, 19.80, 18.67, 17.42, 16.05, 14.57, 13.00, 11.33, 9.60, 7.80, 5.95, 4.06, 2.13, 0.19, -1.75, -3.69, -5.62, -7.51, -9.36, -11.16, -12.88, -14.53, -16.07, -17.50, -18.81, -19.98, -20.99, -21.85, -22.52, -23.02, -23.33, -23.44, -23.35, -23.06]
+    /// Lookup table for sun declination and equation of time
+    public static let sunPosition = SolarPositonFastLookup()
     
     /// Calculate sun rise and set times
+    /// It is assumed the UTC offset has been applied already to `timeRange`. It will be removed in the next step
     public static func calculateSunRiseSet(timeRange: Range<Timestamp>, lat: Float, lon: Float, utcOffsetSeconds: Int) -> (rise: [Timestamp], set: [Timestamp]) {
         var rises = [Timestamp]()
         var sets = [Timestamp]()
@@ -21,8 +19,8 @@ public struct Zensun {
         rises.reserveCapacity(nDays)
         sets.reserveCapacity(nDays)
         for time in timeRange.stride(dtSeconds: 86400) {
-            switch calculateSunTransit(date: time, lat: lat, lon: lon) {
-                
+            let utc = time.add(utcOffsetSeconds)
+            switch calculateSunTransit(utcMidnight: utc, lat: lat, lon: lon) {
             case .polarNight:
                 rises.append(Timestamp(0))
                 sets.append(Timestamp(0))
@@ -30,8 +28,8 @@ public struct Zensun {
                 rises.append(Timestamp(0))
                 sets.append(Timestamp(0))
             case .transit(rise: let rise, set: let set):
-                rises.append(time.add(utcOffsetSeconds + rise))
-                sets.append(time.add(utcOffsetSeconds + set))
+                rises.append(utc.add(rise))
+                sets.append(utc.add(set))
             }
         }
         assert(rises.count == nDays)
@@ -40,16 +38,21 @@ public struct Zensun {
     }
     
     /// Calculate daylight duration in seconds
-    public static func calculateDaylightDuration(timeRange: Range<Timestamp>, lat: Float, lon: Float, utcOffsetSeconds: Int) -> [Float] {
-        return timeRange.stride(dtSeconds: 86400).map { time in
-            switch calculateSunTransit(date: time, lat: lat, lon: lon) {
-            case .polarNight:
-                return 0
-            case .polarDay:
-                return 24*3600
-            case .transit(rise: let rise, set: let set):
-                return Float(set - rise)
+    /// Time MUST be 0 UTC, it will add the time to match the noon time based on longitude
+    /// The correct time is important to get the correct sun declination at local noon
+    public static func calculateDaylightDuration(utcMidnight: Range<Timestamp>, lat: Float, lon: Float) -> [Float] {
+        let noonTimeOffsetSeconds = Int((12-lon/15)*3600)
+        return utcMidnight.stride(dtSeconds: 86400).map { date in
+            let t1 = date.add(noonTimeOffsetSeconds).getSunDeclination().degreesToRadians
+            let alpha = Float(0.83333).degreesToRadians
+            let t0 = lat.degreesToRadians
+            let arg = -(sin(alpha)+sin(t0)*sin(t1))/(cos(t0)*cos(t1))
+            guard arg <= 1 && arg >= -1 else {
+                // polar night or day
+                return arg > 1 ? 0 : 24*3600
             }
+            let dtime = acos(arg)/(Float(15).degreesToRadians)
+            return dtime * 2 * 3600
         }
     }
     
@@ -60,37 +63,22 @@ public struct Zensun {
         case transit(rise: Int, set: Int)
     }
     
-    /// `date` must be LOCAL-TIME midnight and sunTransit will be seconds after local midnight!
-    @inlinable static func calculateSunTransit(date: Timestamp, lat: Float, lon: Float) -> SunTransit {
-        /// fractional day number with 12am 1jan = 1
-        let tt = date.add(12*3600).fractionalDayMidday
-        
-        let (eqtime, decang) = date.add(12*3600).getSunDeclination()
-        let latsun = decang
-        
-        /// colatitude of sun
-        let t1 = (90-latsun).degreesToRadians
-
-        /// earth-sun distance in AU
-        let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
-        
-        /// solar disk half-angle
-        let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
-        
-        /// universal time of noon
+    /// Time MUST be 0 UTC, it will add the time to match the noon time based on longitude
+    /// The correct time is important to get the correct sun declination at local noon
+    @inlinable static func calculateSunTransit(utcMidnight: Timestamp, lat: Float, lon: Float) -> SunTransit {
+        let localMidday = utcMidnight.add(Int((12-lon/15)*3600))
+        let eqtime = localMidday.getSunEquationOfTime()
+        let t1 = localMidday.getSunDeclination().degreesToRadians
+        let alpha = Float(0.83333).degreesToRadians
         let noon = 12-lon/15
-
-        /// colatitude of point
-        let t0 = (90-lat).degreesToRadians
-
-        let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
-        
+        let t0 = lat.degreesToRadians
+        let arg = -(sin(alpha)+sin(t0)*sin(t1))/(cos(t0)*cos(t1))
         
         guard arg <= 1 && arg >= -1 else {
             return arg > 1 ? .polarNight : .polarDay
         }
         
-        let dtime = Foundation.acos(arg)/(Float(15).degreesToRadians)
+        let dtime = acos(arg)/(Float(15).degreesToRadians)
         let sunrise = noon-dtime-eqtime
         let sunset = noon+dtime-eqtime
         return .transit(rise: Int(sunrise*3600), set: Int(sunset*3600))
@@ -106,7 +94,7 @@ public struct Zensun {
             
             // calculate new transit if required
             if lastCalculatedTransit?.date != localMidnight {
-                lastCalculatedTransit = (localMidnight, calculateSunTransit(date: localMidnight, lat: lat, lon: lon))
+                lastCalculatedTransit = (localMidnight, calculateSunTransit(utcMidnight: localMidnight, lat: lat, lon: lon))
             }
             guard let lastCalculatedTransit else {
                 fatalError("Not possible")
@@ -130,16 +118,14 @@ public struct Zensun {
         var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
                 
         for (t, timestamp) in timerange.enumerated() {
-            /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDayMidday
-
-            let (eqtime, decang) = timestamp.getSunDeclination()
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
             
             /// earth-sun distance in AU
-            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            let rsun = timestamp.getSunRadius()
             
             /// solar disk half-angle
-            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
+            let alpha = Float(0.83333).degreesToRadians
             
             let latsun=decang
             /// universal time
@@ -170,7 +156,7 @@ public struct Zensun {
                 }
                 
                 // limit p1 and p10 to sunrise/set
-                let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+                let arg = -(sin(alpha)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
                 let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
                 let sunrise = p0 + carg
                 let sunset = p0 - carg
@@ -198,16 +184,9 @@ public struct Zensun {
         var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
                 
         for (t, timestamp) in timerange.enumerated() {
-            /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDayMidday
-
-            let (eqtime, decang) = timestamp.getSunDeclination()
-            
-            /// earth-sun distance in AU
-            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
-            
-            /// solar disk half-angle
-            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
+            let alpha = Float(0.83333).degreesToRadians
             
             let latsun=decang
             /// universal time
@@ -240,7 +219,7 @@ public struct Zensun {
                     }
                     
                     // limit p1 and p10 to sunrise/set
-                    let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+                    let arg = -(sin(alpha)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
                     let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
                     let sunrise = p0 + carg
                     let sunset = p0 - carg
@@ -262,6 +241,25 @@ public struct Zensun {
         return out
     }
     
+    /*public static func calculateZenithInstant(lat: Float, lon: Float, time: Timestamp) -> Float {
+        let decang = time.getSunDeclination()
+        let eqtime = time.getSunEquationOfTime()
+
+        let latsun=decang
+        let ut = time.hourWithFraction
+        let t1 = (90-latsun).degreesToRadians
+        
+        let lonsun = -15.0*(ut-12.0+eqtime)
+        let p1 = lonsun.degreesToRadians
+        
+
+        let t0 = (90-lat).degreesToRadians
+        let p0 = lon.degreesToRadians
+        /// sun elevation (`zz = sin(alpha)`)
+        let zz = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
+        return acos(zz).radiansToDegrees
+    }*/
+    
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
     public static func calculateRadiationInstant(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
@@ -270,12 +268,11 @@ public struct Zensun {
         out.reserveCapacity(yrange.count * grid.nx * timerange.count)
                 
         for timestamp in timerange {
-            /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDayMidday
-            let rsun=1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
+            let rsun = timestamp.getSunRadius()
             let rsun_square = rsun*rsun
 
-            let (eqtime, decang) = timestamp.getSunDeclination()
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
 
             let latsun=decang
             let ut = timestamp.hourWithFraction
@@ -303,8 +300,9 @@ public struct Zensun {
     /// Calculate DNI using super sampling
     public static func calculateBackwardsDNISupersampled(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt, samples: Int = 60) -> [Float] {
         // Shift timerange by dt and increase time resolution
-        let timeSuperSampled = timerange.range.add(-timerange.dtSeconds).range(dtSeconds: timerange.dtSeconds / samples)
-        let dhiBackwardsSuperSamled = directRadiation.interpolateSolarBackwards(timeOld: timerange, timeNew: timeSuperSampled, latitude: latitude, longitude: longitude, scalefactor: 1)
+        let dtNew = timerange.dtSeconds / samples
+        let timeSuperSampled = timerange.range.add(-timerange.dtSeconds + dtNew).range(dtSeconds: dtNew)
+        let dhiBackwardsSuperSamled = directRadiation.interpolateSolarBackwards(timeOld: timerange, timeNew: timeSuperSampled, latitude: latitude, longitude: longitude, scalefactor: 1000)
         
         let averagedToInstant = backwardsAveragedToInstantFactor(time: timeSuperSampled, latitude: latitude, longitude: longitude)
         let dhiSuperSamled = zip(dhiBackwardsSuperSamled, averagedToInstant).map(*)
@@ -316,41 +314,27 @@ public struct Zensun {
         
         let dni = dniSuperSampled.mean(by: samples)
         
-        // There could be an issue in the DNI calcualtion at sunrise, resulting in 0 watts. Take direct radiation instead.
-        return zip(dni, directRadiation).map(max)
+        return dni
     }
     
     /// Calculate DNI based on zenith angle
     public static func calculateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
-        return calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
+        //return calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
         
-        // For some reason, the code below deaverages data!
-        // Same issue with taylor series expansion
-        
-        /*var out = [Float]()
-        out.reserveCapacity(directRadiation.count)
-        
-        for (dhi, timestamp) in zip(directRadiation, timerange) {
-            // direct horizontal irradiation
+        return zip(directRadiation, timerange).map { (dhi, timestamp) in
             if dhi.isNaN {
-                out.append(.nan)
-                continue
+                return .nan
             }
             if dhi <= 0 {
-                out.append(0)
-                continue
+                return 0
             }
             
-            /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDayMidday
+            /// DNI is typically limted to 85° zenith. We apply 5° to the parallax in addition to atmospheric refraction
+            /// The parallax is then use to limit integral coefficients to sun rise/set
+            let alpha = Float(0.83333 - 5).degreesToRadians
 
-            let (eqtime, decang) = timestamp.getSunDeclination()
-            
-            /// earth-sun distance in AU
-            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
-            
-            /// solar disk half-angle
-            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
             
             let latsun=decang
             /// universal time
@@ -362,12 +346,13 @@ public struct Zensun {
             /// longitude of sun
             let p1 = lonsun.degreesToRadians
             
+            
             let ut0 = ut - (Float(timerange.dtSeconds)/3600)
             let lonsun0 = -15.0*(ut0-12.0+eqtime)
             
             let p10 = lonsun0.degreesToRadians
             
-            let t0=(90-latitude).degreesToRadians                     // colatitude of point
+            let t0=(90-latitude).degreesToRadians
 
             /// longitude of point
             var p0 = longitude.degreesToRadians
@@ -379,7 +364,7 @@ public struct Zensun {
             }
 
             // limit p1 and p10 to sunrise/set
-            let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+            let arg = -(sin(alpha)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
             let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
             let sunrise = p0 + carg
             let sunset = p0 - carg
@@ -390,16 +375,10 @@ public struct Zensun {
             // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
             let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-            /// sun elevation (`zz = sin(alpha) = cos(zenith)`)
             let zzBackwards = (left-right) / (p1_l - p10_l)
-            
-            // The 85° limit should be applied before the integral is calculated, but there seems not to be an easy mathematical solution
-            //let b = max(zz), cos(Float(85).degreesToRadians))
-            //let zenith = 90 - asin(zzBackwards).radiansToDegrees
             let dni = dhi / zzBackwards
-            out.append(dni)
+            return dni
         }
-        return out*/
     }
     
     /// Calculate DNI based on zenith angle
@@ -418,7 +397,8 @@ public struct Zensun {
                 continue
             }
 
-            let (eqtime, decang) = timestamp.getSunDeclination()
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
             
             let latsun=decang
             /// universal time
@@ -429,8 +409,7 @@ public struct Zensun {
             
             /// longitude of sun
             let p1 = lonsun.degreesToRadians
-            
-            let t0=(90-latitude).degreesToRadians                     // colatitude of point
+            let t0=(90-latitude).degreesToRadians
 
             /// longitude of point
             let p0 = longitude.degreesToRadians
@@ -465,15 +444,10 @@ public struct Zensun {
     public static func backwardsAveragedToInstantFactor(time: TimerangeDt, latitude: Float, longitude: Float) -> [Float] {
         return time.map { timestamp in
             /// fractional day number with 12am 1jan = 1
-            let tt = timestamp.fractionalDayMidday
-
-            let (eqtime, decang) = timestamp.getSunDeclination()
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
             
-            /// earth-sun distance in AU
-            let rsun = 1-0.01673*cos(0.9856*(tt-2).degreesToRadians)
-            
-            /// solar disk half-angle
-            let angsun = 6.96e10/(1.5e13*rsun) + Float(0.83333).degreesToRadians
+            let alpha = Float(0.83333).degreesToRadians
             
             let latsun=decang
             /// universal time
@@ -502,7 +476,7 @@ public struct Zensun {
             }
 
             // limit p1 and p10 to sunrise/set
-            let arg = -(sin(angsun)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+            let arg = -(sin(alpha)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
             let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
             let sunrise = p0 + carg
             let sunset = p0 - carg
@@ -571,11 +545,6 @@ public struct Zensun {
 }
 
 extension Timestamp {
-    /// fractional day number with 12am 1jan = 1.
-    public var fractionalDayMidday: Float {
-        Float(secondInAverageYear) / 86400 + 0.5 + 1.0
-    }
-    
     /// Second of year, assuming average of 365.25 days
     /// Range `0 ..< 364.25 * 86400`
     public var secondInAverageYear: Int {
@@ -597,12 +566,19 @@ extension Timestamp {
         Float(((timeIntervalSince1970 % 86400) + 86400) % 86400) / 3600
     }
     
-    @inlinable public func getSunDeclination() -> (eqtime: Float, decang: Float) {
-        let tt = fractionalDayMidday
-        let fraction = (tt - 1).truncatingRemainder(dividingBy: 5) / 5
-        let eqtime = Zensun.eqt.interpolateLinear(Int(tt - 1)/5, fraction) / 60
-        let decang = Zensun.dec.interpolateLinear(Int(tt - 1)/5, fraction)
-        
-        return (eqtime, decang)
+    @inlinable public func getSunDeclination() -> Float {
+        return Zensun.sunPosition.getDeclination(self)
+    }
+    
+    /// In  hours
+    @inlinable public func getSunEquationOfTime() -> Float {
+        return Zensun.sunPosition.getEquationOfTime(self) / 60
+    }
+     
+    /// Eaarth-Sun distance in AU. 0.983 in january. 1.0167135 in july
+    /// https://physics.stackexchange.com/questions/177949/earth-sun-distance-on-a-given-day-of-the-year
+    @inlinable public func getSunRadius() -> Float {
+        let day = Float(secondInAverageYear) / 86400 - 4 + 1
+        return 1-0.01672*cos(((360/365.256363)*day).degreesToRadians)
     }
 }

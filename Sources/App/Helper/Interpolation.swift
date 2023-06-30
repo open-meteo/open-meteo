@@ -33,9 +33,17 @@ extension Array where Element == Float {
         let position = RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1)
         let solarLow = Zensun.calculateRadiationBackwardsAveraged(grid: position, locationRange: 0..<1, timerange: timeLow).data
         let solar = Zensun.calculateRadiationBackwardsAveraged(grid: position, locationRange: 0..<1, timerange: time).data
+        
+        let dt = time.dtSeconds
+        let dtOld = timeLow.dtSeconds
+        let tStart = timeLow.range.lowerBound.timeIntervalSince1970
+        
         return time.enumerated().map { (i, t) in
-            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
-            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
+            // time need to be shifted by dtOld/2 because those are averages over time
+            let (index, fraction) = (t.timeIntervalSince1970 - tStart + dtOld - dt - dtOld/2 + dt/2).moduloFraction(dtOld)
+            if index < 0 {
+                return .nan
+            }
             
             let indexB = Swift.max(index, 0)
             let indexA = Swift.max(index-1, 0)
@@ -45,23 +53,48 @@ extension Array where Element == Float {
             if self[indexB].isNaN {
                 return .nan
             }
-            // At low radiaiton levels it is impossible to estimate KT indices
-            if solarLow[indexB] < 0.005 {
-                return 0
+            if solar[i] == 0 {
+                return 0 // Night
             }
             
-            let B = self[indexB] / solarLow[indexB]
-            let A = self[indexA].isNaN ? B : (solarLow[indexA] <= 0.005 ? B : self[indexA] / solarLow[indexA])
-            let C = self[indexC].isNaN ? B : (solarLow[indexC] <= 0.005 ? B : self[indexC] / solarLow[indexC])
-            let D = self[indexD].isNaN ? C : (solarLow[indexD] <= 0.005 ? C : self[indexD] / solarLow[indexD])
+            let A = self[indexA]
+            let B = self[indexB]
+            let C = self[indexC]
+            let D = self[indexD]
             
-            // linear
-            //let h = (B * (1-fraction) + C * fraction) * solar[i]
+            let solA = solarLow[indexA]
+            let solB = solarLow[indexB]
+            let solC = solarLow[indexC]
+            let solD = solarLow[indexD]
             
-            let a = -A/2.0 + (3.0*B)/2.0 - (3.0*C)/2.0 + D/2.0
-            let b = A - (5.0*B)/2.0 + 2.0*C - D / 2.0
-            let c = -A/2.0 + C/2.0
-            let d = B
+            var ktA = solA <= 0.005 ? .nan : Swift.min(A / solA, 1100)
+            var ktB = solB <= 0.005 ? .nan : Swift.min(B / solB, 1100)
+            var ktC = solC <= 0.005 ? .nan : Swift.min(C / solC, 1100)
+            var ktD = solD <= 0.005 ? .nan : Swift.min(D / solD, 1100)
+            
+            if ktA.isNaN {
+                ktA = !ktB.isNaN ? ktB : !ktC.isNaN ? ktC : ktD
+            }
+            if ktB.isNaN {
+                ktB = !ktA.isNaN ? ktA : !ktC.isNaN ? ktC : ktD
+            }
+            if ktC.isNaN {
+                ktC = !ktB.isNaN ? ktB : !ktD.isNaN ? ktD : ktA
+            }
+            if ktD.isNaN {
+                ktD = !ktC.isNaN ? ktC : !ktB.isNaN ? ktB : ktA
+            }
+            
+            // no interpolation
+            //return (fraction < 0.5 ? ktB : ktC) * solar[i]
+            
+            // linear interpolation
+            //return (ktB * (1-fraction) + ktC * fraction) * solar[i]
+            
+            let a = -ktA/2.0 + (3.0*ktB)/2.0 - (3.0*ktC)/2.0 + ktD/2.0
+            let b = ktA - (5.0*ktB)/2.0 + 2.0*ktC - ktD / 2.0
+            let c = -ktA/2.0 + ktC/2.0
+            let d = ktB
             let h = (a*fraction*fraction*fraction + b*fraction*fraction + c*fraction + d) * solar[i]
             /// adjust it to scalefactor, otherwise interpolated values show more level of detail
             return roundf(h * scalefactor) / scalefactor
