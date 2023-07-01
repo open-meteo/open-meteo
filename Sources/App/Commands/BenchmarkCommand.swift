@@ -50,8 +50,9 @@ final class BenchmarkCommand: Command {
         let elapsed = Double((DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)) / 1_000_000_000
         let mean = elapsed / Double(count)
         let diff = mean - baseLineMeanMs / 1000
-        let b = "\(diff>0 ? "+" : "")\(diff.asSecondsPrettyPrint)"
-        print("\(mean.asSecondsPrettyPrint.pad(8)) | \(min.asSecondsPrettyPrint.pad(8)) | \(max.asSecondsPrettyPrint.pad(8)) | \(String(count).pad(8)) | \(b.pad(16)) |")
+        let factor = round((mean)/(baseLineMeanMs / 1000)*100)/100
+        let b = "\(diff>0 ? "+" : "")\(diff.asSecondsPrettyPrint) (x\(factor))"
+        print("\(mean.asSecondsPrettyPrint.pad(8)) | \(min.asSecondsPrettyPrint.pad(8)) | \(max.asSecondsPrettyPrint.pad(8)) | \(String(count).pad(8)) | \(b.pad(20)) |")
         return result
     }
     
@@ -59,8 +60,12 @@ final class BenchmarkCommand: Command {
     func run(using context: CommandContext, signature: Signature) throws {
         self.timePerTest = signature.time ?? 5
         
-        print("| \("Test".pad(80)) | \("Mean".pad(8)) | \("Min".pad(8)) | \("Max".pad(8)) | \("Runs".pad(8)) | \("Diff to Apple M1".pad(16)) |")
-        print("|\(String.dash(80+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(16+2))|")
+        print("Open-Meteo Benchmark")
+        print("Apple M1 is used as baseline. Positive values = slower than M1.")
+        print("Time per test \(timePerTest) seconds (See --help)")
+        
+        print("| \("Test".pad(80)) | \("Mean".pad(8)) | \("Min".pad(8)) | \("Max".pad(8)) | \("Runs".pad(8)) | \("Diff to Apple M1".pad(20)) |")
+        print("|\(String.dash(80+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(20+2))|")
         
         let sizeMb = 128
         let data = measure("Generating dummy temperature timeseries (\(sizeMb) MB)", 271) {
