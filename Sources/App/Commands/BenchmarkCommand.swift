@@ -30,7 +30,7 @@ final class BenchmarkCommand: Command {
         var result = try fn()
         
         let start = DispatchTime.now()
-        let end = start.advanced(by: .seconds(timePerTest))
+        let end = start.uptimeNanoseconds + UInt64(timePerTest) * 1_000_000_000
         var min = 100.0
         var max = 0.0
         var count = 0
@@ -46,7 +46,7 @@ final class BenchmarkCommand: Command {
             if elapsed > max {
                 max = elapsed
             }
-        } while DispatchTime.now() <= end
+        } while DispatchTime.now().uptimeNanoseconds <= end
         let elapsed = Double((DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)) / 1_000_000_000
         let mean = elapsed / Double(count)
         let diff = mean - baseLineMeanMs / 1000
