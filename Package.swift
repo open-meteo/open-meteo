@@ -3,17 +3,21 @@
 import PackageDescription
 import Foundation
 
-let cFlagsBase = ["-fno-math-errno", "-fno-trapping-math", "-freciprocal-math"]
+#if arch(x86_64)
+let mArch = ["-march=skylake"]
+#else
+let mArch: [String] = []
+#endif
+
 let swiftFlags: [PackageDescription.SwiftSetting] = [
     .unsafeFlags(["-cross-module-optimization", "-Ounchecked"],
     .when(configuration: .release))
 ]
 
-#if arch(x86_64)
-let cFlags = cFlagsBase + ["-march=skylake"]
-#else
-let cFlags = cFlagsBase
-#endif
+let cFlags = [PackageDescription.CSetting.unsafeFlags(["-O3", "-fno-math-errno", "-fno-trapping-math", "-freciprocal-math", "-ffp-contract=fast"] + mArch)]
+// Note: Fast math flags reduce performance for compression
+let cFlagsPFor2D = [PackageDescription.CSetting.unsafeFlags(["-O3"] + mArch)]
+let cFlagsPFor = [PackageDescription.CSetting.unsafeFlags(["-O3", "-w"] + mArch)]
 
 /// Conditional support for Apache Arrow Parquet files
 let enableParquet = ProcessInfo.processInfo.environment["ENABLE_PARQUET"] == "TRUE"
@@ -47,7 +51,7 @@ let package = Package(
             ] + (enableParquet ? [
                 .product(name: "SwiftArrowParquet", package: "SwiftArrowParquet")
             ] : []),
-            cSettings: [.unsafeFlags(cFlags)],
+            cSettings: cFlags,
             swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : [])
         ),
         .systemLibrary(
@@ -62,7 +66,7 @@ let package = Package(
         ),
         .target(
             name: "CHelper",
-            cSettings: [.unsafeFlags(cFlags)],
+            cSettings: cFlags,
             swiftSettings: swiftFlags
         ),
         .executableTarget(
@@ -76,12 +80,12 @@ let package = Package(
         .target(
             name: "SwiftPFor2D",
             dependencies: ["CTurboPFor", "CHelper"],
-            cSettings: [.unsafeFlags(cFlags)],
+            cSettings: cFlagsPFor2D,
             swiftSettings: swiftFlags
         ),
         .target(
             name: "CTurboPFor",
-            cSettings: [.unsafeFlags(cFlags + ["-w"])], // disable all warnings, generated from macros
+            cSettings: cFlagsPFor,
             swiftSettings: swiftFlags
         ),
     ]
