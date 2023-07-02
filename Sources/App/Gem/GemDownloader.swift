@@ -87,6 +87,7 @@ struct GemDownload: AsyncCommandFix {
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server)
         try await download(application: context.application, domain: domain, variables: variables, run: run, skipFilesIfExisting: signature.skipExisting, server: signature.server)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        try FileManager.default.removeItem(atPath: domain.downloadDirectory)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     

@@ -48,6 +48,7 @@ struct DownloadIconWaveCommand: AsyncCommandFix {
         let variables = onlyVariables ?? IconWaveVariable.allCases
         try await download(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convert(logger: logger, domain: domain, run: date, variables: variables)
+        try FileManager.default.removeItem(atPath: domain.downloadDirectory)
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files

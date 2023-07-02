@@ -60,6 +60,7 @@ struct DownloadEcmwfCommand: AsyncCommandFix {
         try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
         try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convertEcmwf(logger: logger, domain: domain, run: run, variables: variables)
+        try FileManager.default.removeItem(atPath: domain.downloadDirectory)
     }
     
     /// Download elevation file

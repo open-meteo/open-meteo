@@ -55,12 +55,14 @@ struct DownloadCamsCommand: AsyncCommandFix {
             }
             try await downloadCamsGlobal(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
             try convertCamsGlobal(logger: logger, domain: domain, run: run, variables: variables)
+            try FileManager.default.removeItem(atPath: domain.downloadDirectory)
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
             try downloadCamsEurope(logger: logger, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
             try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
+            try FileManager.default.removeItem(atPath: domain.downloadDirectory)
         }
     }
     

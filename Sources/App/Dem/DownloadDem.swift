@@ -159,6 +159,7 @@ struct DownloadDemCommand: Command {
             //try a2.writeNetcdf(filename: "\(Dem90.downloadDirectory)lat_\(lat).nc", nx: 360*px, ny: 1200)
             try OmFileWriter(dim0: 1200, dim1: px*360, chunk0: 60, chunk1: 60).write(file: "\(Dem90.omDirectory)lat_\(lat).om", compressionType: .p4nzdec256, scalefactor: 1, all: line)
         }
+        try FileManager.default.removeItem(atPath: Dem90.downloadDirectory)
     }
     
     fileprivate func readNc(file: String) throws -> (data: [Float], dimensions: [Int]) {

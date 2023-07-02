@@ -56,6 +56,7 @@ struct SeasonalForecastDownload: AsyncCommandFix {
             
             try await downloadCfs(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting)
             try convertCfs(logger: logger, domain: domain, run: run)
+            try FileManager.default.removeItem(atPath: domain.downloadDirectory)
         case .jma:
             fatalError()
         case .eccc:

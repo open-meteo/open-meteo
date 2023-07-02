@@ -69,6 +69,7 @@ struct JmaDownload: AsyncCommandFix {
         //try await downloadElevation(application: context.application, domain: domain)
         try await download(application: context.application, domain: domain, run: run, server: server)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        try FileManager.default.removeItem(atPath: domain.downloadDirectory)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     

@@ -383,7 +383,7 @@ struct DownloadIconCommand: AsyncCommandFix {
             // ICON-D2 download 15min data as well
             try convertIcon(logger: logger, domain: .iconD2_15min, run: run, variables: variables)
         }
-        
+        try FileManager.default.removeItem(atPath: domain.downloadDirectory)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 }

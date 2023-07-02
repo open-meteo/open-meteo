@@ -45,6 +45,7 @@ struct MetNoDownloader: AsyncCommandFix {
         
         //try await download(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        try FileManager.default.removeItem(atPath: domain.downloadDirectory)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     

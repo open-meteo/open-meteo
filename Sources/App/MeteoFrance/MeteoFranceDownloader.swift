@@ -73,6 +73,7 @@ struct MeteoFranceDownload: AsyncCommandFix {
         try await downloadElevation(application: context.application, domain: domain)
         try await download(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        try FileManager.default.removeItem(atPath: domain.downloadDirectory)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
