@@ -68,42 +68,42 @@ final class BenchmarkCommand: Command {
         print("|\(String.dash(80+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(20+2))|")
         
         let sizeMb = 128
-        let data = measure("Generating dummy temperature timeseries (\(sizeMb) MB)", 271) {
+        let data = measure("Generating dummy temperature timeseries (\(sizeMb) MB)", 272) {
             return (0..<1024*1024/4*sizeMb).map({
                 let x = Float($0)
                 return sin(x * .pi / 24) * 10 + sin(x * .pi / 24 / 365.25) * 15 + sin(x * .pi / 7)
             })
         }
         
-        try measure("Compression in memory, large chunks", 174) {
+        try measure("Compression in memory, large chunks", 191) {
             try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 1024, chunk1: 1024).writeInMemory(compressionType: .p4nzdec256, scalefactor: 20, all: data)
         }
         
-        let compressed = try measure("Compression in memory, small chunks", 179) {
+        let compressed = try measure("Compression in memory, small chunks", 199) {
             try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 8, chunk1: 128).writeInMemory(compressionType: .p4nzdec256, scalefactor: 20, all: data)
         }
         let sizeMbCompressed = (compressed.count/1024/1024)
         
         let compressedData = DataAsClass(data: compressed)
-        _ = try measure("Decompress from memory, small chunks (\(sizeMbCompressed) MB)", 54) {
+        _ = try measure("Decompress from memory, small chunks (\(sizeMbCompressed) MB)", 44) {
             try OmFileReader(fn: compressedData).readAll()
         }
         
         let file = "\(OpenMeteo.dataDictionary)test.om"
         try FileManager.default.createDirectory(atPath: OpenMeteo.dataDictionary, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItemIfExists(at: file)}
-        try measure("Compress to file, small chunks", 241) {
+        try measure("Compress to file, small chunks", 202) {
             try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 8, chunk1: 128).write(file: file, compressionType: .p4nzdec256, scalefactor: 20, all: data, overwrite: true)
         }
         
-        try measure("Decompress from file, small chunks", 55) {
+        try measure("Decompress from file, small chunks", 46) {
             let read = try OmFileReader(file: file)
             return try read.readAll()
         }
         
         
         let exradTime = TimerangeDt(start: Timestamp(1900,1,1), to: Timestamp(2000,1,1), dtSeconds: 3600)
-        let exrad = measure("Calculate extra terrestrial radiation (100 years, hourly)", 46) {
+        let exrad = measure("Calculate extra terrestrial radiation (100 years, hourly)", 47) {
             return Zensun.extraTerrestrialRadiationBackwards(latitude: 52, longitude: 7, timerange: exradTime)
         }
         
