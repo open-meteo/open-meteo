@@ -4,7 +4,7 @@ import PackageDescription
 import Foundation
 
 #if arch(x86_64)
-let mArch = ["-march=skylake"]
+let mArch = ["-march=native"]
 #else
 let mArch: [String] = []
 #endif
