@@ -90,7 +90,7 @@ Use `openmeteo-api <command> [--help,-h]` for more information on a command.
 
 All data is stored in the current working directory in `./data`. Please make sure that your current working directory is correct. All downloaders will create the required directories automatically. All subsequent downloader invocations will update weather data in this directory. Deleting it, will delete all historical weather data.
 
-Additionally all download instructions as a cronjob file are available [here](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/Commands/CronjobCommand.swift). At a larger stage, an integrated task scheduler might be integrated into the API itself. Currently all downloads are initiated by cronjobs on Open-Meteo servers.
+Additionally all download instructions as a cronjob file are available [here](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/Commands/CronjobCommand.swift). At a larger stage, an integrated task scheduler might be integrated into the API itself. Currently all downloads are initiated by cronjobs on Open-Meteo servers. If you are using the prebuilt Ubuntu binaries, make sure to add a symbolic link to the data directory in the users home directory executing the cronjobs `ln -s /var/lib/openmeteo-api/data`.
 
 ### DWD ICON
 The DWD ICON models are the most important source for the 7 days weather API. There are 3 different domains available:
