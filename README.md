@@ -7,7 +7,7 @@ Open-Meteo is an open-source weather API and offers free access for non-commerci
 
 Head over to https://open-meteo.com! Stay up to date with our blog at https://openmeteo.substack.com.
 
-## Features 
+## Features
 - [Hourly weather forecast](https://open-meteo.com/en/docs) for up to 16 days
 - Global weather models with 11 km and regional models up to 1.5 km resolution
 - Weather model updates every hour for Europe and North America
@@ -23,7 +23,7 @@ Head over to https://open-meteo.com! Stay up to date with our blog at https://op
 ## How does Open-Meteo work?
 Open-Meteo utilizes open-data weather forecasts provided by national weather services. These services offer numerical weather predictions that are free to download. However, working with these models can be challenging, as it requires expertise in binary file formats, grid-systems, projections, and the fundamentals of weather predictions.
 
-Like many other weather APIs, Open-Meteo integrates high-resolution local and global weather models. Over 2 TB of data are downloaded and processed daily from multiple national weather services. The collected data is then stored in local files using a customized file format and compression technique to enhance access to time-series data such as a 14-day temperature forecast. 
+Like many other weather APIs, Open-Meteo integrates high-resolution local and global weather models. Over 2 TB of data are downloaded and processed daily from multiple national weather services. The collected data is then stored in local files using a customized file format and compression technique to enhance access to time-series data such as a 14-day temperature forecast.
 
 In contrast to other weather APIs, Open-Meteo provides complete access to its source code, and all data sources are openly listed, crediting the national weather services for their work. With Docker or prebuilt Ubuntu packages, it is possible to launch your own weather API within minutes. By providing the source code, users can conduct detailed verifications of the weather data processing and even make modifications themselves. Contributions are highly encouraged and welcomed.
 
@@ -44,16 +44,17 @@ Apps:
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
 - [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
-- [WeatherAI](https://play.google.com/store/apps/details?id=com.kingfu.weatherai) WeatherAI offers an intuitive user experience that makes checking the weather a breeze. 
+- [WeatherAI](https://play.google.com/store/apps/details?id=com.kingfu.weatherai) WeatherAI offers an intuitive user experience that makes checking the weather a breeze.
 - [Weather](https://github.com/GustavLindberg99/AndroidWeather) Free, open source, simple and complete weather app for Android
 - [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
+- [Clima](https://f-droid.org/packages/co.prestosole.clima/) Beautiful, minimal, and fast weather app
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
 - [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
 - [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
 - [Homepage](https://github.com/benphelps/homepage/) A highly customizable homepage (or startpage / application dashboard) with Docker and service API integrations.
-- [Spots Guru](https://www.spots.guru) Weather forecast for lazy, the best wind & wave spots around you. 
+- [Spots Guru](https://www.spots.guru) Weather forecast for lazy, the best wind & wave spots around you.
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
 
 Other:
