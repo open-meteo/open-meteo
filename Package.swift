@@ -28,13 +28,13 @@ let package = Package(
         .macOS(.v12)
     ],
     dependencies: [
-        .package(url: "https://github.com/swift-server/async-http-client.git", from: "1.13.1"),
         .package(url: "https://github.com/vapor/vapor.git", from: "4.67.4"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.0.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.1"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "0.1.5"),
-        .package(url: "https://github.com/orlandos-nl/IkigaJSON.git", from: "2.0.0"),
-    ] + (enableParquet ? [.package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "0.0.0")] : []),
+    ] + (enableParquet ? [
+        .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "0.0.0")
+    ] : []),
     targets: [
         .target(
             name: "App",
@@ -45,7 +45,6 @@ let package = Package(
                 .product(name: "SwiftEccodes", package: "SwiftEccodes"),
                 "CHelper",
                 "SwiftPFor2D",
-                "IkigaJSON",
                 "CZlib",
                 "CBz2lib"
             ] + (enableParquet ? [

@@ -28,15 +28,6 @@
       }
     },
     {
-      "identity" : "ikigajson",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/orlandos-nl/IkigaJSON.git",
-      "state" : {
-        "revision" : "3e013cfdba43f4e29923c3926a0cedc9dd712ea7",
-        "version" : "2.1.4"
-      }
-    },
-    {
       "identity" : "multipart-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/multipart-kit.git",

@@ -1,6 +1,5 @@
 import Vapor
 //import Leaf
-import IkigaJSON
 
 struct OpenMeteo {
     /// Data directory with trailing slash
@@ -45,16 +44,6 @@ extension Application {
 // configures your application
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone(abbreviation: "GMT")!
-
-    
-    let decoder = IkigaJSONDecoder()
-    decoder.settings.dateDecodingStrategy = .iso8601
-    ContentConfiguration.global.use(decoder: decoder, for: .json)
-
-    var encoder = IkigaJSONEncoder()
-    encoder.settings.dateDecodingStrategy = .iso8601
-    ContentConfiguration.global.use(encoder: encoder, for: .json)
-    
     
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
@@ -97,32 +86,6 @@ public func configure(_ app: Application) throws {
 
     // register routes
     try routes(app)
-}
-
-
-extension IkigaJSONEncoder: ContentEncoder {
-    public func encode<E: Encodable>(
-        _ encodable: E,
-        to body: inout ByteBuffer,
-        headers: inout HTTPHeaders
-    ) throws {
-        headers.contentType = .json
-        try self.encodeAndWrite(encodable, into: &body)
-    }
-}
-
-extension IkigaJSONDecoder: ContentDecoder {
-    public func decode<D: Decodable>(
-        _ decodable: D.Type,
-        from body: ByteBuffer,
-        headers: HTTPHeaders
-    ) throws -> D {
-        guard headers.contentType == .json || headers.contentType == .jsonAPI else {
-            throw Abort(.unsupportedMediaType)
-        }
-        
-        return try self.decode(D.self, from: body)
-    }
 }
 
 
