@@ -94,9 +94,10 @@ final class RateLimiter: LifecycleHandler {
                 }
                 return
             })
-        case .v6(let socket):
-            let i32 = socket.address.sin6_addr.__u6_addr.__u6_addr32
-            let ip: Int = (Int(i32.0) << 32 &+ Int(i32.1)) ^ (Int(i32.2) << 32 &+ Int(i32.3))
+        case .v6(_):
+            var hasher = Hasher()
+            address.hash(into: &hasher)
+            let ip = hasher.finalize()
             return try lock.withLock({
                 let usageMinutely = Self.limitMinutely > 0 ? minutelyPerIPv6[ip] ?? 0 : 0
                 if usageMinutely >= Self.limitMinutely {
