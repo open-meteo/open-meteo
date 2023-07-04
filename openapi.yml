@@ -88,7 +88,7 @@ paths:
             - shortwave_radiation_sum
             - uv_index_max
             - uv_index_clear_sky_max
-            - et0_fao_evapotranspiration 
+            - et0_fao_evapotranspiration
       - name: latitude
         in: query
         required: true
@@ -176,19 +176,23 @@ paths:
                     example: 3600
                     description: Applied timezone offset from the &timezone= parameter.
                   hourly:
-                    type: object
+                    type: HourlyResponse
                     description: For each selected weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
                   hourly_units:
                     type: object
+                    additionalProperties:
+                      type: string
                     description: For each selected weather variable, the unit will be listed here.
                   daily:
-                    type: object
+                    type: DailyResponse
                     description: For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
                   daily_units:
                     type: object
+                    additionalProperties:
+                      type: string
                     description: For each selected daily weather variable, the unit will be listed here.
                   current_weather:
-                    type: object
+                    type: CurrentWeather
                     description: "Current weather conditions with the attributes: time, temperature, windspeed, winddirection and weathercode"
         400:
           description: Bad Request
@@ -204,3 +208,254 @@ paths:
                     type: string
                     description: Description of the error
                     example: "Latitude must be in range of -90 to 90°. Given: 300"
+components:
+  schemas:
+    HourlyResponse:
+      type: object
+      required:
+        - time
+      properties:
+        time:
+          type: array
+          items:
+            type: string
+        temperature_2m:
+          type: array
+          items:
+            type: float
+        relativehumidity_2m:
+          type: array
+          items:
+            type: float
+        dewpoint_2m:
+          type: array
+          items:
+            type: float
+        apparent_temperature:
+          type: array
+          items:
+            type: float
+        pressure_msl:
+          type: array
+          items:
+            type: float
+        cloudcover:
+          type: array
+          items:
+            type: float
+        cloudcover_low:
+          type: array
+          items:
+            type: float
+        cloudcover_mid:
+          type: array
+          items:
+            type: float
+        cloudcover_high:
+          type: array
+          items:
+            type: float
+        windspeed_10m:
+          type: array
+          items:
+            type: float
+        windspeed_80m:
+          type: array
+          items:
+            type: float
+        windspeed_120m:
+          type: array
+          items:
+            type: float
+        windspeed_180m:
+          type: array
+          items:
+            type: float
+        winddirection_10m:
+          type: array
+          items:
+            type: float
+        winddirection_80m:
+          type: array
+          items:
+            type: float
+        winddirection_120m:
+          type: array
+          items:
+            type: float
+        winddirection_180m:
+          type: array
+          items:
+            type: float
+        windgusts_10m:
+          type: array
+          items:
+            type: float
+        shortwave_radiation:
+          type: array
+          items:
+            type: float
+        direct_radiation:
+          type: array
+          items:
+            type: float
+        direct_normal_irradiance:
+          type: array
+          items:
+            type: float
+        diffuse_radiation:
+          type: array
+          items:
+            type: float
+        vapor_pressure_deficit:
+          type: array
+          items:
+            type: float
+        evapotranspiration:
+          type: array
+          items:
+            type: float
+        precipitation:
+          type: array
+          items:
+            type: float
+        weathercode:
+          type: array
+          items:
+            type: float
+        snow_height:
+          type: array
+          items:
+            type: float
+        freezinglevel_height:
+          type: array
+          items:
+            type: float
+        soil_temperature_0cm:
+          type: array
+          items:
+            type: float
+        soil_temperature_6cm:
+          type: array
+          items:
+            type: float
+        soil_temperature_18cm:
+          type: array
+          items:
+            type: float
+        soil_temperature_54cm:
+          type: array
+          items:
+            type: float
+        soil_moisture_0_1cm:
+          type: array
+          items:
+            type: float
+        soil_moisture_1_3cm:
+          type: array
+          items:
+            type: float
+        soil_moisture_3_9cm:
+          type: array
+          items:
+            type: float
+        soil_moisture_9_27cm:
+          type: array
+          items:
+            type: float
+        soil_moisture_27_81cm:
+          type: array
+          items:
+            type: float
+    DailyResponse:
+      type: object
+      properties:
+        time:
+          type: array
+          items:
+            type: string
+        temperature_2m_max:
+          type: array
+          items:
+            type: float
+        temperature_2m_min:
+          type: array
+          items:
+            type: float
+        apparent_temperature_max:
+          type: array
+          items:
+            type: float
+        apparent_temperature_min:
+          type: array
+          items:
+            type: float
+        precipitation_sum:
+          type: array
+          items:
+            type: float
+        precipitation_hours:
+          type: array
+          items:
+            type: float
+        weathercode:
+          type: array
+          items:
+            type: float
+        sunrise:
+          type: array
+          items:
+            type: float
+        sunset:
+          type: array
+          items:
+            type: float
+        windspeed_10m_max:
+          type: array
+          items:
+            type: float
+        windgusts_10m_max:
+          type: array
+          items:
+            type: float
+        winddirection_10m_dominant:
+          type: array
+          items:
+            type: float
+        shortwave_radiation_sum:
+          type: array
+          items:
+            type: float
+        uv_index_max:
+          type: array
+          items:
+            type: float
+        uv_index_clear_sky_max:
+          type: array
+          items:
+            type: float
+        et0_fao_evapotranspiration:
+          type: array
+          items:
+            type: float
+      required:
+        - time
+    CurrentWeather:
+      type: object
+      properties:
+        time:
+          type: string
+        temperature:
+          type: float
+        windspeed:
+          type: float
+        winddirection:
+          type: float
+        weathercode:
+          type: int
+      required:
+        - time
+        - temperature
+        - windspeed
+        - winddirection
+        - weathercode
