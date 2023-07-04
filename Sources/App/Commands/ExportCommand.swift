@@ -142,6 +142,9 @@ struct ExportCommand: AsyncCommandFix {
         @Option(name: "rain-day-distribution")
         var rainDayDistribution: String?
         
+        @Option(name: "latitude-bounds")
+        var latitudeBounds: String?
+        
         @Option(name: "output", short: "o", help: "Output file name. Default: ./output.nc")
         var outputFilename: String?
         
@@ -173,6 +176,11 @@ struct ExportCommand: AsyncCommandFix {
         disableIdleSleep()
         
         let filePath = signature.outputFilename ?? (format == .netcdf ? "./output.nc" : "./output.parquet")
+        
+        let latitudeBounds = signature.latitudeBounds.map {
+            let parts = $0.split(separator: ",")
+            return Float(parts[0])! ... Float(parts[1])!
+        }
         
         /*let om = try OmFileReader(file: "/Volumes/2TB_1GBs/data/master-MRI_AGCM3_2_S/temperature_2m_max_linear_bias_seasonal.om")
         
@@ -223,12 +231,12 @@ struct ExportCommand: AsyncCommandFix {
                 //outputCoordinates: signature.outputCoordinates,
                 //outputElevation: signature.outputElevation,
                 normals: signature.normalsYears.map { ($0.split(separator: ",").map({Int($0)! }), signature.normalsWith ?? 10) },
-                rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution)
+                rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution), latitudeBounds: latitudeBounds
             )
         }
     }
     
-    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
+    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?) throws {
         #if ENABLE_PARQUET
         
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
@@ -257,6 +265,9 @@ struct ExportCommand: AsyncCommandFix {
                     //    break
                     //}
                     let coords = grid.getCoordinates(gridpoint: l)
+                    if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                        continue
+                    }
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
                     
                     // Read data
@@ -284,6 +295,9 @@ struct ExportCommand: AsyncCommandFix {
                 // Read data
                 let reader = try domain.getReader(position: gridpoint)
                 let coords = grid.getCoordinates(gridpoint: gridpoint)
+                if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                    continue
+                }
                 let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
                 let rows = try variables.map { variable in
                     guard let data = try reader.get(mixed: variable, time: time) else {
@@ -312,6 +326,9 @@ struct ExportCommand: AsyncCommandFix {
             
             for l in 0..<grid.count {
                 let coords = grid.getCoordinates(gridpoint: l)
+                if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                    continue
+                }
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
                 let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
                 let rows = try variables.map { variable in
@@ -338,6 +355,9 @@ struct ExportCommand: AsyncCommandFix {
             // Read data
             let reader = try domain.getReader(position: gridpoint)
             let coords = grid.getCoordinates(gridpoint: gridpoint)
+            if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                continue
+            }
             let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
             let rows = try variables.map { variable in
                 guard let data = try reader.get(mixed: variable, time: time) else {
