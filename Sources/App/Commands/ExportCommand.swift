@@ -274,7 +274,7 @@ struct ExportCommand: AsyncCommandFix {
                         continue
                     }
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-                    if ignoreSea && grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                    if ignoreSea && try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
                         continue
                     }
                     
@@ -307,7 +307,7 @@ struct ExportCommand: AsyncCommandFix {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-                if ignoreSea && grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                if ignoreSea && try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile) {
                     continue
                 }
                 let rows = try variables.map { variable in
@@ -341,7 +341,7 @@ struct ExportCommand: AsyncCommandFix {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-                if ignoreSea && grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                if ignoreSea && try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
                     continue
                 }
                 let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
@@ -373,7 +373,7 @@ struct ExportCommand: AsyncCommandFix {
                 continue
             }
             let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-            if ignoreSea && grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+            if ignoreSea && try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile) {
                 continue
             }
             let rows = try variables.map { variable in
@@ -523,7 +523,6 @@ struct ExportCommand: AsyncCommandFix {
 extension Gridable {
     /// Return true if there is no land around a 5x5 box
     func onlySeaAround(gridpoint: Int, elevationFile: OmFileReader<MmapFile>) throws -> Bool {
-        let allSurroundingPointsAreSeaPoint = true
         for y in -2...2 {
             for x in -2...2 {
                 let point = max(0, min(gridpoint + y * nx + x, count))
