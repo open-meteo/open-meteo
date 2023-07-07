@@ -274,7 +274,7 @@ struct ExportCommand: AsyncCommandFix {
                         continue
                     }
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-                    if ignoreSea && try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                    if ignoreSea, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
                         continue
                     }
                     
@@ -307,7 +307,7 @@ struct ExportCommand: AsyncCommandFix {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-                if ignoreSea && try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile) {
+                if ignoreSea, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile) {
                     continue
                 }
                 let rows = try variables.map { variable in
@@ -341,7 +341,7 @@ struct ExportCommand: AsyncCommandFix {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-                if ignoreSea && try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                if ignoreSea, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
                     continue
                 }
                 let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
@@ -373,7 +373,7 @@ struct ExportCommand: AsyncCommandFix {
                 continue
             }
             let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-            if ignoreSea && try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile) {
+            if ignoreSea, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile) {
                 continue
             }
             let rows = try variables.map { variable in
