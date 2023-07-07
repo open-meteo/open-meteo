@@ -157,6 +157,9 @@ struct ExportCommand: AsyncCommandFix {
         @Flag(name: "output_elevation", help: "Output grid elevation in NetCDF file")
         var outputElevation: Bool
         
+        @Flag(name: "ignore_sea", help: "Ignore sea points")
+        var ignoreSea: Bool
+        
         /// Get time range from parameters
         func getTime(dtSeconds: Int) throws -> TimerangeDt? {
             guard let startDate, let endDate else {
@@ -231,12 +234,14 @@ struct ExportCommand: AsyncCommandFix {
                 //outputCoordinates: signature.outputCoordinates,
                 //outputElevation: signature.outputElevation,
                 normals: signature.normalsYears.map { ($0.split(separator: ",").map({Int($0)! }), signature.normalsWith ?? 10) },
-                rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution), latitudeBounds: latitudeBounds
+                rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution),
+                latitudeBounds: latitudeBounds,
+                ignoreSea: signature.ignoreSea
             )
         }
     }
     
-    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?) throws {
+    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, ignoreSea: Bool) throws {
         #if ENABLE_PARQUET
         
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
@@ -269,6 +274,9 @@ struct ExportCommand: AsyncCommandFix {
                         continue
                     }
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
+                    if ignoreSea && grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                        continue
+                    }
                     
                     // Read data
                     let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
@@ -299,6 +307,9 @@ struct ExportCommand: AsyncCommandFix {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
+                if ignoreSea && grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                    continue
+                }
                 let rows = try variables.map { variable in
                     guard let data = try reader.get(mixed: variable, time: time) else {
                         fatalError("Invalid variable \(variable)")
@@ -330,6 +341,9 @@ struct ExportCommand: AsyncCommandFix {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
+                if ignoreSea && grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                    continue
+                }
                 let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
                 let rows = try variables.map { variable in
                     let reader = variable == "precipitation_sum_imerg" ? try domain.getReader(targetGridDomain: .imerg, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land) : reader
@@ -359,6 +373,9 @@ struct ExportCommand: AsyncCommandFix {
                 continue
             }
             let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
+            if ignoreSea && grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                continue
+            }
             let rows = try variables.map { variable in
                 guard let data = try reader.get(mixed: variable, time: time) else {
                     fatalError("Invalid variable \(variable)")
@@ -500,6 +517,22 @@ struct ExportCommand: AsyncCommandFix {
         }
         
         progress.finish()
+    }
+}
+
+extension Gridable {
+    /// Return true if there is no land around a 5x5 box
+    func onlySeaAround(gridpoint: Int, elevationFile: OmFileReader<MmapFile>) throws -> Bool {
+        let allSurroundingPointsAreSeaPoint = true
+        for y in -2...2 {
+            for x in -2...2 {
+                let point = max(0, min(gridpoint + y * nx + x, count))
+                if try !readElevation(gridpoint: point, elevationFile: elevationFile).isSea {
+                    return false
+                }
+            }
+        }
+        return true
     }
 }
 
