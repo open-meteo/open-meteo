@@ -320,7 +320,7 @@ public extension Sequence where Element == Timestamp {
     var iso8601_YYYYMMddHHmm: [String] {
         var time = 0
         var t = tm()
-        var dateCalculated = 0
+        var dateCalculated = -99999
         return map {
             // only do date calculation if the actual date changes
             if dateCalculated != $0.timeIntervalSince1970 / 86400 {
