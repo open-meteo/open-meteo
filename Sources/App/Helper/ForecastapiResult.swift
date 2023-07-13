@@ -412,7 +412,7 @@ fileprivate extension Sequence where Element == Timestamp {
         return AnySequence<String> { () -> AnyIterator<String> in
             var itterator = self.makeIterator()
             var t = tm()
-            var dateCalculated = 0
+            var dateCalculated = -99999
             
             if onlyDate {
                 return AnyIterator<String> {
@@ -439,8 +439,8 @@ fileprivate extension Sequence where Element == Timestamp {
                 let month = Int(t.tm_mon+1)
                 let day = Int(t.tm_mday)
                 
-                let hour = time % 86400 / 3600
-                let minute = time % 3600 / 60
+                let hour = time.moduloPositive(86400) / 3600
+                let minute = time.moduloPositive(3600) / 60
                 if quotedString {
                     return "\"\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2))\""
                 } else {

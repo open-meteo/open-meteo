@@ -42,6 +42,15 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(rangeDaily.iso8601_YYYYMMdd, expectedDaily)
         // slow version
         XCTAssertEqual(rangeDaily.map({$0.iso8601_YYYY_MM_dd}), expectedDaily)
+        
+        let range2 = TimerangeDt(start: Timestamp(1969,7,1), nTime: 5, dtSeconds: 7200)
+        XCTAssertEqual(range2.range.count, 36000)
+        XCTAssertEqual(range2.count, 5)
+        let expected2 = ["1969-07-01T00:00", "1969-07-01T02:00", "1969-07-01T04:00", "1969-07-01T06:00", "1969-07-01T08:00"]
+        // optimised fast version
+        XCTAssertEqual(range2.iso8601_YYYYMMddHHmm, expected2)
+        // slow version
+        XCTAssertEqual(range2.map({$0.iso8601_YYYY_MM_dd_HH_mm}), expected2)
     }
     
     func testYearMonth() throws {
