@@ -32,7 +32,7 @@ extension Int {
     
     /// Performs mathematical module keeping the result positive
     @inlinable func moduloPositive(_ devisor: Int) -> Int {
-        return self >= 0 ? (self % devisor) : ((self % devisor) + devisor)
+        return((self % devisor) + devisor) % devisor
     }
     
     /// Devide the current number using integer devision, and report the reaming part as a fraction

@@ -28,15 +28,15 @@ public struct Timestamp: Hashable {
     
     /// Hour in 0-23
     @inlinable public var hour: Int {
-        (timeIntervalSince1970 % 86400) / 3600
+        timeIntervalSince1970.moduloPositive(86400) / 3600
     }
     /// Minute in 0-59
     @inlinable public var minute: Int {
-        (timeIntervalSince1970 % 3600) / 60
+        timeIntervalSince1970.moduloPositive(3600) / 60
     }
     /// Second in 0-59
     @inlinable public var second: Int {
-        timeIntervalSince1970 % 60
+        timeIntervalSince1970.moduloPositive(60)
     }
     
     public static func now() -> Timestamp {
@@ -106,7 +106,7 @@ public struct Timestamp: Hashable {
     }
     
     public func floor(toNearest: Int) -> Timestamp {
-        Timestamp(timeIntervalSince1970 - timeIntervalSince1970 % toNearest)
+        Timestamp(timeIntervalSince1970 - timeIntervalSince1970.moduloPositive(toNearest))
     }
     
     public func ceil(toNearest: Int) -> Timestamp {
