@@ -48,23 +48,40 @@ public struct ForecastapiController: RouteCollection {
         
         let hourlyTime = time.range.range(dtSeconds: 3600)
         let dailyTime = time.range.range(dtSeconds: 3600*24)
+        // limited to 3 forecast days
+        let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange).time.range.range(dtSeconds: 3600/4)
         
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
         
         let readers = try domains.compactMap {
             try GenericReaderMulti<ForecastVariable>(domain: $0, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land)
         }
+        // TODO: Preliminary 15 minutes data implemetation only. Final version should support model selection with HRRR 15 minutes data.
+        guard let readerMinutely = try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
         
         guard !readers.isEmpty else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         
+        let paramsMinutely = try IconApiVariable.load(commaSeparatedOptional: params.minutely_15)
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
         
         // Run query on separat thread pool to not block the main pool
         return ForecastapiController.runLoop.next().submit({
             // Start data prefetch to boooooooost API speed :D
+            if let minutelyVariables = paramsMinutely {
+                for variable in minutelyVariables {
+                    switch variable {
+                    case .raw(let raw):
+                        try readerMinutely.prefetchData(variable: .raw(.init(raw, 0)), time: minutelyTime)
+                    case .derived(let derived):
+                        try readerMinutely.prefetchData(variable: .derived(.init(derived, 0)), time: minutelyTime)
+                    }
+                }
+            }
             if let hourlyVariables = paramsHourly {
                 for reader in readers {
                     try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
@@ -90,6 +107,17 @@ public struct ForecastapiController: RouteCollection {
                     }
                 }
                 return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
+            }
+            
+            let minutely: ApiSection? = try paramsMinutely.map { variables in
+                var res = [ApiColumn]()
+                res.reserveCapacity(variables.count)
+                for variable in variables {
+                    let d = try readerMinutely.get(variable: variable, member: 0, time: minutelyTime).convertAndRound(params: params).toApi(name: variable.name)
+                    assert(minutelyTime.count == d.data.count)
+                    res.append(d)
+                }
+                return ApiSection(name: "minutely_15", time: minutelyTime.add(utcOffsetShift), columns: res)
             }
             
             let currentWeather: ForecastapiResult.CurrentWeather?
@@ -158,7 +186,7 @@ public struct ForecastapiController: RouteCollection {
                 utc_offset_seconds: utcOffsetSecondsActual,
                 timezone: timezone,
                 current_weather: currentWeather,
-                sections: [hourly, daily].compactMap({$0}),
+                sections: [minutely, hourly, daily].compactMap({$0}),
                 timeformat: params.timeformatOrDefault
             )
             return try out.response(format: params.format ?? .json)
@@ -171,6 +199,7 @@ public struct ForecastapiController: RouteCollection {
 struct ForecastApiQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
     let latitude: Float
     let longitude: Float
+    let minutely_15: [String]?
     let hourly: [String]?
     let daily: [String]?
     let current_weather: Bool?
