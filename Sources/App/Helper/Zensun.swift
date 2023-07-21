@@ -377,6 +377,11 @@ public struct Zensun {
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
             let zzBackwards = (left-right) / (p1_l - p10_l)
             let dni = dhi / zzBackwards
+            // Prevent possible division by zero
+            // See https://github.com/open-meteo/open-meteo/discussions/395
+            if zzBackwards <= 0.0001 {
+                return dhi
+            }
             return dni
         }
     }
