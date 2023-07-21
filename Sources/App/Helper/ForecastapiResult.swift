@@ -116,7 +116,7 @@ struct ForecastapiResult {
     /// e.g. `52.52N13.42E38m`
     var formatedCoordinatesFilename: String {
         let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
-        let ele = elevation.map { $0.isNaN ? "" : String(format: "%.0fm", $0) } ?? ""
+        let ele = elevation.map { $0.isFinite ? String(format: "%.0fm", $0) : "" } ?? ""
         return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
     }
     
@@ -127,15 +127,15 @@ struct ForecastapiResult {
                 var b = BufferAndWriter(writer: writer)
                 
                 b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
-                let elevation = elevation.map({ $0.isNaN ? "NaN" : "\($0)" }) ?? "NaN"
+                let elevation = elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
                 b.buffer.writeString("\(latitude),\(longitude),\(elevation),\(utc_offset_seconds),\(timezone.identifier),\(timezone.abbreviation() ?? "")\n")
                 
                 if let current_weather = current_weather {
                     b.buffer.writeString("\n")
                     b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.rawValue)),windspeed (\(current_weather.windspeed_unit.rawValue)),winddirection (\(current_weather.winddirection_unit.rawValue)),weathercode (\(current_weather.weathercode_unit.rawValue)),is_day\n")
                     b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false))
-                    let ww = current_weather.weathercode.isNaN ? "NaN" : String(format: "%.0f", current_weather.weathercode)
-                    let is_day = current_weather.is_day.isNaN ? "NaN" : String(format: "%.0f", current_weather.is_day)
+                    let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "NaN"
+                    let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "NaN"
                     b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(current_weather.winddirection),\(ww),\(is_day)\n")
                 }
                 
@@ -156,10 +156,10 @@ struct ForecastapiResult {
                                 b.buffer.writeString(",")
                                 b.buffer.writeString(a[i])
                             case .float(let a):
-                                if a[i].isNaN {
-                                    b.buffer.writeString(",NaN")
-                                } else {
+                                if a[i].isFinite {
                                     b.buffer.writeString(",\(String(format: "%.\(e.unit.significantDigits)f", a[i]))")
+                                } else {
+                                    b.buffer.writeString(",NaN")
                                 }
                             case .int(let a):
                                 b.buffer.writeString(",\(a[i])")
@@ -276,12 +276,12 @@ struct ForecastapiResult {
                 b.buffer.writeString("""
                 {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation() ?? "")"
                 """)
-                if let elevation = elevation, !elevation.isNaN {
+                if let elevation = elevation, elevation.isFinite {
                     b.buffer.writeString(",\"elevation\":\(elevation)")
                 }
                 if let current_weather = current_weather {
-                    let ww = current_weather.weathercode.isNaN ? "null" : String(format: "%.0f", current_weather.weathercode)
-                    let is_day = current_weather.is_day.isNaN ? "null" : String(format: "%.0f", current_weather.is_day)
+                    let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "null"
+                    let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "null"
                     b.buffer.writeString("""
                         ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(current_weather.winddirection),"weathercode":\(ww),"is_day":\(is_day),"time":
                         """)
@@ -346,10 +346,10 @@ struct ForecastapiResult {
                                 } else {
                                     b.buffer.writeString(",")
                                 }
-                                if v.isNaN {
-                                    b.buffer.writeString("null")
-                                } else {
+                                if v.isFinite {
                                     b.buffer.writeString(String(format: format, v))
+                                } else {
+                                    b.buffer.writeString("null")
                                 }
                                 try await b.flushIfRequired()
                             }
