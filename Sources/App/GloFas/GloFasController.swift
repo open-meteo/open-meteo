@@ -99,7 +99,7 @@ struct GloFasController {
         let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
         let dailyTime = time.range.range(dtSeconds: 3600*24)
         
-        let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.seamless_v3]
+        let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
         
         let readers = try domains.compactMap {
             guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
@@ -160,20 +160,30 @@ struct GloFasController {
 }
 
 enum GlofasDomainApi: String, RawRepresentableString, CaseIterable {
+    case best_match
+    
     case seamless_v3
     case forecast_v3
     case consolidated_v3
     
+    case seamless_v4
+    case forecast_v4
     case consolidated_v4
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GloFasMixer? {
         switch self {
+        case .best_match:
+            return try GloFasMixer(domains: [.seasonalv3, .consolidatedv3, .intermediatev3, .forecastv3, .seasonal, .consolidated, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .seamless_v3:
             return try GloFasMixer(domains: [.seasonalv3, .consolidatedv3, .intermediatev3, .forecastv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .forecast_v3:
             return try GloFasMixer(domains: [.seasonalv3, .intermediatev3, .forecastv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
+        case .seamless_v4:
+            return try GloFasMixer(domains: [.seasonal, .consolidated, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode)
+        case .forecast_v4:
+            return try GloFasMixer(domains: [.seasonal, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .consolidated_v3:
             return try GloFasMixer(domains: [.consolidatedv3], lat: lat, lon: lon, elevation: elevation, mode: mode)
         case .consolidated_v4:

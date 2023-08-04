@@ -60,6 +60,8 @@ struct GloFasDownloader: AsyncCommandFix {
         switch domain {
         case .consolidatedv3:
             fallthrough
+        case .intermediate:
+            fallthrough
         case .intermediatev3:
             fallthrough
         case .consolidated:
@@ -89,8 +91,12 @@ struct GloFasDownloader: AsyncCommandFix {
             try downloadTimeIntervalConsolidated(logger: logger, timeinterval: timeInterval, cdskey: cdskey, domain: domain)
         case .seasonalv3:
             fallthrough
+        case .forecast:
+            fallthrough
+        case .seasonal:
+            fallthrough
         case .forecastv3:
-            let runAuto = domain == .forecastv3 ? Timestamp.now().with(hour: 0) : Timestamp.now().with(day: 1)
+            let runAuto = domain.isForecast ? Timestamp.now().with(hour: 0) : Timestamp.now().with(day: 1)
             let run = try signature.date.map(IsoDate.init)?.toTimestamp() ?? runAuto
             
             guard let ftpuser = signature.ftpuser else {
@@ -117,12 +123,12 @@ struct GloFasDownloader: AsyncCommandFix {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
-        let downloadTimeHours: Double = domain == .forecastv3 ? 5 : 14
+        let downloadTimeHours: Double = domain.isForecast ? 5 : 14
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: Int(3600*downloadTimeHours))
-        let directory = domain == .forecastv3 ? "fc_grib" : "seasonal_fc_grib"
+        let directory = domain.isForecast ? "fc_grib" : "seasonal_fc_grib"
         let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH).grib"
         
-        let nTime = domain == .forecastv3 ? 30 : 215
+        let nTime = domain.isForecast ? 30 : 215
         
         // forecast day 0 is valid for the next day
         let timerange = TimerangeDt(start: run.add(24*3600), nTime: nTime, dtSeconds: 24*3600)
@@ -421,7 +427,11 @@ struct GloFasDownloader: AsyncCommandFix {
 }
 
 enum GloFasDomain: String, GenericDomain, CaseIterable {
+    case forecast
     case consolidated
+    case seasonal
+    case intermediate
+    
     case forecastv3
     case consolidatedv3
     case seasonalv3
@@ -443,6 +453,12 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     var grid: Gridable {
         switch self {
         case .consolidated:
+            fallthrough
+        case .intermediate:
+            fallthrough
+        case .seasonal:
+            fallthrough
+        case .forecast:
             return RegularGrid(nx: 7200, ny: 3000, latMin: -60, lonMin: -180, dx: 0.05, dy: 0.05)
         case .consolidatedv3:
             fallthrough
@@ -452,6 +468,16 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
             fallthrough
         case .forecastv3:
             return RegularGrid(nx: 3600, ny: 1500, latMin: -60, lonMin: -180, dx: 0.1, dy: 0.1)
+        }
+    }
+    
+    var isForecast: Bool {
+        switch self {
+        case .forecast:
+            fallthrough
+        case .forecastv3:
+            return true
+        default: return false
         }
     }
     
@@ -466,6 +492,12 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     /// `version_3_1` or  `version_4_0`
     var version: String {
         switch self {
+        case .seasonal:
+            fatalError("should never be called")
+        case .forecast:
+            fallthrough
+        case .intermediate:
+            fallthrough
         case .consolidated:
             return "version_4_0"
         case .forecastv3:
@@ -486,11 +518,17 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
             fallthrough
         case .consolidated:
             return "consolidated"
+        case .forecast:
+            fallthrough
+        case .seasonal:
+            fallthrough
         case .seasonalv3:
             fallthrough
         case .forecastv3:
             fatalError("should never be called")
         case .intermediatev3:
+            fallthrough
+        case .intermediate:
             return "intermediate"
         }
     }
@@ -499,6 +537,8 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .consolidatedv3:
             fallthrough
+        case .intermediate:
+            fallthrough
         case .intermediatev3:
             fallthrough
         case .consolidated:
@@ -506,6 +546,10 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         case .forecastv3:
             return 60
         case .seasonalv3:
+            return 215
+        case .forecast:
+            return 60
+        case .seasonal:
             return 215
         }
     }
