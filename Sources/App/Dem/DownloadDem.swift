@@ -79,6 +79,12 @@ struct DownloadDemCommand: AsyncCommandFix {
     struct Signature: CommandSignature {
         @Argument(name: "path", help: "Local path with DEM90 data")
         var path: String
+
+        @Option(name: "concurrent-conversion-jobs", help: "Max number of concurrent conversion jobs. Default 4")
+        var concurrentConversions: Int?
+
+        @Option(name: "concurrent-compression-jobs", help: "Max number of concurrent compression jobs. Default 4")
+        var concurrentCompressions: Int?
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -89,9 +95,17 @@ struct DownloadDemCommand: AsyncCommandFix {
 
         //let tifTemp = "\(Dem90.downloadDirectory)temp.tif"
 
+        var scheduledConversions = 0
+
         try await withThrowingTaskGroup(of: Void.self) { group in
             for lon in -180..<180 {
                 for lat in -90..<90 {
+                    if scheduledConversions >= signature.concurrentConversions ?? 4 {
+                        try await group.next()
+                    } else {
+                        scheduledConversions += 1
+                    }
+
                     group.addTask {
                         logger.info("Dem lon \(lon) lat \(lat)")
                         let omFile = "\(Dem90.downloadDirectory)\(lat)_\(lon).om"
@@ -141,9 +155,17 @@ struct DownloadDemCommand: AsyncCommandFix {
 
             try await group.waitForAll()
 
+            var scheduledCompressions = 0
+
             for lat in -90..<90 {
                 if FileManager.default.fileExists(atPath: "\(Dem90.omDirectory)lat_\(lat).om") {
                     continue
+                }
+
+                if scheduledCompressions >= signature.concurrentCompressions ?? 4 {
+                    try await group.next()
+                } else {
+                    scheduledCompressions += 1
                 }
 
                 group.addTask {
