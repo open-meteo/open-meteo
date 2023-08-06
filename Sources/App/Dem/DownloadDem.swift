@@ -143,7 +143,7 @@ struct DownloadDemCommand: AsyncCommandFix {
 
             for lat in -90..<90 {
                 if FileManager.default.fileExists(atPath: "\(Dem90.omDirectory)lat_\(lat).om") {
-                    return
+                    continue
                 }
 
                 group.addTask {
