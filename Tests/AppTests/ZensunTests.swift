@@ -147,6 +147,30 @@ final class ZensunTests: XCTestCase {
         XCTAssertEqualArray(averaged, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.903125, 117.9211, 305.77502, 484.58722, 614.3561, 680.2455, 677.99414, 578.95483, 430.6342, 270.31412, 90.66743, 3.6926, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
     }
     
+    func testSolarGapfilling() {
+        let time = TimerangeDt(start: Timestamp(2020, 12, 26, 0), nTime: 48, dtSeconds: 3600)
+        let position = RegularGrid(nx: 1, ny: 1, latMin: 47.5, lonMin: 7, dx: 1, dy: 1)
+        /// 60% ex rad
+        let reference = Zensun.extraTerrestrialRadiationBackwards(latitude: position.latMin, longitude: position.lonMin, timerange: time).map{$0*0.6}
+        var averagedWithNaNs = reference
+        for i in 0..<20 {
+            averagedWithNaNs[7+i*2+1] = averagedWithNaNs[7+i*2..<9+i*2].mean()
+            averagedWithNaNs[7+i*2] = .nan
+        }
+        averagedWithNaNs.interpolateInplaceSolarBackwards(skipFirst: 0, time: time, grid: position, locationRange: 0..<1)
+        XCTAssertEqualArray(reference, averagedWithNaNs, accuracy: 0.001)
+        
+        averagedWithNaNs = reference
+        for i in 0..<13 {
+            averagedWithNaNs[7+i*3+2] = averagedWithNaNs[7+i*3..<10+i*3].mean()
+            averagedWithNaNs[7+i*3+1] = .nan
+            averagedWithNaNs[7+i*3] = .nan
+        }
+        print(averagedWithNaNs)
+        averagedWithNaNs.interpolateInplaceSolarBackwards(skipFirst: 0, time: time, grid: position, locationRange: 0..<1)
+        XCTAssertEqualArray(reference, averagedWithNaNs, accuracy: 0.01)
+    }
+    
     func testDNI() {
         let directRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 116.0, 305.0, 485.0, 615.0, 680.0, 681.0, 579.0, 428.0, 272.0, 87.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
         let time = TimerangeDt(start: Timestamp(2022,7,31), nTime: 24, dtSeconds: 3600)

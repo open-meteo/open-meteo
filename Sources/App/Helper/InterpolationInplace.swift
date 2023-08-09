@@ -199,7 +199,7 @@ extension Array where Element == Float {
             return
         }
         /// Which range of hours solar radiation data is required
-        let solarHours = firstMissing - 6 ..< lastMissing + 2
+        let solarHours = firstMissing - 6 ..< lastMissing + 3
         /// Only calculate solar coefficients for this timerange
         let solarTime = TimerangeDt(
             start: time.range.lowerBound.add(solarHours.lowerBound * time.dtSeconds),
