@@ -135,8 +135,9 @@ struct ForecastapiResult {
                     b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.rawValue)),windspeed (\(current_weather.windspeed_unit.rawValue)),winddirection (\(current_weather.winddirection_unit.rawValue)),weathercode (\(current_weather.weathercode_unit.rawValue)),is_day\n")
                     b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false))
                     let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "NaN"
+                    let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "NaN"
                     let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "NaN"
-                    b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(current_weather.winddirection),\(ww),\(is_day)\n")
+                    b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(winddirection),\(ww),\(is_day)\n")
                 }
                 
                 for section in sections {
@@ -282,8 +283,9 @@ struct ForecastapiResult {
                 if let current_weather = current_weather {
                     let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "null"
                     let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "null"
+                    let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "null"
                     b.buffer.writeString("""
-                        ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(current_weather.winddirection),"weathercode":\(ww),"is_day":\(is_day),"time":
+                        ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(winddirection),"weathercode":\(ww),"is_day":\(is_day),"time":
                         """)
                     b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
                     b.buffer.writeString("}")
