@@ -11,7 +11,7 @@ struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
     }
     
     var omFileName: (file: String, level: Int) {
-        return variable.omFileName
+        return ("\(variable.omFileName.file)_\(member)", variable.omFileName.level)
     }
     
     var scalefactor: Float {
@@ -96,6 +96,7 @@ extension VariableAndMemberAndControl: Hashable, Equatable where Variable: Hasha
 }
 
 extension VariableAndMemberAndControl: GenericVariable where Variable: GenericVariable {
+    /// Note: ensemble models use levels to encode different members, therefore the filename does not contain the member number
     var omFileName: (file: String, level: Int) {
         return (variable.omFileName.file, member)
     }
