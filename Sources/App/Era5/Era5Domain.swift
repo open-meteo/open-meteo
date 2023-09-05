@@ -15,6 +15,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     case cloudcover_high
     case pressure_msl
     case snowfall_water_equivalent
+    /// Only ERA5-Land and CERRA have snow depth in ACTUAL height. ERA5 and ECMWF IFS use water equivalent and density
+    case snow_depth
     case soil_temperature_0_to_7cm
     case soil_temperature_7_to_28cm
     case soil_temperature_28_to_100cm
@@ -61,6 +63,12 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     }
     
     func availableForDomain(domain: CdsDomain) -> Bool {
+        /// Snow depth is only directly available in era5-land
+        /// Others have to download snow depth water equivalent and density separately (not implemented)
+        if self == .snow_depth {
+            return domain == .era5_land
+        }
+        
         // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
         if domain == .era5_land {
             switch self {
@@ -116,6 +124,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_7_to_28cm: return "volumetric_soil_water_layer_2"
         case .soil_moisture_28_to_100cm: return "volumetric_soil_water_layer_3"
         case .soil_moisture_100_to_255cm: return "volumetric_soil_water_layer_4"
+            // NOTE: snow depth uses different definitions in ERA5 and ECMWF IFS. Only ERA5-land returns the actual height directly
+        case .snow_depth: return "snow_depth"
         }
     }
     
@@ -145,6 +155,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
             return "151.128"
         case .snowfall_water_equivalent:
             return "144.128"
+        case .snow_depth:
+            fatalError("Not supported")
         case .soil_temperature_0_to_7cm:
             return "139.128"
         case .soil_temperature_7_to_28cm:
@@ -217,6 +229,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_7_to_28cm: return ["swvl2"]
         case .soil_moisture_28_to_100cm: return ["swvl3"]
         case .soil_moisture_100_to_255cm: return ["swvl4"]
+        case .snow_depth: return ["sde"]
         }
     }
     
@@ -246,6 +259,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_7_to_28cm: return 1000
         case .soil_moisture_28_to_100cm: return 1000
         case .soil_moisture_100_to_255cm: return 1000
+        case .snow_depth: return 100 // 1 cm resolution
         }
     }
     
@@ -274,6 +288,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_7_to_28cm: return .qubicMeterPerQubicMeter
         case .soil_moisture_28_to_100cm: return .qubicMeterPerQubicMeter
         case .soil_moisture_100_to_255cm: return .qubicMeterPerQubicMeter
+        case .snow_depth: return .meter
         }
     }
 }

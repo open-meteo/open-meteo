@@ -150,6 +150,7 @@ enum CdsVariable: String, GenericVariableMixable {
     case cloudcover_high
     case pressure_msl
     case snowfall_water_equivalent
+    case snow_depth
     case soil_temperature_0_to_7cm
     case soil_temperature_7_to_28cm
     case soil_temperature_28_to_100cm
