@@ -78,12 +78,12 @@ fileprivate extension ApiSection {
 fileprivate extension ApiColumn {
     func toFlatbuffers(_ fbb: inout FlatBufferBuilder) -> Offset? {
         switch data {
-        case .string(_):
-            return nil
+        //case .string(_):
+        //    return nil
         case .float(let data):
             return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unitOffset: fbb.create(string: unit.rawValue), valuesVectorOffset: fbb.createVector(data))
-        case .int(_):
-            return nil
+        //case .int(_):
+        //    return nil
         case .timestamp(_):
             return nil
         }

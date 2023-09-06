@@ -4,19 +4,19 @@ import Vapor
 
 
 enum ApiArray {
-    case string([String])
+    //case string([String])
     case float([Float])
-    case int([Int])
+    //case int([Int])
     case timestamp([Timestamp])
     
     var count: Int {
         switch self {
-        case .string(let a):
-            return a.count
+        //case .string(let a):
+        //    return a.count
         case .float(let a):
             return a.count
-        case .int(let a):
-            return a.count
+        //case .int(let a):
+        //    return a.count
         case .timestamp(let a):
             return a.count
         }
@@ -156,17 +156,17 @@ struct ForecastapiResult {
                         b.buffer.writeString(time)
                         for e in section.columns {
                             switch e.data {
-                            case .string(let a):
+                            /*case .string(let a):
                                 b.buffer.writeString(",")
-                                b.buffer.writeString(a[i])
+                                b.buffer.writeString(a[i])*/
                             case .float(let a):
                                 if a[i].isFinite {
                                     b.buffer.writeString(",\(String(format: "%.\(e.unit.significantDigits)f", a[i]))")
                                 } else {
                                     b.buffer.writeString(",NaN")
                                 }
-                            case .int(let a):
-                                b.buffer.writeString(",\(a[i])")
+                            /*case .int(let a):
+                                b.buffer.writeString(",\(a[i])")*/
                             case .timestamp(let a):
                                 switch timeformat {
                                 case .iso8601:
@@ -245,12 +245,12 @@ struct ForecastapiResult {
                 sheet.writeTimestamp(time.add(utc_offset_seconds))
                 for e in section.columns {
                     switch e.data {
-                    case .string(let a):
-                        sheet.write(a[i])
+                    /*case .string(let a):
+                        sheet.write(a[i])*/
                     case .float(let a):
                         sheet.write(a[i])
-                    case .int(let a):
-                        sheet.write(a[i])
+                    /*case .int(let a):
+                        sheet.write(a[i])*/
                     case .timestamp(let a):
                         sheet.writeTimestamp(a[i].add(utc_offset_seconds))
                     }
@@ -333,7 +333,7 @@ struct ForecastapiResult {
                         b.buffer.writeString("[")
                         var firstValue = true
                         switch e.data {
-                        case .string(let strings):
+                        /*case .string(let strings):
                             for v in strings {
                                 if firstValue {
                                     firstValue = false
@@ -342,7 +342,7 @@ struct ForecastapiResult {
                                 }
                                 b.buffer.writeString("\"\(v)\"")
                                 try await b.flushIfRequired()
-                            }
+                            }*/
                         case .float(let floats):
                             let format = "%.\(e.unit.significantDigits)f"
                             for v in floats {
@@ -358,7 +358,7 @@ struct ForecastapiResult {
                                 }
                                 try await b.flushIfRequired()
                             }
-                        case .int(let ints):
+                        /*case .int(let ints):
                             for v in ints {
                                 if firstValue {
                                     firstValue = false
@@ -367,7 +367,7 @@ struct ForecastapiResult {
                                 }
                                 b.buffer.writeString("\(v)")
                                 try await b.flushIfRequired()
-                            }
+                            }*/
                         case .timestamp(let timestamps):
                             for time in timestamps.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: false) {
                                 if firstValue {
