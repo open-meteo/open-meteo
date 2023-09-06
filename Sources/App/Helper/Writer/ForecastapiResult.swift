@@ -40,6 +40,7 @@ enum ForecastResultFormat: String, Codable {
     case json
     case xlsx
     case csv
+    case flatbuffers
 }
 
 /// Simplify flush commands
@@ -110,6 +111,8 @@ struct ForecastapiResult {
             return try toXlsxResponse(timestamp: timestamp)
         case .csv:
             return toCsvResponse()
+        case .flatbuffers:
+            return toFlatbuffersResponse()
         }
     }
     
