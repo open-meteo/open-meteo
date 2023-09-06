@@ -28,6 +28,15 @@
       }
     },
     {
+      "identity" : "flatbuffers",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/google/flatbuffers.git",
+      "state" : {
+        "revision" : "0100f6a5779831fa7a651e4b67ef389a8752bd9b",
+        "version" : "23.5.26"
+      }
+    },
+    {
       "identity" : "multipart-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/multipart-kit.git",
