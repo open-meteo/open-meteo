@@ -19,6 +19,7 @@ struct CurrentWeather {
   weathercode: float;
   windspeed: float;
   winddirection: float;
+  is_day: float;
 }
  
 table Result {

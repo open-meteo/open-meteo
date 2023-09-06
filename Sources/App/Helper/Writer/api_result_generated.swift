@@ -13,6 +13,8 @@ public struct com_openmeteo_api_result_CurrentWeather: NativeStruct, Verifiable,
   private var _weathercode: Float32
   private var _windspeed: Float32
   private var _winddirection: Float32
+  private var _isDay: Float32
+  private let padding0__: UInt32 = 0
 
   public init(_ bb: ByteBuffer, o: Int32) {
     let _accessor = Struct(bb: bb, position: o)
@@ -21,14 +23,16 @@ public struct com_openmeteo_api_result_CurrentWeather: NativeStruct, Verifiable,
     _weathercode = _accessor.readBuffer(of: Float32.self, at: 12)
     _windspeed = _accessor.readBuffer(of: Float32.self, at: 16)
     _winddirection = _accessor.readBuffer(of: Float32.self, at: 20)
+    _isDay = _accessor.readBuffer(of: Float32.self, at: 24)
   }
 
-  public init(time: Int64, temperature: Float32, weathercode: Float32, windspeed: Float32, winddirection: Float32) {
+  public init(time: Int64, temperature: Float32, weathercode: Float32, windspeed: Float32, winddirection: Float32, isDay: Float32) {
     _time = time
     _temperature = temperature
     _weathercode = weathercode
     _windspeed = windspeed
     _winddirection = winddirection
+    _isDay = isDay
   }
 
   public init() {
@@ -37,6 +41,7 @@ public struct com_openmeteo_api_result_CurrentWeather: NativeStruct, Verifiable,
     _weathercode = 0.0
     _windspeed = 0.0
     _winddirection = 0.0
+    _isDay = 0.0
   }
 
   public var time: Int64 { _time }
@@ -44,6 +49,7 @@ public struct com_openmeteo_api_result_CurrentWeather: NativeStruct, Verifiable,
   public var weathercode: Float32 { _weathercode }
   public var windspeed: Float32 { _windspeed }
   public var winddirection: Float32 { _winddirection }
+  public var isDay: Float32 { _isDay }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     try verifier.inBuffer(position: position, of: com_openmeteo_api_result_CurrentWeather.self)
@@ -63,6 +69,7 @@ public struct com_openmeteo_api_result_CurrentWeather_Mutable: FlatBufferObject 
   public var weathercode: Float32 { return _accessor.readBuffer(of: Float32.self, at: 12) }
   public var windspeed: Float32 { return _accessor.readBuffer(of: Float32.self, at: 16) }
   public var winddirection: Float32 { return _accessor.readBuffer(of: Float32.self, at: 20) }
+  public var isDay: Float32 { return _accessor.readBuffer(of: Float32.self, at: 24) }
 }
 
 public struct com_openmeteo_api_result_Variable: FlatBufferObject, Verifiable {

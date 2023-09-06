@@ -12,7 +12,14 @@ extension ForecastapiResult {
                 // TODO make a good guess for the initial size
                 var fbb = FlatBufferBuilder(initialSize: 1024)
                 let currentWeather = self.current_weather.map { c in
-                    com_openmeteo_api_result_CurrentWeather(time: Int64(c.time.timeIntervalSince1970), temperature: c.temperature, weathercode: c.weathercode, windspeed: c.windspeed, winddirection: c.winddirection)
+                    com_openmeteo_api_result_CurrentWeather(
+                        time: Int64(c.time.timeIntervalSince1970),
+                        temperature: c.temperature,
+                        weathercode: c.weathercode,
+                        windspeed: c.windspeed,
+                        winddirection: c.winddirection,
+                        isDay: c.is_day
+                    )
                 }
                 let time = self.sections.first?.time.range.lowerBound.timeIntervalSince1970 ?? 0
                 let hourly = self.sections.first(where: {$0.name == "hourly"})?.toFlatbuffers(&fbb) ?? Offset()
@@ -71,12 +78,12 @@ fileprivate extension FlatBuffers.ByteBuffer {
 
 fileprivate extension ApiSection {
     func toFlatbuffers(_ fbb: inout FlatBufferBuilder) -> Offset {
-        return fbb.createVector(ofOffsets: columns.compactMap({ $0.toFlatbuffers(&fbb) }))
+        return fbb.createVector(ofOffsets: columns.compactMap({ $0.toFlatbuffers(&fbb, timerange: time) }))
     }
 }
 
 fileprivate extension ApiColumn {
-    func toFlatbuffers(_ fbb: inout FlatBufferBuilder) -> Offset? {
+    func toFlatbuffers(_ fbb: inout FlatBufferBuilder, timerange: TimerangeDt) -> Offset? {
         switch data {
         //case .string(_):
         //    return nil
@@ -84,8 +91,13 @@ fileprivate extension ApiColumn {
             return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unitOffset: fbb.create(string: unit.rawValue), valuesVectorOffset: fbb.createVector(data))
         //case .int(_):
         //    return nil
-        case .timestamp(_):
-            return nil
+        case .timestamp(let times):
+            /// only used for sunrise / sunset
+            /// convert unixtimestamp to seconds after midnight
+            let secondsAfterMidnight = zip(timerange, times).map { (midnight, time) in
+                return Float(time.timeIntervalSince1970 - midnight.timeIntervalSince1970)
+            }
+            return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unitOffset: fbb.create(string: unit.rawValue), valuesVectorOffset: fbb.createVector(secondsAfterMidnight))
         }
     }
 }
