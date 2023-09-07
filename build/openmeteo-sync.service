@@ -17,4 +17,4 @@ MemoryMax=500M
 
 
 [Install]
-WantedBy = multi-user.target
+WantedBy = default.target
