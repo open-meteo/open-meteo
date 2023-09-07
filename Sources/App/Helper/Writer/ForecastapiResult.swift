@@ -44,7 +44,7 @@ enum ForecastResultFormat: String, Codable {
 }
 
 /// Simplify flush commands
-fileprivate struct BufferAndWriter {
+struct BufferAndWriter {
     let writer: BodyStreamWriter
     var buffer: ByteBuffer
     
@@ -112,7 +112,8 @@ struct ForecastapiResult {
         case .csv:
             return toCsvResponse()
         case .flatbuffers:
-            return toFlatbuffersResponse()
+            fatalError()
+            //return toFlatbuffersResponse()
         }
     }
     
