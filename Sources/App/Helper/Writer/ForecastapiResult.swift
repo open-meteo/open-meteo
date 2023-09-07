@@ -74,18 +74,20 @@ struct BufferAndWriter {
 }
 
 extension Array where Element == () throws -> ForecastapiResult {
-    func response(format: ForecastResultFormat, timestamp: Timestamp = .now()) throws -> Response {
-        switch format {
-        case .json:
-            return try toJsonResponse()
-        case .xlsx:
-            fatalError()
-            //return try toXlsxResponse(timestamp: timestamp)
-        case .csv:
-            fatalError()
-            //return toCsvResponse()
-        case .flatbuffers:
-            return try toFlatbuffersResponse()
+    func response(format: ForecastResultFormat, timestamp: Timestamp = .now()) -> EventLoopFuture<Response> {
+        return ForecastapiController.runLoop.next().submit {
+            switch format {
+            case .json:
+                return try toJsonResponse()
+            case .xlsx:
+                fatalError()
+                //return try toXlsxResponse(timestamp: timestamp)
+            case .csv:
+                fatalError()
+                //return toCsvResponse()
+            case .flatbuffers:
+                return try toFlatbuffersResponse()
+            }
         }
     }
 }

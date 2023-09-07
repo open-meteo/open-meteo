@@ -18,6 +18,7 @@ enum ForecastapiError: Error {
     case latitudeAndLongitudeSameCount
     case latitudeAndLongitudeNotEmpty
     case latitudeAndLongitudeMaximum(max: Int)
+    case latitudeAndLongitudeCountMustBeTheSame
     case generic(message: String)
 }
 
@@ -56,6 +57,8 @@ extension ForecastapiError: AbortError {
             return "Parameter 'latitude' and 'longitude' must not be empty"
         case .latitudeAndLongitudeMaximum(max: let max):
             return "Parameter 'latitude' and 'longitude' must not exceed \(max) coordinates."
+        case .latitudeAndLongitudeCountMustBeTheSame:
+            return "Parameter 'latitude' and 'longitude' must have the same number of elements"
         case .noDataAvilableForThisLocation:
             return "No data is available for this location"
         case .generic(message: let message):
@@ -155,6 +158,13 @@ fileprivate let timezoneDatabase = try! SwiftTimeZoneLookup(databasePath: "./Res
 extension QueryWithTimezone {
     /// Get user specified timezone. It `auto` is specified, resolve via coordinates
     func resolveTimezone() throws -> TimeZone {
+        return try TimeZone.resolveApiParams(timezone: timezone, latitude: latitude, longitude: longitude)
+    }
+}
+
+extension TimeZone {
+    /// Get user specified timezone. It `auto` is specified, resolve via coordinates
+    static func resolveApiParams(timezone: String?, latitude: Float, longitude: Float) throws -> TimeZone {
         guard var timezone = timezone else {
             return TimeZone(identifier: "GMT")!
         }
