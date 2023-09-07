@@ -6,21 +6,25 @@ extension Array where Element == () throws -> ForecastapiResult {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
     /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-series require a lot of memory
     /// Data is using `size prefixed` flatbuffers to allow streaming of multiple messages for multiple locations
-    func toFlatbuffersResponse() -> Response {
+    func toFlatbuffersResponse() throws -> Response {
+        // First excution outside stream, to capture potential errors better
+        var first = try self.first?()
+        
         let response = Response(body: .init(stream: { writer in
-            _ = writer.eventLoop.performWithTask {
+            writer.submit {
                 // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.
-                var fbb: FlatBufferBuilder? = nil
+                let initialSize = Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)
+                var fbb = FlatBufferBuilder(initialSize: initialSize)
                 var b = BufferAndWriter(writer: writer)
-                for closure in self {
+                if let first {
+                    first.writeToFlatbuffer(&fbb)
+                    b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
+                    fbb.clear()
+                }
+                first = nil
+                try await b.flushIfRequired()
+                for closure in self.dropFirst() {
                     let result = try closure()
-                    if fbb == nil {
-                        let size = Int32((result.estimatedFlatbufferSize/4096+1)*4096)
-                        fbb = FlatBufferBuilder(initialSize: size)
-                    }
-                    guard var fbb else {
-                        continue
-                    }
                     result.writeToFlatbuffer(&fbb)
                     b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
                     fbb.clear()

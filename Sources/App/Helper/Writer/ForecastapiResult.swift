@@ -73,6 +73,23 @@ struct BufferAndWriter {
     }
 }
 
+extension Array where Element == () throws -> ForecastapiResult {
+    func response(format: ForecastResultFormat, timestamp: Timestamp = .now()) throws -> Response {
+        switch format {
+        case .json:
+            return try toJsonResponse()
+        case .xlsx:
+            fatalError()
+            //return try toXlsxResponse(timestamp: timestamp)
+        case .csv:
+            fatalError()
+            //return toCsvResponse()
+        case .flatbuffers:
+            return try toFlatbuffersResponse()
+        }
+    }
+}
+
 /**
  Store the result of a API forecast result and converion to JSON
  */
@@ -267,137 +284,10 @@ struct ForecastapiResult {
         return response
     }
     
-    /**
-     Stream a potentially very large resultset to the client. The JSON file could easily be 20 MB.
-     Instead of generating a massive string in memory, we only allocate 18kb and flush every time the buffer exceeds 16kb.
-     Memory footprint is therefore much smaller and fits better into L2/L3 caches.
-     Additionally code is fully async, to not block the a thread for almost a second to generate a JSON response...
-     */
-    private func toJsonResponse() -> Response {
-        let response = Response(body: .init(stream: { writer in
-            _ = writer.eventLoop.performWithTask {
-                var b = BufferAndWriter(writer: writer)
-
-                b.buffer.writeString("""
-                {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation() ?? "")"
-                """)
-                if let elevation = elevation, elevation.isFinite {
-                    b.buffer.writeString(",\"elevation\":\(elevation)")
-                }
-                if let current_weather = current_weather {
-                    let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "null"
-                    let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "null"
-                    let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "null"
-                    b.buffer.writeString("""
-                        ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(winddirection),"weathercode":\(ww),"is_day":\(is_day),"time":
-                        """)
-                    b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
-                    b.buffer.writeString("}")
-                }
-                
-                /// process sections like hourly or daily
-                for section in sections {
-                    b.buffer.writeString(",\"\(section.name)_units\":")
-                    b.buffer.writeString("{")
-                    switch timeformat {
-                    case .iso8601:
-                        b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.rawValue)\"")
-                    case .unixtime:
-                        b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.rawValue)\"")
-                    }
-                    for e in section.columns {
-                        b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.rawValue)\"")
-                        try await b.flushIfRequired()
-                    }
-                    b.buffer.writeString("}")
-                    b.buffer.writeString(",\"\(section.name)\":")
-                    b.buffer.writeString("{")
-                    b.buffer.writeString("\"time\":[")
-                    
-                    // Write time axis
-                    var firstValue = true
-                    for time in section.time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: section.time.dtSeconds == 86400) {
-                        if firstValue {
-                            firstValue = false
-                        } else {
-                            b.buffer.writeString(",")
-                        }
-                        b.buffer.writeString(time)
-                        try await b.flushIfRequired()
-                    }
-                    b.buffer.writeString("]")
-                    
-                    /// Write data
-                    for e in section.columns {
-                        b.buffer.writeString(",")
-                        b.buffer.writeString("\"\(e.variable)\":")
-                        b.buffer.writeString("[")
-                        var firstValue = true
-                        switch e.data {
-                        /*case .string(let strings):
-                            for v in strings {
-                                if firstValue {
-                                    firstValue = false
-                                } else {
-                                    b.buffer.writeString(",")
-                                }
-                                b.buffer.writeString("\"\(v)\"")
-                                try await b.flushIfRequired()
-                            }*/
-                        case .float(let floats):
-                            let format = "%.\(e.unit.significantDigits)f"
-                            for v in floats {
-                                if firstValue {
-                                    firstValue = false
-                                } else {
-                                    b.buffer.writeString(",")
-                                }
-                                if v.isFinite {
-                                    b.buffer.writeString(String(format: format, v))
-                                } else {
-                                    b.buffer.writeString("null")
-                                }
-                                try await b.flushIfRequired()
-                            }
-                        /*case .int(let ints):
-                            for v in ints {
-                                if firstValue {
-                                    firstValue = false
-                                } else {
-                                    b.buffer.writeString(",")
-                                }
-                                b.buffer.writeString("\(v)")
-                                try await b.flushIfRequired()
-                            }*/
-                        case .timestamp(let timestamps):
-                            for time in timestamps.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: false) {
-                                if firstValue {
-                                    firstValue = false
-                                } else {
-                                    b.buffer.writeString(",")
-                                }
-                                b.buffer.writeString(time)
-                                try await b.flushIfRequired()
-                            }
-                        }
-                        b.buffer.writeString("]")
-                        try await b.flushIfRequired()
-                    }
-                    b.buffer.writeString("}")
-                }
-                b.buffer.writeString("}")
-                try await b.flush()
-                try await b.end()
-            }
-            
-        }, count: -1))
-
-        response.headers.replaceOrAdd(name: .contentType, value: "application/json; charset=utf-8")
-        return response
-    }
+    
 }
 
-fileprivate extension Timestamp {
+extension Timestamp {
     func formated(format: Timeformat, utc_offset_seconds: Int, quotedString: Bool) -> String {
         switch format {
         case .iso8601:
@@ -412,7 +302,7 @@ fileprivate extension Timestamp {
     }
 }
 
-fileprivate extension Sequence where Element == Timestamp {
+extension Sequence where Element == Timestamp {
     /// includes quotes characters if `quotedString` is true
     func itterateIso8601(utc_offset_seconds: Int, quotedString: Bool, onlyDate: Bool) -> AnySequence<String> {
         return AnySequence<String> { () -> AnyIterator<String> in
