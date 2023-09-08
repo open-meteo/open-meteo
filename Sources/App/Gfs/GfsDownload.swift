@@ -155,15 +155,15 @@ struct GfsDownload: AsyncCommandFix {
         let deadLineHours: Double
         switch domain {
         case .gfs013:
-            deadLineHours = 4
+            deadLineHours = 5 // 6 hours interval so we let 1 hour for data conversion
         case .gfs025:
-            deadLineHours = 4
+            deadLineHours = 5
         case .hrrr_conus:
             deadLineHours = 2
         case .gfs025_ensemble:
-            deadLineHours = 4
+            deadLineHours = 5
         case .gfs025_ens:
-            deadLineHours = 4
+            deadLineHours = 5
         case .gfs05_ens:
             deadLineHours = secondFlush ? 10 : 5
         }

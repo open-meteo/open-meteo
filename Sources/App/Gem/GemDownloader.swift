@@ -159,7 +159,7 @@ struct GemDownload: AsyncCommandFix {
     /// Download data and store as compressed files for each timestep
     func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, skipFilesIfExisting: Bool, server: String?) async throws {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: domain == .gem_global_ensemble ? 10 : 5)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5) // 12 hours and 6 hours interval so we let 1 hour for data conversion
         let downloadDirectory = domain.downloadDirectory
         let nMembers = domain.ensembleMembers
         
