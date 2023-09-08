@@ -22,6 +22,7 @@ enum ForecastapiError: Error {
     case latitudeAndLongitudeCountMustBeTheSame
     case startAndEndDateCountMustBeTheSame
     case coordinatesAndStartEndDatesCountMustBeTheSame
+    case coordinatesAndElevationCountMustBeTheSame
     case generic(message: String)
 }
 
@@ -70,6 +71,8 @@ extension ForecastapiError: AbortError {
             return "Parameter 'start_date' and 'end_date' must have the same number of elements"
         case .coordinatesAndStartEndDatesCountMustBeTheSame:
             return "Parameter 'start_date' and 'end_date' must have the same number of elements as coordinates"
+        case .coordinatesAndElevationCountMustBeTheSame:
+            return "Parameter 'elevation' must have the same number of elements as coordinates"
         case .generic(message: let message):
             return message
         }

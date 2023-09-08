@@ -35,27 +35,26 @@ public struct ForecastapiController: RouteCollection {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("api")
         let params = try req.query.decode(ForecastApiQuery.self)
-        try params.validate()
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 16)
         
-        let coordinates = try params.getCoordinatesWithTimezoneAndStartEndDates()
+        let prepared = try params.prepareCoordinates()
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
         let paramsMinutely = try IconApiVariable.load(commaSeparatedOptional: params.minutely_15)
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
         
-        let callbacks: [() throws -> (ForecastapiResult)] = try coordinates.map { coordTimezone in
-            let coordinates = coordTimezone.coordinate
-            let timezone = coordTimezone.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, startEndDate: coordTimezone.startEndDate, allowedRange: allowedRange)
+        let callbacks: [() throws -> (ForecastapiResult)] = try prepared.map { prepared in
+            let coordinates = prepared.coordinate
+            let timezone = prepared.timezone
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
             /// For fractional timezones, shift data to show only for full timestamps
             let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
             
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             // limited to 3 forecast days
-            let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, startEndDate: coordTimezone.startEndDate, allowedRange: allowedRange).range.range(dtSeconds: 3600/4)
+            let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92).range.range(dtSeconds: 3600/4)
             
             let readers = try domains.compactMap {
                 try GenericReaderMulti<ForecastVariable>(domain: $0, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land)
@@ -253,6 +252,10 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
     /// included end date `2022-06-01`
     let end_date: [String]?
     
+    var timeformatOrDefault: Timeformat {
+        return timeformat ?? .iso8601
+    }
+    
     /// Parse `start_date` and `end_date` parameter to range of timestamps
     func getStartEndDates() throws -> [ClosedRange<Timestamp>]? {
         let startDate = try IsoDate.load(commaSeparatedOptional: start_date)
@@ -283,7 +286,13 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
         }
     }
     
-    func getCoordinatesWithTimezoneAndStartEndDates() throws -> [CoordinatesAndTimeZonesAndDates] {
+    /// Reads coordinates, elevation, timezones and start/end dataparameter and prepares an array.
+    /// For each element, an API response object will be returned later
+    func prepareCoordinates() throws -> [CoordinatesAndTimeZonesAndDates] {
+        if daily?.count ?? 0 > 0 && timezone == nil {
+            throw ForecastapiError.timezoneRequired
+        }
+        
         let dates = try getStartEndDates()
         let coordinates = try getCoordinatesWithTimezone()
         
@@ -313,6 +322,9 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
         }
     }
     
+    /// Reads coordinates and timezone fields
+    /// If only one timezone is given, use the same timezone for all coordinates
+    /// Throws errors on invalid coordinates, timezones or invalid counts
     private func getCoordinatesWithTimezone() throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
         let coordinates = try getCoordinates()
         let timezones = try TimeZoneOrAuto.load(commaSeparatedOptional: timezone)
@@ -336,6 +348,9 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
         }
     }
     
+    /// Parse latitude, longitude and elevation arrays to an array of coordinates
+    /// If no elevation is provided, a DEM is used to resolve the elevation
+    /// Throws errors on invalid coordinate ranges
     private func getCoordinates() throws -> [CoordinatesAndElevation] {
         let latitude = try Float.load(commaSeparated: self.latitude)
         let longitude = try Float.load(commaSeparated: self.longitude)
@@ -344,6 +359,9 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
             throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
         }
         if let elevation {
+            guard elevation.count == longitude.count else {
+                throw ForecastapiError.coordinatesAndElevationCountMustBeTheSame
+            }
             return try zip(latitude, zip(longitude, elevation)).map({
                 try CoordinatesAndElevation(latitude: $0.0, longitude: $0.1.0, elevation: $0.1.1)
             })
@@ -353,22 +371,7 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
         })
     }
     
-    func validate(forecastDaysMax: Int = 16) throws {
-        if daily?.count ?? 0 > 0 && timezone == nil {
-            throw ForecastapiError.timezoneRequired
-        }
-        if let forecast_days = forecast_days, forecast_days < 0 || forecast_days > forecastDaysMax {
-            throw ForecastapiError.forecastDaysInvalid(given: forecast_days, allowed: 0...forecastDaysMax)
-        }
-    }
-    
-    var timeformatOrDefault: Timeformat {
-        return timeformat ?? .iso8601
-    }
-    
-    
-    
-    func getTimerange(timezone: TimezoneWithOffset, current: Timestamp, forecastDays: Int, startEndDate: ClosedRange<Timestamp>?, allowedRange: Range<Timestamp>, past_days_max: Int = 92) throws -> TimerangeLocal {
+    func getTimerange(timezone: TimezoneWithOffset, current: Timestamp, forecastDays: Int, forecastDaysMax: Int, startEndDate: ClosedRange<Timestamp>?, allowedRange: Range<Timestamp>, pastDaysMax: Int) throws -> TimerangeLocal {
         let actualUtcOffset = timezone.utcOffsetSeconds
         let utcOffset = (actualUtcOffset / 3600) * 3600
         if let startEndDate {
@@ -383,8 +386,11 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
             /// TODO: If a single hour is requested, this range needs to be adjusted
             return TimerangeLocal(range: start.add(-1 * utcOffset) ..< includedEnd.add(86400 - utcOffset), utcOffsetSeconds: utcOffset)
         }
-        if let past_days = past_days, past_days < 0 || past_days > past_days_max {
-            throw ForecastapiError.pastDaysInvalid(given: past_days, allowed: 0...past_days_max)
+        if forecastDays < 0 || forecastDays > forecastDaysMax {
+            throw ForecastapiError.forecastDaysInvalid(given: forecastDays, allowed: 0...forecastDaysMax)
+        }
+        if let past_days = past_days, past_days < 0 || past_days > pastDaysMax {
+            throw ForecastapiError.pastDaysInvalid(given: past_days, allowed: 0...pastDaysMax)
         }
         let time = Self.forecastTimeRange(currentTime: current, utcOffsetSeconds: utcOffset, pastDays: past_days, forecastDays: forecastDays)
         return time
