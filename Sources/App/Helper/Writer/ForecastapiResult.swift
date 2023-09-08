@@ -103,11 +103,14 @@ struct ForecastapiResult {
     let elevation: Float?
     
     let generationtime_ms: Double
-    let utc_offset_seconds: Int
-    let timezone: TimeZone
+    let timezone: TimezoneWithOffset
     let current_weather: CurrentWeather?
     let sections: [ApiSection]
     let timeformat: Timeformat
+    
+    var utc_offset_seconds: Int {
+        timezone.utcOffsetSeconds
+    }
     
     struct CurrentWeather {
         let temperature: Float
@@ -151,7 +154,7 @@ struct ForecastapiResult {
                 
                 b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
                 let elevation = elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                b.buffer.writeString("\(latitude),\(longitude),\(elevation),\(utc_offset_seconds),\(timezone.identifier),\(timezone.abbreviation() ?? "")\n")
+                b.buffer.writeString("\(latitude),\(longitude),\(elevation),\(utc_offset_seconds),\(timezone.identifier),\(timezone.abbreviation)\n")
                 
                 if let current_weather = current_weather {
                     b.buffer.writeString("\n")
@@ -227,7 +230,7 @@ struct ForecastapiResult {
         sheet.write(elevation ?? .nan)
         sheet.write(utc_offset_seconds)
         sheet.write(timezone.identifier)
-        sheet.write(timezone.abbreviation() ?? "")
+        sheet.write(timezone.abbreviation)
         sheet.endRow()
         
         if let current_weather = current_weather {

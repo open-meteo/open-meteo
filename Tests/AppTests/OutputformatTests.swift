@@ -86,8 +86,7 @@ final class OutputformatTests: XCTestCase {
             longitude: 2,
             elevation: nil,
             generationtime_ms: 12,
-            utc_offset_seconds: 3600,
-            timezone: TimeZone(identifier: "GMT")!,
+            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
             current_weather: current,
             sections: sections,
             timeformat: .iso8601)
@@ -102,8 +101,7 @@ final class OutputformatTests: XCTestCase {
             longitude: 2,
             elevation: nil,
             generationtime_ms: 12,
-            utc_offset_seconds: 3600,
-            timezone: TimeZone(identifier: "GMT")!,
+            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
             current_weather: current,
             sections: sections,
             timeformat: .unixtime)

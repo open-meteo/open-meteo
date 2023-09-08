@@ -75,7 +75,7 @@ extension ForecastapiResult {
     
     fileprivate func streamJsonResponse(to b: inout BufferAndWriter) async throws {
         b.buffer.writeString("""
-        {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation() ?? "")"
+        {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
         """)
         if let elevation = elevation, elevation.isFinite {
             b.buffer.writeString(",\"elevation\":\(elevation)")

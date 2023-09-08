@@ -2,13 +2,15 @@ import Foundation
 import Vapor
 import SwiftTimeZoneLookup
 
-struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSelectable {
+/// All API parameter that are accepted and decoded via GET
+struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let latitude: [String]
     let longitude: [String]
     let minutely_15: [String]?
     let hourly: [String]?
     let daily: [String]?
-    //let six_hourly: [String]? // seasonal
+    /// For seasonal forecast
+    let six_hourly: [String]?
     let current_weather: Bool?
     let elevation: [String]?
     let timezone: [String]?
@@ -22,9 +24,15 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
     let format: ForecastResultFormat?
     let models: [String]?
     let cell_selection: GridSelectionMode?
-    //let disable_bias_correction: Bool? // CMIP
-    //let ensemble: Bool // Glofas
-    //let domains: Domain? // sams
+    
+    /// Used in climate API
+    let disable_bias_correction: Bool? // CMIP
+    
+    // Used in flood API
+    let ensemble: Bool // Glofas
+    
+    /// In Air Quality API
+    let domains: CamsQuery.Domain? // sams
     
     // TODO: Extend to include time for single hour data calls
     /// iso starting date `2022-02-01`
@@ -68,13 +76,13 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
     
     /// Reads coordinates, elevation, timezones and start/end dataparameter and prepares an array.
     /// For each element, an API response object will be returned later
-    func prepareCoordinates() throws -> [CoordinatesAndTimeZonesAndDates] {
+    func prepareCoordinates(allowTimezones: Bool) throws -> [CoordinatesAndTimeZonesAndDates] {
         if daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
         }
         
         let dates = try getStartEndDates()
-        let coordinates = try getCoordinatesWithTimezone()
+        let coordinates = try getCoordinatesWithTimezone(allowTimezones: allowTimezones)
         
         /// If no start/end dates are set, leav it `nil`
         guard let dates else {
@@ -105,9 +113,9 @@ struct ForecastApiQuery: Content, /*QueryWithStartEndDateTimeZone,*/ ApiUnitsSel
     /// Reads coordinates and timezone fields
     /// If only one timezone is given, use the same timezone for all coordinates
     /// Throws errors on invalid coordinates, timezones or invalid counts
-    private func getCoordinatesWithTimezone() throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
+    private func getCoordinatesWithTimezone(allowTimezones: Bool) throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
         let coordinates = try getCoordinates()
-        let timezones = try TimeZoneOrAuto.load(commaSeparatedOptional: timezone)
+        let timezones = allowTimezones ? try TimeZoneOrAuto.load(commaSeparatedOptional: timezone) : nil
         
         guard let timezones else {
             // if no timezone is specified, use GMT for all locations
@@ -306,108 +314,6 @@ enum Timeformat: String, Codable {
     }
 }
 
-protocol QueryWithStartEndDateTimeZone: QueryWithTimezone {
-    var past_days: Int? { get }
-    
-    /// iso starting date `2022-02-01`
-    var start_date: IsoDate? { get }
-    
-    /// included end date `2022-06-01`
-    var end_date: IsoDate? { get }
-}
-
-extension QueryWithStartEndDateTimeZone {
-    func getTimerange(timezone: TimeZone, current: Timestamp, forecastDays: Int, allowedRange: Range<Timestamp>, past_days_max: Int = 92) throws -> (actualUtcOffset: Int, time: TimerangeLocal) {
-        let actualUtcOffset = timezone.secondsFromGMT()
-        let utcOffset = (actualUtcOffset / 3600) * 3600
-        if let startEnd = try getStartEndDateLocal(allowedRange: allowedRange, utcOffsetSeconds: utcOffset) {
-            return (actualUtcOffset, startEnd)
-        }
-        if let past_days = past_days, past_days < 0 || past_days > past_days_max {
-            throw ForecastapiError.pastDaysInvalid(given: past_days, allowed: 0...past_days_max)
-        }
-        let time = Self.forecastTimeRange(currentTime: current, utcOffsetSeconds: utcOffset, pastDays: past_days, forecastDays: forecastDays)
-        return (actualUtcOffset, time)
-    }
-    
-    /// Return an aligned timerange for a local-time 7 day forecast. Timestamps are in UTC time.
-    public static func forecastTimeRange(currentTime: Timestamp, utcOffsetSeconds: Int, pastDays: Int?, forecastDays: Int) -> TimerangeLocal {
-        /// aligin starttime to localtime 0:00
-        let pastDaysSeconds = (pastDays ?? 0) * 3600*24
-        let starttimeUtc = ((currentTime.timeIntervalSince1970 + utcOffsetSeconds) / (3600*24)) * (3600*24) - utcOffsetSeconds - pastDaysSeconds
-        let endtimeUtc = starttimeUtc + forecastDays*24*3600 + pastDaysSeconds
-        let time = Timestamp(starttimeUtc) ..< Timestamp(endtimeUtc)
-        return TimerangeLocal(range: time, utcOffsetSeconds: utcOffsetSeconds)
-    }
-    
-    /// Get a timerange based on `start_date` and `end_date` parameters from the url, if both are set. Nil otherwise
-    private func getStartEndDateLocal(allowedRange: Range<Timestamp>, utcOffsetSeconds: Int) throws -> TimerangeLocal? {
-        if start_date == nil, end_date == nil {
-            return nil
-        }
-        guard let start_date = start_date, let end_date = end_date else {
-            // BOTH parameters must be present
-            throw ForecastapiError.startAndEnddataMustBeSpecified
-        }
-        if let past_days = past_days, past_days != 0 {
-            throw ForecastapiError.pastDaysParameterNotAllowedWithStartEndRange
-        }
-        
-        let start = start_date.toTimestamp()
-        let includedEnd = end_date.toTimestamp()
-        guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
-            throw ForecastapiError.enddateMustBeLargerEqualsThanStartdate
-        }
-        guard allowedRange.contains(start) else {
-            throw ForecastapiError.dateOutOfRange(parameter: "start_date", allowed: allowedRange)
-        }
-        guard allowedRange.contains(includedEnd) else {
-            throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
-        }
-        return TimerangeLocal(range: start.add(-1 * utcOffsetSeconds) ..< includedEnd.add(86400 - utcOffsetSeconds), utcOffsetSeconds: utcOffsetSeconds)
-    }
-}
-
-protocol QueryWithTimezone {
-    var timezone: String? { get }
-    
-    var latitude: Float { get }
-    
-    var longitude: Float { get }
-    
-    var cell_selection: GridSelectionMode? { get }
-}
-
-fileprivate let timezoneDatabase = try! SwiftTimeZoneLookup(databasePath: "./Resources/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources/")
-
-extension QueryWithTimezone {
-    /// Get user specified timezone. It `auto` is specified, resolve via coordinates
-    func resolveTimezone() throws -> TimeZone {
-        return try TimeZone.resolveApiParams(timezone: timezone, latitude: latitude, longitude: longitude)
-    }
-}
-
-extension TimeZone {
-    /// Get user specified timezone. It `auto` is specified, resolve via coordinates
-    static func resolveApiParams(timezone: String?, latitude: Float, longitude: Float) throws -> TimeZone {
-        guard var timezone = timezone else {
-            return TimeZone(identifier: "GMT")!
-        }
-        if timezone == "auto" {
-            if let res = timezoneDatabase.simple(latitude: latitude, longitude: longitude) {
-                timezone = res
-            }
-        }
-        // Some older tz databases my still use the old name for Kyiv
-        if timezone == "Europe/Kyiv", let tz = TimeZone(identifier: "Europe/Kiev") {
-            return tz
-        }
-        guard let tz = TimeZone(identifier: timezone) else {
-            throw ForecastapiError.invalidTimezone
-        }
-        return tz
-    }
-}
 
 /// Differentiate between a user defined timezone or `auto` which is later resolved using coordinates
 enum TimeZoneOrAuto {
@@ -463,6 +369,8 @@ struct TimezoneWithOffset {
     /// Abbreviation like `CEST`
     let abbreviation: String
     
+    fileprivate static let timezoneDatabase = try! SwiftTimeZoneLookup(databasePath: "./Resources/SwiftTimeZoneLookup_SwiftTimeZoneLookup.resources/")
+    
     public init(utcOffsetSeconds: Int, identifier: String, abbreviation: String) {
         self.utcOffsetSeconds = utcOffsetSeconds
         self.identifier = identifier
@@ -476,7 +384,7 @@ struct TimezoneWithOffset {
     }
     
     public init(latitude: Float, longitude: Float) throws {
-        guard let identifier = timezoneDatabase.simple(latitude: latitude, longitude: longitude) else {
+        guard let identifier = TimezoneWithOffset.timezoneDatabase.simple(latitude: latitude, longitude: longitude) else {
             throw ForecastapiError.invalidTimezone
         }
         guard let timezone = TimeZone(identifier: identifier) else {

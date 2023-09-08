@@ -515,7 +515,7 @@ extension IconMixer {
         }
     }
     
-    func getDaily(variable: DailyWeatherVariable, member: Int, params: IconApiQuery, time timeDaily: TimerangeDt) throws -> DataAndUnit {
+    func getDaily(variable: DailyWeatherVariable, member: Int, params: ApiQueryParameter, time timeDaily: TimerangeDt) throws -> DataAndUnit {
         let time = timeDaily.with(dtSeconds: 3600)
         switch variable {
         case .temperature_2m_max:

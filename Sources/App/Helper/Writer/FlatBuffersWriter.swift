@@ -64,7 +64,7 @@ fileprivate extension ForecastapiResult {
             generationtimeMs: Float32(self.generationtime_ms),
             utcOffsetSeconds: Int32(self.utc_offset_seconds),
             timezoneOffset: fbb.create(string: self.timezone.identifier),
-            timezoneAbbreviationOffset: fbb.create(string: self.timezone.abbreviation() ?? ""),
+            timezoneAbbreviationOffset: fbb.create(string: self.timezone.abbreviation),
             currentWeather: currentWeather,
             timeStart: Int64(time),
             dailyVectorOffset: daily,

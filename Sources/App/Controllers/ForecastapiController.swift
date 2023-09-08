@@ -34,11 +34,11 @@ public struct ForecastapiController: RouteCollection {
     
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("api")
-        let params = try req.query.decode(ForecastApiQuery.self)
+        let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 16)
         
-        let prepared = try params.prepareCoordinates()
+        let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
         let paramsMinutely = try IconApiVariable.load(commaSeparatedOptional: params.minutely_15)
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
@@ -177,14 +177,12 @@ public struct ForecastapiController: RouteCollection {
                 }
                 
                 let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-                // TODO: fix timezone
                 return ForecastapiResult(
                     latitude: readers[0].modelLat,
                     longitude: readers[0].modelLon,
                     elevation: readers[0].targetElevation,
                     generationtime_ms: generationTimeMs,
-                    utc_offset_seconds: timezone.utcOffsetSeconds,
-                    timezone: TimeZone(secondsFromGMT: 0)!,// timezone,
+                    timezone: timezone,
                     current_weather: currentWeather,
                     sections: [minutely, hourly, daily].compactMap({$0}),
                     timeformat: params.timeformatOrDefault
