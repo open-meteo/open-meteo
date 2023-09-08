@@ -37,8 +37,8 @@ final class OutputformatTests: XCTestCase {
     }*/
     
     
-    func drainString(_ response: Response) -> String {
-        guard var buffer = try? response.body.collect(on: app!.eventLoopGroup.next()).wait() else {
+    func drainString(_ response: EventLoopFuture<Response>) -> String {
+        guard var buffer = try? response.wait().body.collect(on: response.eventLoop).wait() else {
             fatalError("could not get byffer")
         }
         guard let string = buffer.readString(length: buffer.writerIndex) else {
@@ -47,8 +47,8 @@ final class OutputformatTests: XCTestCase {
         return string
     }
     
-    func drainData(_ response: Response) -> Data {
-        guard var buffer = try? response.body.collect(on: app!.eventLoopGroup.next()).wait() else {
+    func drainData(_ response: EventLoopFuture<Response>) -> Data {
+        guard var buffer = try? response.wait().body.collect(on: response.eventLoop).wait() else {
             fatalError("could not get byffer")
         }
         guard let data = buffer.readData(length: buffer.writerIndex) else {

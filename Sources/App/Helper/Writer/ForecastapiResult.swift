@@ -80,11 +80,11 @@ extension Array where Element == () throws -> ForecastapiResult {
             case .json:
                 return try toJsonResponse()
             case .xlsx:
-                fatalError()
-                //return try toXlsxResponse(timestamp: timestamp)
+                // TODO: Multi location support
+                return try first!().toXlsxResponse(timestamp: timestamp)
             case .csv:
-                fatalError()
-                //return toCsvResponse()
+                // TODO: Multi location support
+                return try first!().toCsvResponse()
             case .flatbuffers:
                 return try toFlatbuffersResponse()
             }
@@ -125,18 +125,9 @@ struct ForecastapiResult {
         let time: Timestamp
     }
     
-    func response(format: ForecastResultFormat, timestamp: Timestamp = .now()) throws -> Response {
-        switch format {
-        case .json:
-            return toJsonResponse()
-        case .xlsx:
-            return try toXlsxResponse(timestamp: timestamp)
-        case .csv:
-            return toCsvResponse()
-        case .flatbuffers:
-            fatalError()
-            //return toFlatbuffersResponse()
-        }
+    func response(format: ForecastResultFormat, timestamp: Timestamp = .now()) throws -> EventLoopFuture<Response> {
+        let res: [() throws -> (ForecastapiResult)] = [{return self}]
+        return res.response(format: format, timestamp: timestamp)
     }
     
     /// e.g. `52.52N13.42E38m`
@@ -147,7 +138,7 @@ struct ForecastapiResult {
     }
     
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
-    private func toCsvResponse() -> Response {
+    fileprivate func toCsvResponse() -> Response {
         let response = Response(body: .init(stream: { writer in
             _ = writer.eventLoop.performWithTask {
                 var b = BufferAndWriter(writer: writer)
@@ -214,7 +205,7 @@ struct ForecastapiResult {
         return response
     }
     
-    private func toXlsxResponse(timestamp: Timestamp) throws -> Response {
+    fileprivate func toXlsxResponse(timestamp: Timestamp) throws -> Response {
         let sheet = try XlsxWriter()
         sheet.startRow()
         sheet.write("latitude")

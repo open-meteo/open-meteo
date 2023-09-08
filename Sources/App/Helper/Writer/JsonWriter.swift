@@ -53,26 +53,6 @@ extension Array where Element == () throws -> ForecastapiResult {
 }
 
 extension ForecastapiResult {
-    /**
-     Stream a potentially very large resultset to the client. The JSON file could easily be 20 MB.
-     Instead of generating a massive string in memory, we only allocate 18kb and flush every time the buffer exceeds 16kb.
-     Memory footprint is therefore much smaller and fits better into L2/L3 caches.
-     Additionally code is fully async, to not block the a thread for almost a second to generate a JSON response...
-     */
-     func toJsonResponse() -> Response {
-        let response = Response(body: .init(stream: { writer in
-            _ = writer.eventLoop.performWithTask {
-                var b = BufferAndWriter(writer: writer)
-                try await streamJsonResponse(to: &b)
-                try await b.end()
-            }
-            
-        }, count: -1))
-        
-        response.headers.replaceOrAdd(name: .contentType, value: "application/json; charset=utf-8")
-        return response
-    }
-    
     fileprivate func streamJsonResponse(to b: inout BufferAndWriter) async throws {
         b.buffer.writeString("""
         {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
@@ -130,16 +110,6 @@ extension ForecastapiResult {
                 b.buffer.writeString("[")
                 var firstValue = true
                 switch e.data {
-                    /*case .string(let strings):
-                     for v in strings {
-                     if firstValue {
-                     firstValue = false
-                     } else {
-                     b.buffer.writeString(",")
-                     }
-                     b.buffer.writeString("\"\(v)\"")
-                     try await b.flushIfRequired()
-                     }*/
                 case .float(let floats):
                     let format = "%.\(e.unit.significantDigits)f"
                     for v in floats {
@@ -155,16 +125,6 @@ extension ForecastapiResult {
                         }
                         try await b.flushIfRequired()
                     }
-                    /*case .int(let ints):
-                     for v in ints {
-                     if firstValue {
-                     firstValue = false
-                     } else {
-                     b.buffer.writeString(",")
-                     }
-                     b.buffer.writeString("\(v)")
-                     try await b.flushIfRequired()
-                     }*/
                 case .timestamp(let timestamps):
                     for time in timestamps.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: false) {
                         if firstValue {
