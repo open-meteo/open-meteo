@@ -71,6 +71,18 @@ public struct IsoDate: Codable {
     }
 }
 
+extension IsoDate {
+    static func load(commaSeparatedOptional: [String]?) throws -> [IsoDate]? {
+        return try commaSeparatedOptional.map {
+            try $0.flatMap { s in
+                try s.split(separator: ",").map { date in
+                    return try IsoDate.init(fromIsoString: String(date))
+                }
+            }
+        }
+    }
+}
+
 extension String {
     subscript(_ range: Range<Int>) -> Substring {
         let start = index(startIndex, offsetBy: max(0, range.lowerBound))

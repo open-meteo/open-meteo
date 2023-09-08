@@ -15,10 +15,13 @@ enum ForecastapiError: Error {
     case noDataAvilableForThisLocation
     case timezoneRequired
     case pastDaysParameterNotAllowedWithStartEndRange
+    case forecastDaysParameterNotAllowedWithStartEndRange
     case latitudeAndLongitudeSameCount
     case latitudeAndLongitudeNotEmpty
     case latitudeAndLongitudeMaximum(max: Int)
     case latitudeAndLongitudeCountMustBeTheSame
+    case startAndEndDateCountMustBeTheSame
+    case coordinatesAndStartEndDatesCountMustBeTheSame
     case generic(message: String)
 }
 
@@ -49,6 +52,8 @@ extension ForecastapiError: AbortError {
             return "Both 'start_date' and 'end_date' must be set in the url"
         case .pastDaysParameterNotAllowedWithStartEndRange:
             return "Parameter 'past_days' is mutually exclusive with 'start_date' and 'end_date'"
+        case .forecastDaysParameterNotAllowedWithStartEndRange:
+            return "Parameter 'forecast_days' is mutually exclusive with 'start_date' and 'end_date'"
         case .timezoneNotSupported:
             return "This API does not yet support timezones"
         case .latitudeAndLongitudeSameCount:
@@ -61,6 +66,10 @@ extension ForecastapiError: AbortError {
             return "Parameter 'latitude' and 'longitude' must have the same number of elements"
         case .noDataAvilableForThisLocation:
             return "No data is available for this location"
+        case .startAndEndDateCountMustBeTheSame:
+            return "Parameter 'start_date' and 'end_date' must have the same number of elements"
+        case .coordinatesAndStartEndDatesCountMustBeTheSame:
+            return "Parameter 'start_date' and 'end_date' must have the same number of elements as coordinates"
         case .generic(message: let message):
             return message
         }
@@ -215,15 +224,15 @@ enum TimeZoneOrAuto {
     }
     
     /// Given a coordinate, resolve auto timezone if required
-    func resolve(coordinate: CoordinatesAndElevation) throws -> CoordinatesAndTimeZones {
+    func resolve(coordinate: CoordinatesAndElevation) throws -> TimezoneWithOffset {
         switch self {
         case .auto:
-            return CoordinatesAndTimeZones(coordinate: coordinate, timezone: .gmt)
-        case .timezone(_):
-            return CoordinatesAndTimeZones(
-                coordinate: coordinate,
-                timezone: try .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            return try .init(
+                latitude: coordinate.latitude,
+                longitude: coordinate.longitude
             )
+        case .timezone(let timezone):
+            return .init(timezone: timezone)
         }
     }
 }
@@ -244,6 +253,12 @@ struct TimezoneWithOffset {
         self.abbreviation = abbreviation
     }
     
+    public init(timezone: TimeZone) {
+        self.utcOffsetSeconds = timezone.secondsFromGMT()
+        self.identifier = timezone.identifier
+        self.abbreviation = timezone.abbreviation() ?? ""
+    }
+    
     public init(latitude: Float, longitude: Float) throws {
         guard let identifier = timezoneDatabase.simple(latitude: latitude, longitude: longitude) else {
             throw ForecastapiError.invalidTimezone
@@ -251,9 +266,7 @@ struct TimezoneWithOffset {
         guard let timezone = TimeZone(identifier: identifier) else {
             throw ForecastapiError.invalidTimezone
         }
-        self.utcOffsetSeconds = timezone.secondsFromGMT()
-        self.identifier = timezone.identifier
-        self.abbreviation = timezone.abbreviation() ?? ""
+        self.init(timezone: timezone)
     }
     
     static let gmt = TimezoneWithOffset(utcOffsetSeconds: 0, identifier: "GMT", abbreviation: "GMT")
