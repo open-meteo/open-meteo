@@ -34,6 +34,7 @@ table Result {
   time_start: int64;
   daily: [Variable];
   hourly: [Variable];
+  six_hourly: [Variable];
   minutely_15: [Variable];
   //monthly: [Variable];
 }

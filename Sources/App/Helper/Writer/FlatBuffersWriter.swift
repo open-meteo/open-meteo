@@ -56,6 +56,7 @@ fileprivate extension ForecastapiResult {
         let hourly = self.sections.first(where: {$0.name == "hourly"})?.toFlatbuffers(&fbb) ?? Offset()
         let daily = self.sections.first(where: {$0.name == "daily"})?.toFlatbuffers(&fbb) ?? Offset()
         let minutely15 = self.sections.first(where: {$0.name == "minutely_15"})?.toFlatbuffers(&fbb) ?? Offset()
+        let sixHourly = self.sections.first(where: {$0.name == "six_hourly"})?.toFlatbuffers(&fbb) ?? Offset()
         let result = com_openmeteo_api_result_Result.createResult(
             &fbb,
             latitude: self.latitude,
@@ -69,6 +70,7 @@ fileprivate extension ForecastapiResult {
             timeStart: Int64(time),
             dailyVectorOffset: daily,
             hourlyVectorOffset: hourly,
+            sixHourlyVectorOffset: sixHourly,
             minutely15VectorOffset: minutely15
         )
         fbb.finish(offset: result, addPrefix: true)

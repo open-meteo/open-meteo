@@ -145,7 +145,8 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
     case timeStart = 20
     case daily = 22
     case hourly = 24
-    case minutely15 = 26
+    case sixHourly = 26
+    case minutely15 = 28
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -168,10 +169,13 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
   public var hasHourly: Bool { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? false : true }
   public var hourlyCount: Int32 { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func hourly(at index: Int32) -> com_openmeteo_api_result_Variable? { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? nil : com_openmeteo_api_result_Variable(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
+  public var hasSixHourly: Bool { let o = _accessor.offset(VTOFFSET.sixHourly.v); return o == 0 ? false : true }
+  public var sixHourlyCount: Int32 { let o = _accessor.offset(VTOFFSET.sixHourly.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func sixHourly(at index: Int32) -> com_openmeteo_api_result_Variable? { let o = _accessor.offset(VTOFFSET.sixHourly.v); return o == 0 ? nil : com_openmeteo_api_result_Variable(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
   public var hasMinutely15: Bool { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? false : true }
   public var minutely15Count: Int32 { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func minutely15(at index: Int32) -> com_openmeteo_api_result_Variable? { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? nil : com_openmeteo_api_result_Variable(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public static func startResult(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 12) }
+  public static func startResult(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 13) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -183,6 +187,7 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
   public static func add(timeStart: Int64, _ fbb: inout FlatBufferBuilder) { fbb.add(element: timeStart, def: 0, at: VTOFFSET.timeStart.p) }
   public static func addVectorOf(daily: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: daily, at: VTOFFSET.daily.p) }
   public static func addVectorOf(hourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourly, at: VTOFFSET.hourly.p) }
+  public static func addVectorOf(sixHourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sixHourly, at: VTOFFSET.sixHourly.p) }
   public static func addVectorOf(minutely15: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: minutely15, at: VTOFFSET.minutely15.p) }
   public static func endResult(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createResult(
@@ -198,6 +203,7 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
     timeStart: Int64 = 0,
     dailyVectorOffset daily: Offset = Offset(),
     hourlyVectorOffset hourly: Offset = Offset(),
+    sixHourlyVectorOffset sixHourly: Offset = Offset(),
     minutely15VectorOffset minutely15: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_api_result_Result.startResult(&fbb)
@@ -212,6 +218,7 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
     com_openmeteo_api_result_Result.add(timeStart: timeStart, &fbb)
     com_openmeteo_api_result_Result.addVectorOf(daily: daily, &fbb)
     com_openmeteo_api_result_Result.addVectorOf(hourly: hourly, &fbb)
+    com_openmeteo_api_result_Result.addVectorOf(sixHourly: sixHourly, &fbb)
     com_openmeteo_api_result_Result.addVectorOf(minutely15: minutely15, &fbb)
     return com_openmeteo_api_result_Result.endResult(&fbb, start: __start)
   }
@@ -229,6 +236,7 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.timeStart.p, fieldName: "timeStart", required: false, type: Int64.self)
     try _v.visit(field: VTOFFSET.daily.p, fieldName: "daily", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_Variable>, com_openmeteo_api_result_Variable>>.self)
     try _v.visit(field: VTOFFSET.hourly.p, fieldName: "hourly", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_Variable>, com_openmeteo_api_result_Variable>>.self)
+    try _v.visit(field: VTOFFSET.sixHourly.p, fieldName: "sixHourly", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_Variable>, com_openmeteo_api_result_Variable>>.self)
     try _v.visit(field: VTOFFSET.minutely15.p, fieldName: "minutely15", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_Variable>, com_openmeteo_api_result_Variable>>.self)
     _v.finish()
   }
