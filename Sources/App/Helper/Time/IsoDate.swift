@@ -4,7 +4,7 @@ import Foundation
  Simple year, month, day container which is decoded to iso dates `2022-01-01`
  */
 public struct IsoDate: Codable {
-    /// Encoded es integer `20220101`
+    /// Encoded as integer `20220101`
     public let date: Int32
     
     public init(year: Int, month: Int, day: Int) {

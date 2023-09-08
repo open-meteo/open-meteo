@@ -183,3 +183,78 @@ extension TimeZone {
         return tz
     }
 }
+
+/// Differentiate between a user defined timezone or `auto` which is later resolved using coordinates
+enum TimeZoneOrAuto {
+    /// User specified `auto`
+    case auto
+    
+    /// User specified valid timezone
+    case timezone(TimeZone)
+    
+    /// Take a string array which contains timezones or `auto`. Does an additional decoding step to split coma separated timezones.
+    /// Throws errors on invalid timezones
+    static func load(commaSeparatedOptional: [String]?) throws -> [TimeZoneOrAuto]? {
+        return try commaSeparatedOptional.map {
+            try $0.flatMap { s in
+                try s.split(separator: ",").map { timezone in
+                    if timezone == "auto" {
+                        return .auto
+                    }
+                    // Some older timezone databases may still use the old name for Kyiv
+                    if timezone == "Europe/Kyiv", let tz = TimeZone(identifier: "Europe/Kiev") {
+                        return .timezone(tz)
+                    }
+                    guard let tz = TimeZone(identifier: String(timezone)) else {
+                        throw ForecastapiError.invalidTimezone
+                    }
+                    return .timezone(tz)
+                }
+            }
+        }
+    }
+    
+    /// Given a coordinate, resolve auto timezone if required
+    func resolve(coordinate: CoordinatesAndElevation) throws -> CoordinatesAndTimeZones {
+        switch self {
+        case .auto:
+            return CoordinatesAndTimeZones(coordinate: coordinate, timezone: .gmt)
+        case .timezone(_):
+            return CoordinatesAndTimeZones(
+                coordinate: coordinate,
+                timezone: try .init(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            )
+        }
+    }
+}
+
+struct TimezoneWithOffset {
+    /// The actual utc offset. Not adjusted to the next full hour.
+    let utcOffsetSeconds: Int
+    
+    /// Identifier like `Europe/Berlin`
+    let identifier: String
+    
+    /// Abbreviation like `CEST`
+    let abbreviation: String
+    
+    public init(utcOffsetSeconds: Int, identifier: String, abbreviation: String) {
+        self.utcOffsetSeconds = utcOffsetSeconds
+        self.identifier = identifier
+        self.abbreviation = abbreviation
+    }
+    
+    public init(latitude: Float, longitude: Float) throws {
+        guard let identifier = timezoneDatabase.simple(latitude: latitude, longitude: longitude) else {
+            throw ForecastapiError.invalidTimezone
+        }
+        guard let timezone = TimeZone(identifier: identifier) else {
+            throw ForecastapiError.invalidTimezone
+        }
+        self.utcOffsetSeconds = timezone.secondsFromGMT()
+        self.identifier = timezone.identifier
+        self.abbreviation = timezone.abbreviation() ?? ""
+    }
+    
+    static let gmt = TimezoneWithOffset(utcOffsetSeconds: 0, identifier: "GMT", abbreviation: "GMT")
+}
