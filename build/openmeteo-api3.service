@@ -15,4 +15,4 @@ RestartSec=1
 ExecCondition=/bin/bash -c '/bin/test -n "$API_BIND3"'
 
 [Install]
-WantedBy = multi-user.target
+WantedBy = default.target

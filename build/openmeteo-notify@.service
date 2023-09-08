@@ -10,4 +10,4 @@ User=nobody
 Group=systemd-journal
 
 [Install]
-WantedBy=multi-user.target
+WantedBy = default.target
