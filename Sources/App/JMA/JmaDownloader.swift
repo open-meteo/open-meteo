@@ -603,6 +603,14 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
 extension Timestamp {
     /// Interprete the run parameter as either a simple hour or a fully specified date
     static func fromRunHourOrYYYYMMDD(_ str: String) throws -> Timestamp {
+        if str.contains(",") {
+            let parts = str.split(separator: ",").map(String.init)
+            let year = parts[0]
+            guard let hr = Int(parts[1]) else {
+                throw TimeError.InvalidDateFromat
+            }
+            return try Timestamp.from(yyyymmdd: year).with(hour: hr)
+        }
         if str.count > 2 {
             return try Timestamp.from(yyyymmdd: str)
         }
