@@ -164,8 +164,8 @@ struct DownloadEra5Command: AsyncCommandFix {
             // Era5 has a typical delay of 5 days
             // Per default, check last 14 days for new data. If data is already downloaded, downloading is skipped
             let lastDays = 14
-            // 6 days delay for ERA5, 1 day for ECMWF IFS
-            let daysBack = domain == .ecmwf_ifs ? -1 : -6
+            // 6 days delay for ERA5, 2 days for ECMWF IFS
+            let daysBack = domain == .ecmwf_ifs ? -2 : -6
             let time0z = Timestamp.now().add(days: daysBack).with(hour: 0)
             return TimerangeDt(start: time0z.add(days: -1 * lastDays), to: time0z.add(days: 1), dtSeconds: dt)
         }
