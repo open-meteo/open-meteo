@@ -17,7 +17,7 @@ public struct EnsembleApiController {
         let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
         let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
         
-        let callbacks: [() throws -> (ForecastapiResult)] = try prepared.map { prepared in
+        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 35, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -34,61 +34,51 @@ public struct EnsembleApiController {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
-            return {
-                let generationTimeStart = Date()
-                // Start data prefetch to boooooooost API speed :D
-                if let hourlyVariables = paramsHourly {
-                    for reader in readers {
-                        let variables = hourlyVariables.flatMap { variable in
-                            (0..<reader.domain.countEnsembleMember).map {
-                                EnsembleVariable(variable, $0)
-                            }
-                        }
-                        try reader.prefetchData(variables: variables, time: hourlyTime)
-                    }
-                }
-                /*if let dailyVariables = paramsDaily {
-                 for reader in readers {
-                 try reader.prefetchData(variables: dailyVariables, time: dailyTime)
-                 }
-                 }*/
-                
-                let hourly: ApiSection? = try paramsHourly.map { variables in
-                    var res = [ApiColumn]()
-                    res.reserveCapacity(variables.count * readers.reduce(0, {$0 + $1.domain.countEnsembleMember}))
-                    for reader in readers {
-                        for variable in variables {
-                            for member in 0..<reader.domain.countEnsembleMember {
-                                let variable = EnsembleVariable(variable, member)
-                                let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : "\(variable.rawValue)"
-                                guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params).toApi(name: name) else {
-                                    continue
+            return ForecastapiResult(
+                latitude: readers[0].modelLat,
+                longitude: readers[0].modelLon,
+                elevation: readers[0].targetElevation,
+                timezone: timezone,
+                prefetch: {
+                    if let hourlyVariables = paramsHourly {
+                        for reader in readers {
+                            let variables = hourlyVariables.flatMap { variable in
+                                (0..<reader.domain.countEnsembleMember).map {
+                                    EnsembleVariable(variable, $0)
                                 }
-                                assert(hourlyTime.count == d.data.count)
-                                res.append(d)
                             }
-                            
+                            try reader.prefetchData(variables: variables, time: hourlyTime)
                         }
                     }
-                    return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-                }
-                
-                let daily: ApiSection? = nil
-                
-                let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-                return ForecastapiResult(
-                    latitude: readers[0].modelLat,
-                    longitude: readers[0].modelLon,
-                    elevation: readers[0].targetElevation,
-                    generationtime_ms: generationTimeMs,
-                    timezone: timezone,
-                    current_weather: nil,
-                    sections: [hourly, daily].compactMap({$0}),
-                    timeformat: params.timeformatOrDefault
-                )
-            }
-        }
-        return callbacks.response(format: params.format ?? .json)
+                },
+                current_weather: nil,
+                hourly: paramsHourly.map { variables in
+                    return {
+                        var res = [ApiColumn]()
+                        res.reserveCapacity(variables.count * readers.reduce(0, {$0 + $1.domain.countEnsembleMember}))
+                        for reader in readers {
+                            for variable in variables {
+                                for member in 0..<reader.domain.countEnsembleMember {
+                                    let variable = EnsembleVariable(variable, member)
+                                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : "\(variable.rawValue)"
+                                    guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params).toApi(name: name) else {
+                                        continue
+                                    }
+                                    assert(hourlyTime.count == d.data.count)
+                                    res.append(d)
+                                }
+                                
+                            }
+                        }
+                        return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
+                    }
+                },
+                daily: nil,
+                sixHourly: nil,
+                minutely15: nil
+            )
+        })
+        return result.response(format: params.format ?? .json)
     }
 }
 

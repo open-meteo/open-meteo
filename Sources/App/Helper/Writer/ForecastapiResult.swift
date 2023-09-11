@@ -3,20 +3,90 @@ import Foundation
 import Vapor
 
 
+/**
+ Store the result of a API forecast result and converion to JSON
+ */
+struct ForecastapiResult {
+    let latitude: Float
+    let longitude: Float
+    
+    /// Desired elevation from a DEM. Used in statistical downscaling
+    let elevation: Float?
+    
+    let timezone: TimezoneWithOffset
+    
+    let prefetch: (() throws -> ())
+    let current_weather: (() throws -> CurrentWeather)?
+    let hourly: (() throws -> ApiSection)?
+    let daily: (() throws -> ApiSection)?
+    let sixHourly: (() throws -> ApiSection)?
+    let minutely15: (() throws -> ApiSection)?
+    
+    func runAllSections() throws -> [ApiSection] {
+        return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({$0})
+    }
+    
+    var utc_offset_seconds: Int {
+        timezone.utcOffsetSeconds
+    }
+    
+    struct CurrentWeather {
+        let temperature: Float
+        let windspeed: Float
+        let winddirection: Float
+        let weathercode: Float
+        let is_day: Float
+        let temperature_unit: SiUnit
+        let windspeed_unit: SiUnit
+        let winddirection_unit: SiUnit
+        let weathercode_unit: SiUnit
+        let time: Timestamp
+    }
+    
+    /// e.g. `52.52N13.42E38m`
+    var formatedCoordinatesFilename: String {
+        let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
+        let ele = elevation.map { $0.isFinite ? String(format: "%.0fm", $0) : "" } ?? ""
+        return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
+    }
+}
+
+
+
+/// Stores the API output for multiple locations
+struct ForecastapiResultSet {
+    let timeformat: Timeformat
+    let results: [ForecastapiResult]
+    
+    /// Output the given result set with a specified format
+    /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
+    func response(format: ForecastResultFormat, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil) -> EventLoopFuture<Response> {
+        return ForecastapiController.runLoop.next().submit {
+            for location in results {
+                try location.prefetch()
+            }
+            switch format {
+            case .json:
+                return try toJsonResponse(fixedGenerationTime: fixedGenerationTime)
+            case .xlsx:
+                return try toXlsxResponse(timestamp: timestamp)
+            case .csv:
+                return try toCsvResponse()
+            case .flatbuffers:
+                return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime)
+            }
+        }
+    }
+}
+
 enum ApiArray {
-    //case string([String])
     case float([Float])
-    //case int([Int])
     case timestamp([Timestamp])
     
     var count: Int {
         switch self {
-        //case .string(let a):
-        //    return a.count
         case .float(let a):
             return a.count
-        //case .int(let a):
-        //    return a.count
         case .timestamp(let a):
             return a.count
         }
@@ -73,215 +143,7 @@ struct BufferAndWriter {
     }
 }
 
-extension Array where Element == () throws -> ForecastapiResult {
-    func response(format: ForecastResultFormat, timestamp: Timestamp = .now()) -> EventLoopFuture<Response> {
-        return ForecastapiController.runLoop.next().submit {
-            switch format {
-            case .json:
-                return try toJsonResponse()
-            case .xlsx:
-                // TODO: Multi location support
-                return try first!().toXlsxResponse(timestamp: timestamp)
-            case .csv:
-                // TODO: Multi location support
-                return try first!().toCsvResponse()
-            case .flatbuffers:
-                return try toFlatbuffersResponse()
-            }
-        }
-    }
-}
 
-/**
- Store the result of a API forecast result and converion to JSON
- */
-struct ForecastapiResult {
-    let latitude: Float
-    let longitude: Float
-    
-    /// Desired elevation from a DEM. Used in statistical downscaling
-    let elevation: Float?
-    
-    let generationtime_ms: Double
-    let timezone: TimezoneWithOffset
-    let current_weather: CurrentWeather?
-    let sections: [ApiSection]
-    let timeformat: Timeformat
-    
-    var utc_offset_seconds: Int {
-        timezone.utcOffsetSeconds
-    }
-    
-    struct CurrentWeather {
-        let temperature: Float
-        let windspeed: Float
-        let winddirection: Float
-        let weathercode: Float
-        let is_day: Float
-        let temperature_unit: SiUnit
-        let windspeed_unit: SiUnit
-        let winddirection_unit: SiUnit
-        let weathercode_unit: SiUnit
-        let time: Timestamp
-    }
-    
-    func response(format: ForecastResultFormat, timestamp: Timestamp = .now()) throws -> EventLoopFuture<Response> {
-        let res: [() throws -> (ForecastapiResult)] = [{return self}]
-        return res.response(format: format, timestamp: timestamp)
-    }
-    
-    /// e.g. `52.52N13.42E38m`
-    var formatedCoordinatesFilename: String {
-        let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
-        let ele = elevation.map { $0.isFinite ? String(format: "%.0fm", $0) : "" } ?? ""
-        return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
-    }
-    
-    /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
-    fileprivate func toCsvResponse() -> Response {
-        let response = Response(body: .init(stream: { writer in
-            _ = writer.eventLoop.performWithTask {
-                var b = BufferAndWriter(writer: writer)
-                
-                b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
-                let elevation = elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                b.buffer.writeString("\(latitude),\(longitude),\(elevation),\(utc_offset_seconds),\(timezone.identifier),\(timezone.abbreviation)\n")
-                
-                if let current_weather = current_weather {
-                    b.buffer.writeString("\n")
-                    b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.rawValue)),windspeed (\(current_weather.windspeed_unit.rawValue)),winddirection (\(current_weather.winddirection_unit.rawValue)),weathercode (\(current_weather.weathercode_unit.rawValue)),is_day\n")
-                    b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false))
-                    let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "NaN"
-                    let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "NaN"
-                    let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "NaN"
-                    b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(winddirection),\(ww),\(is_day)\n")
-                }
-                
-                for section in sections {
-                    // empy line between sections
-                    b.buffer.writeString("\n")
-                    
-                    b.buffer.writeString("time")
-                    for e in section.columns {
-                        b.buffer.writeString(",\(e.variable) (\(e.unit.rawValue))")
-                    }
-                    b.buffer.writeString("\n")
-                    for (i, time) in section.time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false, onlyDate: section.time.dtSeconds == 86400).enumerated() {
-                        b.buffer.writeString(time)
-                        for e in section.columns {
-                            switch e.data {
-                            /*case .string(let a):
-                                b.buffer.writeString(",")
-                                b.buffer.writeString(a[i])*/
-                            case .float(let a):
-                                if a[i].isFinite {
-                                    b.buffer.writeString(",\(String(format: "%.\(e.unit.significantDigits)f", a[i]))")
-                                } else {
-                                    b.buffer.writeString(",NaN")
-                                }
-                            /*case .int(let a):
-                                b.buffer.writeString(",\(a[i])")*/
-                            case .timestamp(let a):
-                                switch timeformat {
-                                case .iso8601:
-                                    b.buffer.writeString(",\(a[i].add(utc_offset_seconds).iso8601_YYYY_MM_dd_HH_mm)")
-                                case .unixtime:
-                                    b.buffer.writeString(",\(a[i].timeIntervalSince1970)")
-                                }
-                            }
-                        }
-                        b.buffer.writeString("\n")
-                        try await b.flushIfRequired()
-                    }
-                }
-                try await b.flush()
-                try await b.end()
-            }
-            
-        }, count: -1))
-
-        response.headers.replaceOrAdd(name: .contentType, value: "text/csv; charset=utf-8")
-        //response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(formatedCoordinatesFilename).csv\"")
-        return response
-    }
-    
-    fileprivate func toXlsxResponse(timestamp: Timestamp) throws -> Response {
-        let sheet = try XlsxWriter()
-        sheet.startRow()
-        sheet.write("latitude")
-        sheet.write("longitude")
-        sheet.write("elevation")
-        sheet.write("utc_offset_seconds")
-        sheet.write("timezone")
-        sheet.write("timezone_abbreviation")
-        sheet.endRow()
-        sheet.startRow()
-        sheet.write(latitude)
-        sheet.write(longitude)
-        sheet.write(elevation ?? .nan)
-        sheet.write(utc_offset_seconds)
-        sheet.write(timezone.identifier)
-        sheet.write(timezone.abbreviation)
-        sheet.endRow()
-        
-        if let current_weather = current_weather {
-            sheet.startRow()
-            sheet.endRow()
-            sheet.startRow()
-            sheet.write("current_weather_time")
-            sheet.write("temperature (\(current_weather.temperature_unit.rawValue))")
-            sheet.write("windspeed (\(current_weather.windspeed_unit.rawValue))")
-            sheet.write("winddirection (\(current_weather.winddirection_unit.rawValue))")
-            sheet.write("weathercode (\(current_weather.weathercode_unit.rawValue))")
-            sheet.write("is_day")
-            sheet.endRow()
-            sheet.startRow()
-            sheet.writeTimestamp(current_weather.time.add(utc_offset_seconds))
-            sheet.write(current_weather.temperature)
-            sheet.write(current_weather.windspeed)
-            sheet.write(current_weather.winddirection)
-            sheet.write(current_weather.weathercode)
-            sheet.write(current_weather.is_day)
-            sheet.endRow()
-        }
-        
-        for section in sections {
-            sheet.startRow()
-            sheet.endRow()
-            sheet.startRow()
-            sheet.write("time")
-            for e in section.columns {
-                sheet.write("\(e.variable) (\(e.unit.rawValue))")
-            }
-            sheet.endRow()
-            for (i, time) in section.time.enumerated() {
-                sheet.startRow()
-                sheet.writeTimestamp(time.add(utc_offset_seconds))
-                for e in section.columns {
-                    switch e.data {
-                    /*case .string(let a):
-                        sheet.write(a[i])*/
-                    case .float(let a):
-                        sheet.write(a[i])
-                    /*case .int(let a):
-                        sheet.write(a[i])*/
-                    case .timestamp(let a):
-                        sheet.writeTimestamp(a[i].add(utc_offset_seconds))
-                    }
-                }
-                sheet.endRow()
-            }
-        }
-        
-        let data = sheet.write(timestamp: timestamp)
-        let response = Response(body: .init(buffer: data))
-        response.headers.replaceOrAdd(name: .contentType, value: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(formatedCoordinatesFilename).xlsx\"")
-        return response
-    }
-    
-    
-}
 
 extension Timestamp {
     func formated(format: Timeformat, utc_offset_seconds: Int, quotedString: Bool) -> String {

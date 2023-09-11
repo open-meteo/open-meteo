@@ -16,7 +16,7 @@ struct CamsController {
         
         let domains = (params.domains ?? .auto).camsDomains
         
-        let callbacks: [() throws -> (ForecastapiResult)] = try prepared.map { prepared in
+        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 5, forecastDaysMax: 7, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -29,37 +29,34 @@ struct CamsController {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
-            return {
-                let generationTimeStart = Date()
-                // Start data prefetch to boooooooost API speed :D
-                if let hourlyVariables = paramsHourly {
-                    try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
-                }
-                
-                let hourly: ApiSection? = try paramsHourly.map { variables in
-                    var res = [ApiColumn]()
-                    res.reserveCapacity(variables.count)
-                    for variable in variables {
-                        let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.name)
-                        res.append(d)
+            return ForecastapiResult(
+                latitude: reader.modelLat,
+                longitude: reader.modelLon,
+                elevation: reader.targetElevation,
+                timezone: timezone,
+                prefetch: {
+                    if let hourlyVariables = paramsHourly {
+                        try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
                     }
-                    return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-                }
-                
-                let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-                return ForecastapiResult(
-                    latitude: reader.modelLat,
-                    longitude: reader.modelLon,
-                    elevation: reader.targetElevation,
-                    generationtime_ms: generationTimeMs,
-                    timezone: timezone,
-                    current_weather: nil,
-                    sections: [hourly /*, daily*/].compactMap({$0}),
-                    timeformat: params.timeformatOrDefault
-                )
-            }
-        }
-        return callbacks.response(format: params.format ?? .json)
+                },
+                current_weather: nil,
+                hourly: paramsHourly.map { variables in
+                    return {
+                        var res = [ApiColumn]()
+                        res.reserveCapacity(variables.count)
+                        for variable in variables {
+                            let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.name)
+                            res.append(d)
+                        }
+                        return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
+                    }
+                },
+                daily: nil,
+                sixHourly: nil,
+                minutely15: nil
+            )
+        })
+        return result.response(format: params.format ?? .json)
     }
 }
 

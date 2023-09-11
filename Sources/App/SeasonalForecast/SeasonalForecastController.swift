@@ -137,7 +137,7 @@ struct SeasonalForecastController {
         let paramsSixHourly = try SeasonalForecastVariable.load(commaSeparatedOptional: params.six_hourly)
         let paramsDaily = try DailyCfsVariable.load(commaSeparatedOptional: params.daily)
         
-        let callbacks: [() throws -> (ForecastapiResult)] = try prepared.map { prepared in
+        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -150,60 +150,55 @@ struct SeasonalForecastController {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
-            return {
-                let generationTimeStart = Date()
-                // Start data prefetch to boooooooost API speed :D
-                if let hourlyVariables = paramsSixHourly {
-                    for varible in hourlyVariables {
-                        for member in members {
-                            try reader.prefetchData(variable: varible, member: member, time: hourlyTime)
+            return ForecastapiResult(
+                latitude: reader.modelLat,
+                longitude: reader.modelLon,
+                elevation: reader.targetElevation,
+                timezone: timezone,
+                prefetch: {
+                    if let hourlyVariables = paramsSixHourly {
+                        for varible in hourlyVariables {
+                            for member in members {
+                                try reader.prefetchData(variable: varible, member: member, time: hourlyTime)
+                            }
                         }
                     }
-                }
-                
-                // Start data prefetch to boooooooost API speed :D
-                if let dailyVariables = paramsDaily {
-                    for varible in dailyVariables {
-                        for member in members {
-                            try reader.prefetchData(variable: varible, member: member, time: dailyTime)
+                    if let dailyVariables = paramsDaily {
+                        for varible in dailyVariables {
+                            for member in members {
+                                try reader.prefetchData(variable: varible, member: member, time: dailyTime)
+                            }
                         }
                     }
-                }
-                
-                let hourly: ApiSection? = try paramsSixHourly.map { variables in
-                    return ApiSection(name: "six_hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
-                        try members.map { member in
-                            let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(params: params).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
-                            assert(hourlyTime.count == d.data.count, "hours \(hourlyTime.count), values \(d.data.count)")
-                            return d
-                        }
-                    })
-                }
-                
-                let daily: ApiSection? = try paramsDaily.map { dailyVariables in
-                    return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.flatMap { variable in
-                        try members.map { member in
-                            let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(params: params).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
-                            assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
-                            return d
-                        }
-                    })
-                }
-                
-                let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-                return ForecastapiResult(
-                    latitude: reader.modelLat,
-                    longitude: reader.modelLon,
-                    elevation: reader.targetElevation,
-                    generationtime_ms: generationTimeMs,
-                    timezone: timezone,
-                    current_weather: nil,
-                    sections: [hourly, daily].compactMap({$0}),
-                    timeformat: params.timeformatOrDefault
-                )
-            }
-        }
-        return callbacks.response(format: params.format ?? .json)
+                },
+                current_weather: nil,
+                hourly: nil,
+                daily: paramsDaily.map { dailyVariables in
+                    return {
+                        return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.flatMap { variable in
+                            try members.map { member in
+                                let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(params: params).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
+                                assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
+                                return d
+                            }
+                        })
+                    }
+                },
+                sixHourly: paramsSixHourly.map { variables in
+                    return {
+                        return ApiSection(name: "six_hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
+                            try members.map { member in
+                                let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(params: params).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
+                                assert(hourlyTime.count == d.data.count, "hours \(hourlyTime.count), values \(d.data.count)")
+                                return d
+                            }
+                        })
+                    }
+                },
+                minutely15: nil
+            )
+        })
+        return result.response(format: params.format ?? .json)
     }
 }
 

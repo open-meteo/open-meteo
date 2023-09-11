@@ -16,7 +16,7 @@ struct CmipController {
         
         let biasCorrection = !(params.disable_bias_correction ?? false)
         
-        let callbacks: [() throws -> (ForecastapiResult)] = try prepared.map { prepared in
+        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -41,42 +41,40 @@ struct CmipController {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             
-            return {
-                let generationTimeStart = Date()
-                if let dailyVariables = paramsDaily {
-                    for reader in readers {
-                        try reader.prefetchData(variables: dailyVariables, time: dailyTime)
-                    }
-                }
-                let daily: ApiSection? = try paramsDaily.map { dailyVariables in
-                    var res = [ApiColumn]()
-                    res.reserveCapacity(dailyVariables.count * readers.count)
-                    for (reader, domain) in zip(readers, domains) {
-                        for variable in dailyVariables {
-                            let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
-                            let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: params).toApi(name: name)
-                            assert(dailyTime.count == d.data.count)
-                            res.append(d)
+            return ForecastapiResult(
+                latitude: readers[0].modelLat,
+                longitude: readers[0].modelLon,
+                elevation: readers[0].targetElevation,
+                timezone: timezone,
+                prefetch: {
+                    if let dailyVariables = paramsDaily {
+                        for reader in readers {
+                            try reader.prefetchData(variables: dailyVariables, time: dailyTime)
                         }
                     }
-                    
-                    return ApiSection(name: "daily", time: dailyTime, columns: res)
-                }
-                
-                let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-                return ForecastapiResult(
-                    latitude: readers[0].modelLat,
-                    longitude: readers[0].modelLon,
-                    elevation: readers[0].targetElevation,
-                    generationtime_ms: generationTimeMs,
-                    timezone: timezone,
-                    current_weather: nil,
-                    sections: [/*hourly,*/ daily].compactMap({$0}),
-                    timeformat: params.timeformatOrDefault
-                )
-            }
-        }
-        return callbacks.response(format: params.format ?? .json)
+                },
+                current_weather: nil,
+                hourly: nil,
+                daily: paramsDaily.map { dailyVariables in
+                    return {
+                        var res = [ApiColumn]()
+                        res.reserveCapacity(dailyVariables.count * readers.count)
+                        for (reader, domain) in zip(readers, domains) {
+                            for variable in dailyVariables {
+                                let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                                let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: params).toApi(name: name)
+                                assert(dailyTime.count == d.data.count)
+                                res.append(d)
+                            }
+                        }
+                        return ApiSection(name: "daily", time: dailyTime, columns: res)
+                    }
+                },
+                sixHourly: nil,
+                minutely15: nil
+            )
+        })
+        return result.response(format: params.format ?? .json)
     }
 }
 

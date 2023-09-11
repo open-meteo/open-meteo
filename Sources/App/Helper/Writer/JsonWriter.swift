@@ -12,33 +12,34 @@ extension BodyStreamWriter {
     }
 }
 
-extension Array where Element == () throws -> ForecastapiResult {
+extension ForecastapiResultSet {
     /**
      Stream a potentially very large resultset to the client. The JSON file could easily be 20 MB.
      Instead of generating a massive string in memory, we only allocate 18kb and flush every time the buffer exceeds 16kb.
      Memory footprint is therefore much smaller and fits better into L2/L3 caches.
      Additionally code is fully async, to not block the a thread for almost a second to generate a JSON response...
      */
-    func toJsonResponse() throws -> Response {
+    func toJsonResponse(fixedGenerationTime: Double?) throws -> Response {
         // First excution outside stream, to capture potential errors better
-        var first = try self.first?()
+        //var first = try self.first?()
         
         let response = Response(body: .init(stream: { writer in
             writer.submit {
                 var b = BufferAndWriter(writer: writer)
                 /// For multiple locations, create an array of results
-                let isMultiPoint = count > 1
+                let isMultiPoint = results.count > 1
                 if isMultiPoint {
                     b.buffer.writeString("[")
                 }
-                if let first {
+                /*if let first {
                     try await first.streamJsonResponse(to: &b)
                 }
-                first = nil
-                for closure in self.dropFirst() {
-                    let result = try closure()
-                    b.buffer.writeString(",")
-                    try await result.streamJsonResponse(to: &b)
+                first = nil*/
+                for (i,location) in results.enumerated() {
+                    if i != 0 {
+                        b.buffer.writeString(",")
+                    }
+                    try await location.streamJsonResponse(to: &b, timeformat: timeformat, fixedGenerationTime: fixedGenerationTime)
                 }
                 if isMultiPoint {
                     b.buffer.writeString("]")
@@ -53,9 +54,14 @@ extension Array where Element == () throws -> ForecastapiResult {
 }
 
 extension ForecastapiResult {
-    fileprivate func streamJsonResponse(to b: inout BufferAndWriter) async throws {
+    fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
+        let generationTimeStart = Date()
+        let current_weather = try current_weather?()
+        let sections = try runAllSections()
+        let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
+        
         b.buffer.writeString("""
-        {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationtime_ms),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
+        {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationTimeMs),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
         """)
         if let elevation = elevation, elevation.isFinite {
             b.buffer.writeString(",\"elevation\":\(elevation)")

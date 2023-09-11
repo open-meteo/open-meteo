@@ -2,30 +2,30 @@ import Foundation
 import FlatBuffers
 import Vapor
 
-extension Array where Element == () throws -> ForecastapiResult {
+extension ForecastapiResultSet {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
     /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-series require a lot of memory
     /// Data is using `size prefixed` flatbuffers to allow streaming of multiple messages for multiple locations
-    func toFlatbuffersResponse() throws -> Response {
+    func toFlatbuffersResponse(fixedGenerationTime: Double?) throws -> Response {
         // First excution outside stream, to capture potential errors better
-        var first = try self.first?()
+        //var first = try self.first?()
         
         let response = Response(body: .init(stream: { writer in
             writer.submit {
                 // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.
-                let initialSize = Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)
+                // TODO: Estimate initial buffer size
+                let initialSize = Int32(4096) // Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)
                 var fbb = FlatBufferBuilder(initialSize: initialSize)
                 var b = BufferAndWriter(writer: writer)
-                if let first {
-                    first.writeToFlatbuffer(&fbb)
-                    b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
-                    fbb.clear()
-                }
-                first = nil
+                //if let first {
+                //    first.writeToFlatbuffer(&fbb)
+                //    b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
+                //    fbb.clear()
+                //}
+                //first = nil
                 try await b.flushIfRequired()
-                for closure in self.dropFirst() {
-                    let result = try closure()
-                    result.writeToFlatbuffer(&fbb)
+                for location in results {
+                    try location.writeToFlatbuffer(&fbb, fixedGenerationTime: fixedGenerationTime)
                     b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
                     fbb.clear()
                     try await b.flushIfRequired()
@@ -41,8 +41,13 @@ extension Array where Element == () throws -> ForecastapiResult {
 
 fileprivate extension ForecastapiResult {
     /// Write data into `FlatBufferBuilder` and finish the message
-    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder) {
-        let currentWeather = self.current_weather.map { c in
+    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, fixedGenerationTime: Double?) throws {
+        let generationTimeStart = Date()
+        let current_weather = try current_weather?()
+        let sections = try runAllSections()
+        let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
+        
+        let currentWeather = current_weather.map { c in
             com_openmeteo_api_result_CurrentWeather(
                 time: Int64(c.time.timeIntervalSince1970),
                 temperature: c.temperature,
@@ -52,17 +57,17 @@ fileprivate extension ForecastapiResult {
                 isDay: c.is_day
             )
         }
-        let time = self.sections.first?.time.range.lowerBound.timeIntervalSince1970 ?? 0
-        let hourly = self.sections.first(where: {$0.name == "hourly"})?.toFlatbuffers(&fbb) ?? Offset()
-        let daily = self.sections.first(where: {$0.name == "daily"})?.toFlatbuffers(&fbb) ?? Offset()
-        let minutely15 = self.sections.first(where: {$0.name == "minutely_15"})?.toFlatbuffers(&fbb) ?? Offset()
-        let sixHourly = self.sections.first(where: {$0.name == "six_hourly"})?.toFlatbuffers(&fbb) ?? Offset()
+        let time = sections.first?.time.range.lowerBound.timeIntervalSince1970 ?? 0
+        let hourly = sections.first(where: {$0.name == "hourly"})?.toFlatbuffers(&fbb) ?? Offset()
+        let daily = sections.first(where: {$0.name == "daily"})?.toFlatbuffers(&fbb) ?? Offset()
+        let minutely15 = sections.first(where: {$0.name == "minutely_15"})?.toFlatbuffers(&fbb) ?? Offset()
+        let sixHourly = sections.first(where: {$0.name == "six_hourly"})?.toFlatbuffers(&fbb) ?? Offset()
         let result = com_openmeteo_api_result_Result.createResult(
             &fbb,
             latitude: self.latitude,
             longitude: self.longitude,
             elevation: self.elevation ?? .nan,
-            generationtimeMs: Float32(self.generationtime_ms),
+            generationtimeMs: Float32(generationTimeMs),
             utcOffsetSeconds: Int32(self.utc_offset_seconds),
             timezoneOffset: fbb.create(string: self.timezone.identifier),
             timezoneAbbreviationOffset: fbb.create(string: self.timezone.abbreviation),
@@ -77,10 +82,10 @@ fileprivate extension ForecastapiResult {
     }
     
     /// Roughly estimate the required size to keep the flatbuffer message in memory. Overestimation is expected.
-    var estimatedFlatbufferSize: Int {
+    /*var estimatedFlatbufferSize: Int {
         let dataSize = 24 + sections.reduce(0, {$0 + $1.estimatedFlatbufferSize})
         return dataSize + 512
-    }
+    }*/
 }
 
 fileprivate extension FlatBuffers.ByteBuffer {
@@ -101,7 +106,6 @@ fileprivate extension ApiSection {
 }
 
 fileprivate extension ApiColumn {
-    
     func toFlatbuffers(_ fbb: inout FlatBufferBuilder, timerange: TimerangeDt) -> Offset? {
         switch data {
         //case .string(_):
