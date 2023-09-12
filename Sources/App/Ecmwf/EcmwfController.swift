@@ -11,6 +11,7 @@ struct EcmwfController {
         
         let prepared = try params.prepareCoordinates(allowTimezones: false)
         let paramsHourly = try EcmwfHourlyVariable.load(commaSeparatedOptional: params.hourly)
+        let nVariables = (paramsHourly?.count ?? 0)
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -29,6 +30,7 @@ struct EcmwfController {
                 longitude: reader.reader.modelLon,
                 elevation: reader.reader.targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let hourlyVariables = paramsHourly {
                         for variable in hourlyVariables {
@@ -63,6 +65,7 @@ struct EcmwfController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

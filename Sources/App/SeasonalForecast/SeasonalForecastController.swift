@@ -136,6 +136,7 @@ struct SeasonalForecastController {
         
         let paramsSixHourly = try SeasonalForecastVariable.load(commaSeparatedOptional: params.six_hourly)
         let paramsDaily = try DailyCfsVariable.load(commaSeparatedOptional: params.daily)
+        let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * members.count
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -155,6 +156,7 @@ struct SeasonalForecastController {
                 longitude: reader.modelLon,
                 elevation: reader.targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let hourlyVariables = paramsSixHourly {
                         for varible in hourlyVariables {
@@ -198,6 +200,7 @@ struct SeasonalForecastController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

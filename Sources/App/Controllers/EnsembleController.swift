@@ -16,6 +16,7 @@ public struct EnsembleApiController {
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
         let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
+        let nVariables = (paramsHourly?.count ?? 0) * domains.reduce(0, {$0 + $1.countEnsembleMember})
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -39,6 +40,7 @@ public struct EnsembleApiController {
                 longitude: readers[0].modelLon,
                 elevation: readers[0].targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let hourlyVariables = paramsHourly {
                         for reader in readers {
@@ -78,6 +80,7 @@ public struct EnsembleApiController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

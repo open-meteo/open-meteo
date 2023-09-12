@@ -12,6 +12,7 @@ public struct GemController {
         let domains = [GemDomain.gem_global, .gem_regional, .gem_hrdps_continental]
         let paramsHourly = try GemVariableCombined.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try GemDailyWeatherVariable.load(commaSeparatedOptional: params.daily)
+        let nVariables = (paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -32,6 +33,7 @@ public struct GemController {
                 longitude: reader.modelLon,
                 elevation: reader.targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let hourlyVariables = paramsHourly {
                         try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
@@ -103,6 +105,7 @@ public struct GemController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

@@ -17,6 +17,7 @@ struct Era5Controller {
         let domains = try CdsDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
         let paramsHourly = try CdsVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try Era5DailyWeatherVariable.load(commaSeparatedOptional: params.daily)
+        let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.count
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -41,6 +42,7 @@ struct Era5Controller {
                 longitude: readers[0].modelLon,
                 elevation: readers[0].targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let hourlyVariables = paramsHourly {
                         for reader in readers {
@@ -106,6 +108,7 @@ struct Era5Controller {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

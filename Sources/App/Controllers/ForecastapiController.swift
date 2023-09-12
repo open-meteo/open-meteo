@@ -43,6 +43,7 @@ public struct ForecastapiController: RouteCollection {
         let paramsMinutely = try IconApiVariable.load(commaSeparatedOptional: params.minutely_15)
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
+        let nVariables = ((paramsHourly?.count ?? 0) + (paramsMinutely?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.count
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -73,6 +74,7 @@ public struct ForecastapiController: RouteCollection {
                 longitude: readers[0].modelLon,
                 elevation: readers[0].targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let minutelyVariables = paramsMinutely {
                         for variable in minutelyVariables {
@@ -181,6 +183,7 @@ public struct ForecastapiController: RouteCollection {
                 }
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

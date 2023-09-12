@@ -96,6 +96,7 @@ struct GloFasController {
         guard let paramsDaily = try GloFasVariableOrDerived.load(commaSeparatedOptional: params.daily) else {
             throw ForecastapiError.generic(message: "Parameter 'daily' required")
         }
+        let nVariables = (params.ensemble ? 51 : 1) * domains.count
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -135,6 +136,7 @@ struct GloFasController {
                 longitude: readers[0].modelLon,
                 elevation: nil,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     for reader in readers {
                         try reader.prefetchData(variables: variables, time: dailyTime)
@@ -157,6 +159,7 @@ struct GloFasController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

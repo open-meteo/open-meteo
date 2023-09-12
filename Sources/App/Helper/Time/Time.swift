@@ -216,6 +216,10 @@ extension Timestamp: Strideable {
 }
 
 extension Range where Bound == Timestamp {
+    @inlinable public var durationSeconds: Int {
+        upperBound.timeIntervalSince1970 - lowerBound.timeIntervalSince1970
+    }
+    
     @inlinable public func add(_ offset: Int) -> Range<Timestamp> {
         return lowerBound.add(offset) ..< upperBound.add(offset)
     }

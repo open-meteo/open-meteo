@@ -13,6 +13,7 @@ struct CmipController {
         let prepared = try params.prepareCoordinates(allowTimezones: false)
         let domains = try Cmip6Domain.load(commaSeparatedOptional: params.models) ?? [.MRI_AGCM3_2_S]
         let paramsDaily = try Cmip6VariableOrDerivedPostBias.load(commaSeparatedOptional: params.daily)
+        let nVariables = (paramsDaily?.count ?? 0) * domains.count
         
         let biasCorrection = !(params.disable_bias_correction ?? false)
         
@@ -46,6 +47,7 @@ struct CmipController {
                 longitude: readers[0].modelLon,
                 elevation: readers[0].targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let dailyVariables = paramsDaily {
                         for reader in readers {
@@ -74,6 +76,7 @@ struct CmipController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

@@ -14,6 +14,7 @@ struct ForecastapiResult {
     let elevation: Float?
     
     let timezone: TimezoneWithOffset
+    let time: TimerangeLocal
     
     let prefetch: (() throws -> ())
     let current_weather: (() throws -> CurrentWeather)?
@@ -76,6 +77,16 @@ struct ForecastapiResultSet {
                 return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime)
             }
         }
+    }
+    
+    /// Calculate excess weight of an API query. The following factors are considered:
+    /// - 7 days of data are considered a weight of 1
+    /// - 10 weather variables are a weight of 1
+    /// - The number of dails and weather variables is scaled linearly afterwards. E.g. 15 weather variales, account for 1.5 weight.
+    func calculateQueryWeight(nVariablesModels: Int) -> Float {
+        let nVariablesWeigth = (max(10, Float(nVariablesModels)) / 10)
+        let nTimeWeight = results.reduce(0, {$0 + max(7, Float($1.time.range.durationSeconds / 86400)) / 7})
+        return nVariablesWeigth * nTimeWeight
     }
 }
 

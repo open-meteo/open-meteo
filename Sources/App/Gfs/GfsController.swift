@@ -21,6 +21,7 @@ public struct GfsController {
         let domains = [GfsDomain.gfs013, /*.nam_conus,*/ .hrrr_conus]
         let paramsHourly = try GfsVariableCombined.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try GfsDailyWeatherVariable.load(commaSeparatedOptional: params.daily)
+        let nVariables = (paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -41,6 +42,7 @@ public struct GfsController {
                 longitude: reader.modelLon,
                 elevation: reader.targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let hourlyVariables = paramsHourly {
                         try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
@@ -112,6 +114,7 @@ public struct GfsController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

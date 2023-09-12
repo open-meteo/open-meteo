@@ -85,6 +85,7 @@ final class OutputformatTests: XCTestCase {
             longitude: 2,
             elevation: nil,
             timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
+            time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0),
             prefetch: {},
             current_weather: {current},
             hourly: {
@@ -96,9 +97,11 @@ final class OutputformatTests: XCTestCase {
             sixHourly: nil,
             minutely15: nil
         )
-        
-        
         let data = ForecastapiResultSet(timeformat: .iso8601, results: [res])
+        
+        XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 2), 1)
+        XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 15), 1.5)
+        XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 20), 2)
         
         let json = drainString(data.response(format: .json, fixedGenerationTime: 12))
         XCTAssertEqual(json, """
@@ -277,6 +280,7 @@ final class OutputformatTests: XCTestCase {
             longitude: 2,
             elevation: nil,
             timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
+            time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0),
             prefetch: {},
             current_weather: {current},
             hourly: {
@@ -291,6 +295,10 @@ final class OutputformatTests: XCTestCase {
         
         
         let data = ForecastapiResultSet(timeformat: .iso8601, results: [res, res])
+        
+        XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 2), 2)
+        XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 15), 3)
+        XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 20), 4)
         
         let json = drainString(data.response(format: .json, fixedGenerationTime: 12))
         XCTAssertEqual(json, """

@@ -29,11 +29,10 @@ struct DemController {
     }
 
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        if req.headers[.host].contains(where: { $0 == "open-meteo.com"}) {
-            throw Abort.init(.notFound)
-        }
+        try req.ensureSubdomain("api")
         let params = try req.query.decode(Query.self)
         try params.validate()
+        req.incrementRateLimiter(weight: 1)
         // Run query on separat thread pool to not block the main pool
         return ForecastapiController.runLoop.next().submit({
             let elevation = try zip(params.latitude, params.longitude).map { (latitude, longitude) in

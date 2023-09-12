@@ -11,6 +11,7 @@ struct MetNoController {
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let paramsHourly = try MetNoHourlyVariable.load(commaSeparatedOptional: params.hourly)
+        let nVariables = (paramsHourly?.count ?? 0)
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -30,6 +31,7 @@ struct MetNoController {
                 longitude: reader.modelLon,
                 elevation: reader.targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let hourlyVariables = paramsHourly {
                         try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
@@ -73,6 +75,7 @@ struct MetNoController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }

@@ -13,6 +13,7 @@ struct CamsController {
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
+        let nVariables = (paramsHourly?.count ?? 0)
         
         let domains = (params.domains ?? .auto).camsDomains
         
@@ -34,6 +35,7 @@ struct CamsController {
                 longitude: reader.modelLon,
                 elevation: reader.targetElevation,
                 timezone: timezone,
+                time: time,
                 prefetch: {
                     if let hourlyVariables = paramsHourly {
                         try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
@@ -56,6 +58,7 @@ struct CamsController {
                 minutely15: nil
             )
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
 }
