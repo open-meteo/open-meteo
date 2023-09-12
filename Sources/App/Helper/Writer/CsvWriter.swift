@@ -68,7 +68,7 @@ extension ForecastapiResultSet {
         }, count: -1))
 
         response.headers.replaceOrAdd(name: .contentType, value: "text/csv; charset=utf-8")
-        //response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(formatedCoordinatesFilename).csv\"")
+        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.formatedCoordinatesFilename ?? "").csv\"")
         return response
     }
 }
