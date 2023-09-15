@@ -162,9 +162,17 @@ enum CdsVariable: String, GenericVariableMixable {
     case soil_moisture_28_to_100cm
     case soil_moisture_100_to_255cm
     case soil_moisture_0_to_100cm
+
+    case terrestrial_radiation
     case shortwave_radiation
-    case precipitation
     case direct_radiation
+    case diffuse_radiation
+    case direct_normal_irradiance
+    case terrestrial_radiation_instant
+    case shortwave_radiation_instant
+    case diffuse_radiation_instant
+    case direct_radiation_instant
+    case direct_normal_irradiance_instant
     
     case weathercode
     case apparent_temperature
@@ -174,13 +182,12 @@ enum CdsVariable: String, GenericVariableMixable {
     case windspeed_100m
     case winddirection_100m
     case vapor_pressure_deficit
-    case diffuse_radiation
+    case precipitation
     case surface_pressure
     case snowfall
     case rain
     case et0_fao_evapotranspiration
     case cloudcover
-    case direct_normal_irradiance
     case growing_degree_days_base_0_limit_50
     case leaf_wetness_probability
     case soil_moisture_index_0_to_7cm
