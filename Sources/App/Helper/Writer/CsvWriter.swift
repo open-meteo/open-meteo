@@ -5,6 +5,9 @@ import Vapor
 extension ForecastapiResultSet {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
     func toCsvResponse() throws -> Response {
+        if results.count > 1000 {
+            throw ForecastapiError.generic(message: "Only up to 1000 locations can be requested at once")
+        }
         let response = Response(body: .init(stream: { writer in
             _ = writer.eventLoop.performWithTask {
                 var b = BufferAndWriter(writer: writer)
