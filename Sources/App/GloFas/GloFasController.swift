@@ -87,75 +87,80 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 struct GloFasController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("flood-api")
-        let generationTimeStart = Date()
-        let params = try req.query.decode(GloFasQuery.self)
-        try params.validate()
+        let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
-        
         let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
-        let timezone = try params.resolveTimezone()
-        let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, allowedRange: allowedRange, past_days_max: 360)
-        /// For fractional timezones, shift data to show only for full timestamps
-        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
-        let dailyTime = time.range.range(dtSeconds: 3600*24)
         
+        let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
+        guard let paramsDaily = try GloFasVariableOrDerived.load(commaSeparatedOptional: params.daily) else {
+            throw ForecastapiError.generic(message: "Parameter 'daily' required")
+        }
+        let nVariables = (params.ensemble ? 51 : 1) * domains.count
         
-        let readers = try domains.compactMap {
-            guard let reader = try $0.getReader(lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
+        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
+            let coordinates = prepared.coordinate
+            let timezone = prepared.timezone
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            /// For fractional timezones, shift data to show only for full timestamps
+            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
+            
+            let dailyTime = time.range.range(dtSeconds: 3600*24)
+            
+            let readers = try domains.compactMap {
+                guard let reader = try $0.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                return reader
+            }
+            
+            guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return reader
-        }
-        
-        guard !readers.isEmpty else {
-            throw ForecastapiError.noDataAvilableForThisLocation
-        }
-        
-        // convert variables
-        let paramsDaily = try GloFasVariableOrDerived.load(commaSeparated: params.daily)
-        let variablesMember: [VariableOrDerived<GloFasReader.Variable, GloFasReader.Derived>] = paramsDaily.map {
-            switch $0 {
-            case .raw(let raw):
-                return .raw(.init(raw, 0))
-            case .derived(let derived):
-                return .derived(derived)
-            }
-        }
-        /// Variables wih 51 members if requested
-        let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
-        
-        // Run query on separat thread pool to not block the main pool
-        return ForecastapiController.runLoop.next().submit({
-            // Start data prefetch to boooooooost API speed :D
-            for reader in readers {
-                try reader.prefetchData(variables: variables, time: dailyTime)
-            }
             
-            let daily = ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
-                try zip(readers, domains).compactMap { (reader, domain) in
-                    let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
-                    let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm, length_unit: .metric)
-                    let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: units).toApi(name: name)
-                    assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
-                    return d
+            // convert variables
+            
+            let variablesMember: [VariableOrDerived<GloFasReader.Variable, GloFasReader.Derived>] = paramsDaily.map {
+                switch $0 {
+                case .raw(let raw):
+                    return .raw(.init(raw, 0))
+                case .derived(let derived):
+                    return .derived(derived)
                 }
-            })
+            }
+            /// Variables wih 51 members if requested
+            let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
             
-            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-            let out = ForecastapiResult(
+            return ForecastapiResult(
                 latitude: readers[0].modelLat,
                 longitude: readers[0].modelLon,
                 elevation: nil,
-                generationtime_ms: generationTimeMs,
-                utc_offset_seconds: utcOffsetSecondsActual,
                 timezone: timezone,
+                time: time,
+                prefetch: {
+                    for reader in readers {
+                        try reader.prefetchData(variables: variables, time: dailyTime)
+                    }
+                },
                 current_weather: nil,
-                sections: [daily],
-                timeformat: params.timeformatOrDefault
+                hourly: nil,
+                daily: {
+                    ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
+                        try zip(readers, domains).compactMap { (reader, domain) in
+                            let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                            let units = ApiUnits(temperature_unit: .celsius, windspeed_unit: .ms, precipitation_unit: .mm, length_unit: .metric)
+                            let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: units).toApi(name: name)
+                            assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
+                            return d
+                        }
+                    })
+                },
+                sixHourly: nil,
+                minutely15: nil
             )
-            return try out.response(format: params.format ?? .json)
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
+        return result.response(format: params.format ?? .json)
     }
 }
 
@@ -189,44 +194,5 @@ enum GlofasDomainApi: String, RawRepresentableString, CaseIterable {
         case .consolidated_v4:
             return try GloFasMixer(domains: [.consolidated], lat: lat, lon: lon, elevation: elevation, mode: mode)
         }
-    }
-}
-
-struct GloFasQuery: Content, QueryWithStartEndDateTimeZone {
-    let latitude: Float
-    let longitude: Float
-    let daily: [String]
-    let timeformat: Timeformat?
-    let past_days: Int?
-    let forecast_days: Int?
-    let format: ForecastResultFormat?
-    let timezone: String?
-    let models: [String]?
-    let ensemble: Bool
-    let cell_selection: GridSelectionMode?
-    
-    /// iso starting date `2022-02-01`
-    let start_date: IsoDate?
-    /// included end date `2022-06-01`
-    let end_date: IsoDate?
-    
-    
-    func validate() throws {
-        if latitude > 90 || latitude < -90 || latitude.isNaN {
-            throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
-        }
-        if longitude > 180 || longitude < -180 || longitude.isNaN {
-            throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
-        }
-        if let timezone = timezone, !timezone.isEmpty {
-            throw ForecastapiError.timezoneNotSupported
-        }
-        if let forecast_days = forecast_days, forecast_days < 0 || forecast_days >= 367 {
-            throw ForecastapiError.forecastDaysInvalid(given: forecast_days, allowed: 0...366)
-        }
-    }
-    
-    var timeformatOrDefault: Timeformat {
-        return timeformat ?? .iso8601
     }
 }

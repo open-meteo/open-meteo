@@ -1,0 +1,42 @@
+// Flatbuffers API result format for open-meteo weather data
+// 
+// Generate swift code with: 
+// flatc -o Sources/App/Helper/Writer/ --swift format/api_result.fbs
+//
+// Make sure flatbuffers is installed with `brew install flatbuffers`
+
+namespace com.openmeteo.api.result;
+
+table Variable {
+  variable: string (required);
+  unit: string (required);
+  values: [float] (required);
+}
+
+struct CurrentWeather {
+  time: int64;
+  temperature: float;
+  weathercode: float;
+  windspeed: float;
+  winddirection: float;
+  is_day: float;
+}
+ 
+table Result {
+  latitude: float;
+  longitude: float;
+  elevation: float;
+  generationtime_ms: float;
+  utc_offset_seconds: int32;
+  timezone: string;
+  timezone_abbreviation: string;
+  current_weather: CurrentWeather;
+  time_start: int64;
+  daily: [Variable];
+  hourly: [Variable];
+  six_hourly: [Variable];
+  minutely_15: [Variable];
+  //monthly: [Variable];
+}
+ 
+root_type Result;

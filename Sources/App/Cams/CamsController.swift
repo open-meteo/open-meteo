@@ -7,58 +7,59 @@ import Vapor
 struct CamsController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("air-quality-api")
-        let generationTimeStart = Date()
-        let params = try req.query.decode(CamsQuery.self)
-        try params.validate()
+        let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
-        
         let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 6)
-        let timezone = try params.resolveTimezone()
-        let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 5, allowedRange: allowedRange)
-        /// For fractional timezones, shift data to show only for full timestamps
-        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
-        let hourlyTime = time.range.range(dtSeconds: 3600)
-        //let dailyTime = time.range.range(dtSeconds: 3600*24)
+        
+        let prepared = try params.prepareCoordinates(allowTimezones: true)
+        let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
+        let nVariables = (paramsHourly?.count ?? 0)
         
         let domains = (params.domains ?? .auto).camsDomains
         
-        guard let reader = try CamsMixer(domains: domains, lat: params.latitude, lon: params.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
-        }
-        let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
-        
-        
-        // Run query on separat thread pool to not block the main pool
-        return ForecastapiController.runLoop.next().submit({
-            // Start data prefetch to boooooooost API speed :D
-            if let hourlyVariables = paramsHourly {
-                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
+            let coordinates = prepared.coordinate
+            let timezone = prepared.timezone
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 5, forecastDaysMax: 7, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            /// For fractional timezones, shift data to show only for full timestamps
+            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
+            
+            let hourlyTime = time.range.range(dtSeconds: 3600)
+            
+            guard let reader = try CamsMixer(domains: domains, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .nearest) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
             }
             
-            let hourly: ApiSection? = try paramsHourly.map { variables in
-                var res = [ApiColumn]()
-                res.reserveCapacity(variables.count)
-                for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.name)
-                    res.append(d)
-                }
-                return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-            }
-            
-            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-            let out = ForecastapiResult(
+            return ForecastapiResult(
                 latitude: reader.modelLat,
                 longitude: reader.modelLon,
-                elevation: nil,
-                generationtime_ms: generationTimeMs,
-                utc_offset_seconds: utcOffsetSecondsActual,
+                elevation: reader.targetElevation,
                 timezone: timezone,
+                time: time,
+                prefetch: {
+                    if let hourlyVariables = paramsHourly {
+                        try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                    }
+                },
                 current_weather: nil,
-                sections: [hourly /*, daily*/].compactMap({$0}),
-                timeformat: params.timeformatOrDefault
+                hourly: paramsHourly.map { variables in
+                    return {
+                        var res = [ApiColumn]()
+                        res.reserveCapacity(variables.count)
+                        for variable in variables {
+                            let d = try reader.get(variable: variable, time: hourlyTime).toApi(name: variable.name)
+                            res.append(d)
+                        }
+                        return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
+                    }
+                },
+                daily: nil,
+                sixHourly: nil,
+                minutely15: nil
             )
-            return try out.response(format: params.format ?? .json)
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
+        return result.response(format: params.format ?? .json)
     }
 }
 
@@ -239,41 +240,8 @@ struct CamsMixer: GenericReaderMixer {
     }
 }
 
-struct CamsQuery: Content, QueryWithStartEndDateTimeZone {
-    let latitude: Float
-    let longitude: Float
-    let hourly: [String]?
-    //let daily: [CamsVariableDaily]?
-    //let temperature_unit: TemperatureUnit?
-    //let windspeed_unit: WindspeedUnit?
-    //let precipitation_unit: PrecipitationUnit?
-    let timeformat: Timeformat?
-    let past_days: Int?
-    let format: ForecastResultFormat?
-    let timezone: String?
-    let domains: Domain?
-    let cell_selection: GridSelectionMode?
-    
-    /// iso starting date `2022-02-01`
-    let start_date: IsoDate?
-    /// included end date `2022-06-01`
-    let end_date: IsoDate?
-    
-    func validate() throws {
-        if latitude > 90 || latitude < -90 || latitude.isNaN {
-            throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
-        }
-        if longitude > 180 || longitude < -180 || longitude.isNaN {
-            throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
-        }
-        /*if daily?.count ?? 0 > 0 && timezone == nil {
-            throw ForecastapiError.timezoneRequired
-        }*/
-    }
-    
-    var timeformatOrDefault: Timeformat {
-        return timeformat ?? .iso8601
-    }
+struct CamsQuery {
+
 }
 
 extension CamsQuery {

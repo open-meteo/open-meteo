@@ -14,7 +14,7 @@ final class ZensunTests: XCTestCase {
         // https://www.timeanddate.com/sun/usa/los-angeles?month=11&year=2021
         let utcOffsetSeconds = -25200
         let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = ForecastApiQuery.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
+        let time = ApiQueryParameter.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
         
         // vancouver: lat: 49.25, lon: -123.12
         let times = Zensun.calculateSunRiseSet(timeRange: time.range, lat: 34.05223, lon: -118.24368, utcOffsetSeconds: utcOffsetSeconds)
@@ -31,7 +31,7 @@ final class ZensunTests: XCTestCase {
         // https://www.timeanddate.com/sun/canada/vancouver?month=11&year=2021
         let utcOffsetSeconds = -25200
         let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = ForecastApiQuery.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
+        let time = ApiQueryParameter.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
         
         let times = Zensun.calculateSunRiseSet(timeRange: time.range, lat: 49.25, lon: -123.12, utcOffsetSeconds: utcOffsetSeconds)
         XCTAssertEqual(times.rise[0], Timestamp(1636211364))

@@ -58,9 +58,8 @@ final class RateLimiter: LifecycleHandler {
         })
     }
     
-    /// Check if the current IP address is over quota and throw an error. If not, update counter and return.
-    /// `count` can be later used to increase the weight for "heavy" API calls. E.g. calls with many weather variables my account for more than just 1.
-    func check(request: Request, count: Float) throws {
+    /// Check if the current IP address is over quota and throw an error. If not return.
+    func check(request: Request) throws {
         guard Self.limitDaily > 0 || Self.limitHourly > 0 || Self.limitMinutely > 0 else {
             return
         }
@@ -71,26 +70,16 @@ final class RateLimiter: LifecycleHandler {
         case .v4(let socket):
             let ip: UInt32 = socket.address.sin_addr.s_addr
             return try lock.withLock({
-                let usageMinutely = Self.limitMinutely > 0 ? minutelyPerIPv4[ip] ?? 0 : 0
-                if usageMinutely >= Self.limitMinutely {
+                if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
                     throw RateLimitError.minutlyExceeded
                 }
-                let usageHourly = Self.limitHourly > 0 ? hourlyPerIPv4[ip] ?? 0 : 0
-                if usageHourly >= Self.limitHourly {
+                
+                if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
                     throw RateLimitError.hourlyExceeded
                 }
-                let usageDaily = Self.limitDaily > 0 ? dailyPerIPv4[ip] ?? 0 : 0
-                if usageDaily >= Self.limitDaily {
+                
+                if Self.limitDaily > 0, let usageDaily = dailyPerIPv4[ip], usageDaily >= Self.limitDaily {
                     throw RateLimitError.dailyExceeded
-                }
-                if Self.limitMinutely > 0 {
-                    minutelyPerIPv4[ip] = count + usageMinutely
-                }
-                if Self.limitHourly > 0 {
-                    hourlyPerIPv4[ip] = count + usageHourly
-                }
-                if Self.limitDaily > 0 {
-                    dailyPerIPv4[ip] = count + usageDaily
                 }
                 return
             })
@@ -99,26 +88,59 @@ final class RateLimiter: LifecycleHandler {
             address.hash(into: &hasher)
             let ip = hasher.finalize()
             return try lock.withLock({
-                let usageMinutely = Self.limitMinutely > 0 ? minutelyPerIPv6[ip] ?? 0 : 0
-                if usageMinutely >= Self.limitMinutely {
+                if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
                     throw RateLimitError.minutlyExceeded
                 }
-                let usageHourly = Self.limitHourly > 0 ? hourlyPerIPv6[ip] ?? 0 : 0
-                if usageHourly >= Self.limitHourly {
+                if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
                     throw RateLimitError.hourlyExceeded
                 }
-                let usageDaily = Self.limitDaily > 0 ? dailyPerIPv6[ip] ?? 0 : 0
-                if usageDaily >= Self.limitDaily {
+                if Self.limitDaily > 0, let usageDaily = dailyPerIPv6[ip], usageDaily >= Self.limitDaily {
                     throw RateLimitError.dailyExceeded
                 }
+                return
+            })
+        case .unixDomainSocket(_):
+            return
+        }
+    }
+    
+    /// Increment the current IP address by the specified counter
+    /// `count` can be later used to increase the weight for "heavy" API calls. E.g. calls with many weather variables my account for more than just 1.
+    func increment(request: Request, count: Float) {
+        guard Self.limitDaily > 0 || Self.limitHourly > 0 || Self.limitMinutely > 0 else {
+            return
+        }
+        guard let address = request.peerAddress ?? request.remoteAddress else {
+            return
+        }
+        switch address {
+        case .v4(let socket):
+            let ip: UInt32 = socket.address.sin_addr.s_addr
+            return lock.withLock({
                 if Self.limitMinutely > 0 {
-                    minutelyPerIPv6[ip] = count + usageMinutely
+                    minutelyPerIPv4[ip] = count + (minutelyPerIPv4[ip] ?? 0)
                 }
                 if Self.limitHourly > 0 {
-                    hourlyPerIPv6[ip] = count + usageHourly
+                    hourlyPerIPv4[ip] = count + (hourlyPerIPv4[ip] ?? 0)
                 }
                 if Self.limitDaily > 0 {
-                    dailyPerIPv6[ip] = count + usageDaily
+                    dailyPerIPv4[ip] = count + (dailyPerIPv4[ip] ?? 0)
+                }
+                return
+            })
+        case .v6(_):
+            var hasher = Hasher()
+            address.hash(into: &hasher)
+            let ip = hasher.finalize()
+            return lock.withLock({
+                if Self.limitMinutely > 0 {
+                    minutelyPerIPv6[ip] = count + (minutelyPerIPv6[ip] ?? 0)
+                }
+                if Self.limitHourly > 0 {
+                    hourlyPerIPv6[ip] = count + (hourlyPerIPv6[ip] ?? 0)
+                }
+                if Self.limitDaily > 0 {
+                    dailyPerIPv6[ip] = count + (dailyPerIPv6[ip] ?? 0)
                 }
                 return
             })
@@ -162,7 +184,7 @@ extension Request {
         
         /// Free API
         if headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "customer-") }) {
-            try RateLimiter.instance.check(request: self, count: 1)
+            try RateLimiter.instance.check(request: self)
         }
         
         /// API node dedicated to customers
@@ -173,6 +195,13 @@ extension Request {
             guard ApiKeyManager.apiKeys.contains(String.SubSequence(apikey)) else {
                 throw ApiKeyManagerError.apiKeyInvalid
             }
+        }
+    }
+    
+    func incrementRateLimiter(weight: Float) {
+        /// Free API
+        if headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "customer-") }) {
+            RateLimiter.instance.increment(request: self, count: weight)
         }
     }
 }

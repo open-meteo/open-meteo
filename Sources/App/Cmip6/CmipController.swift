@@ -6,94 +6,78 @@ import Vapor
 struct CmipController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("climate-api")
-        let generationTimeStart = Date()
-        let params = try req.query.decode(CmipQuery.self)
-        try params.validate()
-        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
-        
+        let params = try req.query.decode(ApiQueryParameter.self)
+        let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)
-        //let timezone = try params.resolveTimezone()
-        let time = try params.getTimerange(allowedRange: allowedRange)
-        //let hourlyTime = time.range.range(dtSeconds: 3600)
-        let dailyTime = time.range.range(dtSeconds: 3600*24)
+        
+        let prepared = try params.prepareCoordinates(allowTimezones: false)
+        let domains = try Cmip6Domain.load(commaSeparatedOptional: params.models) ?? [.MRI_AGCM3_2_S]
+        let paramsDaily = try Cmip6VariableOrDerivedPostBias.load(commaSeparatedOptional: params.daily)
+        let nVariables = (paramsDaily?.count ?? 0) * domains.count
+        
         let biasCorrection = !(params.disable_bias_correction ?? false)
         
-        let domains = try Cmip6Domain.load(commaSeparatedOptional: params.models) ?? [.MRI_AGCM3_2_S]
-        
-        let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
-            if biasCorrection {
-                guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
-                }
-                return Cmip6ReaderPostBiasCorrected(reader: reader, domain: domain)
-            } else {
-                guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
-                }
-                let reader2 = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
-                return Cmip6ReaderPostBiasCorrected(reader: reader2, domain: domain)
-            }
-        }
-        
-        guard !readers.isEmpty else {
-            throw ForecastapiError.noDataAvilableForThisLocation
-        }
-
-        // Start data prefetch to boooooooost API speed :D
-        /*if let hourlyVariables = params.hourly {
-            for reader in readers {
-                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
-            }
-        }*/
-        let paramsDaily = try Cmip6VariableOrDerivedPostBias.load(commaSeparatedOptional: params.daily)
-        if let dailyVariables = paramsDaily {
-            for reader in readers {
-                try reader.prefetchData(variables: dailyVariables, time: dailyTime)
-            }
-        }
-        
-        
-        /*let hourly: ApiSection? = try params.hourly.map { variables in
-            var res = [ApiColumn]()
-            res.reserveCapacity(variables.count * readers.count)
-            for reader in readers {
-                for variable in variables {
-                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.reader.reader.domain.rawValue)" : variable.rawValue
-                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: name)
-                    assert(hourlyTime.count == d.data.count)
-                    res.append(d)
-                }
-            }
-            return ApiSection(name: "hourly", time: hourlyTime, columns: res)
-        }*/
-        let daily: ApiSection? = try paramsDaily.map { dailyVariables in
-            var res = [ApiColumn]()
-            res.reserveCapacity(dailyVariables.count * readers.count)
-            for (reader, domain) in zip(readers, domains) {
-                for variable in dailyVariables {
-                    let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
-                    let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: params).toApi(name: name)
-                    assert(dailyTime.count == d.data.count)
-                    res.append(d)
+        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
+            let coordinates = prepared.coordinate
+            let timezone = prepared.timezone
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let dailyTime = time.range.range(dtSeconds: 3600*24)
+            
+            let readers: [any Cmip6Readerable] = try domains.map { domain -> any Cmip6Readerable in
+                if biasCorrection {
+                    guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                        throw ForecastapiError.noDataAvilableForThisLocation
+                    }
+                    return Cmip6ReaderPostBiasCorrected(reader: reader, domain: domain)
+                } else {
+                    guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                        throw ForecastapiError.noDataAvilableForThisLocation
+                    }
+                    let reader2 = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
+                    return Cmip6ReaderPostBiasCorrected(reader: reader2, domain: domain)
                 }
             }
             
-            return ApiSection(name: "daily", time: dailyTime, columns: res)
-        }
-        
-        let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-        let out = ForecastapiResult(
-            latitude: readers[0].modelLat,
-            longitude: readers[0].modelLon,
-            elevation: readers[0].targetElevation,
-            generationtime_ms: generationTimeMs,
-            utc_offset_seconds: 0,
-            timezone: TimeZone(identifier: "GMT")!,
-            current_weather: nil,
-            sections: [/*hourly,*/ daily].compactMap({$0}),
-            timeformat: params.timeformatOrDefault
-        )
-        return req.eventLoop.makeSucceededFuture(try out.response(format: params.format ?? .json))
+            guard !readers.isEmpty else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            
+            return ForecastapiResult(
+                latitude: readers[0].modelLat,
+                longitude: readers[0].modelLon,
+                elevation: readers[0].targetElevation,
+                timezone: timezone,
+                time: time,
+                prefetch: {
+                    if let dailyVariables = paramsDaily {
+                        for reader in readers {
+                            try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+                        }
+                    }
+                },
+                current_weather: nil,
+                hourly: nil,
+                daily: paramsDaily.map { dailyVariables in
+                    return {
+                        var res = [ApiColumn]()
+                        res.reserveCapacity(dailyVariables.count * readers.count)
+                        for (reader, domain) in zip(readers, domains) {
+                            for variable in dailyVariables {
+                                let name = readers.count > 1 ? "\(variable.rawValue)_\(domain.rawValue)" : variable.rawValue
+                                let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: params).toApi(name: name)
+                                assert(dailyTime.count == d.data.count)
+                                res.append(d)
+                            }
+                        }
+                        return ApiSection(name: "daily", time: dailyTime, columns: res)
+                    }
+                },
+                sixHourly: nil,
+                minutely15: nil
+            )
+        })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
+        return result.response(format: params.format ?? .json)
     }
 }
 
@@ -848,81 +832,4 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .windspeed_10m_max, time: time)
         }
     }
-}
-
-struct CmipQuery: Content, QueryWithTimezone, ApiUnitsSelectable {
-    let latitude: Float
-    let longitude: Float
-    //let hourly: [Cmip6VariableOrDerived]?
-    let daily: [String]?
-    //let current_weather: Bool?
-    let elevation: Float?
-    //let timezone: String?
-    let temperature_unit: TemperatureUnit?
-    let windspeed_unit: WindspeedUnit?
-    let precipitation_unit: PrecipitationUnit?
-    let length_unit: LengthUnit?
-    let timeformat: Timeformat?
-    let format: ForecastResultFormat?
-    let cell_selection: GridSelectionMode?
-    let disable_bias_correction: Bool?
-    
-    /// not used, because only daily data
-    let timezone: String?
-    let models: [String]?
-    
-    /// iso starting date `2022-02-01`
-    let start_date: IsoDate
-    /// included end date `2022-06-01`
-    let end_date: IsoDate
-    
-    func validate() throws {
-        if latitude > 90 || latitude < -90 || latitude.isNaN {
-            throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
-        }
-        if longitude > 180 || longitude < -180 || longitude.isNaN {
-            throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
-        }
-        guard end_date.date >= start_date.date else {
-            throw ForecastapiError.enddateMustBeLargerEqualsThanStartdate
-        }
-        guard start_date.year >= 1950, start_date.year <= 2050 else {
-            throw ForecastapiError.dateOutOfRange(parameter: "start_date", allowed: Timestamp(1950,1,1)..<Timestamp(2050,1,1))
-        }
-        guard end_date.year >= 1950, end_date.year <= 2050 else {
-            throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: Timestamp(1950,1,1)..<Timestamp(2050,1,1))
-        }
-        //if daily?.count ?? 0 > 0 && timezone == nil {
-            //throw ForecastapiError.timezoneRequired
-        //}
-    }
-    
-    func getTimerange(allowedRange: Range<Timestamp>) throws -> TimerangeLocal {
-        let start = start_date.toTimestamp()
-        let includedEnd = end_date.toTimestamp()
-        guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
-            throw ForecastapiError.enddateMustBeLargerEqualsThanStartdate
-        }
-        guard allowedRange.contains(start) else {
-            throw ForecastapiError.dateOutOfRange(parameter: "start_date", allowed: allowedRange)
-        }
-        guard allowedRange.contains(includedEnd) else {
-            throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
-        }
-        return TimerangeLocal(range: start ..< includedEnd.add(86400), utcOffsetSeconds: 0)
-    }
-    
-    var timeformatOrDefault: Timeformat {
-        return timeformat ?? .iso8601
-    }
-    
-    /*func getUtcOffsetSeconds() throws -> Int {
-        guard let timezone = timezone else {
-            return 0
-        }
-        guard let tz = TimeZone(identifier: timezone) else {
-            throw ForecastapiError.invalidTimezone
-        }
-        return (tz.secondsFromGMT() / 3600) * 3600
-    }*/
 }

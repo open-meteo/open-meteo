@@ -5,123 +5,82 @@ import Vapor
 struct MetNoController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("api")
-        let generationTimeStart = Date()
-        let params = try req.query.decode(MetNoQuery.self)
-        try params.validate()
+        let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
-        
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 4)
-        let timezone = try params.resolveTimezone()
-        let (utcOffsetSecondsActual, time) = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, allowedRange: allowedRange)
-        /// For fractional timezones, shift data to show only for full timestamps
-        let utcOffsetShift = time.utcOffsetSeconds - utcOffsetSecondsActual
-        let hourlyTime = time.range.range(dtSeconds: 3600)
-        let elevationOrDem = try params.elevation ?? Dem90.read(lat: params.latitude, lon: params.longitude)
         
-        guard let reader = try MetNoReader(domain: MetNoDomain.nordic_pp, lat: params.latitude, lon: params.longitude, elevation: elevationOrDem, mode: params.cell_selection ?? .land) else {
-            throw ForecastapiError.noDataAvilableForThisLocation
-        }
-        // Start data prefetch to boooooooost API speed :D
+        let prepared = try params.prepareCoordinates(allowTimezones: true)
         let paramsHourly = try MetNoHourlyVariable.load(commaSeparatedOptional: params.hourly)
+        let nVariables = (paramsHourly?.count ?? 0)
         
-        // Run query on separat thread pool to not block the main pool
-        return ForecastapiController.runLoop.next().submit({
-            if let hourlyVariables = paramsHourly {
-                try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
+            let coordinates = prepared.coordinate
+            let timezone = prepared.timezone
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 3, forecastDaysMax: 7, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            /// For fractional timezones, shift data to show only for full timestamps
+            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
+            
+            let hourlyTime = time.range.range(dtSeconds: 3600)
+            
+            guard let reader = try MetNoReader(domain: MetNoDomain.nordic_pp, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
             }
             
-            let hourly: ApiSection? = try paramsHourly.map { variables in
-                var res = [ApiColumn]()
-                res.reserveCapacity(variables.count)
-                for variable in variables {
-                    let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
-                    res.append(d)
-                }
-                return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-            }
-            
-            let currentWeather: ForecastapiResult.CurrentWeather?
-            if params.current_weather == true {
-                let starttime = currentTime.floor(toNearest: 3600)
-                let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                let temperature = try reader.get(raw: .temperature_2m, time: time).convertAndRound(params: params)
-                let winddirection = try reader.get(raw: .winddirection_10m, time: time).convertAndRound(params: params)
-                let windspeed = try reader.get(raw: .windspeed_10m, time: time).convertAndRound(params: params)
-                let weathercode = try reader.get(derived: .weathercode, time: time).convertAndRound(params: params)
-                currentWeather = ForecastapiResult.CurrentWeather(
-                    temperature: temperature.data[0],
-                    windspeed: windspeed.data[0],
-                    winddirection: winddirection.data[0],
-                    weathercode: weathercode.data[0],
-                    is_day: try reader.get(derived: .is_day, time: time).convertAndRound(params: params).data[0],
-                    temperature_unit: temperature.unit,
-                    windspeed_unit: windspeed.unit,
-                    winddirection_unit: winddirection.unit,
-                    weathercode_unit: weathercode.unit,
-                    time: starttime
-                )
-            } else {
-                currentWeather = nil
-            }
-            
-            let generationTimeMs = Date().timeIntervalSince(generationTimeStart) * 1000
-            let out = ForecastapiResult(
+            return ForecastapiResult(
                 latitude: reader.modelLat,
                 longitude: reader.modelLon,
                 elevation: reader.targetElevation,
-                generationtime_ms: generationTimeMs,
-                utc_offset_seconds: utcOffsetSecondsActual,
                 timezone: timezone,
-                current_weather: currentWeather,
-                sections: [hourly].compactMap({$0}),
-                timeformat: params.timeformatOrDefault
+                time: time,
+                prefetch: {
+                    if let hourlyVariables = paramsHourly {
+                        try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                    }
+                },
+                current_weather: params.current_weather == true ? {
+                    let starttime = currentTime.floor(toNearest: 3600)
+                    let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
+                    return {
+                        let temperature = try reader.get(raw: .temperature_2m, time: time).convertAndRound(params: params)
+                        let winddirection = try reader.get(raw: .winddirection_10m, time: time).convertAndRound(params: params)
+                        let windspeed = try reader.get(raw: .windspeed_10m, time: time).convertAndRound(params: params)
+                        let weathercode = try reader.get(derived: .weathercode, time: time).convertAndRound(params: params)
+                        return ForecastapiResult.CurrentWeather(
+                            temperature: temperature.data[0],
+                            windspeed: windspeed.data[0],
+                            winddirection: winddirection.data[0],
+                            weathercode: weathercode.data[0],
+                            is_day: try reader.get(derived: .is_day, time: time).convertAndRound(params: params).data[0],
+                            temperature_unit: temperature.unit,
+                            windspeed_unit: windspeed.unit,
+                            winddirection_unit: winddirection.unit,
+                            weathercode_unit: weathercode.unit,
+                            time: starttime
+                        )
+                    }
+                }() : nil,
+                hourly: paramsHourly.map { variables in
+                    return {
+                        var res = [ApiColumn]()
+                        res.reserveCapacity(variables.count)
+                        for variable in variables {
+                            let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params).toApi(name: variable.name)
+                            res.append(d)
+                        }
+                        return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
+                    }
+                },
+                daily: nil,
+                sixHourly: nil,
+                minutely15: nil
             )
-            return try out.response(format: params.format ?? .json)
         })
+        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
+        return result.response(format: params.format ?? .json)
     }
 }
 
 typealias MetNoHourlyVariable = VariableOrDerived<MetNoVariable, MetNoVariableDerived>
-
-struct MetNoQuery: Content, QueryWithStartEndDateTimeZone, ApiUnitsSelectable {
-    let latitude: Float
-    let longitude: Float
-    let hourly: [String]?
-    let current_weather: Bool?
-    let elevation: Float?
-    //let timezone: String?
-    let temperature_unit: TemperatureUnit?
-    let windspeed_unit: WindspeedUnit?
-    let precipitation_unit: PrecipitationUnit?
-    let length_unit: LengthUnit?
-    let timeformat: Timeformat?
-    let past_days: Int?
-    let format: ForecastResultFormat?
-    let timezone: String?
-    let cell_selection: GridSelectionMode?
-    
-    /// iso starting date `2022-02-01`
-    let start_date: IsoDate?
-    /// included end date `2022-06-01`
-    let end_date: IsoDate?
-    
-    
-    func validate() throws {
-        if latitude > 90 || latitude < -90 || latitude.isNaN {
-            throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
-        }
-        if longitude > 180 || longitude < -180 || longitude.isNaN {
-            throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
-        }
-        /*if daily?.count ?? 0 > 0 && timezone == nil {
-            throw ForecastapiError.timezoneRequired
-        }*/
-    }
-    
-    var timeformatOrDefault: Timeformat {
-        return timeformat ?? .iso8601
-    }
-}
 
 struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     var reader: GenericReaderCached<MetNoDomain, MetNoVariable>
