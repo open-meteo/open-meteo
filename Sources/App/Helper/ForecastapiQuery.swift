@@ -387,6 +387,11 @@ struct TimezoneWithOffset {
         guard let identifier = TimezoneWithOffset.timezoneDatabase.simple(latitude: latitude, longitude: longitude) else {
             throw ForecastapiError.invalidTimezone
         }
+        // Some older timezone databases may still use the old name for Kyiv
+        if identifier == "Europe/Kyiv", let tz = TimeZone(identifier: "Europe/Kiev") {
+            self.init(timezone: tz)
+            return
+        }
         guard let timezone = TimeZone(identifier: identifier) else {
             throw ForecastapiError.invalidTimezone
         }
