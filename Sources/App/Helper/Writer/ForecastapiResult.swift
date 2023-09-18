@@ -80,13 +80,25 @@ struct ForecastapiResultSet {
     }
     
     /// Calculate excess weight of an API query. The following factors are considered:
-    /// - 7 days of data are considered a weight of 1
+    /// - 14 days of data are considered a weight of 1
     /// - 10 weather variables are a weight of 1
     /// - The number of dails and weather variables is scaled linearly afterwards. E.g. 15 weather variales, account for 1.5 weight.
+    /// - Number of locations
+    ///
+    /// `weight = max(variables / 10, variables / 10 * days / 14) * locations`
+    ///
+    /// See: https://github.com/open-meteo/open-meteo/issues/438#issuecomment-1722945326
     func calculateQueryWeight(nVariablesModels: Int) -> Float {
-        let nVariablesWeigth = (max(10, Float(nVariablesModels)) / 10)
-        let nTimeWeight = results.reduce(0, {$0 + max(7, Float($1.time.range.durationSeconds / 86400)) / 7})
-        return nVariablesWeigth * nTimeWeight
+        let referenceDays = 14
+        let referenceVariables = 10
+        // Sum up weights for each location. Technically each location can have a different time interval
+        return results.reduce(0, {
+            let nDays = $1.time.range.durationSeconds / 86400
+            let timeFraction = Float(nDays) / Float(referenceDays)
+            let variablesFraction = Float(nVariablesModels) / Float(referenceVariables)
+            let weight = max(variablesFraction, timeFraction * variablesFraction)
+            return $0 + max(1, weight)
+        })
     }
 }
 

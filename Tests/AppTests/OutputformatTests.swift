@@ -36,6 +36,77 @@ final class OutputformatTests: XCTestCase {
         })
     }*/
     
+    /// Test adjustment of API call weights
+    /// "Heavy" API calls are counted more than just 1 API call
+    ///
+    /// See: https://github.com/open-meteo/open-meteo/issues/438#issuecomment-1722945326
+    func testApiWeight() {
+        let location20year = ForecastapiResult(
+            latitude: 41,
+            longitude: 2,
+            elevation: nil,
+            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
+            time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 0),
+            prefetch: {},
+            current_weather: nil,
+            hourly: nil,
+            daily: nil,
+            sixHourly: nil,
+            minutely15: nil
+        )
+        let result20year = ForecastapiResultSet(timeformat: .iso8601, results: [location20year])
+        // 20 year data, one location, one variable
+        XCTAssertEqual(result20year.calculateQueryWeight(nVariablesModels: 1), 54.79286)
+        // 20 year data, one location, two variables
+        XCTAssertEqual(result20year.calculateQueryWeight(nVariablesModels: 2), 109.58572)
+        
+        let location7day = ForecastapiResult(
+            latitude: 41,
+            longitude: 2,
+            elevation: nil,
+            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
+            time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 0),
+            prefetch: {},
+            current_weather: nil,
+            hourly: nil,
+            daily: nil,
+            sixHourly: nil,
+            minutely15: nil
+        )
+        let result7day = ForecastapiResultSet(timeformat: .iso8601, results: [location7day])
+        // 7 day data, one location, one variable
+        XCTAssertEqual(result7day.calculateQueryWeight(nVariablesModels: 1), 1)
+        // 7 day data, one location, two variables
+        XCTAssertEqual(result7day.calculateQueryWeight(nVariablesModels: 2), 1)
+        // 7 day data, one location, 15 variables
+        XCTAssertEqual(result7day.calculateQueryWeight(nVariablesModels: 15), 1.5)
+        // 7 day data, one location, 30 variables
+        XCTAssertEqual(result7day.calculateQueryWeight(nVariablesModels: 30), 3)
+        
+        let location1month = ForecastapiResult(
+            latitude: 41,
+            longitude: 2,
+            elevation: nil,
+            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
+            time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 0),
+            prefetch: {},
+            current_weather: nil,
+            hourly: nil,
+            daily: nil,
+            sixHourly: nil,
+            minutely15: nil
+        )
+        let result1month = ForecastapiResultSet(timeformat: .iso8601, results: [location1month, location1month])
+        // 1 month data, two locations, one variable
+        XCTAssertEqual(result1month.calculateQueryWeight(nVariablesModels: 1), 2.0)
+        // 1 month data, two locations, two variables
+        XCTAssertEqual(result1month.calculateQueryWeight(nVariablesModels: 2), 2.0)
+        // 1 month data, two locations, 15 variables
+        XCTAssertEqual(result1month.calculateQueryWeight(nVariablesModels: 15), 6.6428566)
+        // 1 month data, two locations, 30 variables
+        XCTAssertEqual(result1month.calculateQueryWeight(nVariablesModels: 30), 13.285713)
+    }
+    
     
     func drainString(_ response: EventLoopFuture<Response>) -> String {
         guard var buffer = try? response.wait().body.collect(on: response.eventLoop).wait() else {
