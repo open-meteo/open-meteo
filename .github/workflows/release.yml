@@ -44,8 +44,8 @@ jobs:
       run: apt-get update && apt-get -qq -y install libnetcdf-dev libbz2-dev build-essential curl
     - name: Get eccodes
       run: |
-        curl -L https://github.com/patrick-zippenfenig/ecCodes-ubuntu/releases/download/2.30.0/libeccodes0_2.30.0_jammy_amd64.deb -o libeccodes0_2.30.0_jammy_amd64.deb
-        apt install -y ./libeccodes0_2.30.0_jammy_amd64.deb
+        curl -L https://github.com/patrick-zippenfenig/ecCodes-ubuntu/releases/download/2.31.0/libeccodes0_2.31.0_jammy_amd64.deb -o libeccodes0_2.31.0_jammy_amd64.deb
+        apt install -y ./libeccodes0_2.31.0_jammy_amd64.deb
     - name: Build
       run: |
         ${{ env.swift_build }}
@@ -81,7 +81,7 @@ jobs:
       with:
         repo_supported_arch: amd64
         repo_supported_version: jammy
-        file: 'libeccodes0_2.30.0_jammy_amd64.deb'
+        file: 'libeccodes0_2.31.0_jammy_amd64.deb'
         file_target_version: jammy
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}
