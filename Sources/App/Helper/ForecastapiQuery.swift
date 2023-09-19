@@ -332,14 +332,7 @@ enum TimeZoneOrAuto {
                     if timezone == "auto" {
                         return .auto
                     }
-                    // Some older timezone databases may still use the old name for Kyiv
-                    if timezone == "Europe/Kyiv", let tz = TimeZone(identifier: "Europe/Kiev") {
-                        return .timezone(tz)
-                    }
-                    guard let tz = TimeZone(identifier: String(timezone)) else {
-                        throw ForecastapiError.invalidTimezone
-                    }
-                    return .timezone(tz)
+                    return .timezone(try TimeZone.initWithFallback(String(timezone)))
                 }
             }
         }
@@ -387,16 +380,23 @@ struct TimezoneWithOffset {
         guard let identifier = TimezoneWithOffset.timezoneDatabase.simple(latitude: latitude, longitude: longitude) else {
             throw ForecastapiError.invalidTimezone
         }
+        self.init(timezone: try TimeZone.initWithFallback(identifier))
+    }
+    static let gmt = TimezoneWithOffset(utcOffsetSeconds: 0, identifier: "GMT", abbreviation: "GMT")
+}
+
+extension TimeZone {
+    static func initWithFallback(_ identifier: String) throws -> TimeZone {
         // Some older timezone databases may still use the old name for Kyiv
         if identifier == "Europe/Kyiv", let tz = TimeZone(identifier: "Europe/Kiev") {
-            self.init(timezone: tz)
-            return
+            return tz
         }
-        guard let timezone = TimeZone(identifier: identifier) else {
+        if identifier == "America/Nuuk", let tz = TimeZone(identifier: "America/Godthab") {
+            return tz
+        }
+        guard let tz = TimeZone(identifier: identifier) else {
             throw ForecastapiError.invalidTimezone
         }
-        self.init(timezone: timezone)
+        return tz
     }
-    
-    static let gmt = TimezoneWithOffset(utcOffsetSeconds: 0, identifier: "GMT", abbreviation: "GMT")
 }
