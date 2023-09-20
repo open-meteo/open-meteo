@@ -240,4 +240,9 @@ struct DataAndUnit {
     func toApi(name: String) -> ApiColumn {
         return ApiColumn(variable: name, unit: unit, data: .float(data))
     }
+    
+    func toApiSingle(name: String) -> ApiColumnSingle {
+        assert(data.count == 1)
+        return ApiColumnSingle(variable: name, unit: unit, value: data[0])
+    }
 }

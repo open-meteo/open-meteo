@@ -45,6 +45,10 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
     
     func prefetchData(variable: Variable, time: TimerangeDt) throws {
         for reader in reader {
+            if time.dtSeconds > reader.modelDtSeconds {
+                /// 15 minutely domain while reading hourly data
+                continue
+            }
             if try reader.prefetchData(mixed: variable.rawValue, time: time) {
                 break
             }
@@ -64,6 +68,10 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         var unit: SiUnit? = nil
         if variable.requiresOffsetCorrectionForMixing {
             for r in reader.reversed() {
+                if time.dtSeconds > r.modelDtSeconds {
+                    /// 15 minutely domain while reading hourly data
+                    continue
+                }
                 guard let d = try r.get(mixed: variable.rawValue, time: time) else {
                     continue
                 }
@@ -85,6 +93,10 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         } else {
             // default case, just place new data in 1:1
             for r in reader.reversed() {
+                if time.dtSeconds > r.modelDtSeconds {
+                    /// 15 minutely domain while reading hourly data
+                    continue
+                }
                 guard let d = try r.get(mixed: variable.rawValue, time: time) else {
                     continue
                 }

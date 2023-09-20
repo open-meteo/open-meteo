@@ -59,6 +59,7 @@ extension ForecastapiResult {
     fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
         let current_weather = try current_weather?()
+        let current = try current?()
         let sections = try runAllSections()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
@@ -77,6 +78,34 @@ extension ForecastapiResult {
                 """)
             b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
             b.buffer.writeString("}")
+        }
+        
+        if let current {
+            b.buffer.writeString(",\"\(current.name)_units\":")
+            b.buffer.writeString("{")
+            switch timeformat {
+            case .iso8601:
+                b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.rawValue)\"")
+            case .unixtime:
+                b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.rawValue)\"")
+            }
+            for e in current.columns {
+                b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.rawValue)\"")
+            }
+            b.buffer.writeString("}")
+            b.buffer.writeString(",\"\(current.name)\":")
+            b.buffer.writeString("{")
+            b.buffer.writeString("\"time\":")
+            b.buffer.writeString(current.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
+            
+            /// Write data
+            for e in current.columns {
+                let format = "%.\(e.unit.significantDigits)f"
+                b.buffer.writeString(",")
+                b.buffer.writeString("\"\(e.variable)\":\(e.value.isFinite ? String(format: format, e.value) : "null")")
+            }
+            b.buffer.writeString("}")
+            try await b.flushIfRequired()
         }
         
         /// process sections like hourly or daily

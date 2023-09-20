@@ -42,6 +42,7 @@ struct IconWaveController {
                     }
                 },
                 current_weather: nil,
+                current: nil,
                 hourly:
                     paramsHourly.map { variables in
                         return {

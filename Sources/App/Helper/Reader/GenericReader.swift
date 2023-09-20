@@ -112,6 +112,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             return try readAndScale(variable: variable, time: time)
         }
         if time.dtSeconds > domain.dtSeconds {
+            /// do not allow aggregations
             fatalError()
         }
         

@@ -13,6 +13,12 @@ table Variable {
   values: [float] (required);
 }
 
+table VariableSingle {
+  variable: string (required);
+  unit: string (required);
+  value: float (required);
+}
+
 struct CurrentWeather {
   time: int64;
   temperature: float;
@@ -36,6 +42,7 @@ table Result {
   hourly: [Variable];
   six_hourly: [Variable];
   minutely_15: [Variable];
+  current: [VariableSingle];
   //monthly: [Variable];
 }
  
