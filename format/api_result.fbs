@@ -43,6 +43,8 @@ table Result {
   six_hourly: [Variable];
   minutely_15: [Variable];
   current: [VariableSingle];
+  current_time: int64;
+  current_interval_seconds: int32;
   //monthly: [Variable];
 }
  

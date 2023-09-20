@@ -130,7 +130,7 @@ public struct ForecastapiController: RouteCollection {
                                 res.append(d)
                             }
                         }
-                        return ApiSectionSingle(name: "current", time: currentTimeRange.range.lowerBound, columns: res)
+                        return ApiSectionSingle(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: res)
                     }
                 },
                 hourly: paramsHourly.map { variables in
