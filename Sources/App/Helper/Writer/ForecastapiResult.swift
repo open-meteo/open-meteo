@@ -141,6 +141,7 @@ struct ApiSection {
 struct ApiSectionSingle {
     let name: String
     let time: Timestamp
+    let dtSeconds: Int
     let columns: [ApiColumnSingle]
 }
 
