@@ -4,6 +4,56 @@
 
 import FlatBuffers
 
+public enum com_openmeteo_api_result_Unit: Int8, Enum, Verifiable {
+  public typealias T = Int8
+  public static var byteSize: Int { return MemoryLayout<Int8>.size }
+  public var value: Int8 { return self.rawValue }
+  case celsius = 1
+  case fahrenheit = 2
+  case kelvin = 3
+  case kmh = 4
+  case mph = 5
+  case knots = 6
+  case ms = 7
+  case msNotUnitConverted = 8
+  case millimeter = 9
+  case centimeter = 10
+  case inch = 11
+  case feet = 12
+  case meter = 13
+  case gpm = 14
+  case percent = 15
+  case hectoPascal = 16
+  case pascal = 17
+  case degreeDirection = 18
+  case wmoCode = 19
+  case wattPerSquareMeter = 20
+  case kilogramPerSquareMeter = 21
+  case gramPerKilogram = 22
+  case perSecond = 23
+  case second = 24
+  case qubicMeterPerQubicMeter = 25
+  case qubicMeterPerSecond = 26
+  case kiloPascal = 27
+  case megaJoulesPerSquareMeter = 28
+  case joulesPerKilogram = 29
+  case hours = 30
+  case iso8601 = 31
+  case unixtime = 32
+  case microgramsPerQuibicMeter = 33
+  case grainsPerQuibicMeter = 34
+  case dimensionless = 35
+  case dimensionlessInteger = 36
+  case eaqi = 37
+  case usaqi = 38
+  case gddCelsius = 39
+  case fraction = 40
+
+  public static var max: com_openmeteo_api_result_Unit { return .fraction }
+  public static var min: com_openmeteo_api_result_Unit { return .celsius }
+}
+
+
 public struct com_openmeteo_api_result_CurrentWeather: NativeStruct, Verifiable, FlatbuffersInitializable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
@@ -91,21 +141,20 @@ public struct com_openmeteo_api_result_Variable: FlatBufferObject, Verifiable {
 
   public var variable: String! { let o = _accessor.offset(VTOFFSET.variable.v); return _accessor.string(at: o) }
   public var variableSegmentArray: [UInt8]! { return _accessor.getVector(at: VTOFFSET.variable.v) }
-  public var unit: String! { let o = _accessor.offset(VTOFFSET.unit.v); return _accessor.string(at: o) }
-  public var unitSegmentArray: [UInt8]! { return _accessor.getVector(at: VTOFFSET.unit.v) }
+  public var unit: com_openmeteo_api_result_Unit { let o = _accessor.offset(VTOFFSET.unit.v); return o == 0 ? .dimensionless : com_openmeteo_api_result_Unit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .dimensionless }
   public var hasValues: Bool { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? false : true }
   public var valuesCount: Int32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func values(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
   public var values: [Float32] { return _accessor.getVector(at: VTOFFSET.values.v) ?? [] }
   public static func startVariable(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 3) }
   public static func add(variable: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: variable, at: VTOFFSET.variable.p) }
-  public static func add(unit: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: unit, at: VTOFFSET.unit.p) }
+  public static func add(unit: com_openmeteo_api_result_Unit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: unit.rawValue, def: 35, at: VTOFFSET.unit.p) }
   public static func addVectorOf(values: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: values, at: VTOFFSET.values.p) }
-  public static func endVariable(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4, 6, 8]); return end }
+  public static func endVariable(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4, 8]); return end }
   public static func createVariable(
     _ fbb: inout FlatBufferBuilder,
     variableOffset variable: Offset,
-    unitOffset unit: Offset,
+    unit: com_openmeteo_api_result_Unit = .dimensionless,
     valuesVectorOffset values: Offset
   ) -> Offset {
     let __start = com_openmeteo_api_result_Variable.startVariable(&fbb)
@@ -118,7 +167,7 @@ public struct com_openmeteo_api_result_Variable: FlatBufferObject, Verifiable {
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
     try _v.visit(field: VTOFFSET.variable.p, fieldName: "variable", required: true, type: ForwardOffset<String>.self)
-    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: true, type: ForwardOffset<String>.self)
+    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: false, type: com_openmeteo_api_result_Unit.self)
     try _v.visit(field: VTOFFSET.values.p, fieldName: "values", required: true, type: ForwardOffset<Vector<Float32, Float32>>.self)
     _v.finish()
   }
@@ -143,18 +192,17 @@ public struct com_openmeteo_api_result_VariableSingle: FlatBufferObject, Verifia
 
   public var variable: String! { let o = _accessor.offset(VTOFFSET.variable.v); return _accessor.string(at: o) }
   public var variableSegmentArray: [UInt8]! { return _accessor.getVector(at: VTOFFSET.variable.v) }
-  public var unit: String! { let o = _accessor.offset(VTOFFSET.unit.v); return _accessor.string(at: o) }
-  public var unitSegmentArray: [UInt8]! { return _accessor.getVector(at: VTOFFSET.unit.v) }
+  public var unit: com_openmeteo_api_result_Unit { let o = _accessor.offset(VTOFFSET.unit.v); return o == 0 ? .dimensionless : com_openmeteo_api_result_Unit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .dimensionless }
   public var value: Float32 { let o = _accessor.offset(VTOFFSET.value.v); return o == 0 ? 0.0 : _accessor.readBuffer(of: Float32.self, at: o) }
   public static func startVariableSingle(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 3) }
   public static func add(variable: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: variable, at: VTOFFSET.variable.p) }
-  public static func add(unit: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: unit, at: VTOFFSET.unit.p) }
+  public static func add(unit: com_openmeteo_api_result_Unit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: unit.rawValue, def: 35, at: VTOFFSET.unit.p) }
   public static func add(value: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: value, def: 0.0, at: VTOFFSET.value.p) }
-  public static func endVariableSingle(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4, 6]); return end }
+  public static func endVariableSingle(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
   public static func createVariableSingle(
     _ fbb: inout FlatBufferBuilder,
     variableOffset variable: Offset,
-    unitOffset unit: Offset,
+    unit: com_openmeteo_api_result_Unit = .dimensionless,
     value: Float32 = 0.0
   ) -> Offset {
     let __start = com_openmeteo_api_result_VariableSingle.startVariableSingle(&fbb)
@@ -167,7 +215,7 @@ public struct com_openmeteo_api_result_VariableSingle: FlatBufferObject, Verifia
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
     try _v.visit(field: VTOFFSET.variable.p, fieldName: "variable", required: true, type: ForwardOffset<String>.self)
-    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: true, type: ForwardOffset<String>.self)
+    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: false, type: com_openmeteo_api_result_Unit.self)
     try _v.visit(field: VTOFFSET.value.p, fieldName: "value", required: false, type: Float32.self)
     _v.finish()
   }

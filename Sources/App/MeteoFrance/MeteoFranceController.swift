@@ -578,7 +578,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
             case .is_day:
-                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
             case .windspeed_20m:
                 let u = try get(raw: .wind_u_component_20m, time: time).data
                 let v = try get(raw: .wind_v_component_20m, time: time).data

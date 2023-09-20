@@ -243,7 +243,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 modelDtHours: time.dtSeconds / 3600), .wmoCode
            )
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .terrestrial_radiation:
             let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
             return DataAndUnit(solar, .wattPerSquareMeter)

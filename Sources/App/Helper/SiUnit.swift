@@ -1,48 +1,8 @@
 import Foundation
 
+typealias SiUnit = com_openmeteo_api_result_Unit
 
-enum SiUnit {
-    case celsius
-    case fahrenheit
-    case kelvin
-    case kmh
-    case mph
-    case knots
-    case ms
-    case ms_not_unit_converted
-    case millimeter
-    case centimeter
-    case inch
-    case feet
-    case meter
-    case gpm
-    case percent
-    case hectoPascal
-    case pascal
-    case degreeDirection
-    case wmoCode
-    case wattPerSquareMeter
-    case kilogramPerSquareMeter
-    case gramPerKilogram
-    case perSecond
-    case second
-    case qubicMeterPerQubicMeter
-    case qubicMeterPerSecond
-    case kiloPascal
-    case megaJoulesPerSquareMeter
-    case joulesPerKilogram
-    case hours
-    case iso8601
-    case unixtime
-    case microgramsPerQuibicMeter
-    case grainsPerQuibicMeter
-    case dimensionless
-    case dimensionless_integer
-    case eaqi
-    case usaqi
-    case gddCelsius
-    case fraction
-    
+extension SiUnit {
     var rawValue: String {
         switch self {
         case .celsius: return "°C"
@@ -52,7 +12,7 @@ enum SiUnit {
         case .mph: return "mp/h"
         case .knots: return "kn"
         case .ms: return "m/s"
-        case .ms_not_unit_converted: return "m/s"
+        case .msNotUnitConverted: return "m/s"
         case .millimeter: return "mm"
         case .centimeter: return "cm"
         case .inch: return "inch"
@@ -80,7 +40,7 @@ enum SiUnit {
         case .microgramsPerQuibicMeter: return "μg/m³"
         case .grainsPerQuibicMeter: return "grains/m³"
         case .dimensionless: return ""
-        case .dimensionless_integer: return ""
+        case .dimensionlessInteger: return ""
         case .eaqi: return "EAQI"
         case .usaqi: return "USAQI"
         case .gddCelsius: return "GGDc"
@@ -97,7 +57,7 @@ enum SiUnit {
         case .mph: return 1
         case .knots: return 1
         case .ms: return 2
-        case .ms_not_unit_converted: return 2
+        case .msNotUnitConverted: return 2
         case .millimeter: return 2
         case .inch: return 3
         case .feet: return 3
@@ -123,7 +83,7 @@ enum SiUnit {
         case .microgramsPerQuibicMeter: return 1
         case .grainsPerQuibicMeter: return 1
         case .dimensionless: return 2
-        case .dimensionless_integer: return 0
+        case .dimensionlessInteger: return 0
         case .joulesPerKilogram: return 1
         case .qubicMeterPerSecond: return 2
         case .eaqi: return 0
