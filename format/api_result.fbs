@@ -16,7 +16,7 @@ table Variable {
 table VariableSingle {
   variable: string (required);
   unit: string (required);
-  value: float (required);
+  value: float;
 }
 
 struct CurrentWeather {

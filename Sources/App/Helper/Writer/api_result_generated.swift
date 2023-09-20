@@ -124,6 +124,55 @@ public struct com_openmeteo_api_result_Variable: FlatBufferObject, Verifiable {
   }
 }
 
+public struct com_openmeteo_api_result_VariableSingle: FlatBufferObject, Verifiable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Table
+
+  private init(_ t: Table) { _accessor = t }
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
+
+  private enum VTOFFSET: VOffset {
+    case variable = 4
+    case unit = 6
+    case value = 8
+    var v: Int32 { Int32(self.rawValue) }
+    var p: VOffset { self.rawValue }
+  }
+
+  public var variable: String! { let o = _accessor.offset(VTOFFSET.variable.v); return _accessor.string(at: o) }
+  public var variableSegmentArray: [UInt8]! { return _accessor.getVector(at: VTOFFSET.variable.v) }
+  public var unit: String! { let o = _accessor.offset(VTOFFSET.unit.v); return _accessor.string(at: o) }
+  public var unitSegmentArray: [UInt8]! { return _accessor.getVector(at: VTOFFSET.unit.v) }
+  public var value: Float32 { let o = _accessor.offset(VTOFFSET.value.v); return o == 0 ? 0.0 : _accessor.readBuffer(of: Float32.self, at: o) }
+  public static func startVariableSingle(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 3) }
+  public static func add(variable: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: variable, at: VTOFFSET.variable.p) }
+  public static func add(unit: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: unit, at: VTOFFSET.unit.p) }
+  public static func add(value: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: value, def: 0.0, at: VTOFFSET.value.p) }
+  public static func endVariableSingle(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4, 6]); return end }
+  public static func createVariableSingle(
+    _ fbb: inout FlatBufferBuilder,
+    variableOffset variable: Offset,
+    unitOffset unit: Offset,
+    value: Float32 = 0.0
+  ) -> Offset {
+    let __start = com_openmeteo_api_result_VariableSingle.startVariableSingle(&fbb)
+    com_openmeteo_api_result_VariableSingle.add(variable: variable, &fbb)
+    com_openmeteo_api_result_VariableSingle.add(unit: unit, &fbb)
+    com_openmeteo_api_result_VariableSingle.add(value: value, &fbb)
+    return com_openmeteo_api_result_VariableSingle.endVariableSingle(&fbb, start: __start)
+  }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.variable.p, fieldName: "variable", required: true, type: ForwardOffset<String>.self)
+    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: true, type: ForwardOffset<String>.self)
+    try _v.visit(field: VTOFFSET.value.p, fieldName: "value", required: false, type: Float32.self)
+    _v.finish()
+  }
+}
+
 public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
@@ -147,6 +196,9 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
     case hourly = 24
     case sixHourly = 26
     case minutely15 = 28
+    case current = 30
+    case currentTime = 32
+    case currentIntervalSeconds = 34
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -175,7 +227,12 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
   public var hasMinutely15: Bool { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? false : true }
   public var minutely15Count: Int32 { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func minutely15(at index: Int32) -> com_openmeteo_api_result_Variable? { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? nil : com_openmeteo_api_result_Variable(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public static func startResult(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 13) }
+  public var hasCurrent: Bool { let o = _accessor.offset(VTOFFSET.current.v); return o == 0 ? false : true }
+  public var currentCount: Int32 { let o = _accessor.offset(VTOFFSET.current.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func current(at index: Int32) -> com_openmeteo_api_result_VariableSingle? { let o = _accessor.offset(VTOFFSET.current.v); return o == 0 ? nil : com_openmeteo_api_result_VariableSingle(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
+  public var currentTime: Int64 { let o = _accessor.offset(VTOFFSET.currentTime.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int64.self, at: o) }
+  public var currentIntervalSeconds: Int32 { let o = _accessor.offset(VTOFFSET.currentIntervalSeconds.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public static func startResult(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 16) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -189,6 +246,9 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
   public static func addVectorOf(hourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourly, at: VTOFFSET.hourly.p) }
   public static func addVectorOf(sixHourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sixHourly, at: VTOFFSET.sixHourly.p) }
   public static func addVectorOf(minutely15: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: minutely15, at: VTOFFSET.minutely15.p) }
+  public static func addVectorOf(current: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: current, at: VTOFFSET.current.p) }
+  public static func add(currentTime: Int64, _ fbb: inout FlatBufferBuilder) { fbb.add(element: currentTime, def: 0, at: VTOFFSET.currentTime.p) }
+  public static func add(currentIntervalSeconds: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: currentIntervalSeconds, def: 0, at: VTOFFSET.currentIntervalSeconds.p) }
   public static func endResult(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createResult(
     _ fbb: inout FlatBufferBuilder,
@@ -204,7 +264,10 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
     dailyVectorOffset daily: Offset = Offset(),
     hourlyVectorOffset hourly: Offset = Offset(),
     sixHourlyVectorOffset sixHourly: Offset = Offset(),
-    minutely15VectorOffset minutely15: Offset = Offset()
+    minutely15VectorOffset minutely15: Offset = Offset(),
+    currentVectorOffset current: Offset = Offset(),
+    currentTime: Int64 = 0,
+    currentIntervalSeconds: Int32 = 0
   ) -> Offset {
     let __start = com_openmeteo_api_result_Result.startResult(&fbb)
     com_openmeteo_api_result_Result.add(latitude: latitude, &fbb)
@@ -220,6 +283,9 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
     com_openmeteo_api_result_Result.addVectorOf(hourly: hourly, &fbb)
     com_openmeteo_api_result_Result.addVectorOf(sixHourly: sixHourly, &fbb)
     com_openmeteo_api_result_Result.addVectorOf(minutely15: minutely15, &fbb)
+    com_openmeteo_api_result_Result.addVectorOf(current: current, &fbb)
+    com_openmeteo_api_result_Result.add(currentTime: currentTime, &fbb)
+    com_openmeteo_api_result_Result.add(currentIntervalSeconds: currentIntervalSeconds, &fbb)
     return com_openmeteo_api_result_Result.endResult(&fbb, start: __start)
   }
 
@@ -238,6 +304,9 @@ public struct com_openmeteo_api_result_Result: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.hourly.p, fieldName: "hourly", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_Variable>, com_openmeteo_api_result_Variable>>.self)
     try _v.visit(field: VTOFFSET.sixHourly.p, fieldName: "sixHourly", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_Variable>, com_openmeteo_api_result_Variable>>.self)
     try _v.visit(field: VTOFFSET.minutely15.p, fieldName: "minutely15", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_Variable>, com_openmeteo_api_result_Variable>>.self)
+    try _v.visit(field: VTOFFSET.current.p, fieldName: "current", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_VariableSingle>, com_openmeteo_api_result_VariableSingle>>.self)
+    try _v.visit(field: VTOFFSET.currentTime.p, fieldName: "currentTime", required: false, type: Int64.self)
+    try _v.visit(field: VTOFFSET.currentIntervalSeconds.p, fieldName: "currentIntervalSeconds", required: false, type: Int32.self)
     _v.finish()
   }
 }
