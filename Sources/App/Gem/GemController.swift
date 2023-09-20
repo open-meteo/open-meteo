@@ -409,7 +409,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                     modelDtHours: time.dtSeconds / 3600), .wmoCode
                 )
             case .is_day:
-                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionless_integer)
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
             }
         case .pressure(let v):
             switch v.variable {

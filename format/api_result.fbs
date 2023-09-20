@@ -7,15 +7,60 @@
 
 namespace com.openmeteo.api.result;
 
+enum Unit : byte {
+  celsius = 1,
+  fahrenheit,
+  kelvin,
+  kmh,
+  mph,
+  knots,
+  ms,
+  ms_not_unit_converted,
+  millimeter,
+  centimeter,
+  inch,
+  feet,
+  meter,
+  gpm,
+  percent,
+  hectoPascal,
+  pascal,
+  degreeDirection,
+  wmoCode,
+  wattPerSquareMeter,
+  kilogramPerSquareMeter,
+  gramPerKilogram,
+  perSecond,
+  second,
+  qubicMeterPerQubicMeter,
+  qubicMeterPerSecond,
+  kiloPascal,
+  megaJoulesPerSquareMeter,
+  joulesPerKilogram,
+  hours,
+  iso8601,
+  unixtime,
+  microgramsPerQuibicMeter,
+  grainsPerQuibicMeter,
+  dimensionless,
+  dimensionless_integer,
+  eaqi,
+  usaqi,
+  gddCelsius,
+  fraction
+}
+
+   
+
 table Variable {
   variable: string (required);
-  unit: string (required);
+  unit: Unit = dimensionless;
   values: [float] (required);
 }
 
 table VariableSingle {
   variable: string (required);
-  unit: string (required);
+  unit: Unit = dimensionless;
   value: float;
 }
 

@@ -300,7 +300,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .snowfall_height:
             return .meter
         case .updraft:
-            return .ms_not_unit_converted
+            return .msNotUnitConverted
         }
     }
     

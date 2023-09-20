@@ -377,7 +377,7 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
         case .relativehumidity:
             return .percent
         case .vertical_velocity:
-            return .ms_not_unit_converted
+            return .msNotUnitConverted
         }
     }
     

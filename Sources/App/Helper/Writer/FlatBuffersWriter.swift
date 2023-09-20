@@ -123,7 +123,7 @@ fileprivate extension ApiColumn {
         //case .string(_):
         //    return nil
         case .float(let data):
-            return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unitOffset: fbb.create(string: unit.rawValue), valuesVectorOffset: fbb.createVector(data))
+            return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unit: unit, valuesVectorOffset: fbb.createVector(data))
         //case .int(_):
         //    return nil
         case .timestamp(let times):
@@ -132,13 +132,13 @@ fileprivate extension ApiColumn {
             let secondsAfterMidnight = zip(timerange, times).map { (midnight, time) in
                 return Float(time.timeIntervalSince1970 - midnight.timeIntervalSince1970)
             }
-            return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unitOffset: fbb.create(string: unit.rawValue), valuesVectorOffset: fbb.createVector(secondsAfterMidnight))
+            return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unit: unit, valuesVectorOffset: fbb.createVector(secondsAfterMidnight))
         }
     }
 }
 
 fileprivate extension ApiColumnSingle {
     func toFlatbuffers(_ fbb: inout FlatBufferBuilder) -> Offset? {
-        return com_openmeteo_api_result_VariableSingle.createVariableSingle(&fbb, variableOffset: fbb.create(string: variable), unitOffset: fbb.create(string: unit.rawValue), value: value)
+        return com_openmeteo_api_result_VariableSingle.createVariableSingle(&fbb, variableOffset: fbb.create(string: variable), unit: unit, value: value)
     }
 }
