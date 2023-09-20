@@ -46,6 +46,7 @@ fileprivate extension ForecastapiResult {
     func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, fixedGenerationTime: Double?) throws {
         let generationTimeStart = Date()
         let current_weather = try current_weather?()
+        let current = try current?()
         let sections = try runAllSections()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
@@ -78,7 +79,10 @@ fileprivate extension ForecastapiResult {
             dailyVectorOffset: daily,
             hourlyVectorOffset: hourly,
             sixHourlyVectorOffset: sixHourly,
-            minutely15VectorOffset: minutely15
+            minutely15VectorOffset: minutely15,
+            currentVectorOffset: current?.toFlatbuffers(&fbb) ?? Offset(),
+            currentTime: (current?.time.timeIntervalSince1970).map(Int64.init) ?? 0,
+            currentIntervalSeconds: (current?.dtSeconds).map(Int32.init) ?? 0
         )
         fbb.finish(offset: result, addPrefix: true)
     }
@@ -107,6 +111,12 @@ fileprivate extension ApiSection {
     }
 }
 
+fileprivate extension ApiSectionSingle {
+    func toFlatbuffers(_ fbb: inout FlatBufferBuilder) -> Offset {
+        return fbb.createVector(ofOffsets: columns.compactMap({ $0.toFlatbuffers(&fbb) }))
+    }
+}
+
 fileprivate extension ApiColumn {
     func toFlatbuffers(_ fbb: inout FlatBufferBuilder, timerange: TimerangeDt) -> Offset? {
         switch data {
@@ -124,5 +134,11 @@ fileprivate extension ApiColumn {
             }
             return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unitOffset: fbb.create(string: unit.rawValue), valuesVectorOffset: fbb.createVector(secondsAfterMidnight))
         }
+    }
+}
+
+fileprivate extension ApiColumnSingle {
+    func toFlatbuffers(_ fbb: inout FlatBufferBuilder) -> Offset? {
+        return com_openmeteo_api_result_VariableSingle.createVariableSingle(&fbb, variableOffset: fbb.create(string: variable), unitOffset: fbb.create(string: unit.rawValue), value: value)
     }
 }
