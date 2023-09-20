@@ -56,6 +56,7 @@ struct Era5Controller {
                     }
                 },
                 current_weather: nil,
+                current: nil,
                 hourly: paramsHourly.map { variables in
                     return {
                         var res = [ApiColumn]()

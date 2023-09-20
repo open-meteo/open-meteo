@@ -7,6 +7,8 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let latitude: [String]
     let longitude: [String]
     let minutely_15: [String]?
+    /// Select individual variables for current weather
+    let current: [String]?
     let hourly: [String]?
     let daily: [String]?
     /// For seasonal forecast

@@ -41,7 +41,8 @@ struct CamsController {
                         try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
                     }
                 },
-                current_weather: nil,
+                current_weather: nil, 
+                current: nil,
                 hourly: paramsHourly.map { variables in
                     return {
                         var res = [ApiColumn]()

@@ -54,6 +54,7 @@ public struct EnsembleApiController {
                     }
                 },
                 current_weather: nil,
+                current: nil,
                 hourly: paramsHourly.map { variables in
                     return {
                         var res = [ApiColumn]()

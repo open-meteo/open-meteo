@@ -56,6 +56,7 @@ struct CmipController {
                     }
                 },
                 current_weather: nil,
+                current: nil,
                 hourly: nil,
                 daily: paramsDaily.map { dailyVariables in
                     return {

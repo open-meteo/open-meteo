@@ -18,6 +18,7 @@ struct ForecastapiResult {
     
     let prefetch: (() throws -> ())
     let current_weather: (() throws -> CurrentWeather)?
+    let current: (() throws -> ApiSectionSingle)?
     let hourly: (() throws -> ApiSection)?
     let daily: (() throws -> ApiSection)?
     let sixHourly: (() throws -> ApiSection)?
@@ -122,11 +123,25 @@ struct ApiColumn {
     let data: ApiArray
 }
 
+/// Contain a single value
+struct ApiColumnSingle {
+    let variable: String
+    let unit: SiUnit
+    let value: Float
+}
+
 struct ApiSection {
     // e.g. hourly or daily
     let name: String
     let time: TimerangeDt
     let columns: [ApiColumn]
+}
+
+/// Sfore current weather information giving only a single value per variable
+struct ApiSectionSingle {
+    let name: String
+    let time: Timestamp
+    let columns: [ApiColumnSingle]
 }
 
 enum ForecastResultFormat: String, Codable {

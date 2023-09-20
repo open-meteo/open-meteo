@@ -143,6 +143,7 @@ struct GloFasController {
                     }
                 },
                 current_weather: nil,
+                current: nil,
                 hourly: nil,
                 daily: {
                     ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in

@@ -49,6 +49,7 @@ final class OutputformatTests: XCTestCase {
             time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 0),
             prefetch: {},
             current_weather: nil,
+            current: nil,
             hourly: nil,
             daily: nil,
             sixHourly: nil,
@@ -68,6 +69,7 @@ final class OutputformatTests: XCTestCase {
             time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 0),
             prefetch: {},
             current_weather: nil,
+            current: nil,
             hourly: nil,
             daily: nil,
             sixHourly: nil,
@@ -91,6 +93,7 @@ final class OutputformatTests: XCTestCase {
             time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 0),
             prefetch: {},
             current_weather: nil,
+            current: nil,
             hourly: nil,
             daily: nil,
             sixHourly: nil,
@@ -159,6 +162,7 @@ final class OutputformatTests: XCTestCase {
             time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0),
             prefetch: {},
             current_weather: {current},
+            current: nil,
             hourly: {
                 hourly
             },
@@ -354,6 +358,7 @@ final class OutputformatTests: XCTestCase {
             time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0),
             prefetch: {},
             current_weather: {current},
+            current: nil,
             hourly: {
                 hourly
             },

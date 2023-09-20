@@ -59,6 +59,7 @@ struct MetNoController {
                         )
                     }
                 }() : nil,
+                current: nil,
                 hourly: paramsHourly.map { variables in
                     return {
                         var res = [ApiColumn]()

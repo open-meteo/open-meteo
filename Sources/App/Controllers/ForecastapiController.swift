@@ -40,10 +40,15 @@ public struct ForecastapiController: RouteCollection {
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
-        let paramsMinutely = try IconApiVariable.load(commaSeparatedOptional: params.minutely_15)
+        let paramsMinutely = try ForecastVariable.load(commaSeparatedOptional: params.minutely_15)
+        let paramsCurrent = try ForecastVariable.load(commaSeparatedOptional: params.current)
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
-        let nVariables = ((paramsHourly?.count ?? 0) + (paramsMinutely?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.count
+        let nParamsHourly = paramsHourly?.count ?? 0
+        let nParamsMinutely = paramsMinutely?.count ?? 0
+        let nParamsCurrent = paramsCurrent?.count ?? 0
+        let nParamsDaily = paramsDaily?.count ?? 0
+        let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
         
         let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -52,6 +57,7 @@ public struct ForecastapiController: RouteCollection {
             /// For fractional timezones, shift data to show only for full timestamps
             let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
             
+            let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
             let hourlyTime = time.range.range(dtSeconds: 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             // limited to 3 forecast days
@@ -59,10 +65,6 @@ public struct ForecastapiController: RouteCollection {
             
             let readers = try domains.compactMap {
                 try GenericReaderMulti<ForecastVariable>(domain: $0, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land)
-            }
-            // TODO: Preliminary 15 minutes data implemetation only. Final version should support model selection with HRRR 15 minutes data.
-            guard let readerMinutely = try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
             }
             
             guard !readers.isEmpty else {
@@ -76,52 +78,61 @@ public struct ForecastapiController: RouteCollection {
                 timezone: timezone,
                 time: time,
                 prefetch: {
-                    if let minutelyVariables = paramsMinutely {
-                        for variable in minutelyVariables {
-                            switch variable {
-                            case .raw(let raw):
-                                try readerMinutely.prefetchData(variable: .raw(.init(raw, 0)), time: minutelyTime)
-                            case .derived(let derived):
-                                try readerMinutely.prefetchData(variable: .derived(.init(derived, 0)), time: minutelyTime)
-                            }
+                    if let paramsCurrent {
+                        for reader in readers {
+                            try reader.prefetchData(variables: paramsCurrent, time: minutelyTime)
                         }
                     }
-                    if let hourlyVariables = paramsHourly {
+                    if let paramsMinutely {
                         for reader in readers {
-                            try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                            try reader.prefetchData(variables: paramsMinutely, time: minutelyTime)
                         }
                     }
-                    if let dailyVariables = paramsDaily {
+                    if let paramsHourly {
                         for reader in readers {
-                            try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+                            try reader.prefetchData(variables: paramsHourly, time: hourlyTime)
+                        }
+                    }
+                    if let paramsDaily {
+                        for reader in readers {
+                            try reader.prefetchData(variables: paramsDaily, time: dailyTime)
                         }
                     }
                 },
-                current_weather: params.current_weather == true ? try {
-                    let starttime = currentTime.floor(toNearest: 3600)
-                    let time = TimerangeDt(start: starttime, nTime: 1, dtSeconds: 3600)
-                    guard let reader = try GenericReaderMulti<ForecastVariable>(domain: MultiDomains.best_match, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
-                        throw ForecastapiError.noDataAvilableForThisLocation
-                    }
+                current_weather: (params.current_weather == true ? {
+                    let temperature = try readers[0].get(variable: ForecastVariable.surface(.temperature_2m), time: currentTimeRange)!.convertAndRound(params: params)
+                    let winddirection = try readers[0].get(variable: ForecastVariable.surface(.winddirection_10m), time: currentTimeRange)!.convertAndRound(params: params)
+                    let windspeed = try readers[0].get(variable: ForecastVariable.surface(.windspeed_10m), time: currentTimeRange)!.convertAndRound(params: params)
+                    let weathercode = try readers[0].get(variable: ForecastVariable.surface(.weathercode), time: currentTimeRange)!.convertAndRound(params: params)
+                    return ForecastapiResult.CurrentWeather(
+                        temperature: temperature.data[0],
+                        windspeed: windspeed.data[0],
+                        winddirection: winddirection.data[0],
+                        weathercode: weathercode.data[0],
+                        is_day: try readers[0].get(variable: .surface(.is_day), time: currentTimeRange)!.convertAndRound(params: params).data[0],
+                        temperature_unit: temperature.unit,
+                        windspeed_unit: windspeed.unit,
+                        winddirection_unit: winddirection.unit,
+                        weathercode_unit: weathercode.unit,
+                        time: currentTimeRange.range.lowerBound
+                    )
+                } : nil),
+                current: paramsCurrent.map { variables in
                     return {
-                        let temperature = try reader.get(variable: .surface(.temperature_2m), time: time)!.convertAndRound(params: params)
-                        let winddirection = try reader.get(variable: .surface(.winddirection_10m), time: time)!.convertAndRound(params: params)
-                        let windspeed = try reader.get(variable: .surface(.windspeed_10m), time: time)!.convertAndRound(params: params)
-                        let weathercode = try reader.get(variable: .surface(.weathercode), time: time)!.convertAndRound(params: params)
-                        return ForecastapiResult.CurrentWeather(
-                            temperature: temperature.data[0],
-                            windspeed: windspeed.data[0],
-                            winddirection: winddirection.data[0],
-                            weathercode: weathercode.data[0],
-                            is_day: try reader.get(variable: .surface(.is_day), time: time)!.convertAndRound(params: params).data[0],
-                            temperature_unit: temperature.unit,
-                            windspeed_unit: windspeed.unit,
-                            winddirection_unit: winddirection.unit,
-                            weathercode_unit: weathercode.unit,
-                            time: starttime
-                        )
+                        var res = [ApiColumnSingle]()
+                        res.reserveCapacity(variables.count * readers.count)
+                        for reader in readers {
+                            for variable in variables {
+                                let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                                guard let d = try reader.get(variable: variable, time: currentTimeRange)?.convertAndRound(params: params).toApiSingle(name: name) else {
+                                    continue
+                                }
+                                res.append(d)
+                            }
+                        }
+                        return ApiSectionSingle(name: "current", time: currentTimeRange.range.lowerBound, columns: res)
                     }
-                }() : nil,
+                },
                 hourly: paramsHourly.map { variables in
                     return {
                         var res = [ApiColumn]()
@@ -172,13 +183,18 @@ public struct ForecastapiController: RouteCollection {
                 minutely15: paramsMinutely.map { variables in
                     return {
                         var res = [ApiColumn]()
-                        res.reserveCapacity(variables.count)
-                        for variable in variables {
-                            let d = try readerMinutely.get(variable: variable, member: 0, time: minutelyTime).convertAndRound(params: params).toApi(name: variable.name)
-                            assert(minutelyTime.count == d.data.count)
-                            res.append(d)
+                        res.reserveCapacity(variables.count * readers.count)
+                        for reader in readers {
+                            for variable in variables {
+                                let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
+                                guard let d = try reader.get(variable: variable, time: minutelyTime)?.convertAndRound(params: params).toApi(name: name) else {
+                                    continue
+                                }
+                                assert(minutelyTime.count == d.data.count)
+                                res.append(d)
+                            }
                         }
-                        return ApiSection(name: "minutely_15", time: minutelyTime.add(utcOffsetShift), columns: res)
+                        return ApiSection(name: "minutely_15", time: hourlyTime.add(utcOffsetShift), columns: res)
                     }
                 }
             )
@@ -251,12 +267,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return Array([gfs013, icon, iconEu, metno].compacted())
             }
             // If Icon-d2 is available, use icon domains
-            if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode) {
+            if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode),
+               let iconD2_15min = try IconReader(domain: .iconD2_15min, lat: lat, lon: lon, elevation: elevation, mode: mode) {
                 // TODO: check how out of projection areas are handled
                 guard let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
                 }
-                return [gfs013, icon, iconEu, iconD2]
+                return [gfs013, icon, iconEu, iconD2, iconD2_15min]
             }
             // For western europe, use arome models
             if let arome_france_hd = try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode) {
@@ -318,13 +335,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .icon_seamless:
             fallthrough
         case .icon_mix:
-            return try IconMixer(domains: [.icon, .iconEu, .iconD2], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .icon_global:
             return try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .icon_eu:
             return try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .icon_d2:
-            return try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .ecmwf_ifs04:
             return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .metno_nordic:
