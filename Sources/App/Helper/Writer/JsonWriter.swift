@@ -93,8 +93,8 @@ extension ForecastapiResult {
                 b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.rawValue)\"")
             }
             b.buffer.writeString("}")
-            b.buffer.writeString(",\"\(current.name)\":")
             b.buffer.writeString(",\"\(current.name)_interval_seconds\":\(current.dtSeconds)")
+            b.buffer.writeString(",\"\(current.name)\":")
             b.buffer.writeString("{")
             b.buffer.writeString("\"time\":")
             b.buffer.writeString(current.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
