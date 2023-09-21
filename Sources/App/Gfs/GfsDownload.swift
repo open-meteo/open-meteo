@@ -184,6 +184,12 @@ struct GfsDownload: AsyncCommandFix {
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
+        /**
+         HRRR 15min notes
+         TODO: fix radiation... it it not 15min averaged.. could use direct rad instead of diffure and then fix it: VBDSF
+         TODO: pressure
+         TODO: relative humidity
+         */
         if domain == .hrrr_conus_15min {
             for forecastHour in 0...18 {
                 logger.info("Downloading forecastHour \(forecastHour)")

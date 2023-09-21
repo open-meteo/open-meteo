@@ -152,7 +152,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .frozen_precipitation_percent:
                 return ":CPOFP:surface"
             case .categorical_freezing_rain:
-                return ":CFRZR:surface::"
+                return ":CFRZR:surface:"
             case .windgusts_10m:
                 return ":GUST:surface:"
             case .freezinglevel_height:
