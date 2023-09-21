@@ -33,7 +33,9 @@ extension ForecastapiResultSet {
                         let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "NaN"
                         let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "NaN"
                         let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "NaN"
-                        b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(winddirection),\(ww),\(is_day)\n")
+                        let windspeed = current_weather.windspeed.isFinite ? "\(current_weather.windspeed)" : "NaN"
+                        let temperature = current_weather.temperature.isFinite ? "\(current_weather.temperature)" : "NaN"
+                        b.buffer.writeString(",\(temperature),\(windspeed),\(winddirection),\(ww),\(is_day)\n")
                     }
                 } else {
                     for (i, location) in results.enumerated() {
@@ -47,7 +49,9 @@ extension ForecastapiResultSet {
                             let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "NaN"
                             let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "NaN"
                             let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "NaN"
-                            b.buffer.writeString(",\(current_weather.temperature),\(current_weather.windspeed),\(winddirection),\(ww),\(is_day)\n")
+                            let windspeed = current_weather.windspeed.isFinite ? "\(current_weather.windspeed)" : "NaN"
+                            let temperature = current_weather.temperature.isFinite ? "\(current_weather.temperature)" : "NaN"
+                            b.buffer.writeString(",\(temperature),\(windspeed),\(winddirection),\(ww),\(is_day)\n")
                         }
                     }
                 }
