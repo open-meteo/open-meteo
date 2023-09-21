@@ -282,8 +282,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return Array([gfs013, icon, arpege_europe, arome_france, arome_france_hd].compacted())
             }
             // For North America, use HRRR
-            if let hrrr = try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [icon, gfs013, hrrr]
+            if let hrrr = try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode), 
+                let hrrr15min = try GfsReader(domain: .hrrr_conus_15min, lat: lat, lon: lon, elevation: elevation, mode: mode) {
+                return [icon, gfs013, hrrr, hrrr15min]
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
             if let jma_msm = try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode) {
@@ -305,11 +306,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .gfs_seamless:
             fallthrough
         case .gfs_mix:
-            return try GfsMixer(domains: [.gfs013, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GfsMixer(domains: [.gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_global:
             return try GfsMixer(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_hrrr:
-            return try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try GfsMixer(domains: [.hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .meteofrance_seamless:
             fallthrough
         case .meteofrance_mix:

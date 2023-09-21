@@ -255,6 +255,11 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return nil
             }
             self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
+        case .hrrr_conus_15min:
+            guard let reader = try GenericReader<GfsDomain, Variable>(domain: .hrrr_conus_15min, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
         }
         self.domain = domain
     }
@@ -268,7 +273,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         }
         
         /// Make sure showers are `0` instead of `NaN` in HRRR, otherwise it is mixed with GFS showers
-        if domain == .hrrr_conus, case let .surface(variable) = raw.variable, variable == .showers {
+        if (domain == .hrrr_conus || domain == .hrrr_conus_15min), case let .surface(variable) = raw.variable, variable == .showers {
             let precipitation = try reader.get(variable: .init(.surface(.precipitation), member), time: time)
             return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
         }
@@ -300,7 +305,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         }
         
         /// Make sure showers are `0` in HRRR, otherwise it is mixed with GFS showers
-        if domain == .hrrr_conus, case let .surface(variable) = raw.variable, variable == .showers {
+        if (domain == .hrrr_conus || domain == .hrrr_conus_15min), case let .surface(variable) = raw.variable, variable == .showers {
             return try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
         }
         
