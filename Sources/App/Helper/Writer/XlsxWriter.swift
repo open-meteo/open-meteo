@@ -69,6 +69,9 @@ extension ForecastapiResultSet {
         }
         
         for (i, location) in results.enumerated() {
+            try location.current?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+        }
+        for (i, location) in results.enumerated() {
             try location.minutely15?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
         }
         for (i, location) in results.enumerated() {
@@ -121,5 +124,33 @@ extension ApiSection {
             }
             sheet.endRow()
         }
+    }
+}
+
+extension ApiSectionSingle {
+    fileprivate func writeXlsx(into sheet: XlsxWriter, utc_offset_seconds: Int, location_id: Int?) throws {
+        if location_id == nil || location_id == 0 {
+            sheet.startRow()
+            sheet.endRow()
+            sheet.startRow()
+            if location_id != nil {
+                sheet.write("location_id")
+            }
+            sheet.write("time")
+            for e in columns {
+                sheet.write("\(e.variable) (\(e.unit.rawValue))")
+            }
+            sheet.endRow()
+        }
+
+        sheet.startRow()
+        if let location_id {
+            sheet.write(location_id + 1)
+        }
+        sheet.writeTimestamp(time.add(utc_offset_seconds))
+        for e in columns {
+            sheet.write(e.value)
+        }
+        sheet.endRow()
     }
 }
