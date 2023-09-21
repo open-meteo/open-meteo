@@ -73,8 +73,10 @@ extension ForecastapiResult {
             let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "null"
             let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "null"
             let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "null"
+            let windspeed = current_weather.windspeed.isFinite ? "\(current_weather.windspeed)" : "null"
+            let temperature = current_weather.temperature.isFinite ? "\(current_weather.temperature)" : "null"
             b.buffer.writeString("""
-                ,"current_weather":{"temperature":\(current_weather.temperature),"windspeed":\(current_weather.windspeed),"winddirection":\(winddirection),"weathercode":\(ww),"is_day":\(is_day),"time":
+                ,"current_weather":{"temperature":\(temperature),"windspeed":\(windspeed),"winddirection":\(winddirection),"weathercode":\(ww),"is_day":\(is_day),"time":
                 """)
             b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
             b.buffer.writeString("}")
