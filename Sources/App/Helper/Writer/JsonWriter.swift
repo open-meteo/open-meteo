@@ -85,12 +85,12 @@ extension ForecastapiResult {
             b.buffer.writeString("{")
             switch timeformat {
             case .iso8601:
-                b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.rawValue)\"")
+                b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.abbreviation)\"")
             case .unixtime:
-                b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.rawValue)\"")
+                b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.abbreviation)\"")
             }
             for e in current.columns {
-                b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.rawValue)\"")
+                b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.abbreviation)\"")
             }
             b.buffer.writeString("}")
             b.buffer.writeString(",\"\(current.name)_interval_seconds\":\(current.dtSeconds)")
@@ -115,12 +115,12 @@ extension ForecastapiResult {
             b.buffer.writeString("{")
             switch timeformat {
             case .iso8601:
-                b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.rawValue)\"")
+                b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.abbreviation)\"")
             case .unixtime:
-                b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.rawValue)\"")
+                b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.abbreviation)\"")
             }
             for e in section.columns {
-                b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.rawValue)\"")
+                b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.abbreviation)\"")
                 try await b.flushIfRequired()
             }
             b.buffer.writeString("}")

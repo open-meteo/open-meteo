@@ -103,7 +103,7 @@ fileprivate extension FlatBuffers.ByteBuffer {
 
 fileprivate extension ApiSection {
     var estimatedFlatbufferSize: Int {
-        24 + columns.reduce(0, {$0 + $1.unit.rawValue.count + $1.variable.count + $1.data.count * 4 + 24})
+        24 + columns.reduce(0, {$0 + $1.unit.abbreviation.count + $1.variable.count + $1.data.count * 4 + 24})
     }
         
     func toFlatbuffers(_ fbb: inout FlatBufferBuilder) -> Offset {
