@@ -28,7 +28,7 @@ extension ForecastapiResultSet {
                 if results.count == 1, let location = results.first {
                     if let current_weather = try location.current_weather?() {
                         b.buffer.writeString("\n")
-                        b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.rawValue)),windspeed (\(current_weather.windspeed_unit.rawValue)),winddirection (\(current_weather.winddirection_unit.rawValue)),weathercode (\(current_weather.weathercode_unit.rawValue)),is_day\n")
+                        b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.abbreviation)),windspeed (\(current_weather.windspeed_unit.abbreviation)),winddirection (\(current_weather.winddirection_unit.abbreviation)),weathercode (\(current_weather.weathercode_unit.abbreviation)),is_day\n")
                         b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: location.utc_offset_seconds, quotedString: false))
                         let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "NaN"
                         let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "NaN"
@@ -40,7 +40,7 @@ extension ForecastapiResultSet {
                         if let current_weather = try location.current_weather?() {
                             if i == 0 {
                                 b.buffer.writeString("\n")
-                                b.buffer.writeString("location_id,current_weather_time,temperature (\(current_weather.temperature_unit.rawValue)),windspeed (\(current_weather.windspeed_unit.rawValue)),winddirection (\(current_weather.winddirection_unit.rawValue)),weathercode (\(current_weather.weathercode_unit.rawValue)),is_day\n")
+                                b.buffer.writeString("location_id,current_weather_time,temperature (\(current_weather.temperature_unit.abbreviation)),windspeed (\(current_weather.windspeed_unit.abbreviation)),winddirection (\(current_weather.winddirection_unit.abbreviation)),weathercode (\(current_weather.weathercode_unit.abbreviation)),is_day\n")
                             }
                             b.buffer.writeString("\(i+1),")
                             b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: location.utc_offset_seconds, quotedString: false))
@@ -90,7 +90,7 @@ extension ApiSectionSingle {
             }
             
             for e in columns {
-                b.buffer.writeString(",\(e.variable) (\(e.unit.rawValue))")
+                b.buffer.writeString(",\(e.variable) (\(e.unit.abbreviation))")
             }
             b.buffer.writeString("\n")
         }
@@ -125,7 +125,7 @@ extension ApiSection {
             }
             
             for e in columns {
-                b.buffer.writeString(",\(e.variable) (\(e.unit.rawValue))")
+                b.buffer.writeString(",\(e.variable) (\(e.unit.abbreviation))")
             }
             b.buffer.writeString("\n")
         }

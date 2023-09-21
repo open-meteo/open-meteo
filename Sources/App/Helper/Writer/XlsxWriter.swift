@@ -46,10 +46,10 @@ extension ForecastapiResultSet {
                         sheet.write("location_id")
                     }
                     sheet.write("current_weather_time")
-                    sheet.write("temperature (\(current_weather.temperature_unit.rawValue))")
-                    sheet.write("windspeed (\(current_weather.windspeed_unit.rawValue))")
-                    sheet.write("winddirection (\(current_weather.winddirection_unit.rawValue))")
-                    sheet.write("weathercode (\(current_weather.weathercode_unit.rawValue))")
+                    sheet.write("temperature (\(current_weather.temperature_unit.abbreviation))")
+                    sheet.write("windspeed (\(current_weather.windspeed_unit.abbreviation))")
+                    sheet.write("winddirection (\(current_weather.winddirection_unit.abbreviation))")
+                    sheet.write("weathercode (\(current_weather.weathercode_unit.abbreviation))")
                     sheet.write("is_day")
                     sheet.endRow()
                 }
@@ -103,7 +103,7 @@ extension ApiSection {
             }
             sheet.write("time")
             for e in columns {
-                sheet.write("\(e.variable) (\(e.unit.rawValue))")
+                sheet.write("\(e.variable) (\(e.unit.abbreviation))")
             }
             sheet.endRow()
         }
@@ -138,7 +138,7 @@ extension ApiSectionSingle {
             }
             sheet.write("time")
             for e in columns {
-                sheet.write("\(e.variable) (\(e.unit.rawValue))")
+                sheet.write("\(e.variable) (\(e.unit.abbreviation))")
             }
             sheet.endRow()
         }

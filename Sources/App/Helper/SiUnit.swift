@@ -3,7 +3,8 @@ import Foundation
 typealias SiUnit = com_openmeteo_api_result_Unit
 
 extension SiUnit {
-    var rawValue: String {
+    /// Short form e.g. `°C`
+    var abbreviation: String {
         switch self {
         case .celsius: return "°C"
         case .fahrenheit: return "°F"
