@@ -194,7 +194,7 @@ public struct ForecastapiController: RouteCollection {
                                 res.append(d)
                             }
                         }
-                        return ApiSection(name: "minutely_15", time: hourlyTime.add(utcOffsetShift), columns: res)
+                        return ApiSection(name: "minutely_15", time: minutelyTime.add(utcOffsetShift), columns: res)
                     }
                 }
             )
