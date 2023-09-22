@@ -306,11 +306,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .gfs_seamless:
             fallthrough
         case .gfs_mix:
-            return try GfsMixer(domains: [.gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GfsMixer(domains: [.gfs013, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_global:
             return try GfsMixer(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_hrrr:
-            return try GfsMixer(domains: [.hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GfsMixer(domains: [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .meteofrance_seamless:
             fallthrough
         case .meteofrance_mix:

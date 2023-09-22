@@ -251,15 +251,20 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             }
             self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
         case .hrrr_conus:
-            guard let reader = try GenericReader<GfsDomain, Variable>(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            // Combine HRRR hourly and 15 minutely data. This way, weather codes can be calculated using HRRR hourly and 15 minutely data.
+            // E.g. CAPE is not available for HRRR 15 minutely data.
+            let readers: [GenericReaderCached<GfsDomain, Variable>] = try [GfsDomain.hrrr_conus, .hrrr_conus_15min].compactMap {
+                guard let reader = try GenericReader<GfsDomain, Variable>(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                    return nil
+                }
+                return GenericReaderCached(reader: reader)
+            }
+            guard !readers.isEmpty else {
                 return nil
             }
-            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
+            self.reader = GenericReaderMixerSameDomain(reader: readers)
         case .hrrr_conus_15min:
-            guard let reader = try GenericReader<GfsDomain, Variable>(domain: .hrrr_conus_15min, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                return nil
-            }
-            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
+            fatalError("hrrr_conus_15min should not been initilised in GfsMixer025_013")
         }
         self.domain = domain
     }
