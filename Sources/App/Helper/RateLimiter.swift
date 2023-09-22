@@ -71,7 +71,7 @@ final class RateLimiter: LifecycleHandler {
             let ip: UInt32 = socket.address.sin_addr.s_addr
             return try lock.withLock({
                 if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
-                    throw RateLimitError.minutlyExceeded
+                    throw RateLimitError.minutelyExceeded
                 }
                 
                 if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
@@ -89,7 +89,7 @@ final class RateLimiter: LifecycleHandler {
             let ip = hasher.finalize()
             return try lock.withLock({
                 if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
-                    throw RateLimitError.minutlyExceeded
+                    throw RateLimitError.minutelyExceeded
                 }
                 if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
                     throw RateLimitError.hourlyExceeded
@@ -157,7 +157,7 @@ final class RateLimiter: LifecycleHandler {
 enum RateLimitError: Error, AbortError {
     case dailyExceeded
     case hourlyExceeded
-    case minutlyExceeded
+    case minutelyExceeded
     
     var status: NIOHTTP1.HTTPResponseStatus {
         return .tooManyRequests
@@ -169,7 +169,7 @@ enum RateLimitError: Error, AbortError {
             return "Daily API request limit exceeded. Please try again tomorrow."
         case .hourlyExceeded:
             return "Hourly API request limit exceeded. Please try again in the next hour."
-        case .minutlyExceeded:
+        case .minutelyExceeded:
             return "Minutely API request limit exceeded. Please try again in one minute."
         }
     }
