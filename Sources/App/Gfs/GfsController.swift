@@ -3,11 +3,7 @@ import Vapor
 
 /**
  TODO:
- - No convective precip in NAM/HRRR
- - No 120/180m wind
  - Soil temp/moisture on different levels
- - DONE No cloudcover in NAM/HRRR on pressure levels -> RH to clouds implemented
- - DONE No diffuse/direct radiation in GFS -> separation model implemented
  */
 public struct GfsController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
@@ -454,7 +450,13 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
             case .windspeed_120m:
-                fallthrough
+                // Take 100m wind and scale to 120m
+                let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
+                let v = try get(raw: .init(.surface(.wind_v_component_100m), member), time: time).data
+                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 120)
+                var speed = zip(u,v).map(Meteorology.windspeed)
+                speed.multiplyAdd(multiply: scalefactor, add: 0)
+                return DataAndUnit(speed, .ms)
             case .windspeed_100m:
                 let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
                 let v = try get(raw: .init(.surface(.wind_v_component_100m), member), time: time).data
@@ -527,11 +529,9 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let pressure_msl = try get(raw: .init(.surface(.pressure_msl), member), time: time)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure_msl.data, elevation: reader.targetElevation), pressure_msl.unit)
             case .terrestrial_radiation:
-                /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
             case .terrestrial_radiation_instant:
-                /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
             case .dewpoint_2m:
