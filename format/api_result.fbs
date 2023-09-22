@@ -50,15 +50,171 @@ enum Unit : byte {
   fraction
 }
 
-   
-
-table Variable {
-  variable: string (required);
-  unit: Unit = dimensionless;
-  values: [float] (required);
+enum Aggregation : byte {
+  undefined = 0,
+  min,
+  max,
+  mean,
+  median,
+  p10,
+  p25,
+  p75,
+  p90,
+  dominant,
+  sum
 }
 
+// All hourly variables
+enum VariableType : byte {
+  undefined = 0,
+  temperature,
+  cloudcover,
+  cloudcover_low,
+  cloudcover_mid,
+  cloudcover_high,
+  pressure_msl,
+  relativehumidity,
+  precipitation,
+  precipitation_probability,
+  weathercode,
+  soil_temperature,
+  soil_moisture,
+  snow_depth,
+  snow_height,
+  sensible_heatflux,
+  latent_heatflux,
+  showers,
+  rain,
+  windgusts,
+  freezinglevel_height,
+  dewpoint,
+  diffuse_radiation,
+  direct_radiation,
+  apparent_temperature,
+  windspeed,
+  winddirection,
+  direct_normal_irradiance,
+  evapotranspiration,
+  et0_fao_evapotranspiration,
+  vapor_pressure_deficit,
+  shortwave_radiation,
+  snowfall,
+  surface_pressure,
+  terrestrial_radiation,
+  terrestrial_radiation_instant,
+  shortwave_radiation_instant,
+  diffuse_radiation_instant,
+  direct_radiation_instant,
+  direct_normal_irradiance_instant,
+  visibility,
+  cape,
+  uv_index,
+  uv_index_clear_sky,
+  is_day,
+
+  growing_degree_days,
+  leaf_wetness_probability,
+  soil_moisture_index,
+
+  // Used as pressure levels
+  geopotential_height,
+  vertical_velocity,
+
+  // CAMS
+  pm10,
+  pm2_5,
+  dust,
+  aerosol_optical_depth,
+  carbon_monoxide,
+  nitrogen_dioxide,
+  ammonia,
+  ozone,
+  sulphur_dioxide,
+  alder_pollen,
+  birch_pollen,
+  grass_pollen,
+  mugwort_pollen,
+  olive_pollen,
+  ragweed_pollen,
+
+  // wave
+  wave_height,
+  wave_period,
+  wave_direction,
+  wind_wave_height,
+  wind_wave_period,
+  wind_wave_peak_period,
+  wind_wave_direction,
+  swell_wave_height,
+  swell_wave_period,
+  swell_wave_peak_period,
+  swell_wave_direction,
+
+  // floods
+  river_discharge,
+
+  daylight_duration,
+  sunrise,
+  sunset,
+}
+
+enum Model: byte {
+  undefined = 0,
+  best_match,
+  gfs_seamless,
+  gfs_mix,
+  gfs_global,
+  gfs_hrrr,
+  meteofrance_seamless,
+  meteofrance_mix,
+  meteofrance_arpege_world,
+  meteofrance_arpege_europe,
+  meteofrance_arome_france,
+  meteofrance_arome_france_hd,
+  jma_seamless,
+  jma_mix,
+  jma_msm,
+  jms_gsm,
+  jma_gsm,
+  gem_seamless,
+  gem_global,
+  gem_regional,
+  gem_hrdps_continental,
+  icon_seamless,
+  icon_mix,
+  icon_global,
+  icon_eu,
+  icon_d2,
+  ecmwf_ifs04,
+  metno_nordic
+  // TOOD flood, era5, wave, etc models
+}
+
+table Variable {
+  values: [float] (required);
+
+  variable: VariableType;
+  aggregation: Aggregation; // Min/max for daily values
+  unit: Unit = dimensionless;
+  ensemble_member: int;
+  model: Model;
+
+  altitude: int; // 2m above ground
+  pressure: int; // 850 hpa
+
+  depth: int; // soil_temperature_0cm
+  depth_upper: int; // soil_temperature_0_to_100cm
+
+  // Growing degree days
+  gdd_base: int;
+  gdd_limit: int;
+
+  // solar stuff like facing_angle or inclination
+}
+
+
 table VariableSingle {
+  // TODO: same schema as `Variable` above
   variable: string (required);
   unit: Unit = dimensionless;
   value: float;
