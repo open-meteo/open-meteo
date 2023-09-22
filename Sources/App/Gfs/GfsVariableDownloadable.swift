@@ -1,12 +1,12 @@
 /// Required additions to a GFS variable to make it downloadable
 protocol GfsVariableDownloadable: GenericVariable {
-    func gribIndexName(for domain: GfsDomain) -> String?
+    func gribIndexName(for domain: GfsDomain, timestep: Int?) -> String?
     func skipHour0(for domain: GfsDomain) -> Bool
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)?
 }
 
 extension GfsSurfaceVariable: GfsVariableDownloadable {
-    func gribIndexName(for domain: GfsDomain) -> String? {
+    func gribIndexName(for domain: GfsDomain, timestep: Int?) -> String? {
         switch domain {
         case .gfs013:
             // gfs013 https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20230510/00/atmos/gfs.t00z.sfluxgrbf000.grib2.idx
@@ -152,7 +152,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .frozen_precipitation_percent:
                 return ":CPOFP:surface"
             case .categorical_freezing_rain:
-                return ":CFRZR:"
+                return ":CFRZR:surface:"
             case .windgusts_10m:
                 return ":GUST:surface:"
             case .freezinglevel_height:
@@ -167,6 +167,42 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":VIS:surface:"
             case .precipitation_probability:
                 return nil
+            default:
+                return nil
+            }
+        case .hrrr_conus_15min:
+            guard let timestep else {
+                return nil
+            }
+            let avg15 = timestep == 0 ? "anl" : "\(timestep-15)-\(timestep) min ave fcst"
+            let fcst = timestep == 0 ? "anl" : "\(timestep) min fcst"
+            switch self {
+            case .temperature_2m:
+                return ":TMP:2 m above ground:\(fcst):"
+            case .precipitation:
+                return ":PRATE:surface:\(fcst):"
+            case .frozen_precipitation_percent:
+                return ":CPOFP:surface:\(fcst):"
+            case .categorical_freezing_rain:
+                return ":CFRZR:surface:\(fcst):"
+            case .windgusts_10m:
+                return ":GUST:surface:\(fcst):"
+            case .wind_v_component_10m:
+                return ":VGRD:10 m above ground:\(fcst):"
+            case .wind_u_component_10m:
+                return ":UGRD:10 m above ground:\(fcst):"
+            case .wind_v_component_80m:
+                return ":VGRD:80 m above ground:\(fcst):"
+            case .wind_u_component_80m:
+                return ":UGRD:80 m above ground:\(fcst):"
+            case .shortwave_radiation:
+                // 15 min backwards averaged
+                return ":DSWRF:surface:\(avg15):"
+            case .diffuse_radiation:
+                // instantanous, will be backwards averaged later
+                return ":VDDSF:surface:\(fcst):"
+            case .visibility:
+                return ":VIS:surface:\(fcst):"
             default:
                 return nil
             }
@@ -299,6 +335,16 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
     }
     
     func skipHour0(for domain: GfsDomain) -> Bool {
+        if domain == .hrrr_conus_15min {
+            switch self {
+            case .shortwave_radiation:
+                return true
+            case .diffuse_radiation:
+                return true
+            default:
+                return false
+            }
+        }
         switch self {
         case .precipitation_probability: return true
         case .precipitation: return true
@@ -346,6 +392,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 fallthrough
             case .gfs025:
                 fallthrough
+            case .hrrr_conus_15min:
+                fallthrough
             case .hrrr_conus:
                 // precipitation rate per second to hourly precipitation
                 return (Float(domain.dtSeconds), 0)
@@ -370,7 +418,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
 }
 
 extension GfsPressureVariable: GfsVariableDownloadable {
-    func gribIndexName(for domain: GfsDomain) -> String? {
+    func gribIndexName(for domain: GfsDomain, timestep: Int?) -> String? {
         switch variable {
         case .temperature:
             return ":TMP:\(level) mb:"
@@ -399,6 +447,8 @@ extension GfsPressureVariable: GfsVariableDownloadable {
                 // Vertical Velocity (Geometric) [m/s]
                 return ":DZDT:\(level) mb:"
             case .gfs05_ens:
+                fallthrough
+            case .hrrr_conus_15min:
                 fallthrough
             case .hrrr_conus:
                 // Vertical Velocity (Pressure) [Pa/s]

@@ -194,7 +194,7 @@ public struct ForecastapiController: RouteCollection {
                                 res.append(d)
                             }
                         }
-                        return ApiSection(name: "minutely_15", time: hourlyTime.add(utcOffsetShift), columns: res)
+                        return ApiSection(name: "minutely_15", time: minutelyTime.add(utcOffsetShift), columns: res)
                     }
                 }
             )
@@ -309,7 +309,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .gfs_global:
             return try GfsMixer(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .gfs_hrrr:
-            return try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try GfsMixer(domains: [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .meteofrance_seamless:
             fallthrough
         case .meteofrance_mix:

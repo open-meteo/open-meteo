@@ -445,6 +445,74 @@ public struct Zensun {
         }
     }
     
+    
+    /// 2d field. Calculate scaling factor from backwards to instant radiation factor
+    public static func backwardsAveragedToInstantFactor(grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt) -> Array2DFastTime {
+        var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
+        
+        for (t, timestamp) in timerange.enumerated() {
+            /// fractional day number with 12am 1jan = 1
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
+            
+            let alpha = Float(0.83333).degreesToRadians
+            
+            let latsun=decang
+            /// universal time
+            let ut = timestamp.hourWithFraction
+            let t1 = (90-latsun).degreesToRadians
+            
+            let lonsun = -15.0*(ut-12.0+eqtime)
+            
+            for (i, gridpoint) in locationRange.enumerated() {
+                let (latitude, longitude) = grid.getCoordinates(gridpoint: gridpoint)
+                /// longitude of sun
+                let p1 = lonsun.degreesToRadians
+                
+                let ut0 = ut - (Float(timerange.dtSeconds)/3600)
+                let lonsun0 = -15.0*(ut0-12.0+eqtime)
+                
+                let p10 = lonsun0.degreesToRadians
+                
+                let t0=(90-latitude).degreesToRadians                     // colatitude of point
+                
+                /// longitude of point
+                var p0 = longitude.degreesToRadians
+                if p0 < p1 - .pi {
+                    p0 += 2 * .pi
+                }
+                if p0 > p1 + .pi {
+                    p0 -= 2 * .pi
+                }
+                
+                // limit p1 and p10 to sunrise/set
+                let arg = -(sin(alpha)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+                let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                let sunrise = p0 + carg
+                let sunset = p0 - carg
+                let p1_l = min(sunrise, p10)
+                let p10_l = max(sunset, p1)
+                
+                // solve integral to get sun elevation dt
+                // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+                let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+                let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                /// sun elevation (`zz = sin(alpha)`)
+                let zzBackwards = (left-right) / (p1_l - p10_l)
+                
+                /// Instant sun elevation
+                let zzInstant = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
+                if zzBackwards <= 0 || zzInstant <= 0 {
+                    out[i, t] = 0
+                    continue
+                }
+                out[i, t] = zzInstant / zzBackwards
+            }
+        }
+        return out
+    }
+    
+    
     /// Calculate scaling factor from backwards to instant radiation factor
     public static func backwardsAveragedToInstantFactor(time: TimerangeDt, latitude: Float, longitude: Float) -> [Float] {
         return time.map { timestamp in

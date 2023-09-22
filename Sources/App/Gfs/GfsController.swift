@@ -3,11 +3,7 @@ import Vapor
 
 /**
  TODO:
- - No convective precip in NAM/HRRR
- - No 120/180m wind
  - Soil temp/moisture on different levels
- - DONE No cloudcover in NAM/HRRR on pressure levels -> RH to clouds implemented
- - DONE No diffuse/direct radiation in GFS -> separation model implemented
  */
 public struct GfsController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
@@ -251,10 +247,20 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             }
             self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
         case .hrrr_conus:
-            guard let reader = try GenericReader<GfsDomain, Variable>(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            // Combine HRRR hourly and 15 minutely data. This way, weather codes can be calculated using HRRR hourly and 15 minutely data.
+            // E.g. CAPE is not available for HRRR 15 minutely data.
+            let readers: [GenericReaderCached<GfsDomain, Variable>] = try [GfsDomain.hrrr_conus, .hrrr_conus_15min].compactMap {
+                guard let reader = try GenericReader<GfsDomain, Variable>(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                    return nil
+                }
+                return GenericReaderCached(reader: reader)
+            }
+            guard !readers.isEmpty else {
                 return nil
             }
-            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
+            self.reader = GenericReaderMixerSameDomain(reader: readers)
+        case .hrrr_conus_15min:
+            fatalError("hrrr_conus_15min should not been initilised in GfsMixer025_013")
         }
         self.domain = domain
     }
@@ -268,7 +274,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         }
         
         /// Make sure showers are `0` instead of `NaN` in HRRR, otherwise it is mixed with GFS showers
-        if domain == .hrrr_conus, case let .surface(variable) = raw.variable, variable == .showers {
+        if (domain == .hrrr_conus || domain == .hrrr_conus_15min), case let .surface(variable) = raw.variable, variable == .showers {
             let precipitation = try reader.get(variable: .init(.surface(.precipitation), member), time: time)
             return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
         }
@@ -300,7 +306,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         }
         
         /// Make sure showers are `0` in HRRR, otherwise it is mixed with GFS showers
-        if domain == .hrrr_conus, case let .surface(variable) = raw.variable, variable == .showers {
+        if (domain == .hrrr_conus || domain == .hrrr_conus_15min), case let .surface(variable) = raw.variable, variable == .showers {
             return try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
         }
         
@@ -444,7 +450,13 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
             case .windspeed_120m:
-                fallthrough
+                // Take 100m wind and scale to 120m
+                let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
+                let v = try get(raw: .init(.surface(.wind_v_component_100m), member), time: time).data
+                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 120)
+                var speed = zip(u,v).map(Meteorology.windspeed)
+                speed.multiplyAdd(multiply: scalefactor, add: 0)
+                return DataAndUnit(speed, .ms)
             case .windspeed_100m:
                 let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
                 let v = try get(raw: .init(.surface(.wind_v_component_100m), member), time: time).data
@@ -517,11 +529,9 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let pressure_msl = try get(raw: .init(.surface(.pressure_msl), member), time: time)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure_msl.data, elevation: reader.targetElevation), pressure_msl.unit)
             case .terrestrial_radiation:
-                /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
             case .terrestrial_radiation_instant:
-                /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 return DataAndUnit(solar, .wattPerSquareMeter)
             case .dewpoint_2m:

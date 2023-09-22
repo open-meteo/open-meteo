@@ -18,6 +18,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     //case nam_conus // disabled because it only add 12 forecast hours
     case hrrr_conus
     
+    case hrrr_conus_15min
+    
     /// Only used for precipitation probability on the fly
     case gfs025_ensemble
     
@@ -55,6 +57,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 3*3600
         case .gfs05_ens:
             return 3*3600
+        case .hrrr_conus_15min:
+            return 3600/4
         }
     }
     
@@ -72,6 +76,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return true
         case .gfs05_ens:
             return true
+        case .hrrr_conus_15min:
+            return false
         }
     }
     
@@ -95,6 +101,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
                 //return Self.namConusElevationFile
             case .hrrr_conus:
                 return Self.hrrrConusElevationFile
+            case .hrrr_conus_15min:
+                return Self.hrrrConusElevationFile
             }
         }
     }
@@ -117,9 +125,12 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         //case .nam_conus:
             // NAM has a delay of 1:40 hours after initialisation. Cronjob starts at 1:40
             //return ((t.hour - 1 + 24) % 24) / 6 * 6
+        case .hrrr_conus_15min:
+            fallthrough
         case .hrrr_conus:
             // HRRR has a delay of 55 minutes after initlisation. Cronjob starts at xx:55
             return t.with(hour: t.hour)
+
         }
     }
     
@@ -166,6 +177,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             //return Array(0...60)
         case .hrrr_conus:
             return (run % 6 == 0) ? Array(0...48) : Array(0...18)
+        case .hrrr_conus_15min:
+            return Array(0...18*4)
         }
     }
     
@@ -193,6 +206,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return [                            100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]  // disabled: 50, 75,
             // all available
             //return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
+        case .hrrr_conus_15min:
+            return []
         }
         
     }
@@ -213,6 +228,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 384 + 1 + 4*24
         case .hrrr_conus:
             return 48 + 1 + 4*24
+        case .hrrr_conus_15min:
+            return 48*4*2
         }
     }
     
@@ -233,6 +250,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             /// labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
             let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
             return LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)*/
+        case .hrrr_conus_15min:
+            fallthrough
         case .hrrr_conus:
             let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
             return ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
@@ -274,6 +293,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             //let google = "https://storage.googleapis.com/high-resolution-rapid-refresh/"
             let aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
             return ["\(useArchive ? aws : nomads)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfprsf\(fHH).grib2"]
+        case .hrrr_conus_15min:
+            let nomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"
+            let aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
+            return ["\(useArchive ? aws : nomads)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfsubhf\(fHH).grib2"]
         }
     }
 }
