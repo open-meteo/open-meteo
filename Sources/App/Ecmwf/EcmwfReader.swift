@@ -154,7 +154,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
                 liftedIndex: nil,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
-                modelDtHours: time.dtSeconds / 3600), .wmoCode
+                modelDtSeconds: time.dtSeconds), .wmoCode
             )
         case .cloudcover_1000hPa:
             let rh = try get(raw: .init(.relative_humidity_1000hPa, member), time: time)

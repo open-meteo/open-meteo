@@ -582,7 +582,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                     liftedIndex: liftedIndex,
                     visibilityMeters: visibility,
                     categoricalFreezingRain: categoricalFreezingRain,
-                    modelDtHours: time.dtSeconds / 3600), .wmoCode
+                    modelDtSeconds: time.dtSeconds), .wmoCode
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)

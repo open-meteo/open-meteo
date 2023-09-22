@@ -256,7 +256,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 liftedIndex: nil,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
-                modelDtHours: time.dtSeconds / 3600), .wmoCode
+                modelDtSeconds: time.dtSeconds), .wmoCode
            )
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
