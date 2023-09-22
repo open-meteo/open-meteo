@@ -174,7 +174,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             guard let timestep else {
                 return nil
             }
-            //let avg15 = timestep == 0 ? "anl" : "\(timestep-15)-\(timestep) min ave fcst"
+            let avg15 = timestep == 0 ? "anl" : "\(timestep-15)-\(timestep) min ave fcst"
             let fcst = timestep == 0 ? "anl" : "\(timestep) min fcst"
             switch self {
             case .temperature_2m:
@@ -196,8 +196,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .wind_u_component_80m:
                 return ":UGRD:80 m above ground:\(fcst):"
             case .shortwave_radiation:
-                return ":DSWRF:surface:\(fcst):"
+                // 15 min backwards averaged
+                return ":DSWRF:surface:\(avg15):"
             case .diffuse_radiation:
+                // instantanous, will be backwards averaged later
                 return ":VDDSF:surface:\(fcst):"
             case .visibility:
                 return ":VIS:surface:\(fcst):"
@@ -334,7 +336,14 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
     
     func skipHour0(for domain: GfsDomain) -> Bool {
         if domain == .hrrr_conus_15min {
-            return false
+            switch self {
+            case .shortwave_radiation:
+                return true
+            case .diffuse_radiation:
+                return true
+            default:
+                return false
+            }
         }
         switch self {
         case .precipitation_probability: return true

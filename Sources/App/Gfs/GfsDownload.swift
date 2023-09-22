@@ -184,12 +184,7 @@ struct GfsDownload: AsyncCommandFix {
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        /**
-         HRRR 15min notes
-         TODO: fix radiation... it it not 15min averaged.. could use direct rad instead of diffure and then fix it: VBDSF
-         TODO: pressure
-         TODO: relative humidity
-         */
+        // Download HRRR 15 minutes data
         if domain == .hrrr_conus_15min {
             for forecastHour in 0...18 {
                 logger.info("Downloading forecastHour \(forecastHour)")
@@ -416,6 +411,19 @@ struct GfsDownload: AsyncCommandFix {
                     for (i, memberReader) in reader.reader.enumerated() {
                         try memberReader.read(into: &readTemp, arrayDim1Range: (0..<locationRange.count), arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
                         data3d[0..<locationRange.count, i, reader.hour / max(domain.dtHours,1)] = readTemp
+                    }
+                }
+                
+                // HRRR contains instantanous values for solar flux. Convert it to backwards averaged.
+                // HRRR_15min data has backwards averaged radiation, but diffuse radiation is still instantanous
+                if let variable = variable as? GfsSurfaceVariable {
+                    if  (domain == .hrrr_conus && [.shortwave_radiation, .diffuse_radiation].contains(variable) ||
+                        (domain == .hrrr_conus_15min && variable == .diffuse_radiation)
+                    ) {
+                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: locationRange, timerange: time)
+                        for i in data3d.data.indices {
+                            data3d.data[i] /= factor.data[i]
+                        }
                     }
                 }
                 
