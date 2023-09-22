@@ -282,9 +282,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return Array([gfs013, icon, arpege_europe, arome_france, arome_france_hd].compacted())
             }
             // For North America, use HRRR
-            if let hrrr = try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode), 
-                let hrrr15min = try GfsReader(domain: .hrrr_conus_15min, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                return [icon, gfs013, hrrr, hrrr15min]
+            if let hrrr = try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) {
+                return [icon, gfs013, hrrr]
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
             if let jma_msm = try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode) {
