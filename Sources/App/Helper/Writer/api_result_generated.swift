@@ -54,6 +54,174 @@ public enum com_openmeteo_api_result_Unit: Int8, Enum, Verifiable {
 }
 
 
+public enum com_openmeteo_api_result_Aggregation: Int8, Enum, Verifiable {
+  public typealias T = Int8
+  public static var byteSize: Int { return MemoryLayout<Int8>.size }
+  public var value: Int8 { return self.rawValue }
+  case undefined = 0
+  case minimum = 1
+  case maximum = 2
+  case mean = 3
+  case median = 4
+  case p10 = 5
+  case p25 = 6
+  case p75 = 7
+  case p90 = 8
+  case dominant = 9
+  case sum = 10
+
+  public static var max: com_openmeteo_api_result_Aggregation { return .sum }
+  public static var min: com_openmeteo_api_result_Aggregation { return .undefined }
+}
+
+
+public enum com_openmeteo_api_result_VariableType: Int8, Enum, Verifiable {
+  public typealias T = Int8
+  public static var byteSize: Int { return MemoryLayout<Int8>.size }
+  public var value: Int8 { return self.rawValue }
+  case undefined = 0
+  case temperature = 1
+  case cloudcover = 2
+  case cloudcoverLow = 3
+  case cloudcoverMid = 4
+  case cloudcoverHigh = 5
+  case pressureMsl = 6
+  case relativehumidity = 7
+  case precipitation = 8
+  case precipitationProbability = 9
+  case weathercode = 10
+  case soilTemperature = 11
+  case soilMoisture = 12
+  case snowDepth = 13
+  case snowHeight = 14
+  case sensibleHeatflux = 15
+  case latentHeatflux = 16
+  case showers = 17
+  case rain = 18
+  case windgusts = 19
+  case freezinglevelHeight = 20
+  case dewpoint = 21
+  case diffuseRadiation = 22
+  case directRadiation = 23
+  case apparentTemperature = 24
+  case windspeed = 25
+  case winddirection = 26
+  case directNormalIrradiance = 27
+  case evapotranspiration = 28
+  case et0FaoEvapotranspiration = 29
+  case vaporPressureDeficit = 30
+  case shortwaveRadiation = 31
+  case snowfall = 32
+  case surfacePressure = 33
+  case terrestrialRadiation = 34
+  case terrestrialRadiationInstant = 35
+  case shortwaveRadiationInstant = 36
+  case diffuseRadiationInstant = 37
+  case directRadiationInstant = 38
+  case directNormalIrradianceInstant = 39
+  case visibility = 40
+  case cape = 41
+  case uvIndex = 42
+  case uvIndexClearSky = 43
+  case isDay = 44
+  case growingDegreeDays = 45
+  case leafWetnessProbability = 46
+  case soilMoistureIndex = 47
+  case geopotentialHeight = 48
+  case verticalVelocity = 49
+  case daylightDuration = 50
+  case sunrise = 51
+  case sunset = 52
+  case pm10 = 53
+  case pm25 = 54
+  case dust = 55
+  case aerosolOpticalDepth = 56
+  case carbonMonoxide = 57
+  case nitrogenDioxide = 58
+  case ammonia = 59
+  case ozone = 60
+  case sulphurDioxide = 61
+  case alderPollen = 62
+  case birchPollen = 63
+  case grassPollen = 64
+  case mugwortPollen = 65
+  case olivePollen = 66
+  case ragweedPollen = 67
+  case waveHeight = 68
+  case wavePeriod = 69
+  case waveDirection = 70
+  case windWaveHeight = 71
+  case windWavePeriod = 72
+  case windWavePeakPeriod = 73
+  case windWaveDirection = 74
+  case swellWaveHeight = 75
+  case swellWavePeriod = 76
+  case swellWavePeakPeriod = 77
+  case swellWaveDirection = 78
+  case riverDischarge = 79
+
+  public static var max: com_openmeteo_api_result_VariableType { return .riverDischarge }
+  public static var min: com_openmeteo_api_result_VariableType { return .undefined }
+}
+
+
+public enum com_openmeteo_api_result_Model: Int8, Enum, Verifiable {
+  public typealias T = Int8
+  public static var byteSize: Int { return MemoryLayout<Int8>.size }
+  public var value: Int8 { return self.rawValue }
+  case undefined = 0
+  case bestMatch = 1
+  case gfsSeamless = 2
+  case gfsGlobal = 3
+  case gfsHrrr = 4
+  case meteofranceSeamless = 5
+  case meteofranceArpegeWorld = 6
+  case meteofranceArpegeEurope = 7
+  case meteofranceAromeFrance = 8
+  case meteofranceAromeFranceHd = 9
+  case jmaSeamless = 10
+  case jmaMsm = 11
+  case jmsGsm = 12
+  case jmaGsm = 13
+  case gemSeamless = 14
+  case gemGlobal = 15
+  case gemRegional = 16
+  case gemHrdpsContinental = 17
+  case iconSeamless = 18
+  case iconGlobal = 19
+  case iconEu = 20
+  case iconD2 = 21
+  case ecmwfIfs04 = 22
+  case metnoNordic = 23
+  case camsGlobal = 24
+  case camsEurope = 25
+  case cmccCm2Vhr4 = 26
+  case fgoalsF3HHighressst = 27
+  case fgoalsF3H = 28
+  case hiramSitHr = 29
+  case mriAgcm32S = 30
+  case ecEarth3pHr = 31
+  case mpiEsm12Xr = 32
+  case nicam168s = 33
+  case era5 = 34
+  case cerra = 35
+  case era5Land = 36
+  case ecmwfIfs = 37
+  case glofasSeamlessV3 = 38
+  case glofasForecastV3 = 39
+  case glofasConsolidatedV3 = 40
+  case glofasSeamlessV4 = 41
+  case glofasForecastV4 = 42
+  case glofasConsolidatedV4 = 43
+  case gwam = 44
+  case ewam = 45
+  case noaaCfs = 46
+
+  public static var max: com_openmeteo_api_result_Model { return .noaaCfs }
+  public static var min: com_openmeteo_api_result_Model { return .undefined }
+}
+
+
 public struct com_openmeteo_api_result_CurrentWeather: NativeStruct, Verifiable, FlatbuffersInitializable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
@@ -132,43 +300,108 @@ public struct com_openmeteo_api_result_Variable: FlatBufferObject, Verifiable {
   public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
 
   private enum VTOFFSET: VOffset {
-    case variable = 4
-    case unit = 6
-    case values = 8
+    case values = 4
+    case variable = 6
+    case aggregation = 8
+    case unit = 10
+    case ensembleMember = 12
+    case model = 14
+    case altitude = 16
+    case pressure = 18
+    case depth = 20
+    case depthUpper = 22
+    case gddBase = 24
+    case gddLimit = 26
+    case inclination = 28
+    case facing = 30
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
 
-  public var variable: String! { let o = _accessor.offset(VTOFFSET.variable.v); return _accessor.string(at: o) }
-  public var variableSegmentArray: [UInt8]! { return _accessor.getVector(at: VTOFFSET.variable.v) }
-  public var unit: com_openmeteo_api_result_Unit { let o = _accessor.offset(VTOFFSET.unit.v); return o == 0 ? .dimensionless : com_openmeteo_api_result_Unit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .dimensionless }
   public var hasValues: Bool { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? false : true }
   public var valuesCount: Int32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func values(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
   public var values: [Float32] { return _accessor.getVector(at: VTOFFSET.values.v) ?? [] }
-  public static func startVariable(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 3) }
-  public static func add(variable: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: variable, at: VTOFFSET.variable.p) }
-  public static func add(unit: com_openmeteo_api_result_Unit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: unit.rawValue, def: 35, at: VTOFFSET.unit.p) }
+  public var variable: com_openmeteo_api_result_VariableType { let o = _accessor.offset(VTOFFSET.variable.v); return o == 0 ? .undefined : com_openmeteo_api_result_VariableType(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var aggregation: com_openmeteo_api_result_Aggregation { let o = _accessor.offset(VTOFFSET.aggregation.v); return o == 0 ? .undefined : com_openmeteo_api_result_Aggregation(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var unit: com_openmeteo_api_result_Unit { let o = _accessor.offset(VTOFFSET.unit.v); return o == 0 ? .dimensionless : com_openmeteo_api_result_Unit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .dimensionless }
+  public var ensembleMember: Int32 { let o = _accessor.offset(VTOFFSET.ensembleMember.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var model: com_openmeteo_api_result_Model { let o = _accessor.offset(VTOFFSET.model.v); return o == 0 ? .undefined : com_openmeteo_api_result_Model(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var altitude: Int32 { let o = _accessor.offset(VTOFFSET.altitude.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var pressure: Int32 { let o = _accessor.offset(VTOFFSET.pressure.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var depth: Int32 { let o = _accessor.offset(VTOFFSET.depth.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var depthUpper: Int32 { let o = _accessor.offset(VTOFFSET.depthUpper.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var gddBase: Int32 { let o = _accessor.offset(VTOFFSET.gddBase.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var gddLimit: Int32 { let o = _accessor.offset(VTOFFSET.gddLimit.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var inclination: Int32 { let o = _accessor.offset(VTOFFSET.inclination.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var facing: Int32 { let o = _accessor.offset(VTOFFSET.facing.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public static func startVariable(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 14) }
   public static func addVectorOf(values: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: values, at: VTOFFSET.values.p) }
-  public static func endVariable(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4, 8]); return end }
+  public static func add(variable: com_openmeteo_api_result_VariableType, _ fbb: inout FlatBufferBuilder) { fbb.add(element: variable.rawValue, def: 0, at: VTOFFSET.variable.p) }
+  public static func add(aggregation: com_openmeteo_api_result_Aggregation, _ fbb: inout FlatBufferBuilder) { fbb.add(element: aggregation.rawValue, def: 0, at: VTOFFSET.aggregation.p) }
+  public static func add(unit: com_openmeteo_api_result_Unit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: unit.rawValue, def: 35, at: VTOFFSET.unit.p) }
+  public static func add(ensembleMember: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: ensembleMember, def: 0, at: VTOFFSET.ensembleMember.p) }
+  public static func add(model: com_openmeteo_api_result_Model, _ fbb: inout FlatBufferBuilder) { fbb.add(element: model.rawValue, def: 0, at: VTOFFSET.model.p) }
+  public static func add(altitude: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: altitude, def: 0, at: VTOFFSET.altitude.p) }
+  public static func add(pressure: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: pressure, def: 0, at: VTOFFSET.pressure.p) }
+  public static func add(depth: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: depth, def: 0, at: VTOFFSET.depth.p) }
+  public static func add(depthUpper: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: depthUpper, def: 0, at: VTOFFSET.depthUpper.p) }
+  public static func add(gddBase: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: gddBase, def: 0, at: VTOFFSET.gddBase.p) }
+  public static func add(gddLimit: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: gddLimit, def: 0, at: VTOFFSET.gddLimit.p) }
+  public static func add(inclination: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: inclination, def: 0, at: VTOFFSET.inclination.p) }
+  public static func add(facing: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: facing, def: 0, at: VTOFFSET.facing.p) }
+  public static func endVariable(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
   public static func createVariable(
     _ fbb: inout FlatBufferBuilder,
-    variableOffset variable: Offset,
+    valuesVectorOffset values: Offset,
+    variable: com_openmeteo_api_result_VariableType = .undefined,
+    aggregation: com_openmeteo_api_result_Aggregation = .undefined,
     unit: com_openmeteo_api_result_Unit = .dimensionless,
-    valuesVectorOffset values: Offset
+    ensembleMember: Int32 = 0,
+    model: com_openmeteo_api_result_Model = .undefined,
+    altitude: Int32 = 0,
+    pressure: Int32 = 0,
+    depth: Int32 = 0,
+    depthUpper: Int32 = 0,
+    gddBase: Int32 = 0,
+    gddLimit: Int32 = 0,
+    inclination: Int32 = 0,
+    facing: Int32 = 0
   ) -> Offset {
     let __start = com_openmeteo_api_result_Variable.startVariable(&fbb)
-    com_openmeteo_api_result_Variable.add(variable: variable, &fbb)
-    com_openmeteo_api_result_Variable.add(unit: unit, &fbb)
     com_openmeteo_api_result_Variable.addVectorOf(values: values, &fbb)
+    com_openmeteo_api_result_Variable.add(variable: variable, &fbb)
+    com_openmeteo_api_result_Variable.add(aggregation: aggregation, &fbb)
+    com_openmeteo_api_result_Variable.add(unit: unit, &fbb)
+    com_openmeteo_api_result_Variable.add(ensembleMember: ensembleMember, &fbb)
+    com_openmeteo_api_result_Variable.add(model: model, &fbb)
+    com_openmeteo_api_result_Variable.add(altitude: altitude, &fbb)
+    com_openmeteo_api_result_Variable.add(pressure: pressure, &fbb)
+    com_openmeteo_api_result_Variable.add(depth: depth, &fbb)
+    com_openmeteo_api_result_Variable.add(depthUpper: depthUpper, &fbb)
+    com_openmeteo_api_result_Variable.add(gddBase: gddBase, &fbb)
+    com_openmeteo_api_result_Variable.add(gddLimit: gddLimit, &fbb)
+    com_openmeteo_api_result_Variable.add(inclination: inclination, &fbb)
+    com_openmeteo_api_result_Variable.add(facing: facing, &fbb)
     return com_openmeteo_api_result_Variable.endVariable(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
-    try _v.visit(field: VTOFFSET.variable.p, fieldName: "variable", required: true, type: ForwardOffset<String>.self)
-    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: false, type: com_openmeteo_api_result_Unit.self)
     try _v.visit(field: VTOFFSET.values.p, fieldName: "values", required: true, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.variable.p, fieldName: "variable", required: false, type: com_openmeteo_api_result_VariableType.self)
+    try _v.visit(field: VTOFFSET.aggregation.p, fieldName: "aggregation", required: false, type: com_openmeteo_api_result_Aggregation.self)
+    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: false, type: com_openmeteo_api_result_Unit.self)
+    try _v.visit(field: VTOFFSET.ensembleMember.p, fieldName: "ensembleMember", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.model.p, fieldName: "model", required: false, type: com_openmeteo_api_result_Model.self)
+    try _v.visit(field: VTOFFSET.altitude.p, fieldName: "altitude", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.pressure.p, fieldName: "pressure", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.depth.p, fieldName: "depth", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.depthUpper.p, fieldName: "depthUpper", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.gddBase.p, fieldName: "gddBase", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.gddLimit.p, fieldName: "gddLimit", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.inclination.p, fieldName: "inclination", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.facing.p, fieldName: "facing", required: false, type: Int32.self)
     _v.finish()
   }
 }
