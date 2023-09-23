@@ -119,7 +119,8 @@ fileprivate extension ApiSectionSingle {
 
 fileprivate extension ApiColumn {
     func toFlatbuffers(_ fbb: inout FlatBufferBuilder, timerange: TimerangeDt) -> Offset? {
-        switch data {
+        fatalError()
+        /*switch data {
         //case .string(_):
         //    return nil
         case .float(let data):
@@ -133,7 +134,7 @@ fileprivate extension ApiColumn {
                 return Float(time.timeIntervalSince1970 - midnight.timeIntervalSince1970)
             }
             return com_openmeteo_api_result_Variable.createVariable(&fbb, variableOffset: fbb.create(string: variable), unit: unit, valuesVectorOffset: fbb.createVector(secondsAfterMidnight))
-        }
+        }*/
     }
 }
 
