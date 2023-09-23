@@ -52,8 +52,8 @@ enum Unit : byte {
 
 enum Aggregation : byte {
   undefined = 0,
-  min,
-  max,
+  minimum,
+  maximum,
   mean,
   median,
   p10,
@@ -111,14 +111,14 @@ enum VariableType : byte {
   uv_index,
   uv_index_clear_sky,
   is_day,
-
   growing_degree_days,
   leaf_wetness_probability,
   soil_moisture_index,
-
-  // Used as pressure levels
   geopotential_height,
   vertical_velocity,
+  daylight_duration,
+  sunrise,
+  sunset,
 
   // CAMS
   pm10,
@@ -152,27 +152,20 @@ enum VariableType : byte {
 
   // floods
   river_discharge,
-
-  daylight_duration,
-  sunrise,
-  sunset,
 }
 
 enum Model: byte {
   undefined = 0,
   best_match,
   gfs_seamless,
-  gfs_mix,
   gfs_global,
   gfs_hrrr,
   meteofrance_seamless,
-  meteofrance_mix,
   meteofrance_arpege_world,
   meteofrance_arpege_europe,
   meteofrance_arome_france,
   meteofrance_arome_france_hd,
   jma_seamless,
-  jma_mix,
   jma_msm,
   jms_gsm,
   jma_gsm,
@@ -181,35 +174,59 @@ enum Model: byte {
   gem_regional,
   gem_hrdps_continental,
   icon_seamless,
-  icon_mix,
   icon_global,
   icon_eu,
   icon_d2,
   ecmwf_ifs04,
-  metno_nordic
-  // TOOD flood, era5, wave, etc models
+  metno_nordic,
+  cams_global,
+  cams_europe,
+  CMCC_CM2_VHR4,
+  FGOALS_f3_H_highresSST,
+  FGOALS_f3_H,
+  HiRAM_SIT_HR,
+  MRI_AGCM3_2_S,
+  EC_Earth3P_HR,
+  MPI_ESM1_2_XR,
+  NICAM16_8S,
+  era5,
+  cerra,
+  era5_land,
+  ecmwf_ifs,
+  glofas_seamless_v3,
+  glofas_forecast_v3,
+  glofas_consolidated_v3,
+  glofas_seamless_v4,
+  glofas_forecast_v4,
+  glofas_consolidated_v4,
+  gwam,
+  ewam,
+  noaa_cfs
 }
 
 table Variable {
   values: [float] (required);
 
   variable: VariableType;
-  aggregation: Aggregation; // Min/max for daily values
+  aggregation: Aggregation = undefined; // Min/max for daily values
   unit: Unit = dimensionless;
-  ensemble_member: int;
+  ensemble_member: int32;
   model: Model;
 
-  altitude: int; // 2m above ground
-  pressure: int; // 850 hpa
+  altitude: int32; // 2m above ground
+  pressure: int32; // 850 hpa
 
-  depth: int; // soil_temperature_0cm
-  depth_upper: int; // soil_temperature_0_to_100cm
+  // Soil temperature and moisture
+  depth: int32; // soil_temperature_0cm
+  depth_upper: int32; // soil_temperature_0_to_100cm
 
   // Growing degree days
-  gdd_base: int;
-  gdd_limit: int;
+  gdd_base: int32;
+  gdd_limit: int32;
 
-  // solar stuff like facing_angle or inclination
+  // Tilted radiation
+  inclination: int32;
+  facing: int32;
 }
 
 
