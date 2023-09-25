@@ -5,6 +5,8 @@
 //
 // Make sure flatbuffers is installed with `brew install flatbuffers`
 
+include "units.fbs";
+
 namespace com.openmeteo.api.result;
 
 enum WeatherModel: byte {
@@ -205,17 +207,16 @@ table WeatherHourlyUnit {
   soil_moisture_index_100_to_255cm: SiUnit;
   soil_moisture_index_0_to_100cm: SiUnit;
   lightning_potential: SiUnit;
-
-  temperature_hpa: [PressureValues];
-  geopotential_height_hpa: [PressureValues];
-  relativehumidity_hpa: [PressureValues];
-  windspeed_hpa: [PressureValues];
-  winddirection_hpa: [PressureValues];
-  dewpoint_hpa: [PressureValues];
-  cloudcover_hpa: [PressureValues];
-  vertical_velocity_hpa: [PressureValues];
-  growing_degree_days: Gdd;
-  tilted_direct_radiation: Tilted; 
+  temperature_hpa: SiUnit;
+  geopotential_height_hpa: SiUnit;
+  relativehumidity_hpa: SiUnit;
+  windspeed_hpa: SiUnit;
+  winddirection_hpa: SiUnit;
+  dewpoint_hpa: SiUnit;
+  cloudcover_hpa: SiUnit;
+  vertical_velocity_hpa: SiUnit;
+  growing_degree_days: SiUnit;
+  tilted_direct_radiation: SiUnit; 
 }
 
 
@@ -307,12 +308,16 @@ table WeatherApi {
   current_weather: CurrentWeather;
   time_start: int64;
   daily: WeatherDaily;
+  //daily_units: WeatherDailyUnit;
   hourly: WeatherHourly;
-  six_hourly: [Variable];
-  minutely_15: [Variable];
-  current: [VariableSingle];
-  current_time: int64;
-  current_interval_seconds: int32;
+  hourly_units: WeatherHourlyUnit;
+  six_hourly: WeatherHourly;
+  six_hourly_units: WeatherHourly;
+  minutely_15: WeatherHourly;
+  minutely_15_units: WeatherHourly;
+  //current: [VariableSingle];
+  //current_time: int64;
+  //current_interval_seconds: int32;
   //monthly: [Variable];
 }
  
