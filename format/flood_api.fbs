@@ -17,22 +17,13 @@ enum FloodModel: byte {
 }
 
 table FloodDaily {
-  time: TimeRange;
-  river_discharge_mean: [float];
-  river_discharge_min: [float];
-  river_discharge_max: [float];
-  river_discharge_median: [float];
-  river_discharge_p25: [float];
-  river_discharge_p75: [float];
-}
-
-table FloodDailyUnits {
-  river_discharge_mean: SiUnit;
-  river_discharge_min: SiUnit;
-  river_discharge_max: SiUnit;
-  river_discharge_median: SiUnit;
-  river_discharge_p25: SiUnit;
-  river_discharge_p75: SiUnit;
+  time: TimeRange (required);
+  river_discharge_mean: ValuesAndUnit;
+  river_discharge_min: ValuesAndUnit;
+  river_discharge_max: ValuesAndUnit;
+  river_discharge_median: ValuesAndUnit;
+  river_discharge_p25: ValuesAndUnit;
+  river_discharge_p75: ValuesAndUnit;
 }
 
 table FloodApiResponse {
@@ -46,7 +37,6 @@ table FloodApiResponse {
   timezone_abbreviation: string;
   time: TimeRange;
   daily: FloodDaily;
-  daily_units: FloodDailyUnits;
 }
 
 root_type FloodApiResponse;

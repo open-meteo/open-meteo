@@ -43,206 +43,78 @@ public struct com_openmeteo_MarineHourly: FlatBufferObject, Verifiable {
     var p: VOffset { self.rawValue }
   }
 
-  public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
-  public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public var hasWaveHeight: Bool { let o = _accessor.offset(VTOFFSET.waveHeight.v); return o == 0 ? false : true }
-  public var waveHeightCount: Int32 { let o = _accessor.offset(VTOFFSET.waveHeight.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func waveHeight(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.waveHeight.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var waveHeight: [Float32] { return _accessor.getVector(at: VTOFFSET.waveHeight.v) ?? [] }
-  public var hasWavePeriod: Bool { let o = _accessor.offset(VTOFFSET.wavePeriod.v); return o == 0 ? false : true }
-  public var wavePeriodCount: Int32 { let o = _accessor.offset(VTOFFSET.wavePeriod.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func wavePeriod(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.wavePeriod.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var wavePeriod: [Float32] { return _accessor.getVector(at: VTOFFSET.wavePeriod.v) ?? [] }
-  public var hasWaveDirection: Bool { let o = _accessor.offset(VTOFFSET.waveDirection.v); return o == 0 ? false : true }
-  public var waveDirectionCount: Int32 { let o = _accessor.offset(VTOFFSET.waveDirection.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func waveDirection(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.waveDirection.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var waveDirection: [Float32] { return _accessor.getVector(at: VTOFFSET.waveDirection.v) ?? [] }
-  public var hasWindWaveHeight: Bool { let o = _accessor.offset(VTOFFSET.windWaveHeight.v); return o == 0 ? false : true }
-  public var windWaveHeightCount: Int32 { let o = _accessor.offset(VTOFFSET.windWaveHeight.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windWaveHeight(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windWaveHeight.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var windWaveHeight: [Float32] { return _accessor.getVector(at: VTOFFSET.windWaveHeight.v) ?? [] }
-  public var hasWindWavePeriod: Bool { let o = _accessor.offset(VTOFFSET.windWavePeriod.v); return o == 0 ? false : true }
-  public var windWavePeriodCount: Int32 { let o = _accessor.offset(VTOFFSET.windWavePeriod.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windWavePeriod(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windWavePeriod.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var windWavePeriod: [Float32] { return _accessor.getVector(at: VTOFFSET.windWavePeriod.v) ?? [] }
-  public var hasWindWavePeakPeriod: Bool { let o = _accessor.offset(VTOFFSET.windWavePeakPeriod.v); return o == 0 ? false : true }
-  public var windWavePeakPeriodCount: Int32 { let o = _accessor.offset(VTOFFSET.windWavePeakPeriod.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windWavePeakPeriod(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windWavePeakPeriod.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var windWavePeakPeriod: [Float32] { return _accessor.getVector(at: VTOFFSET.windWavePeakPeriod.v) ?? [] }
-  public var hasWindWaveDirection: Bool { let o = _accessor.offset(VTOFFSET.windWaveDirection.v); return o == 0 ? false : true }
-  public var windWaveDirectionCount: Int32 { let o = _accessor.offset(VTOFFSET.windWaveDirection.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windWaveDirection(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windWaveDirection.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var windWaveDirection: [Float32] { return _accessor.getVector(at: VTOFFSET.windWaveDirection.v) ?? [] }
-  public var hasSwellWaveHeight: Bool { let o = _accessor.offset(VTOFFSET.swellWaveHeight.v); return o == 0 ? false : true }
-  public var swellWaveHeightCount: Int32 { let o = _accessor.offset(VTOFFSET.swellWaveHeight.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func swellWaveHeight(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.swellWaveHeight.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var swellWaveHeight: [Float32] { return _accessor.getVector(at: VTOFFSET.swellWaveHeight.v) ?? [] }
-  public var hasSwellWavePeriod: Bool { let o = _accessor.offset(VTOFFSET.swellWavePeriod.v); return o == 0 ? false : true }
-  public var swellWavePeriodCount: Int32 { let o = _accessor.offset(VTOFFSET.swellWavePeriod.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func swellWavePeriod(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.swellWavePeriod.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var swellWavePeriod: [Float32] { return _accessor.getVector(at: VTOFFSET.swellWavePeriod.v) ?? [] }
-  public var hasSwellWavePeakPeriod: Bool { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriod.v); return o == 0 ? false : true }
-  public var swellWavePeakPeriodCount: Int32 { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriod.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func swellWavePeakPeriod(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriod.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var swellWavePeakPeriod: [Float32] { return _accessor.getVector(at: VTOFFSET.swellWavePeakPeriod.v) ?? [] }
-  public var hasSwellWaveDirection: Bool { let o = _accessor.offset(VTOFFSET.swellWaveDirection.v); return o == 0 ? false : true }
-  public var swellWaveDirectionCount: Int32 { let o = _accessor.offset(VTOFFSET.swellWaveDirection.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func swellWaveDirection(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.swellWaveDirection.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var swellWaveDirection: [Float32] { return _accessor.getVector(at: VTOFFSET.swellWaveDirection.v) ?? [] }
+  public var time: com_openmeteo_TimeRange! { let o = _accessor.offset(VTOFFSET.time.v); return _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
+  public var mutableTime: com_openmeteo_TimeRange_Mutable! { let o = _accessor.offset(VTOFFSET.time.v); return com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
+  public var waveHeight: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.waveHeight.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var wavePeriod: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.wavePeriod.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var waveDirection: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.waveDirection.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windWaveHeight: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windWaveHeight.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windWavePeriod: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windWavePeriod.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windWavePeakPeriod: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windWavePeakPeriod.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windWaveDirection: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windWaveDirection.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var swellWaveHeight: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.swellWaveHeight.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var swellWavePeriod: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.swellWavePeriod.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var swellWavePeakPeriod: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriod.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var swellWaveDirection: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.swellWaveDirection.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public static func startMarineHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 12) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
-  public static func addVectorOf(waveHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: waveHeight, at: VTOFFSET.waveHeight.p) }
-  public static func addVectorOf(wavePeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: wavePeriod, at: VTOFFSET.wavePeriod.p) }
-  public static func addVectorOf(waveDirection: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: waveDirection, at: VTOFFSET.waveDirection.p) }
-  public static func addVectorOf(windWaveHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWaveHeight, at: VTOFFSET.windWaveHeight.p) }
-  public static func addVectorOf(windWavePeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWavePeriod, at: VTOFFSET.windWavePeriod.p) }
-  public static func addVectorOf(windWavePeakPeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWavePeakPeriod, at: VTOFFSET.windWavePeakPeriod.p) }
-  public static func addVectorOf(windWaveDirection: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWaveDirection, at: VTOFFSET.windWaveDirection.p) }
-  public static func addVectorOf(swellWaveHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWaveHeight, at: VTOFFSET.swellWaveHeight.p) }
-  public static func addVectorOf(swellWavePeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWavePeriod, at: VTOFFSET.swellWavePeriod.p) }
-  public static func addVectorOf(swellWavePeakPeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWavePeakPeriod, at: VTOFFSET.swellWavePeakPeriod.p) }
-  public static func addVectorOf(swellWaveDirection: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWaveDirection, at: VTOFFSET.swellWaveDirection.p) }
-  public static func endMarineHourly(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func add(waveHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: waveHeight, at: VTOFFSET.waveHeight.p) }
+  public static func add(wavePeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: wavePeriod, at: VTOFFSET.wavePeriod.p) }
+  public static func add(waveDirection: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: waveDirection, at: VTOFFSET.waveDirection.p) }
+  public static func add(windWaveHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWaveHeight, at: VTOFFSET.windWaveHeight.p) }
+  public static func add(windWavePeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWavePeriod, at: VTOFFSET.windWavePeriod.p) }
+  public static func add(windWavePeakPeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWavePeakPeriod, at: VTOFFSET.windWavePeakPeriod.p) }
+  public static func add(windWaveDirection: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWaveDirection, at: VTOFFSET.windWaveDirection.p) }
+  public static func add(swellWaveHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWaveHeight, at: VTOFFSET.swellWaveHeight.p) }
+  public static func add(swellWavePeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWavePeriod, at: VTOFFSET.swellWavePeriod.p) }
+  public static func add(swellWavePeakPeriod: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWavePeakPeriod, at: VTOFFSET.swellWavePeakPeriod.p) }
+  public static func add(swellWaveDirection: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWaveDirection, at: VTOFFSET.swellWaveDirection.p) }
+  public static func endMarineHourly(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
   public static func createMarineHourly(
     _ fbb: inout FlatBufferBuilder,
-    time: com_openmeteo_TimeRange? = nil,
-    waveHeightVectorOffset waveHeight: Offset = Offset(),
-    wavePeriodVectorOffset wavePeriod: Offset = Offset(),
-    waveDirectionVectorOffset waveDirection: Offset = Offset(),
-    windWaveHeightVectorOffset windWaveHeight: Offset = Offset(),
-    windWavePeriodVectorOffset windWavePeriod: Offset = Offset(),
-    windWavePeakPeriodVectorOffset windWavePeakPeriod: Offset = Offset(),
-    windWaveDirectionVectorOffset windWaveDirection: Offset = Offset(),
-    swellWaveHeightVectorOffset swellWaveHeight: Offset = Offset(),
-    swellWavePeriodVectorOffset swellWavePeriod: Offset = Offset(),
-    swellWavePeakPeriodVectorOffset swellWavePeakPeriod: Offset = Offset(),
-    swellWaveDirectionVectorOffset swellWaveDirection: Offset = Offset()
+    time: com_openmeteo_TimeRange,
+    waveHeightOffset waveHeight: Offset = Offset(),
+    wavePeriodOffset wavePeriod: Offset = Offset(),
+    waveDirectionOffset waveDirection: Offset = Offset(),
+    windWaveHeightOffset windWaveHeight: Offset = Offset(),
+    windWavePeriodOffset windWavePeriod: Offset = Offset(),
+    windWavePeakPeriodOffset windWavePeakPeriod: Offset = Offset(),
+    windWaveDirectionOffset windWaveDirection: Offset = Offset(),
+    swellWaveHeightOffset swellWaveHeight: Offset = Offset(),
+    swellWavePeriodOffset swellWavePeriod: Offset = Offset(),
+    swellWavePeakPeriodOffset swellWavePeakPeriod: Offset = Offset(),
+    swellWaveDirectionOffset swellWaveDirection: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_MarineHourly.startMarineHourly(&fbb)
     com_openmeteo_MarineHourly.add(time: time, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(waveHeight: waveHeight, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(wavePeriod: wavePeriod, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(waveDirection: waveDirection, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(windWaveHeight: windWaveHeight, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(windWavePeriod: windWavePeriod, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(windWavePeakPeriod: windWavePeakPeriod, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(windWaveDirection: windWaveDirection, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(swellWaveHeight: swellWaveHeight, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(swellWavePeriod: swellWavePeriod, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(swellWavePeakPeriod: swellWavePeakPeriod, &fbb)
-    com_openmeteo_MarineHourly.addVectorOf(swellWaveDirection: swellWaveDirection, &fbb)
+    com_openmeteo_MarineHourly.add(waveHeight: waveHeight, &fbb)
+    com_openmeteo_MarineHourly.add(wavePeriod: wavePeriod, &fbb)
+    com_openmeteo_MarineHourly.add(waveDirection: waveDirection, &fbb)
+    com_openmeteo_MarineHourly.add(windWaveHeight: windWaveHeight, &fbb)
+    com_openmeteo_MarineHourly.add(windWavePeriod: windWavePeriod, &fbb)
+    com_openmeteo_MarineHourly.add(windWavePeakPeriod: windWavePeakPeriod, &fbb)
+    com_openmeteo_MarineHourly.add(windWaveDirection: windWaveDirection, &fbb)
+    com_openmeteo_MarineHourly.add(swellWaveHeight: swellWaveHeight, &fbb)
+    com_openmeteo_MarineHourly.add(swellWavePeriod: swellWavePeriod, &fbb)
+    com_openmeteo_MarineHourly.add(swellWavePeakPeriod: swellWavePeakPeriod, &fbb)
+    com_openmeteo_MarineHourly.add(swellWaveDirection: swellWaveDirection, &fbb)
     return com_openmeteo_MarineHourly.endMarineHourly(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
-    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: false, type: com_openmeteo_TimeRange.self)
-    try _v.visit(field: VTOFFSET.waveHeight.p, fieldName: "waveHeight", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.wavePeriod.p, fieldName: "wavePeriod", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.waveDirection.p, fieldName: "waveDirection", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.windWaveHeight.p, fieldName: "windWaveHeight", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.windWavePeriod.p, fieldName: "windWavePeriod", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.windWavePeakPeriod.p, fieldName: "windWavePeakPeriod", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.windWaveDirection.p, fieldName: "windWaveDirection", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.swellWaveHeight.p, fieldName: "swellWaveHeight", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.swellWavePeriod.p, fieldName: "swellWavePeriod", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.swellWavePeakPeriod.p, fieldName: "swellWavePeakPeriod", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.swellWaveDirection.p, fieldName: "swellWaveDirection", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    _v.finish()
-  }
-}
-
-public struct com_openmeteo_MarineHourlyUnits: FlatBufferObject, Verifiable {
-
-  static func validateVersion() { FlatBuffersVersion_23_5_26() }
-  public var __buffer: ByteBuffer! { return _accessor.bb }
-  private var _accessor: Table
-
-  private init(_ t: Table) { _accessor = t }
-  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
-
-  private enum VTOFFSET: VOffset {
-    case waveHeight = 4
-    case wavePeriod = 6
-    case waveDirection = 8
-    case windWaveHeight = 10
-    case windWavePeriod = 12
-    case windWavePeakPeriod = 14
-    case windWaveDirection = 16
-    case swellWaveHeight = 18
-    case swellWavePeriod = 20
-    case swellWavePeakPeriod = 22
-    case swellWaveDirection = 24
-    var v: Int32 { Int32(self.rawValue) }
-    var p: VOffset { self.rawValue }
-  }
-
-  public var waveHeight: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.waveHeight.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var wavePeriod: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.wavePeriod.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var waveDirection: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.waveDirection.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windWaveHeight: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windWaveHeight.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windWavePeriod: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windWavePeriod.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windWavePeakPeriod: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windWavePeakPeriod.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windWaveDirection: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windWaveDirection.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var swellWaveHeight: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.swellWaveHeight.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var swellWavePeriod: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.swellWavePeriod.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var swellWavePeakPeriod: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriod.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var swellWaveDirection: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.swellWaveDirection.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public static func startMarineHourlyUnits(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 11) }
-  public static func add(waveHeight: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: waveHeight.rawValue, def: 0, at: VTOFFSET.waveHeight.p) }
-  public static func add(wavePeriod: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: wavePeriod.rawValue, def: 0, at: VTOFFSET.wavePeriod.p) }
-  public static func add(waveDirection: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: waveDirection.rawValue, def: 0, at: VTOFFSET.waveDirection.p) }
-  public static func add(windWaveHeight: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windWaveHeight.rawValue, def: 0, at: VTOFFSET.windWaveHeight.p) }
-  public static func add(windWavePeriod: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windWavePeriod.rawValue, def: 0, at: VTOFFSET.windWavePeriod.p) }
-  public static func add(windWavePeakPeriod: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windWavePeakPeriod.rawValue, def: 0, at: VTOFFSET.windWavePeakPeriod.p) }
-  public static func add(windWaveDirection: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windWaveDirection.rawValue, def: 0, at: VTOFFSET.windWaveDirection.p) }
-  public static func add(swellWaveHeight: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: swellWaveHeight.rawValue, def: 0, at: VTOFFSET.swellWaveHeight.p) }
-  public static func add(swellWavePeriod: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: swellWavePeriod.rawValue, def: 0, at: VTOFFSET.swellWavePeriod.p) }
-  public static func add(swellWavePeakPeriod: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: swellWavePeakPeriod.rawValue, def: 0, at: VTOFFSET.swellWavePeakPeriod.p) }
-  public static func add(swellWaveDirection: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: swellWaveDirection.rawValue, def: 0, at: VTOFFSET.swellWaveDirection.p) }
-  public static func endMarineHourlyUnits(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
-  public static func createMarineHourlyUnits(
-    _ fbb: inout FlatBufferBuilder,
-    waveHeight: com_openmeteo_SiUnit = .undefined,
-    wavePeriod: com_openmeteo_SiUnit = .undefined,
-    waveDirection: com_openmeteo_SiUnit = .undefined,
-    windWaveHeight: com_openmeteo_SiUnit = .undefined,
-    windWavePeriod: com_openmeteo_SiUnit = .undefined,
-    windWavePeakPeriod: com_openmeteo_SiUnit = .undefined,
-    windWaveDirection: com_openmeteo_SiUnit = .undefined,
-    swellWaveHeight: com_openmeteo_SiUnit = .undefined,
-    swellWavePeriod: com_openmeteo_SiUnit = .undefined,
-    swellWavePeakPeriod: com_openmeteo_SiUnit = .undefined,
-    swellWaveDirection: com_openmeteo_SiUnit = .undefined
-  ) -> Offset {
-    let __start = com_openmeteo_MarineHourlyUnits.startMarineHourlyUnits(&fbb)
-    com_openmeteo_MarineHourlyUnits.add(waveHeight: waveHeight, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(wavePeriod: wavePeriod, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(waveDirection: waveDirection, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(windWaveHeight: windWaveHeight, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(windWavePeriod: windWavePeriod, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(windWavePeakPeriod: windWavePeakPeriod, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(windWaveDirection: windWaveDirection, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(swellWaveHeight: swellWaveHeight, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(swellWavePeriod: swellWavePeriod, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(swellWavePeakPeriod: swellWavePeakPeriod, &fbb)
-    com_openmeteo_MarineHourlyUnits.add(swellWaveDirection: swellWaveDirection, &fbb)
-    return com_openmeteo_MarineHourlyUnits.endMarineHourlyUnits(&fbb, start: __start)
-  }
-
-  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
-    var _v = try verifier.visitTable(at: position)
-    try _v.visit(field: VTOFFSET.waveHeight.p, fieldName: "waveHeight", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.wavePeriod.p, fieldName: "wavePeriod", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.waveDirection.p, fieldName: "waveDirection", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.windWaveHeight.p, fieldName: "windWaveHeight", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.windWavePeriod.p, fieldName: "windWavePeriod", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.windWavePeakPeriod.p, fieldName: "windWavePeakPeriod", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.windWaveDirection.p, fieldName: "windWaveDirection", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.swellWaveHeight.p, fieldName: "swellWaveHeight", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.swellWavePeriod.p, fieldName: "swellWavePeriod", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.swellWavePeakPeriod.p, fieldName: "swellWavePeakPeriod", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.swellWaveDirection.p, fieldName: "swellWaveDirection", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: true, type: com_openmeteo_TimeRange.self)
+    try _v.visit(field: VTOFFSET.waveHeight.p, fieldName: "waveHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.wavePeriod.p, fieldName: "wavePeriod", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.waveDirection.p, fieldName: "waveDirection", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windWaveHeight.p, fieldName: "windWaveHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windWavePeriod.p, fieldName: "windWavePeriod", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windWavePeakPeriod.p, fieldName: "windWavePeakPeriod", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windWaveDirection.p, fieldName: "windWaveDirection", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.swellWaveHeight.p, fieldName: "swellWaveHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.swellWavePeriod.p, fieldName: "swellWavePeriod", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.swellWavePeakPeriod.p, fieldName: "swellWavePeakPeriod", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.swellWaveDirection.p, fieldName: "swellWaveDirection", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     _v.finish()
   }
 }
@@ -273,206 +145,78 @@ public struct com_openmeteo_MarineDaily: FlatBufferObject, Verifiable {
     var p: VOffset { self.rawValue }
   }
 
-  public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
-  public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public var hasWaveHeightMax: Bool { let o = _accessor.offset(VTOFFSET.waveHeightMax.v); return o == 0 ? false : true }
-  public var waveHeightMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.waveHeightMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func waveHeightMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.waveHeightMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var waveHeightMax: [Float32] { return _accessor.getVector(at: VTOFFSET.waveHeightMax.v) ?? [] }
-  public var hasWindWaveHeightMax: Bool { let o = _accessor.offset(VTOFFSET.windWaveHeightMax.v); return o == 0 ? false : true }
-  public var windWaveHeightMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.windWaveHeightMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windWaveHeightMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windWaveHeightMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var windWaveHeightMax: [Float32] { return _accessor.getVector(at: VTOFFSET.windWaveHeightMax.v) ?? [] }
-  public var hasSwellWaveHeightMax: Bool { let o = _accessor.offset(VTOFFSET.swellWaveHeightMax.v); return o == 0 ? false : true }
-  public var swellWaveHeightMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.swellWaveHeightMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func swellWaveHeightMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.swellWaveHeightMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var swellWaveHeightMax: [Float32] { return _accessor.getVector(at: VTOFFSET.swellWaveHeightMax.v) ?? [] }
-  public var hasWaveDirectionDominant: Bool { let o = _accessor.offset(VTOFFSET.waveDirectionDominant.v); return o == 0 ? false : true }
-  public var waveDirectionDominantCount: Int32 { let o = _accessor.offset(VTOFFSET.waveDirectionDominant.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func waveDirectionDominant(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.waveDirectionDominant.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var waveDirectionDominant: [Float32] { return _accessor.getVector(at: VTOFFSET.waveDirectionDominant.v) ?? [] }
-  public var hasWindWaveDirectionDominant: Bool { let o = _accessor.offset(VTOFFSET.windWaveDirectionDominant.v); return o == 0 ? false : true }
-  public var windWaveDirectionDominantCount: Int32 { let o = _accessor.offset(VTOFFSET.windWaveDirectionDominant.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windWaveDirectionDominant(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windWaveDirectionDominant.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var windWaveDirectionDominant: [Float32] { return _accessor.getVector(at: VTOFFSET.windWaveDirectionDominant.v) ?? [] }
-  public var hasSwellWaveDirectionDominant: Bool { let o = _accessor.offset(VTOFFSET.swellWaveDirectionDominant.v); return o == 0 ? false : true }
-  public var swellWaveDirectionDominantCount: Int32 { let o = _accessor.offset(VTOFFSET.swellWaveDirectionDominant.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func swellWaveDirectionDominant(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.swellWaveDirectionDominant.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var swellWaveDirectionDominant: [Float32] { return _accessor.getVector(at: VTOFFSET.swellWaveDirectionDominant.v) ?? [] }
-  public var hasWavePeriodMax: Bool { let o = _accessor.offset(VTOFFSET.wavePeriodMax.v); return o == 0 ? false : true }
-  public var wavePeriodMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.wavePeriodMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func wavePeriodMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.wavePeriodMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var wavePeriodMax: [Float32] { return _accessor.getVector(at: VTOFFSET.wavePeriodMax.v) ?? [] }
-  public var hasWindWavePeriodMax: Bool { let o = _accessor.offset(VTOFFSET.windWavePeriodMax.v); return o == 0 ? false : true }
-  public var windWavePeriodMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.windWavePeriodMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windWavePeriodMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windWavePeriodMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var windWavePeriodMax: [Float32] { return _accessor.getVector(at: VTOFFSET.windWavePeriodMax.v) ?? [] }
-  public var hasWindWavePeakPeriodMax: Bool { let o = _accessor.offset(VTOFFSET.windWavePeakPeriodMax.v); return o == 0 ? false : true }
-  public var windWavePeakPeriodMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.windWavePeakPeriodMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windWavePeakPeriodMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windWavePeakPeriodMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var windWavePeakPeriodMax: [Float32] { return _accessor.getVector(at: VTOFFSET.windWavePeakPeriodMax.v) ?? [] }
-  public var hasSwellWavePeriodMax: Bool { let o = _accessor.offset(VTOFFSET.swellWavePeriodMax.v); return o == 0 ? false : true }
-  public var swellWavePeriodMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.swellWavePeriodMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func swellWavePeriodMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.swellWavePeriodMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var swellWavePeriodMax: [Float32] { return _accessor.getVector(at: VTOFFSET.swellWavePeriodMax.v) ?? [] }
-  public var hasSwellWavePeakPeriodMax: Bool { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriodMax.v); return o == 0 ? false : true }
-  public var swellWavePeakPeriodMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriodMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func swellWavePeakPeriodMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriodMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var swellWavePeakPeriodMax: [Float32] { return _accessor.getVector(at: VTOFFSET.swellWavePeakPeriodMax.v) ?? [] }
+  public var time: com_openmeteo_TimeRange! { let o = _accessor.offset(VTOFFSET.time.v); return _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
+  public var mutableTime: com_openmeteo_TimeRange_Mutable! { let o = _accessor.offset(VTOFFSET.time.v); return com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
+  public var waveHeightMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.waveHeightMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windWaveHeightMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windWaveHeightMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var swellWaveHeightMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.swellWaveHeightMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var waveDirectionDominant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.waveDirectionDominant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windWaveDirectionDominant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windWaveDirectionDominant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var swellWaveDirectionDominant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.swellWaveDirectionDominant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var wavePeriodMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.wavePeriodMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windWavePeriodMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windWavePeriodMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windWavePeakPeriodMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windWavePeakPeriodMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var swellWavePeriodMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.swellWavePeriodMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var swellWavePeakPeriodMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriodMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public static func startMarineDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 12) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
-  public static func addVectorOf(waveHeightMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: waveHeightMax, at: VTOFFSET.waveHeightMax.p) }
-  public static func addVectorOf(windWaveHeightMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWaveHeightMax, at: VTOFFSET.windWaveHeightMax.p) }
-  public static func addVectorOf(swellWaveHeightMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWaveHeightMax, at: VTOFFSET.swellWaveHeightMax.p) }
-  public static func addVectorOf(waveDirectionDominant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: waveDirectionDominant, at: VTOFFSET.waveDirectionDominant.p) }
-  public static func addVectorOf(windWaveDirectionDominant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWaveDirectionDominant, at: VTOFFSET.windWaveDirectionDominant.p) }
-  public static func addVectorOf(swellWaveDirectionDominant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWaveDirectionDominant, at: VTOFFSET.swellWaveDirectionDominant.p) }
-  public static func addVectorOf(wavePeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: wavePeriodMax, at: VTOFFSET.wavePeriodMax.p) }
-  public static func addVectorOf(windWavePeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWavePeriodMax, at: VTOFFSET.windWavePeriodMax.p) }
-  public static func addVectorOf(windWavePeakPeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWavePeakPeriodMax, at: VTOFFSET.windWavePeakPeriodMax.p) }
-  public static func addVectorOf(swellWavePeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWavePeriodMax, at: VTOFFSET.swellWavePeriodMax.p) }
-  public static func addVectorOf(swellWavePeakPeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWavePeakPeriodMax, at: VTOFFSET.swellWavePeakPeriodMax.p) }
-  public static func endMarineDaily(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func add(waveHeightMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: waveHeightMax, at: VTOFFSET.waveHeightMax.p) }
+  public static func add(windWaveHeightMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWaveHeightMax, at: VTOFFSET.windWaveHeightMax.p) }
+  public static func add(swellWaveHeightMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWaveHeightMax, at: VTOFFSET.swellWaveHeightMax.p) }
+  public static func add(waveDirectionDominant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: waveDirectionDominant, at: VTOFFSET.waveDirectionDominant.p) }
+  public static func add(windWaveDirectionDominant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWaveDirectionDominant, at: VTOFFSET.windWaveDirectionDominant.p) }
+  public static func add(swellWaveDirectionDominant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWaveDirectionDominant, at: VTOFFSET.swellWaveDirectionDominant.p) }
+  public static func add(wavePeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: wavePeriodMax, at: VTOFFSET.wavePeriodMax.p) }
+  public static func add(windWavePeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWavePeriodMax, at: VTOFFSET.windWavePeriodMax.p) }
+  public static func add(windWavePeakPeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windWavePeakPeriodMax, at: VTOFFSET.windWavePeakPeriodMax.p) }
+  public static func add(swellWavePeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWavePeriodMax, at: VTOFFSET.swellWavePeriodMax.p) }
+  public static func add(swellWavePeakPeriodMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: swellWavePeakPeriodMax, at: VTOFFSET.swellWavePeakPeriodMax.p) }
+  public static func endMarineDaily(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
   public static func createMarineDaily(
     _ fbb: inout FlatBufferBuilder,
-    time: com_openmeteo_TimeRange? = nil,
-    waveHeightMaxVectorOffset waveHeightMax: Offset = Offset(),
-    windWaveHeightMaxVectorOffset windWaveHeightMax: Offset = Offset(),
-    swellWaveHeightMaxVectorOffset swellWaveHeightMax: Offset = Offset(),
-    waveDirectionDominantVectorOffset waveDirectionDominant: Offset = Offset(),
-    windWaveDirectionDominantVectorOffset windWaveDirectionDominant: Offset = Offset(),
-    swellWaveDirectionDominantVectorOffset swellWaveDirectionDominant: Offset = Offset(),
-    wavePeriodMaxVectorOffset wavePeriodMax: Offset = Offset(),
-    windWavePeriodMaxVectorOffset windWavePeriodMax: Offset = Offset(),
-    windWavePeakPeriodMaxVectorOffset windWavePeakPeriodMax: Offset = Offset(),
-    swellWavePeriodMaxVectorOffset swellWavePeriodMax: Offset = Offset(),
-    swellWavePeakPeriodMaxVectorOffset swellWavePeakPeriodMax: Offset = Offset()
+    time: com_openmeteo_TimeRange,
+    waveHeightMaxOffset waveHeightMax: Offset = Offset(),
+    windWaveHeightMaxOffset windWaveHeightMax: Offset = Offset(),
+    swellWaveHeightMaxOffset swellWaveHeightMax: Offset = Offset(),
+    waveDirectionDominantOffset waveDirectionDominant: Offset = Offset(),
+    windWaveDirectionDominantOffset windWaveDirectionDominant: Offset = Offset(),
+    swellWaveDirectionDominantOffset swellWaveDirectionDominant: Offset = Offset(),
+    wavePeriodMaxOffset wavePeriodMax: Offset = Offset(),
+    windWavePeriodMaxOffset windWavePeriodMax: Offset = Offset(),
+    windWavePeakPeriodMaxOffset windWavePeakPeriodMax: Offset = Offset(),
+    swellWavePeriodMaxOffset swellWavePeriodMax: Offset = Offset(),
+    swellWavePeakPeriodMaxOffset swellWavePeakPeriodMax: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_MarineDaily.startMarineDaily(&fbb)
     com_openmeteo_MarineDaily.add(time: time, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(waveHeightMax: waveHeightMax, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(windWaveHeightMax: windWaveHeightMax, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(swellWaveHeightMax: swellWaveHeightMax, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(waveDirectionDominant: waveDirectionDominant, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(windWaveDirectionDominant: windWaveDirectionDominant, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(swellWaveDirectionDominant: swellWaveDirectionDominant, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(wavePeriodMax: wavePeriodMax, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(windWavePeriodMax: windWavePeriodMax, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(windWavePeakPeriodMax: windWavePeakPeriodMax, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(swellWavePeriodMax: swellWavePeriodMax, &fbb)
-    com_openmeteo_MarineDaily.addVectorOf(swellWavePeakPeriodMax: swellWavePeakPeriodMax, &fbb)
+    com_openmeteo_MarineDaily.add(waveHeightMax: waveHeightMax, &fbb)
+    com_openmeteo_MarineDaily.add(windWaveHeightMax: windWaveHeightMax, &fbb)
+    com_openmeteo_MarineDaily.add(swellWaveHeightMax: swellWaveHeightMax, &fbb)
+    com_openmeteo_MarineDaily.add(waveDirectionDominant: waveDirectionDominant, &fbb)
+    com_openmeteo_MarineDaily.add(windWaveDirectionDominant: windWaveDirectionDominant, &fbb)
+    com_openmeteo_MarineDaily.add(swellWaveDirectionDominant: swellWaveDirectionDominant, &fbb)
+    com_openmeteo_MarineDaily.add(wavePeriodMax: wavePeriodMax, &fbb)
+    com_openmeteo_MarineDaily.add(windWavePeriodMax: windWavePeriodMax, &fbb)
+    com_openmeteo_MarineDaily.add(windWavePeakPeriodMax: windWavePeakPeriodMax, &fbb)
+    com_openmeteo_MarineDaily.add(swellWavePeriodMax: swellWavePeriodMax, &fbb)
+    com_openmeteo_MarineDaily.add(swellWavePeakPeriodMax: swellWavePeakPeriodMax, &fbb)
     return com_openmeteo_MarineDaily.endMarineDaily(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
-    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: false, type: com_openmeteo_TimeRange.self)
-    try _v.visit(field: VTOFFSET.waveHeightMax.p, fieldName: "waveHeightMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.windWaveHeightMax.p, fieldName: "windWaveHeightMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.swellWaveHeightMax.p, fieldName: "swellWaveHeightMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.waveDirectionDominant.p, fieldName: "waveDirectionDominant", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.windWaveDirectionDominant.p, fieldName: "windWaveDirectionDominant", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.swellWaveDirectionDominant.p, fieldName: "swellWaveDirectionDominant", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.wavePeriodMax.p, fieldName: "wavePeriodMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.windWavePeriodMax.p, fieldName: "windWavePeriodMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.windWavePeakPeriodMax.p, fieldName: "windWavePeakPeriodMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.swellWavePeriodMax.p, fieldName: "swellWavePeriodMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.swellWavePeakPeriodMax.p, fieldName: "swellWavePeakPeriodMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    _v.finish()
-  }
-}
-
-public struct com_openmeteo_MarineDailyUnits: FlatBufferObject, Verifiable {
-
-  static func validateVersion() { FlatBuffersVersion_23_5_26() }
-  public var __buffer: ByteBuffer! { return _accessor.bb }
-  private var _accessor: Table
-
-  private init(_ t: Table) { _accessor = t }
-  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
-
-  private enum VTOFFSET: VOffset {
-    case waveHeightMax = 4
-    case windWaveHeightMax = 6
-    case swellWaveHeightMax = 8
-    case waveDirectionDominant = 10
-    case windWaveDirectionDominant = 12
-    case swellWaveDirectionDominant = 14
-    case wavePeriodMax = 16
-    case windWavePeriodMax = 18
-    case windWavePeakPeriodMax = 20
-    case swellWavePeriodMax = 22
-    case swellWavePeakPeriodMax = 24
-    var v: Int32 { Int32(self.rawValue) }
-    var p: VOffset { self.rawValue }
-  }
-
-  public var waveHeightMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.waveHeightMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windWaveHeightMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windWaveHeightMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var swellWaveHeightMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.swellWaveHeightMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var waveDirectionDominant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.waveDirectionDominant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windWaveDirectionDominant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windWaveDirectionDominant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var swellWaveDirectionDominant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.swellWaveDirectionDominant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var wavePeriodMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.wavePeriodMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windWavePeriodMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windWavePeriodMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windWavePeakPeriodMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windWavePeakPeriodMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var swellWavePeriodMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.swellWavePeriodMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var swellWavePeakPeriodMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.swellWavePeakPeriodMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public static func startMarineDailyUnits(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 11) }
-  public static func add(waveHeightMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: waveHeightMax.rawValue, def: 0, at: VTOFFSET.waveHeightMax.p) }
-  public static func add(windWaveHeightMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windWaveHeightMax.rawValue, def: 0, at: VTOFFSET.windWaveHeightMax.p) }
-  public static func add(swellWaveHeightMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: swellWaveHeightMax.rawValue, def: 0, at: VTOFFSET.swellWaveHeightMax.p) }
-  public static func add(waveDirectionDominant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: waveDirectionDominant.rawValue, def: 0, at: VTOFFSET.waveDirectionDominant.p) }
-  public static func add(windWaveDirectionDominant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windWaveDirectionDominant.rawValue, def: 0, at: VTOFFSET.windWaveDirectionDominant.p) }
-  public static func add(swellWaveDirectionDominant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: swellWaveDirectionDominant.rawValue, def: 0, at: VTOFFSET.swellWaveDirectionDominant.p) }
-  public static func add(wavePeriodMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: wavePeriodMax.rawValue, def: 0, at: VTOFFSET.wavePeriodMax.p) }
-  public static func add(windWavePeriodMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windWavePeriodMax.rawValue, def: 0, at: VTOFFSET.windWavePeriodMax.p) }
-  public static func add(windWavePeakPeriodMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windWavePeakPeriodMax.rawValue, def: 0, at: VTOFFSET.windWavePeakPeriodMax.p) }
-  public static func add(swellWavePeriodMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: swellWavePeriodMax.rawValue, def: 0, at: VTOFFSET.swellWavePeriodMax.p) }
-  public static func add(swellWavePeakPeriodMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: swellWavePeakPeriodMax.rawValue, def: 0, at: VTOFFSET.swellWavePeakPeriodMax.p) }
-  public static func endMarineDailyUnits(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
-  public static func createMarineDailyUnits(
-    _ fbb: inout FlatBufferBuilder,
-    waveHeightMax: com_openmeteo_SiUnit = .undefined,
-    windWaveHeightMax: com_openmeteo_SiUnit = .undefined,
-    swellWaveHeightMax: com_openmeteo_SiUnit = .undefined,
-    waveDirectionDominant: com_openmeteo_SiUnit = .undefined,
-    windWaveDirectionDominant: com_openmeteo_SiUnit = .undefined,
-    swellWaveDirectionDominant: com_openmeteo_SiUnit = .undefined,
-    wavePeriodMax: com_openmeteo_SiUnit = .undefined,
-    windWavePeriodMax: com_openmeteo_SiUnit = .undefined,
-    windWavePeakPeriodMax: com_openmeteo_SiUnit = .undefined,
-    swellWavePeriodMax: com_openmeteo_SiUnit = .undefined,
-    swellWavePeakPeriodMax: com_openmeteo_SiUnit = .undefined
-  ) -> Offset {
-    let __start = com_openmeteo_MarineDailyUnits.startMarineDailyUnits(&fbb)
-    com_openmeteo_MarineDailyUnits.add(waveHeightMax: waveHeightMax, &fbb)
-    com_openmeteo_MarineDailyUnits.add(windWaveHeightMax: windWaveHeightMax, &fbb)
-    com_openmeteo_MarineDailyUnits.add(swellWaveHeightMax: swellWaveHeightMax, &fbb)
-    com_openmeteo_MarineDailyUnits.add(waveDirectionDominant: waveDirectionDominant, &fbb)
-    com_openmeteo_MarineDailyUnits.add(windWaveDirectionDominant: windWaveDirectionDominant, &fbb)
-    com_openmeteo_MarineDailyUnits.add(swellWaveDirectionDominant: swellWaveDirectionDominant, &fbb)
-    com_openmeteo_MarineDailyUnits.add(wavePeriodMax: wavePeriodMax, &fbb)
-    com_openmeteo_MarineDailyUnits.add(windWavePeriodMax: windWavePeriodMax, &fbb)
-    com_openmeteo_MarineDailyUnits.add(windWavePeakPeriodMax: windWavePeakPeriodMax, &fbb)
-    com_openmeteo_MarineDailyUnits.add(swellWavePeriodMax: swellWavePeriodMax, &fbb)
-    com_openmeteo_MarineDailyUnits.add(swellWavePeakPeriodMax: swellWavePeakPeriodMax, &fbb)
-    return com_openmeteo_MarineDailyUnits.endMarineDailyUnits(&fbb, start: __start)
-  }
-
-  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
-    var _v = try verifier.visitTable(at: position)
-    try _v.visit(field: VTOFFSET.waveHeightMax.p, fieldName: "waveHeightMax", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.windWaveHeightMax.p, fieldName: "windWaveHeightMax", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.swellWaveHeightMax.p, fieldName: "swellWaveHeightMax", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.waveDirectionDominant.p, fieldName: "waveDirectionDominant", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.windWaveDirectionDominant.p, fieldName: "windWaveDirectionDominant", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.swellWaveDirectionDominant.p, fieldName: "swellWaveDirectionDominant", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.wavePeriodMax.p, fieldName: "wavePeriodMax", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.windWavePeriodMax.p, fieldName: "windWavePeriodMax", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.windWavePeakPeriodMax.p, fieldName: "windWavePeakPeriodMax", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.swellWavePeriodMax.p, fieldName: "swellWavePeriodMax", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.swellWavePeakPeriodMax.p, fieldName: "swellWavePeakPeriodMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: true, type: com_openmeteo_TimeRange.self)
+    try _v.visit(field: VTOFFSET.waveHeightMax.p, fieldName: "waveHeightMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windWaveHeightMax.p, fieldName: "windWaveHeightMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.swellWaveHeightMax.p, fieldName: "swellWaveHeightMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.waveDirectionDominant.p, fieldName: "waveDirectionDominant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windWaveDirectionDominant.p, fieldName: "windWaveDirectionDominant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.swellWaveDirectionDominant.p, fieldName: "swellWaveDirectionDominant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.wavePeriodMax.p, fieldName: "wavePeriodMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windWavePeriodMax.p, fieldName: "windWavePeriodMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windWavePeakPeriodMax.p, fieldName: "windWavePeakPeriodMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.swellWavePeriodMax.p, fieldName: "swellWavePeriodMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.swellWavePeakPeriodMax.p, fieldName: "swellWavePeakPeriodMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     _v.finish()
   }
 }
@@ -496,9 +240,7 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
     case timezone = 16
     case timezoneAbbreviation = 18
     case daily = 20
-    case dailyUnits = 22
-    case hourly = 24
-    case hourlyUnits = 26
+    case hourly = 22
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -514,10 +256,8 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
   public var timezoneAbbreviation: String? { let o = _accessor.offset(VTOFFSET.timezoneAbbreviation.v); return o == 0 ? nil : _accessor.string(at: o) }
   public var timezoneAbbreviationSegmentArray: [UInt8]? { return _accessor.getVector(at: VTOFFSET.timezoneAbbreviation.v) }
   public var daily: com_openmeteo_MarineDaily? { let o = _accessor.offset(VTOFFSET.daily.v); return o == 0 ? nil : com_openmeteo_MarineDaily(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var dailyUnits: com_openmeteo_MarineDailyUnits? { let o = _accessor.offset(VTOFFSET.dailyUnits.v); return o == 0 ? nil : com_openmeteo_MarineDailyUnits(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var hourly: com_openmeteo_MarineHourly? { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? nil : com_openmeteo_MarineHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var hourlyUnits: com_openmeteo_MarineHourlyUnits? { let o = _accessor.offset(VTOFFSET.hourlyUnits.v); return o == 0 ? nil : com_openmeteo_MarineHourlyUnits(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startMarineApiResponse(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 12) }
+  public static func startMarineApiResponse(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -527,9 +267,7 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
   public static func add(timezone: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezone, at: VTOFFSET.timezone.p) }
   public static func add(timezoneAbbreviation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezoneAbbreviation, at: VTOFFSET.timezoneAbbreviation.p) }
   public static func add(daily: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: daily, at: VTOFFSET.daily.p) }
-  public static func add(dailyUnits: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dailyUnits, at: VTOFFSET.dailyUnits.p) }
   public static func add(hourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourly, at: VTOFFSET.hourly.p) }
-  public static func add(hourlyUnits: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourlyUnits, at: VTOFFSET.hourlyUnits.p) }
   public static func endMarineApiResponse(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createMarineApiResponse(
     _ fbb: inout FlatBufferBuilder,
@@ -542,9 +280,7 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
     timezoneOffset timezone: Offset = Offset(),
     timezoneAbbreviationOffset timezoneAbbreviation: Offset = Offset(),
     dailyOffset daily: Offset = Offset(),
-    dailyUnitsOffset dailyUnits: Offset = Offset(),
-    hourlyOffset hourly: Offset = Offset(),
-    hourlyUnitsOffset hourlyUnits: Offset = Offset()
+    hourlyOffset hourly: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_MarineApiResponse.startMarineApiResponse(&fbb)
     com_openmeteo_MarineApiResponse.add(latitude: latitude, &fbb)
@@ -556,9 +292,7 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
     com_openmeteo_MarineApiResponse.add(timezone: timezone, &fbb)
     com_openmeteo_MarineApiResponse.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
     com_openmeteo_MarineApiResponse.add(daily: daily, &fbb)
-    com_openmeteo_MarineApiResponse.add(dailyUnits: dailyUnits, &fbb)
     com_openmeteo_MarineApiResponse.add(hourly: hourly, &fbb)
-    com_openmeteo_MarineApiResponse.add(hourlyUnits: hourlyUnits, &fbb)
     return com_openmeteo_MarineApiResponse.endMarineApiResponse(&fbb, start: __start)
   }
 
@@ -573,9 +307,7 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.timezone.p, fieldName: "timezone", required: false, type: ForwardOffset<String>.self)
     try _v.visit(field: VTOFFSET.timezoneAbbreviation.p, fieldName: "timezoneAbbreviation", required: false, type: ForwardOffset<String>.self)
     try _v.visit(field: VTOFFSET.daily.p, fieldName: "daily", required: false, type: ForwardOffset<com_openmeteo_MarineDaily>.self)
-    try _v.visit(field: VTOFFSET.dailyUnits.p, fieldName: "dailyUnits", required: false, type: ForwardOffset<com_openmeteo_MarineDailyUnits>.self)
     try _v.visit(field: VTOFFSET.hourly.p, fieldName: "hourly", required: false, type: ForwardOffset<com_openmeteo_MarineHourly>.self)
-    try _v.visit(field: VTOFFSET.hourlyUnits.p, fieldName: "hourlyUnits", required: false, type: ForwardOffset<com_openmeteo_MarineHourlyUnits>.self)
     _v.finish()
   }
 }

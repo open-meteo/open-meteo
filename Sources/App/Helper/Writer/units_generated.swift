@@ -105,3 +105,47 @@ public struct com_openmeteo_TimeRange_Mutable: FlatBufferObject {
   public var interval: Int32 { return _accessor.readBuffer(of: Int32.self, at: 16) }
 }
 
+public struct com_openmeteo_ValuesAndUnit: FlatBufferObject, Verifiable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Table
+
+  private init(_ t: Table) { _accessor = t }
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
+
+  private enum VTOFFSET: VOffset {
+    case values = 4
+    case unit = 6
+    var v: Int32 { Int32(self.rawValue) }
+    var p: VOffset { self.rawValue }
+  }
+
+  public var hasValues: Bool { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? false : true }
+  public var valuesCount: Int32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func values(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var values: [Float32] { return _accessor.getVector(at: VTOFFSET.values.v) ?? [] }
+  public var unit: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.unit.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public static func startValuesAndUnit(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 2) }
+  public static func addVectorOf(values: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: values, at: VTOFFSET.values.p) }
+  public static func add(unit: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: unit.rawValue, def: 0, at: VTOFFSET.unit.p) }
+  public static func endValuesAndUnit(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
+  public static func createValuesAndUnit(
+    _ fbb: inout FlatBufferBuilder,
+    valuesVectorOffset values: Offset,
+    unit: com_openmeteo_SiUnit = .undefined
+  ) -> Offset {
+    let __start = com_openmeteo_ValuesAndUnit.startValuesAndUnit(&fbb)
+    com_openmeteo_ValuesAndUnit.addVectorOf(values: values, &fbb)
+    com_openmeteo_ValuesAndUnit.add(unit: unit, &fbb)
+    return com_openmeteo_ValuesAndUnit.endValuesAndUnit(&fbb, start: __start)
+  }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.values.p, fieldName: "values", required: true, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: false, type: com_openmeteo_SiUnit.self)
+    _v.finish()
+  }
+}
+
