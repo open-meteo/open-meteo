@@ -422,6 +422,9 @@ struct GfsDownload: AsyncCommandFix {
                     ) {
                         let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: locationRange, timerange: time)
                         for i in data3d.data.indices {
+                            if factor.data[i] < 0.05 {
+                                continue
+                            }
                             data3d.data[i] /= factor.data[i]
                         }
                     }
