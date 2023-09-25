@@ -1,0 +1,98 @@
+
+// flatc -o Sources/App/Helper/Writer/ --swift format/AirQuality_api.fbs
+
+include "units.fbs";
+
+namespace com.openmeteo.AirQuality_api;
+
+
+enum AirQualityModel: byte {
+    best_match = 0,
+    cams_global,
+    cams_europe,
+}
+
+table AirQualityHourly {
+  pm10: [float];
+  pm2_5: [float];
+  dust: [float];
+  aerosol_optical_depth: [float];
+  carbon_monoxide: [float];
+  nitrogen_dioxide: [float];
+  ammonia: [float];
+  ozone: [float];
+  sulphur_dioxide: [float];
+  uv_index: [float];
+  uv_index_clear_sky: [float];
+  alder_pollen: [float];
+  birch_pollen: [float];
+  grass_pollen: [float];
+  mugwort_pollen: [float];
+  olive_pollen: [float];
+  ragweed_pollen: [float];
+  european_aqi: [float];
+  european_aqi_pm2_5: [float];
+  european_aqi_pm10: [float];
+  european_aqi_no2: [float];
+  european_aqi_o3: [float];
+  european_aqi_so2: [float];
+  us_aqi: [float];
+  us_aqi_pm2_5: [float];
+  us_aqi_pm10: [float];
+  us_aqi_no2: [float];
+  us_aqi_o3: [float];
+  us_aqi_so2: [float];
+  us_aqi_co: [float];
+}
+
+table AirQualityHourlyUnits {
+  pm10: SiUnit;
+  pm2_5: SiUnit;
+  dust: SiUnit;
+  aerosol_optical_depth: SiUnit;
+  carbon_monoxide: SiUnit;
+  nitrogen_dioxide: SiUnit;
+  ammonia: SiUnit;
+  ozone: SiUnit;
+  sulphur_dioxide: SiUnit;
+  uv_index: SiUnit;
+  uv_index_clear_sky: SiUnit;
+  alder_pollen: SiUnit;
+  birch_pollen: SiUnit;
+  grass_pollen: SiUnit;
+  mugwort_pollen: SiUnit;
+  olive_pollen: SiUnit;
+  ragweed_pollen: SiUnit;
+  european_aqi: SiUnit;
+  european_aqi_pm2_5: SiUnit;
+  european_aqi_pm10: SiUnit;
+  european_aqi_no2: SiUnit;
+  european_aqi_o3: SiUnit;
+  european_aqi_so2: SiUnit;
+  us_aqi: SiUnit;
+  us_aqi_pm2_5: SiUnit;
+  us_aqi_pm10: SiUnit;
+  us_aqi_no2: SiUnit;
+  us_aqi_o3: SiUnit;
+  us_aqi_so2: SiUnit;
+  us_aqi_co: SiUnit;
+}
+
+
+table AirQualityApiResponse {
+  latitude: float;
+  longitude: float;
+  elevation: float;
+  model: AirQualityModel;
+  generationtime_ms: float;
+  utc_offset_seconds: int32;
+  timezone: string;
+  timezone_abbreviation: string;
+  time_start: int64;
+  //daily: AirQualityDaily;
+  //daily_units: AirQualityDailyUnits;
+  hourly: AirQualityHourly;
+  hourly_units: AirQualityHourlyUnits;
+}
+
+root_type AirQualityApiResponse;
