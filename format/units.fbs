@@ -1,4 +1,12 @@
 
+namespace com.openmeteo;
+
+
+struct TimeRange {
+  start: int64;
+  end: int64;
+  interval: int32;
+}
 
 enum SiUnit : byte {
   undefined = 0,

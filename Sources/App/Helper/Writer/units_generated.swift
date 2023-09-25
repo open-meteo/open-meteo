@@ -4,7 +4,7 @@
 
 import FlatBuffers
 
-public enum SiUnit: Int8, Enum, Verifiable {
+public enum com_openmeteo_SiUnit: Int8, Enum, Verifiable {
   public typealias T = Int8
   public static var byteSize: Int { return MemoryLayout<Int8>.size }
   public var value: Int8 { return self.rawValue }
@@ -50,8 +50,58 @@ public enum SiUnit: Int8, Enum, Verifiable {
   case gddCelsius = 39
   case fraction = 40
 
-  public static var max: SiUnit { return .fraction }
-  public static var min: SiUnit { return .undefined }
+  public static var max: com_openmeteo_SiUnit { return .fraction }
+  public static var min: com_openmeteo_SiUnit { return .undefined }
 }
 
+
+public struct com_openmeteo_TimeRange: NativeStruct, Verifiable, FlatbuffersInitializable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+
+  private var _start: Int64
+  private var _end: Int64
+  private var _interval: Int32
+  private let padding0__: UInt32 = 0
+
+  public init(_ bb: ByteBuffer, o: Int32) {
+    let _accessor = Struct(bb: bb, position: o)
+    _start = _accessor.readBuffer(of: Int64.self, at: 0)
+    _end = _accessor.readBuffer(of: Int64.self, at: 8)
+    _interval = _accessor.readBuffer(of: Int32.self, at: 16)
+  }
+
+  public init(start: Int64, end: Int64, interval: Int32) {
+    _start = start
+    _end = end
+    _interval = interval
+  }
+
+  public init() {
+    _start = 0
+    _end = 0
+    _interval = 0
+  }
+
+  public var start: Int64 { _start }
+  public var end: Int64 { _end }
+  public var interval: Int32 { _interval }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    try verifier.inBuffer(position: position, of: com_openmeteo_TimeRange.self)
+  }
+}
+
+public struct com_openmeteo_TimeRange_Mutable: FlatBufferObject {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Struct
+
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Struct(bb: bb, position: o) }
+
+  public var start: Int64 { return _accessor.readBuffer(of: Int64.self, at: 0) }
+  public var end: Int64 { return _accessor.readBuffer(of: Int64.self, at: 8) }
+  public var interval: Int32 { return _accessor.readBuffer(of: Int32.self, at: 16) }
+}
 

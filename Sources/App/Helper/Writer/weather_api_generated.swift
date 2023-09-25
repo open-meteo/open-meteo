@@ -4,7 +4,7 @@
 
 import FlatBuffers
 
-public enum com_openmeteo_api_result_WeatherModel: Int8, Enum, Verifiable {
+public enum com_openmeteo_WeatherModel: Int8, Enum, Verifiable {
   public typealias T = Int8
   public static var byteSize: Int { return MemoryLayout<Int8>.size }
   public var value: Int8 { return self.rawValue }
@@ -38,12 +38,12 @@ public enum com_openmeteo_api_result_WeatherModel: Int8, Enum, Verifiable {
   case ecmwfIfs = 27
   case noaaCfs = 28
 
-  public static var max: com_openmeteo_api_result_WeatherModel { return .noaaCfs }
-  public static var min: com_openmeteo_api_result_WeatherModel { return .undefined }
+  public static var max: com_openmeteo_WeatherModel { return .noaaCfs }
+  public static var min: com_openmeteo_WeatherModel { return .undefined }
 }
 
 
-public struct com_openmeteo_api_result_CurrentWeather: NativeStruct, Verifiable, FlatbuffersInitializable {
+public struct com_openmeteo_CurrentWeather: NativeStruct, Verifiable, FlatbuffersInitializable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
 
@@ -91,11 +91,11 @@ public struct com_openmeteo_api_result_CurrentWeather: NativeStruct, Verifiable,
   public var isDay: Float32 { _isDay }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
-    try verifier.inBuffer(position: position, of: com_openmeteo_api_result_CurrentWeather.self)
+    try verifier.inBuffer(position: position, of: com_openmeteo_CurrentWeather.self)
   }
 }
 
-public struct com_openmeteo_api_result_CurrentWeather_Mutable: FlatBufferObject {
+public struct com_openmeteo_CurrentWeather_Mutable: FlatBufferObject {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -111,7 +111,7 @@ public struct com_openmeteo_api_result_CurrentWeather_Mutable: FlatBufferObject 
   public var isDay: Float32 { return _accessor.readBuffer(of: Float32.self, at: 24) }
 }
 
-public struct com_openmeteo_api_result_WeatherHourly: FlatBufferObject, Verifiable {
+public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -121,96 +121,377 @@ public struct com_openmeteo_api_result_WeatherHourly: FlatBufferObject, Verifiab
   public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
 
   private enum VTOFFSET: VOffset {
-    case temperture2m = 4
-    case cloudcover = 6
-    case cloudcoverLow = 8
-    case cloudcoverMid = 10
-    case cloudcoverHigh = 12
-    case pressureMsl = 14
-    case relativehumidity2m = 16
-    case precipitation = 18
-    case precipitationProbability = 20
-    case weathercode = 22
-    case temperature80m = 24
-    case temperature120m = 26
-    case temperature180m = 28
-    case soilTemperature0cm = 30
-    case soilTemperature6cm = 32
-    case soilTemperature18cm = 34
-    case soilTemperature54cm = 36
-    case soilMoisture01cm = 38
-    case soilMoisture13cm = 40
-    case soilMoisture39cm = 42
-    case soilMoisture927cm = 44
-    case soilMoisture2781cm = 46
-    case snowDepth = 48
-    case snowHeight = 50
-    case sensibleHeatflux = 52
-    case latentHeatflux = 54
-    case showers = 56
-    case rain = 58
-    case windgusts10m = 60
-    case freezinglevelHeight = 62
-    case dewpoint2m = 64
-    case diffuseRadiation = 66
-    case directRadiation = 68
-    case apparentTemperature = 70
-    case windspeed10m = 72
-    case winddirection10m = 74
-    case windspeed80m = 76
-    case winddirection80m = 78
-    case windspeed120m = 80
-    case winddirection120m = 82
-    case windspeed180m = 84
-    case winddirection180m = 86
-    case directNormalIrradiance = 88
-    case evapotranspiration = 90
-    case et0FaoEvapotranspiration = 92
-    case vaporPressureDeficit = 94
-    case shortwaveRadiation = 96
-    case snowfall = 98
-    case surfacePressure = 100
-    case terrestrialRadiation = 102
-    case terrestrialRadiationInstant = 104
-    case shortwaveRadiationInstant = 106
-    case diffuseRadiationInstant = 108
-    case directRadiationInstant = 110
-    case directNormalIrradianceInstant = 112
-    case visibility = 114
-    case cape = 116
-    case uvIndex = 118
-    case uvIndexClearSky = 120
-    case isDay = 122
-    case soilTemperature0To10cm = 124
-    case soilTemperature10To40cm = 126
-    case soilTemperature40To100cm = 128
-    case soilTemperature100To200cm = 130
-    case soilMoisture0To10cm = 132
-    case soilMoisture10To40cm = 134
-    case soilMoisture40To100cm = 136
-    case soilMoisture100To200cm = 138
-    case growingDegreeDaysBase0Limit50 = 140
-    case leafWetnessProbability = 142
-    case soilMoistureIndex0To7cm = 144
-    case soilMoistureIndex7To28cm = 146
-    case soilMoistureIndex28To100cm = 148
-    case soilMoistureIndex100To255cm = 150
-    case soilMoistureIndex0To100cm = 152
-    case lightningPotential = 154
-    case temperatureHpa = 156
-    case geopotentialHeightHpa = 158
-    case relativehumidityHpa = 160
-    case windspeedHpa = 162
-    case winddirectionHpa = 164
-    case dewpointHpa = 166
-    case cloudcoverHpa = 168
-    case verticalVelocityHpa = 170
-    case growingDegreeDays = 172
-    case tiltedDirectRadiation = 174
+    case time = 4
+    case temperture2m = 6
+    case cloudcover = 8
+    case cloudcoverLow = 10
+    case cloudcoverMid = 12
+    case cloudcoverHigh = 14
+    case pressureMsl = 16
+    case relativehumidity2m = 18
+    case precipitation = 20
+    case precipitationProbability = 22
+    case weathercode = 24
+    case temperature80m = 26
+    case temperature120m = 28
+    case temperature180m = 30
+    case soilTemperature0cm = 32
+    case soilTemperature6cm = 34
+    case soilTemperature18cm = 36
+    case soilTemperature54cm = 38
+    case soilMoisture01cm = 40
+    case soilMoisture13cm = 42
+    case soilMoisture39cm = 44
+    case soilMoisture927cm = 46
+    case soilMoisture2781cm = 48
+    case snowDepth = 50
+    case snowHeight = 52
+    case sensibleHeatflux = 54
+    case latentHeatflux = 56
+    case showers = 58
+    case rain = 60
+    case windgusts10m = 62
+    case freezinglevelHeight = 64
+    case dewpoint2m = 66
+    case diffuseRadiation = 68
+    case directRadiation = 70
+    case apparentTemperature = 72
+    case windspeed10m = 74
+    case winddirection10m = 76
+    case windspeed80m = 78
+    case winddirection80m = 80
+    case windspeed120m = 82
+    case winddirection120m = 84
+    case windspeed180m = 86
+    case winddirection180m = 88
+    case directNormalIrradiance = 90
+    case evapotranspiration = 92
+    case et0FaoEvapotranspiration = 94
+    case vaporPressureDeficit = 96
+    case shortwaveRadiation = 98
+    case snowfall = 100
+    case surfacePressure = 102
+    case terrestrialRadiation = 104
+    case terrestrialRadiationInstant = 106
+    case shortwaveRadiationInstant = 108
+    case diffuseRadiationInstant = 110
+    case directRadiationInstant = 112
+    case directNormalIrradianceInstant = 114
+    case visibility = 116
+    case cape = 118
+    case uvIndex = 120
+    case uvIndexClearSky = 122
+    case isDay = 124
+    case soilTemperature0To10cm = 126
+    case soilTemperature10To40cm = 128
+    case soilTemperature40To100cm = 130
+    case soilTemperature100To200cm = 132
+    case soilMoisture0To10cm = 134
+    case soilMoisture10To40cm = 136
+    case soilMoisture40To100cm = 138
+    case soilMoisture100To200cm = 140
+    case growingDegreeDaysBase0Limit50 = 142
+    case leafWetnessProbability = 144
+    case soilMoistureIndex0To7cm = 146
+    case soilMoistureIndex7To28cm = 148
+    case soilMoistureIndex28To100cm = 150
+    case soilMoistureIndex100To255cm = 152
+    case soilMoistureIndex0To100cm = 154
+    case lightningPotential = 156
+    case temperature1015hPa = 158
+    case temperature1000hPa = 160
+    case temperature985hPa = 162
+    case temperature975hPa = 164
+    case temperature970hPa = 166
+    case temperature950hPa = 168
+    case temperature925hPa = 170
+    case temperature900hPa = 172
+    case temperature875hPa = 174
+    case temperature850hPa = 176
+    case temperature800hPa = 178
+    case temperature750hPa = 180
+    case temperature700hPa = 182
+    case temperature650hPa = 184
+    case temperature600hPa = 186
+    case temperature550hPa = 188
+    case temperature500hPa = 190
+    case temperature450hPa = 192
+    case temperature400hPa = 194
+    case temperature350hPa = 196
+    case temperature300hPa = 198
+    case temperature275hPa = 200
+    case temperature250hPa = 202
+    case temperature225hPa = 204
+    case temperature200hPa = 206
+    case temperature175hPa = 208
+    case temperature150hPa = 210
+    case temperature125hPa = 212
+    case temperature100hPa = 214
+    case temperature70hPa = 216
+    case temperature50hPa = 218
+    case temperature40hPa = 220
+    case temperature30hPa = 222
+    case temperature20hPa = 224
+    case temperature15hPa = 226
+    case temperature10hPa = 228
+    case dewpoint1015hPa = 230
+    case dewpoint1000hPa = 232
+    case dewpoint985hPa = 234
+    case dewpoint975hPa = 236
+    case dewpoint970hPa = 238
+    case dewpoint950hPa = 240
+    case dewpoint925hPa = 242
+    case dewpoint900hPa = 244
+    case dewpoint875hPa = 246
+    case dewpoint850hPa = 248
+    case dewpoint800hPa = 250
+    case dewpoint750hPa = 252
+    case dewpoint700hPa = 254
+    case dewpoint650hPa = 256
+    case dewpoint600hPa = 258
+    case dewpoint550hPa = 260
+    case dewpoint500hPa = 262
+    case dewpoint450hPa = 264
+    case dewpoint400hPa = 266
+    case dewpoint350hPa = 268
+    case dewpoint300hPa = 270
+    case dewpoint275hPa = 272
+    case dewpoint250hPa = 274
+    case dewpoint225hPa = 276
+    case dewpoint200hPa = 278
+    case dewpoint175hPa = 280
+    case dewpoint150hPa = 282
+    case dewpoint125hPa = 284
+    case dewpoint100hPa = 286
+    case dewpoint70hPa = 288
+    case dewpoint50hPa = 290
+    case dewpoint40hPa = 292
+    case dewpoint30hPa = 294
+    case dewpoint20hPa = 296
+    case dewpoint15hPa = 298
+    case dewpoint10hPa = 300
+    case relativehumidity1015hPa = 302
+    case relativehumidity1000hPa = 304
+    case relativehumidity985hPa = 306
+    case relativehumidity975hPa = 308
+    case relativehumidity970hPa = 310
+    case relativehumidity950hPa = 312
+    case relativehumidity925hPa = 314
+    case relativehumidity900hPa = 316
+    case relativehumidity875hPa = 318
+    case relativehumidity850hPa = 320
+    case relativehumidity800hPa = 322
+    case relativehumidity750hPa = 324
+    case relativehumidity700hPa = 326
+    case relativehumidity650hPa = 328
+    case relativehumidity600hPa = 330
+    case relativehumidity550hPa = 332
+    case relativehumidity500hPa = 334
+    case relativehumidity450hPa = 336
+    case relativehumidity400hPa = 338
+    case relativehumidity350hPa = 340
+    case relativehumidity300hPa = 342
+    case relativehumidity275hPa = 344
+    case relativehumidity250hPa = 346
+    case relativehumidity225hPa = 348
+    case relativehumidity200hPa = 350
+    case relativehumidity175hPa = 352
+    case relativehumidity150hPa = 354
+    case relativehumidity125hPa = 356
+    case relativehumidity100hPa = 358
+    case relativehumidity70hPa = 360
+    case relativehumidity50hPa = 362
+    case relativehumidity40hPa = 364
+    case relativehumidity30hPa = 366
+    case relativehumidity20hPa = 368
+    case relativehumidity15hPa = 370
+    case relativehumidity10hPa = 372
+    case cloudcover1015hPa = 374
+    case cloudcover1000hPa = 376
+    case cloudcover985hPa = 378
+    case cloudcover975hPa = 380
+    case cloudcover970hPa = 382
+    case cloudcover950hPa = 384
+    case cloudcover925hPa = 386
+    case cloudcover900hPa = 388
+    case cloudcover875hPa = 390
+    case cloudcover850hPa = 392
+    case cloudcover800hPa = 394
+    case cloudcover750hPa = 396
+    case cloudcover700hPa = 398
+    case cloudcover650hPa = 400
+    case cloudcover600hPa = 402
+    case cloudcover550hPa = 404
+    case cloudcover500hPa = 406
+    case cloudcover450hPa = 408
+    case cloudcover400hPa = 410
+    case cloudcover350hPa = 412
+    case cloudcover300hPa = 414
+    case cloudcover275hPa = 416
+    case cloudcover250hPa = 418
+    case cloudcover225hPa = 420
+    case cloudcover200hPa = 422
+    case cloudcover175hPa = 424
+    case cloudcover150hPa = 426
+    case cloudcover125hPa = 428
+    case cloudcover100hPa = 430
+    case cloudcover70hPa = 432
+    case cloudcover50hPa = 434
+    case cloudcover40hPa = 436
+    case cloudcover30hPa = 438
+    case cloudcover20hPa = 440
+    case cloudcover15hPa = 442
+    case cloudcover10hPa = 444
+    case windspeed1015hPa = 446
+    case windspeed1000hPa = 448
+    case windspeed985hPa = 450
+    case windspeed975hPa = 452
+    case windspeed970hPa = 454
+    case windspeed950hPa = 456
+    case windspeed925hPa = 458
+    case windspeed900hPa = 460
+    case windspeed875hPa = 462
+    case windspeed850hPa = 464
+    case windspeed800hPa = 466
+    case windspeed750hPa = 468
+    case windspeed700hPa = 470
+    case windspeed650hPa = 472
+    case windspeed600hPa = 474
+    case windspeed550hPa = 476
+    case windspeed500hPa = 478
+    case windspeed450hPa = 480
+    case windspeed400hPa = 482
+    case windspeed350hPa = 484
+    case windspeed300hPa = 486
+    case windspeed275hPa = 488
+    case windspeed250hPa = 490
+    case windspeed225hPa = 492
+    case windspeed200hPa = 494
+    case windspeed175hPa = 496
+    case windspeed150hPa = 498
+    case windspeed125hPa = 500
+    case windspeed100hPa = 502
+    case windspeed70hPa = 504
+    case windspeed50hPa = 506
+    case windspeed40hPa = 508
+    case windspeed30hPa = 510
+    case windspeed20hPa = 512
+    case windspeed15hPa = 514
+    case windspeed10hPa = 516
+    case winddirection1015hPa = 518
+    case winddirection1000hPa = 520
+    case winddirection985hPa = 522
+    case winddirection975hPa = 524
+    case winddirection970hPa = 526
+    case winddirection950hPa = 528
+    case winddirection925hPa = 530
+    case winddirection900hPa = 532
+    case winddirection875hPa = 534
+    case winddirection850hPa = 536
+    case winddirection800hPa = 538
+    case winddirection750hPa = 540
+    case winddirection700hPa = 542
+    case winddirection650hPa = 544
+    case winddirection600hPa = 546
+    case winddirection550hPa = 548
+    case winddirection500hPa = 550
+    case winddirection450hPa = 552
+    case winddirection400hPa = 554
+    case winddirection350hPa = 556
+    case winddirection300hPa = 558
+    case winddirection275hPa = 560
+    case winddirection250hPa = 562
+    case winddirection225hPa = 564
+    case winddirection200hPa = 566
+    case winddirection175hPa = 568
+    case winddirection150hPa = 570
+    case winddirection125hPa = 572
+    case winddirection100hPa = 574
+    case winddirection70hPa = 576
+    case winddirection50hPa = 578
+    case winddirection40hPa = 580
+    case winddirection30hPa = 582
+    case winddirection20hPa = 584
+    case winddirection15hPa = 586
+    case winddirection10hPa = 588
+    case verticalVelocity1015hPa = 590
+    case verticalVelocity1000hPa = 592
+    case verticalVelocity985hPa = 594
+    case verticalVelocity975hPa = 596
+    case verticalVelocity970hPa = 598
+    case verticalVelocity950hPa = 600
+    case verticalVelocity925hPa = 602
+    case verticalVelocity900hPa = 604
+    case verticalVelocity875hPa = 606
+    case verticalVelocity850hPa = 608
+    case verticalVelocity800hPa = 610
+    case verticalVelocity750hPa = 612
+    case verticalVelocity700hPa = 614
+    case verticalVelocity650hPa = 616
+    case verticalVelocity600hPa = 618
+    case verticalVelocity550hPa = 620
+    case verticalVelocity500hPa = 622
+    case verticalVelocity450hPa = 624
+    case verticalVelocity400hPa = 626
+    case verticalVelocity350hPa = 628
+    case verticalVelocity300hPa = 630
+    case verticalVelocity275hPa = 632
+    case verticalVelocity250hPa = 634
+    case verticalVelocity225hPa = 636
+    case verticalVelocity200hPa = 638
+    case verticalVelocity175hPa = 640
+    case verticalVelocity150hPa = 642
+    case verticalVelocity125hPa = 644
+    case verticalVelocity100hPa = 646
+    case verticalVelocity70hPa = 648
+    case verticalVelocity50hPa = 650
+    case verticalVelocity40hPa = 652
+    case verticalVelocity30hPa = 654
+    case verticalVelocity20hPa = 656
+    case verticalVelocity15hPa = 658
+    case verticalVelocity10hPa = 660
+    case geopotentialHeight1015hPa = 662
+    case geopotentialHeight1000hPa = 664
+    case geopotentialHeight985hPa = 666
+    case geopotentialHeight975hPa = 668
+    case geopotentialHeight970hPa = 670
+    case geopotentialHeight950hPa = 672
+    case geopotentialHeight925hPa = 674
+    case geopotentialHeight900hPa = 676
+    case geopotentialHeight875hPa = 678
+    case geopotentialHeight850hPa = 680
+    case geopotentialHeight800hPa = 682
+    case geopotentialHeight750hPa = 684
+    case geopotentialHeight700hPa = 686
+    case geopotentialHeight650hPa = 688
+    case geopotentialHeight600hPa = 690
+    case geopotentialHeight550hPa = 692
+    case geopotentialHeight500hPa = 694
+    case geopotentialHeight450hPa = 696
+    case geopotentialHeight400hPa = 698
+    case geopotentialHeight350hPa = 700
+    case geopotentialHeight300hPa = 702
+    case geopotentialHeight275hPa = 704
+    case geopotentialHeight250hPa = 706
+    case geopotentialHeight225hPa = 708
+    case geopotentialHeight200hPa = 710
+    case geopotentialHeight175hPa = 712
+    case geopotentialHeight150hPa = 714
+    case geopotentialHeight125hPa = 716
+    case geopotentialHeight100hPa = 718
+    case geopotentialHeight70hPa = 720
+    case geopotentialHeight50hPa = 722
+    case geopotentialHeight40hPa = 724
+    case geopotentialHeight30hPa = 726
+    case geopotentialHeight20hPa = 728
+    case geopotentialHeight15hPa = 730
+    case geopotentialHeight10hPa = 732
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
 
+  public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
+  public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var hasTemperture2m: Bool { let o = _accessor.offset(VTOFFSET.temperture2m.v); return o == 0 ? false : true }
   public var temperture2mCount: Int32 { let o = _accessor.offset(VTOFFSET.temperture2m.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func temperture2m(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperture2m.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
@@ -515,33 +796,1160 @@ public struct com_openmeteo_api_result_WeatherHourly: FlatBufferObject, Verifiab
   public var lightningPotentialCount: Int32 { let o = _accessor.offset(VTOFFSET.lightningPotential.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func lightningPotential(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.lightningPotential.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
   public var lightningPotential: [Float32] { return _accessor.getVector(at: VTOFFSET.lightningPotential.v) ?? [] }
-  public var hasTemperatureHpa: Bool { let o = _accessor.offset(VTOFFSET.temperatureHpa.v); return o == 0 ? false : true }
-  public var temperatureHpaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperatureHpa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func temperatureHpa(at index: Int32) -> com_openmeteo_api_result_PressureValues? { let o = _accessor.offset(VTOFFSET.temperatureHpa.v); return o == 0 ? nil : com_openmeteo_api_result_PressureValues(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public var hasGeopotentialHeightHpa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeightHpa.v); return o == 0 ? false : true }
-  public var geopotentialHeightHpaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeightHpa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func geopotentialHeightHpa(at index: Int32) -> com_openmeteo_api_result_PressureValues? { let o = _accessor.offset(VTOFFSET.geopotentialHeightHpa.v); return o == 0 ? nil : com_openmeteo_api_result_PressureValues(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public var hasRelativehumidityHpa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidityHpa.v); return o == 0 ? false : true }
-  public var relativehumidityHpaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidityHpa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func relativehumidityHpa(at index: Int32) -> com_openmeteo_api_result_PressureValues? { let o = _accessor.offset(VTOFFSET.relativehumidityHpa.v); return o == 0 ? nil : com_openmeteo_api_result_PressureValues(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public var hasWindspeedHpa: Bool { let o = _accessor.offset(VTOFFSET.windspeedHpa.v); return o == 0 ? false : true }
-  public var windspeedHpaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeedHpa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func windspeedHpa(at index: Int32) -> com_openmeteo_api_result_PressureValues? { let o = _accessor.offset(VTOFFSET.windspeedHpa.v); return o == 0 ? nil : com_openmeteo_api_result_PressureValues(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public var hasWinddirectionHpa: Bool { let o = _accessor.offset(VTOFFSET.winddirectionHpa.v); return o == 0 ? false : true }
-  public var winddirectionHpaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirectionHpa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func winddirectionHpa(at index: Int32) -> com_openmeteo_api_result_PressureValues? { let o = _accessor.offset(VTOFFSET.winddirectionHpa.v); return o == 0 ? nil : com_openmeteo_api_result_PressureValues(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public var hasDewpointHpa: Bool { let o = _accessor.offset(VTOFFSET.dewpointHpa.v); return o == 0 ? false : true }
-  public var dewpointHpaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpointHpa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func dewpointHpa(at index: Int32) -> com_openmeteo_api_result_PressureValues? { let o = _accessor.offset(VTOFFSET.dewpointHpa.v); return o == 0 ? nil : com_openmeteo_api_result_PressureValues(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public var hasCloudcoverHpa: Bool { let o = _accessor.offset(VTOFFSET.cloudcoverHpa.v); return o == 0 ? false : true }
-  public var cloudcoverHpaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcoverHpa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func cloudcoverHpa(at index: Int32) -> com_openmeteo_api_result_PressureValues? { let o = _accessor.offset(VTOFFSET.cloudcoverHpa.v); return o == 0 ? nil : com_openmeteo_api_result_PressureValues(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public var hasVerticalVelocityHpa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocityHpa.v); return o == 0 ? false : true }
-  public var verticalVelocityHpaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocityHpa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func verticalVelocityHpa(at index: Int32) -> com_openmeteo_api_result_PressureValues? { let o = _accessor.offset(VTOFFSET.verticalVelocityHpa.v); return o == 0 ? nil : com_openmeteo_api_result_PressureValues(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
-  public var growingDegreeDays: com_openmeteo_api_result_Gdd? { let o = _accessor.offset(VTOFFSET.growingDegreeDays.v); return o == 0 ? nil : com_openmeteo_api_result_Gdd(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var tiltedDirectRadiation: com_openmeteo_api_result_Tilted? { let o = _accessor.offset(VTOFFSET.tiltedDirectRadiation.v); return o == 0 ? nil : com_openmeteo_api_result_Tilted(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 86) }
+  public var hasTemperature1015hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature1015hPa.v); return o == 0 ? false : true }
+  public var temperature1015hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature1015hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature1015hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature1015hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature1015hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature1015hPa.v) ?? [] }
+  public var hasTemperature1000hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature1000hPa.v); return o == 0 ? false : true }
+  public var temperature1000hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature1000hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature1000hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature1000hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature1000hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature1000hPa.v) ?? [] }
+  public var hasTemperature985hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature985hPa.v); return o == 0 ? false : true }
+  public var temperature985hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature985hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature985hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature985hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature985hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature985hPa.v) ?? [] }
+  public var hasTemperature975hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature975hPa.v); return o == 0 ? false : true }
+  public var temperature975hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature975hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature975hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature975hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature975hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature975hPa.v) ?? [] }
+  public var hasTemperature970hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature970hPa.v); return o == 0 ? false : true }
+  public var temperature970hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature970hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature970hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature970hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature970hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature970hPa.v) ?? [] }
+  public var hasTemperature950hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature950hPa.v); return o == 0 ? false : true }
+  public var temperature950hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature950hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature950hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature950hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature950hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature950hPa.v) ?? [] }
+  public var hasTemperature925hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature925hPa.v); return o == 0 ? false : true }
+  public var temperature925hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature925hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature925hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature925hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature925hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature925hPa.v) ?? [] }
+  public var hasTemperature900hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature900hPa.v); return o == 0 ? false : true }
+  public var temperature900hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature900hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature900hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature900hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature900hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature900hPa.v) ?? [] }
+  public var hasTemperature875hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature875hPa.v); return o == 0 ? false : true }
+  public var temperature875hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature875hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature875hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature875hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature875hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature875hPa.v) ?? [] }
+  public var hasTemperature850hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature850hPa.v); return o == 0 ? false : true }
+  public var temperature850hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature850hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature850hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature850hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature850hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature850hPa.v) ?? [] }
+  public var hasTemperature800hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature800hPa.v); return o == 0 ? false : true }
+  public var temperature800hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature800hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature800hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature800hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature800hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature800hPa.v) ?? [] }
+  public var hasTemperature750hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature750hPa.v); return o == 0 ? false : true }
+  public var temperature750hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature750hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature750hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature750hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature750hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature750hPa.v) ?? [] }
+  public var hasTemperature700hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature700hPa.v); return o == 0 ? false : true }
+  public var temperature700hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature700hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature700hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature700hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature700hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature700hPa.v) ?? [] }
+  public var hasTemperature650hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature650hPa.v); return o == 0 ? false : true }
+  public var temperature650hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature650hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature650hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature650hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature650hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature650hPa.v) ?? [] }
+  public var hasTemperature600hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature600hPa.v); return o == 0 ? false : true }
+  public var temperature600hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature600hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature600hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature600hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature600hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature600hPa.v) ?? [] }
+  public var hasTemperature550hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature550hPa.v); return o == 0 ? false : true }
+  public var temperature550hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature550hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature550hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature550hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature550hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature550hPa.v) ?? [] }
+  public var hasTemperature500hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature500hPa.v); return o == 0 ? false : true }
+  public var temperature500hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature500hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature500hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature500hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature500hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature500hPa.v) ?? [] }
+  public var hasTemperature450hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature450hPa.v); return o == 0 ? false : true }
+  public var temperature450hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature450hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature450hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature450hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature450hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature450hPa.v) ?? [] }
+  public var hasTemperature400hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature400hPa.v); return o == 0 ? false : true }
+  public var temperature400hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature400hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature400hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature400hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature400hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature400hPa.v) ?? [] }
+  public var hasTemperature350hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature350hPa.v); return o == 0 ? false : true }
+  public var temperature350hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature350hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature350hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature350hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature350hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature350hPa.v) ?? [] }
+  public var hasTemperature300hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature300hPa.v); return o == 0 ? false : true }
+  public var temperature300hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature300hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature300hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature300hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature300hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature300hPa.v) ?? [] }
+  public var hasTemperature275hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature275hPa.v); return o == 0 ? false : true }
+  public var temperature275hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature275hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature275hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature275hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature275hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature275hPa.v) ?? [] }
+  public var hasTemperature250hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature250hPa.v); return o == 0 ? false : true }
+  public var temperature250hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature250hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature250hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature250hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature250hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature250hPa.v) ?? [] }
+  public var hasTemperature225hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature225hPa.v); return o == 0 ? false : true }
+  public var temperature225hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature225hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature225hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature225hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature225hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature225hPa.v) ?? [] }
+  public var hasTemperature200hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature200hPa.v); return o == 0 ? false : true }
+  public var temperature200hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature200hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature200hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature200hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature200hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature200hPa.v) ?? [] }
+  public var hasTemperature175hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature175hPa.v); return o == 0 ? false : true }
+  public var temperature175hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature175hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature175hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature175hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature175hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature175hPa.v) ?? [] }
+  public var hasTemperature150hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature150hPa.v); return o == 0 ? false : true }
+  public var temperature150hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature150hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature150hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature150hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature150hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature150hPa.v) ?? [] }
+  public var hasTemperature125hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature125hPa.v); return o == 0 ? false : true }
+  public var temperature125hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature125hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature125hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature125hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature125hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature125hPa.v) ?? [] }
+  public var hasTemperature100hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature100hPa.v); return o == 0 ? false : true }
+  public var temperature100hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature100hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature100hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature100hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature100hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature100hPa.v) ?? [] }
+  public var hasTemperature70hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature70hPa.v); return o == 0 ? false : true }
+  public var temperature70hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature70hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature70hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature70hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature70hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature70hPa.v) ?? [] }
+  public var hasTemperature50hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature50hPa.v); return o == 0 ? false : true }
+  public var temperature50hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature50hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature50hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature50hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature50hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature50hPa.v) ?? [] }
+  public var hasTemperature40hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature40hPa.v); return o == 0 ? false : true }
+  public var temperature40hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature40hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature40hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature40hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature40hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature40hPa.v) ?? [] }
+  public var hasTemperature30hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature30hPa.v); return o == 0 ? false : true }
+  public var temperature30hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature30hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature30hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature30hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature30hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature30hPa.v) ?? [] }
+  public var hasTemperature20hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature20hPa.v); return o == 0 ? false : true }
+  public var temperature20hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature20hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature20hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature20hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature20hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature20hPa.v) ?? [] }
+  public var hasTemperature15hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature15hPa.v); return o == 0 ? false : true }
+  public var temperature15hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature15hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature15hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature15hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature15hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature15hPa.v) ?? [] }
+  public var hasTemperature10hPa: Bool { let o = _accessor.offset(VTOFFSET.temperature10hPa.v); return o == 0 ? false : true }
+  public var temperature10hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature10hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func temperature10hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature10hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var temperature10hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.temperature10hPa.v) ?? [] }
+  public var hasDewpoint1015hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint1015hPa.v); return o == 0 ? false : true }
+  public var dewpoint1015hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint1015hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint1015hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint1015hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint1015hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint1015hPa.v) ?? [] }
+  public var hasDewpoint1000hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint1000hPa.v); return o == 0 ? false : true }
+  public var dewpoint1000hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint1000hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint1000hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint1000hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint1000hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint1000hPa.v) ?? [] }
+  public var hasDewpoint985hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint985hPa.v); return o == 0 ? false : true }
+  public var dewpoint985hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint985hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint985hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint985hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint985hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint985hPa.v) ?? [] }
+  public var hasDewpoint975hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint975hPa.v); return o == 0 ? false : true }
+  public var dewpoint975hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint975hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint975hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint975hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint975hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint975hPa.v) ?? [] }
+  public var hasDewpoint970hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint970hPa.v); return o == 0 ? false : true }
+  public var dewpoint970hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint970hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint970hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint970hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint970hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint970hPa.v) ?? [] }
+  public var hasDewpoint950hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint950hPa.v); return o == 0 ? false : true }
+  public var dewpoint950hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint950hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint950hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint950hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint950hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint950hPa.v) ?? [] }
+  public var hasDewpoint925hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint925hPa.v); return o == 0 ? false : true }
+  public var dewpoint925hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint925hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint925hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint925hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint925hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint925hPa.v) ?? [] }
+  public var hasDewpoint900hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint900hPa.v); return o == 0 ? false : true }
+  public var dewpoint900hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint900hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint900hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint900hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint900hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint900hPa.v) ?? [] }
+  public var hasDewpoint875hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint875hPa.v); return o == 0 ? false : true }
+  public var dewpoint875hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint875hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint875hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint875hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint875hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint875hPa.v) ?? [] }
+  public var hasDewpoint850hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint850hPa.v); return o == 0 ? false : true }
+  public var dewpoint850hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint850hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint850hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint850hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint850hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint850hPa.v) ?? [] }
+  public var hasDewpoint800hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint800hPa.v); return o == 0 ? false : true }
+  public var dewpoint800hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint800hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint800hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint800hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint800hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint800hPa.v) ?? [] }
+  public var hasDewpoint750hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint750hPa.v); return o == 0 ? false : true }
+  public var dewpoint750hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint750hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint750hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint750hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint750hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint750hPa.v) ?? [] }
+  public var hasDewpoint700hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint700hPa.v); return o == 0 ? false : true }
+  public var dewpoint700hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint700hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint700hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint700hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint700hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint700hPa.v) ?? [] }
+  public var hasDewpoint650hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint650hPa.v); return o == 0 ? false : true }
+  public var dewpoint650hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint650hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint650hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint650hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint650hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint650hPa.v) ?? [] }
+  public var hasDewpoint600hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint600hPa.v); return o == 0 ? false : true }
+  public var dewpoint600hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint600hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint600hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint600hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint600hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint600hPa.v) ?? [] }
+  public var hasDewpoint550hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint550hPa.v); return o == 0 ? false : true }
+  public var dewpoint550hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint550hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint550hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint550hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint550hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint550hPa.v) ?? [] }
+  public var hasDewpoint500hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint500hPa.v); return o == 0 ? false : true }
+  public var dewpoint500hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint500hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint500hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint500hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint500hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint500hPa.v) ?? [] }
+  public var hasDewpoint450hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint450hPa.v); return o == 0 ? false : true }
+  public var dewpoint450hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint450hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint450hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint450hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint450hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint450hPa.v) ?? [] }
+  public var hasDewpoint400hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint400hPa.v); return o == 0 ? false : true }
+  public var dewpoint400hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint400hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint400hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint400hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint400hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint400hPa.v) ?? [] }
+  public var hasDewpoint350hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint350hPa.v); return o == 0 ? false : true }
+  public var dewpoint350hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint350hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint350hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint350hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint350hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint350hPa.v) ?? [] }
+  public var hasDewpoint300hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint300hPa.v); return o == 0 ? false : true }
+  public var dewpoint300hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint300hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint300hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint300hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint300hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint300hPa.v) ?? [] }
+  public var hasDewpoint275hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint275hPa.v); return o == 0 ? false : true }
+  public var dewpoint275hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint275hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint275hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint275hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint275hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint275hPa.v) ?? [] }
+  public var hasDewpoint250hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint250hPa.v); return o == 0 ? false : true }
+  public var dewpoint250hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint250hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint250hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint250hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint250hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint250hPa.v) ?? [] }
+  public var hasDewpoint225hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint225hPa.v); return o == 0 ? false : true }
+  public var dewpoint225hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint225hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint225hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint225hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint225hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint225hPa.v) ?? [] }
+  public var hasDewpoint200hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint200hPa.v); return o == 0 ? false : true }
+  public var dewpoint200hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint200hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint200hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint200hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint200hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint200hPa.v) ?? [] }
+  public var hasDewpoint175hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint175hPa.v); return o == 0 ? false : true }
+  public var dewpoint175hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint175hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint175hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint175hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint175hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint175hPa.v) ?? [] }
+  public var hasDewpoint150hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint150hPa.v); return o == 0 ? false : true }
+  public var dewpoint150hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint150hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint150hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint150hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint150hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint150hPa.v) ?? [] }
+  public var hasDewpoint125hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint125hPa.v); return o == 0 ? false : true }
+  public var dewpoint125hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint125hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint125hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint125hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint125hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint125hPa.v) ?? [] }
+  public var hasDewpoint100hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint100hPa.v); return o == 0 ? false : true }
+  public var dewpoint100hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint100hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint100hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint100hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint100hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint100hPa.v) ?? [] }
+  public var hasDewpoint70hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint70hPa.v); return o == 0 ? false : true }
+  public var dewpoint70hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint70hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint70hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint70hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint70hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint70hPa.v) ?? [] }
+  public var hasDewpoint50hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint50hPa.v); return o == 0 ? false : true }
+  public var dewpoint50hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint50hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint50hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint50hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint50hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint50hPa.v) ?? [] }
+  public var hasDewpoint40hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint40hPa.v); return o == 0 ? false : true }
+  public var dewpoint40hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint40hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint40hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint40hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint40hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint40hPa.v) ?? [] }
+  public var hasDewpoint30hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint30hPa.v); return o == 0 ? false : true }
+  public var dewpoint30hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint30hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint30hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint30hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint30hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint30hPa.v) ?? [] }
+  public var hasDewpoint20hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint20hPa.v); return o == 0 ? false : true }
+  public var dewpoint20hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint20hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint20hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint20hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint20hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint20hPa.v) ?? [] }
+  public var hasDewpoint15hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint15hPa.v); return o == 0 ? false : true }
+  public var dewpoint15hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint15hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint15hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint15hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint15hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint15hPa.v) ?? [] }
+  public var hasDewpoint10hPa: Bool { let o = _accessor.offset(VTOFFSET.dewpoint10hPa.v); return o == 0 ? false : true }
+  public var dewpoint10hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.dewpoint10hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func dewpoint10hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dewpoint10hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var dewpoint10hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.dewpoint10hPa.v) ?? [] }
+  public var hasRelativehumidity1015hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity1015hPa.v); return o == 0 ? false : true }
+  public var relativehumidity1015hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity1015hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity1015hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity1015hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity1015hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity1015hPa.v) ?? [] }
+  public var hasRelativehumidity1000hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity1000hPa.v); return o == 0 ? false : true }
+  public var relativehumidity1000hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity1000hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity1000hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity1000hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity1000hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity1000hPa.v) ?? [] }
+  public var hasRelativehumidity985hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity985hPa.v); return o == 0 ? false : true }
+  public var relativehumidity985hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity985hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity985hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity985hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity985hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity985hPa.v) ?? [] }
+  public var hasRelativehumidity975hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity975hPa.v); return o == 0 ? false : true }
+  public var relativehumidity975hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity975hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity975hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity975hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity975hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity975hPa.v) ?? [] }
+  public var hasRelativehumidity970hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity970hPa.v); return o == 0 ? false : true }
+  public var relativehumidity970hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity970hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity970hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity970hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity970hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity970hPa.v) ?? [] }
+  public var hasRelativehumidity950hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity950hPa.v); return o == 0 ? false : true }
+  public var relativehumidity950hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity950hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity950hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity950hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity950hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity950hPa.v) ?? [] }
+  public var hasRelativehumidity925hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity925hPa.v); return o == 0 ? false : true }
+  public var relativehumidity925hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity925hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity925hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity925hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity925hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity925hPa.v) ?? [] }
+  public var hasRelativehumidity900hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity900hPa.v); return o == 0 ? false : true }
+  public var relativehumidity900hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity900hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity900hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity900hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity900hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity900hPa.v) ?? [] }
+  public var hasRelativehumidity875hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity875hPa.v); return o == 0 ? false : true }
+  public var relativehumidity875hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity875hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity875hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity875hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity875hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity875hPa.v) ?? [] }
+  public var hasRelativehumidity850hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity850hPa.v); return o == 0 ? false : true }
+  public var relativehumidity850hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity850hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity850hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity850hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity850hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity850hPa.v) ?? [] }
+  public var hasRelativehumidity800hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity800hPa.v); return o == 0 ? false : true }
+  public var relativehumidity800hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity800hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity800hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity800hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity800hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity800hPa.v) ?? [] }
+  public var hasRelativehumidity750hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity750hPa.v); return o == 0 ? false : true }
+  public var relativehumidity750hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity750hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity750hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity750hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity750hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity750hPa.v) ?? [] }
+  public var hasRelativehumidity700hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity700hPa.v); return o == 0 ? false : true }
+  public var relativehumidity700hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity700hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity700hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity700hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity700hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity700hPa.v) ?? [] }
+  public var hasRelativehumidity650hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity650hPa.v); return o == 0 ? false : true }
+  public var relativehumidity650hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity650hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity650hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity650hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity650hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity650hPa.v) ?? [] }
+  public var hasRelativehumidity600hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity600hPa.v); return o == 0 ? false : true }
+  public var relativehumidity600hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity600hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity600hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity600hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity600hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity600hPa.v) ?? [] }
+  public var hasRelativehumidity550hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity550hPa.v); return o == 0 ? false : true }
+  public var relativehumidity550hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity550hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity550hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity550hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity550hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity550hPa.v) ?? [] }
+  public var hasRelativehumidity500hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity500hPa.v); return o == 0 ? false : true }
+  public var relativehumidity500hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity500hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity500hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity500hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity500hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity500hPa.v) ?? [] }
+  public var hasRelativehumidity450hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity450hPa.v); return o == 0 ? false : true }
+  public var relativehumidity450hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity450hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity450hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity450hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity450hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity450hPa.v) ?? [] }
+  public var hasRelativehumidity400hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity400hPa.v); return o == 0 ? false : true }
+  public var relativehumidity400hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity400hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity400hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity400hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity400hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity400hPa.v) ?? [] }
+  public var hasRelativehumidity350hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity350hPa.v); return o == 0 ? false : true }
+  public var relativehumidity350hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity350hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity350hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity350hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity350hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity350hPa.v) ?? [] }
+  public var hasRelativehumidity300hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity300hPa.v); return o == 0 ? false : true }
+  public var relativehumidity300hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity300hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity300hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity300hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity300hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity300hPa.v) ?? [] }
+  public var hasRelativehumidity275hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity275hPa.v); return o == 0 ? false : true }
+  public var relativehumidity275hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity275hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity275hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity275hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity275hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity275hPa.v) ?? [] }
+  public var hasRelativehumidity250hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity250hPa.v); return o == 0 ? false : true }
+  public var relativehumidity250hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity250hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity250hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity250hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity250hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity250hPa.v) ?? [] }
+  public var hasRelativehumidity225hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity225hPa.v); return o == 0 ? false : true }
+  public var relativehumidity225hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity225hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity225hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity225hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity225hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity225hPa.v) ?? [] }
+  public var hasRelativehumidity200hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity200hPa.v); return o == 0 ? false : true }
+  public var relativehumidity200hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity200hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity200hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity200hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity200hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity200hPa.v) ?? [] }
+  public var hasRelativehumidity175hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity175hPa.v); return o == 0 ? false : true }
+  public var relativehumidity175hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity175hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity175hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity175hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity175hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity175hPa.v) ?? [] }
+  public var hasRelativehumidity150hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity150hPa.v); return o == 0 ? false : true }
+  public var relativehumidity150hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity150hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity150hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity150hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity150hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity150hPa.v) ?? [] }
+  public var hasRelativehumidity125hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity125hPa.v); return o == 0 ? false : true }
+  public var relativehumidity125hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity125hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity125hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity125hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity125hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity125hPa.v) ?? [] }
+  public var hasRelativehumidity100hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity100hPa.v); return o == 0 ? false : true }
+  public var relativehumidity100hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity100hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity100hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity100hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity100hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity100hPa.v) ?? [] }
+  public var hasRelativehumidity70hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity70hPa.v); return o == 0 ? false : true }
+  public var relativehumidity70hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity70hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity70hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity70hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity70hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity70hPa.v) ?? [] }
+  public var hasRelativehumidity50hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity50hPa.v); return o == 0 ? false : true }
+  public var relativehumidity50hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity50hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity50hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity50hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity50hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity50hPa.v) ?? [] }
+  public var hasRelativehumidity40hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity40hPa.v); return o == 0 ? false : true }
+  public var relativehumidity40hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity40hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity40hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity40hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity40hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity40hPa.v) ?? [] }
+  public var hasRelativehumidity30hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity30hPa.v); return o == 0 ? false : true }
+  public var relativehumidity30hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity30hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity30hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity30hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity30hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity30hPa.v) ?? [] }
+  public var hasRelativehumidity20hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity20hPa.v); return o == 0 ? false : true }
+  public var relativehumidity20hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity20hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity20hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity20hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity20hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity20hPa.v) ?? [] }
+  public var hasRelativehumidity15hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity15hPa.v); return o == 0 ? false : true }
+  public var relativehumidity15hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity15hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity15hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity15hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity15hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity15hPa.v) ?? [] }
+  public var hasRelativehumidity10hPa: Bool { let o = _accessor.offset(VTOFFSET.relativehumidity10hPa.v); return o == 0 ? false : true }
+  public var relativehumidity10hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.relativehumidity10hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func relativehumidity10hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.relativehumidity10hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var relativehumidity10hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.relativehumidity10hPa.v) ?? [] }
+  public var hasCloudcover1015hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover1015hPa.v); return o == 0 ? false : true }
+  public var cloudcover1015hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover1015hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover1015hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover1015hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover1015hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover1015hPa.v) ?? [] }
+  public var hasCloudcover1000hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover1000hPa.v); return o == 0 ? false : true }
+  public var cloudcover1000hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover1000hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover1000hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover1000hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover1000hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover1000hPa.v) ?? [] }
+  public var hasCloudcover985hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover985hPa.v); return o == 0 ? false : true }
+  public var cloudcover985hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover985hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover985hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover985hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover985hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover985hPa.v) ?? [] }
+  public var hasCloudcover975hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover975hPa.v); return o == 0 ? false : true }
+  public var cloudcover975hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover975hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover975hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover975hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover975hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover975hPa.v) ?? [] }
+  public var hasCloudcover970hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover970hPa.v); return o == 0 ? false : true }
+  public var cloudcover970hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover970hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover970hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover970hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover970hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover970hPa.v) ?? [] }
+  public var hasCloudcover950hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover950hPa.v); return o == 0 ? false : true }
+  public var cloudcover950hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover950hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover950hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover950hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover950hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover950hPa.v) ?? [] }
+  public var hasCloudcover925hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover925hPa.v); return o == 0 ? false : true }
+  public var cloudcover925hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover925hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover925hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover925hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover925hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover925hPa.v) ?? [] }
+  public var hasCloudcover900hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover900hPa.v); return o == 0 ? false : true }
+  public var cloudcover900hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover900hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover900hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover900hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover900hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover900hPa.v) ?? [] }
+  public var hasCloudcover875hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover875hPa.v); return o == 0 ? false : true }
+  public var cloudcover875hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover875hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover875hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover875hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover875hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover875hPa.v) ?? [] }
+  public var hasCloudcover850hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover850hPa.v); return o == 0 ? false : true }
+  public var cloudcover850hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover850hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover850hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover850hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover850hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover850hPa.v) ?? [] }
+  public var hasCloudcover800hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover800hPa.v); return o == 0 ? false : true }
+  public var cloudcover800hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover800hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover800hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover800hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover800hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover800hPa.v) ?? [] }
+  public var hasCloudcover750hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover750hPa.v); return o == 0 ? false : true }
+  public var cloudcover750hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover750hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover750hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover750hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover750hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover750hPa.v) ?? [] }
+  public var hasCloudcover700hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover700hPa.v); return o == 0 ? false : true }
+  public var cloudcover700hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover700hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover700hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover700hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover700hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover700hPa.v) ?? [] }
+  public var hasCloudcover650hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover650hPa.v); return o == 0 ? false : true }
+  public var cloudcover650hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover650hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover650hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover650hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover650hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover650hPa.v) ?? [] }
+  public var hasCloudcover600hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover600hPa.v); return o == 0 ? false : true }
+  public var cloudcover600hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover600hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover600hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover600hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover600hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover600hPa.v) ?? [] }
+  public var hasCloudcover550hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover550hPa.v); return o == 0 ? false : true }
+  public var cloudcover550hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover550hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover550hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover550hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover550hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover550hPa.v) ?? [] }
+  public var hasCloudcover500hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover500hPa.v); return o == 0 ? false : true }
+  public var cloudcover500hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover500hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover500hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover500hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover500hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover500hPa.v) ?? [] }
+  public var hasCloudcover450hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover450hPa.v); return o == 0 ? false : true }
+  public var cloudcover450hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover450hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover450hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover450hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover450hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover450hPa.v) ?? [] }
+  public var hasCloudcover400hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover400hPa.v); return o == 0 ? false : true }
+  public var cloudcover400hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover400hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover400hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover400hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover400hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover400hPa.v) ?? [] }
+  public var hasCloudcover350hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover350hPa.v); return o == 0 ? false : true }
+  public var cloudcover350hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover350hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover350hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover350hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover350hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover350hPa.v) ?? [] }
+  public var hasCloudcover300hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover300hPa.v); return o == 0 ? false : true }
+  public var cloudcover300hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover300hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover300hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover300hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover300hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover300hPa.v) ?? [] }
+  public var hasCloudcover275hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover275hPa.v); return o == 0 ? false : true }
+  public var cloudcover275hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover275hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover275hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover275hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover275hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover275hPa.v) ?? [] }
+  public var hasCloudcover250hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover250hPa.v); return o == 0 ? false : true }
+  public var cloudcover250hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover250hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover250hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover250hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover250hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover250hPa.v) ?? [] }
+  public var hasCloudcover225hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover225hPa.v); return o == 0 ? false : true }
+  public var cloudcover225hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover225hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover225hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover225hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover225hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover225hPa.v) ?? [] }
+  public var hasCloudcover200hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover200hPa.v); return o == 0 ? false : true }
+  public var cloudcover200hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover200hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover200hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover200hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover200hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover200hPa.v) ?? [] }
+  public var hasCloudcover175hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover175hPa.v); return o == 0 ? false : true }
+  public var cloudcover175hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover175hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover175hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover175hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover175hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover175hPa.v) ?? [] }
+  public var hasCloudcover150hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover150hPa.v); return o == 0 ? false : true }
+  public var cloudcover150hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover150hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover150hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover150hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover150hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover150hPa.v) ?? [] }
+  public var hasCloudcover125hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover125hPa.v); return o == 0 ? false : true }
+  public var cloudcover125hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover125hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover125hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover125hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover125hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover125hPa.v) ?? [] }
+  public var hasCloudcover100hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover100hPa.v); return o == 0 ? false : true }
+  public var cloudcover100hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover100hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover100hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover100hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover100hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover100hPa.v) ?? [] }
+  public var hasCloudcover70hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover70hPa.v); return o == 0 ? false : true }
+  public var cloudcover70hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover70hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover70hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover70hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover70hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover70hPa.v) ?? [] }
+  public var hasCloudcover50hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover50hPa.v); return o == 0 ? false : true }
+  public var cloudcover50hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover50hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover50hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover50hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover50hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover50hPa.v) ?? [] }
+  public var hasCloudcover40hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover40hPa.v); return o == 0 ? false : true }
+  public var cloudcover40hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover40hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover40hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover40hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover40hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover40hPa.v) ?? [] }
+  public var hasCloudcover30hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover30hPa.v); return o == 0 ? false : true }
+  public var cloudcover30hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover30hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover30hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover30hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover30hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover30hPa.v) ?? [] }
+  public var hasCloudcover20hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover20hPa.v); return o == 0 ? false : true }
+  public var cloudcover20hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover20hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover20hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover20hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover20hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover20hPa.v) ?? [] }
+  public var hasCloudcover15hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover15hPa.v); return o == 0 ? false : true }
+  public var cloudcover15hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover15hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover15hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover15hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover15hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover15hPa.v) ?? [] }
+  public var hasCloudcover10hPa: Bool { let o = _accessor.offset(VTOFFSET.cloudcover10hPa.v); return o == 0 ? false : true }
+  public var cloudcover10hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.cloudcover10hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func cloudcover10hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.cloudcover10hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var cloudcover10hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.cloudcover10hPa.v) ?? [] }
+  public var hasWindspeed1015hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed1015hPa.v); return o == 0 ? false : true }
+  public var windspeed1015hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed1015hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed1015hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed1015hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed1015hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed1015hPa.v) ?? [] }
+  public var hasWindspeed1000hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed1000hPa.v); return o == 0 ? false : true }
+  public var windspeed1000hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed1000hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed1000hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed1000hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed1000hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed1000hPa.v) ?? [] }
+  public var hasWindspeed985hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed985hPa.v); return o == 0 ? false : true }
+  public var windspeed985hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed985hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed985hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed985hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed985hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed985hPa.v) ?? [] }
+  public var hasWindspeed975hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed975hPa.v); return o == 0 ? false : true }
+  public var windspeed975hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed975hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed975hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed975hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed975hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed975hPa.v) ?? [] }
+  public var hasWindspeed970hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed970hPa.v); return o == 0 ? false : true }
+  public var windspeed970hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed970hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed970hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed970hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed970hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed970hPa.v) ?? [] }
+  public var hasWindspeed950hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed950hPa.v); return o == 0 ? false : true }
+  public var windspeed950hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed950hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed950hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed950hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed950hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed950hPa.v) ?? [] }
+  public var hasWindspeed925hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed925hPa.v); return o == 0 ? false : true }
+  public var windspeed925hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed925hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed925hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed925hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed925hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed925hPa.v) ?? [] }
+  public var hasWindspeed900hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed900hPa.v); return o == 0 ? false : true }
+  public var windspeed900hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed900hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed900hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed900hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed900hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed900hPa.v) ?? [] }
+  public var hasWindspeed875hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed875hPa.v); return o == 0 ? false : true }
+  public var windspeed875hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed875hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed875hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed875hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed875hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed875hPa.v) ?? [] }
+  public var hasWindspeed850hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed850hPa.v); return o == 0 ? false : true }
+  public var windspeed850hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed850hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed850hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed850hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed850hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed850hPa.v) ?? [] }
+  public var hasWindspeed800hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed800hPa.v); return o == 0 ? false : true }
+  public var windspeed800hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed800hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed800hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed800hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed800hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed800hPa.v) ?? [] }
+  public var hasWindspeed750hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed750hPa.v); return o == 0 ? false : true }
+  public var windspeed750hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed750hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed750hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed750hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed750hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed750hPa.v) ?? [] }
+  public var hasWindspeed700hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed700hPa.v); return o == 0 ? false : true }
+  public var windspeed700hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed700hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed700hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed700hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed700hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed700hPa.v) ?? [] }
+  public var hasWindspeed650hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed650hPa.v); return o == 0 ? false : true }
+  public var windspeed650hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed650hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed650hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed650hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed650hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed650hPa.v) ?? [] }
+  public var hasWindspeed600hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed600hPa.v); return o == 0 ? false : true }
+  public var windspeed600hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed600hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed600hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed600hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed600hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed600hPa.v) ?? [] }
+  public var hasWindspeed550hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed550hPa.v); return o == 0 ? false : true }
+  public var windspeed550hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed550hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed550hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed550hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed550hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed550hPa.v) ?? [] }
+  public var hasWindspeed500hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed500hPa.v); return o == 0 ? false : true }
+  public var windspeed500hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed500hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed500hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed500hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed500hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed500hPa.v) ?? [] }
+  public var hasWindspeed450hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed450hPa.v); return o == 0 ? false : true }
+  public var windspeed450hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed450hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed450hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed450hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed450hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed450hPa.v) ?? [] }
+  public var hasWindspeed400hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed400hPa.v); return o == 0 ? false : true }
+  public var windspeed400hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed400hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed400hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed400hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed400hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed400hPa.v) ?? [] }
+  public var hasWindspeed350hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed350hPa.v); return o == 0 ? false : true }
+  public var windspeed350hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed350hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed350hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed350hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed350hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed350hPa.v) ?? [] }
+  public var hasWindspeed300hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed300hPa.v); return o == 0 ? false : true }
+  public var windspeed300hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed300hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed300hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed300hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed300hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed300hPa.v) ?? [] }
+  public var hasWindspeed275hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed275hPa.v); return o == 0 ? false : true }
+  public var windspeed275hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed275hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed275hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed275hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed275hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed275hPa.v) ?? [] }
+  public var hasWindspeed250hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed250hPa.v); return o == 0 ? false : true }
+  public var windspeed250hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed250hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed250hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed250hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed250hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed250hPa.v) ?? [] }
+  public var hasWindspeed225hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed225hPa.v); return o == 0 ? false : true }
+  public var windspeed225hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed225hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed225hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed225hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed225hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed225hPa.v) ?? [] }
+  public var hasWindspeed200hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed200hPa.v); return o == 0 ? false : true }
+  public var windspeed200hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed200hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed200hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed200hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed200hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed200hPa.v) ?? [] }
+  public var hasWindspeed175hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed175hPa.v); return o == 0 ? false : true }
+  public var windspeed175hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed175hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed175hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed175hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed175hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed175hPa.v) ?? [] }
+  public var hasWindspeed150hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed150hPa.v); return o == 0 ? false : true }
+  public var windspeed150hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed150hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed150hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed150hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed150hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed150hPa.v) ?? [] }
+  public var hasWindspeed125hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed125hPa.v); return o == 0 ? false : true }
+  public var windspeed125hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed125hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed125hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed125hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed125hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed125hPa.v) ?? [] }
+  public var hasWindspeed100hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed100hPa.v); return o == 0 ? false : true }
+  public var windspeed100hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed100hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed100hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed100hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed100hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed100hPa.v) ?? [] }
+  public var hasWindspeed70hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed70hPa.v); return o == 0 ? false : true }
+  public var windspeed70hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed70hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed70hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed70hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed70hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed70hPa.v) ?? [] }
+  public var hasWindspeed50hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed50hPa.v); return o == 0 ? false : true }
+  public var windspeed50hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed50hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed50hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed50hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed50hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed50hPa.v) ?? [] }
+  public var hasWindspeed40hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed40hPa.v); return o == 0 ? false : true }
+  public var windspeed40hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed40hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed40hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed40hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed40hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed40hPa.v) ?? [] }
+  public var hasWindspeed30hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed30hPa.v); return o == 0 ? false : true }
+  public var windspeed30hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed30hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed30hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed30hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed30hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed30hPa.v) ?? [] }
+  public var hasWindspeed20hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed20hPa.v); return o == 0 ? false : true }
+  public var windspeed20hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed20hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed20hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed20hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed20hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed20hPa.v) ?? [] }
+  public var hasWindspeed15hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed15hPa.v); return o == 0 ? false : true }
+  public var windspeed15hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed15hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed15hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed15hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed15hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed15hPa.v) ?? [] }
+  public var hasWindspeed10hPa: Bool { let o = _accessor.offset(VTOFFSET.windspeed10hPa.v); return o == 0 ? false : true }
+  public var windspeed10hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.windspeed10hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func windspeed10hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.windspeed10hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var windspeed10hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.windspeed10hPa.v) ?? [] }
+  public var hasWinddirection1015hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection1015hPa.v); return o == 0 ? false : true }
+  public var winddirection1015hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection1015hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection1015hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection1015hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection1015hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection1015hPa.v) ?? [] }
+  public var hasWinddirection1000hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection1000hPa.v); return o == 0 ? false : true }
+  public var winddirection1000hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection1000hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection1000hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection1000hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection1000hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection1000hPa.v) ?? [] }
+  public var hasWinddirection985hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection985hPa.v); return o == 0 ? false : true }
+  public var winddirection985hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection985hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection985hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection985hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection985hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection985hPa.v) ?? [] }
+  public var hasWinddirection975hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection975hPa.v); return o == 0 ? false : true }
+  public var winddirection975hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection975hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection975hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection975hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection975hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection975hPa.v) ?? [] }
+  public var hasWinddirection970hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection970hPa.v); return o == 0 ? false : true }
+  public var winddirection970hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection970hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection970hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection970hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection970hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection970hPa.v) ?? [] }
+  public var hasWinddirection950hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection950hPa.v); return o == 0 ? false : true }
+  public var winddirection950hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection950hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection950hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection950hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection950hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection950hPa.v) ?? [] }
+  public var hasWinddirection925hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection925hPa.v); return o == 0 ? false : true }
+  public var winddirection925hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection925hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection925hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection925hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection925hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection925hPa.v) ?? [] }
+  public var hasWinddirection900hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection900hPa.v); return o == 0 ? false : true }
+  public var winddirection900hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection900hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection900hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection900hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection900hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection900hPa.v) ?? [] }
+  public var hasWinddirection875hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection875hPa.v); return o == 0 ? false : true }
+  public var winddirection875hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection875hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection875hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection875hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection875hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection875hPa.v) ?? [] }
+  public var hasWinddirection850hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection850hPa.v); return o == 0 ? false : true }
+  public var winddirection850hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection850hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection850hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection850hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection850hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection850hPa.v) ?? [] }
+  public var hasWinddirection800hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection800hPa.v); return o == 0 ? false : true }
+  public var winddirection800hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection800hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection800hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection800hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection800hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection800hPa.v) ?? [] }
+  public var hasWinddirection750hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection750hPa.v); return o == 0 ? false : true }
+  public var winddirection750hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection750hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection750hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection750hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection750hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection750hPa.v) ?? [] }
+  public var hasWinddirection700hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection700hPa.v); return o == 0 ? false : true }
+  public var winddirection700hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection700hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection700hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection700hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection700hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection700hPa.v) ?? [] }
+  public var hasWinddirection650hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection650hPa.v); return o == 0 ? false : true }
+  public var winddirection650hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection650hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection650hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection650hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection650hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection650hPa.v) ?? [] }
+  public var hasWinddirection600hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection600hPa.v); return o == 0 ? false : true }
+  public var winddirection600hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection600hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection600hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection600hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection600hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection600hPa.v) ?? [] }
+  public var hasWinddirection550hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection550hPa.v); return o == 0 ? false : true }
+  public var winddirection550hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection550hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection550hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection550hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection550hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection550hPa.v) ?? [] }
+  public var hasWinddirection500hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection500hPa.v); return o == 0 ? false : true }
+  public var winddirection500hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection500hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection500hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection500hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection500hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection500hPa.v) ?? [] }
+  public var hasWinddirection450hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection450hPa.v); return o == 0 ? false : true }
+  public var winddirection450hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection450hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection450hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection450hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection450hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection450hPa.v) ?? [] }
+  public var hasWinddirection400hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection400hPa.v); return o == 0 ? false : true }
+  public var winddirection400hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection400hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection400hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection400hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection400hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection400hPa.v) ?? [] }
+  public var hasWinddirection350hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection350hPa.v); return o == 0 ? false : true }
+  public var winddirection350hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection350hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection350hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection350hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection350hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection350hPa.v) ?? [] }
+  public var hasWinddirection300hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection300hPa.v); return o == 0 ? false : true }
+  public var winddirection300hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection300hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection300hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection300hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection300hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection300hPa.v) ?? [] }
+  public var hasWinddirection275hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection275hPa.v); return o == 0 ? false : true }
+  public var winddirection275hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection275hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection275hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection275hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection275hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection275hPa.v) ?? [] }
+  public var hasWinddirection250hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection250hPa.v); return o == 0 ? false : true }
+  public var winddirection250hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection250hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection250hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection250hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection250hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection250hPa.v) ?? [] }
+  public var hasWinddirection225hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection225hPa.v); return o == 0 ? false : true }
+  public var winddirection225hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection225hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection225hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection225hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection225hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection225hPa.v) ?? [] }
+  public var hasWinddirection200hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection200hPa.v); return o == 0 ? false : true }
+  public var winddirection200hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection200hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection200hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection200hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection200hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection200hPa.v) ?? [] }
+  public var hasWinddirection175hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection175hPa.v); return o == 0 ? false : true }
+  public var winddirection175hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection175hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection175hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection175hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection175hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection175hPa.v) ?? [] }
+  public var hasWinddirection150hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection150hPa.v); return o == 0 ? false : true }
+  public var winddirection150hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection150hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection150hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection150hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection150hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection150hPa.v) ?? [] }
+  public var hasWinddirection125hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection125hPa.v); return o == 0 ? false : true }
+  public var winddirection125hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection125hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection125hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection125hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection125hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection125hPa.v) ?? [] }
+  public var hasWinddirection100hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection100hPa.v); return o == 0 ? false : true }
+  public var winddirection100hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection100hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection100hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection100hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection100hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection100hPa.v) ?? [] }
+  public var hasWinddirection70hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection70hPa.v); return o == 0 ? false : true }
+  public var winddirection70hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection70hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection70hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection70hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection70hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection70hPa.v) ?? [] }
+  public var hasWinddirection50hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection50hPa.v); return o == 0 ? false : true }
+  public var winddirection50hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection50hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection50hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection50hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection50hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection50hPa.v) ?? [] }
+  public var hasWinddirection40hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection40hPa.v); return o == 0 ? false : true }
+  public var winddirection40hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection40hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection40hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection40hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection40hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection40hPa.v) ?? [] }
+  public var hasWinddirection30hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection30hPa.v); return o == 0 ? false : true }
+  public var winddirection30hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection30hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection30hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection30hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection30hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection30hPa.v) ?? [] }
+  public var hasWinddirection20hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection20hPa.v); return o == 0 ? false : true }
+  public var winddirection20hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection20hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection20hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection20hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection20hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection20hPa.v) ?? [] }
+  public var hasWinddirection15hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection15hPa.v); return o == 0 ? false : true }
+  public var winddirection15hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection15hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection15hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection15hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection15hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection15hPa.v) ?? [] }
+  public var hasWinddirection10hPa: Bool { let o = _accessor.offset(VTOFFSET.winddirection10hPa.v); return o == 0 ? false : true }
+  public var winddirection10hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.winddirection10hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func winddirection10hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.winddirection10hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var winddirection10hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.winddirection10hPa.v) ?? [] }
+  public var hasVerticalVelocity1015hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity1015hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity1015hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity1015hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity1015hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity1015hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity1015hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity1015hPa.v) ?? [] }
+  public var hasVerticalVelocity1000hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity1000hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity1000hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity1000hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity1000hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity1000hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity1000hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity1000hPa.v) ?? [] }
+  public var hasVerticalVelocity985hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity985hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity985hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity985hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity985hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity985hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity985hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity985hPa.v) ?? [] }
+  public var hasVerticalVelocity975hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity975hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity975hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity975hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity975hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity975hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity975hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity975hPa.v) ?? [] }
+  public var hasVerticalVelocity970hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity970hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity970hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity970hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity970hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity970hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity970hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity970hPa.v) ?? [] }
+  public var hasVerticalVelocity950hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity950hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity950hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity950hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity950hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity950hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity950hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity950hPa.v) ?? [] }
+  public var hasVerticalVelocity925hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity925hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity925hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity925hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity925hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity925hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity925hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity925hPa.v) ?? [] }
+  public var hasVerticalVelocity900hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity900hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity900hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity900hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity900hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity900hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity900hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity900hPa.v) ?? [] }
+  public var hasVerticalVelocity875hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity875hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity875hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity875hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity875hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity875hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity875hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity875hPa.v) ?? [] }
+  public var hasVerticalVelocity850hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity850hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity850hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity850hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity850hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity850hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity850hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity850hPa.v) ?? [] }
+  public var hasVerticalVelocity800hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity800hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity800hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity800hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity800hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity800hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity800hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity800hPa.v) ?? [] }
+  public var hasVerticalVelocity750hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity750hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity750hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity750hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity750hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity750hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity750hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity750hPa.v) ?? [] }
+  public var hasVerticalVelocity700hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity700hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity700hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity700hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity700hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity700hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity700hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity700hPa.v) ?? [] }
+  public var hasVerticalVelocity650hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity650hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity650hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity650hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity650hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity650hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity650hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity650hPa.v) ?? [] }
+  public var hasVerticalVelocity600hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity600hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity600hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity600hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity600hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity600hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity600hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity600hPa.v) ?? [] }
+  public var hasVerticalVelocity550hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity550hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity550hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity550hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity550hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity550hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity550hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity550hPa.v) ?? [] }
+  public var hasVerticalVelocity500hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity500hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity500hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity500hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity500hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity500hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity500hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity500hPa.v) ?? [] }
+  public var hasVerticalVelocity450hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity450hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity450hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity450hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity450hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity450hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity450hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity450hPa.v) ?? [] }
+  public var hasVerticalVelocity400hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity400hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity400hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity400hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity400hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity400hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity400hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity400hPa.v) ?? [] }
+  public var hasVerticalVelocity350hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity350hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity350hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity350hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity350hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity350hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity350hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity350hPa.v) ?? [] }
+  public var hasVerticalVelocity300hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity300hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity300hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity300hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity300hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity300hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity300hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity300hPa.v) ?? [] }
+  public var hasVerticalVelocity275hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity275hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity275hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity275hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity275hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity275hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity275hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity275hPa.v) ?? [] }
+  public var hasVerticalVelocity250hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity250hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity250hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity250hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity250hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity250hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity250hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity250hPa.v) ?? [] }
+  public var hasVerticalVelocity225hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity225hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity225hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity225hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity225hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity225hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity225hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity225hPa.v) ?? [] }
+  public var hasVerticalVelocity200hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity200hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity200hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity200hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity200hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity200hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity200hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity200hPa.v) ?? [] }
+  public var hasVerticalVelocity175hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity175hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity175hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity175hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity175hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity175hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity175hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity175hPa.v) ?? [] }
+  public var hasVerticalVelocity150hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity150hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity150hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity150hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity150hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity150hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity150hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity150hPa.v) ?? [] }
+  public var hasVerticalVelocity125hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity125hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity125hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity125hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity125hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity125hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity125hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity125hPa.v) ?? [] }
+  public var hasVerticalVelocity100hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity100hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity100hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity100hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity100hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity100hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity100hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity100hPa.v) ?? [] }
+  public var hasVerticalVelocity70hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity70hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity70hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity70hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity70hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity70hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity70hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity70hPa.v) ?? [] }
+  public var hasVerticalVelocity50hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity50hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity50hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity50hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity50hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity50hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity50hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity50hPa.v) ?? [] }
+  public var hasVerticalVelocity40hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity40hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity40hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity40hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity40hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity40hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity40hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity40hPa.v) ?? [] }
+  public var hasVerticalVelocity30hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity30hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity30hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity30hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity30hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity30hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity30hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity30hPa.v) ?? [] }
+  public var hasVerticalVelocity20hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity20hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity20hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity20hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity20hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity20hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity20hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity20hPa.v) ?? [] }
+  public var hasVerticalVelocity15hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity15hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity15hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity15hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity15hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity15hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity15hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity15hPa.v) ?? [] }
+  public var hasVerticalVelocity10hPa: Bool { let o = _accessor.offset(VTOFFSET.verticalVelocity10hPa.v); return o == 0 ? false : true }
+  public var verticalVelocity10hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.verticalVelocity10hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func verticalVelocity10hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.verticalVelocity10hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var verticalVelocity10hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.verticalVelocity10hPa.v) ?? [] }
+  public var hasGeopotentialHeight1015hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight1015hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight1015hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight1015hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight1015hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight1015hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight1015hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight1015hPa.v) ?? [] }
+  public var hasGeopotentialHeight1000hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight1000hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight1000hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight1000hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight1000hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight1000hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight1000hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight1000hPa.v) ?? [] }
+  public var hasGeopotentialHeight985hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight985hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight985hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight985hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight985hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight985hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight985hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight985hPa.v) ?? [] }
+  public var hasGeopotentialHeight975hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight975hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight975hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight975hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight975hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight975hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight975hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight975hPa.v) ?? [] }
+  public var hasGeopotentialHeight970hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight970hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight970hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight970hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight970hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight970hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight970hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight970hPa.v) ?? [] }
+  public var hasGeopotentialHeight950hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight950hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight950hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight950hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight950hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight950hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight950hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight950hPa.v) ?? [] }
+  public var hasGeopotentialHeight925hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight925hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight925hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight925hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight925hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight925hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight925hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight925hPa.v) ?? [] }
+  public var hasGeopotentialHeight900hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight900hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight900hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight900hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight900hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight900hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight900hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight900hPa.v) ?? [] }
+  public var hasGeopotentialHeight875hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight875hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight875hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight875hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight875hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight875hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight875hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight875hPa.v) ?? [] }
+  public var hasGeopotentialHeight850hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight850hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight850hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight850hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight850hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight850hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight850hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight850hPa.v) ?? [] }
+  public var hasGeopotentialHeight800hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight800hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight800hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight800hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight800hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight800hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight800hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight800hPa.v) ?? [] }
+  public var hasGeopotentialHeight750hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight750hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight750hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight750hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight750hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight750hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight750hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight750hPa.v) ?? [] }
+  public var hasGeopotentialHeight700hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight700hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight700hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight700hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight700hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight700hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight700hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight700hPa.v) ?? [] }
+  public var hasGeopotentialHeight650hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight650hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight650hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight650hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight650hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight650hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight650hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight650hPa.v) ?? [] }
+  public var hasGeopotentialHeight600hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight600hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight600hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight600hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight600hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight600hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight600hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight600hPa.v) ?? [] }
+  public var hasGeopotentialHeight550hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight550hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight550hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight550hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight550hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight550hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight550hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight550hPa.v) ?? [] }
+  public var hasGeopotentialHeight500hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight500hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight500hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight500hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight500hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight500hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight500hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight500hPa.v) ?? [] }
+  public var hasGeopotentialHeight450hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight450hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight450hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight450hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight450hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight450hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight450hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight450hPa.v) ?? [] }
+  public var hasGeopotentialHeight400hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight400hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight400hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight400hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight400hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight400hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight400hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight400hPa.v) ?? [] }
+  public var hasGeopotentialHeight350hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight350hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight350hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight350hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight350hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight350hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight350hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight350hPa.v) ?? [] }
+  public var hasGeopotentialHeight300hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight300hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight300hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight300hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight300hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight300hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight300hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight300hPa.v) ?? [] }
+  public var hasGeopotentialHeight275hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight275hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight275hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight275hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight275hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight275hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight275hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight275hPa.v) ?? [] }
+  public var hasGeopotentialHeight250hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight250hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight250hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight250hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight250hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight250hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight250hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight250hPa.v) ?? [] }
+  public var hasGeopotentialHeight225hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight225hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight225hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight225hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight225hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight225hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight225hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight225hPa.v) ?? [] }
+  public var hasGeopotentialHeight200hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight200hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight200hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight200hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight200hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight200hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight200hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight200hPa.v) ?? [] }
+  public var hasGeopotentialHeight175hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight175hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight175hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight175hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight175hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight175hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight175hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight175hPa.v) ?? [] }
+  public var hasGeopotentialHeight150hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight150hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight150hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight150hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight150hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight150hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight150hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight150hPa.v) ?? [] }
+  public var hasGeopotentialHeight125hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight125hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight125hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight125hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight125hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight125hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight125hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight125hPa.v) ?? [] }
+  public var hasGeopotentialHeight100hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight100hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight100hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight100hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight100hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight100hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight100hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight100hPa.v) ?? [] }
+  public var hasGeopotentialHeight70hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight70hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight70hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight70hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight70hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight70hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight70hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight70hPa.v) ?? [] }
+  public var hasGeopotentialHeight50hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight50hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight50hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight50hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight50hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight50hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight50hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight50hPa.v) ?? [] }
+  public var hasGeopotentialHeight40hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight40hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight40hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight40hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight40hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight40hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight40hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight40hPa.v) ?? [] }
+  public var hasGeopotentialHeight30hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight30hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight30hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight30hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight30hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight30hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight30hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight30hPa.v) ?? [] }
+  public var hasGeopotentialHeight20hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight20hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight20hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight20hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight20hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight20hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight20hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight20hPa.v) ?? [] }
+  public var hasGeopotentialHeight15hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight15hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight15hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight15hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight15hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight15hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight15hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight15hPa.v) ?? [] }
+  public var hasGeopotentialHeight10hPa: Bool { let o = _accessor.offset(VTOFFSET.geopotentialHeight10hPa.v); return o == 0 ? false : true }
+  public var geopotentialHeight10hPaCount: Int32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight10hPa.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func geopotentialHeight10hPa(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.geopotentialHeight10hPa.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var geopotentialHeight10hPa: [Float32] { return _accessor.getVector(at: VTOFFSET.geopotentialHeight10hPa.v) ?? [] }
+  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 365) }
+  public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func addVectorOf(temperture2m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperture2m, at: VTOFFSET.temperture2m.p) }
   public static func addVectorOf(cloudcover: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover, at: VTOFFSET.cloudcover.p) }
   public static func addVectorOf(cloudcoverLow: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverLow, at: VTOFFSET.cloudcoverLow.p) }
@@ -618,19 +2026,298 @@ public struct com_openmeteo_api_result_WeatherHourly: FlatBufferObject, Verifiab
   public static func addVectorOf(soilMoistureIndex100To255cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex100To255cm, at: VTOFFSET.soilMoistureIndex100To255cm.p) }
   public static func addVectorOf(soilMoistureIndex0To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex0To100cm, at: VTOFFSET.soilMoistureIndex0To100cm.p) }
   public static func addVectorOf(lightningPotential: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: lightningPotential, at: VTOFFSET.lightningPotential.p) }
-  public static func addVectorOf(temperatureHpa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperatureHpa, at: VTOFFSET.temperatureHpa.p) }
-  public static func addVectorOf(geopotentialHeightHpa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeightHpa, at: VTOFFSET.geopotentialHeightHpa.p) }
-  public static func addVectorOf(relativehumidityHpa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidityHpa, at: VTOFFSET.relativehumidityHpa.p) }
-  public static func addVectorOf(windspeedHpa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeedHpa, at: VTOFFSET.windspeedHpa.p) }
-  public static func addVectorOf(winddirectionHpa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirectionHpa, at: VTOFFSET.winddirectionHpa.p) }
-  public static func addVectorOf(dewpointHpa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpointHpa, at: VTOFFSET.dewpointHpa.p) }
-  public static func addVectorOf(cloudcoverHpa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverHpa, at: VTOFFSET.cloudcoverHpa.p) }
-  public static func addVectorOf(verticalVelocityHpa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocityHpa, at: VTOFFSET.verticalVelocityHpa.p) }
-  public static func add(growingDegreeDays: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: growingDegreeDays, at: VTOFFSET.growingDegreeDays.p) }
-  public static func add(tiltedDirectRadiation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: tiltedDirectRadiation, at: VTOFFSET.tiltedDirectRadiation.p) }
+  public static func addVectorOf(temperature1015hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature1015hPa, at: VTOFFSET.temperature1015hPa.p) }
+  public static func addVectorOf(temperature1000hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature1000hPa, at: VTOFFSET.temperature1000hPa.p) }
+  public static func addVectorOf(temperature985hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature985hPa, at: VTOFFSET.temperature985hPa.p) }
+  public static func addVectorOf(temperature975hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature975hPa, at: VTOFFSET.temperature975hPa.p) }
+  public static func addVectorOf(temperature970hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature970hPa, at: VTOFFSET.temperature970hPa.p) }
+  public static func addVectorOf(temperature950hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature950hPa, at: VTOFFSET.temperature950hPa.p) }
+  public static func addVectorOf(temperature925hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature925hPa, at: VTOFFSET.temperature925hPa.p) }
+  public static func addVectorOf(temperature900hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature900hPa, at: VTOFFSET.temperature900hPa.p) }
+  public static func addVectorOf(temperature875hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature875hPa, at: VTOFFSET.temperature875hPa.p) }
+  public static func addVectorOf(temperature850hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature850hPa, at: VTOFFSET.temperature850hPa.p) }
+  public static func addVectorOf(temperature800hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature800hPa, at: VTOFFSET.temperature800hPa.p) }
+  public static func addVectorOf(temperature750hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature750hPa, at: VTOFFSET.temperature750hPa.p) }
+  public static func addVectorOf(temperature700hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature700hPa, at: VTOFFSET.temperature700hPa.p) }
+  public static func addVectorOf(temperature650hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature650hPa, at: VTOFFSET.temperature650hPa.p) }
+  public static func addVectorOf(temperature600hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature600hPa, at: VTOFFSET.temperature600hPa.p) }
+  public static func addVectorOf(temperature550hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature550hPa, at: VTOFFSET.temperature550hPa.p) }
+  public static func addVectorOf(temperature500hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature500hPa, at: VTOFFSET.temperature500hPa.p) }
+  public static func addVectorOf(temperature450hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature450hPa, at: VTOFFSET.temperature450hPa.p) }
+  public static func addVectorOf(temperature400hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature400hPa, at: VTOFFSET.temperature400hPa.p) }
+  public static func addVectorOf(temperature350hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature350hPa, at: VTOFFSET.temperature350hPa.p) }
+  public static func addVectorOf(temperature300hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature300hPa, at: VTOFFSET.temperature300hPa.p) }
+  public static func addVectorOf(temperature275hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature275hPa, at: VTOFFSET.temperature275hPa.p) }
+  public static func addVectorOf(temperature250hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature250hPa, at: VTOFFSET.temperature250hPa.p) }
+  public static func addVectorOf(temperature225hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature225hPa, at: VTOFFSET.temperature225hPa.p) }
+  public static func addVectorOf(temperature200hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature200hPa, at: VTOFFSET.temperature200hPa.p) }
+  public static func addVectorOf(temperature175hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature175hPa, at: VTOFFSET.temperature175hPa.p) }
+  public static func addVectorOf(temperature150hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature150hPa, at: VTOFFSET.temperature150hPa.p) }
+  public static func addVectorOf(temperature125hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature125hPa, at: VTOFFSET.temperature125hPa.p) }
+  public static func addVectorOf(temperature100hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature100hPa, at: VTOFFSET.temperature100hPa.p) }
+  public static func addVectorOf(temperature70hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature70hPa, at: VTOFFSET.temperature70hPa.p) }
+  public static func addVectorOf(temperature50hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature50hPa, at: VTOFFSET.temperature50hPa.p) }
+  public static func addVectorOf(temperature40hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature40hPa, at: VTOFFSET.temperature40hPa.p) }
+  public static func addVectorOf(temperature30hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature30hPa, at: VTOFFSET.temperature30hPa.p) }
+  public static func addVectorOf(temperature20hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature20hPa, at: VTOFFSET.temperature20hPa.p) }
+  public static func addVectorOf(temperature15hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature15hPa, at: VTOFFSET.temperature15hPa.p) }
+  public static func addVectorOf(temperature10hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature10hPa, at: VTOFFSET.temperature10hPa.p) }
+  public static func addVectorOf(dewpoint1015hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint1015hPa, at: VTOFFSET.dewpoint1015hPa.p) }
+  public static func addVectorOf(dewpoint1000hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint1000hPa, at: VTOFFSET.dewpoint1000hPa.p) }
+  public static func addVectorOf(dewpoint985hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint985hPa, at: VTOFFSET.dewpoint985hPa.p) }
+  public static func addVectorOf(dewpoint975hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint975hPa, at: VTOFFSET.dewpoint975hPa.p) }
+  public static func addVectorOf(dewpoint970hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint970hPa, at: VTOFFSET.dewpoint970hPa.p) }
+  public static func addVectorOf(dewpoint950hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint950hPa, at: VTOFFSET.dewpoint950hPa.p) }
+  public static func addVectorOf(dewpoint925hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint925hPa, at: VTOFFSET.dewpoint925hPa.p) }
+  public static func addVectorOf(dewpoint900hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint900hPa, at: VTOFFSET.dewpoint900hPa.p) }
+  public static func addVectorOf(dewpoint875hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint875hPa, at: VTOFFSET.dewpoint875hPa.p) }
+  public static func addVectorOf(dewpoint850hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint850hPa, at: VTOFFSET.dewpoint850hPa.p) }
+  public static func addVectorOf(dewpoint800hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint800hPa, at: VTOFFSET.dewpoint800hPa.p) }
+  public static func addVectorOf(dewpoint750hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint750hPa, at: VTOFFSET.dewpoint750hPa.p) }
+  public static func addVectorOf(dewpoint700hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint700hPa, at: VTOFFSET.dewpoint700hPa.p) }
+  public static func addVectorOf(dewpoint650hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint650hPa, at: VTOFFSET.dewpoint650hPa.p) }
+  public static func addVectorOf(dewpoint600hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint600hPa, at: VTOFFSET.dewpoint600hPa.p) }
+  public static func addVectorOf(dewpoint550hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint550hPa, at: VTOFFSET.dewpoint550hPa.p) }
+  public static func addVectorOf(dewpoint500hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint500hPa, at: VTOFFSET.dewpoint500hPa.p) }
+  public static func addVectorOf(dewpoint450hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint450hPa, at: VTOFFSET.dewpoint450hPa.p) }
+  public static func addVectorOf(dewpoint400hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint400hPa, at: VTOFFSET.dewpoint400hPa.p) }
+  public static func addVectorOf(dewpoint350hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint350hPa, at: VTOFFSET.dewpoint350hPa.p) }
+  public static func addVectorOf(dewpoint300hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint300hPa, at: VTOFFSET.dewpoint300hPa.p) }
+  public static func addVectorOf(dewpoint275hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint275hPa, at: VTOFFSET.dewpoint275hPa.p) }
+  public static func addVectorOf(dewpoint250hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint250hPa, at: VTOFFSET.dewpoint250hPa.p) }
+  public static func addVectorOf(dewpoint225hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint225hPa, at: VTOFFSET.dewpoint225hPa.p) }
+  public static func addVectorOf(dewpoint200hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint200hPa, at: VTOFFSET.dewpoint200hPa.p) }
+  public static func addVectorOf(dewpoint175hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint175hPa, at: VTOFFSET.dewpoint175hPa.p) }
+  public static func addVectorOf(dewpoint150hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint150hPa, at: VTOFFSET.dewpoint150hPa.p) }
+  public static func addVectorOf(dewpoint125hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint125hPa, at: VTOFFSET.dewpoint125hPa.p) }
+  public static func addVectorOf(dewpoint100hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint100hPa, at: VTOFFSET.dewpoint100hPa.p) }
+  public static func addVectorOf(dewpoint70hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint70hPa, at: VTOFFSET.dewpoint70hPa.p) }
+  public static func addVectorOf(dewpoint50hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint50hPa, at: VTOFFSET.dewpoint50hPa.p) }
+  public static func addVectorOf(dewpoint40hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint40hPa, at: VTOFFSET.dewpoint40hPa.p) }
+  public static func addVectorOf(dewpoint30hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint30hPa, at: VTOFFSET.dewpoint30hPa.p) }
+  public static func addVectorOf(dewpoint20hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint20hPa, at: VTOFFSET.dewpoint20hPa.p) }
+  public static func addVectorOf(dewpoint15hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint15hPa, at: VTOFFSET.dewpoint15hPa.p) }
+  public static func addVectorOf(dewpoint10hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint10hPa, at: VTOFFSET.dewpoint10hPa.p) }
+  public static func addVectorOf(relativehumidity1015hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity1015hPa, at: VTOFFSET.relativehumidity1015hPa.p) }
+  public static func addVectorOf(relativehumidity1000hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity1000hPa, at: VTOFFSET.relativehumidity1000hPa.p) }
+  public static func addVectorOf(relativehumidity985hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity985hPa, at: VTOFFSET.relativehumidity985hPa.p) }
+  public static func addVectorOf(relativehumidity975hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity975hPa, at: VTOFFSET.relativehumidity975hPa.p) }
+  public static func addVectorOf(relativehumidity970hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity970hPa, at: VTOFFSET.relativehumidity970hPa.p) }
+  public static func addVectorOf(relativehumidity950hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity950hPa, at: VTOFFSET.relativehumidity950hPa.p) }
+  public static func addVectorOf(relativehumidity925hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity925hPa, at: VTOFFSET.relativehumidity925hPa.p) }
+  public static func addVectorOf(relativehumidity900hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity900hPa, at: VTOFFSET.relativehumidity900hPa.p) }
+  public static func addVectorOf(relativehumidity875hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity875hPa, at: VTOFFSET.relativehumidity875hPa.p) }
+  public static func addVectorOf(relativehumidity850hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity850hPa, at: VTOFFSET.relativehumidity850hPa.p) }
+  public static func addVectorOf(relativehumidity800hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity800hPa, at: VTOFFSET.relativehumidity800hPa.p) }
+  public static func addVectorOf(relativehumidity750hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity750hPa, at: VTOFFSET.relativehumidity750hPa.p) }
+  public static func addVectorOf(relativehumidity700hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity700hPa, at: VTOFFSET.relativehumidity700hPa.p) }
+  public static func addVectorOf(relativehumidity650hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity650hPa, at: VTOFFSET.relativehumidity650hPa.p) }
+  public static func addVectorOf(relativehumidity600hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity600hPa, at: VTOFFSET.relativehumidity600hPa.p) }
+  public static func addVectorOf(relativehumidity550hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity550hPa, at: VTOFFSET.relativehumidity550hPa.p) }
+  public static func addVectorOf(relativehumidity500hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity500hPa, at: VTOFFSET.relativehumidity500hPa.p) }
+  public static func addVectorOf(relativehumidity450hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity450hPa, at: VTOFFSET.relativehumidity450hPa.p) }
+  public static func addVectorOf(relativehumidity400hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity400hPa, at: VTOFFSET.relativehumidity400hPa.p) }
+  public static func addVectorOf(relativehumidity350hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity350hPa, at: VTOFFSET.relativehumidity350hPa.p) }
+  public static func addVectorOf(relativehumidity300hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity300hPa, at: VTOFFSET.relativehumidity300hPa.p) }
+  public static func addVectorOf(relativehumidity275hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity275hPa, at: VTOFFSET.relativehumidity275hPa.p) }
+  public static func addVectorOf(relativehumidity250hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity250hPa, at: VTOFFSET.relativehumidity250hPa.p) }
+  public static func addVectorOf(relativehumidity225hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity225hPa, at: VTOFFSET.relativehumidity225hPa.p) }
+  public static func addVectorOf(relativehumidity200hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity200hPa, at: VTOFFSET.relativehumidity200hPa.p) }
+  public static func addVectorOf(relativehumidity175hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity175hPa, at: VTOFFSET.relativehumidity175hPa.p) }
+  public static func addVectorOf(relativehumidity150hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity150hPa, at: VTOFFSET.relativehumidity150hPa.p) }
+  public static func addVectorOf(relativehumidity125hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity125hPa, at: VTOFFSET.relativehumidity125hPa.p) }
+  public static func addVectorOf(relativehumidity100hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity100hPa, at: VTOFFSET.relativehumidity100hPa.p) }
+  public static func addVectorOf(relativehumidity70hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity70hPa, at: VTOFFSET.relativehumidity70hPa.p) }
+  public static func addVectorOf(relativehumidity50hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity50hPa, at: VTOFFSET.relativehumidity50hPa.p) }
+  public static func addVectorOf(relativehumidity40hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity40hPa, at: VTOFFSET.relativehumidity40hPa.p) }
+  public static func addVectorOf(relativehumidity30hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity30hPa, at: VTOFFSET.relativehumidity30hPa.p) }
+  public static func addVectorOf(relativehumidity20hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity20hPa, at: VTOFFSET.relativehumidity20hPa.p) }
+  public static func addVectorOf(relativehumidity15hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity15hPa, at: VTOFFSET.relativehumidity15hPa.p) }
+  public static func addVectorOf(relativehumidity10hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity10hPa, at: VTOFFSET.relativehumidity10hPa.p) }
+  public static func addVectorOf(cloudcover1015hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover1015hPa, at: VTOFFSET.cloudcover1015hPa.p) }
+  public static func addVectorOf(cloudcover1000hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover1000hPa, at: VTOFFSET.cloudcover1000hPa.p) }
+  public static func addVectorOf(cloudcover985hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover985hPa, at: VTOFFSET.cloudcover985hPa.p) }
+  public static func addVectorOf(cloudcover975hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover975hPa, at: VTOFFSET.cloudcover975hPa.p) }
+  public static func addVectorOf(cloudcover970hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover970hPa, at: VTOFFSET.cloudcover970hPa.p) }
+  public static func addVectorOf(cloudcover950hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover950hPa, at: VTOFFSET.cloudcover950hPa.p) }
+  public static func addVectorOf(cloudcover925hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover925hPa, at: VTOFFSET.cloudcover925hPa.p) }
+  public static func addVectorOf(cloudcover900hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover900hPa, at: VTOFFSET.cloudcover900hPa.p) }
+  public static func addVectorOf(cloudcover875hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover875hPa, at: VTOFFSET.cloudcover875hPa.p) }
+  public static func addVectorOf(cloudcover850hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover850hPa, at: VTOFFSET.cloudcover850hPa.p) }
+  public static func addVectorOf(cloudcover800hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover800hPa, at: VTOFFSET.cloudcover800hPa.p) }
+  public static func addVectorOf(cloudcover750hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover750hPa, at: VTOFFSET.cloudcover750hPa.p) }
+  public static func addVectorOf(cloudcover700hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover700hPa, at: VTOFFSET.cloudcover700hPa.p) }
+  public static func addVectorOf(cloudcover650hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover650hPa, at: VTOFFSET.cloudcover650hPa.p) }
+  public static func addVectorOf(cloudcover600hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover600hPa, at: VTOFFSET.cloudcover600hPa.p) }
+  public static func addVectorOf(cloudcover550hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover550hPa, at: VTOFFSET.cloudcover550hPa.p) }
+  public static func addVectorOf(cloudcover500hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover500hPa, at: VTOFFSET.cloudcover500hPa.p) }
+  public static func addVectorOf(cloudcover450hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover450hPa, at: VTOFFSET.cloudcover450hPa.p) }
+  public static func addVectorOf(cloudcover400hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover400hPa, at: VTOFFSET.cloudcover400hPa.p) }
+  public static func addVectorOf(cloudcover350hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover350hPa, at: VTOFFSET.cloudcover350hPa.p) }
+  public static func addVectorOf(cloudcover300hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover300hPa, at: VTOFFSET.cloudcover300hPa.p) }
+  public static func addVectorOf(cloudcover275hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover275hPa, at: VTOFFSET.cloudcover275hPa.p) }
+  public static func addVectorOf(cloudcover250hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover250hPa, at: VTOFFSET.cloudcover250hPa.p) }
+  public static func addVectorOf(cloudcover225hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover225hPa, at: VTOFFSET.cloudcover225hPa.p) }
+  public static func addVectorOf(cloudcover200hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover200hPa, at: VTOFFSET.cloudcover200hPa.p) }
+  public static func addVectorOf(cloudcover175hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover175hPa, at: VTOFFSET.cloudcover175hPa.p) }
+  public static func addVectorOf(cloudcover150hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover150hPa, at: VTOFFSET.cloudcover150hPa.p) }
+  public static func addVectorOf(cloudcover125hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover125hPa, at: VTOFFSET.cloudcover125hPa.p) }
+  public static func addVectorOf(cloudcover100hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover100hPa, at: VTOFFSET.cloudcover100hPa.p) }
+  public static func addVectorOf(cloudcover70hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover70hPa, at: VTOFFSET.cloudcover70hPa.p) }
+  public static func addVectorOf(cloudcover50hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover50hPa, at: VTOFFSET.cloudcover50hPa.p) }
+  public static func addVectorOf(cloudcover40hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover40hPa, at: VTOFFSET.cloudcover40hPa.p) }
+  public static func addVectorOf(cloudcover30hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover30hPa, at: VTOFFSET.cloudcover30hPa.p) }
+  public static func addVectorOf(cloudcover20hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover20hPa, at: VTOFFSET.cloudcover20hPa.p) }
+  public static func addVectorOf(cloudcover15hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover15hPa, at: VTOFFSET.cloudcover15hPa.p) }
+  public static func addVectorOf(cloudcover10hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover10hPa, at: VTOFFSET.cloudcover10hPa.p) }
+  public static func addVectorOf(windspeed1015hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed1015hPa, at: VTOFFSET.windspeed1015hPa.p) }
+  public static func addVectorOf(windspeed1000hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed1000hPa, at: VTOFFSET.windspeed1000hPa.p) }
+  public static func addVectorOf(windspeed985hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed985hPa, at: VTOFFSET.windspeed985hPa.p) }
+  public static func addVectorOf(windspeed975hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed975hPa, at: VTOFFSET.windspeed975hPa.p) }
+  public static func addVectorOf(windspeed970hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed970hPa, at: VTOFFSET.windspeed970hPa.p) }
+  public static func addVectorOf(windspeed950hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed950hPa, at: VTOFFSET.windspeed950hPa.p) }
+  public static func addVectorOf(windspeed925hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed925hPa, at: VTOFFSET.windspeed925hPa.p) }
+  public static func addVectorOf(windspeed900hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed900hPa, at: VTOFFSET.windspeed900hPa.p) }
+  public static func addVectorOf(windspeed875hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed875hPa, at: VTOFFSET.windspeed875hPa.p) }
+  public static func addVectorOf(windspeed850hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed850hPa, at: VTOFFSET.windspeed850hPa.p) }
+  public static func addVectorOf(windspeed800hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed800hPa, at: VTOFFSET.windspeed800hPa.p) }
+  public static func addVectorOf(windspeed750hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed750hPa, at: VTOFFSET.windspeed750hPa.p) }
+  public static func addVectorOf(windspeed700hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed700hPa, at: VTOFFSET.windspeed700hPa.p) }
+  public static func addVectorOf(windspeed650hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed650hPa, at: VTOFFSET.windspeed650hPa.p) }
+  public static func addVectorOf(windspeed600hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed600hPa, at: VTOFFSET.windspeed600hPa.p) }
+  public static func addVectorOf(windspeed550hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed550hPa, at: VTOFFSET.windspeed550hPa.p) }
+  public static func addVectorOf(windspeed500hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed500hPa, at: VTOFFSET.windspeed500hPa.p) }
+  public static func addVectorOf(windspeed450hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed450hPa, at: VTOFFSET.windspeed450hPa.p) }
+  public static func addVectorOf(windspeed400hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed400hPa, at: VTOFFSET.windspeed400hPa.p) }
+  public static func addVectorOf(windspeed350hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed350hPa, at: VTOFFSET.windspeed350hPa.p) }
+  public static func addVectorOf(windspeed300hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed300hPa, at: VTOFFSET.windspeed300hPa.p) }
+  public static func addVectorOf(windspeed275hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed275hPa, at: VTOFFSET.windspeed275hPa.p) }
+  public static func addVectorOf(windspeed250hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed250hPa, at: VTOFFSET.windspeed250hPa.p) }
+  public static func addVectorOf(windspeed225hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed225hPa, at: VTOFFSET.windspeed225hPa.p) }
+  public static func addVectorOf(windspeed200hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed200hPa, at: VTOFFSET.windspeed200hPa.p) }
+  public static func addVectorOf(windspeed175hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed175hPa, at: VTOFFSET.windspeed175hPa.p) }
+  public static func addVectorOf(windspeed150hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed150hPa, at: VTOFFSET.windspeed150hPa.p) }
+  public static func addVectorOf(windspeed125hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed125hPa, at: VTOFFSET.windspeed125hPa.p) }
+  public static func addVectorOf(windspeed100hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed100hPa, at: VTOFFSET.windspeed100hPa.p) }
+  public static func addVectorOf(windspeed70hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed70hPa, at: VTOFFSET.windspeed70hPa.p) }
+  public static func addVectorOf(windspeed50hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed50hPa, at: VTOFFSET.windspeed50hPa.p) }
+  public static func addVectorOf(windspeed40hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed40hPa, at: VTOFFSET.windspeed40hPa.p) }
+  public static func addVectorOf(windspeed30hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed30hPa, at: VTOFFSET.windspeed30hPa.p) }
+  public static func addVectorOf(windspeed20hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed20hPa, at: VTOFFSET.windspeed20hPa.p) }
+  public static func addVectorOf(windspeed15hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed15hPa, at: VTOFFSET.windspeed15hPa.p) }
+  public static func addVectorOf(windspeed10hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10hPa, at: VTOFFSET.windspeed10hPa.p) }
+  public static func addVectorOf(winddirection1015hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection1015hPa, at: VTOFFSET.winddirection1015hPa.p) }
+  public static func addVectorOf(winddirection1000hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection1000hPa, at: VTOFFSET.winddirection1000hPa.p) }
+  public static func addVectorOf(winddirection985hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection985hPa, at: VTOFFSET.winddirection985hPa.p) }
+  public static func addVectorOf(winddirection975hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection975hPa, at: VTOFFSET.winddirection975hPa.p) }
+  public static func addVectorOf(winddirection970hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection970hPa, at: VTOFFSET.winddirection970hPa.p) }
+  public static func addVectorOf(winddirection950hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection950hPa, at: VTOFFSET.winddirection950hPa.p) }
+  public static func addVectorOf(winddirection925hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection925hPa, at: VTOFFSET.winddirection925hPa.p) }
+  public static func addVectorOf(winddirection900hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection900hPa, at: VTOFFSET.winddirection900hPa.p) }
+  public static func addVectorOf(winddirection875hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection875hPa, at: VTOFFSET.winddirection875hPa.p) }
+  public static func addVectorOf(winddirection850hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection850hPa, at: VTOFFSET.winddirection850hPa.p) }
+  public static func addVectorOf(winddirection800hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection800hPa, at: VTOFFSET.winddirection800hPa.p) }
+  public static func addVectorOf(winddirection750hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection750hPa, at: VTOFFSET.winddirection750hPa.p) }
+  public static func addVectorOf(winddirection700hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection700hPa, at: VTOFFSET.winddirection700hPa.p) }
+  public static func addVectorOf(winddirection650hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection650hPa, at: VTOFFSET.winddirection650hPa.p) }
+  public static func addVectorOf(winddirection600hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection600hPa, at: VTOFFSET.winddirection600hPa.p) }
+  public static func addVectorOf(winddirection550hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection550hPa, at: VTOFFSET.winddirection550hPa.p) }
+  public static func addVectorOf(winddirection500hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection500hPa, at: VTOFFSET.winddirection500hPa.p) }
+  public static func addVectorOf(winddirection450hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection450hPa, at: VTOFFSET.winddirection450hPa.p) }
+  public static func addVectorOf(winddirection400hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection400hPa, at: VTOFFSET.winddirection400hPa.p) }
+  public static func addVectorOf(winddirection350hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection350hPa, at: VTOFFSET.winddirection350hPa.p) }
+  public static func addVectorOf(winddirection300hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection300hPa, at: VTOFFSET.winddirection300hPa.p) }
+  public static func addVectorOf(winddirection275hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection275hPa, at: VTOFFSET.winddirection275hPa.p) }
+  public static func addVectorOf(winddirection250hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection250hPa, at: VTOFFSET.winddirection250hPa.p) }
+  public static func addVectorOf(winddirection225hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection225hPa, at: VTOFFSET.winddirection225hPa.p) }
+  public static func addVectorOf(winddirection200hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection200hPa, at: VTOFFSET.winddirection200hPa.p) }
+  public static func addVectorOf(winddirection175hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection175hPa, at: VTOFFSET.winddirection175hPa.p) }
+  public static func addVectorOf(winddirection150hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection150hPa, at: VTOFFSET.winddirection150hPa.p) }
+  public static func addVectorOf(winddirection125hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection125hPa, at: VTOFFSET.winddirection125hPa.p) }
+  public static func addVectorOf(winddirection100hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection100hPa, at: VTOFFSET.winddirection100hPa.p) }
+  public static func addVectorOf(winddirection70hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection70hPa, at: VTOFFSET.winddirection70hPa.p) }
+  public static func addVectorOf(winddirection50hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection50hPa, at: VTOFFSET.winddirection50hPa.p) }
+  public static func addVectorOf(winddirection40hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection40hPa, at: VTOFFSET.winddirection40hPa.p) }
+  public static func addVectorOf(winddirection30hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection30hPa, at: VTOFFSET.winddirection30hPa.p) }
+  public static func addVectorOf(winddirection20hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection20hPa, at: VTOFFSET.winddirection20hPa.p) }
+  public static func addVectorOf(winddirection15hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection15hPa, at: VTOFFSET.winddirection15hPa.p) }
+  public static func addVectorOf(winddirection10hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection10hPa, at: VTOFFSET.winddirection10hPa.p) }
+  public static func addVectorOf(verticalVelocity1015hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity1015hPa, at: VTOFFSET.verticalVelocity1015hPa.p) }
+  public static func addVectorOf(verticalVelocity1000hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity1000hPa, at: VTOFFSET.verticalVelocity1000hPa.p) }
+  public static func addVectorOf(verticalVelocity985hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity985hPa, at: VTOFFSET.verticalVelocity985hPa.p) }
+  public static func addVectorOf(verticalVelocity975hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity975hPa, at: VTOFFSET.verticalVelocity975hPa.p) }
+  public static func addVectorOf(verticalVelocity970hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity970hPa, at: VTOFFSET.verticalVelocity970hPa.p) }
+  public static func addVectorOf(verticalVelocity950hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity950hPa, at: VTOFFSET.verticalVelocity950hPa.p) }
+  public static func addVectorOf(verticalVelocity925hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity925hPa, at: VTOFFSET.verticalVelocity925hPa.p) }
+  public static func addVectorOf(verticalVelocity900hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity900hPa, at: VTOFFSET.verticalVelocity900hPa.p) }
+  public static func addVectorOf(verticalVelocity875hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity875hPa, at: VTOFFSET.verticalVelocity875hPa.p) }
+  public static func addVectorOf(verticalVelocity850hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity850hPa, at: VTOFFSET.verticalVelocity850hPa.p) }
+  public static func addVectorOf(verticalVelocity800hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity800hPa, at: VTOFFSET.verticalVelocity800hPa.p) }
+  public static func addVectorOf(verticalVelocity750hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity750hPa, at: VTOFFSET.verticalVelocity750hPa.p) }
+  public static func addVectorOf(verticalVelocity700hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity700hPa, at: VTOFFSET.verticalVelocity700hPa.p) }
+  public static func addVectorOf(verticalVelocity650hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity650hPa, at: VTOFFSET.verticalVelocity650hPa.p) }
+  public static func addVectorOf(verticalVelocity600hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity600hPa, at: VTOFFSET.verticalVelocity600hPa.p) }
+  public static func addVectorOf(verticalVelocity550hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity550hPa, at: VTOFFSET.verticalVelocity550hPa.p) }
+  public static func addVectorOf(verticalVelocity500hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity500hPa, at: VTOFFSET.verticalVelocity500hPa.p) }
+  public static func addVectorOf(verticalVelocity450hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity450hPa, at: VTOFFSET.verticalVelocity450hPa.p) }
+  public static func addVectorOf(verticalVelocity400hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity400hPa, at: VTOFFSET.verticalVelocity400hPa.p) }
+  public static func addVectorOf(verticalVelocity350hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity350hPa, at: VTOFFSET.verticalVelocity350hPa.p) }
+  public static func addVectorOf(verticalVelocity300hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity300hPa, at: VTOFFSET.verticalVelocity300hPa.p) }
+  public static func addVectorOf(verticalVelocity275hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity275hPa, at: VTOFFSET.verticalVelocity275hPa.p) }
+  public static func addVectorOf(verticalVelocity250hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity250hPa, at: VTOFFSET.verticalVelocity250hPa.p) }
+  public static func addVectorOf(verticalVelocity225hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity225hPa, at: VTOFFSET.verticalVelocity225hPa.p) }
+  public static func addVectorOf(verticalVelocity200hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity200hPa, at: VTOFFSET.verticalVelocity200hPa.p) }
+  public static func addVectorOf(verticalVelocity175hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity175hPa, at: VTOFFSET.verticalVelocity175hPa.p) }
+  public static func addVectorOf(verticalVelocity150hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity150hPa, at: VTOFFSET.verticalVelocity150hPa.p) }
+  public static func addVectorOf(verticalVelocity125hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity125hPa, at: VTOFFSET.verticalVelocity125hPa.p) }
+  public static func addVectorOf(verticalVelocity100hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity100hPa, at: VTOFFSET.verticalVelocity100hPa.p) }
+  public static func addVectorOf(verticalVelocity70hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity70hPa, at: VTOFFSET.verticalVelocity70hPa.p) }
+  public static func addVectorOf(verticalVelocity50hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity50hPa, at: VTOFFSET.verticalVelocity50hPa.p) }
+  public static func addVectorOf(verticalVelocity40hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity40hPa, at: VTOFFSET.verticalVelocity40hPa.p) }
+  public static func addVectorOf(verticalVelocity30hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity30hPa, at: VTOFFSET.verticalVelocity30hPa.p) }
+  public static func addVectorOf(verticalVelocity20hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity20hPa, at: VTOFFSET.verticalVelocity20hPa.p) }
+  public static func addVectorOf(verticalVelocity15hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity15hPa, at: VTOFFSET.verticalVelocity15hPa.p) }
+  public static func addVectorOf(verticalVelocity10hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: verticalVelocity10hPa, at: VTOFFSET.verticalVelocity10hPa.p) }
+  public static func addVectorOf(geopotentialHeight1015hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight1015hPa, at: VTOFFSET.geopotentialHeight1015hPa.p) }
+  public static func addVectorOf(geopotentialHeight1000hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight1000hPa, at: VTOFFSET.geopotentialHeight1000hPa.p) }
+  public static func addVectorOf(geopotentialHeight985hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight985hPa, at: VTOFFSET.geopotentialHeight985hPa.p) }
+  public static func addVectorOf(geopotentialHeight975hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight975hPa, at: VTOFFSET.geopotentialHeight975hPa.p) }
+  public static func addVectorOf(geopotentialHeight970hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight970hPa, at: VTOFFSET.geopotentialHeight970hPa.p) }
+  public static func addVectorOf(geopotentialHeight950hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight950hPa, at: VTOFFSET.geopotentialHeight950hPa.p) }
+  public static func addVectorOf(geopotentialHeight925hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight925hPa, at: VTOFFSET.geopotentialHeight925hPa.p) }
+  public static func addVectorOf(geopotentialHeight900hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight900hPa, at: VTOFFSET.geopotentialHeight900hPa.p) }
+  public static func addVectorOf(geopotentialHeight875hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight875hPa, at: VTOFFSET.geopotentialHeight875hPa.p) }
+  public static func addVectorOf(geopotentialHeight850hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight850hPa, at: VTOFFSET.geopotentialHeight850hPa.p) }
+  public static func addVectorOf(geopotentialHeight800hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight800hPa, at: VTOFFSET.geopotentialHeight800hPa.p) }
+  public static func addVectorOf(geopotentialHeight750hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight750hPa, at: VTOFFSET.geopotentialHeight750hPa.p) }
+  public static func addVectorOf(geopotentialHeight700hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight700hPa, at: VTOFFSET.geopotentialHeight700hPa.p) }
+  public static func addVectorOf(geopotentialHeight650hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight650hPa, at: VTOFFSET.geopotentialHeight650hPa.p) }
+  public static func addVectorOf(geopotentialHeight600hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight600hPa, at: VTOFFSET.geopotentialHeight600hPa.p) }
+  public static func addVectorOf(geopotentialHeight550hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight550hPa, at: VTOFFSET.geopotentialHeight550hPa.p) }
+  public static func addVectorOf(geopotentialHeight500hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight500hPa, at: VTOFFSET.geopotentialHeight500hPa.p) }
+  public static func addVectorOf(geopotentialHeight450hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight450hPa, at: VTOFFSET.geopotentialHeight450hPa.p) }
+  public static func addVectorOf(geopotentialHeight400hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight400hPa, at: VTOFFSET.geopotentialHeight400hPa.p) }
+  public static func addVectorOf(geopotentialHeight350hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight350hPa, at: VTOFFSET.geopotentialHeight350hPa.p) }
+  public static func addVectorOf(geopotentialHeight300hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight300hPa, at: VTOFFSET.geopotentialHeight300hPa.p) }
+  public static func addVectorOf(geopotentialHeight275hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight275hPa, at: VTOFFSET.geopotentialHeight275hPa.p) }
+  public static func addVectorOf(geopotentialHeight250hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight250hPa, at: VTOFFSET.geopotentialHeight250hPa.p) }
+  public static func addVectorOf(geopotentialHeight225hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight225hPa, at: VTOFFSET.geopotentialHeight225hPa.p) }
+  public static func addVectorOf(geopotentialHeight200hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight200hPa, at: VTOFFSET.geopotentialHeight200hPa.p) }
+  public static func addVectorOf(geopotentialHeight175hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight175hPa, at: VTOFFSET.geopotentialHeight175hPa.p) }
+  public static func addVectorOf(geopotentialHeight150hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight150hPa, at: VTOFFSET.geopotentialHeight150hPa.p) }
+  public static func addVectorOf(geopotentialHeight125hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight125hPa, at: VTOFFSET.geopotentialHeight125hPa.p) }
+  public static func addVectorOf(geopotentialHeight100hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight100hPa, at: VTOFFSET.geopotentialHeight100hPa.p) }
+  public static func addVectorOf(geopotentialHeight70hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight70hPa, at: VTOFFSET.geopotentialHeight70hPa.p) }
+  public static func addVectorOf(geopotentialHeight50hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight50hPa, at: VTOFFSET.geopotentialHeight50hPa.p) }
+  public static func addVectorOf(geopotentialHeight40hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight40hPa, at: VTOFFSET.geopotentialHeight40hPa.p) }
+  public static func addVectorOf(geopotentialHeight30hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight30hPa, at: VTOFFSET.geopotentialHeight30hPa.p) }
+  public static func addVectorOf(geopotentialHeight20hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight20hPa, at: VTOFFSET.geopotentialHeight20hPa.p) }
+  public static func addVectorOf(geopotentialHeight15hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight15hPa, at: VTOFFSET.geopotentialHeight15hPa.p) }
+  public static func addVectorOf(geopotentialHeight10hPa: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: geopotentialHeight10hPa, at: VTOFFSET.geopotentialHeight10hPa.p) }
   public static func endWeatherHourly(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createWeatherHourly(
     _ fbb: inout FlatBufferBuilder,
+    time: com_openmeteo_TimeRange? = nil,
     temperture2mVectorOffset temperture2m: Offset = Offset(),
     cloudcoverVectorOffset cloudcover: Offset = Offset(),
     cloudcoverLowVectorOffset cloudcoverLow: Offset = Offset(),
@@ -707,109 +2394,667 @@ public struct com_openmeteo_api_result_WeatherHourly: FlatBufferObject, Verifiab
     soilMoistureIndex100To255cmVectorOffset soilMoistureIndex100To255cm: Offset = Offset(),
     soilMoistureIndex0To100cmVectorOffset soilMoistureIndex0To100cm: Offset = Offset(),
     lightningPotentialVectorOffset lightningPotential: Offset = Offset(),
-    temperatureHpaVectorOffset temperatureHpa: Offset = Offset(),
-    geopotentialHeightHpaVectorOffset geopotentialHeightHpa: Offset = Offset(),
-    relativehumidityHpaVectorOffset relativehumidityHpa: Offset = Offset(),
-    windspeedHpaVectorOffset windspeedHpa: Offset = Offset(),
-    winddirectionHpaVectorOffset winddirectionHpa: Offset = Offset(),
-    dewpointHpaVectorOffset dewpointHpa: Offset = Offset(),
-    cloudcoverHpaVectorOffset cloudcoverHpa: Offset = Offset(),
-    verticalVelocityHpaVectorOffset verticalVelocityHpa: Offset = Offset(),
-    growingDegreeDaysOffset growingDegreeDays: Offset = Offset(),
-    tiltedDirectRadiationOffset tiltedDirectRadiation: Offset = Offset()
+    temperature1015hPaVectorOffset temperature1015hPa: Offset = Offset(),
+    temperature1000hPaVectorOffset temperature1000hPa: Offset = Offset(),
+    temperature985hPaVectorOffset temperature985hPa: Offset = Offset(),
+    temperature975hPaVectorOffset temperature975hPa: Offset = Offset(),
+    temperature970hPaVectorOffset temperature970hPa: Offset = Offset(),
+    temperature950hPaVectorOffset temperature950hPa: Offset = Offset(),
+    temperature925hPaVectorOffset temperature925hPa: Offset = Offset(),
+    temperature900hPaVectorOffset temperature900hPa: Offset = Offset(),
+    temperature875hPaVectorOffset temperature875hPa: Offset = Offset(),
+    temperature850hPaVectorOffset temperature850hPa: Offset = Offset(),
+    temperature800hPaVectorOffset temperature800hPa: Offset = Offset(),
+    temperature750hPaVectorOffset temperature750hPa: Offset = Offset(),
+    temperature700hPaVectorOffset temperature700hPa: Offset = Offset(),
+    temperature650hPaVectorOffset temperature650hPa: Offset = Offset(),
+    temperature600hPaVectorOffset temperature600hPa: Offset = Offset(),
+    temperature550hPaVectorOffset temperature550hPa: Offset = Offset(),
+    temperature500hPaVectorOffset temperature500hPa: Offset = Offset(),
+    temperature450hPaVectorOffset temperature450hPa: Offset = Offset(),
+    temperature400hPaVectorOffset temperature400hPa: Offset = Offset(),
+    temperature350hPaVectorOffset temperature350hPa: Offset = Offset(),
+    temperature300hPaVectorOffset temperature300hPa: Offset = Offset(),
+    temperature275hPaVectorOffset temperature275hPa: Offset = Offset(),
+    temperature250hPaVectorOffset temperature250hPa: Offset = Offset(),
+    temperature225hPaVectorOffset temperature225hPa: Offset = Offset(),
+    temperature200hPaVectorOffset temperature200hPa: Offset = Offset(),
+    temperature175hPaVectorOffset temperature175hPa: Offset = Offset(),
+    temperature150hPaVectorOffset temperature150hPa: Offset = Offset(),
+    temperature125hPaVectorOffset temperature125hPa: Offset = Offset(),
+    temperature100hPaVectorOffset temperature100hPa: Offset = Offset(),
+    temperature70hPaVectorOffset temperature70hPa: Offset = Offset(),
+    temperature50hPaVectorOffset temperature50hPa: Offset = Offset(),
+    temperature40hPaVectorOffset temperature40hPa: Offset = Offset(),
+    temperature30hPaVectorOffset temperature30hPa: Offset = Offset(),
+    temperature20hPaVectorOffset temperature20hPa: Offset = Offset(),
+    temperature15hPaVectorOffset temperature15hPa: Offset = Offset(),
+    temperature10hPaVectorOffset temperature10hPa: Offset = Offset(),
+    dewpoint1015hPaVectorOffset dewpoint1015hPa: Offset = Offset(),
+    dewpoint1000hPaVectorOffset dewpoint1000hPa: Offset = Offset(),
+    dewpoint985hPaVectorOffset dewpoint985hPa: Offset = Offset(),
+    dewpoint975hPaVectorOffset dewpoint975hPa: Offset = Offset(),
+    dewpoint970hPaVectorOffset dewpoint970hPa: Offset = Offset(),
+    dewpoint950hPaVectorOffset dewpoint950hPa: Offset = Offset(),
+    dewpoint925hPaVectorOffset dewpoint925hPa: Offset = Offset(),
+    dewpoint900hPaVectorOffset dewpoint900hPa: Offset = Offset(),
+    dewpoint875hPaVectorOffset dewpoint875hPa: Offset = Offset(),
+    dewpoint850hPaVectorOffset dewpoint850hPa: Offset = Offset(),
+    dewpoint800hPaVectorOffset dewpoint800hPa: Offset = Offset(),
+    dewpoint750hPaVectorOffset dewpoint750hPa: Offset = Offset(),
+    dewpoint700hPaVectorOffset dewpoint700hPa: Offset = Offset(),
+    dewpoint650hPaVectorOffset dewpoint650hPa: Offset = Offset(),
+    dewpoint600hPaVectorOffset dewpoint600hPa: Offset = Offset(),
+    dewpoint550hPaVectorOffset dewpoint550hPa: Offset = Offset(),
+    dewpoint500hPaVectorOffset dewpoint500hPa: Offset = Offset(),
+    dewpoint450hPaVectorOffset dewpoint450hPa: Offset = Offset(),
+    dewpoint400hPaVectorOffset dewpoint400hPa: Offset = Offset(),
+    dewpoint350hPaVectorOffset dewpoint350hPa: Offset = Offset(),
+    dewpoint300hPaVectorOffset dewpoint300hPa: Offset = Offset(),
+    dewpoint275hPaVectorOffset dewpoint275hPa: Offset = Offset(),
+    dewpoint250hPaVectorOffset dewpoint250hPa: Offset = Offset(),
+    dewpoint225hPaVectorOffset dewpoint225hPa: Offset = Offset(),
+    dewpoint200hPaVectorOffset dewpoint200hPa: Offset = Offset(),
+    dewpoint175hPaVectorOffset dewpoint175hPa: Offset = Offset(),
+    dewpoint150hPaVectorOffset dewpoint150hPa: Offset = Offset(),
+    dewpoint125hPaVectorOffset dewpoint125hPa: Offset = Offset(),
+    dewpoint100hPaVectorOffset dewpoint100hPa: Offset = Offset(),
+    dewpoint70hPaVectorOffset dewpoint70hPa: Offset = Offset(),
+    dewpoint50hPaVectorOffset dewpoint50hPa: Offset = Offset(),
+    dewpoint40hPaVectorOffset dewpoint40hPa: Offset = Offset(),
+    dewpoint30hPaVectorOffset dewpoint30hPa: Offset = Offset(),
+    dewpoint20hPaVectorOffset dewpoint20hPa: Offset = Offset(),
+    dewpoint15hPaVectorOffset dewpoint15hPa: Offset = Offset(),
+    dewpoint10hPaVectorOffset dewpoint10hPa: Offset = Offset(),
+    relativehumidity1015hPaVectorOffset relativehumidity1015hPa: Offset = Offset(),
+    relativehumidity1000hPaVectorOffset relativehumidity1000hPa: Offset = Offset(),
+    relativehumidity985hPaVectorOffset relativehumidity985hPa: Offset = Offset(),
+    relativehumidity975hPaVectorOffset relativehumidity975hPa: Offset = Offset(),
+    relativehumidity970hPaVectorOffset relativehumidity970hPa: Offset = Offset(),
+    relativehumidity950hPaVectorOffset relativehumidity950hPa: Offset = Offset(),
+    relativehumidity925hPaVectorOffset relativehumidity925hPa: Offset = Offset(),
+    relativehumidity900hPaVectorOffset relativehumidity900hPa: Offset = Offset(),
+    relativehumidity875hPaVectorOffset relativehumidity875hPa: Offset = Offset(),
+    relativehumidity850hPaVectorOffset relativehumidity850hPa: Offset = Offset(),
+    relativehumidity800hPaVectorOffset relativehumidity800hPa: Offset = Offset(),
+    relativehumidity750hPaVectorOffset relativehumidity750hPa: Offset = Offset(),
+    relativehumidity700hPaVectorOffset relativehumidity700hPa: Offset = Offset(),
+    relativehumidity650hPaVectorOffset relativehumidity650hPa: Offset = Offset(),
+    relativehumidity600hPaVectorOffset relativehumidity600hPa: Offset = Offset(),
+    relativehumidity550hPaVectorOffset relativehumidity550hPa: Offset = Offset(),
+    relativehumidity500hPaVectorOffset relativehumidity500hPa: Offset = Offset(),
+    relativehumidity450hPaVectorOffset relativehumidity450hPa: Offset = Offset(),
+    relativehumidity400hPaVectorOffset relativehumidity400hPa: Offset = Offset(),
+    relativehumidity350hPaVectorOffset relativehumidity350hPa: Offset = Offset(),
+    relativehumidity300hPaVectorOffset relativehumidity300hPa: Offset = Offset(),
+    relativehumidity275hPaVectorOffset relativehumidity275hPa: Offset = Offset(),
+    relativehumidity250hPaVectorOffset relativehumidity250hPa: Offset = Offset(),
+    relativehumidity225hPaVectorOffset relativehumidity225hPa: Offset = Offset(),
+    relativehumidity200hPaVectorOffset relativehumidity200hPa: Offset = Offset(),
+    relativehumidity175hPaVectorOffset relativehumidity175hPa: Offset = Offset(),
+    relativehumidity150hPaVectorOffset relativehumidity150hPa: Offset = Offset(),
+    relativehumidity125hPaVectorOffset relativehumidity125hPa: Offset = Offset(),
+    relativehumidity100hPaVectorOffset relativehumidity100hPa: Offset = Offset(),
+    relativehumidity70hPaVectorOffset relativehumidity70hPa: Offset = Offset(),
+    relativehumidity50hPaVectorOffset relativehumidity50hPa: Offset = Offset(),
+    relativehumidity40hPaVectorOffset relativehumidity40hPa: Offset = Offset(),
+    relativehumidity30hPaVectorOffset relativehumidity30hPa: Offset = Offset(),
+    relativehumidity20hPaVectorOffset relativehumidity20hPa: Offset = Offset(),
+    relativehumidity15hPaVectorOffset relativehumidity15hPa: Offset = Offset(),
+    relativehumidity10hPaVectorOffset relativehumidity10hPa: Offset = Offset(),
+    cloudcover1015hPaVectorOffset cloudcover1015hPa: Offset = Offset(),
+    cloudcover1000hPaVectorOffset cloudcover1000hPa: Offset = Offset(),
+    cloudcover985hPaVectorOffset cloudcover985hPa: Offset = Offset(),
+    cloudcover975hPaVectorOffset cloudcover975hPa: Offset = Offset(),
+    cloudcover970hPaVectorOffset cloudcover970hPa: Offset = Offset(),
+    cloudcover950hPaVectorOffset cloudcover950hPa: Offset = Offset(),
+    cloudcover925hPaVectorOffset cloudcover925hPa: Offset = Offset(),
+    cloudcover900hPaVectorOffset cloudcover900hPa: Offset = Offset(),
+    cloudcover875hPaVectorOffset cloudcover875hPa: Offset = Offset(),
+    cloudcover850hPaVectorOffset cloudcover850hPa: Offset = Offset(),
+    cloudcover800hPaVectorOffset cloudcover800hPa: Offset = Offset(),
+    cloudcover750hPaVectorOffset cloudcover750hPa: Offset = Offset(),
+    cloudcover700hPaVectorOffset cloudcover700hPa: Offset = Offset(),
+    cloudcover650hPaVectorOffset cloudcover650hPa: Offset = Offset(),
+    cloudcover600hPaVectorOffset cloudcover600hPa: Offset = Offset(),
+    cloudcover550hPaVectorOffset cloudcover550hPa: Offset = Offset(),
+    cloudcover500hPaVectorOffset cloudcover500hPa: Offset = Offset(),
+    cloudcover450hPaVectorOffset cloudcover450hPa: Offset = Offset(),
+    cloudcover400hPaVectorOffset cloudcover400hPa: Offset = Offset(),
+    cloudcover350hPaVectorOffset cloudcover350hPa: Offset = Offset(),
+    cloudcover300hPaVectorOffset cloudcover300hPa: Offset = Offset(),
+    cloudcover275hPaVectorOffset cloudcover275hPa: Offset = Offset(),
+    cloudcover250hPaVectorOffset cloudcover250hPa: Offset = Offset(),
+    cloudcover225hPaVectorOffset cloudcover225hPa: Offset = Offset(),
+    cloudcover200hPaVectorOffset cloudcover200hPa: Offset = Offset(),
+    cloudcover175hPaVectorOffset cloudcover175hPa: Offset = Offset(),
+    cloudcover150hPaVectorOffset cloudcover150hPa: Offset = Offset(),
+    cloudcover125hPaVectorOffset cloudcover125hPa: Offset = Offset(),
+    cloudcover100hPaVectorOffset cloudcover100hPa: Offset = Offset(),
+    cloudcover70hPaVectorOffset cloudcover70hPa: Offset = Offset(),
+    cloudcover50hPaVectorOffset cloudcover50hPa: Offset = Offset(),
+    cloudcover40hPaVectorOffset cloudcover40hPa: Offset = Offset(),
+    cloudcover30hPaVectorOffset cloudcover30hPa: Offset = Offset(),
+    cloudcover20hPaVectorOffset cloudcover20hPa: Offset = Offset(),
+    cloudcover15hPaVectorOffset cloudcover15hPa: Offset = Offset(),
+    cloudcover10hPaVectorOffset cloudcover10hPa: Offset = Offset(),
+    windspeed1015hPaVectorOffset windspeed1015hPa: Offset = Offset(),
+    windspeed1000hPaVectorOffset windspeed1000hPa: Offset = Offset(),
+    windspeed985hPaVectorOffset windspeed985hPa: Offset = Offset(),
+    windspeed975hPaVectorOffset windspeed975hPa: Offset = Offset(),
+    windspeed970hPaVectorOffset windspeed970hPa: Offset = Offset(),
+    windspeed950hPaVectorOffset windspeed950hPa: Offset = Offset(),
+    windspeed925hPaVectorOffset windspeed925hPa: Offset = Offset(),
+    windspeed900hPaVectorOffset windspeed900hPa: Offset = Offset(),
+    windspeed875hPaVectorOffset windspeed875hPa: Offset = Offset(),
+    windspeed850hPaVectorOffset windspeed850hPa: Offset = Offset(),
+    windspeed800hPaVectorOffset windspeed800hPa: Offset = Offset(),
+    windspeed750hPaVectorOffset windspeed750hPa: Offset = Offset(),
+    windspeed700hPaVectorOffset windspeed700hPa: Offset = Offset(),
+    windspeed650hPaVectorOffset windspeed650hPa: Offset = Offset(),
+    windspeed600hPaVectorOffset windspeed600hPa: Offset = Offset(),
+    windspeed550hPaVectorOffset windspeed550hPa: Offset = Offset(),
+    windspeed500hPaVectorOffset windspeed500hPa: Offset = Offset(),
+    windspeed450hPaVectorOffset windspeed450hPa: Offset = Offset(),
+    windspeed400hPaVectorOffset windspeed400hPa: Offset = Offset(),
+    windspeed350hPaVectorOffset windspeed350hPa: Offset = Offset(),
+    windspeed300hPaVectorOffset windspeed300hPa: Offset = Offset(),
+    windspeed275hPaVectorOffset windspeed275hPa: Offset = Offset(),
+    windspeed250hPaVectorOffset windspeed250hPa: Offset = Offset(),
+    windspeed225hPaVectorOffset windspeed225hPa: Offset = Offset(),
+    windspeed200hPaVectorOffset windspeed200hPa: Offset = Offset(),
+    windspeed175hPaVectorOffset windspeed175hPa: Offset = Offset(),
+    windspeed150hPaVectorOffset windspeed150hPa: Offset = Offset(),
+    windspeed125hPaVectorOffset windspeed125hPa: Offset = Offset(),
+    windspeed100hPaVectorOffset windspeed100hPa: Offset = Offset(),
+    windspeed70hPaVectorOffset windspeed70hPa: Offset = Offset(),
+    windspeed50hPaVectorOffset windspeed50hPa: Offset = Offset(),
+    windspeed40hPaVectorOffset windspeed40hPa: Offset = Offset(),
+    windspeed30hPaVectorOffset windspeed30hPa: Offset = Offset(),
+    windspeed20hPaVectorOffset windspeed20hPa: Offset = Offset(),
+    windspeed15hPaVectorOffset windspeed15hPa: Offset = Offset(),
+    windspeed10hPaVectorOffset windspeed10hPa: Offset = Offset(),
+    winddirection1015hPaVectorOffset winddirection1015hPa: Offset = Offset(),
+    winddirection1000hPaVectorOffset winddirection1000hPa: Offset = Offset(),
+    winddirection985hPaVectorOffset winddirection985hPa: Offset = Offset(),
+    winddirection975hPaVectorOffset winddirection975hPa: Offset = Offset(),
+    winddirection970hPaVectorOffset winddirection970hPa: Offset = Offset(),
+    winddirection950hPaVectorOffset winddirection950hPa: Offset = Offset(),
+    winddirection925hPaVectorOffset winddirection925hPa: Offset = Offset(),
+    winddirection900hPaVectorOffset winddirection900hPa: Offset = Offset(),
+    winddirection875hPaVectorOffset winddirection875hPa: Offset = Offset(),
+    winddirection850hPaVectorOffset winddirection850hPa: Offset = Offset(),
+    winddirection800hPaVectorOffset winddirection800hPa: Offset = Offset(),
+    winddirection750hPaVectorOffset winddirection750hPa: Offset = Offset(),
+    winddirection700hPaVectorOffset winddirection700hPa: Offset = Offset(),
+    winddirection650hPaVectorOffset winddirection650hPa: Offset = Offset(),
+    winddirection600hPaVectorOffset winddirection600hPa: Offset = Offset(),
+    winddirection550hPaVectorOffset winddirection550hPa: Offset = Offset(),
+    winddirection500hPaVectorOffset winddirection500hPa: Offset = Offset(),
+    winddirection450hPaVectorOffset winddirection450hPa: Offset = Offset(),
+    winddirection400hPaVectorOffset winddirection400hPa: Offset = Offset(),
+    winddirection350hPaVectorOffset winddirection350hPa: Offset = Offset(),
+    winddirection300hPaVectorOffset winddirection300hPa: Offset = Offset(),
+    winddirection275hPaVectorOffset winddirection275hPa: Offset = Offset(),
+    winddirection250hPaVectorOffset winddirection250hPa: Offset = Offset(),
+    winddirection225hPaVectorOffset winddirection225hPa: Offset = Offset(),
+    winddirection200hPaVectorOffset winddirection200hPa: Offset = Offset(),
+    winddirection175hPaVectorOffset winddirection175hPa: Offset = Offset(),
+    winddirection150hPaVectorOffset winddirection150hPa: Offset = Offset(),
+    winddirection125hPaVectorOffset winddirection125hPa: Offset = Offset(),
+    winddirection100hPaVectorOffset winddirection100hPa: Offset = Offset(),
+    winddirection70hPaVectorOffset winddirection70hPa: Offset = Offset(),
+    winddirection50hPaVectorOffset winddirection50hPa: Offset = Offset(),
+    winddirection40hPaVectorOffset winddirection40hPa: Offset = Offset(),
+    winddirection30hPaVectorOffset winddirection30hPa: Offset = Offset(),
+    winddirection20hPaVectorOffset winddirection20hPa: Offset = Offset(),
+    winddirection15hPaVectorOffset winddirection15hPa: Offset = Offset(),
+    winddirection10hPaVectorOffset winddirection10hPa: Offset = Offset(),
+    verticalVelocity1015hPaVectorOffset verticalVelocity1015hPa: Offset = Offset(),
+    verticalVelocity1000hPaVectorOffset verticalVelocity1000hPa: Offset = Offset(),
+    verticalVelocity985hPaVectorOffset verticalVelocity985hPa: Offset = Offset(),
+    verticalVelocity975hPaVectorOffset verticalVelocity975hPa: Offset = Offset(),
+    verticalVelocity970hPaVectorOffset verticalVelocity970hPa: Offset = Offset(),
+    verticalVelocity950hPaVectorOffset verticalVelocity950hPa: Offset = Offset(),
+    verticalVelocity925hPaVectorOffset verticalVelocity925hPa: Offset = Offset(),
+    verticalVelocity900hPaVectorOffset verticalVelocity900hPa: Offset = Offset(),
+    verticalVelocity875hPaVectorOffset verticalVelocity875hPa: Offset = Offset(),
+    verticalVelocity850hPaVectorOffset verticalVelocity850hPa: Offset = Offset(),
+    verticalVelocity800hPaVectorOffset verticalVelocity800hPa: Offset = Offset(),
+    verticalVelocity750hPaVectorOffset verticalVelocity750hPa: Offset = Offset(),
+    verticalVelocity700hPaVectorOffset verticalVelocity700hPa: Offset = Offset(),
+    verticalVelocity650hPaVectorOffset verticalVelocity650hPa: Offset = Offset(),
+    verticalVelocity600hPaVectorOffset verticalVelocity600hPa: Offset = Offset(),
+    verticalVelocity550hPaVectorOffset verticalVelocity550hPa: Offset = Offset(),
+    verticalVelocity500hPaVectorOffset verticalVelocity500hPa: Offset = Offset(),
+    verticalVelocity450hPaVectorOffset verticalVelocity450hPa: Offset = Offset(),
+    verticalVelocity400hPaVectorOffset verticalVelocity400hPa: Offset = Offset(),
+    verticalVelocity350hPaVectorOffset verticalVelocity350hPa: Offset = Offset(),
+    verticalVelocity300hPaVectorOffset verticalVelocity300hPa: Offset = Offset(),
+    verticalVelocity275hPaVectorOffset verticalVelocity275hPa: Offset = Offset(),
+    verticalVelocity250hPaVectorOffset verticalVelocity250hPa: Offset = Offset(),
+    verticalVelocity225hPaVectorOffset verticalVelocity225hPa: Offset = Offset(),
+    verticalVelocity200hPaVectorOffset verticalVelocity200hPa: Offset = Offset(),
+    verticalVelocity175hPaVectorOffset verticalVelocity175hPa: Offset = Offset(),
+    verticalVelocity150hPaVectorOffset verticalVelocity150hPa: Offset = Offset(),
+    verticalVelocity125hPaVectorOffset verticalVelocity125hPa: Offset = Offset(),
+    verticalVelocity100hPaVectorOffset verticalVelocity100hPa: Offset = Offset(),
+    verticalVelocity70hPaVectorOffset verticalVelocity70hPa: Offset = Offset(),
+    verticalVelocity50hPaVectorOffset verticalVelocity50hPa: Offset = Offset(),
+    verticalVelocity40hPaVectorOffset verticalVelocity40hPa: Offset = Offset(),
+    verticalVelocity30hPaVectorOffset verticalVelocity30hPa: Offset = Offset(),
+    verticalVelocity20hPaVectorOffset verticalVelocity20hPa: Offset = Offset(),
+    verticalVelocity15hPaVectorOffset verticalVelocity15hPa: Offset = Offset(),
+    verticalVelocity10hPaVectorOffset verticalVelocity10hPa: Offset = Offset(),
+    geopotentialHeight1015hPaVectorOffset geopotentialHeight1015hPa: Offset = Offset(),
+    geopotentialHeight1000hPaVectorOffset geopotentialHeight1000hPa: Offset = Offset(),
+    geopotentialHeight985hPaVectorOffset geopotentialHeight985hPa: Offset = Offset(),
+    geopotentialHeight975hPaVectorOffset geopotentialHeight975hPa: Offset = Offset(),
+    geopotentialHeight970hPaVectorOffset geopotentialHeight970hPa: Offset = Offset(),
+    geopotentialHeight950hPaVectorOffset geopotentialHeight950hPa: Offset = Offset(),
+    geopotentialHeight925hPaVectorOffset geopotentialHeight925hPa: Offset = Offset(),
+    geopotentialHeight900hPaVectorOffset geopotentialHeight900hPa: Offset = Offset(),
+    geopotentialHeight875hPaVectorOffset geopotentialHeight875hPa: Offset = Offset(),
+    geopotentialHeight850hPaVectorOffset geopotentialHeight850hPa: Offset = Offset(),
+    geopotentialHeight800hPaVectorOffset geopotentialHeight800hPa: Offset = Offset(),
+    geopotentialHeight750hPaVectorOffset geopotentialHeight750hPa: Offset = Offset(),
+    geopotentialHeight700hPaVectorOffset geopotentialHeight700hPa: Offset = Offset(),
+    geopotentialHeight650hPaVectorOffset geopotentialHeight650hPa: Offset = Offset(),
+    geopotentialHeight600hPaVectorOffset geopotentialHeight600hPa: Offset = Offset(),
+    geopotentialHeight550hPaVectorOffset geopotentialHeight550hPa: Offset = Offset(),
+    geopotentialHeight500hPaVectorOffset geopotentialHeight500hPa: Offset = Offset(),
+    geopotentialHeight450hPaVectorOffset geopotentialHeight450hPa: Offset = Offset(),
+    geopotentialHeight400hPaVectorOffset geopotentialHeight400hPa: Offset = Offset(),
+    geopotentialHeight350hPaVectorOffset geopotentialHeight350hPa: Offset = Offset(),
+    geopotentialHeight300hPaVectorOffset geopotentialHeight300hPa: Offset = Offset(),
+    geopotentialHeight275hPaVectorOffset geopotentialHeight275hPa: Offset = Offset(),
+    geopotentialHeight250hPaVectorOffset geopotentialHeight250hPa: Offset = Offset(),
+    geopotentialHeight225hPaVectorOffset geopotentialHeight225hPa: Offset = Offset(),
+    geopotentialHeight200hPaVectorOffset geopotentialHeight200hPa: Offset = Offset(),
+    geopotentialHeight175hPaVectorOffset geopotentialHeight175hPa: Offset = Offset(),
+    geopotentialHeight150hPaVectorOffset geopotentialHeight150hPa: Offset = Offset(),
+    geopotentialHeight125hPaVectorOffset geopotentialHeight125hPa: Offset = Offset(),
+    geopotentialHeight100hPaVectorOffset geopotentialHeight100hPa: Offset = Offset(),
+    geopotentialHeight70hPaVectorOffset geopotentialHeight70hPa: Offset = Offset(),
+    geopotentialHeight50hPaVectorOffset geopotentialHeight50hPa: Offset = Offset(),
+    geopotentialHeight40hPaVectorOffset geopotentialHeight40hPa: Offset = Offset(),
+    geopotentialHeight30hPaVectorOffset geopotentialHeight30hPa: Offset = Offset(),
+    geopotentialHeight20hPaVectorOffset geopotentialHeight20hPa: Offset = Offset(),
+    geopotentialHeight15hPaVectorOffset geopotentialHeight15hPa: Offset = Offset(),
+    geopotentialHeight10hPaVectorOffset geopotentialHeight10hPa: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_api_result_WeatherHourly.startWeatherHourly(&fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(temperture2m: temperture2m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(cloudcover: cloudcover, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(cloudcoverLow: cloudcoverLow, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(cloudcoverMid: cloudcoverMid, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(cloudcoverHigh: cloudcoverHigh, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(pressureMsl: pressureMsl, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(relativehumidity2m: relativehumidity2m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(precipitation: precipitation, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(precipitationProbability: precipitationProbability, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(weathercode: weathercode, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(temperature80m: temperature80m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(temperature120m: temperature120m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(temperature180m: temperature180m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilTemperature0cm: soilTemperature0cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilTemperature6cm: soilTemperature6cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilTemperature18cm: soilTemperature18cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilTemperature54cm: soilTemperature54cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture01cm: soilMoisture01cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture13cm: soilMoisture13cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture39cm: soilMoisture39cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture927cm: soilMoisture927cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture2781cm: soilMoisture2781cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(snowDepth: snowDepth, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(snowHeight: snowHeight, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(sensibleHeatflux: sensibleHeatflux, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(latentHeatflux: latentHeatflux, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(showers: showers, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(rain: rain, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(windgusts10m: windgusts10m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(freezinglevelHeight: freezinglevelHeight, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(dewpoint2m: dewpoint2m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(diffuseRadiation: diffuseRadiation, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(directRadiation: directRadiation, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(apparentTemperature: apparentTemperature, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(windspeed10m: windspeed10m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(winddirection10m: winddirection10m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(windspeed80m: windspeed80m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(winddirection80m: winddirection80m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(windspeed120m: windspeed120m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(winddirection120m: winddirection120m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(windspeed180m: windspeed180m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(winddirection180m: winddirection180m, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(directNormalIrradiance: directNormalIrradiance, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(evapotranspiration: evapotranspiration, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(vaporPressureDeficit: vaporPressureDeficit, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(shortwaveRadiation: shortwaveRadiation, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(snowfall: snowfall, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(surfacePressure: surfacePressure, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(terrestrialRadiation: terrestrialRadiation, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(terrestrialRadiationInstant: terrestrialRadiationInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(shortwaveRadiationInstant: shortwaveRadiationInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(diffuseRadiationInstant: diffuseRadiationInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(directRadiationInstant: directRadiationInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(directNormalIrradianceInstant: directNormalIrradianceInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(visibility: visibility, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(cape: cape, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(uvIndex: uvIndex, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(uvIndexClearSky: uvIndexClearSky, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(isDay: isDay, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilTemperature0To10cm: soilTemperature0To10cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilTemperature10To40cm: soilTemperature10To40cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilTemperature40To100cm: soilTemperature40To100cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilTemperature100To200cm: soilTemperature100To200cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture0To10cm: soilMoisture0To10cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture10To40cm: soilMoisture10To40cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture40To100cm: soilMoisture40To100cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoisture100To200cm: soilMoisture100To200cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(growingDegreeDaysBase0Limit50: growingDegreeDaysBase0Limit50, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(leafWetnessProbability: leafWetnessProbability, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoistureIndex0To7cm: soilMoistureIndex0To7cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoistureIndex7To28cm: soilMoistureIndex7To28cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoistureIndex28To100cm: soilMoistureIndex28To100cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoistureIndex100To255cm: soilMoistureIndex100To255cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(soilMoistureIndex0To100cm: soilMoistureIndex0To100cm, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(lightningPotential: lightningPotential, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(temperatureHpa: temperatureHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(geopotentialHeightHpa: geopotentialHeightHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(relativehumidityHpa: relativehumidityHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(windspeedHpa: windspeedHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(winddirectionHpa: winddirectionHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(dewpointHpa: dewpointHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(cloudcoverHpa: cloudcoverHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourly.addVectorOf(verticalVelocityHpa: verticalVelocityHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourly.add(growingDegreeDays: growingDegreeDays, &fbb)
-    com_openmeteo_api_result_WeatherHourly.add(tiltedDirectRadiation: tiltedDirectRadiation, &fbb)
-    return com_openmeteo_api_result_WeatherHourly.endWeatherHourly(&fbb, start: __start)
+    let __start = com_openmeteo_WeatherHourly.startWeatherHourly(&fbb)
+    com_openmeteo_WeatherHourly.add(time: time, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperture2m: temperture2m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover: cloudcover, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcoverLow: cloudcoverLow, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcoverMid: cloudcoverMid, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcoverHigh: cloudcoverHigh, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(pressureMsl: pressureMsl, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity2m: relativehumidity2m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(precipitation: precipitation, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(precipitationProbability: precipitationProbability, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(weathercode: weathercode, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature80m: temperature80m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature120m: temperature120m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature180m: temperature180m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilTemperature0cm: soilTemperature0cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilTemperature6cm: soilTemperature6cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilTemperature18cm: soilTemperature18cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilTemperature54cm: soilTemperature54cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture01cm: soilMoisture01cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture13cm: soilMoisture13cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture39cm: soilMoisture39cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture927cm: soilMoisture927cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture2781cm: soilMoisture2781cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(snowDepth: snowDepth, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(snowHeight: snowHeight, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(sensibleHeatflux: sensibleHeatflux, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(latentHeatflux: latentHeatflux, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(showers: showers, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(rain: rain, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windgusts10m: windgusts10m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(freezinglevelHeight: freezinglevelHeight, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint2m: dewpoint2m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(diffuseRadiation: diffuseRadiation, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(directRadiation: directRadiation, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(apparentTemperature: apparentTemperature, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed10m: windspeed10m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection10m: winddirection10m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed80m: windspeed80m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection80m: winddirection80m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed120m: windspeed120m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection120m: winddirection120m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed180m: windspeed180m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection180m: winddirection180m, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(directNormalIrradiance: directNormalIrradiance, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(evapotranspiration: evapotranspiration, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(vaporPressureDeficit: vaporPressureDeficit, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(shortwaveRadiation: shortwaveRadiation, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(snowfall: snowfall, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(surfacePressure: surfacePressure, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(terrestrialRadiation: terrestrialRadiation, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(terrestrialRadiationInstant: terrestrialRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(shortwaveRadiationInstant: shortwaveRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(diffuseRadiationInstant: diffuseRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(directRadiationInstant: directRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(directNormalIrradianceInstant: directNormalIrradianceInstant, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(visibility: visibility, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cape: cape, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(uvIndex: uvIndex, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(uvIndexClearSky: uvIndexClearSky, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(isDay: isDay, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilTemperature0To10cm: soilTemperature0To10cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilTemperature10To40cm: soilTemperature10To40cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilTemperature40To100cm: soilTemperature40To100cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilTemperature100To200cm: soilTemperature100To200cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture0To10cm: soilMoisture0To10cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture10To40cm: soilMoisture10To40cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture40To100cm: soilMoisture40To100cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoisture100To200cm: soilMoisture100To200cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(growingDegreeDaysBase0Limit50: growingDegreeDaysBase0Limit50, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(leafWetnessProbability: leafWetnessProbability, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoistureIndex0To7cm: soilMoistureIndex0To7cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoistureIndex7To28cm: soilMoistureIndex7To28cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoistureIndex28To100cm: soilMoistureIndex28To100cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoistureIndex100To255cm: soilMoistureIndex100To255cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(soilMoistureIndex0To100cm: soilMoistureIndex0To100cm, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(lightningPotential: lightningPotential, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature1015hPa: temperature1015hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature1000hPa: temperature1000hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature985hPa: temperature985hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature975hPa: temperature975hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature970hPa: temperature970hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature950hPa: temperature950hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature925hPa: temperature925hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature900hPa: temperature900hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature875hPa: temperature875hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature850hPa: temperature850hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature800hPa: temperature800hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature750hPa: temperature750hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature700hPa: temperature700hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature650hPa: temperature650hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature600hPa: temperature600hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature550hPa: temperature550hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature500hPa: temperature500hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature450hPa: temperature450hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature400hPa: temperature400hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature350hPa: temperature350hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature300hPa: temperature300hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature275hPa: temperature275hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature250hPa: temperature250hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature225hPa: temperature225hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature200hPa: temperature200hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature175hPa: temperature175hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature150hPa: temperature150hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature125hPa: temperature125hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature100hPa: temperature100hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature70hPa: temperature70hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature50hPa: temperature50hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature40hPa: temperature40hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature30hPa: temperature30hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature20hPa: temperature20hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature15hPa: temperature15hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(temperature10hPa: temperature10hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint1015hPa: dewpoint1015hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint1000hPa: dewpoint1000hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint985hPa: dewpoint985hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint975hPa: dewpoint975hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint970hPa: dewpoint970hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint950hPa: dewpoint950hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint925hPa: dewpoint925hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint900hPa: dewpoint900hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint875hPa: dewpoint875hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint850hPa: dewpoint850hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint800hPa: dewpoint800hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint750hPa: dewpoint750hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint700hPa: dewpoint700hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint650hPa: dewpoint650hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint600hPa: dewpoint600hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint550hPa: dewpoint550hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint500hPa: dewpoint500hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint450hPa: dewpoint450hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint400hPa: dewpoint400hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint350hPa: dewpoint350hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint300hPa: dewpoint300hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint275hPa: dewpoint275hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint250hPa: dewpoint250hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint225hPa: dewpoint225hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint200hPa: dewpoint200hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint175hPa: dewpoint175hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint150hPa: dewpoint150hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint125hPa: dewpoint125hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint100hPa: dewpoint100hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint70hPa: dewpoint70hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint50hPa: dewpoint50hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint40hPa: dewpoint40hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint30hPa: dewpoint30hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint20hPa: dewpoint20hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint15hPa: dewpoint15hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(dewpoint10hPa: dewpoint10hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity1015hPa: relativehumidity1015hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity1000hPa: relativehumidity1000hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity985hPa: relativehumidity985hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity975hPa: relativehumidity975hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity970hPa: relativehumidity970hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity950hPa: relativehumidity950hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity925hPa: relativehumidity925hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity900hPa: relativehumidity900hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity875hPa: relativehumidity875hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity850hPa: relativehumidity850hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity800hPa: relativehumidity800hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity750hPa: relativehumidity750hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity700hPa: relativehumidity700hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity650hPa: relativehumidity650hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity600hPa: relativehumidity600hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity550hPa: relativehumidity550hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity500hPa: relativehumidity500hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity450hPa: relativehumidity450hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity400hPa: relativehumidity400hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity350hPa: relativehumidity350hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity300hPa: relativehumidity300hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity275hPa: relativehumidity275hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity250hPa: relativehumidity250hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity225hPa: relativehumidity225hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity200hPa: relativehumidity200hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity175hPa: relativehumidity175hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity150hPa: relativehumidity150hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity125hPa: relativehumidity125hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity100hPa: relativehumidity100hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity70hPa: relativehumidity70hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity50hPa: relativehumidity50hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity40hPa: relativehumidity40hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity30hPa: relativehumidity30hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity20hPa: relativehumidity20hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity15hPa: relativehumidity15hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(relativehumidity10hPa: relativehumidity10hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover1015hPa: cloudcover1015hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover1000hPa: cloudcover1000hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover985hPa: cloudcover985hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover975hPa: cloudcover975hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover970hPa: cloudcover970hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover950hPa: cloudcover950hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover925hPa: cloudcover925hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover900hPa: cloudcover900hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover875hPa: cloudcover875hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover850hPa: cloudcover850hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover800hPa: cloudcover800hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover750hPa: cloudcover750hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover700hPa: cloudcover700hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover650hPa: cloudcover650hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover600hPa: cloudcover600hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover550hPa: cloudcover550hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover500hPa: cloudcover500hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover450hPa: cloudcover450hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover400hPa: cloudcover400hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover350hPa: cloudcover350hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover300hPa: cloudcover300hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover275hPa: cloudcover275hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover250hPa: cloudcover250hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover225hPa: cloudcover225hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover200hPa: cloudcover200hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover175hPa: cloudcover175hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover150hPa: cloudcover150hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover125hPa: cloudcover125hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover100hPa: cloudcover100hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover70hPa: cloudcover70hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover50hPa: cloudcover50hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover40hPa: cloudcover40hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover30hPa: cloudcover30hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover20hPa: cloudcover20hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover15hPa: cloudcover15hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(cloudcover10hPa: cloudcover10hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed1015hPa: windspeed1015hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed1000hPa: windspeed1000hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed985hPa: windspeed985hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed975hPa: windspeed975hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed970hPa: windspeed970hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed950hPa: windspeed950hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed925hPa: windspeed925hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed900hPa: windspeed900hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed875hPa: windspeed875hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed850hPa: windspeed850hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed800hPa: windspeed800hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed750hPa: windspeed750hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed700hPa: windspeed700hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed650hPa: windspeed650hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed600hPa: windspeed600hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed550hPa: windspeed550hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed500hPa: windspeed500hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed450hPa: windspeed450hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed400hPa: windspeed400hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed350hPa: windspeed350hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed300hPa: windspeed300hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed275hPa: windspeed275hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed250hPa: windspeed250hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed225hPa: windspeed225hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed200hPa: windspeed200hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed175hPa: windspeed175hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed150hPa: windspeed150hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed125hPa: windspeed125hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed100hPa: windspeed100hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed70hPa: windspeed70hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed50hPa: windspeed50hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed40hPa: windspeed40hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed30hPa: windspeed30hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed20hPa: windspeed20hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed15hPa: windspeed15hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(windspeed10hPa: windspeed10hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection1015hPa: winddirection1015hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection1000hPa: winddirection1000hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection985hPa: winddirection985hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection975hPa: winddirection975hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection970hPa: winddirection970hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection950hPa: winddirection950hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection925hPa: winddirection925hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection900hPa: winddirection900hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection875hPa: winddirection875hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection850hPa: winddirection850hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection800hPa: winddirection800hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection750hPa: winddirection750hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection700hPa: winddirection700hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection650hPa: winddirection650hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection600hPa: winddirection600hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection550hPa: winddirection550hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection500hPa: winddirection500hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection450hPa: winddirection450hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection400hPa: winddirection400hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection350hPa: winddirection350hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection300hPa: winddirection300hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection275hPa: winddirection275hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection250hPa: winddirection250hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection225hPa: winddirection225hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection200hPa: winddirection200hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection175hPa: winddirection175hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection150hPa: winddirection150hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection125hPa: winddirection125hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection100hPa: winddirection100hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection70hPa: winddirection70hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection50hPa: winddirection50hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection40hPa: winddirection40hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection30hPa: winddirection30hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection20hPa: winddirection20hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection15hPa: winddirection15hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(winddirection10hPa: winddirection10hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity1015hPa: verticalVelocity1015hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity1000hPa: verticalVelocity1000hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity985hPa: verticalVelocity985hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity975hPa: verticalVelocity975hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity970hPa: verticalVelocity970hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity950hPa: verticalVelocity950hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity925hPa: verticalVelocity925hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity900hPa: verticalVelocity900hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity875hPa: verticalVelocity875hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity850hPa: verticalVelocity850hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity800hPa: verticalVelocity800hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity750hPa: verticalVelocity750hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity700hPa: verticalVelocity700hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity650hPa: verticalVelocity650hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity600hPa: verticalVelocity600hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity550hPa: verticalVelocity550hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity500hPa: verticalVelocity500hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity450hPa: verticalVelocity450hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity400hPa: verticalVelocity400hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity350hPa: verticalVelocity350hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity300hPa: verticalVelocity300hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity275hPa: verticalVelocity275hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity250hPa: verticalVelocity250hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity225hPa: verticalVelocity225hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity200hPa: verticalVelocity200hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity175hPa: verticalVelocity175hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity150hPa: verticalVelocity150hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity125hPa: verticalVelocity125hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity100hPa: verticalVelocity100hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity70hPa: verticalVelocity70hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity50hPa: verticalVelocity50hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity40hPa: verticalVelocity40hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity30hPa: verticalVelocity30hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity20hPa: verticalVelocity20hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity15hPa: verticalVelocity15hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(verticalVelocity10hPa: verticalVelocity10hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight1015hPa: geopotentialHeight1015hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight1000hPa: geopotentialHeight1000hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight985hPa: geopotentialHeight985hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight975hPa: geopotentialHeight975hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight970hPa: geopotentialHeight970hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight950hPa: geopotentialHeight950hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight925hPa: geopotentialHeight925hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight900hPa: geopotentialHeight900hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight875hPa: geopotentialHeight875hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight850hPa: geopotentialHeight850hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight800hPa: geopotentialHeight800hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight750hPa: geopotentialHeight750hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight700hPa: geopotentialHeight700hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight650hPa: geopotentialHeight650hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight600hPa: geopotentialHeight600hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight550hPa: geopotentialHeight550hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight500hPa: geopotentialHeight500hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight450hPa: geopotentialHeight450hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight400hPa: geopotentialHeight400hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight350hPa: geopotentialHeight350hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight300hPa: geopotentialHeight300hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight275hPa: geopotentialHeight275hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight250hPa: geopotentialHeight250hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight225hPa: geopotentialHeight225hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight200hPa: geopotentialHeight200hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight175hPa: geopotentialHeight175hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight150hPa: geopotentialHeight150hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight125hPa: geopotentialHeight125hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight100hPa: geopotentialHeight100hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight70hPa: geopotentialHeight70hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight50hPa: geopotentialHeight50hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight40hPa: geopotentialHeight40hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight30hPa: geopotentialHeight30hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight20hPa: geopotentialHeight20hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight15hPa: geopotentialHeight15hPa, &fbb)
+    com_openmeteo_WeatherHourly.addVectorOf(geopotentialHeight10hPa: geopotentialHeight10hPa, &fbb)
+    return com_openmeteo_WeatherHourly.endWeatherHourly(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: false, type: com_openmeteo_TimeRange.self)
     try _v.visit(field: VTOFFSET.temperture2m.p, fieldName: "temperture2m", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
     try _v.visit(field: VTOFFSET.cloudcover.p, fieldName: "cloudcover", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
     try _v.visit(field: VTOFFSET.cloudcoverLow.p, fieldName: "cloudcoverLow", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
@@ -886,21 +3131,299 @@ public struct com_openmeteo_api_result_WeatherHourly: FlatBufferObject, Verifiab
     try _v.visit(field: VTOFFSET.soilMoistureIndex100To255cm.p, fieldName: "soilMoistureIndex100To255cm", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
     try _v.visit(field: VTOFFSET.soilMoistureIndex0To100cm.p, fieldName: "soilMoistureIndex0To100cm", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
     try _v.visit(field: VTOFFSET.lightningPotential.p, fieldName: "lightningPotential", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.temperatureHpa.p, fieldName: "temperatureHpa", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_PressureValues>, com_openmeteo_api_result_PressureValues>>.self)
-    try _v.visit(field: VTOFFSET.geopotentialHeightHpa.p, fieldName: "geopotentialHeightHpa", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_PressureValues>, com_openmeteo_api_result_PressureValues>>.self)
-    try _v.visit(field: VTOFFSET.relativehumidityHpa.p, fieldName: "relativehumidityHpa", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_PressureValues>, com_openmeteo_api_result_PressureValues>>.self)
-    try _v.visit(field: VTOFFSET.windspeedHpa.p, fieldName: "windspeedHpa", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_PressureValues>, com_openmeteo_api_result_PressureValues>>.self)
-    try _v.visit(field: VTOFFSET.winddirectionHpa.p, fieldName: "winddirectionHpa", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_PressureValues>, com_openmeteo_api_result_PressureValues>>.self)
-    try _v.visit(field: VTOFFSET.dewpointHpa.p, fieldName: "dewpointHpa", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_PressureValues>, com_openmeteo_api_result_PressureValues>>.self)
-    try _v.visit(field: VTOFFSET.cloudcoverHpa.p, fieldName: "cloudcoverHpa", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_PressureValues>, com_openmeteo_api_result_PressureValues>>.self)
-    try _v.visit(field: VTOFFSET.verticalVelocityHpa.p, fieldName: "verticalVelocityHpa", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_api_result_PressureValues>, com_openmeteo_api_result_PressureValues>>.self)
-    try _v.visit(field: VTOFFSET.growingDegreeDays.p, fieldName: "growingDegreeDays", required: false, type: ForwardOffset<com_openmeteo_api_result_Gdd>.self)
-    try _v.visit(field: VTOFFSET.tiltedDirectRadiation.p, fieldName: "tiltedDirectRadiation", required: false, type: ForwardOffset<com_openmeteo_api_result_Tilted>.self)
+    try _v.visit(field: VTOFFSET.temperature1015hPa.p, fieldName: "temperature1015hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature1000hPa.p, fieldName: "temperature1000hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature985hPa.p, fieldName: "temperature985hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature975hPa.p, fieldName: "temperature975hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature970hPa.p, fieldName: "temperature970hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature950hPa.p, fieldName: "temperature950hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature925hPa.p, fieldName: "temperature925hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature900hPa.p, fieldName: "temperature900hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature875hPa.p, fieldName: "temperature875hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature850hPa.p, fieldName: "temperature850hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature800hPa.p, fieldName: "temperature800hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature750hPa.p, fieldName: "temperature750hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature700hPa.p, fieldName: "temperature700hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature650hPa.p, fieldName: "temperature650hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature600hPa.p, fieldName: "temperature600hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature550hPa.p, fieldName: "temperature550hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature500hPa.p, fieldName: "temperature500hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature450hPa.p, fieldName: "temperature450hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature400hPa.p, fieldName: "temperature400hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature350hPa.p, fieldName: "temperature350hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature300hPa.p, fieldName: "temperature300hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature275hPa.p, fieldName: "temperature275hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature250hPa.p, fieldName: "temperature250hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature225hPa.p, fieldName: "temperature225hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature200hPa.p, fieldName: "temperature200hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature175hPa.p, fieldName: "temperature175hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature150hPa.p, fieldName: "temperature150hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature125hPa.p, fieldName: "temperature125hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature100hPa.p, fieldName: "temperature100hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature70hPa.p, fieldName: "temperature70hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature50hPa.p, fieldName: "temperature50hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature40hPa.p, fieldName: "temperature40hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature30hPa.p, fieldName: "temperature30hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature20hPa.p, fieldName: "temperature20hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature15hPa.p, fieldName: "temperature15hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.temperature10hPa.p, fieldName: "temperature10hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint1015hPa.p, fieldName: "dewpoint1015hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint1000hPa.p, fieldName: "dewpoint1000hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint985hPa.p, fieldName: "dewpoint985hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint975hPa.p, fieldName: "dewpoint975hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint970hPa.p, fieldName: "dewpoint970hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint950hPa.p, fieldName: "dewpoint950hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint925hPa.p, fieldName: "dewpoint925hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint900hPa.p, fieldName: "dewpoint900hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint875hPa.p, fieldName: "dewpoint875hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint850hPa.p, fieldName: "dewpoint850hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint800hPa.p, fieldName: "dewpoint800hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint750hPa.p, fieldName: "dewpoint750hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint700hPa.p, fieldName: "dewpoint700hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint650hPa.p, fieldName: "dewpoint650hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint600hPa.p, fieldName: "dewpoint600hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint550hPa.p, fieldName: "dewpoint550hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint500hPa.p, fieldName: "dewpoint500hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint450hPa.p, fieldName: "dewpoint450hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint400hPa.p, fieldName: "dewpoint400hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint350hPa.p, fieldName: "dewpoint350hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint300hPa.p, fieldName: "dewpoint300hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint275hPa.p, fieldName: "dewpoint275hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint250hPa.p, fieldName: "dewpoint250hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint225hPa.p, fieldName: "dewpoint225hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint200hPa.p, fieldName: "dewpoint200hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint175hPa.p, fieldName: "dewpoint175hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint150hPa.p, fieldName: "dewpoint150hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint125hPa.p, fieldName: "dewpoint125hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint100hPa.p, fieldName: "dewpoint100hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint70hPa.p, fieldName: "dewpoint70hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint50hPa.p, fieldName: "dewpoint50hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint40hPa.p, fieldName: "dewpoint40hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint30hPa.p, fieldName: "dewpoint30hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint20hPa.p, fieldName: "dewpoint20hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint15hPa.p, fieldName: "dewpoint15hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.dewpoint10hPa.p, fieldName: "dewpoint10hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity1015hPa.p, fieldName: "relativehumidity1015hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity1000hPa.p, fieldName: "relativehumidity1000hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity985hPa.p, fieldName: "relativehumidity985hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity975hPa.p, fieldName: "relativehumidity975hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity970hPa.p, fieldName: "relativehumidity970hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity950hPa.p, fieldName: "relativehumidity950hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity925hPa.p, fieldName: "relativehumidity925hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity900hPa.p, fieldName: "relativehumidity900hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity875hPa.p, fieldName: "relativehumidity875hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity850hPa.p, fieldName: "relativehumidity850hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity800hPa.p, fieldName: "relativehumidity800hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity750hPa.p, fieldName: "relativehumidity750hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity700hPa.p, fieldName: "relativehumidity700hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity650hPa.p, fieldName: "relativehumidity650hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity600hPa.p, fieldName: "relativehumidity600hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity550hPa.p, fieldName: "relativehumidity550hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity500hPa.p, fieldName: "relativehumidity500hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity450hPa.p, fieldName: "relativehumidity450hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity400hPa.p, fieldName: "relativehumidity400hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity350hPa.p, fieldName: "relativehumidity350hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity300hPa.p, fieldName: "relativehumidity300hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity275hPa.p, fieldName: "relativehumidity275hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity250hPa.p, fieldName: "relativehumidity250hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity225hPa.p, fieldName: "relativehumidity225hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity200hPa.p, fieldName: "relativehumidity200hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity175hPa.p, fieldName: "relativehumidity175hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity150hPa.p, fieldName: "relativehumidity150hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity125hPa.p, fieldName: "relativehumidity125hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity100hPa.p, fieldName: "relativehumidity100hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity70hPa.p, fieldName: "relativehumidity70hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity50hPa.p, fieldName: "relativehumidity50hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity40hPa.p, fieldName: "relativehumidity40hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity30hPa.p, fieldName: "relativehumidity30hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity20hPa.p, fieldName: "relativehumidity20hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity15hPa.p, fieldName: "relativehumidity15hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity10hPa.p, fieldName: "relativehumidity10hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover1015hPa.p, fieldName: "cloudcover1015hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover1000hPa.p, fieldName: "cloudcover1000hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover985hPa.p, fieldName: "cloudcover985hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover975hPa.p, fieldName: "cloudcover975hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover970hPa.p, fieldName: "cloudcover970hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover950hPa.p, fieldName: "cloudcover950hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover925hPa.p, fieldName: "cloudcover925hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover900hPa.p, fieldName: "cloudcover900hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover875hPa.p, fieldName: "cloudcover875hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover850hPa.p, fieldName: "cloudcover850hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover800hPa.p, fieldName: "cloudcover800hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover750hPa.p, fieldName: "cloudcover750hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover700hPa.p, fieldName: "cloudcover700hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover650hPa.p, fieldName: "cloudcover650hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover600hPa.p, fieldName: "cloudcover600hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover550hPa.p, fieldName: "cloudcover550hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover500hPa.p, fieldName: "cloudcover500hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover450hPa.p, fieldName: "cloudcover450hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover400hPa.p, fieldName: "cloudcover400hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover350hPa.p, fieldName: "cloudcover350hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover300hPa.p, fieldName: "cloudcover300hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover275hPa.p, fieldName: "cloudcover275hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover250hPa.p, fieldName: "cloudcover250hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover225hPa.p, fieldName: "cloudcover225hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover200hPa.p, fieldName: "cloudcover200hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover175hPa.p, fieldName: "cloudcover175hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover150hPa.p, fieldName: "cloudcover150hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover125hPa.p, fieldName: "cloudcover125hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover100hPa.p, fieldName: "cloudcover100hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover70hPa.p, fieldName: "cloudcover70hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover50hPa.p, fieldName: "cloudcover50hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover40hPa.p, fieldName: "cloudcover40hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover30hPa.p, fieldName: "cloudcover30hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover20hPa.p, fieldName: "cloudcover20hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover15hPa.p, fieldName: "cloudcover15hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.cloudcover10hPa.p, fieldName: "cloudcover10hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed1015hPa.p, fieldName: "windspeed1015hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed1000hPa.p, fieldName: "windspeed1000hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed985hPa.p, fieldName: "windspeed985hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed975hPa.p, fieldName: "windspeed975hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed970hPa.p, fieldName: "windspeed970hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed950hPa.p, fieldName: "windspeed950hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed925hPa.p, fieldName: "windspeed925hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed900hPa.p, fieldName: "windspeed900hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed875hPa.p, fieldName: "windspeed875hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed850hPa.p, fieldName: "windspeed850hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed800hPa.p, fieldName: "windspeed800hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed750hPa.p, fieldName: "windspeed750hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed700hPa.p, fieldName: "windspeed700hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed650hPa.p, fieldName: "windspeed650hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed600hPa.p, fieldName: "windspeed600hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed550hPa.p, fieldName: "windspeed550hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed500hPa.p, fieldName: "windspeed500hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed450hPa.p, fieldName: "windspeed450hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed400hPa.p, fieldName: "windspeed400hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed350hPa.p, fieldName: "windspeed350hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed300hPa.p, fieldName: "windspeed300hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed275hPa.p, fieldName: "windspeed275hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed250hPa.p, fieldName: "windspeed250hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed225hPa.p, fieldName: "windspeed225hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed200hPa.p, fieldName: "windspeed200hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed175hPa.p, fieldName: "windspeed175hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed150hPa.p, fieldName: "windspeed150hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed125hPa.p, fieldName: "windspeed125hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed100hPa.p, fieldName: "windspeed100hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed70hPa.p, fieldName: "windspeed70hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed50hPa.p, fieldName: "windspeed50hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed40hPa.p, fieldName: "windspeed40hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed30hPa.p, fieldName: "windspeed30hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed20hPa.p, fieldName: "windspeed20hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed15hPa.p, fieldName: "windspeed15hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.windspeed10hPa.p, fieldName: "windspeed10hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection1015hPa.p, fieldName: "winddirection1015hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection1000hPa.p, fieldName: "winddirection1000hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection985hPa.p, fieldName: "winddirection985hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection975hPa.p, fieldName: "winddirection975hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection970hPa.p, fieldName: "winddirection970hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection950hPa.p, fieldName: "winddirection950hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection925hPa.p, fieldName: "winddirection925hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection900hPa.p, fieldName: "winddirection900hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection875hPa.p, fieldName: "winddirection875hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection850hPa.p, fieldName: "winddirection850hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection800hPa.p, fieldName: "winddirection800hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection750hPa.p, fieldName: "winddirection750hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection700hPa.p, fieldName: "winddirection700hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection650hPa.p, fieldName: "winddirection650hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection600hPa.p, fieldName: "winddirection600hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection550hPa.p, fieldName: "winddirection550hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection500hPa.p, fieldName: "winddirection500hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection450hPa.p, fieldName: "winddirection450hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection400hPa.p, fieldName: "winddirection400hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection350hPa.p, fieldName: "winddirection350hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection300hPa.p, fieldName: "winddirection300hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection275hPa.p, fieldName: "winddirection275hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection250hPa.p, fieldName: "winddirection250hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection225hPa.p, fieldName: "winddirection225hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection200hPa.p, fieldName: "winddirection200hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection175hPa.p, fieldName: "winddirection175hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection150hPa.p, fieldName: "winddirection150hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection125hPa.p, fieldName: "winddirection125hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection100hPa.p, fieldName: "winddirection100hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection70hPa.p, fieldName: "winddirection70hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection50hPa.p, fieldName: "winddirection50hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection40hPa.p, fieldName: "winddirection40hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection30hPa.p, fieldName: "winddirection30hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection20hPa.p, fieldName: "winddirection20hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection15hPa.p, fieldName: "winddirection15hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.winddirection10hPa.p, fieldName: "winddirection10hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity1015hPa.p, fieldName: "verticalVelocity1015hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity1000hPa.p, fieldName: "verticalVelocity1000hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity985hPa.p, fieldName: "verticalVelocity985hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity975hPa.p, fieldName: "verticalVelocity975hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity970hPa.p, fieldName: "verticalVelocity970hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity950hPa.p, fieldName: "verticalVelocity950hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity925hPa.p, fieldName: "verticalVelocity925hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity900hPa.p, fieldName: "verticalVelocity900hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity875hPa.p, fieldName: "verticalVelocity875hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity850hPa.p, fieldName: "verticalVelocity850hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity800hPa.p, fieldName: "verticalVelocity800hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity750hPa.p, fieldName: "verticalVelocity750hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity700hPa.p, fieldName: "verticalVelocity700hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity650hPa.p, fieldName: "verticalVelocity650hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity600hPa.p, fieldName: "verticalVelocity600hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity550hPa.p, fieldName: "verticalVelocity550hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity500hPa.p, fieldName: "verticalVelocity500hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity450hPa.p, fieldName: "verticalVelocity450hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity400hPa.p, fieldName: "verticalVelocity400hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity350hPa.p, fieldName: "verticalVelocity350hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity300hPa.p, fieldName: "verticalVelocity300hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity275hPa.p, fieldName: "verticalVelocity275hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity250hPa.p, fieldName: "verticalVelocity250hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity225hPa.p, fieldName: "verticalVelocity225hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity200hPa.p, fieldName: "verticalVelocity200hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity175hPa.p, fieldName: "verticalVelocity175hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity150hPa.p, fieldName: "verticalVelocity150hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity125hPa.p, fieldName: "verticalVelocity125hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity100hPa.p, fieldName: "verticalVelocity100hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity70hPa.p, fieldName: "verticalVelocity70hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity50hPa.p, fieldName: "verticalVelocity50hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity40hPa.p, fieldName: "verticalVelocity40hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity30hPa.p, fieldName: "verticalVelocity30hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity20hPa.p, fieldName: "verticalVelocity20hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity15hPa.p, fieldName: "verticalVelocity15hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.verticalVelocity10hPa.p, fieldName: "verticalVelocity10hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight1015hPa.p, fieldName: "geopotentialHeight1015hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight1000hPa.p, fieldName: "geopotentialHeight1000hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight985hPa.p, fieldName: "geopotentialHeight985hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight975hPa.p, fieldName: "geopotentialHeight975hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight970hPa.p, fieldName: "geopotentialHeight970hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight950hPa.p, fieldName: "geopotentialHeight950hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight925hPa.p, fieldName: "geopotentialHeight925hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight900hPa.p, fieldName: "geopotentialHeight900hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight875hPa.p, fieldName: "geopotentialHeight875hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight850hPa.p, fieldName: "geopotentialHeight850hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight800hPa.p, fieldName: "geopotentialHeight800hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight750hPa.p, fieldName: "geopotentialHeight750hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight700hPa.p, fieldName: "geopotentialHeight700hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight650hPa.p, fieldName: "geopotentialHeight650hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight600hPa.p, fieldName: "geopotentialHeight600hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight550hPa.p, fieldName: "geopotentialHeight550hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight500hPa.p, fieldName: "geopotentialHeight500hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight450hPa.p, fieldName: "geopotentialHeight450hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight400hPa.p, fieldName: "geopotentialHeight400hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight350hPa.p, fieldName: "geopotentialHeight350hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight300hPa.p, fieldName: "geopotentialHeight300hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight275hPa.p, fieldName: "geopotentialHeight275hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight250hPa.p, fieldName: "geopotentialHeight250hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight225hPa.p, fieldName: "geopotentialHeight225hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight200hPa.p, fieldName: "geopotentialHeight200hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight175hPa.p, fieldName: "geopotentialHeight175hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight150hPa.p, fieldName: "geopotentialHeight150hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight125hPa.p, fieldName: "geopotentialHeight125hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight100hPa.p, fieldName: "geopotentialHeight100hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight70hPa.p, fieldName: "geopotentialHeight70hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight50hPa.p, fieldName: "geopotentialHeight50hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight40hPa.p, fieldName: "geopotentialHeight40hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight30hPa.p, fieldName: "geopotentialHeight30hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight20hPa.p, fieldName: "geopotentialHeight20hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight15hPa.p, fieldName: "geopotentialHeight15hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeight10hPa.p, fieldName: "geopotentialHeight10hPa", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
     _v.finish()
   }
 }
 
-public struct com_openmeteo_api_result_WeatherHourlyUnit: FlatBufferObject, Verifiable {
+public struct com_openmeteo_WeatherHourlyUnits: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -1000,452 +3523,452 @@ public struct com_openmeteo_api_result_WeatherHourlyUnit: FlatBufferObject, Veri
     var p: VOffset { self.rawValue }
   }
 
-  public var temperture2m: SiUnit { let o = _accessor.offset(VTOFFSET.temperture2m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var cloudcover: SiUnit { let o = _accessor.offset(VTOFFSET.cloudcover.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var cloudcoverLow: SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverLow.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var cloudcoverMid: SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverMid.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var cloudcoverHigh: SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverHigh.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var pressureMsl: SiUnit { let o = _accessor.offset(VTOFFSET.pressureMsl.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var relativehumidity2m: SiUnit { let o = _accessor.offset(VTOFFSET.relativehumidity2m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var precipitation: SiUnit { let o = _accessor.offset(VTOFFSET.precipitation.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var precipitationProbability: SiUnit { let o = _accessor.offset(VTOFFSET.precipitationProbability.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var weathercode: SiUnit { let o = _accessor.offset(VTOFFSET.weathercode.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var temperature80m: SiUnit { let o = _accessor.offset(VTOFFSET.temperature80m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var temperature120m: SiUnit { let o = _accessor.offset(VTOFFSET.temperature120m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var temperature180m: SiUnit { let o = _accessor.offset(VTOFFSET.temperature180m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilTemperature0cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature0cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilTemperature6cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature6cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilTemperature18cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature18cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilTemperature54cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature54cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture01cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture01cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture13cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture13cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture39cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture39cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture927cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture927cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture2781cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture2781cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var snowDepth: SiUnit { let o = _accessor.offset(VTOFFSET.snowDepth.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var snowHeight: SiUnit { let o = _accessor.offset(VTOFFSET.snowHeight.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var sensibleHeatflux: SiUnit { let o = _accessor.offset(VTOFFSET.sensibleHeatflux.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var latentHeatflux: SiUnit { let o = _accessor.offset(VTOFFSET.latentHeatflux.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var showers: SiUnit { let o = _accessor.offset(VTOFFSET.showers.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var rain: SiUnit { let o = _accessor.offset(VTOFFSET.rain.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windgusts10m: SiUnit { let o = _accessor.offset(VTOFFSET.windgusts10m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var freezinglevelHeight: SiUnit { let o = _accessor.offset(VTOFFSET.freezinglevelHeight.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var dewpoint2m: SiUnit { let o = _accessor.offset(VTOFFSET.dewpoint2m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var diffuseRadiation: SiUnit { let o = _accessor.offset(VTOFFSET.diffuseRadiation.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var directRadiation: SiUnit { let o = _accessor.offset(VTOFFSET.directRadiation.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var apparentTemperature: SiUnit { let o = _accessor.offset(VTOFFSET.apparentTemperature.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windspeed10m: SiUnit { let o = _accessor.offset(VTOFFSET.windspeed10m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var winddirection10m: SiUnit { let o = _accessor.offset(VTOFFSET.winddirection10m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windspeed80m: SiUnit { let o = _accessor.offset(VTOFFSET.windspeed80m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var winddirection80m: SiUnit { let o = _accessor.offset(VTOFFSET.winddirection80m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windspeed120m: SiUnit { let o = _accessor.offset(VTOFFSET.windspeed120m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var winddirection120m: SiUnit { let o = _accessor.offset(VTOFFSET.winddirection120m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windspeed180m: SiUnit { let o = _accessor.offset(VTOFFSET.windspeed180m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var winddirection180m: SiUnit { let o = _accessor.offset(VTOFFSET.winddirection180m.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var directNormalIrradiance: SiUnit { let o = _accessor.offset(VTOFFSET.directNormalIrradiance.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var evapotranspiration: SiUnit { let o = _accessor.offset(VTOFFSET.evapotranspiration.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var et0FaoEvapotranspiration: SiUnit { let o = _accessor.offset(VTOFFSET.et0FaoEvapotranspiration.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var vaporPressureDeficit: SiUnit { let o = _accessor.offset(VTOFFSET.vaporPressureDeficit.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var shortwaveRadiation: SiUnit { let o = _accessor.offset(VTOFFSET.shortwaveRadiation.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var snowfall: SiUnit { let o = _accessor.offset(VTOFFSET.snowfall.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var surfacePressure: SiUnit { let o = _accessor.offset(VTOFFSET.surfacePressure.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var terrestrialRadiation: SiUnit { let o = _accessor.offset(VTOFFSET.terrestrialRadiation.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var terrestrialRadiationInstant: SiUnit { let o = _accessor.offset(VTOFFSET.terrestrialRadiationInstant.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var shortwaveRadiationInstant: SiUnit { let o = _accessor.offset(VTOFFSET.shortwaveRadiationInstant.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var diffuseRadiationInstant: SiUnit { let o = _accessor.offset(VTOFFSET.diffuseRadiationInstant.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var directRadiationInstant: SiUnit { let o = _accessor.offset(VTOFFSET.directRadiationInstant.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var directNormalIrradianceInstant: SiUnit { let o = _accessor.offset(VTOFFSET.directNormalIrradianceInstant.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var visibility: SiUnit { let o = _accessor.offset(VTOFFSET.visibility.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var cape: SiUnit { let o = _accessor.offset(VTOFFSET.cape.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var uvIndex: SiUnit { let o = _accessor.offset(VTOFFSET.uvIndex.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var uvIndexClearSky: SiUnit { let o = _accessor.offset(VTOFFSET.uvIndexClearSky.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var isDay: SiUnit { let o = _accessor.offset(VTOFFSET.isDay.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilTemperature0To10cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature0To10cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilTemperature10To40cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature10To40cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilTemperature40To100cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature40To100cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilTemperature100To200cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature100To200cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture0To10cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture0To10cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture10To40cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture10To40cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture40To100cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture40To100cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoisture100To200cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture100To200cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var growingDegreeDaysBase0Limit50: SiUnit { let o = _accessor.offset(VTOFFSET.growingDegreeDaysBase0Limit50.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var leafWetnessProbability: SiUnit { let o = _accessor.offset(VTOFFSET.leafWetnessProbability.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoistureIndex0To7cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To7cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoistureIndex7To28cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex7To28cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoistureIndex28To100cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex28To100cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoistureIndex100To255cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex100To255cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var soilMoistureIndex0To100cm: SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To100cm.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var lightningPotential: SiUnit { let o = _accessor.offset(VTOFFSET.lightningPotential.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var temperatureHpa: SiUnit { let o = _accessor.offset(VTOFFSET.temperatureHpa.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var geopotentialHeightHpa: SiUnit { let o = _accessor.offset(VTOFFSET.geopotentialHeightHpa.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var relativehumidityHpa: SiUnit { let o = _accessor.offset(VTOFFSET.relativehumidityHpa.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var windspeedHpa: SiUnit { let o = _accessor.offset(VTOFFSET.windspeedHpa.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var winddirectionHpa: SiUnit { let o = _accessor.offset(VTOFFSET.winddirectionHpa.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var dewpointHpa: SiUnit { let o = _accessor.offset(VTOFFSET.dewpointHpa.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var cloudcoverHpa: SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverHpa.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var verticalVelocityHpa: SiUnit { let o = _accessor.offset(VTOFFSET.verticalVelocityHpa.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var growingDegreeDays: SiUnit { let o = _accessor.offset(VTOFFSET.growingDegreeDays.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var tiltedDirectRadiation: SiUnit { let o = _accessor.offset(VTOFFSET.tiltedDirectRadiation.v); return o == 0 ? .undefined : SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public static func startWeatherHourlyUnit(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 86) }
-  public static func add(temperture2m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperture2m.rawValue, def: 0, at: VTOFFSET.temperture2m.p) }
-  public static func add(cloudcover: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcover.rawValue, def: 0, at: VTOFFSET.cloudcover.p) }
-  public static func add(cloudcoverLow: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverLow.rawValue, def: 0, at: VTOFFSET.cloudcoverLow.p) }
-  public static func add(cloudcoverMid: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverMid.rawValue, def: 0, at: VTOFFSET.cloudcoverMid.p) }
-  public static func add(cloudcoverHigh: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverHigh.rawValue, def: 0, at: VTOFFSET.cloudcoverHigh.p) }
-  public static func add(pressureMsl: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: pressureMsl.rawValue, def: 0, at: VTOFFSET.pressureMsl.p) }
-  public static func add(relativehumidity2m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: relativehumidity2m.rawValue, def: 0, at: VTOFFSET.relativehumidity2m.p) }
-  public static func add(precipitation: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitation.rawValue, def: 0, at: VTOFFSET.precipitation.p) }
-  public static func add(precipitationProbability: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitationProbability.rawValue, def: 0, at: VTOFFSET.precipitationProbability.p) }
-  public static func add(weathercode: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: weathercode.rawValue, def: 0, at: VTOFFSET.weathercode.p) }
-  public static func add(temperature80m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature80m.rawValue, def: 0, at: VTOFFSET.temperature80m.p) }
-  public static func add(temperature120m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature120m.rawValue, def: 0, at: VTOFFSET.temperature120m.p) }
-  public static func add(temperature180m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature180m.rawValue, def: 0, at: VTOFFSET.temperature180m.p) }
-  public static func add(soilTemperature0cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature0cm.rawValue, def: 0, at: VTOFFSET.soilTemperature0cm.p) }
-  public static func add(soilTemperature6cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature6cm.rawValue, def: 0, at: VTOFFSET.soilTemperature6cm.p) }
-  public static func add(soilTemperature18cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature18cm.rawValue, def: 0, at: VTOFFSET.soilTemperature18cm.p) }
-  public static func add(soilTemperature54cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature54cm.rawValue, def: 0, at: VTOFFSET.soilTemperature54cm.p) }
-  public static func add(soilMoisture01cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture01cm.rawValue, def: 0, at: VTOFFSET.soilMoisture01cm.p) }
-  public static func add(soilMoisture13cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture13cm.rawValue, def: 0, at: VTOFFSET.soilMoisture13cm.p) }
-  public static func add(soilMoisture39cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture39cm.rawValue, def: 0, at: VTOFFSET.soilMoisture39cm.p) }
-  public static func add(soilMoisture927cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture927cm.rawValue, def: 0, at: VTOFFSET.soilMoisture927cm.p) }
-  public static func add(soilMoisture2781cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture2781cm.rawValue, def: 0, at: VTOFFSET.soilMoisture2781cm.p) }
-  public static func add(snowDepth: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: snowDepth.rawValue, def: 0, at: VTOFFSET.snowDepth.p) }
-  public static func add(snowHeight: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: snowHeight.rawValue, def: 0, at: VTOFFSET.snowHeight.p) }
-  public static func add(sensibleHeatflux: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: sensibleHeatflux.rawValue, def: 0, at: VTOFFSET.sensibleHeatflux.p) }
-  public static func add(latentHeatflux: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latentHeatflux.rawValue, def: 0, at: VTOFFSET.latentHeatflux.p) }
-  public static func add(showers: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: showers.rawValue, def: 0, at: VTOFFSET.showers.p) }
-  public static func add(rain: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: rain.rawValue, def: 0, at: VTOFFSET.rain.p) }
-  public static func add(windgusts10m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windgusts10m.rawValue, def: 0, at: VTOFFSET.windgusts10m.p) }
-  public static func add(freezinglevelHeight: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: freezinglevelHeight.rawValue, def: 0, at: VTOFFSET.freezinglevelHeight.p) }
-  public static func add(dewpoint2m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: dewpoint2m.rawValue, def: 0, at: VTOFFSET.dewpoint2m.p) }
-  public static func add(diffuseRadiation: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffuseRadiation.rawValue, def: 0, at: VTOFFSET.diffuseRadiation.p) }
-  public static func add(directRadiation: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: directRadiation.rawValue, def: 0, at: VTOFFSET.directRadiation.p) }
-  public static func add(apparentTemperature: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: apparentTemperature.rawValue, def: 0, at: VTOFFSET.apparentTemperature.p) }
-  public static func add(windspeed10m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed10m.rawValue, def: 0, at: VTOFFSET.windspeed10m.p) }
-  public static func add(winddirection10m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection10m.rawValue, def: 0, at: VTOFFSET.winddirection10m.p) }
-  public static func add(windspeed80m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed80m.rawValue, def: 0, at: VTOFFSET.windspeed80m.p) }
-  public static func add(winddirection80m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection80m.rawValue, def: 0, at: VTOFFSET.winddirection80m.p) }
-  public static func add(windspeed120m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed120m.rawValue, def: 0, at: VTOFFSET.windspeed120m.p) }
-  public static func add(winddirection120m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection120m.rawValue, def: 0, at: VTOFFSET.winddirection120m.p) }
-  public static func add(windspeed180m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed180m.rawValue, def: 0, at: VTOFFSET.windspeed180m.p) }
-  public static func add(winddirection180m: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection180m.rawValue, def: 0, at: VTOFFSET.winddirection180m.p) }
-  public static func add(directNormalIrradiance: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: directNormalIrradiance.rawValue, def: 0, at: VTOFFSET.directNormalIrradiance.p) }
-  public static func add(evapotranspiration: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: evapotranspiration.rawValue, def: 0, at: VTOFFSET.evapotranspiration.p) }
-  public static func add(et0FaoEvapotranspiration: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: et0FaoEvapotranspiration.rawValue, def: 0, at: VTOFFSET.et0FaoEvapotranspiration.p) }
-  public static func add(vaporPressureDeficit: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: vaporPressureDeficit.rawValue, def: 0, at: VTOFFSET.vaporPressureDeficit.p) }
-  public static func add(shortwaveRadiation: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: shortwaveRadiation.rawValue, def: 0, at: VTOFFSET.shortwaveRadiation.p) }
-  public static func add(snowfall: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: snowfall.rawValue, def: 0, at: VTOFFSET.snowfall.p) }
-  public static func add(surfacePressure: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: surfacePressure.rawValue, def: 0, at: VTOFFSET.surfacePressure.p) }
-  public static func add(terrestrialRadiation: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: terrestrialRadiation.rawValue, def: 0, at: VTOFFSET.terrestrialRadiation.p) }
-  public static func add(terrestrialRadiationInstant: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: terrestrialRadiationInstant.rawValue, def: 0, at: VTOFFSET.terrestrialRadiationInstant.p) }
-  public static func add(shortwaveRadiationInstant: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: shortwaveRadiationInstant.rawValue, def: 0, at: VTOFFSET.shortwaveRadiationInstant.p) }
-  public static func add(diffuseRadiationInstant: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffuseRadiationInstant.rawValue, def: 0, at: VTOFFSET.diffuseRadiationInstant.p) }
-  public static func add(directRadiationInstant: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: directRadiationInstant.rawValue, def: 0, at: VTOFFSET.directRadiationInstant.p) }
-  public static func add(directNormalIrradianceInstant: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: directNormalIrradianceInstant.rawValue, def: 0, at: VTOFFSET.directNormalIrradianceInstant.p) }
-  public static func add(visibility: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: visibility.rawValue, def: 0, at: VTOFFSET.visibility.p) }
-  public static func add(cape: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cape.rawValue, def: 0, at: VTOFFSET.cape.p) }
-  public static func add(uvIndex: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: uvIndex.rawValue, def: 0, at: VTOFFSET.uvIndex.p) }
-  public static func add(uvIndexClearSky: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: uvIndexClearSky.rawValue, def: 0, at: VTOFFSET.uvIndexClearSky.p) }
-  public static func add(isDay: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: isDay.rawValue, def: 0, at: VTOFFSET.isDay.p) }
-  public static func add(soilTemperature0To10cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature0To10cm.rawValue, def: 0, at: VTOFFSET.soilTemperature0To10cm.p) }
-  public static func add(soilTemperature10To40cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature10To40cm.rawValue, def: 0, at: VTOFFSET.soilTemperature10To40cm.p) }
-  public static func add(soilTemperature40To100cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature40To100cm.rawValue, def: 0, at: VTOFFSET.soilTemperature40To100cm.p) }
-  public static func add(soilTemperature100To200cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature100To200cm.rawValue, def: 0, at: VTOFFSET.soilTemperature100To200cm.p) }
-  public static func add(soilMoisture0To10cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture0To10cm.rawValue, def: 0, at: VTOFFSET.soilMoisture0To10cm.p) }
-  public static func add(soilMoisture10To40cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture10To40cm.rawValue, def: 0, at: VTOFFSET.soilMoisture10To40cm.p) }
-  public static func add(soilMoisture40To100cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture40To100cm.rawValue, def: 0, at: VTOFFSET.soilMoisture40To100cm.p) }
-  public static func add(soilMoisture100To200cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture100To200cm.rawValue, def: 0, at: VTOFFSET.soilMoisture100To200cm.p) }
-  public static func add(growingDegreeDaysBase0Limit50: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: growingDegreeDaysBase0Limit50.rawValue, def: 0, at: VTOFFSET.growingDegreeDaysBase0Limit50.p) }
-  public static func add(leafWetnessProbability: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: leafWetnessProbability.rawValue, def: 0, at: VTOFFSET.leafWetnessProbability.p) }
-  public static func add(soilMoistureIndex0To7cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex0To7cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex0To7cm.p) }
-  public static func add(soilMoistureIndex7To28cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex7To28cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex7To28cm.p) }
-  public static func add(soilMoistureIndex28To100cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex28To100cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex28To100cm.p) }
-  public static func add(soilMoistureIndex100To255cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex100To255cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex100To255cm.p) }
-  public static func add(soilMoistureIndex0To100cm: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex0To100cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex0To100cm.p) }
-  public static func add(lightningPotential: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: lightningPotential.rawValue, def: 0, at: VTOFFSET.lightningPotential.p) }
-  public static func add(temperatureHpa: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperatureHpa.rawValue, def: 0, at: VTOFFSET.temperatureHpa.p) }
-  public static func add(geopotentialHeightHpa: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: geopotentialHeightHpa.rawValue, def: 0, at: VTOFFSET.geopotentialHeightHpa.p) }
-  public static func add(relativehumidityHpa: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: relativehumidityHpa.rawValue, def: 0, at: VTOFFSET.relativehumidityHpa.p) }
-  public static func add(windspeedHpa: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeedHpa.rawValue, def: 0, at: VTOFFSET.windspeedHpa.p) }
-  public static func add(winddirectionHpa: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirectionHpa.rawValue, def: 0, at: VTOFFSET.winddirectionHpa.p) }
-  public static func add(dewpointHpa: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: dewpointHpa.rawValue, def: 0, at: VTOFFSET.dewpointHpa.p) }
-  public static func add(cloudcoverHpa: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverHpa.rawValue, def: 0, at: VTOFFSET.cloudcoverHpa.p) }
-  public static func add(verticalVelocityHpa: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: verticalVelocityHpa.rawValue, def: 0, at: VTOFFSET.verticalVelocityHpa.p) }
-  public static func add(growingDegreeDays: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: growingDegreeDays.rawValue, def: 0, at: VTOFFSET.growingDegreeDays.p) }
-  public static func add(tiltedDirectRadiation: SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: tiltedDirectRadiation.rawValue, def: 0, at: VTOFFSET.tiltedDirectRadiation.p) }
-  public static func endWeatherHourlyUnit(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
-  public static func createWeatherHourlyUnit(
+  public var temperture2m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.temperture2m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cloudcover: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cloudcover.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cloudcoverLow: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverLow.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cloudcoverMid: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverMid.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cloudcoverHigh: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverHigh.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var pressureMsl: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.pressureMsl.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var relativehumidity2m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.relativehumidity2m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var precipitation: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.precipitation.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var precipitationProbability: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.precipitationProbability.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var weathercode: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.weathercode.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var temperature80m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.temperature80m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var temperature120m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.temperature120m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var temperature180m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.temperature180m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilTemperature0cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature0cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilTemperature6cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature6cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilTemperature18cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature18cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilTemperature54cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature54cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture01cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture01cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture13cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture13cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture39cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture39cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture927cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture927cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture2781cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture2781cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var snowDepth: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.snowDepth.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var snowHeight: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.snowHeight.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var sensibleHeatflux: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.sensibleHeatflux.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var latentHeatflux: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.latentHeatflux.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var showers: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.showers.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var rain: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.rain.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windgusts10m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windgusts10m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var freezinglevelHeight: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.freezinglevelHeight.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var dewpoint2m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.dewpoint2m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var diffuseRadiation: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.diffuseRadiation.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var directRadiation: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.directRadiation.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var apparentTemperature: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.apparentTemperature.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windspeed10m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windspeed10m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var winddirection10m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.winddirection10m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windspeed80m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windspeed80m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var winddirection80m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.winddirection80m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windspeed120m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windspeed120m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var winddirection120m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.winddirection120m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windspeed180m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windspeed180m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var winddirection180m: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.winddirection180m.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var directNormalIrradiance: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.directNormalIrradiance.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var evapotranspiration: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.evapotranspiration.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var et0FaoEvapotranspiration: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.et0FaoEvapotranspiration.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var vaporPressureDeficit: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.vaporPressureDeficit.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var shortwaveRadiation: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.shortwaveRadiation.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var snowfall: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.snowfall.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var surfacePressure: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.surfacePressure.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var terrestrialRadiation: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.terrestrialRadiation.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var terrestrialRadiationInstant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.terrestrialRadiationInstant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var shortwaveRadiationInstant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.shortwaveRadiationInstant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var diffuseRadiationInstant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.diffuseRadiationInstant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var directRadiationInstant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.directRadiationInstant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var directNormalIrradianceInstant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.directNormalIrradianceInstant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var visibility: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.visibility.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cape: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cape.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var uvIndex: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.uvIndex.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var uvIndexClearSky: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.uvIndexClearSky.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var isDay: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.isDay.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilTemperature0To10cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature0To10cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilTemperature10To40cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature10To40cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilTemperature40To100cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature40To100cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilTemperature100To200cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilTemperature100To200cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture0To10cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture0To10cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture10To40cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture10To40cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture40To100cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture40To100cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoisture100To200cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoisture100To200cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var growingDegreeDaysBase0Limit50: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.growingDegreeDaysBase0Limit50.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var leafWetnessProbability: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.leafWetnessProbability.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoistureIndex0To7cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To7cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoistureIndex7To28cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex7To28cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoistureIndex28To100cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex28To100cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoistureIndex100To255cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex100To255cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var soilMoistureIndex0To100cm: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To100cm.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var lightningPotential: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.lightningPotential.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var temperatureHpa: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.temperatureHpa.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var geopotentialHeightHpa: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.geopotentialHeightHpa.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var relativehumidityHpa: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.relativehumidityHpa.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windspeedHpa: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windspeedHpa.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var winddirectionHpa: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.winddirectionHpa.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var dewpointHpa: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.dewpointHpa.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cloudcoverHpa: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverHpa.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var verticalVelocityHpa: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.verticalVelocityHpa.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var growingDegreeDays: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.growingDegreeDays.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var tiltedDirectRadiation: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.tiltedDirectRadiation.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public static func startWeatherHourlyUnits(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 86) }
+  public static func add(temperture2m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperture2m.rawValue, def: 0, at: VTOFFSET.temperture2m.p) }
+  public static func add(cloudcover: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcover.rawValue, def: 0, at: VTOFFSET.cloudcover.p) }
+  public static func add(cloudcoverLow: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverLow.rawValue, def: 0, at: VTOFFSET.cloudcoverLow.p) }
+  public static func add(cloudcoverMid: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverMid.rawValue, def: 0, at: VTOFFSET.cloudcoverMid.p) }
+  public static func add(cloudcoverHigh: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverHigh.rawValue, def: 0, at: VTOFFSET.cloudcoverHigh.p) }
+  public static func add(pressureMsl: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: pressureMsl.rawValue, def: 0, at: VTOFFSET.pressureMsl.p) }
+  public static func add(relativehumidity2m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: relativehumidity2m.rawValue, def: 0, at: VTOFFSET.relativehumidity2m.p) }
+  public static func add(precipitation: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitation.rawValue, def: 0, at: VTOFFSET.precipitation.p) }
+  public static func add(precipitationProbability: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitationProbability.rawValue, def: 0, at: VTOFFSET.precipitationProbability.p) }
+  public static func add(weathercode: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: weathercode.rawValue, def: 0, at: VTOFFSET.weathercode.p) }
+  public static func add(temperature80m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature80m.rawValue, def: 0, at: VTOFFSET.temperature80m.p) }
+  public static func add(temperature120m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature120m.rawValue, def: 0, at: VTOFFSET.temperature120m.p) }
+  public static func add(temperature180m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature180m.rawValue, def: 0, at: VTOFFSET.temperature180m.p) }
+  public static func add(soilTemperature0cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature0cm.rawValue, def: 0, at: VTOFFSET.soilTemperature0cm.p) }
+  public static func add(soilTemperature6cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature6cm.rawValue, def: 0, at: VTOFFSET.soilTemperature6cm.p) }
+  public static func add(soilTemperature18cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature18cm.rawValue, def: 0, at: VTOFFSET.soilTemperature18cm.p) }
+  public static func add(soilTemperature54cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature54cm.rawValue, def: 0, at: VTOFFSET.soilTemperature54cm.p) }
+  public static func add(soilMoisture01cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture01cm.rawValue, def: 0, at: VTOFFSET.soilMoisture01cm.p) }
+  public static func add(soilMoisture13cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture13cm.rawValue, def: 0, at: VTOFFSET.soilMoisture13cm.p) }
+  public static func add(soilMoisture39cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture39cm.rawValue, def: 0, at: VTOFFSET.soilMoisture39cm.p) }
+  public static func add(soilMoisture927cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture927cm.rawValue, def: 0, at: VTOFFSET.soilMoisture927cm.p) }
+  public static func add(soilMoisture2781cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture2781cm.rawValue, def: 0, at: VTOFFSET.soilMoisture2781cm.p) }
+  public static func add(snowDepth: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: snowDepth.rawValue, def: 0, at: VTOFFSET.snowDepth.p) }
+  public static func add(snowHeight: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: snowHeight.rawValue, def: 0, at: VTOFFSET.snowHeight.p) }
+  public static func add(sensibleHeatflux: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: sensibleHeatflux.rawValue, def: 0, at: VTOFFSET.sensibleHeatflux.p) }
+  public static func add(latentHeatflux: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latentHeatflux.rawValue, def: 0, at: VTOFFSET.latentHeatflux.p) }
+  public static func add(showers: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: showers.rawValue, def: 0, at: VTOFFSET.showers.p) }
+  public static func add(rain: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: rain.rawValue, def: 0, at: VTOFFSET.rain.p) }
+  public static func add(windgusts10m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windgusts10m.rawValue, def: 0, at: VTOFFSET.windgusts10m.p) }
+  public static func add(freezinglevelHeight: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: freezinglevelHeight.rawValue, def: 0, at: VTOFFSET.freezinglevelHeight.p) }
+  public static func add(dewpoint2m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: dewpoint2m.rawValue, def: 0, at: VTOFFSET.dewpoint2m.p) }
+  public static func add(diffuseRadiation: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffuseRadiation.rawValue, def: 0, at: VTOFFSET.diffuseRadiation.p) }
+  public static func add(directRadiation: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: directRadiation.rawValue, def: 0, at: VTOFFSET.directRadiation.p) }
+  public static func add(apparentTemperature: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: apparentTemperature.rawValue, def: 0, at: VTOFFSET.apparentTemperature.p) }
+  public static func add(windspeed10m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed10m.rawValue, def: 0, at: VTOFFSET.windspeed10m.p) }
+  public static func add(winddirection10m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection10m.rawValue, def: 0, at: VTOFFSET.winddirection10m.p) }
+  public static func add(windspeed80m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed80m.rawValue, def: 0, at: VTOFFSET.windspeed80m.p) }
+  public static func add(winddirection80m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection80m.rawValue, def: 0, at: VTOFFSET.winddirection80m.p) }
+  public static func add(windspeed120m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed120m.rawValue, def: 0, at: VTOFFSET.windspeed120m.p) }
+  public static func add(winddirection120m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection120m.rawValue, def: 0, at: VTOFFSET.winddirection120m.p) }
+  public static func add(windspeed180m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed180m.rawValue, def: 0, at: VTOFFSET.windspeed180m.p) }
+  public static func add(winddirection180m: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection180m.rawValue, def: 0, at: VTOFFSET.winddirection180m.p) }
+  public static func add(directNormalIrradiance: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: directNormalIrradiance.rawValue, def: 0, at: VTOFFSET.directNormalIrradiance.p) }
+  public static func add(evapotranspiration: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: evapotranspiration.rawValue, def: 0, at: VTOFFSET.evapotranspiration.p) }
+  public static func add(et0FaoEvapotranspiration: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: et0FaoEvapotranspiration.rawValue, def: 0, at: VTOFFSET.et0FaoEvapotranspiration.p) }
+  public static func add(vaporPressureDeficit: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: vaporPressureDeficit.rawValue, def: 0, at: VTOFFSET.vaporPressureDeficit.p) }
+  public static func add(shortwaveRadiation: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: shortwaveRadiation.rawValue, def: 0, at: VTOFFSET.shortwaveRadiation.p) }
+  public static func add(snowfall: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: snowfall.rawValue, def: 0, at: VTOFFSET.snowfall.p) }
+  public static func add(surfacePressure: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: surfacePressure.rawValue, def: 0, at: VTOFFSET.surfacePressure.p) }
+  public static func add(terrestrialRadiation: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: terrestrialRadiation.rawValue, def: 0, at: VTOFFSET.terrestrialRadiation.p) }
+  public static func add(terrestrialRadiationInstant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: terrestrialRadiationInstant.rawValue, def: 0, at: VTOFFSET.terrestrialRadiationInstant.p) }
+  public static func add(shortwaveRadiationInstant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: shortwaveRadiationInstant.rawValue, def: 0, at: VTOFFSET.shortwaveRadiationInstant.p) }
+  public static func add(diffuseRadiationInstant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: diffuseRadiationInstant.rawValue, def: 0, at: VTOFFSET.diffuseRadiationInstant.p) }
+  public static func add(directRadiationInstant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: directRadiationInstant.rawValue, def: 0, at: VTOFFSET.directRadiationInstant.p) }
+  public static func add(directNormalIrradianceInstant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: directNormalIrradianceInstant.rawValue, def: 0, at: VTOFFSET.directNormalIrradianceInstant.p) }
+  public static func add(visibility: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: visibility.rawValue, def: 0, at: VTOFFSET.visibility.p) }
+  public static func add(cape: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cape.rawValue, def: 0, at: VTOFFSET.cape.p) }
+  public static func add(uvIndex: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: uvIndex.rawValue, def: 0, at: VTOFFSET.uvIndex.p) }
+  public static func add(uvIndexClearSky: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: uvIndexClearSky.rawValue, def: 0, at: VTOFFSET.uvIndexClearSky.p) }
+  public static func add(isDay: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: isDay.rawValue, def: 0, at: VTOFFSET.isDay.p) }
+  public static func add(soilTemperature0To10cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature0To10cm.rawValue, def: 0, at: VTOFFSET.soilTemperature0To10cm.p) }
+  public static func add(soilTemperature10To40cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature10To40cm.rawValue, def: 0, at: VTOFFSET.soilTemperature10To40cm.p) }
+  public static func add(soilTemperature40To100cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature40To100cm.rawValue, def: 0, at: VTOFFSET.soilTemperature40To100cm.p) }
+  public static func add(soilTemperature100To200cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilTemperature100To200cm.rawValue, def: 0, at: VTOFFSET.soilTemperature100To200cm.p) }
+  public static func add(soilMoisture0To10cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture0To10cm.rawValue, def: 0, at: VTOFFSET.soilMoisture0To10cm.p) }
+  public static func add(soilMoisture10To40cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture10To40cm.rawValue, def: 0, at: VTOFFSET.soilMoisture10To40cm.p) }
+  public static func add(soilMoisture40To100cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture40To100cm.rawValue, def: 0, at: VTOFFSET.soilMoisture40To100cm.p) }
+  public static func add(soilMoisture100To200cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoisture100To200cm.rawValue, def: 0, at: VTOFFSET.soilMoisture100To200cm.p) }
+  public static func add(growingDegreeDaysBase0Limit50: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: growingDegreeDaysBase0Limit50.rawValue, def: 0, at: VTOFFSET.growingDegreeDaysBase0Limit50.p) }
+  public static func add(leafWetnessProbability: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: leafWetnessProbability.rawValue, def: 0, at: VTOFFSET.leafWetnessProbability.p) }
+  public static func add(soilMoistureIndex0To7cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex0To7cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex0To7cm.p) }
+  public static func add(soilMoistureIndex7To28cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex7To28cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex7To28cm.p) }
+  public static func add(soilMoistureIndex28To100cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex28To100cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex28To100cm.p) }
+  public static func add(soilMoistureIndex100To255cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex100To255cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex100To255cm.p) }
+  public static func add(soilMoistureIndex0To100cm: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: soilMoistureIndex0To100cm.rawValue, def: 0, at: VTOFFSET.soilMoistureIndex0To100cm.p) }
+  public static func add(lightningPotential: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: lightningPotential.rawValue, def: 0, at: VTOFFSET.lightningPotential.p) }
+  public static func add(temperatureHpa: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperatureHpa.rawValue, def: 0, at: VTOFFSET.temperatureHpa.p) }
+  public static func add(geopotentialHeightHpa: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: geopotentialHeightHpa.rawValue, def: 0, at: VTOFFSET.geopotentialHeightHpa.p) }
+  public static func add(relativehumidityHpa: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: relativehumidityHpa.rawValue, def: 0, at: VTOFFSET.relativehumidityHpa.p) }
+  public static func add(windspeedHpa: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeedHpa.rawValue, def: 0, at: VTOFFSET.windspeedHpa.p) }
+  public static func add(winddirectionHpa: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirectionHpa.rawValue, def: 0, at: VTOFFSET.winddirectionHpa.p) }
+  public static func add(dewpointHpa: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: dewpointHpa.rawValue, def: 0, at: VTOFFSET.dewpointHpa.p) }
+  public static func add(cloudcoverHpa: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverHpa.rawValue, def: 0, at: VTOFFSET.cloudcoverHpa.p) }
+  public static func add(verticalVelocityHpa: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: verticalVelocityHpa.rawValue, def: 0, at: VTOFFSET.verticalVelocityHpa.p) }
+  public static func add(growingDegreeDays: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: growingDegreeDays.rawValue, def: 0, at: VTOFFSET.growingDegreeDays.p) }
+  public static func add(tiltedDirectRadiation: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: tiltedDirectRadiation.rawValue, def: 0, at: VTOFFSET.tiltedDirectRadiation.p) }
+  public static func endWeatherHourlyUnits(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createWeatherHourlyUnits(
     _ fbb: inout FlatBufferBuilder,
-    temperture2m: SiUnit = .undefined,
-    cloudcover: SiUnit = .undefined,
-    cloudcoverLow: SiUnit = .undefined,
-    cloudcoverMid: SiUnit = .undefined,
-    cloudcoverHigh: SiUnit = .undefined,
-    pressureMsl: SiUnit = .undefined,
-    relativehumidity2m: SiUnit = .undefined,
-    precipitation: SiUnit = .undefined,
-    precipitationProbability: SiUnit = .undefined,
-    weathercode: SiUnit = .undefined,
-    temperature80m: SiUnit = .undefined,
-    temperature120m: SiUnit = .undefined,
-    temperature180m: SiUnit = .undefined,
-    soilTemperature0cm: SiUnit = .undefined,
-    soilTemperature6cm: SiUnit = .undefined,
-    soilTemperature18cm: SiUnit = .undefined,
-    soilTemperature54cm: SiUnit = .undefined,
-    soilMoisture01cm: SiUnit = .undefined,
-    soilMoisture13cm: SiUnit = .undefined,
-    soilMoisture39cm: SiUnit = .undefined,
-    soilMoisture927cm: SiUnit = .undefined,
-    soilMoisture2781cm: SiUnit = .undefined,
-    snowDepth: SiUnit = .undefined,
-    snowHeight: SiUnit = .undefined,
-    sensibleHeatflux: SiUnit = .undefined,
-    latentHeatflux: SiUnit = .undefined,
-    showers: SiUnit = .undefined,
-    rain: SiUnit = .undefined,
-    windgusts10m: SiUnit = .undefined,
-    freezinglevelHeight: SiUnit = .undefined,
-    dewpoint2m: SiUnit = .undefined,
-    diffuseRadiation: SiUnit = .undefined,
-    directRadiation: SiUnit = .undefined,
-    apparentTemperature: SiUnit = .undefined,
-    windspeed10m: SiUnit = .undefined,
-    winddirection10m: SiUnit = .undefined,
-    windspeed80m: SiUnit = .undefined,
-    winddirection80m: SiUnit = .undefined,
-    windspeed120m: SiUnit = .undefined,
-    winddirection120m: SiUnit = .undefined,
-    windspeed180m: SiUnit = .undefined,
-    winddirection180m: SiUnit = .undefined,
-    directNormalIrradiance: SiUnit = .undefined,
-    evapotranspiration: SiUnit = .undefined,
-    et0FaoEvapotranspiration: SiUnit = .undefined,
-    vaporPressureDeficit: SiUnit = .undefined,
-    shortwaveRadiation: SiUnit = .undefined,
-    snowfall: SiUnit = .undefined,
-    surfacePressure: SiUnit = .undefined,
-    terrestrialRadiation: SiUnit = .undefined,
-    terrestrialRadiationInstant: SiUnit = .undefined,
-    shortwaveRadiationInstant: SiUnit = .undefined,
-    diffuseRadiationInstant: SiUnit = .undefined,
-    directRadiationInstant: SiUnit = .undefined,
-    directNormalIrradianceInstant: SiUnit = .undefined,
-    visibility: SiUnit = .undefined,
-    cape: SiUnit = .undefined,
-    uvIndex: SiUnit = .undefined,
-    uvIndexClearSky: SiUnit = .undefined,
-    isDay: SiUnit = .undefined,
-    soilTemperature0To10cm: SiUnit = .undefined,
-    soilTemperature10To40cm: SiUnit = .undefined,
-    soilTemperature40To100cm: SiUnit = .undefined,
-    soilTemperature100To200cm: SiUnit = .undefined,
-    soilMoisture0To10cm: SiUnit = .undefined,
-    soilMoisture10To40cm: SiUnit = .undefined,
-    soilMoisture40To100cm: SiUnit = .undefined,
-    soilMoisture100To200cm: SiUnit = .undefined,
-    growingDegreeDaysBase0Limit50: SiUnit = .undefined,
-    leafWetnessProbability: SiUnit = .undefined,
-    soilMoistureIndex0To7cm: SiUnit = .undefined,
-    soilMoistureIndex7To28cm: SiUnit = .undefined,
-    soilMoistureIndex28To100cm: SiUnit = .undefined,
-    soilMoistureIndex100To255cm: SiUnit = .undefined,
-    soilMoistureIndex0To100cm: SiUnit = .undefined,
-    lightningPotential: SiUnit = .undefined,
-    temperatureHpa: SiUnit = .undefined,
-    geopotentialHeightHpa: SiUnit = .undefined,
-    relativehumidityHpa: SiUnit = .undefined,
-    windspeedHpa: SiUnit = .undefined,
-    winddirectionHpa: SiUnit = .undefined,
-    dewpointHpa: SiUnit = .undefined,
-    cloudcoverHpa: SiUnit = .undefined,
-    verticalVelocityHpa: SiUnit = .undefined,
-    growingDegreeDays: SiUnit = .undefined,
-    tiltedDirectRadiation: SiUnit = .undefined
+    temperture2m: com_openmeteo_SiUnit = .undefined,
+    cloudcover: com_openmeteo_SiUnit = .undefined,
+    cloudcoverLow: com_openmeteo_SiUnit = .undefined,
+    cloudcoverMid: com_openmeteo_SiUnit = .undefined,
+    cloudcoverHigh: com_openmeteo_SiUnit = .undefined,
+    pressureMsl: com_openmeteo_SiUnit = .undefined,
+    relativehumidity2m: com_openmeteo_SiUnit = .undefined,
+    precipitation: com_openmeteo_SiUnit = .undefined,
+    precipitationProbability: com_openmeteo_SiUnit = .undefined,
+    weathercode: com_openmeteo_SiUnit = .undefined,
+    temperature80m: com_openmeteo_SiUnit = .undefined,
+    temperature120m: com_openmeteo_SiUnit = .undefined,
+    temperature180m: com_openmeteo_SiUnit = .undefined,
+    soilTemperature0cm: com_openmeteo_SiUnit = .undefined,
+    soilTemperature6cm: com_openmeteo_SiUnit = .undefined,
+    soilTemperature18cm: com_openmeteo_SiUnit = .undefined,
+    soilTemperature54cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture01cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture13cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture39cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture927cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture2781cm: com_openmeteo_SiUnit = .undefined,
+    snowDepth: com_openmeteo_SiUnit = .undefined,
+    snowHeight: com_openmeteo_SiUnit = .undefined,
+    sensibleHeatflux: com_openmeteo_SiUnit = .undefined,
+    latentHeatflux: com_openmeteo_SiUnit = .undefined,
+    showers: com_openmeteo_SiUnit = .undefined,
+    rain: com_openmeteo_SiUnit = .undefined,
+    windgusts10m: com_openmeteo_SiUnit = .undefined,
+    freezinglevelHeight: com_openmeteo_SiUnit = .undefined,
+    dewpoint2m: com_openmeteo_SiUnit = .undefined,
+    diffuseRadiation: com_openmeteo_SiUnit = .undefined,
+    directRadiation: com_openmeteo_SiUnit = .undefined,
+    apparentTemperature: com_openmeteo_SiUnit = .undefined,
+    windspeed10m: com_openmeteo_SiUnit = .undefined,
+    winddirection10m: com_openmeteo_SiUnit = .undefined,
+    windspeed80m: com_openmeteo_SiUnit = .undefined,
+    winddirection80m: com_openmeteo_SiUnit = .undefined,
+    windspeed120m: com_openmeteo_SiUnit = .undefined,
+    winddirection120m: com_openmeteo_SiUnit = .undefined,
+    windspeed180m: com_openmeteo_SiUnit = .undefined,
+    winddirection180m: com_openmeteo_SiUnit = .undefined,
+    directNormalIrradiance: com_openmeteo_SiUnit = .undefined,
+    evapotranspiration: com_openmeteo_SiUnit = .undefined,
+    et0FaoEvapotranspiration: com_openmeteo_SiUnit = .undefined,
+    vaporPressureDeficit: com_openmeteo_SiUnit = .undefined,
+    shortwaveRadiation: com_openmeteo_SiUnit = .undefined,
+    snowfall: com_openmeteo_SiUnit = .undefined,
+    surfacePressure: com_openmeteo_SiUnit = .undefined,
+    terrestrialRadiation: com_openmeteo_SiUnit = .undefined,
+    terrestrialRadiationInstant: com_openmeteo_SiUnit = .undefined,
+    shortwaveRadiationInstant: com_openmeteo_SiUnit = .undefined,
+    diffuseRadiationInstant: com_openmeteo_SiUnit = .undefined,
+    directRadiationInstant: com_openmeteo_SiUnit = .undefined,
+    directNormalIrradianceInstant: com_openmeteo_SiUnit = .undefined,
+    visibility: com_openmeteo_SiUnit = .undefined,
+    cape: com_openmeteo_SiUnit = .undefined,
+    uvIndex: com_openmeteo_SiUnit = .undefined,
+    uvIndexClearSky: com_openmeteo_SiUnit = .undefined,
+    isDay: com_openmeteo_SiUnit = .undefined,
+    soilTemperature0To10cm: com_openmeteo_SiUnit = .undefined,
+    soilTemperature10To40cm: com_openmeteo_SiUnit = .undefined,
+    soilTemperature40To100cm: com_openmeteo_SiUnit = .undefined,
+    soilTemperature100To200cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture0To10cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture10To40cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture40To100cm: com_openmeteo_SiUnit = .undefined,
+    soilMoisture100To200cm: com_openmeteo_SiUnit = .undefined,
+    growingDegreeDaysBase0Limit50: com_openmeteo_SiUnit = .undefined,
+    leafWetnessProbability: com_openmeteo_SiUnit = .undefined,
+    soilMoistureIndex0To7cm: com_openmeteo_SiUnit = .undefined,
+    soilMoistureIndex7To28cm: com_openmeteo_SiUnit = .undefined,
+    soilMoistureIndex28To100cm: com_openmeteo_SiUnit = .undefined,
+    soilMoistureIndex100To255cm: com_openmeteo_SiUnit = .undefined,
+    soilMoistureIndex0To100cm: com_openmeteo_SiUnit = .undefined,
+    lightningPotential: com_openmeteo_SiUnit = .undefined,
+    temperatureHpa: com_openmeteo_SiUnit = .undefined,
+    geopotentialHeightHpa: com_openmeteo_SiUnit = .undefined,
+    relativehumidityHpa: com_openmeteo_SiUnit = .undefined,
+    windspeedHpa: com_openmeteo_SiUnit = .undefined,
+    winddirectionHpa: com_openmeteo_SiUnit = .undefined,
+    dewpointHpa: com_openmeteo_SiUnit = .undefined,
+    cloudcoverHpa: com_openmeteo_SiUnit = .undefined,
+    verticalVelocityHpa: com_openmeteo_SiUnit = .undefined,
+    growingDegreeDays: com_openmeteo_SiUnit = .undefined,
+    tiltedDirectRadiation: com_openmeteo_SiUnit = .undefined
   ) -> Offset {
-    let __start = com_openmeteo_api_result_WeatherHourlyUnit.startWeatherHourlyUnit(&fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(temperture2m: temperture2m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(cloudcover: cloudcover, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(cloudcoverLow: cloudcoverLow, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(cloudcoverMid: cloudcoverMid, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(cloudcoverHigh: cloudcoverHigh, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(pressureMsl: pressureMsl, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(relativehumidity2m: relativehumidity2m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(precipitation: precipitation, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(precipitationProbability: precipitationProbability, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(weathercode: weathercode, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(temperature80m: temperature80m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(temperature120m: temperature120m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(temperature180m: temperature180m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilTemperature0cm: soilTemperature0cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilTemperature6cm: soilTemperature6cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilTemperature18cm: soilTemperature18cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilTemperature54cm: soilTemperature54cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture01cm: soilMoisture01cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture13cm: soilMoisture13cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture39cm: soilMoisture39cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture927cm: soilMoisture927cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture2781cm: soilMoisture2781cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(snowDepth: snowDepth, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(snowHeight: snowHeight, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(sensibleHeatflux: sensibleHeatflux, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(latentHeatflux: latentHeatflux, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(showers: showers, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(rain: rain, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(windgusts10m: windgusts10m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(freezinglevelHeight: freezinglevelHeight, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(dewpoint2m: dewpoint2m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(diffuseRadiation: diffuseRadiation, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(directRadiation: directRadiation, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(apparentTemperature: apparentTemperature, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(windspeed10m: windspeed10m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(winddirection10m: winddirection10m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(windspeed80m: windspeed80m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(winddirection80m: winddirection80m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(windspeed120m: windspeed120m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(winddirection120m: winddirection120m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(windspeed180m: windspeed180m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(winddirection180m: winddirection180m, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(directNormalIrradiance: directNormalIrradiance, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(evapotranspiration: evapotranspiration, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(vaporPressureDeficit: vaporPressureDeficit, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(shortwaveRadiation: shortwaveRadiation, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(snowfall: snowfall, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(surfacePressure: surfacePressure, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(terrestrialRadiation: terrestrialRadiation, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(terrestrialRadiationInstant: terrestrialRadiationInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(shortwaveRadiationInstant: shortwaveRadiationInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(diffuseRadiationInstant: diffuseRadiationInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(directRadiationInstant: directRadiationInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(directNormalIrradianceInstant: directNormalIrradianceInstant, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(visibility: visibility, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(cape: cape, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(uvIndex: uvIndex, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(uvIndexClearSky: uvIndexClearSky, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(isDay: isDay, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilTemperature0To10cm: soilTemperature0To10cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilTemperature10To40cm: soilTemperature10To40cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilTemperature40To100cm: soilTemperature40To100cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilTemperature100To200cm: soilTemperature100To200cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture0To10cm: soilMoisture0To10cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture10To40cm: soilMoisture10To40cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture40To100cm: soilMoisture40To100cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoisture100To200cm: soilMoisture100To200cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(growingDegreeDaysBase0Limit50: growingDegreeDaysBase0Limit50, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(leafWetnessProbability: leafWetnessProbability, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoistureIndex0To7cm: soilMoistureIndex0To7cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoistureIndex7To28cm: soilMoistureIndex7To28cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoistureIndex28To100cm: soilMoistureIndex28To100cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoistureIndex100To255cm: soilMoistureIndex100To255cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(soilMoistureIndex0To100cm: soilMoistureIndex0To100cm, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(lightningPotential: lightningPotential, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(temperatureHpa: temperatureHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(geopotentialHeightHpa: geopotentialHeightHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(relativehumidityHpa: relativehumidityHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(windspeedHpa: windspeedHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(winddirectionHpa: winddirectionHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(dewpointHpa: dewpointHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(cloudcoverHpa: cloudcoverHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(verticalVelocityHpa: verticalVelocityHpa, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(growingDegreeDays: growingDegreeDays, &fbb)
-    com_openmeteo_api_result_WeatherHourlyUnit.add(tiltedDirectRadiation: tiltedDirectRadiation, &fbb)
-    return com_openmeteo_api_result_WeatherHourlyUnit.endWeatherHourlyUnit(&fbb, start: __start)
+    let __start = com_openmeteo_WeatherHourlyUnits.startWeatherHourlyUnits(&fbb)
+    com_openmeteo_WeatherHourlyUnits.add(temperture2m: temperture2m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(cloudcover: cloudcover, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(cloudcoverLow: cloudcoverLow, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(cloudcoverMid: cloudcoverMid, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(cloudcoverHigh: cloudcoverHigh, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(pressureMsl: pressureMsl, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(relativehumidity2m: relativehumidity2m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(precipitation: precipitation, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(precipitationProbability: precipitationProbability, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(weathercode: weathercode, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(temperature80m: temperature80m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(temperature120m: temperature120m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(temperature180m: temperature180m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilTemperature0cm: soilTemperature0cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilTemperature6cm: soilTemperature6cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilTemperature18cm: soilTemperature18cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilTemperature54cm: soilTemperature54cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture01cm: soilMoisture01cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture13cm: soilMoisture13cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture39cm: soilMoisture39cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture927cm: soilMoisture927cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture2781cm: soilMoisture2781cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(snowDepth: snowDepth, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(snowHeight: snowHeight, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(sensibleHeatflux: sensibleHeatflux, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(latentHeatflux: latentHeatflux, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(showers: showers, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(rain: rain, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(windgusts10m: windgusts10m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(freezinglevelHeight: freezinglevelHeight, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(dewpoint2m: dewpoint2m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(diffuseRadiation: diffuseRadiation, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(directRadiation: directRadiation, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(apparentTemperature: apparentTemperature, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(windspeed10m: windspeed10m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(winddirection10m: winddirection10m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(windspeed80m: windspeed80m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(winddirection80m: winddirection80m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(windspeed120m: windspeed120m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(winddirection120m: winddirection120m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(windspeed180m: windspeed180m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(winddirection180m: winddirection180m, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(directNormalIrradiance: directNormalIrradiance, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(evapotranspiration: evapotranspiration, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(vaporPressureDeficit: vaporPressureDeficit, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(shortwaveRadiation: shortwaveRadiation, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(snowfall: snowfall, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(surfacePressure: surfacePressure, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(terrestrialRadiation: terrestrialRadiation, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(terrestrialRadiationInstant: terrestrialRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(shortwaveRadiationInstant: shortwaveRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(diffuseRadiationInstant: diffuseRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(directRadiationInstant: directRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(directNormalIrradianceInstant: directNormalIrradianceInstant, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(visibility: visibility, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(cape: cape, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(uvIndex: uvIndex, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(uvIndexClearSky: uvIndexClearSky, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(isDay: isDay, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilTemperature0To10cm: soilTemperature0To10cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilTemperature10To40cm: soilTemperature10To40cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilTemperature40To100cm: soilTemperature40To100cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilTemperature100To200cm: soilTemperature100To200cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture0To10cm: soilMoisture0To10cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture10To40cm: soilMoisture10To40cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture40To100cm: soilMoisture40To100cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoisture100To200cm: soilMoisture100To200cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(growingDegreeDaysBase0Limit50: growingDegreeDaysBase0Limit50, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(leafWetnessProbability: leafWetnessProbability, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoistureIndex0To7cm: soilMoistureIndex0To7cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoistureIndex7To28cm: soilMoistureIndex7To28cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoistureIndex28To100cm: soilMoistureIndex28To100cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoistureIndex100To255cm: soilMoistureIndex100To255cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(soilMoistureIndex0To100cm: soilMoistureIndex0To100cm, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(lightningPotential: lightningPotential, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(temperatureHpa: temperatureHpa, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(geopotentialHeightHpa: geopotentialHeightHpa, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(relativehumidityHpa: relativehumidityHpa, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(windspeedHpa: windspeedHpa, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(winddirectionHpa: winddirectionHpa, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(dewpointHpa: dewpointHpa, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(cloudcoverHpa: cloudcoverHpa, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(verticalVelocityHpa: verticalVelocityHpa, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(growingDegreeDays: growingDegreeDays, &fbb)
+    com_openmeteo_WeatherHourlyUnits.add(tiltedDirectRadiation: tiltedDirectRadiation, &fbb)
+    return com_openmeteo_WeatherHourlyUnits.endWeatherHourlyUnits(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
-    try _v.visit(field: VTOFFSET.temperture2m.p, fieldName: "temperture2m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.cloudcover.p, fieldName: "cloudcover", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.cloudcoverLow.p, fieldName: "cloudcoverLow", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.cloudcoverMid.p, fieldName: "cloudcoverMid", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.cloudcoverHigh.p, fieldName: "cloudcoverHigh", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.pressureMsl.p, fieldName: "pressureMsl", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.relativehumidity2m.p, fieldName: "relativehumidity2m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.precipitation.p, fieldName: "precipitation", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.precipitationProbability.p, fieldName: "precipitationProbability", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.weathercode.p, fieldName: "weathercode", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.temperature80m.p, fieldName: "temperature80m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.temperature120m.p, fieldName: "temperature120m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.temperature180m.p, fieldName: "temperature180m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilTemperature0cm.p, fieldName: "soilTemperature0cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilTemperature6cm.p, fieldName: "soilTemperature6cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilTemperature18cm.p, fieldName: "soilTemperature18cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilTemperature54cm.p, fieldName: "soilTemperature54cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture01cm.p, fieldName: "soilMoisture01cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture13cm.p, fieldName: "soilMoisture13cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture39cm.p, fieldName: "soilMoisture39cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture927cm.p, fieldName: "soilMoisture927cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture2781cm.p, fieldName: "soilMoisture2781cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.snowDepth.p, fieldName: "snowDepth", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.snowHeight.p, fieldName: "snowHeight", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.sensibleHeatflux.p, fieldName: "sensibleHeatflux", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.latentHeatflux.p, fieldName: "latentHeatflux", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.showers.p, fieldName: "showers", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.rain.p, fieldName: "rain", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.windgusts10m.p, fieldName: "windgusts10m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.freezinglevelHeight.p, fieldName: "freezinglevelHeight", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.dewpoint2m.p, fieldName: "dewpoint2m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.diffuseRadiation.p, fieldName: "diffuseRadiation", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.directRadiation.p, fieldName: "directRadiation", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.apparentTemperature.p, fieldName: "apparentTemperature", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.windspeed10m.p, fieldName: "windspeed10m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.winddirection10m.p, fieldName: "winddirection10m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.windspeed80m.p, fieldName: "windspeed80m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.winddirection80m.p, fieldName: "winddirection80m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.windspeed120m.p, fieldName: "windspeed120m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.winddirection120m.p, fieldName: "winddirection120m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.windspeed180m.p, fieldName: "windspeed180m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.winddirection180m.p, fieldName: "winddirection180m", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.directNormalIrradiance.p, fieldName: "directNormalIrradiance", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.evapotranspiration.p, fieldName: "evapotranspiration", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.et0FaoEvapotranspiration.p, fieldName: "et0FaoEvapotranspiration", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.vaporPressureDeficit.p, fieldName: "vaporPressureDeficit", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.shortwaveRadiation.p, fieldName: "shortwaveRadiation", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.snowfall.p, fieldName: "snowfall", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.surfacePressure.p, fieldName: "surfacePressure", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.terrestrialRadiation.p, fieldName: "terrestrialRadiation", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.terrestrialRadiationInstant.p, fieldName: "terrestrialRadiationInstant", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.shortwaveRadiationInstant.p, fieldName: "shortwaveRadiationInstant", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.diffuseRadiationInstant.p, fieldName: "diffuseRadiationInstant", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.directRadiationInstant.p, fieldName: "directRadiationInstant", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.directNormalIrradianceInstant.p, fieldName: "directNormalIrradianceInstant", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.visibility.p, fieldName: "visibility", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.cape.p, fieldName: "cape", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.uvIndex.p, fieldName: "uvIndex", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.uvIndexClearSky.p, fieldName: "uvIndexClearSky", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.isDay.p, fieldName: "isDay", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilTemperature0To10cm.p, fieldName: "soilTemperature0To10cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilTemperature10To40cm.p, fieldName: "soilTemperature10To40cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilTemperature40To100cm.p, fieldName: "soilTemperature40To100cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilTemperature100To200cm.p, fieldName: "soilTemperature100To200cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture0To10cm.p, fieldName: "soilMoisture0To10cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture10To40cm.p, fieldName: "soilMoisture10To40cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture40To100cm.p, fieldName: "soilMoisture40To100cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoisture100To200cm.p, fieldName: "soilMoisture100To200cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.growingDegreeDaysBase0Limit50.p, fieldName: "growingDegreeDaysBase0Limit50", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.leafWetnessProbability.p, fieldName: "leafWetnessProbability", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex0To7cm.p, fieldName: "soilMoistureIndex0To7cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex7To28cm.p, fieldName: "soilMoistureIndex7To28cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex28To100cm.p, fieldName: "soilMoistureIndex28To100cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex100To255cm.p, fieldName: "soilMoistureIndex100To255cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex0To100cm.p, fieldName: "soilMoistureIndex0To100cm", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.lightningPotential.p, fieldName: "lightningPotential", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.temperatureHpa.p, fieldName: "temperatureHpa", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.geopotentialHeightHpa.p, fieldName: "geopotentialHeightHpa", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.relativehumidityHpa.p, fieldName: "relativehumidityHpa", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.windspeedHpa.p, fieldName: "windspeedHpa", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.winddirectionHpa.p, fieldName: "winddirectionHpa", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.dewpointHpa.p, fieldName: "dewpointHpa", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.cloudcoverHpa.p, fieldName: "cloudcoverHpa", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.verticalVelocityHpa.p, fieldName: "verticalVelocityHpa", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.growingDegreeDays.p, fieldName: "growingDegreeDays", required: false, type: SiUnit.self)
-    try _v.visit(field: VTOFFSET.tiltedDirectRadiation.p, fieldName: "tiltedDirectRadiation", required: false, type: SiUnit.self)
+    try _v.visit(field: VTOFFSET.temperture2m.p, fieldName: "temperture2m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cloudcover.p, fieldName: "cloudcover", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cloudcoverLow.p, fieldName: "cloudcoverLow", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cloudcoverMid.p, fieldName: "cloudcoverMid", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cloudcoverHigh.p, fieldName: "cloudcoverHigh", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.pressureMsl.p, fieldName: "pressureMsl", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.relativehumidity2m.p, fieldName: "relativehumidity2m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.precipitation.p, fieldName: "precipitation", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.precipitationProbability.p, fieldName: "precipitationProbability", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.weathercode.p, fieldName: "weathercode", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.temperature80m.p, fieldName: "temperature80m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.temperature120m.p, fieldName: "temperature120m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.temperature180m.p, fieldName: "temperature180m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilTemperature0cm.p, fieldName: "soilTemperature0cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilTemperature6cm.p, fieldName: "soilTemperature6cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilTemperature18cm.p, fieldName: "soilTemperature18cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilTemperature54cm.p, fieldName: "soilTemperature54cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture01cm.p, fieldName: "soilMoisture01cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture13cm.p, fieldName: "soilMoisture13cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture39cm.p, fieldName: "soilMoisture39cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture927cm.p, fieldName: "soilMoisture927cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture2781cm.p, fieldName: "soilMoisture2781cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.snowDepth.p, fieldName: "snowDepth", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.snowHeight.p, fieldName: "snowHeight", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.sensibleHeatflux.p, fieldName: "sensibleHeatflux", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.latentHeatflux.p, fieldName: "latentHeatflux", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.showers.p, fieldName: "showers", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.rain.p, fieldName: "rain", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windgusts10m.p, fieldName: "windgusts10m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.freezinglevelHeight.p, fieldName: "freezinglevelHeight", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.dewpoint2m.p, fieldName: "dewpoint2m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.diffuseRadiation.p, fieldName: "diffuseRadiation", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.directRadiation.p, fieldName: "directRadiation", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.apparentTemperature.p, fieldName: "apparentTemperature", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windspeed10m.p, fieldName: "windspeed10m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.winddirection10m.p, fieldName: "winddirection10m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windspeed80m.p, fieldName: "windspeed80m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.winddirection80m.p, fieldName: "winddirection80m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windspeed120m.p, fieldName: "windspeed120m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.winddirection120m.p, fieldName: "winddirection120m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windspeed180m.p, fieldName: "windspeed180m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.winddirection180m.p, fieldName: "winddirection180m", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.directNormalIrradiance.p, fieldName: "directNormalIrradiance", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.evapotranspiration.p, fieldName: "evapotranspiration", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.et0FaoEvapotranspiration.p, fieldName: "et0FaoEvapotranspiration", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.vaporPressureDeficit.p, fieldName: "vaporPressureDeficit", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.shortwaveRadiation.p, fieldName: "shortwaveRadiation", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.snowfall.p, fieldName: "snowfall", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.surfacePressure.p, fieldName: "surfacePressure", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.terrestrialRadiation.p, fieldName: "terrestrialRadiation", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.terrestrialRadiationInstant.p, fieldName: "terrestrialRadiationInstant", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.shortwaveRadiationInstant.p, fieldName: "shortwaveRadiationInstant", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.diffuseRadiationInstant.p, fieldName: "diffuseRadiationInstant", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.directRadiationInstant.p, fieldName: "directRadiationInstant", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.directNormalIrradianceInstant.p, fieldName: "directNormalIrradianceInstant", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.visibility.p, fieldName: "visibility", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cape.p, fieldName: "cape", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.uvIndex.p, fieldName: "uvIndex", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.uvIndexClearSky.p, fieldName: "uvIndexClearSky", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.isDay.p, fieldName: "isDay", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilTemperature0To10cm.p, fieldName: "soilTemperature0To10cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilTemperature10To40cm.p, fieldName: "soilTemperature10To40cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilTemperature40To100cm.p, fieldName: "soilTemperature40To100cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilTemperature100To200cm.p, fieldName: "soilTemperature100To200cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture0To10cm.p, fieldName: "soilMoisture0To10cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture10To40cm.p, fieldName: "soilMoisture10To40cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture40To100cm.p, fieldName: "soilMoisture40To100cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoisture100To200cm.p, fieldName: "soilMoisture100To200cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.growingDegreeDaysBase0Limit50.p, fieldName: "growingDegreeDaysBase0Limit50", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.leafWetnessProbability.p, fieldName: "leafWetnessProbability", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex0To7cm.p, fieldName: "soilMoistureIndex0To7cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex7To28cm.p, fieldName: "soilMoistureIndex7To28cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex28To100cm.p, fieldName: "soilMoistureIndex28To100cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex100To255cm.p, fieldName: "soilMoistureIndex100To255cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex0To100cm.p, fieldName: "soilMoistureIndex0To100cm", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.lightningPotential.p, fieldName: "lightningPotential", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.temperatureHpa.p, fieldName: "temperatureHpa", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.geopotentialHeightHpa.p, fieldName: "geopotentialHeightHpa", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.relativehumidityHpa.p, fieldName: "relativehumidityHpa", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windspeedHpa.p, fieldName: "windspeedHpa", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.winddirectionHpa.p, fieldName: "winddirectionHpa", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.dewpointHpa.p, fieldName: "dewpointHpa", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cloudcoverHpa.p, fieldName: "cloudcoverHpa", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.verticalVelocityHpa.p, fieldName: "verticalVelocityHpa", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.growingDegreeDays.p, fieldName: "growingDegreeDays", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.tiltedDirectRadiation.p, fieldName: "tiltedDirectRadiation", required: false, type: com_openmeteo_SiUnit.self)
     _v.finish()
   }
 }
 
-public struct com_openmeteo_api_result_PressureValues: FlatBufferObject, Verifiable {
+public struct com_openmeteo_PressureValues: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -1475,10 +3998,10 @@ public struct com_openmeteo_api_result_PressureValues: FlatBufferObject, Verifia
     pressureLevel: Int16 = 0,
     valuesVectorOffset values: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_api_result_PressureValues.startPressureValues(&fbb)
-    com_openmeteo_api_result_PressureValues.add(pressureLevel: pressureLevel, &fbb)
-    com_openmeteo_api_result_PressureValues.addVectorOf(values: values, &fbb)
-    return com_openmeteo_api_result_PressureValues.endPressureValues(&fbb, start: __start)
+    let __start = com_openmeteo_PressureValues.startPressureValues(&fbb)
+    com_openmeteo_PressureValues.add(pressureLevel: pressureLevel, &fbb)
+    com_openmeteo_PressureValues.addVectorOf(values: values, &fbb)
+    return com_openmeteo_PressureValues.endPressureValues(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
@@ -1489,7 +4012,7 @@ public struct com_openmeteo_api_result_PressureValues: FlatBufferObject, Verifia
   }
 }
 
-public struct com_openmeteo_api_result_Gdd: FlatBufferObject, Verifiable {
+public struct com_openmeteo_Gdd: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -1523,11 +4046,11 @@ public struct com_openmeteo_api_result_Gdd: FlatBufferObject, Verifiable {
     base: Float32 = 0.0,
     valuesVectorOffset values: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_api_result_Gdd.startGdd(&fbb)
-    com_openmeteo_api_result_Gdd.add(limit: limit, &fbb)
-    com_openmeteo_api_result_Gdd.add(base: base, &fbb)
-    com_openmeteo_api_result_Gdd.addVectorOf(values: values, &fbb)
-    return com_openmeteo_api_result_Gdd.endGdd(&fbb, start: __start)
+    let __start = com_openmeteo_Gdd.startGdd(&fbb)
+    com_openmeteo_Gdd.add(limit: limit, &fbb)
+    com_openmeteo_Gdd.add(base: base, &fbb)
+    com_openmeteo_Gdd.addVectorOf(values: values, &fbb)
+    return com_openmeteo_Gdd.endGdd(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
@@ -1539,7 +4062,7 @@ public struct com_openmeteo_api_result_Gdd: FlatBufferObject, Verifiable {
   }
 }
 
-public struct com_openmeteo_api_result_Tilted: FlatBufferObject, Verifiable {
+public struct com_openmeteo_Tilted: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -1573,11 +4096,11 @@ public struct com_openmeteo_api_result_Tilted: FlatBufferObject, Verifiable {
     azimuth: Float32 = 0.0,
     valuesVectorOffset values: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_api_result_Tilted.startTilted(&fbb)
-    com_openmeteo_api_result_Tilted.add(tilt: tilt, &fbb)
-    com_openmeteo_api_result_Tilted.add(azimuth: azimuth, &fbb)
-    com_openmeteo_api_result_Tilted.addVectorOf(values: values, &fbb)
-    return com_openmeteo_api_result_Tilted.endTilted(&fbb, start: __start)
+    let __start = com_openmeteo_Tilted.startTilted(&fbb)
+    com_openmeteo_Tilted.add(tilt: tilt, &fbb)
+    com_openmeteo_Tilted.add(azimuth: azimuth, &fbb)
+    com_openmeteo_Tilted.addVectorOf(values: values, &fbb)
+    return com_openmeteo_Tilted.endTilted(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
@@ -1589,7 +4112,7 @@ public struct com_openmeteo_api_result_Tilted: FlatBufferObject, Verifiable {
   }
 }
 
-public struct com_openmeteo_api_result_WeatherDaily: FlatBufferObject, Verifiable {
+public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -1599,53 +4122,56 @@ public struct com_openmeteo_api_result_WeatherDaily: FlatBufferObject, Verifiabl
   public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
 
   private enum VTOFFSET: VOffset {
-    case temperature2mMax = 4
-    case temperature2mMin = 6
-    case temperature2mMean = 8
-    case apparentTemperatureMax = 10
-    case apparentTemperatureMin = 12
-    case apparentTemperatureMean = 14
-    case precipitationSum = 16
-    case precipitationProbabilityMax = 18
-    case precipitationProbabilityMin = 20
-    case precipitationProbabilityMean = 22
-    case snowfallSum = 24
-    case rainSum = 26
-    case showersSum = 28
-    case weathercode = 30
-    case shortwaveRadiationSum = 32
-    case windspeed10mMax = 34
-    case windspeed10mMin = 36
-    case windspeed10mMean = 38
-    case windgusts10mMax = 40
-    case windgusts10mMin = 42
-    case windgusts10mMean = 44
-    case winddirection10mDominant = 46
-    case precipitationHours = 48
-    case sunrise = 50
-    case sunset = 52
-    case et0FaoEvapotranspiration = 54
-    case visibilityMax = 56
-    case visibilityMin = 58
-    case visibilityMean = 60
-    case pressureMslMax = 62
-    case pressureMslMin = 64
-    case pressureMslMean = 66
-    case surfacePressureMax = 68
-    case surfacePressureMin = 70
-    case surfacePressureMean = 72
-    case capeMax = 74
-    case capeMin = 76
-    case capeMean = 78
-    case cloudcoverMax = 80
-    case cloudcoverMin = 82
-    case cloudcoverMean = 84
-    case uvIndexMax = 86
-    case uvIndexClearSkyMax = 88
+    case time = 4
+    case temperature2mMax = 6
+    case temperature2mMin = 8
+    case temperature2mMean = 10
+    case apparentTemperatureMax = 12
+    case apparentTemperatureMin = 14
+    case apparentTemperatureMean = 16
+    case precipitationSum = 18
+    case precipitationProbabilityMax = 20
+    case precipitationProbabilityMin = 22
+    case precipitationProbabilityMean = 24
+    case snowfallSum = 26
+    case rainSum = 28
+    case showersSum = 30
+    case weathercode = 32
+    case shortwaveRadiationSum = 34
+    case windspeed10mMax = 36
+    case windspeed10mMin = 38
+    case windspeed10mMean = 40
+    case windgusts10mMax = 42
+    case windgusts10mMin = 44
+    case windgusts10mMean = 46
+    case winddirection10mDominant = 48
+    case precipitationHours = 50
+    case sunrise = 52
+    case sunset = 54
+    case et0FaoEvapotranspiration = 56
+    case visibilityMax = 58
+    case visibilityMin = 60
+    case visibilityMean = 62
+    case pressureMslMax = 64
+    case pressureMslMin = 66
+    case pressureMslMean = 68
+    case surfacePressureMax = 70
+    case surfacePressureMin = 72
+    case surfacePressureMean = 74
+    case capeMax = 76
+    case capeMin = 78
+    case capeMean = 80
+    case cloudcoverMax = 82
+    case cloudcoverMin = 84
+    case cloudcoverMean = 86
+    case uvIndexMax = 88
+    case uvIndexClearSkyMax = 90
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
 
+  public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
+  public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var hasTemperature2mMax: Bool { let o = _accessor.offset(VTOFFSET.temperature2mMax.v); return o == 0 ? false : true }
   public var temperature2mMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.temperature2mMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func temperature2mMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.temperature2mMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
@@ -1818,7 +4344,8 @@ public struct com_openmeteo_api_result_WeatherDaily: FlatBufferObject, Verifiabl
   public var uvIndexClearSkyMaxCount: Int32 { let o = _accessor.offset(VTOFFSET.uvIndexClearSkyMax.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func uvIndexClearSkyMax(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.uvIndexClearSkyMax.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
   public var uvIndexClearSkyMax: [Float32] { return _accessor.getVector(at: VTOFFSET.uvIndexClearSkyMax.v) ?? [] }
-  public static func startWeatherDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 43) }
+  public static func startWeatherDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 44) }
+  public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func addVectorOf(temperature2mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMax, at: VTOFFSET.temperature2mMax.p) }
   public static func addVectorOf(temperature2mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMin, at: VTOFFSET.temperature2mMin.p) }
   public static func addVectorOf(temperature2mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMean, at: VTOFFSET.temperature2mMean.p) }
@@ -1865,6 +4392,7 @@ public struct com_openmeteo_api_result_WeatherDaily: FlatBufferObject, Verifiabl
   public static func endWeatherDaily(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createWeatherDaily(
     _ fbb: inout FlatBufferBuilder,
+    time: com_openmeteo_TimeRange? = nil,
     temperature2mMaxVectorOffset temperature2mMax: Offset = Offset(),
     temperature2mMinVectorOffset temperature2mMin: Offset = Offset(),
     temperature2mMeanVectorOffset temperature2mMean: Offset = Offset(),
@@ -1909,55 +4437,57 @@ public struct com_openmeteo_api_result_WeatherDaily: FlatBufferObject, Verifiabl
     uvIndexMaxVectorOffset uvIndexMax: Offset = Offset(),
     uvIndexClearSkyMaxVectorOffset uvIndexClearSkyMax: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_api_result_WeatherDaily.startWeatherDaily(&fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(temperature2mMax: temperature2mMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(temperature2mMin: temperature2mMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(temperature2mMean: temperature2mMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(apparentTemperatureMax: apparentTemperatureMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(apparentTemperatureMin: apparentTemperatureMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(apparentTemperatureMean: apparentTemperatureMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(precipitationSum: precipitationSum, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(precipitationProbabilityMax: precipitationProbabilityMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(precipitationProbabilityMin: precipitationProbabilityMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(precipitationProbabilityMean: precipitationProbabilityMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(snowfallSum: snowfallSum, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(rainSum: rainSum, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(showersSum: showersSum, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(weathercode: weathercode, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(shortwaveRadiationSum: shortwaveRadiationSum, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(windspeed10mMax: windspeed10mMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(windspeed10mMin: windspeed10mMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(windspeed10mMean: windspeed10mMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(windgusts10mMax: windgusts10mMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(windgusts10mMin: windgusts10mMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(windgusts10mMean: windgusts10mMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(winddirection10mDominant: winddirection10mDominant, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(precipitationHours: precipitationHours, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(sunrise: sunrise, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(sunset: sunset, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(visibilityMax: visibilityMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(visibilityMin: visibilityMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(visibilityMean: visibilityMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(pressureMslMax: pressureMslMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(pressureMslMin: pressureMslMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(pressureMslMean: pressureMslMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(surfacePressureMax: surfacePressureMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(surfacePressureMin: surfacePressureMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(surfacePressureMean: surfacePressureMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(capeMax: capeMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(capeMin: capeMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(capeMean: capeMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(cloudcoverMax: cloudcoverMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(cloudcoverMin: cloudcoverMin, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(cloudcoverMean: cloudcoverMean, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(uvIndexMax: uvIndexMax, &fbb)
-    com_openmeteo_api_result_WeatherDaily.addVectorOf(uvIndexClearSkyMax: uvIndexClearSkyMax, &fbb)
-    return com_openmeteo_api_result_WeatherDaily.endWeatherDaily(&fbb, start: __start)
+    let __start = com_openmeteo_WeatherDaily.startWeatherDaily(&fbb)
+    com_openmeteo_WeatherDaily.add(time: time, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(temperature2mMax: temperature2mMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(temperature2mMin: temperature2mMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(temperature2mMean: temperature2mMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(apparentTemperatureMax: apparentTemperatureMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(apparentTemperatureMin: apparentTemperatureMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(apparentTemperatureMean: apparentTemperatureMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(precipitationSum: precipitationSum, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(precipitationProbabilityMax: precipitationProbabilityMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(precipitationProbabilityMin: precipitationProbabilityMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(precipitationProbabilityMean: precipitationProbabilityMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(snowfallSum: snowfallSum, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(rainSum: rainSum, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(showersSum: showersSum, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(weathercode: weathercode, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(shortwaveRadiationSum: shortwaveRadiationSum, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(windspeed10mMax: windspeed10mMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(windspeed10mMin: windspeed10mMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(windspeed10mMean: windspeed10mMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(windgusts10mMax: windgusts10mMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(windgusts10mMin: windgusts10mMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(windgusts10mMean: windgusts10mMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(winddirection10mDominant: winddirection10mDominant, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(precipitationHours: precipitationHours, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(sunrise: sunrise, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(sunset: sunset, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(visibilityMax: visibilityMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(visibilityMin: visibilityMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(visibilityMean: visibilityMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(pressureMslMax: pressureMslMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(pressureMslMin: pressureMslMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(pressureMslMean: pressureMslMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(surfacePressureMax: surfacePressureMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(surfacePressureMin: surfacePressureMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(surfacePressureMean: surfacePressureMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(capeMax: capeMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(capeMin: capeMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(capeMean: capeMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(cloudcoverMax: cloudcoverMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(cloudcoverMin: cloudcoverMin, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(cloudcoverMean: cloudcoverMean, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(uvIndexMax: uvIndexMax, &fbb)
+    com_openmeteo_WeatherDaily.addVectorOf(uvIndexClearSkyMax: uvIndexClearSkyMax, &fbb)
+    return com_openmeteo_WeatherDaily.endWeatherDaily(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: false, type: com_openmeteo_TimeRange.self)
     try _v.visit(field: VTOFFSET.temperature2mMax.p, fieldName: "temperature2mMax", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
     try _v.visit(field: VTOFFSET.temperature2mMin.p, fieldName: "temperature2mMin", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
     try _v.visit(field: VTOFFSET.temperature2mMean.p, fieldName: "temperature2mMean", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
@@ -2005,7 +4535,301 @@ public struct com_openmeteo_api_result_WeatherDaily: FlatBufferObject, Verifiabl
   }
 }
 
-public struct com_openmeteo_api_result_WeatherApi: FlatBufferObject, Verifiable {
+public struct com_openmeteo_WeatherDailyUnits: FlatBufferObject, Verifiable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Table
+
+  private init(_ t: Table) { _accessor = t }
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
+
+  private enum VTOFFSET: VOffset {
+    case time = 4
+    case temperature2mMax = 6
+    case temperature2mMin = 8
+    case temperature2mMean = 10
+    case apparentTemperatureMax = 12
+    case apparentTemperatureMin = 14
+    case apparentTemperatureMean = 16
+    case precipitationSum = 18
+    case precipitationProbabilityMax = 20
+    case precipitationProbabilityMin = 22
+    case precipitationProbabilityMean = 24
+    case snowfallSum = 26
+    case rainSum = 28
+    case showersSum = 30
+    case weathercode = 32
+    case shortwaveRadiationSum = 34
+    case windspeed10mMax = 36
+    case windspeed10mMin = 38
+    case windspeed10mMean = 40
+    case windgusts10mMax = 42
+    case windgusts10mMin = 44
+    case windgusts10mMean = 46
+    case winddirection10mDominant = 48
+    case precipitationHours = 50
+    case sunrise = 52
+    case sunset = 54
+    case et0FaoEvapotranspiration = 56
+    case visibilityMax = 58
+    case visibilityMin = 60
+    case visibilityMean = 62
+    case pressureMslMax = 64
+    case pressureMslMin = 66
+    case pressureMslMean = 68
+    case surfacePressureMax = 70
+    case surfacePressureMin = 72
+    case surfacePressureMean = 74
+    case capeMax = 76
+    case capeMin = 78
+    case capeMean = 80
+    case cloudcoverMax = 82
+    case cloudcoverMin = 84
+    case cloudcoverMean = 86
+    case uvIndexMax = 88
+    case uvIndexClearSkyMax = 90
+    var v: Int32 { Int32(self.rawValue) }
+    var p: VOffset { self.rawValue }
+  }
+
+  public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
+  public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
+  public var temperature2mMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.temperature2mMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var temperature2mMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.temperature2mMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var temperature2mMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.temperature2mMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var apparentTemperatureMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.apparentTemperatureMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var apparentTemperatureMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.apparentTemperatureMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var apparentTemperatureMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.apparentTemperatureMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var precipitationSum: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.precipitationSum.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var precipitationProbabilityMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var precipitationProbabilityMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var precipitationProbabilityMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var snowfallSum: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.snowfallSum.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var rainSum: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.rainSum.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var showersSum: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.showersSum.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var weathercode: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.weathercode.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var shortwaveRadiationSum: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.shortwaveRadiationSum.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windspeed10mMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windspeed10mMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windspeed10mMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windspeed10mMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windspeed10mMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windspeed10mMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windgusts10mMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windgusts10mMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windgusts10mMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windgusts10mMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var windgusts10mMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.windgusts10mMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var winddirection10mDominant: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.winddirection10mDominant.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var precipitationHours: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.precipitationHours.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var sunrise: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.sunrise.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var sunset: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.sunset.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var et0FaoEvapotranspiration: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.et0FaoEvapotranspiration.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var visibilityMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.visibilityMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var visibilityMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.visibilityMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var visibilityMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.visibilityMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var pressureMslMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.pressureMslMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var pressureMslMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.pressureMslMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var pressureMslMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.pressureMslMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var surfacePressureMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.surfacePressureMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var surfacePressureMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.surfacePressureMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var surfacePressureMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.surfacePressureMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var capeMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.capeMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var capeMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.capeMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var capeMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.capeMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cloudcoverMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cloudcoverMin: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverMin.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var cloudcoverMean: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.cloudcoverMean.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var uvIndexMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.uvIndexMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var uvIndexClearSkyMax: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.uvIndexClearSkyMax.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public static func startWeatherDailyUnits(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 44) }
+  public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
+  public static func add(temperature2mMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature2mMax.rawValue, def: 0, at: VTOFFSET.temperature2mMax.p) }
+  public static func add(temperature2mMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature2mMin.rawValue, def: 0, at: VTOFFSET.temperature2mMin.p) }
+  public static func add(temperature2mMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: temperature2mMean.rawValue, def: 0, at: VTOFFSET.temperature2mMean.p) }
+  public static func add(apparentTemperatureMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: apparentTemperatureMax.rawValue, def: 0, at: VTOFFSET.apparentTemperatureMax.p) }
+  public static func add(apparentTemperatureMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: apparentTemperatureMin.rawValue, def: 0, at: VTOFFSET.apparentTemperatureMin.p) }
+  public static func add(apparentTemperatureMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: apparentTemperatureMean.rawValue, def: 0, at: VTOFFSET.apparentTemperatureMean.p) }
+  public static func add(precipitationSum: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitationSum.rawValue, def: 0, at: VTOFFSET.precipitationSum.p) }
+  public static func add(precipitationProbabilityMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitationProbabilityMax.rawValue, def: 0, at: VTOFFSET.precipitationProbabilityMax.p) }
+  public static func add(precipitationProbabilityMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitationProbabilityMin.rawValue, def: 0, at: VTOFFSET.precipitationProbabilityMin.p) }
+  public static func add(precipitationProbabilityMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitationProbabilityMean.rawValue, def: 0, at: VTOFFSET.precipitationProbabilityMean.p) }
+  public static func add(snowfallSum: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: snowfallSum.rawValue, def: 0, at: VTOFFSET.snowfallSum.p) }
+  public static func add(rainSum: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: rainSum.rawValue, def: 0, at: VTOFFSET.rainSum.p) }
+  public static func add(showersSum: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: showersSum.rawValue, def: 0, at: VTOFFSET.showersSum.p) }
+  public static func add(weathercode: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: weathercode.rawValue, def: 0, at: VTOFFSET.weathercode.p) }
+  public static func add(shortwaveRadiationSum: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: shortwaveRadiationSum.rawValue, def: 0, at: VTOFFSET.shortwaveRadiationSum.p) }
+  public static func add(windspeed10mMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed10mMax.rawValue, def: 0, at: VTOFFSET.windspeed10mMax.p) }
+  public static func add(windspeed10mMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed10mMin.rawValue, def: 0, at: VTOFFSET.windspeed10mMin.p) }
+  public static func add(windspeed10mMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windspeed10mMean.rawValue, def: 0, at: VTOFFSET.windspeed10mMean.p) }
+  public static func add(windgusts10mMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windgusts10mMax.rawValue, def: 0, at: VTOFFSET.windgusts10mMax.p) }
+  public static func add(windgusts10mMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windgusts10mMin.rawValue, def: 0, at: VTOFFSET.windgusts10mMin.p) }
+  public static func add(windgusts10mMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: windgusts10mMean.rawValue, def: 0, at: VTOFFSET.windgusts10mMean.p) }
+  public static func add(winddirection10mDominant: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: winddirection10mDominant.rawValue, def: 0, at: VTOFFSET.winddirection10mDominant.p) }
+  public static func add(precipitationHours: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: precipitationHours.rawValue, def: 0, at: VTOFFSET.precipitationHours.p) }
+  public static func add(sunrise: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: sunrise.rawValue, def: 0, at: VTOFFSET.sunrise.p) }
+  public static func add(sunset: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: sunset.rawValue, def: 0, at: VTOFFSET.sunset.p) }
+  public static func add(et0FaoEvapotranspiration: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: et0FaoEvapotranspiration.rawValue, def: 0, at: VTOFFSET.et0FaoEvapotranspiration.p) }
+  public static func add(visibilityMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: visibilityMax.rawValue, def: 0, at: VTOFFSET.visibilityMax.p) }
+  public static func add(visibilityMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: visibilityMin.rawValue, def: 0, at: VTOFFSET.visibilityMin.p) }
+  public static func add(visibilityMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: visibilityMean.rawValue, def: 0, at: VTOFFSET.visibilityMean.p) }
+  public static func add(pressureMslMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: pressureMslMax.rawValue, def: 0, at: VTOFFSET.pressureMslMax.p) }
+  public static func add(pressureMslMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: pressureMslMin.rawValue, def: 0, at: VTOFFSET.pressureMslMin.p) }
+  public static func add(pressureMslMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: pressureMslMean.rawValue, def: 0, at: VTOFFSET.pressureMslMean.p) }
+  public static func add(surfacePressureMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: surfacePressureMax.rawValue, def: 0, at: VTOFFSET.surfacePressureMax.p) }
+  public static func add(surfacePressureMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: surfacePressureMin.rawValue, def: 0, at: VTOFFSET.surfacePressureMin.p) }
+  public static func add(surfacePressureMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: surfacePressureMean.rawValue, def: 0, at: VTOFFSET.surfacePressureMean.p) }
+  public static func add(capeMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: capeMax.rawValue, def: 0, at: VTOFFSET.capeMax.p) }
+  public static func add(capeMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: capeMin.rawValue, def: 0, at: VTOFFSET.capeMin.p) }
+  public static func add(capeMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: capeMean.rawValue, def: 0, at: VTOFFSET.capeMean.p) }
+  public static func add(cloudcoverMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverMax.rawValue, def: 0, at: VTOFFSET.cloudcoverMax.p) }
+  public static func add(cloudcoverMin: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverMin.rawValue, def: 0, at: VTOFFSET.cloudcoverMin.p) }
+  public static func add(cloudcoverMean: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: cloudcoverMean.rawValue, def: 0, at: VTOFFSET.cloudcoverMean.p) }
+  public static func add(uvIndexMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: uvIndexMax.rawValue, def: 0, at: VTOFFSET.uvIndexMax.p) }
+  public static func add(uvIndexClearSkyMax: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: uvIndexClearSkyMax.rawValue, def: 0, at: VTOFFSET.uvIndexClearSkyMax.p) }
+  public static func endWeatherDailyUnits(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createWeatherDailyUnits(
+    _ fbb: inout FlatBufferBuilder,
+    time: com_openmeteo_TimeRange? = nil,
+    temperature2mMax: com_openmeteo_SiUnit = .undefined,
+    temperature2mMin: com_openmeteo_SiUnit = .undefined,
+    temperature2mMean: com_openmeteo_SiUnit = .undefined,
+    apparentTemperatureMax: com_openmeteo_SiUnit = .undefined,
+    apparentTemperatureMin: com_openmeteo_SiUnit = .undefined,
+    apparentTemperatureMean: com_openmeteo_SiUnit = .undefined,
+    precipitationSum: com_openmeteo_SiUnit = .undefined,
+    precipitationProbabilityMax: com_openmeteo_SiUnit = .undefined,
+    precipitationProbabilityMin: com_openmeteo_SiUnit = .undefined,
+    precipitationProbabilityMean: com_openmeteo_SiUnit = .undefined,
+    snowfallSum: com_openmeteo_SiUnit = .undefined,
+    rainSum: com_openmeteo_SiUnit = .undefined,
+    showersSum: com_openmeteo_SiUnit = .undefined,
+    weathercode: com_openmeteo_SiUnit = .undefined,
+    shortwaveRadiationSum: com_openmeteo_SiUnit = .undefined,
+    windspeed10mMax: com_openmeteo_SiUnit = .undefined,
+    windspeed10mMin: com_openmeteo_SiUnit = .undefined,
+    windspeed10mMean: com_openmeteo_SiUnit = .undefined,
+    windgusts10mMax: com_openmeteo_SiUnit = .undefined,
+    windgusts10mMin: com_openmeteo_SiUnit = .undefined,
+    windgusts10mMean: com_openmeteo_SiUnit = .undefined,
+    winddirection10mDominant: com_openmeteo_SiUnit = .undefined,
+    precipitationHours: com_openmeteo_SiUnit = .undefined,
+    sunrise: com_openmeteo_SiUnit = .undefined,
+    sunset: com_openmeteo_SiUnit = .undefined,
+    et0FaoEvapotranspiration: com_openmeteo_SiUnit = .undefined,
+    visibilityMax: com_openmeteo_SiUnit = .undefined,
+    visibilityMin: com_openmeteo_SiUnit = .undefined,
+    visibilityMean: com_openmeteo_SiUnit = .undefined,
+    pressureMslMax: com_openmeteo_SiUnit = .undefined,
+    pressureMslMin: com_openmeteo_SiUnit = .undefined,
+    pressureMslMean: com_openmeteo_SiUnit = .undefined,
+    surfacePressureMax: com_openmeteo_SiUnit = .undefined,
+    surfacePressureMin: com_openmeteo_SiUnit = .undefined,
+    surfacePressureMean: com_openmeteo_SiUnit = .undefined,
+    capeMax: com_openmeteo_SiUnit = .undefined,
+    capeMin: com_openmeteo_SiUnit = .undefined,
+    capeMean: com_openmeteo_SiUnit = .undefined,
+    cloudcoverMax: com_openmeteo_SiUnit = .undefined,
+    cloudcoverMin: com_openmeteo_SiUnit = .undefined,
+    cloudcoverMean: com_openmeteo_SiUnit = .undefined,
+    uvIndexMax: com_openmeteo_SiUnit = .undefined,
+    uvIndexClearSkyMax: com_openmeteo_SiUnit = .undefined
+  ) -> Offset {
+    let __start = com_openmeteo_WeatherDailyUnits.startWeatherDailyUnits(&fbb)
+    com_openmeteo_WeatherDailyUnits.add(time: time, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(temperature2mMax: temperature2mMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(temperature2mMin: temperature2mMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(temperature2mMean: temperature2mMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(apparentTemperatureMax: apparentTemperatureMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(apparentTemperatureMin: apparentTemperatureMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(apparentTemperatureMean: apparentTemperatureMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(precipitationSum: precipitationSum, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(precipitationProbabilityMax: precipitationProbabilityMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(precipitationProbabilityMin: precipitationProbabilityMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(precipitationProbabilityMean: precipitationProbabilityMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(snowfallSum: snowfallSum, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(rainSum: rainSum, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(showersSum: showersSum, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(weathercode: weathercode, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(shortwaveRadiationSum: shortwaveRadiationSum, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(windspeed10mMax: windspeed10mMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(windspeed10mMin: windspeed10mMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(windspeed10mMean: windspeed10mMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(windgusts10mMax: windgusts10mMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(windgusts10mMin: windgusts10mMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(windgusts10mMean: windgusts10mMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(winddirection10mDominant: winddirection10mDominant, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(precipitationHours: precipitationHours, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(sunrise: sunrise, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(sunset: sunset, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(visibilityMax: visibilityMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(visibilityMin: visibilityMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(visibilityMean: visibilityMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(pressureMslMax: pressureMslMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(pressureMslMin: pressureMslMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(pressureMslMean: pressureMslMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(surfacePressureMax: surfacePressureMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(surfacePressureMin: surfacePressureMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(surfacePressureMean: surfacePressureMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(capeMax: capeMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(capeMin: capeMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(capeMean: capeMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(cloudcoverMax: cloudcoverMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(cloudcoverMin: cloudcoverMin, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(cloudcoverMean: cloudcoverMean, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(uvIndexMax: uvIndexMax, &fbb)
+    com_openmeteo_WeatherDailyUnits.add(uvIndexClearSkyMax: uvIndexClearSkyMax, &fbb)
+    return com_openmeteo_WeatherDailyUnits.endWeatherDailyUnits(&fbb, start: __start)
+  }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: false, type: com_openmeteo_TimeRange.self)
+    try _v.visit(field: VTOFFSET.temperature2mMax.p, fieldName: "temperature2mMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.temperature2mMin.p, fieldName: "temperature2mMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.temperature2mMean.p, fieldName: "temperature2mMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.apparentTemperatureMax.p, fieldName: "apparentTemperatureMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.apparentTemperatureMin.p, fieldName: "apparentTemperatureMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.apparentTemperatureMean.p, fieldName: "apparentTemperatureMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.precipitationSum.p, fieldName: "precipitationSum", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.precipitationProbabilityMax.p, fieldName: "precipitationProbabilityMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.precipitationProbabilityMin.p, fieldName: "precipitationProbabilityMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.precipitationProbabilityMean.p, fieldName: "precipitationProbabilityMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.snowfallSum.p, fieldName: "snowfallSum", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.rainSum.p, fieldName: "rainSum", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.showersSum.p, fieldName: "showersSum", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.weathercode.p, fieldName: "weathercode", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.shortwaveRadiationSum.p, fieldName: "shortwaveRadiationSum", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windspeed10mMax.p, fieldName: "windspeed10mMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windspeed10mMin.p, fieldName: "windspeed10mMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windspeed10mMean.p, fieldName: "windspeed10mMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windgusts10mMax.p, fieldName: "windgusts10mMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windgusts10mMin.p, fieldName: "windgusts10mMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.windgusts10mMean.p, fieldName: "windgusts10mMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.winddirection10mDominant.p, fieldName: "winddirection10mDominant", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.precipitationHours.p, fieldName: "precipitationHours", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.sunrise.p, fieldName: "sunrise", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.sunset.p, fieldName: "sunset", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.et0FaoEvapotranspiration.p, fieldName: "et0FaoEvapotranspiration", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.visibilityMax.p, fieldName: "visibilityMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.visibilityMin.p, fieldName: "visibilityMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.visibilityMean.p, fieldName: "visibilityMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.pressureMslMax.p, fieldName: "pressureMslMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.pressureMslMin.p, fieldName: "pressureMslMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.pressureMslMean.p, fieldName: "pressureMslMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.surfacePressureMax.p, fieldName: "surfacePressureMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.surfacePressureMin.p, fieldName: "surfacePressureMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.surfacePressureMean.p, fieldName: "surfacePressureMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.capeMax.p, fieldName: "capeMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.capeMin.p, fieldName: "capeMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.capeMean.p, fieldName: "capeMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cloudcoverMax.p, fieldName: "cloudcoverMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cloudcoverMin.p, fieldName: "cloudcoverMin", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.cloudcoverMean.p, fieldName: "cloudcoverMean", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.uvIndexMax.p, fieldName: "uvIndexMax", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.uvIndexClearSkyMax.p, fieldName: "uvIndexClearSkyMax", required: false, type: com_openmeteo_SiUnit.self)
+    _v.finish()
+  }
+}
+
+public struct com_openmeteo_WeatherApi: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -2025,8 +4849,8 @@ public struct com_openmeteo_api_result_WeatherApi: FlatBufferObject, Verifiable 
     case timezone = 18
     case timezoneAbbreviation = 20
     case currentWeather = 22
-    case timeStart = 24
-    case daily = 26
+    case daily = 24
+    case dailyUnits = 26
     case hourly = 28
     case hourlyUnits = 30
     case sixHourly = 32
@@ -2040,7 +4864,7 @@ public struct com_openmeteo_api_result_WeatherApi: FlatBufferObject, Verifiable 
   public var latitude: Float32 { let o = _accessor.offset(VTOFFSET.latitude.v); return o == 0 ? 0.0 : _accessor.readBuffer(of: Float32.self, at: o) }
   public var longitude: Float32 { let o = _accessor.offset(VTOFFSET.longitude.v); return o == 0 ? 0.0 : _accessor.readBuffer(of: Float32.self, at: o) }
   public var elevation: Float32 { let o = _accessor.offset(VTOFFSET.elevation.v); return o == 0 ? 0.0 : _accessor.readBuffer(of: Float32.self, at: o) }
-  public var model: com_openmeteo_api_result_WeatherModel { let o = _accessor.offset(VTOFFSET.model.v); return o == 0 ? .undefined : com_openmeteo_api_result_WeatherModel(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var model: com_openmeteo_WeatherModel { let o = _accessor.offset(VTOFFSET.model.v); return o == 0 ? .undefined : com_openmeteo_WeatherModel(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
   public var ensembleMember: Int8 { let o = _accessor.offset(VTOFFSET.ensembleMember.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int8.self, at: o) }
   public var generationtimeMs: Float32 { let o = _accessor.offset(VTOFFSET.generationtimeMs.v); return o == 0 ? 0.0 : _accessor.readBuffer(of: Float32.self, at: o) }
   public var utcOffsetSeconds: Int32 { let o = _accessor.offset(VTOFFSET.utcOffsetSeconds.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
@@ -2048,29 +4872,29 @@ public struct com_openmeteo_api_result_WeatherApi: FlatBufferObject, Verifiable 
   public var timezoneSegmentArray: [UInt8]? { return _accessor.getVector(at: VTOFFSET.timezone.v) }
   public var timezoneAbbreviation: String? { let o = _accessor.offset(VTOFFSET.timezoneAbbreviation.v); return o == 0 ? nil : _accessor.string(at: o) }
   public var timezoneAbbreviationSegmentArray: [UInt8]? { return _accessor.getVector(at: VTOFFSET.timezoneAbbreviation.v) }
-  public var currentWeather: com_openmeteo_api_result_CurrentWeather? { let o = _accessor.offset(VTOFFSET.currentWeather.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_api_result_CurrentWeather.self, at: o) }
-  public var mutableCurrentWeather: com_openmeteo_api_result_CurrentWeather_Mutable? { let o = _accessor.offset(VTOFFSET.currentWeather.v); return o == 0 ? nil : com_openmeteo_api_result_CurrentWeather_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public var timeStart: Int64 { let o = _accessor.offset(VTOFFSET.timeStart.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int64.self, at: o) }
-  public var daily: com_openmeteo_api_result_WeatherDaily? { let o = _accessor.offset(VTOFFSET.daily.v); return o == 0 ? nil : com_openmeteo_api_result_WeatherDaily(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var hourly: com_openmeteo_api_result_WeatherHourly? { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? nil : com_openmeteo_api_result_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var hourlyUnits: com_openmeteo_api_result_WeatherHourlyUnit? { let o = _accessor.offset(VTOFFSET.hourlyUnits.v); return o == 0 ? nil : com_openmeteo_api_result_WeatherHourlyUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var sixHourly: com_openmeteo_api_result_WeatherHourly? { let o = _accessor.offset(VTOFFSET.sixHourly.v); return o == 0 ? nil : com_openmeteo_api_result_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var sixHourlyUnits: com_openmeteo_api_result_WeatherHourly? { let o = _accessor.offset(VTOFFSET.sixHourlyUnits.v); return o == 0 ? nil : com_openmeteo_api_result_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var minutely15: com_openmeteo_api_result_WeatherHourly? { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? nil : com_openmeteo_api_result_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var minutely15Units: com_openmeteo_api_result_WeatherHourly? { let o = _accessor.offset(VTOFFSET.minutely15Units.v); return o == 0 ? nil : com_openmeteo_api_result_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var currentWeather: com_openmeteo_CurrentWeather? { let o = _accessor.offset(VTOFFSET.currentWeather.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_CurrentWeather.self, at: o) }
+  public var mutableCurrentWeather: com_openmeteo_CurrentWeather_Mutable? { let o = _accessor.offset(VTOFFSET.currentWeather.v); return o == 0 ? nil : com_openmeteo_CurrentWeather_Mutable(_accessor.bb, o: o + _accessor.postion) }
+  public var daily: com_openmeteo_WeatherDaily? { let o = _accessor.offset(VTOFFSET.daily.v); return o == 0 ? nil : com_openmeteo_WeatherDaily(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var dailyUnits: com_openmeteo_WeatherDailyUnits? { let o = _accessor.offset(VTOFFSET.dailyUnits.v); return o == 0 ? nil : com_openmeteo_WeatherDailyUnits(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var hourly: com_openmeteo_WeatherHourly? { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? nil : com_openmeteo_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var hourlyUnits: com_openmeteo_WeatherHourlyUnits? { let o = _accessor.offset(VTOFFSET.hourlyUnits.v); return o == 0 ? nil : com_openmeteo_WeatherHourlyUnits(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var sixHourly: com_openmeteo_WeatherHourly? { let o = _accessor.offset(VTOFFSET.sixHourly.v); return o == 0 ? nil : com_openmeteo_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var sixHourlyUnits: com_openmeteo_WeatherHourlyUnits? { let o = _accessor.offset(VTOFFSET.sixHourlyUnits.v); return o == 0 ? nil : com_openmeteo_WeatherHourlyUnits(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var minutely15: com_openmeteo_WeatherHourly? { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? nil : com_openmeteo_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var minutely15Units: com_openmeteo_WeatherHourlyUnits? { let o = _accessor.offset(VTOFFSET.minutely15Units.v); return o == 0 ? nil : com_openmeteo_WeatherHourlyUnits(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public static func startWeatherApi(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 18) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
-  public static func add(model: com_openmeteo_api_result_WeatherModel, _ fbb: inout FlatBufferBuilder) { fbb.add(element: model.rawValue, def: 0, at: VTOFFSET.model.p) }
+  public static func add(model: com_openmeteo_WeatherModel, _ fbb: inout FlatBufferBuilder) { fbb.add(element: model.rawValue, def: 0, at: VTOFFSET.model.p) }
   public static func add(ensembleMember: Int8, _ fbb: inout FlatBufferBuilder) { fbb.add(element: ensembleMember, def: 0, at: VTOFFSET.ensembleMember.p) }
   public static func add(generationtimeMs: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: generationtimeMs, def: 0.0, at: VTOFFSET.generationtimeMs.p) }
   public static func add(utcOffsetSeconds: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: utcOffsetSeconds, def: 0, at: VTOFFSET.utcOffsetSeconds.p) }
   public static func add(timezone: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezone, at: VTOFFSET.timezone.p) }
   public static func add(timezoneAbbreviation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezoneAbbreviation, at: VTOFFSET.timezoneAbbreviation.p) }
-  public static func add(currentWeather: com_openmeteo_api_result_CurrentWeather?, _ fbb: inout FlatBufferBuilder) { guard let currentWeather = currentWeather else { return }; fbb.create(struct: currentWeather, position: VTOFFSET.currentWeather.p) }
-  public static func add(timeStart: Int64, _ fbb: inout FlatBufferBuilder) { fbb.add(element: timeStart, def: 0, at: VTOFFSET.timeStart.p) }
+  public static func add(currentWeather: com_openmeteo_CurrentWeather?, _ fbb: inout FlatBufferBuilder) { guard let currentWeather = currentWeather else { return }; fbb.create(struct: currentWeather, position: VTOFFSET.currentWeather.p) }
   public static func add(daily: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: daily, at: VTOFFSET.daily.p) }
+  public static func add(dailyUnits: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dailyUnits, at: VTOFFSET.dailyUnits.p) }
   public static func add(hourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourly, at: VTOFFSET.hourly.p) }
   public static func add(hourlyUnits: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourlyUnits, at: VTOFFSET.hourlyUnits.p) }
   public static func add(sixHourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sixHourly, at: VTOFFSET.sixHourly.p) }
@@ -2083,15 +4907,15 @@ public struct com_openmeteo_api_result_WeatherApi: FlatBufferObject, Verifiable 
     latitude: Float32 = 0.0,
     longitude: Float32 = 0.0,
     elevation: Float32 = 0.0,
-    model: com_openmeteo_api_result_WeatherModel = .undefined,
+    model: com_openmeteo_WeatherModel = .undefined,
     ensembleMember: Int8 = 0,
     generationtimeMs: Float32 = 0.0,
     utcOffsetSeconds: Int32 = 0,
     timezoneOffset timezone: Offset = Offset(),
     timezoneAbbreviationOffset timezoneAbbreviation: Offset = Offset(),
-    currentWeather: com_openmeteo_api_result_CurrentWeather? = nil,
-    timeStart: Int64 = 0,
+    currentWeather: com_openmeteo_CurrentWeather? = nil,
     dailyOffset daily: Offset = Offset(),
+    dailyUnitsOffset dailyUnits: Offset = Offset(),
     hourlyOffset hourly: Offset = Offset(),
     hourlyUnitsOffset hourlyUnits: Offset = Offset(),
     sixHourlyOffset sixHourly: Offset = Offset(),
@@ -2099,26 +4923,26 @@ public struct com_openmeteo_api_result_WeatherApi: FlatBufferObject, Verifiable 
     minutely15Offset minutely15: Offset = Offset(),
     minutely15UnitsOffset minutely15Units: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_api_result_WeatherApi.startWeatherApi(&fbb)
-    com_openmeteo_api_result_WeatherApi.add(latitude: latitude, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(longitude: longitude, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(elevation: elevation, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(model: model, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(ensembleMember: ensembleMember, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(generationtimeMs: generationtimeMs, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(timezone: timezone, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(currentWeather: currentWeather, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(timeStart: timeStart, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(daily: daily, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(hourly: hourly, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(hourlyUnits: hourlyUnits, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(sixHourly: sixHourly, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(sixHourlyUnits: sixHourlyUnits, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(minutely15: minutely15, &fbb)
-    com_openmeteo_api_result_WeatherApi.add(minutely15Units: minutely15Units, &fbb)
-    return com_openmeteo_api_result_WeatherApi.endWeatherApi(&fbb, start: __start)
+    let __start = com_openmeteo_WeatherApi.startWeatherApi(&fbb)
+    com_openmeteo_WeatherApi.add(latitude: latitude, &fbb)
+    com_openmeteo_WeatherApi.add(longitude: longitude, &fbb)
+    com_openmeteo_WeatherApi.add(elevation: elevation, &fbb)
+    com_openmeteo_WeatherApi.add(model: model, &fbb)
+    com_openmeteo_WeatherApi.add(ensembleMember: ensembleMember, &fbb)
+    com_openmeteo_WeatherApi.add(generationtimeMs: generationtimeMs, &fbb)
+    com_openmeteo_WeatherApi.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
+    com_openmeteo_WeatherApi.add(timezone: timezone, &fbb)
+    com_openmeteo_WeatherApi.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
+    com_openmeteo_WeatherApi.add(currentWeather: currentWeather, &fbb)
+    com_openmeteo_WeatherApi.add(daily: daily, &fbb)
+    com_openmeteo_WeatherApi.add(dailyUnits: dailyUnits, &fbb)
+    com_openmeteo_WeatherApi.add(hourly: hourly, &fbb)
+    com_openmeteo_WeatherApi.add(hourlyUnits: hourlyUnits, &fbb)
+    com_openmeteo_WeatherApi.add(sixHourly: sixHourly, &fbb)
+    com_openmeteo_WeatherApi.add(sixHourlyUnits: sixHourlyUnits, &fbb)
+    com_openmeteo_WeatherApi.add(minutely15: minutely15, &fbb)
+    com_openmeteo_WeatherApi.add(minutely15Units: minutely15Units, &fbb)
+    return com_openmeteo_WeatherApi.endWeatherApi(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
@@ -2126,21 +4950,21 @@ public struct com_openmeteo_api_result_WeatherApi: FlatBufferObject, Verifiable 
     try _v.visit(field: VTOFFSET.latitude.p, fieldName: "latitude", required: false, type: Float32.self)
     try _v.visit(field: VTOFFSET.longitude.p, fieldName: "longitude", required: false, type: Float32.self)
     try _v.visit(field: VTOFFSET.elevation.p, fieldName: "elevation", required: false, type: Float32.self)
-    try _v.visit(field: VTOFFSET.model.p, fieldName: "model", required: false, type: com_openmeteo_api_result_WeatherModel.self)
+    try _v.visit(field: VTOFFSET.model.p, fieldName: "model", required: false, type: com_openmeteo_WeatherModel.self)
     try _v.visit(field: VTOFFSET.ensembleMember.p, fieldName: "ensembleMember", required: false, type: Int8.self)
     try _v.visit(field: VTOFFSET.generationtimeMs.p, fieldName: "generationtimeMs", required: false, type: Float32.self)
     try _v.visit(field: VTOFFSET.utcOffsetSeconds.p, fieldName: "utcOffsetSeconds", required: false, type: Int32.self)
     try _v.visit(field: VTOFFSET.timezone.p, fieldName: "timezone", required: false, type: ForwardOffset<String>.self)
     try _v.visit(field: VTOFFSET.timezoneAbbreviation.p, fieldName: "timezoneAbbreviation", required: false, type: ForwardOffset<String>.self)
-    try _v.visit(field: VTOFFSET.currentWeather.p, fieldName: "currentWeather", required: false, type: com_openmeteo_api_result_CurrentWeather.self)
-    try _v.visit(field: VTOFFSET.timeStart.p, fieldName: "timeStart", required: false, type: Int64.self)
-    try _v.visit(field: VTOFFSET.daily.p, fieldName: "daily", required: false, type: ForwardOffset<com_openmeteo_api_result_WeatherDaily>.self)
-    try _v.visit(field: VTOFFSET.hourly.p, fieldName: "hourly", required: false, type: ForwardOffset<com_openmeteo_api_result_WeatherHourly>.self)
-    try _v.visit(field: VTOFFSET.hourlyUnits.p, fieldName: "hourlyUnits", required: false, type: ForwardOffset<com_openmeteo_api_result_WeatherHourlyUnit>.self)
-    try _v.visit(field: VTOFFSET.sixHourly.p, fieldName: "sixHourly", required: false, type: ForwardOffset<com_openmeteo_api_result_WeatherHourly>.self)
-    try _v.visit(field: VTOFFSET.sixHourlyUnits.p, fieldName: "sixHourlyUnits", required: false, type: ForwardOffset<com_openmeteo_api_result_WeatherHourly>.self)
-    try _v.visit(field: VTOFFSET.minutely15.p, fieldName: "minutely15", required: false, type: ForwardOffset<com_openmeteo_api_result_WeatherHourly>.self)
-    try _v.visit(field: VTOFFSET.minutely15Units.p, fieldName: "minutely15Units", required: false, type: ForwardOffset<com_openmeteo_api_result_WeatherHourly>.self)
+    try _v.visit(field: VTOFFSET.currentWeather.p, fieldName: "currentWeather", required: false, type: com_openmeteo_CurrentWeather.self)
+    try _v.visit(field: VTOFFSET.daily.p, fieldName: "daily", required: false, type: ForwardOffset<com_openmeteo_WeatherDaily>.self)
+    try _v.visit(field: VTOFFSET.dailyUnits.p, fieldName: "dailyUnits", required: false, type: ForwardOffset<com_openmeteo_WeatherDailyUnits>.self)
+    try _v.visit(field: VTOFFSET.hourly.p, fieldName: "hourly", required: false, type: ForwardOffset<com_openmeteo_WeatherHourly>.self)
+    try _v.visit(field: VTOFFSET.hourlyUnits.p, fieldName: "hourlyUnits", required: false, type: ForwardOffset<com_openmeteo_WeatherHourlyUnits>.self)
+    try _v.visit(field: VTOFFSET.sixHourly.p, fieldName: "sixHourly", required: false, type: ForwardOffset<com_openmeteo_WeatherHourly>.self)
+    try _v.visit(field: VTOFFSET.sixHourlyUnits.p, fieldName: "sixHourlyUnits", required: false, type: ForwardOffset<com_openmeteo_WeatherHourlyUnits>.self)
+    try _v.visit(field: VTOFFSET.minutely15.p, fieldName: "minutely15", required: false, type: ForwardOffset<com_openmeteo_WeatherHourly>.self)
+    try _v.visit(field: VTOFFSET.minutely15Units.p, fieldName: "minutely15Units", required: false, type: ForwardOffset<com_openmeteo_WeatherHourlyUnits>.self)
     _v.finish()
   }
 }

@@ -3,7 +3,7 @@
 
 include "units.fbs";
 
-namespace com.openmeteo.AirQuality_api;
+namespace com.openmeteo;
 
 
 enum AirQualityModel: byte {
@@ -13,6 +13,7 @@ enum AirQualityModel: byte {
 }
 
 table AirQualityHourly {
+  time: TimeRange;
   pm10: [float];
   pm2_5: [float];
   dust: [float];
@@ -88,7 +89,7 @@ table AirQualityApiResponse {
   utc_offset_seconds: int32;
   timezone: string;
   timezone_abbreviation: string;
-  time_start: int64;
+  time: TimeRange;
   //daily: AirQualityDaily;
   //daily_units: AirQualityDailyUnits;
   hourly: AirQualityHourly;
