@@ -62,472 +62,173 @@ public struct com_openmeteo_AirQualityHourly: FlatBufferObject, Verifiable {
     var p: VOffset { self.rawValue }
   }
 
-  public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
-  public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public var hasPm10: Bool { let o = _accessor.offset(VTOFFSET.pm10.v); return o == 0 ? false : true }
-  public var pm10Count: Int32 { let o = _accessor.offset(VTOFFSET.pm10.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func pm10(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.pm10.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var pm10: [Float32] { return _accessor.getVector(at: VTOFFSET.pm10.v) ?? [] }
-  public var hasPm25: Bool { let o = _accessor.offset(VTOFFSET.pm25.v); return o == 0 ? false : true }
-  public var pm25Count: Int32 { let o = _accessor.offset(VTOFFSET.pm25.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func pm25(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.pm25.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var pm25: [Float32] { return _accessor.getVector(at: VTOFFSET.pm25.v) ?? [] }
-  public var hasDust: Bool { let o = _accessor.offset(VTOFFSET.dust.v); return o == 0 ? false : true }
-  public var dustCount: Int32 { let o = _accessor.offset(VTOFFSET.dust.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func dust(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.dust.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var dust: [Float32] { return _accessor.getVector(at: VTOFFSET.dust.v) ?? [] }
-  public var hasAerosolOpticalDepth: Bool { let o = _accessor.offset(VTOFFSET.aerosolOpticalDepth.v); return o == 0 ? false : true }
-  public var aerosolOpticalDepthCount: Int32 { let o = _accessor.offset(VTOFFSET.aerosolOpticalDepth.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func aerosolOpticalDepth(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.aerosolOpticalDepth.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var aerosolOpticalDepth: [Float32] { return _accessor.getVector(at: VTOFFSET.aerosolOpticalDepth.v) ?? [] }
-  public var hasCarbonMonoxide: Bool { let o = _accessor.offset(VTOFFSET.carbonMonoxide.v); return o == 0 ? false : true }
-  public var carbonMonoxideCount: Int32 { let o = _accessor.offset(VTOFFSET.carbonMonoxide.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func carbonMonoxide(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.carbonMonoxide.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var carbonMonoxide: [Float32] { return _accessor.getVector(at: VTOFFSET.carbonMonoxide.v) ?? [] }
-  public var hasNitrogenDioxide: Bool { let o = _accessor.offset(VTOFFSET.nitrogenDioxide.v); return o == 0 ? false : true }
-  public var nitrogenDioxideCount: Int32 { let o = _accessor.offset(VTOFFSET.nitrogenDioxide.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func nitrogenDioxide(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.nitrogenDioxide.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var nitrogenDioxide: [Float32] { return _accessor.getVector(at: VTOFFSET.nitrogenDioxide.v) ?? [] }
-  public var hasAmmonia: Bool { let o = _accessor.offset(VTOFFSET.ammonia.v); return o == 0 ? false : true }
-  public var ammoniaCount: Int32 { let o = _accessor.offset(VTOFFSET.ammonia.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func ammonia(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.ammonia.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var ammonia: [Float32] { return _accessor.getVector(at: VTOFFSET.ammonia.v) ?? [] }
-  public var hasOzone: Bool { let o = _accessor.offset(VTOFFSET.ozone.v); return o == 0 ? false : true }
-  public var ozoneCount: Int32 { let o = _accessor.offset(VTOFFSET.ozone.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func ozone(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.ozone.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var ozone: [Float32] { return _accessor.getVector(at: VTOFFSET.ozone.v) ?? [] }
-  public var hasSulphurDioxide: Bool { let o = _accessor.offset(VTOFFSET.sulphurDioxide.v); return o == 0 ? false : true }
-  public var sulphurDioxideCount: Int32 { let o = _accessor.offset(VTOFFSET.sulphurDioxide.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func sulphurDioxide(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.sulphurDioxide.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var sulphurDioxide: [Float32] { return _accessor.getVector(at: VTOFFSET.sulphurDioxide.v) ?? [] }
-  public var hasUvIndex: Bool { let o = _accessor.offset(VTOFFSET.uvIndex.v); return o == 0 ? false : true }
-  public var uvIndexCount: Int32 { let o = _accessor.offset(VTOFFSET.uvIndex.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func uvIndex(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.uvIndex.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var uvIndex: [Float32] { return _accessor.getVector(at: VTOFFSET.uvIndex.v) ?? [] }
-  public var hasUvIndexClearSky: Bool { let o = _accessor.offset(VTOFFSET.uvIndexClearSky.v); return o == 0 ? false : true }
-  public var uvIndexClearSkyCount: Int32 { let o = _accessor.offset(VTOFFSET.uvIndexClearSky.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func uvIndexClearSky(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.uvIndexClearSky.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var uvIndexClearSky: [Float32] { return _accessor.getVector(at: VTOFFSET.uvIndexClearSky.v) ?? [] }
-  public var hasAlderPollen: Bool { let o = _accessor.offset(VTOFFSET.alderPollen.v); return o == 0 ? false : true }
-  public var alderPollenCount: Int32 { let o = _accessor.offset(VTOFFSET.alderPollen.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func alderPollen(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.alderPollen.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var alderPollen: [Float32] { return _accessor.getVector(at: VTOFFSET.alderPollen.v) ?? [] }
-  public var hasBirchPollen: Bool { let o = _accessor.offset(VTOFFSET.birchPollen.v); return o == 0 ? false : true }
-  public var birchPollenCount: Int32 { let o = _accessor.offset(VTOFFSET.birchPollen.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func birchPollen(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.birchPollen.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var birchPollen: [Float32] { return _accessor.getVector(at: VTOFFSET.birchPollen.v) ?? [] }
-  public var hasGrassPollen: Bool { let o = _accessor.offset(VTOFFSET.grassPollen.v); return o == 0 ? false : true }
-  public var grassPollenCount: Int32 { let o = _accessor.offset(VTOFFSET.grassPollen.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func grassPollen(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.grassPollen.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var grassPollen: [Float32] { return _accessor.getVector(at: VTOFFSET.grassPollen.v) ?? [] }
-  public var hasMugwortPollen: Bool { let o = _accessor.offset(VTOFFSET.mugwortPollen.v); return o == 0 ? false : true }
-  public var mugwortPollenCount: Int32 { let o = _accessor.offset(VTOFFSET.mugwortPollen.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func mugwortPollen(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.mugwortPollen.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var mugwortPollen: [Float32] { return _accessor.getVector(at: VTOFFSET.mugwortPollen.v) ?? [] }
-  public var hasOlivePollen: Bool { let o = _accessor.offset(VTOFFSET.olivePollen.v); return o == 0 ? false : true }
-  public var olivePollenCount: Int32 { let o = _accessor.offset(VTOFFSET.olivePollen.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func olivePollen(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.olivePollen.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var olivePollen: [Float32] { return _accessor.getVector(at: VTOFFSET.olivePollen.v) ?? [] }
-  public var hasRagweedPollen: Bool { let o = _accessor.offset(VTOFFSET.ragweedPollen.v); return o == 0 ? false : true }
-  public var ragweedPollenCount: Int32 { let o = _accessor.offset(VTOFFSET.ragweedPollen.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func ragweedPollen(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.ragweedPollen.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var ragweedPollen: [Float32] { return _accessor.getVector(at: VTOFFSET.ragweedPollen.v) ?? [] }
-  public var hasEuropeanAqi: Bool { let o = _accessor.offset(VTOFFSET.europeanAqi.v); return o == 0 ? false : true }
-  public var europeanAqiCount: Int32 { let o = _accessor.offset(VTOFFSET.europeanAqi.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func europeanAqi(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.europeanAqi.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var europeanAqi: [Float32] { return _accessor.getVector(at: VTOFFSET.europeanAqi.v) ?? [] }
-  public var hasEuropeanAqiPm25: Bool { let o = _accessor.offset(VTOFFSET.europeanAqiPm25.v); return o == 0 ? false : true }
-  public var europeanAqiPm25Count: Int32 { let o = _accessor.offset(VTOFFSET.europeanAqiPm25.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func europeanAqiPm25(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.europeanAqiPm25.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var europeanAqiPm25: [Float32] { return _accessor.getVector(at: VTOFFSET.europeanAqiPm25.v) ?? [] }
-  public var hasEuropeanAqiPm10: Bool { let o = _accessor.offset(VTOFFSET.europeanAqiPm10.v); return o == 0 ? false : true }
-  public var europeanAqiPm10Count: Int32 { let o = _accessor.offset(VTOFFSET.europeanAqiPm10.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func europeanAqiPm10(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.europeanAqiPm10.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var europeanAqiPm10: [Float32] { return _accessor.getVector(at: VTOFFSET.europeanAqiPm10.v) ?? [] }
-  public var hasEuropeanAqiNo2: Bool { let o = _accessor.offset(VTOFFSET.europeanAqiNo2.v); return o == 0 ? false : true }
-  public var europeanAqiNo2Count: Int32 { let o = _accessor.offset(VTOFFSET.europeanAqiNo2.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func europeanAqiNo2(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.europeanAqiNo2.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var europeanAqiNo2: [Float32] { return _accessor.getVector(at: VTOFFSET.europeanAqiNo2.v) ?? [] }
-  public var hasEuropeanAqiO3: Bool { let o = _accessor.offset(VTOFFSET.europeanAqiO3.v); return o == 0 ? false : true }
-  public var europeanAqiO3Count: Int32 { let o = _accessor.offset(VTOFFSET.europeanAqiO3.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func europeanAqiO3(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.europeanAqiO3.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var europeanAqiO3: [Float32] { return _accessor.getVector(at: VTOFFSET.europeanAqiO3.v) ?? [] }
-  public var hasEuropeanAqiSo2: Bool { let o = _accessor.offset(VTOFFSET.europeanAqiSo2.v); return o == 0 ? false : true }
-  public var europeanAqiSo2Count: Int32 { let o = _accessor.offset(VTOFFSET.europeanAqiSo2.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func europeanAqiSo2(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.europeanAqiSo2.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var europeanAqiSo2: [Float32] { return _accessor.getVector(at: VTOFFSET.europeanAqiSo2.v) ?? [] }
-  public var hasUsAqi: Bool { let o = _accessor.offset(VTOFFSET.usAqi.v); return o == 0 ? false : true }
-  public var usAqiCount: Int32 { let o = _accessor.offset(VTOFFSET.usAqi.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func usAqi(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.usAqi.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var usAqi: [Float32] { return _accessor.getVector(at: VTOFFSET.usAqi.v) ?? [] }
-  public var hasUsAqiPm25: Bool { let o = _accessor.offset(VTOFFSET.usAqiPm25.v); return o == 0 ? false : true }
-  public var usAqiPm25Count: Int32 { let o = _accessor.offset(VTOFFSET.usAqiPm25.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func usAqiPm25(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.usAqiPm25.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var usAqiPm25: [Float32] { return _accessor.getVector(at: VTOFFSET.usAqiPm25.v) ?? [] }
-  public var hasUsAqiPm10: Bool { let o = _accessor.offset(VTOFFSET.usAqiPm10.v); return o == 0 ? false : true }
-  public var usAqiPm10Count: Int32 { let o = _accessor.offset(VTOFFSET.usAqiPm10.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func usAqiPm10(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.usAqiPm10.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var usAqiPm10: [Float32] { return _accessor.getVector(at: VTOFFSET.usAqiPm10.v) ?? [] }
-  public var hasUsAqiNo2: Bool { let o = _accessor.offset(VTOFFSET.usAqiNo2.v); return o == 0 ? false : true }
-  public var usAqiNo2Count: Int32 { let o = _accessor.offset(VTOFFSET.usAqiNo2.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func usAqiNo2(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.usAqiNo2.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var usAqiNo2: [Float32] { return _accessor.getVector(at: VTOFFSET.usAqiNo2.v) ?? [] }
-  public var hasUsAqiO3: Bool { let o = _accessor.offset(VTOFFSET.usAqiO3.v); return o == 0 ? false : true }
-  public var usAqiO3Count: Int32 { let o = _accessor.offset(VTOFFSET.usAqiO3.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func usAqiO3(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.usAqiO3.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var usAqiO3: [Float32] { return _accessor.getVector(at: VTOFFSET.usAqiO3.v) ?? [] }
-  public var hasUsAqiSo2: Bool { let o = _accessor.offset(VTOFFSET.usAqiSo2.v); return o == 0 ? false : true }
-  public var usAqiSo2Count: Int32 { let o = _accessor.offset(VTOFFSET.usAqiSo2.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func usAqiSo2(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.usAqiSo2.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var usAqiSo2: [Float32] { return _accessor.getVector(at: VTOFFSET.usAqiSo2.v) ?? [] }
-  public var hasUsAqiCo: Bool { let o = _accessor.offset(VTOFFSET.usAqiCo.v); return o == 0 ? false : true }
-  public var usAqiCoCount: Int32 { let o = _accessor.offset(VTOFFSET.usAqiCo.v); return o == 0 ? 0 : _accessor.vector(count: o) }
-  public func usAqiCo(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.usAqiCo.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
-  public var usAqiCo: [Float32] { return _accessor.getVector(at: VTOFFSET.usAqiCo.v) ?? [] }
+  public var time: com_openmeteo_TimeRange! { let o = _accessor.offset(VTOFFSET.time.v); return _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
+  public var mutableTime: com_openmeteo_TimeRange_Mutable! { let o = _accessor.offset(VTOFFSET.time.v); return com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
+  public var pm10: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pm10.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var pm25: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pm25.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var dust: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.dust.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var aerosolOpticalDepth: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.aerosolOpticalDepth.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var carbonMonoxide: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.carbonMonoxide.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var nitrogenDioxide: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.nitrogenDioxide.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var ammonia: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.ammonia.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var ozone: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.ozone.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var sulphurDioxide: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.sulphurDioxide.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var uvIndex: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.uvIndex.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var uvIndexClearSky: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.uvIndexClearSky.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var alderPollen: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.alderPollen.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var birchPollen: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.birchPollen.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var grassPollen: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.grassPollen.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var mugwortPollen: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.mugwortPollen.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var olivePollen: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.olivePollen.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var ragweedPollen: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.ragweedPollen.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var europeanAqi: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.europeanAqi.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var europeanAqiPm25: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.europeanAqiPm25.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var europeanAqiPm10: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.europeanAqiPm10.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var europeanAqiNo2: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.europeanAqiNo2.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var europeanAqiO3: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.europeanAqiO3.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var europeanAqiSo2: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.europeanAqiSo2.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var usAqi: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.usAqi.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var usAqiPm25: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.usAqiPm25.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var usAqiPm10: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.usAqiPm10.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var usAqiNo2: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.usAqiNo2.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var usAqiO3: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.usAqiO3.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var usAqiSo2: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.usAqiSo2.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var usAqiCo: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.usAqiCo.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public static func startAirQualityHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 31) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
-  public static func addVectorOf(pm10: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pm10, at: VTOFFSET.pm10.p) }
-  public static func addVectorOf(pm25: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pm25, at: VTOFFSET.pm25.p) }
-  public static func addVectorOf(dust: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dust, at: VTOFFSET.dust.p) }
-  public static func addVectorOf(aerosolOpticalDepth: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: aerosolOpticalDepth, at: VTOFFSET.aerosolOpticalDepth.p) }
-  public static func addVectorOf(carbonMonoxide: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: carbonMonoxide, at: VTOFFSET.carbonMonoxide.p) }
-  public static func addVectorOf(nitrogenDioxide: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: nitrogenDioxide, at: VTOFFSET.nitrogenDioxide.p) }
-  public static func addVectorOf(ammonia: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: ammonia, at: VTOFFSET.ammonia.p) }
-  public static func addVectorOf(ozone: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: ozone, at: VTOFFSET.ozone.p) }
-  public static func addVectorOf(sulphurDioxide: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sulphurDioxide, at: VTOFFSET.sulphurDioxide.p) }
-  public static func addVectorOf(uvIndex: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndex, at: VTOFFSET.uvIndex.p) }
-  public static func addVectorOf(uvIndexClearSky: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndexClearSky, at: VTOFFSET.uvIndexClearSky.p) }
-  public static func addVectorOf(alderPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: alderPollen, at: VTOFFSET.alderPollen.p) }
-  public static func addVectorOf(birchPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: birchPollen, at: VTOFFSET.birchPollen.p) }
-  public static func addVectorOf(grassPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: grassPollen, at: VTOFFSET.grassPollen.p) }
-  public static func addVectorOf(mugwortPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: mugwortPollen, at: VTOFFSET.mugwortPollen.p) }
-  public static func addVectorOf(olivePollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: olivePollen, at: VTOFFSET.olivePollen.p) }
-  public static func addVectorOf(ragweedPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: ragweedPollen, at: VTOFFSET.ragweedPollen.p) }
-  public static func addVectorOf(europeanAqi: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqi, at: VTOFFSET.europeanAqi.p) }
-  public static func addVectorOf(europeanAqiPm25: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiPm25, at: VTOFFSET.europeanAqiPm25.p) }
-  public static func addVectorOf(europeanAqiPm10: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiPm10, at: VTOFFSET.europeanAqiPm10.p) }
-  public static func addVectorOf(europeanAqiNo2: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiNo2, at: VTOFFSET.europeanAqiNo2.p) }
-  public static func addVectorOf(europeanAqiO3: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiO3, at: VTOFFSET.europeanAqiO3.p) }
-  public static func addVectorOf(europeanAqiSo2: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiSo2, at: VTOFFSET.europeanAqiSo2.p) }
-  public static func addVectorOf(usAqi: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqi, at: VTOFFSET.usAqi.p) }
-  public static func addVectorOf(usAqiPm25: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiPm25, at: VTOFFSET.usAqiPm25.p) }
-  public static func addVectorOf(usAqiPm10: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiPm10, at: VTOFFSET.usAqiPm10.p) }
-  public static func addVectorOf(usAqiNo2: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiNo2, at: VTOFFSET.usAqiNo2.p) }
-  public static func addVectorOf(usAqiO3: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiO3, at: VTOFFSET.usAqiO3.p) }
-  public static func addVectorOf(usAqiSo2: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiSo2, at: VTOFFSET.usAqiSo2.p) }
-  public static func addVectorOf(usAqiCo: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiCo, at: VTOFFSET.usAqiCo.p) }
-  public static func endAirQualityHourly(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func add(pm10: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pm10, at: VTOFFSET.pm10.p) }
+  public static func add(pm25: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pm25, at: VTOFFSET.pm25.p) }
+  public static func add(dust: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dust, at: VTOFFSET.dust.p) }
+  public static func add(aerosolOpticalDepth: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: aerosolOpticalDepth, at: VTOFFSET.aerosolOpticalDepth.p) }
+  public static func add(carbonMonoxide: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: carbonMonoxide, at: VTOFFSET.carbonMonoxide.p) }
+  public static func add(nitrogenDioxide: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: nitrogenDioxide, at: VTOFFSET.nitrogenDioxide.p) }
+  public static func add(ammonia: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: ammonia, at: VTOFFSET.ammonia.p) }
+  public static func add(ozone: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: ozone, at: VTOFFSET.ozone.p) }
+  public static func add(sulphurDioxide: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sulphurDioxide, at: VTOFFSET.sulphurDioxide.p) }
+  public static func add(uvIndex: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndex, at: VTOFFSET.uvIndex.p) }
+  public static func add(uvIndexClearSky: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndexClearSky, at: VTOFFSET.uvIndexClearSky.p) }
+  public static func add(alderPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: alderPollen, at: VTOFFSET.alderPollen.p) }
+  public static func add(birchPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: birchPollen, at: VTOFFSET.birchPollen.p) }
+  public static func add(grassPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: grassPollen, at: VTOFFSET.grassPollen.p) }
+  public static func add(mugwortPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: mugwortPollen, at: VTOFFSET.mugwortPollen.p) }
+  public static func add(olivePollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: olivePollen, at: VTOFFSET.olivePollen.p) }
+  public static func add(ragweedPollen: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: ragweedPollen, at: VTOFFSET.ragweedPollen.p) }
+  public static func add(europeanAqi: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqi, at: VTOFFSET.europeanAqi.p) }
+  public static func add(europeanAqiPm25: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiPm25, at: VTOFFSET.europeanAqiPm25.p) }
+  public static func add(europeanAqiPm10: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiPm10, at: VTOFFSET.europeanAqiPm10.p) }
+  public static func add(europeanAqiNo2: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiNo2, at: VTOFFSET.europeanAqiNo2.p) }
+  public static func add(europeanAqiO3: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiO3, at: VTOFFSET.europeanAqiO3.p) }
+  public static func add(europeanAqiSo2: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: europeanAqiSo2, at: VTOFFSET.europeanAqiSo2.p) }
+  public static func add(usAqi: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqi, at: VTOFFSET.usAqi.p) }
+  public static func add(usAqiPm25: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiPm25, at: VTOFFSET.usAqiPm25.p) }
+  public static func add(usAqiPm10: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiPm10, at: VTOFFSET.usAqiPm10.p) }
+  public static func add(usAqiNo2: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiNo2, at: VTOFFSET.usAqiNo2.p) }
+  public static func add(usAqiO3: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiO3, at: VTOFFSET.usAqiO3.p) }
+  public static func add(usAqiSo2: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiSo2, at: VTOFFSET.usAqiSo2.p) }
+  public static func add(usAqiCo: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: usAqiCo, at: VTOFFSET.usAqiCo.p) }
+  public static func endAirQualityHourly(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
   public static func createAirQualityHourly(
     _ fbb: inout FlatBufferBuilder,
-    time: com_openmeteo_TimeRange? = nil,
-    pm10VectorOffset pm10: Offset = Offset(),
-    pm25VectorOffset pm25: Offset = Offset(),
-    dustVectorOffset dust: Offset = Offset(),
-    aerosolOpticalDepthVectorOffset aerosolOpticalDepth: Offset = Offset(),
-    carbonMonoxideVectorOffset carbonMonoxide: Offset = Offset(),
-    nitrogenDioxideVectorOffset nitrogenDioxide: Offset = Offset(),
-    ammoniaVectorOffset ammonia: Offset = Offset(),
-    ozoneVectorOffset ozone: Offset = Offset(),
-    sulphurDioxideVectorOffset sulphurDioxide: Offset = Offset(),
-    uvIndexVectorOffset uvIndex: Offset = Offset(),
-    uvIndexClearSkyVectorOffset uvIndexClearSky: Offset = Offset(),
-    alderPollenVectorOffset alderPollen: Offset = Offset(),
-    birchPollenVectorOffset birchPollen: Offset = Offset(),
-    grassPollenVectorOffset grassPollen: Offset = Offset(),
-    mugwortPollenVectorOffset mugwortPollen: Offset = Offset(),
-    olivePollenVectorOffset olivePollen: Offset = Offset(),
-    ragweedPollenVectorOffset ragweedPollen: Offset = Offset(),
-    europeanAqiVectorOffset europeanAqi: Offset = Offset(),
-    europeanAqiPm25VectorOffset europeanAqiPm25: Offset = Offset(),
-    europeanAqiPm10VectorOffset europeanAqiPm10: Offset = Offset(),
-    europeanAqiNo2VectorOffset europeanAqiNo2: Offset = Offset(),
-    europeanAqiO3VectorOffset europeanAqiO3: Offset = Offset(),
-    europeanAqiSo2VectorOffset europeanAqiSo2: Offset = Offset(),
-    usAqiVectorOffset usAqi: Offset = Offset(),
-    usAqiPm25VectorOffset usAqiPm25: Offset = Offset(),
-    usAqiPm10VectorOffset usAqiPm10: Offset = Offset(),
-    usAqiNo2VectorOffset usAqiNo2: Offset = Offset(),
-    usAqiO3VectorOffset usAqiO3: Offset = Offset(),
-    usAqiSo2VectorOffset usAqiSo2: Offset = Offset(),
-    usAqiCoVectorOffset usAqiCo: Offset = Offset()
+    time: com_openmeteo_TimeRange,
+    pm10Offset pm10: Offset = Offset(),
+    pm25Offset pm25: Offset = Offset(),
+    dustOffset dust: Offset = Offset(),
+    aerosolOpticalDepthOffset aerosolOpticalDepth: Offset = Offset(),
+    carbonMonoxideOffset carbonMonoxide: Offset = Offset(),
+    nitrogenDioxideOffset nitrogenDioxide: Offset = Offset(),
+    ammoniaOffset ammonia: Offset = Offset(),
+    ozoneOffset ozone: Offset = Offset(),
+    sulphurDioxideOffset sulphurDioxide: Offset = Offset(),
+    uvIndexOffset uvIndex: Offset = Offset(),
+    uvIndexClearSkyOffset uvIndexClearSky: Offset = Offset(),
+    alderPollenOffset alderPollen: Offset = Offset(),
+    birchPollenOffset birchPollen: Offset = Offset(),
+    grassPollenOffset grassPollen: Offset = Offset(),
+    mugwortPollenOffset mugwortPollen: Offset = Offset(),
+    olivePollenOffset olivePollen: Offset = Offset(),
+    ragweedPollenOffset ragweedPollen: Offset = Offset(),
+    europeanAqiOffset europeanAqi: Offset = Offset(),
+    europeanAqiPm25Offset europeanAqiPm25: Offset = Offset(),
+    europeanAqiPm10Offset europeanAqiPm10: Offset = Offset(),
+    europeanAqiNo2Offset europeanAqiNo2: Offset = Offset(),
+    europeanAqiO3Offset europeanAqiO3: Offset = Offset(),
+    europeanAqiSo2Offset europeanAqiSo2: Offset = Offset(),
+    usAqiOffset usAqi: Offset = Offset(),
+    usAqiPm25Offset usAqiPm25: Offset = Offset(),
+    usAqiPm10Offset usAqiPm10: Offset = Offset(),
+    usAqiNo2Offset usAqiNo2: Offset = Offset(),
+    usAqiO3Offset usAqiO3: Offset = Offset(),
+    usAqiSo2Offset usAqiSo2: Offset = Offset(),
+    usAqiCoOffset usAqiCo: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_AirQualityHourly.startAirQualityHourly(&fbb)
     com_openmeteo_AirQualityHourly.add(time: time, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(pm10: pm10, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(pm25: pm25, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(dust: dust, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(aerosolOpticalDepth: aerosolOpticalDepth, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(carbonMonoxide: carbonMonoxide, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(nitrogenDioxide: nitrogenDioxide, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(ammonia: ammonia, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(ozone: ozone, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(sulphurDioxide: sulphurDioxide, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(uvIndex: uvIndex, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(uvIndexClearSky: uvIndexClearSky, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(alderPollen: alderPollen, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(birchPollen: birchPollen, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(grassPollen: grassPollen, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(mugwortPollen: mugwortPollen, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(olivePollen: olivePollen, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(ragweedPollen: ragweedPollen, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(europeanAqi: europeanAqi, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(europeanAqiPm25: europeanAqiPm25, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(europeanAqiPm10: europeanAqiPm10, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(europeanAqiNo2: europeanAqiNo2, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(europeanAqiO3: europeanAqiO3, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(europeanAqiSo2: europeanAqiSo2, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(usAqi: usAqi, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(usAqiPm25: usAqiPm25, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(usAqiPm10: usAqiPm10, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(usAqiNo2: usAqiNo2, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(usAqiO3: usAqiO3, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(usAqiSo2: usAqiSo2, &fbb)
-    com_openmeteo_AirQualityHourly.addVectorOf(usAqiCo: usAqiCo, &fbb)
+    com_openmeteo_AirQualityHourly.add(pm10: pm10, &fbb)
+    com_openmeteo_AirQualityHourly.add(pm25: pm25, &fbb)
+    com_openmeteo_AirQualityHourly.add(dust: dust, &fbb)
+    com_openmeteo_AirQualityHourly.add(aerosolOpticalDepth: aerosolOpticalDepth, &fbb)
+    com_openmeteo_AirQualityHourly.add(carbonMonoxide: carbonMonoxide, &fbb)
+    com_openmeteo_AirQualityHourly.add(nitrogenDioxide: nitrogenDioxide, &fbb)
+    com_openmeteo_AirQualityHourly.add(ammonia: ammonia, &fbb)
+    com_openmeteo_AirQualityHourly.add(ozone: ozone, &fbb)
+    com_openmeteo_AirQualityHourly.add(sulphurDioxide: sulphurDioxide, &fbb)
+    com_openmeteo_AirQualityHourly.add(uvIndex: uvIndex, &fbb)
+    com_openmeteo_AirQualityHourly.add(uvIndexClearSky: uvIndexClearSky, &fbb)
+    com_openmeteo_AirQualityHourly.add(alderPollen: alderPollen, &fbb)
+    com_openmeteo_AirQualityHourly.add(birchPollen: birchPollen, &fbb)
+    com_openmeteo_AirQualityHourly.add(grassPollen: grassPollen, &fbb)
+    com_openmeteo_AirQualityHourly.add(mugwortPollen: mugwortPollen, &fbb)
+    com_openmeteo_AirQualityHourly.add(olivePollen: olivePollen, &fbb)
+    com_openmeteo_AirQualityHourly.add(ragweedPollen: ragweedPollen, &fbb)
+    com_openmeteo_AirQualityHourly.add(europeanAqi: europeanAqi, &fbb)
+    com_openmeteo_AirQualityHourly.add(europeanAqiPm25: europeanAqiPm25, &fbb)
+    com_openmeteo_AirQualityHourly.add(europeanAqiPm10: europeanAqiPm10, &fbb)
+    com_openmeteo_AirQualityHourly.add(europeanAqiNo2: europeanAqiNo2, &fbb)
+    com_openmeteo_AirQualityHourly.add(europeanAqiO3: europeanAqiO3, &fbb)
+    com_openmeteo_AirQualityHourly.add(europeanAqiSo2: europeanAqiSo2, &fbb)
+    com_openmeteo_AirQualityHourly.add(usAqi: usAqi, &fbb)
+    com_openmeteo_AirQualityHourly.add(usAqiPm25: usAqiPm25, &fbb)
+    com_openmeteo_AirQualityHourly.add(usAqiPm10: usAqiPm10, &fbb)
+    com_openmeteo_AirQualityHourly.add(usAqiNo2: usAqiNo2, &fbb)
+    com_openmeteo_AirQualityHourly.add(usAqiO3: usAqiO3, &fbb)
+    com_openmeteo_AirQualityHourly.add(usAqiSo2: usAqiSo2, &fbb)
+    com_openmeteo_AirQualityHourly.add(usAqiCo: usAqiCo, &fbb)
     return com_openmeteo_AirQualityHourly.endAirQualityHourly(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
-    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: false, type: com_openmeteo_TimeRange.self)
-    try _v.visit(field: VTOFFSET.pm10.p, fieldName: "pm10", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.pm25.p, fieldName: "pm25", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.dust.p, fieldName: "dust", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.aerosolOpticalDepth.p, fieldName: "aerosolOpticalDepth", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.carbonMonoxide.p, fieldName: "carbonMonoxide", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.nitrogenDioxide.p, fieldName: "nitrogenDioxide", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.ammonia.p, fieldName: "ammonia", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.ozone.p, fieldName: "ozone", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.sulphurDioxide.p, fieldName: "sulphurDioxide", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.uvIndex.p, fieldName: "uvIndex", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.uvIndexClearSky.p, fieldName: "uvIndexClearSky", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.alderPollen.p, fieldName: "alderPollen", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.birchPollen.p, fieldName: "birchPollen", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.grassPollen.p, fieldName: "grassPollen", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.mugwortPollen.p, fieldName: "mugwortPollen", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.olivePollen.p, fieldName: "olivePollen", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.ragweedPollen.p, fieldName: "ragweedPollen", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.europeanAqi.p, fieldName: "europeanAqi", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.europeanAqiPm25.p, fieldName: "europeanAqiPm25", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.europeanAqiPm10.p, fieldName: "europeanAqiPm10", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.europeanAqiNo2.p, fieldName: "europeanAqiNo2", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.europeanAqiO3.p, fieldName: "europeanAqiO3", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.europeanAqiSo2.p, fieldName: "europeanAqiSo2", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.usAqi.p, fieldName: "usAqi", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.usAqiPm25.p, fieldName: "usAqiPm25", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.usAqiPm10.p, fieldName: "usAqiPm10", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.usAqiNo2.p, fieldName: "usAqiNo2", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.usAqiO3.p, fieldName: "usAqiO3", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.usAqiSo2.p, fieldName: "usAqiSo2", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    try _v.visit(field: VTOFFSET.usAqiCo.p, fieldName: "usAqiCo", required: false, type: ForwardOffset<Vector<Float32, Float32>>.self)
-    _v.finish()
-  }
-}
-
-public struct com_openmeteo_AirQualityHourlyUnits: FlatBufferObject, Verifiable {
-
-  static func validateVersion() { FlatBuffersVersion_23_5_26() }
-  public var __buffer: ByteBuffer! { return _accessor.bb }
-  private var _accessor: Table
-
-  private init(_ t: Table) { _accessor = t }
-  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
-
-  private enum VTOFFSET: VOffset {
-    case pm10 = 4
-    case pm25 = 6
-    case dust = 8
-    case aerosolOpticalDepth = 10
-    case carbonMonoxide = 12
-    case nitrogenDioxide = 14
-    case ammonia = 16
-    case ozone = 18
-    case sulphurDioxide = 20
-    case uvIndex = 22
-    case uvIndexClearSky = 24
-    case alderPollen = 26
-    case birchPollen = 28
-    case grassPollen = 30
-    case mugwortPollen = 32
-    case olivePollen = 34
-    case ragweedPollen = 36
-    case europeanAqi = 38
-    case europeanAqiPm25 = 40
-    case europeanAqiPm10 = 42
-    case europeanAqiNo2 = 44
-    case europeanAqiO3 = 46
-    case europeanAqiSo2 = 48
-    case usAqi = 50
-    case usAqiPm25 = 52
-    case usAqiPm10 = 54
-    case usAqiNo2 = 56
-    case usAqiO3 = 58
-    case usAqiSo2 = 60
-    case usAqiCo = 62
-    var v: Int32 { Int32(self.rawValue) }
-    var p: VOffset { self.rawValue }
-  }
-
-  public var pm10: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.pm10.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var pm25: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.pm25.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var dust: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.dust.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var aerosolOpticalDepth: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.aerosolOpticalDepth.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var carbonMonoxide: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.carbonMonoxide.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var nitrogenDioxide: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.nitrogenDioxide.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var ammonia: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.ammonia.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var ozone: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.ozone.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var sulphurDioxide: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.sulphurDioxide.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var uvIndex: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.uvIndex.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var uvIndexClearSky: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.uvIndexClearSky.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var alderPollen: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.alderPollen.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var birchPollen: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.birchPollen.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var grassPollen: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.grassPollen.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var mugwortPollen: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.mugwortPollen.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var olivePollen: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.olivePollen.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var ragweedPollen: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.ragweedPollen.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var europeanAqi: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.europeanAqi.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var europeanAqiPm25: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.europeanAqiPm25.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var europeanAqiPm10: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.europeanAqiPm10.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var europeanAqiNo2: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.europeanAqiNo2.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var europeanAqiO3: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.europeanAqiO3.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var europeanAqiSo2: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.europeanAqiSo2.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var usAqi: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.usAqi.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var usAqiPm25: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.usAqiPm25.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var usAqiPm10: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.usAqiPm10.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var usAqiNo2: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.usAqiNo2.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var usAqiO3: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.usAqiO3.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var usAqiSo2: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.usAqiSo2.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public var usAqiCo: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.usAqiCo.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
-  public static func startAirQualityHourlyUnits(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 30) }
-  public static func add(pm10: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: pm10.rawValue, def: 0, at: VTOFFSET.pm10.p) }
-  public static func add(pm25: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: pm25.rawValue, def: 0, at: VTOFFSET.pm25.p) }
-  public static func add(dust: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: dust.rawValue, def: 0, at: VTOFFSET.dust.p) }
-  public static func add(aerosolOpticalDepth: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: aerosolOpticalDepth.rawValue, def: 0, at: VTOFFSET.aerosolOpticalDepth.p) }
-  public static func add(carbonMonoxide: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: carbonMonoxide.rawValue, def: 0, at: VTOFFSET.carbonMonoxide.p) }
-  public static func add(nitrogenDioxide: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: nitrogenDioxide.rawValue, def: 0, at: VTOFFSET.nitrogenDioxide.p) }
-  public static func add(ammonia: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: ammonia.rawValue, def: 0, at: VTOFFSET.ammonia.p) }
-  public static func add(ozone: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: ozone.rawValue, def: 0, at: VTOFFSET.ozone.p) }
-  public static func add(sulphurDioxide: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: sulphurDioxide.rawValue, def: 0, at: VTOFFSET.sulphurDioxide.p) }
-  public static func add(uvIndex: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: uvIndex.rawValue, def: 0, at: VTOFFSET.uvIndex.p) }
-  public static func add(uvIndexClearSky: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: uvIndexClearSky.rawValue, def: 0, at: VTOFFSET.uvIndexClearSky.p) }
-  public static func add(alderPollen: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: alderPollen.rawValue, def: 0, at: VTOFFSET.alderPollen.p) }
-  public static func add(birchPollen: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: birchPollen.rawValue, def: 0, at: VTOFFSET.birchPollen.p) }
-  public static func add(grassPollen: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: grassPollen.rawValue, def: 0, at: VTOFFSET.grassPollen.p) }
-  public static func add(mugwortPollen: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: mugwortPollen.rawValue, def: 0, at: VTOFFSET.mugwortPollen.p) }
-  public static func add(olivePollen: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: olivePollen.rawValue, def: 0, at: VTOFFSET.olivePollen.p) }
-  public static func add(ragweedPollen: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: ragweedPollen.rawValue, def: 0, at: VTOFFSET.ragweedPollen.p) }
-  public static func add(europeanAqi: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: europeanAqi.rawValue, def: 0, at: VTOFFSET.europeanAqi.p) }
-  public static func add(europeanAqiPm25: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: europeanAqiPm25.rawValue, def: 0, at: VTOFFSET.europeanAqiPm25.p) }
-  public static func add(europeanAqiPm10: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: europeanAqiPm10.rawValue, def: 0, at: VTOFFSET.europeanAqiPm10.p) }
-  public static func add(europeanAqiNo2: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: europeanAqiNo2.rawValue, def: 0, at: VTOFFSET.europeanAqiNo2.p) }
-  public static func add(europeanAqiO3: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: europeanAqiO3.rawValue, def: 0, at: VTOFFSET.europeanAqiO3.p) }
-  public static func add(europeanAqiSo2: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: europeanAqiSo2.rawValue, def: 0, at: VTOFFSET.europeanAqiSo2.p) }
-  public static func add(usAqi: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: usAqi.rawValue, def: 0, at: VTOFFSET.usAqi.p) }
-  public static func add(usAqiPm25: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: usAqiPm25.rawValue, def: 0, at: VTOFFSET.usAqiPm25.p) }
-  public static func add(usAqiPm10: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: usAqiPm10.rawValue, def: 0, at: VTOFFSET.usAqiPm10.p) }
-  public static func add(usAqiNo2: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: usAqiNo2.rawValue, def: 0, at: VTOFFSET.usAqiNo2.p) }
-  public static func add(usAqiO3: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: usAqiO3.rawValue, def: 0, at: VTOFFSET.usAqiO3.p) }
-  public static func add(usAqiSo2: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: usAqiSo2.rawValue, def: 0, at: VTOFFSET.usAqiSo2.p) }
-  public static func add(usAqiCo: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: usAqiCo.rawValue, def: 0, at: VTOFFSET.usAqiCo.p) }
-  public static func endAirQualityHourlyUnits(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
-  public static func createAirQualityHourlyUnits(
-    _ fbb: inout FlatBufferBuilder,
-    pm10: com_openmeteo_SiUnit = .undefined,
-    pm25: com_openmeteo_SiUnit = .undefined,
-    dust: com_openmeteo_SiUnit = .undefined,
-    aerosolOpticalDepth: com_openmeteo_SiUnit = .undefined,
-    carbonMonoxide: com_openmeteo_SiUnit = .undefined,
-    nitrogenDioxide: com_openmeteo_SiUnit = .undefined,
-    ammonia: com_openmeteo_SiUnit = .undefined,
-    ozone: com_openmeteo_SiUnit = .undefined,
-    sulphurDioxide: com_openmeteo_SiUnit = .undefined,
-    uvIndex: com_openmeteo_SiUnit = .undefined,
-    uvIndexClearSky: com_openmeteo_SiUnit = .undefined,
-    alderPollen: com_openmeteo_SiUnit = .undefined,
-    birchPollen: com_openmeteo_SiUnit = .undefined,
-    grassPollen: com_openmeteo_SiUnit = .undefined,
-    mugwortPollen: com_openmeteo_SiUnit = .undefined,
-    olivePollen: com_openmeteo_SiUnit = .undefined,
-    ragweedPollen: com_openmeteo_SiUnit = .undefined,
-    europeanAqi: com_openmeteo_SiUnit = .undefined,
-    europeanAqiPm25: com_openmeteo_SiUnit = .undefined,
-    europeanAqiPm10: com_openmeteo_SiUnit = .undefined,
-    europeanAqiNo2: com_openmeteo_SiUnit = .undefined,
-    europeanAqiO3: com_openmeteo_SiUnit = .undefined,
-    europeanAqiSo2: com_openmeteo_SiUnit = .undefined,
-    usAqi: com_openmeteo_SiUnit = .undefined,
-    usAqiPm25: com_openmeteo_SiUnit = .undefined,
-    usAqiPm10: com_openmeteo_SiUnit = .undefined,
-    usAqiNo2: com_openmeteo_SiUnit = .undefined,
-    usAqiO3: com_openmeteo_SiUnit = .undefined,
-    usAqiSo2: com_openmeteo_SiUnit = .undefined,
-    usAqiCo: com_openmeteo_SiUnit = .undefined
-  ) -> Offset {
-    let __start = com_openmeteo_AirQualityHourlyUnits.startAirQualityHourlyUnits(&fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(pm10: pm10, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(pm25: pm25, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(dust: dust, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(aerosolOpticalDepth: aerosolOpticalDepth, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(carbonMonoxide: carbonMonoxide, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(nitrogenDioxide: nitrogenDioxide, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(ammonia: ammonia, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(ozone: ozone, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(sulphurDioxide: sulphurDioxide, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(uvIndex: uvIndex, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(uvIndexClearSky: uvIndexClearSky, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(alderPollen: alderPollen, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(birchPollen: birchPollen, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(grassPollen: grassPollen, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(mugwortPollen: mugwortPollen, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(olivePollen: olivePollen, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(ragweedPollen: ragweedPollen, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(europeanAqi: europeanAqi, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(europeanAqiPm25: europeanAqiPm25, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(europeanAqiPm10: europeanAqiPm10, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(europeanAqiNo2: europeanAqiNo2, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(europeanAqiO3: europeanAqiO3, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(europeanAqiSo2: europeanAqiSo2, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(usAqi: usAqi, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(usAqiPm25: usAqiPm25, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(usAqiPm10: usAqiPm10, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(usAqiNo2: usAqiNo2, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(usAqiO3: usAqiO3, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(usAqiSo2: usAqiSo2, &fbb)
-    com_openmeteo_AirQualityHourlyUnits.add(usAqiCo: usAqiCo, &fbb)
-    return com_openmeteo_AirQualityHourlyUnits.endAirQualityHourlyUnits(&fbb, start: __start)
-  }
-
-  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
-    var _v = try verifier.visitTable(at: position)
-    try _v.visit(field: VTOFFSET.pm10.p, fieldName: "pm10", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.pm25.p, fieldName: "pm25", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.dust.p, fieldName: "dust", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.aerosolOpticalDepth.p, fieldName: "aerosolOpticalDepth", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.carbonMonoxide.p, fieldName: "carbonMonoxide", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.nitrogenDioxide.p, fieldName: "nitrogenDioxide", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.ammonia.p, fieldName: "ammonia", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.ozone.p, fieldName: "ozone", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.sulphurDioxide.p, fieldName: "sulphurDioxide", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.uvIndex.p, fieldName: "uvIndex", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.uvIndexClearSky.p, fieldName: "uvIndexClearSky", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.alderPollen.p, fieldName: "alderPollen", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.birchPollen.p, fieldName: "birchPollen", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.grassPollen.p, fieldName: "grassPollen", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.mugwortPollen.p, fieldName: "mugwortPollen", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.olivePollen.p, fieldName: "olivePollen", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.ragweedPollen.p, fieldName: "ragweedPollen", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.europeanAqi.p, fieldName: "europeanAqi", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.europeanAqiPm25.p, fieldName: "europeanAqiPm25", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.europeanAqiPm10.p, fieldName: "europeanAqiPm10", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.europeanAqiNo2.p, fieldName: "europeanAqiNo2", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.europeanAqiO3.p, fieldName: "europeanAqiO3", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.europeanAqiSo2.p, fieldName: "europeanAqiSo2", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.usAqi.p, fieldName: "usAqi", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.usAqiPm25.p, fieldName: "usAqiPm25", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.usAqiPm10.p, fieldName: "usAqiPm10", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.usAqiNo2.p, fieldName: "usAqiNo2", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.usAqiO3.p, fieldName: "usAqiO3", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.usAqiSo2.p, fieldName: "usAqiSo2", required: false, type: com_openmeteo_SiUnit.self)
-    try _v.visit(field: VTOFFSET.usAqiCo.p, fieldName: "usAqiCo", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: true, type: com_openmeteo_TimeRange.self)
+    try _v.visit(field: VTOFFSET.pm10.p, fieldName: "pm10", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.pm25.p, fieldName: "pm25", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.dust.p, fieldName: "dust", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.aerosolOpticalDepth.p, fieldName: "aerosolOpticalDepth", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.carbonMonoxide.p, fieldName: "carbonMonoxide", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.nitrogenDioxide.p, fieldName: "nitrogenDioxide", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.ammonia.p, fieldName: "ammonia", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.ozone.p, fieldName: "ozone", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.sulphurDioxide.p, fieldName: "sulphurDioxide", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.uvIndex.p, fieldName: "uvIndex", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.uvIndexClearSky.p, fieldName: "uvIndexClearSky", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.alderPollen.p, fieldName: "alderPollen", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.birchPollen.p, fieldName: "birchPollen", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.grassPollen.p, fieldName: "grassPollen", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.mugwortPollen.p, fieldName: "mugwortPollen", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.olivePollen.p, fieldName: "olivePollen", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.ragweedPollen.p, fieldName: "ragweedPollen", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.europeanAqi.p, fieldName: "europeanAqi", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.europeanAqiPm25.p, fieldName: "europeanAqiPm25", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.europeanAqiPm10.p, fieldName: "europeanAqiPm10", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.europeanAqiNo2.p, fieldName: "europeanAqiNo2", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.europeanAqiO3.p, fieldName: "europeanAqiO3", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.europeanAqiSo2.p, fieldName: "europeanAqiSo2", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.usAqi.p, fieldName: "usAqi", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.usAqiPm25.p, fieldName: "usAqiPm25", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.usAqiPm10.p, fieldName: "usAqiPm10", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.usAqiNo2.p, fieldName: "usAqiNo2", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.usAqiO3.p, fieldName: "usAqiO3", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.usAqiSo2.p, fieldName: "usAqiSo2", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.usAqiCo.p, fieldName: "usAqiCo", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     _v.finish()
   }
 }
@@ -552,7 +253,6 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
     case timezoneAbbreviation = 18
     case time = 20
     case hourly = 22
-    case hourlyUnits = 24
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -570,8 +270,7 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
   public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
   public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var hourly: com_openmeteo_AirQualityHourly? { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? nil : com_openmeteo_AirQualityHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var hourlyUnits: com_openmeteo_AirQualityHourlyUnits? { let o = _accessor.offset(VTOFFSET.hourlyUnits.v); return o == 0 ? nil : com_openmeteo_AirQualityHourlyUnits(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startAirQualityApiResponse(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 11) }
+  public static func startAirQualityApiResponse(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -582,7 +281,6 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
   public static func add(timezoneAbbreviation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezoneAbbreviation, at: VTOFFSET.timezoneAbbreviation.p) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func add(hourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourly, at: VTOFFSET.hourly.p) }
-  public static func add(hourlyUnits: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourlyUnits, at: VTOFFSET.hourlyUnits.p) }
   public static func endAirQualityApiResponse(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createAirQualityApiResponse(
     _ fbb: inout FlatBufferBuilder,
@@ -595,8 +293,7 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
     timezoneOffset timezone: Offset = Offset(),
     timezoneAbbreviationOffset timezoneAbbreviation: Offset = Offset(),
     time: com_openmeteo_TimeRange? = nil,
-    hourlyOffset hourly: Offset = Offset(),
-    hourlyUnitsOffset hourlyUnits: Offset = Offset()
+    hourlyOffset hourly: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_AirQualityApiResponse.startAirQualityApiResponse(&fbb)
     com_openmeteo_AirQualityApiResponse.add(latitude: latitude, &fbb)
@@ -609,7 +306,6 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
     com_openmeteo_AirQualityApiResponse.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
     com_openmeteo_AirQualityApiResponse.add(time: time, &fbb)
     com_openmeteo_AirQualityApiResponse.add(hourly: hourly, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(hourlyUnits: hourlyUnits, &fbb)
     return com_openmeteo_AirQualityApiResponse.endAirQualityApiResponse(&fbb, start: __start)
   }
 
@@ -625,7 +321,6 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
     try _v.visit(field: VTOFFSET.timezoneAbbreviation.p, fieldName: "timezoneAbbreviation", required: false, type: ForwardOffset<String>.self)
     try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: false, type: com_openmeteo_TimeRange.self)
     try _v.visit(field: VTOFFSET.hourly.p, fieldName: "hourly", required: false, type: ForwardOffset<com_openmeteo_AirQualityHourly>.self)
-    try _v.visit(field: VTOFFSET.hourlyUnits.p, fieldName: "hourlyUnits", required: false, type: ForwardOffset<com_openmeteo_AirQualityHourlyUnits>.self)
     _v.finish()
   }
 }

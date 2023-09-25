@@ -19,33 +19,18 @@ enum ClimateModel: byte {
 }
 
 table ClimateDaily {
-  time: TimeRange;
-  wave_height_max: [float];
-  wind_wave_height_max: [float];
-  swell_wave_height_max: [float];
-  wave_direction_dominant: [float];
-  wind_wave_direction_dominant: [float];
-  swell_wave_direction_dominant: [float];
-  wave_period_max: [float];
-  wind_wave_period_max: [float];
-  wind_wave_peak_period_max: [float];
-  swell_wave_period_max: [float];
-  swell_wave_peak_period_max: [float];
-}
-
-table ClimateDailyUnits {
-  time: TimeRange;
-  wave_height_max: SiUnit;
-  wind_wave_height_max: SiUnit;
-  swell_wave_height_max: SiUnit;
-  wave_direction_dominant: SiUnit;
-  wind_wave_direction_dominant: SiUnit;
-  swell_wave_direction_dominant: SiUnit;
-  wave_period_max: SiUnit;
-  wind_wave_period_max: SiUnit;
-  wind_wave_peak_period_max: SiUnit;
-  swell_wave_period_max: SiUnit;
-  swell_wave_peak_period_max: SiUnit;
+  time: TimeRange (required);
+  wave_height_max: ValuesAndUnit;
+  wind_wave_height_max: ValuesAndUnit;
+  swell_wave_height_max: ValuesAndUnit;
+  wave_direction_dominant: ValuesAndUnit;
+  wind_wave_direction_dominant: ValuesAndUnit;
+  swell_wave_direction_dominant: ValuesAndUnit;
+  wave_period_max: ValuesAndUnit;
+  wind_wave_period_max: ValuesAndUnit;
+  wind_wave_peak_period_max: ValuesAndUnit;
+  swell_wave_period_max: ValuesAndUnit;
+  swell_wave_peak_period_max: ValuesAndUnit;
 }
 
 table ClimateApiResponse {
@@ -59,7 +44,6 @@ table ClimateApiResponse {
   timezone_abbreviation: string;
   time_start: int64;
   daily: ClimateDaily;
-  daily_units: ClimateDailyUnits;
 }
 
 root_type ClimateApiResponse;
