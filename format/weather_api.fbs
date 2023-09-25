@@ -1,0 +1,320 @@
+// Flatbuffers API result format for open-meteo weather data
+// 
+// Generate swift code with: 
+// flatc -o Sources/App/Helper/Writer/ --swift format/api_result.fbs
+//
+// Make sure flatbuffers is installed with `brew install flatbuffers`
+
+namespace com.openmeteo.api.result;
+
+enum WeatherModel: byte {
+  undefined = 0,
+  best_match,
+  gfs_seamless,
+  gfs_global,
+  gfs_hrrr,
+  meteofrance_seamless,
+  meteofrance_arpege_world,
+  meteofrance_arpege_europe,
+  meteofrance_arome_france,
+  meteofrance_arome_france_hd,
+  jma_seamless,
+  jma_msm,
+  jms_gsm,
+  jma_gsm,
+  gem_seamless,
+  gem_global,
+  gem_regional,
+  gem_hrdps_continental,
+  icon_seamless,
+  icon_global,
+  icon_eu,
+  icon_d2,
+  ecmwf_ifs04,
+  metno_nordic,
+  era5,
+  cerra,
+  era5_land,
+  ecmwf_ifs,
+  noaa_cfs
+}
+
+table WeatherHourly {
+  temperture_2m: [float];
+  cloudcover: [float];
+  cloudcover_low: [float];
+  cloudcover_mid: [float];
+  cloudcover_high: [float];
+  pressure_msl: [float];
+  relativehumidity_2m: [float];
+  precipitation: [float];
+  precipitation_probability: [float];
+  weathercode: [float];
+  temperature_80m: [float];
+  temperature_120m: [float];
+  temperature_180m: [float];
+  soil_temperature_0cm: [float];
+  soil_temperature_6cm: [float];
+  soil_temperature_18cm: [float];
+  soil_temperature_54cm: [float];
+  soil_moisture_0_1cm: [float];
+  soil_moisture_1_3cm: [float];
+  soil_moisture_3_9cm: [float];
+  soil_moisture_9_27cm: [float];
+  soil_moisture_27_81cm: [float];
+  snow_depth: [float];
+  snow_height: [float];
+  sensible_heatflux: [float];
+  latent_heatflux: [float];
+  showers: [float];
+  rain: [float];
+  windgusts_10m: [float];
+  freezinglevel_height: [float];
+  dewpoint_2m: [float];
+  diffuse_radiation: [float];
+  direct_radiation: [float];
+  apparent_temperature: [float];
+  windspeed_10m: [float];
+  winddirection_10m: [float];
+  windspeed_80m: [float];
+  winddirection_80m: [float];
+  windspeed_120m: [float];
+  winddirection_120m: [float];
+  windspeed_180m: [float];
+  winddirection_180m: [float];
+  direct_normal_irradiance: [float];
+  evapotranspiration: [float];
+  et0_fao_evapotranspiration: [float];
+  vapor_pressure_deficit: [float];
+  shortwave_radiation: [float];
+  snowfall: [float];
+  surface_pressure: [float];
+  terrestrial_radiation: [float];
+  terrestrial_radiation_instant: [float];
+  shortwave_radiation_instant: [float];
+  diffuse_radiation_instant: [float];
+  direct_radiation_instant: [float];
+  direct_normal_irradiance_instant: [float];
+  visibility: [float];
+  cape: [float];
+  uv_index: [float];
+  uv_index_clear_sky: [float];
+  is_day: [float];
+  soil_temperature_0_to_10cm: [float];
+  soil_temperature_10_to_40cm: [float];
+  soil_temperature_40_to_100cm: [float];
+  soil_temperature_100_to_200cm: [float];
+  soil_moisture_0_to_10cm: [float];
+  soil_moisture_10_to_40cm: [float];
+  soil_moisture_40_to_100cm: [float];
+  soil_moisture_100_to_200cm: [float];
+  growing_degree_days_base_0_limit_50: [float];
+  leaf_wetness_probability: [float];
+  soil_moisture_index_0_to_7cm: [float];
+  soil_moisture_index_7_to_28cm: [float];
+  soil_moisture_index_28_to_100cm: [float];
+  soil_moisture_index_100_to_255cm: [float];
+  soil_moisture_index_0_to_100cm: [float];
+  lightning_potential: [float];
+  temperature_hpa: [PressureValues];
+  geopotential_height_hpa: [PressureValues];
+  relativehumidity_hpa: [PressureValues];
+  windspeed_hpa: [PressureValues];
+  winddirection_hpa: [PressureValues];
+  dewpoint_hpa: [PressureValues];
+  cloudcover_hpa: [PressureValues];
+  vertical_velocity_hpa: [PressureValues];
+  growing_degree_days: Gdd;
+  tilted_direct_radiation: Tilted; 
+}
+
+table WeatherHourlyUnit {
+  temperture_2m: SiUnit;
+  cloudcover: SiUnit;
+  cloudcover_low: SiUnit;
+  cloudcover_mid: SiUnit;
+  cloudcover_high: SiUnit;
+  pressure_msl: SiUnit;
+  relativehumidity_2m: SiUnit;
+  precipitation: SiUnit;
+  precipitation_probability: SiUnit;
+  weathercode: SiUnit;
+  temperature_80m: SiUnit;
+  temperature_120m: SiUnit;
+  temperature_180m: SiUnit;
+  soil_temperature_0cm: SiUnit;
+  soil_temperature_6cm: SiUnit;
+  soil_temperature_18cm: SiUnit;
+  soil_temperature_54cm: SiUnit;
+  soil_moisture_0_1cm: SiUnit;
+  soil_moisture_1_3cm: SiUnit;
+  soil_moisture_3_9cm: SiUnit;
+  soil_moisture_9_27cm: SiUnit;
+  soil_moisture_27_81cm: SiUnit;
+  snow_depth: SiUnit;
+  snow_height: SiUnit;
+  sensible_heatflux: SiUnit;
+  latent_heatflux: SiUnit;
+  showers: SiUnit;
+  rain: SiUnit;
+  windgusts_10m: SiUnit;
+  freezinglevel_height: SiUnit;
+  dewpoint_2m: SiUnit;
+  diffuse_radiation: SiUnit;
+  direct_radiation: SiUnit;
+  apparent_temperature: SiUnit;
+  windspeed_10m: SiUnit;
+  winddirection_10m: SiUnit;
+  windspeed_80m: SiUnit;
+  winddirection_80m: SiUnit;
+  windspeed_120m: SiUnit;
+  winddirection_120m: SiUnit;
+  windspeed_180m: SiUnit;
+  winddirection_180m: SiUnit;
+  direct_normal_irradiance: SiUnit;
+  evapotranspiration: SiUnit;
+  et0_fao_evapotranspiration: SiUnit;
+  vapor_pressure_deficit: SiUnit;
+  shortwave_radiation: SiUnit;
+  snowfall: SiUnit;
+  surface_pressure: SiUnit;
+  terrestrial_radiation: SiUnit;
+  terrestrial_radiation_instant: SiUnit;
+  shortwave_radiation_instant: SiUnit;
+  diffuse_radiation_instant: SiUnit;
+  direct_radiation_instant: SiUnit;
+  direct_normal_irradiance_instant: SiUnit;
+  visibility: SiUnit;
+  cape: SiUnit;
+  uv_index: SiUnit;
+  uv_index_clear_sky: SiUnit;
+  is_day: SiUnit;
+  soil_temperature_0_to_10cm: SiUnit;
+  soil_temperature_10_to_40cm: SiUnit;
+  soil_temperature_40_to_100cm: SiUnit;
+  soil_temperature_100_to_200cm: SiUnit;
+  soil_moisture_0_to_10cm: SiUnit;
+  soil_moisture_10_to_40cm: SiUnit;
+  soil_moisture_40_to_100cm: SiUnit;
+  soil_moisture_100_to_200cm: SiUnit;
+  growing_degree_days_base_0_limit_50: SiUnit;
+  leaf_wetness_probability: SiUnit;
+  soil_moisture_index_0_to_7cm: SiUnit;
+  soil_moisture_index_7_to_28cm: SiUnit;
+  soil_moisture_index_28_to_100cm: SiUnit;
+  soil_moisture_index_100_to_255cm: SiUnit;
+  soil_moisture_index_0_to_100cm: SiUnit;
+  lightning_potential: SiUnit;
+
+  temperature_hpa: [PressureValues];
+  geopotential_height_hpa: [PressureValues];
+  relativehumidity_hpa: [PressureValues];
+  windspeed_hpa: [PressureValues];
+  winddirection_hpa: [PressureValues];
+  dewpoint_hpa: [PressureValues];
+  cloudcover_hpa: [PressureValues];
+  vertical_velocity_hpa: [PressureValues];
+  growing_degree_days: Gdd;
+  tilted_direct_radiation: Tilted; 
+}
+
+
+table PressureValues {
+  pressure_level: int16;
+  values: [float];
+}
+
+table Gdd {
+  limit: float;
+  base: float;
+  values: [float];
+}
+
+table Tilted {
+  tilt: float;
+  azimuth: float;
+  values: [float];
+}
+
+table WeatherDaily {
+  temperature_2m_max: [float];
+  temperature_2m_min: [float];
+  temperature_2m_mean: [float];
+  apparent_temperature_max: [float];
+  apparent_temperature_min: [float];
+  apparent_temperature_mean: [float];
+  precipitation_sum: [float];
+  precipitation_probability_max: [float];
+  precipitation_probability_min: [float];
+  precipitation_probability_mean: [float];
+  snowfall_sum: [float];
+  rain_sum: [float];
+  showers_sum: [float];
+  weathercode: [float];
+  shortwave_radiation_sum: [float];
+  windspeed_10m_max: [float];
+  windspeed_10m_min: [float];
+  windspeed_10m_mean: [float];
+  windgusts_10m_max: [float];
+  windgusts_10m_min: [float];
+  windgusts_10m_mean: [float];
+  winddirection_10m_dominant: [float];
+  precipitation_hours: [float];
+  sunrise: [int64];
+  sunset: [int64];
+  et0_fao_evapotranspiration: [float];
+  visibility_max: [float];
+  visibility_min: [float];
+  visibility_mean: [float];
+  pressure_msl_max: [float];
+  pressure_msl_min: [float];
+  pressure_msl_mean: [float];
+  surface_pressure_max: [float];
+  surface_pressure_min: [float];
+  surface_pressure_mean: [float];
+  cape_max: [float];
+  cape_min: [float];
+  cape_mean: [float];
+  cloudcover_max: [float];
+  cloudcover_min: [float];
+  cloudcover_mean: [float];
+  uv_index_max: [float];
+  uv_index_clear_sky_max: [float];
+
+
+  // could be long....
+}
+
+struct CurrentWeather {
+  time: int64;
+  temperature: float;
+  weathercode: float;
+  windspeed: float;
+  winddirection: float;
+  is_day: float;
+}
+ 
+table WeatherApi {
+  latitude: float;
+  longitude: float;
+  elevation: float;
+  model: WeatherModel;
+  ensemble_member: int8;
+  generationtime_ms: float;
+  utc_offset_seconds: int32;
+  timezone: string;
+  timezone_abbreviation: string;
+  current_weather: CurrentWeather;
+  time_start: int64;
+  daily: WeatherDaily;
+  hourly: WeatherHourly;
+  six_hourly: [Variable];
+  minutely_15: [Variable];
+  current: [VariableSingle];
+  current_time: int64;
+  current_interval_seconds: int32;
+  //monthly: [Variable];
+}
+ 
+root_type WeatherApi;
+

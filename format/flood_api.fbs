@@ -1,0 +1,51 @@
+
+// flatc -o Sources/App/Helper/Writer/ --swift format/Flood_api.fbs
+
+include "units.fbs";
+
+namespace com.openmeteo.flood_api;
+
+
+enum FloodModel: byte {
+    best_match = 0,
+    glofas_seamless_v3,
+    glofas_forecast_v3,
+    glofas_consolidated_v3,
+    glofas_seamless_v4,
+    glofas_forecast_v4,
+    glofas_consolidated_v4,
+}
+
+table FloodDaily {
+  river_discharge_mean: [float];
+  river_discharge_min: [float];
+  river_discharge_max: [float];
+  river_discharge_median: [float];
+  river_discharge_p25: [float];
+  river_discharge_p75: [float];
+}
+
+table FloodDailyUnits {
+  river_discharge_mean: SiUnit;
+  river_discharge_min: SiUnit;
+  river_discharge_max: SiUnit;
+  river_discharge_median: SiUnit;
+  river_discharge_p25: SiUnit;
+  river_discharge_p75: SiUnit;
+}
+
+table FloodApiResponse {
+  latitude: float;
+  longitude: float;
+  elevation: float;
+  model: FloodModel;
+  generationtime_ms: float;
+  utc_offset_seconds: int32;
+  timezone: string;
+  timezone_abbreviation: string;
+  time_start: int64;
+  daily: FloodDaily;
+  daily_units: FloodDailyUnits;
+}
+
+root_type FloodApiResponse;
