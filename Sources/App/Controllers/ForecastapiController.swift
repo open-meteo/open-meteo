@@ -519,6 +519,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case soil_temperature_6cm
     case soil_temperature_7_to_28cm
     case surface_air_pressure
+    case snowfall_height
     case surface_pressure
     case surface_temperature
     case temperature_100m
