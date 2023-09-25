@@ -421,6 +421,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case vapor_pressure_deficit
     case shortwave_radiation
     case snowfall
+    case snowfall_height
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
