@@ -84,6 +84,43 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
  */
 typealias IconVariable = SurfaceAndPressureVariable<IconSurfaceVariable, IconPressureVariable>
 
+extension IconSurfaceVariable: DecodableApiVariable {
+    static func from(api: ApiVariable) -> Self? {
+        guard api.aggregation == .undefined, api.pressure == 0 else {
+            return nil
+        }
+        switch api.variable {
+        case .temperature:
+            switch api.altitude {
+            case 2: return .temperature_2m
+            case 80: return .temperature_80m
+            case 120: return .temperature_120m
+            case 180: return .temperature_180m
+            default: return nil
+            }
+        case .cloudcover: return .cloudcover
+        case .cloudcoverLow: return .cloudcover_low
+        case .cloudcoverMid: return .cloudcover_mid
+        case .cloudcoverHigh: return .cloudcover_high
+        case .pressureMsl: return .pressure_msl
+        case .precipitation: return .precipitation
+        case .weathercode: return .weathercode
+        case .soilTemperature:
+            guard api.depthUpper == 0 else {
+                return nil
+            }
+            switch api.depth {
+            case 0: return .soil_temperature_0cm
+            case 6: return .soil_temperature_6cm
+            case 18: return .soil_temperature_18cm
+                case
+            }
+        default:
+            return nil
+        }
+    }
+}
+
 /**
  Available variables to download from the DWD open data server
  */

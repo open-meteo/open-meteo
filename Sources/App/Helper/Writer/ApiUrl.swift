@@ -1,5 +1,8 @@
 import Foundation
 
+protocol DecodableApiVariable {
+    static func from(api: ApiVariable) -> Self?
+}
 
 /// Decodable variable that can be specified in an URL
 struct ApiVariable {
