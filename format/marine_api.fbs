@@ -3,8 +3,7 @@
 
 include "units.fbs";
 
-namespace com.openmeteo.marine_api;
-
+namespace com.openmeteo;
 
 enum MarineModel: byte {
     best_match = 0,
@@ -13,75 +12,76 @@ enum MarineModel: byte {
 }
 
 table MarineHourly {
-  wave_height: [float];
-  wave_period: [float];
-  wave_direction: [float];
-  wind_wave_height: [float];
-  wind_wave_period: [float];
-  wind_wave_peak_period: [float];
-  wind_wave_direction: [float];
-  swell_wave_height: [float];
-  swell_wave_period: [float];
-  swell_wave_peak_period: [float];
-  swell_wave_direction: [float];
+    time: TimeRange;
+    wave_height: [float];
+    wave_period: [float];
+    wave_direction: [float];
+    wind_wave_height: [float];
+    wind_wave_period: [float];
+    wind_wave_peak_period: [float];
+    wind_wave_direction: [float];
+    swell_wave_height: [float];
+    swell_wave_period: [float];
+    swell_wave_peak_period: [float];
+    swell_wave_direction: [float];
 }
 
 table MarineHourlyUnits {
-  wave_height: SiUnit;
-  wave_period: SiUnit;
-  wave_direction: SiUnit;
-  wind_wave_height: SiUnit;
-  wind_wave_period: SiUnit;
-  wind_wave_peak_period: SiUnit;
-  wind_wave_direction: SiUnit;
-  swell_wave_height: SiUnit;
-  swell_wave_period: SiUnit;
-  swell_wave_peak_period: SiUnit;
-  swell_wave_direction: SiUnit;
+    wave_height: SiUnit;
+    wave_period: SiUnit;
+    wave_direction: SiUnit;
+    wind_wave_height: SiUnit;
+    wind_wave_period: SiUnit;
+    wind_wave_peak_period: SiUnit;
+    wind_wave_direction: SiUnit;
+    swell_wave_height: SiUnit;
+    swell_wave_period: SiUnit;
+    swell_wave_peak_period: SiUnit;
+    swell_wave_direction: SiUnit;
 }
 
 table MarineDaily {
-  wave_height_max: [float];
-  wind_wave_height_max: [float];
-  swell_wave_height_max: [float];
-  wave_direction_dominant: [float];
-  wind_wave_direction_dominant: [float];
-  swell_wave_direction_dominant: [float];
-  wave_period_max: [float];
-  wind_wave_period_max: [float];
-  wind_wave_peak_period_max: [float];
-  swell_wave_period_max: [float];
-  swell_wave_peak_period_max: [float];
+    time: TimeRange;
+    wave_height_max: [float];
+    wind_wave_height_max: [float];
+    swell_wave_height_max: [float];
+    wave_direction_dominant: [float];
+    wind_wave_direction_dominant: [float];
+    swell_wave_direction_dominant: [float];
+    wave_period_max: [float];
+    wind_wave_period_max: [float];
+    wind_wave_peak_period_max: [float];
+    swell_wave_period_max: [float];
+    swell_wave_peak_period_max: [float];
 }
 
 table MarineDailyUnits {
-  wave_height_max: SiUnit;
-  wind_wave_height_max: SiUnit;
-  swell_wave_height_max: SiUnit;
-  wave_direction_dominant: SiUnit;
-  wind_wave_direction_dominant: SiUnit;
-  swell_wave_direction_dominant: SiUnit;
-  wave_period_max: SiUnit;
-  wind_wave_period_max: SiUnit;
-  wind_wave_peak_period_max: SiUnit;
-  swell_wave_period_max: SiUnit;
-  swell_wave_peak_period_max: SiUnit;
+    wave_height_max: SiUnit;
+    wind_wave_height_max: SiUnit;
+    swell_wave_height_max: SiUnit;
+    wave_direction_dominant: SiUnit;
+    wind_wave_direction_dominant: SiUnit;
+    swell_wave_direction_dominant: SiUnit;
+    wave_period_max: SiUnit;
+    wind_wave_period_max: SiUnit;
+    wind_wave_peak_period_max: SiUnit;
+    swell_wave_period_max: SiUnit;
+    swell_wave_peak_period_max: SiUnit;
 }
 
 table MarineApiResponse {
-  latitude: float;
-  longitude: float;
-  elevation: float;
-  model: MarineModel;
-  generationtime_ms: float;
-  utc_offset_seconds: int32;
-  timezone: string;
-  timezone_abbreviation: string;
-  time_start: int64;
-  daily: MarineDaily;
-  daily_units: MarineDailyUnits;
-  hourly: MarineHourly;
-  hourly_units: MarineHourlyUnits;
+    latitude: float;
+    longitude: float;
+    elevation: float;
+    model: MarineModel;
+    generationtime_ms: float;
+    utc_offset_seconds: int32;
+    timezone: string;
+    timezone_abbreviation: string;
+    daily: MarineDaily;
+    daily_units: MarineDailyUnits;
+    hourly: MarineHourly;
+    hourly_units: MarineHourlyUnits;
 }
 
 root_type MarineApiResponse;

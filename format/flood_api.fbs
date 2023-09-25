@@ -3,7 +3,7 @@
 
 include "units.fbs";
 
-namespace com.openmeteo.flood_api;
+namespace com.openmeteo;
 
 
 enum FloodModel: byte {
@@ -17,6 +17,7 @@ enum FloodModel: byte {
 }
 
 table FloodDaily {
+  time: TimeRange;
   river_discharge_mean: [float];
   river_discharge_min: [float];
   river_discharge_max: [float];
@@ -43,7 +44,7 @@ table FloodApiResponse {
   utc_offset_seconds: int32;
   timezone: string;
   timezone_abbreviation: string;
-  time_start: int64;
+  time: TimeRange;
   daily: FloodDaily;
   daily_units: FloodDailyUnits;
 }

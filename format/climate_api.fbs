@@ -3,7 +3,7 @@
 
 include "units.fbs";
 
-namespace com.openmeteo.Climate_api;
+namespace com.openmeteo;
 
 
 enum ClimateModel: byte {
@@ -18,35 +18,8 @@ enum ClimateModel: byte {
     NICAM16_8S,
 }
 
-table ClimateHourly {
-  wave_height: [float];
-  wave_period: [float];
-  wave_direction: [float];
-  wind_wave_height: [float];
-  wind_wave_period: [float];
-  wind_wave_peak_period: [float];
-  wind_wave_direction: [float];
-  swell_wave_height: [float];
-  swell_wave_period: [float];
-  swell_wave_peak_period: [float];
-  swell_wave_direction: [float];
-}
-
-table ClimateHourlyUnits {
-  wave_height: SiUnit;
-  wave_period: SiUnit;
-  wave_direction: SiUnit;
-  wind_wave_height: SiUnit;
-  wind_wave_period: SiUnit;
-  wind_wave_peak_period: SiUnit;
-  wind_wave_direction: SiUnit;
-  swell_wave_height: SiUnit;
-  swell_wave_period: SiUnit;
-  swell_wave_peak_period: SiUnit;
-  swell_wave_direction: SiUnit;
-}
-
 table ClimateDaily {
+  time: TimeRange;
   wave_height_max: [float];
   wind_wave_height_max: [float];
   swell_wave_height_max: [float];
@@ -61,6 +34,7 @@ table ClimateDaily {
 }
 
 table ClimateDailyUnits {
+  time: TimeRange;
   wave_height_max: SiUnit;
   wind_wave_height_max: SiUnit;
   swell_wave_height_max: SiUnit;
@@ -86,8 +60,6 @@ table ClimateApiResponse {
   time_start: int64;
   daily: ClimateDaily;
   daily_units: ClimateDailyUnits;
-  hourly: ClimateHourly;
-  hourly_units: ClimateHourlyUnits;
 }
 
 root_type ClimateApiResponse;
