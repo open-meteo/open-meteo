@@ -167,7 +167,7 @@ table WeatherHourly {
   soil_moisture_index_0_to_100cm: ValuesAndUnit;
   lightning_potential: ValuesAndUnit;
 
-  pressure_level_temperature_: ValuesUnitPressureLevel;
+  pressure_level_temperature: ValuesUnitPressureLevel;
   pressure_level_dewpoint: ValuesUnitPressureLevel;
   pressure_level_relativehumidity: ValuesUnitPressureLevel;
   pressure_level_cloudcover: ValuesUnitPressureLevel;
