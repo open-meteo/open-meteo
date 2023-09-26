@@ -209,172 +209,232 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
 
   private enum VTOFFSET: VOffset {
     case time = 4
-    case temperature2m = 6
-    case cloudcover = 8
-    case cloudcoverLow = 10
-    case cloudcoverMid = 12
-    case cloudcoverHigh = 14
-    case pressureMsl = 16
-    case relativehumidity2m = 18
-    case precipitation = 20
-    case precipitationProbability = 22
-    case weathercode = 24
-    case temperature80m = 26
-    case temperature120m = 28
-    case temperature180m = 30
-    case soilTemperature0cm = 32
-    case soilTemperature6cm = 34
-    case soilTemperature18cm = 36
-    case soilTemperature54cm = 38
-    case soilMoisture01cm = 40
-    case soilMoisture13cm = 42
-    case soilMoisture39cm = 44
-    case soilMoisture927cm = 46
-    case soilMoisture2781cm = 48
-    case snowDepth = 50
-    case snowHeight = 52
-    case sensibleHeatflux = 54
-    case latentHeatflux = 56
-    case showers = 58
-    case rain = 60
-    case windgusts10m = 62
-    case freezinglevelHeight = 64
-    case dewpoint2m = 66
-    case diffuseRadiation = 68
-    case directRadiation = 70
-    case apparentTemperature = 72
-    case windspeed10m = 74
-    case winddirection10m = 76
-    case windspeed80m = 78
-    case winddirection80m = 80
-    case windspeed120m = 82
-    case winddirection120m = 84
-    case windspeed180m = 86
-    case winddirection180m = 88
-    case directNormalIrradiance = 90
-    case evapotranspiration = 92
-    case et0FaoEvapotranspiration = 94
-    case vaporPressureDeficit = 96
-    case shortwaveRadiation = 98
-    case snowfall = 100
-    case surfacePressure = 102
-    case terrestrialRadiation = 104
-    case terrestrialRadiationInstant = 106
-    case shortwaveRadiationInstant = 108
-    case diffuseRadiationInstant = 110
-    case directRadiationInstant = 112
-    case directNormalIrradianceInstant = 114
-    case visibility = 116
-    case cape = 118
-    case uvIndex = 120
-    case uvIndexClearSky = 122
-    case isDay = 124
-    case soilTemperature0To10cm = 126
+    case apparentTemperature = 6
+    case cape = 8
+    case cloudcover = 10
+    case cloudcoverHigh = 12
+    case cloudcoverLow = 14
+    case cloudcoverMid = 16
+    case dewpoint2m = 18
+    case diffuseRadiation = 20
+    case diffuseRadiationInstant = 22
+    case directNormalIrradiance = 24
+    case directNormalIrradianceInstant = 26
+    case directRadiation = 28
+    case directRadiationInstant = 30
+    case et0FaoEvapotranspiration = 32
+    case evapotranspiration = 34
+    case freezinglevelHeight = 36
+    case growingDegreeDaysBase0Limit50 = 38
+    case isDay = 40
+    case latentHeatflux = 42
+    case leafWetnessProbability = 44
+    case lightningPotential = 46
+    case precipitation = 48
+    case precipitationProbability = 50
+    case pressureMsl = 52
+    case rain = 54
+    case relativehumidity2m = 56
+    case runoff = 58
+    case sensibleHeatflux = 60
+    case shortwaveRadiation = 62
+    case shortwaveRadiationInstant = 64
+    case showers = 66
+    case skinTemperature = 68
+    case snowDepth = 70
+    case snowHeight = 72
+    case snowfall = 74
+    case snowfallWaterEquivalent = 76
+    case soilMoisture01cm = 78
+    case soilMoisture0To100cm = 80
+    case soilMoisture0To10cm = 82
+    case soilMoisture0To7cm = 84
+    case soilMoisture100To200cm = 86
+    case soilMoisture100To255cm = 88
+    case soilMoisture10To40cm = 90
+    case soilMoisture13cm = 92
+    case soilMoisture2781cm = 94
+    case soilMoisture28To100cm = 96
+    case soilMoisture39cm = 98
+    case soilMoisture40To100cm = 100
+    case soilMoisture7To28cm = 102
+    case soilMoisture927cm = 104
+    case soilMoistureIndex0To100cm = 106
+    case soilMoistureIndex0To7cm = 108
+    case soilMoistureIndex100To255cm = 110
+    case soilMoistureIndex28To100cm = 112
+    case soilMoistureIndex7To28cm = 114
+    case soilTemperature0To100cm = 116
+    case soilTemperature0To10cm = 118
+    case soilTemperature0To7cm = 120
+    case soilTemperature0cm = 122
+    case soilTemperature100To200cm = 124
+    case soilTemperature100To255cm = 126
     case soilTemperature10To40cm = 128
-    case soilTemperature40To100cm = 130
-    case soilTemperature100To200cm = 132
-    case soilMoisture0To10cm = 134
-    case soilMoisture10To40cm = 136
-    case soilMoisture40To100cm = 138
-    case soilMoisture100To200cm = 140
-    case growingDegreeDaysBase0Limit50 = 142
-    case leafWetnessProbability = 144
-    case soilMoistureIndex0To7cm = 146
-    case soilMoistureIndex7To28cm = 148
-    case soilMoistureIndex28To100cm = 150
-    case soilMoistureIndex100To255cm = 152
-    case soilMoistureIndex0To100cm = 154
-    case lightningPotential = 156
-    case pressureLevelTemperature = 158
-    case pressureLevelDewpoint = 160
-    case pressureLevelRelativehumidity = 162
-    case pressureLevelCloudcover = 164
-    case pressureLevelWindspeed = 166
-    case pressureLevelWinddirection = 168
-    case pressureLevelVerticalVelocity = 170
-    case pressureLevelGeopotentialHeight = 172
+    case soilTemperature18cm = 130
+    case soilTemperature28To100cm = 132
+    case soilTemperature40To100cm = 134
+    case soilTemperature54cm = 136
+    case soilTemperature6cm = 138
+    case soilTemperature7To28cm = 140
+    case surfaceAirPressure = 142
+    case surfacePressure = 144
+    case surfaceTemperature = 146
+    case temperature120m = 148
+    case temperature180m = 150
+    case temperature2m = 152
+    case temperature40m = 154
+    case temperature80m = 156
+    case terrestrialRadiation = 158
+    case terrestrialRadiationInstant = 160
+    case totalColumnIntegratedWaterVapour = 162
+    case updraft = 164
+    case uvIndex = 166
+    case uvIndexClearSky = 168
+    case vaporPressureDeficit = 170
+    case visibility = 172
+    case weathercode = 174
+    case winddirection100m = 176
+    case winddirection10m = 178
+    case winddirection120m = 180
+    case winddirection150m = 182
+    case winddirection180m = 184
+    case winddirection200m = 186
+    case winddirection20m = 188
+    case winddirection40m = 190
+    case winddirection50m = 192
+    case winddirection80m = 194
+    case windgusts10m = 196
+    case windspeed100m = 198
+    case windspeed10m = 200
+    case windspeed120m = 202
+    case windspeed150m = 204
+    case windspeed180m = 206
+    case windspeed200m = 208
+    case windspeed20m = 210
+    case windspeed40m = 212
+    case windspeed50m = 214
+    case windspeed80m = 216
+    case pressureLevelTemperature = 218
+    case pressureLevelDewpoint = 220
+    case pressureLevelRelativehumidity = 222
+    case pressureLevelCloudcover = 224
+    case pressureLevelWindspeed = 226
+    case pressureLevelWinddirection = 228
+    case pressureLevelVerticalVelocity = 230
+    case pressureLevelGeopotentialHeight = 232
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
 
   public var time: com_openmeteo_TimeRange! { let o = _accessor.offset(VTOFFSET.time.v); return _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
   public var mutableTime: com_openmeteo_TimeRange_Mutable! { let o = _accessor.offset(VTOFFSET.time.v); return com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public var temperature2m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature2m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var apparentTemperature: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.apparentTemperature.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var cape: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cape.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var cloudcover: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcover.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var cloudcoverHigh: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverHigh.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var cloudcoverLow: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverLow.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var cloudcoverMid: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverMid.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var cloudcoverHigh: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverHigh.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var pressureMsl: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pressureMsl.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var relativehumidity2m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.relativehumidity2m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var precipitation: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitation.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var precipitationProbability: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationProbability.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var weathercode: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.weathercode.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var temperature80m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature80m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var temperature120m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature120m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var temperature180m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature180m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilTemperature0cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature0cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilTemperature6cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature6cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilTemperature18cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature18cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilTemperature54cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature54cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture01cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture01cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture13cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture13cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture39cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture39cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture927cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture927cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture2781cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture2781cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var snowDepth: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowDepth.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var snowHeight: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowHeight.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var sensibleHeatflux: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.sensibleHeatflux.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var latentHeatflux: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.latentHeatflux.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var showers: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.showers.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var rain: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.rain.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windgusts10m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windgusts10m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var freezinglevelHeight: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.freezinglevelHeight.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var dewpoint2m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.dewpoint2m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var diffuseRadiation: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.diffuseRadiation.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var directRadiation: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.directRadiation.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var apparentTemperature: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.apparentTemperature.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windspeed10m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var winddirection10m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection10m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windspeed80m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed80m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var winddirection80m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection80m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windspeed120m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed120m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var winddirection120m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection120m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windspeed180m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed180m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var winddirection180m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection180m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var diffuseRadiationInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.diffuseRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var directNormalIrradiance: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.directNormalIrradiance.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var evapotranspiration: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.evapotranspiration.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var directNormalIrradianceInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.directNormalIrradianceInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var directRadiation: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.directRadiation.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var directRadiationInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.directRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var et0FaoEvapotranspiration: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.et0FaoEvapotranspiration.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var vaporPressureDeficit: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.vaporPressureDeficit.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var evapotranspiration: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.evapotranspiration.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var freezinglevelHeight: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.freezinglevelHeight.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var growingDegreeDaysBase0Limit50: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.growingDegreeDaysBase0Limit50.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var isDay: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.isDay.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var latentHeatflux: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.latentHeatflux.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var leafWetnessProbability: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.leafWetnessProbability.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var lightningPotential: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.lightningPotential.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var precipitation: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitation.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var precipitationProbability: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationProbability.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var pressureMsl: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pressureMsl.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var rain: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.rain.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var relativehumidity2m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.relativehumidity2m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var runoff: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.runoff.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var sensibleHeatflux: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.sensibleHeatflux.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var shortwaveRadiation: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.shortwaveRadiation.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var shortwaveRadiationInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.shortwaveRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var showers: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.showers.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var skinTemperature: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.skinTemperature.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var snowDepth: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowDepth.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var snowHeight: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowHeight.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var snowfall: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowfall.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var snowfallWaterEquivalent: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowfallWaterEquivalent.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture01cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture01cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture0To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture0To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture0To10cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture0To10cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture0To7cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture0To7cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture100To200cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture100To200cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture100To255cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture100To255cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture10To40cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture10To40cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture13cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture13cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture2781cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture2781cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture28To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture28To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture39cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture39cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture40To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture40To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture7To28cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture7To28cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture927cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture927cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex0To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex0To7cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To7cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex100To255cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex100To255cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex28To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex28To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex7To28cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex7To28cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature0To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature0To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature0To10cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature0To10cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature0To7cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature0To7cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature0cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature0cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature100To200cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature100To200cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature100To255cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature100To255cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature10To40cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature10To40cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature18cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature18cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature28To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature28To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature40To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature40To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature54cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature54cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature6cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature6cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature7To28cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature7To28cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var surfaceAirPressure: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfaceAirPressure.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var surfacePressure: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfacePressure.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var surfaceTemperature: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfaceTemperature.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var temperature120m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature120m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var temperature180m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature180m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var temperature2m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature2m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var temperature40m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature40m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var temperature80m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature80m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var terrestrialRadiation: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.terrestrialRadiation.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var terrestrialRadiationInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.terrestrialRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var shortwaveRadiationInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.shortwaveRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var diffuseRadiationInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.diffuseRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var directRadiationInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.directRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var directNormalIrradianceInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.directNormalIrradianceInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var visibility: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.visibility.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var cape: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cape.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var totalColumnIntegratedWaterVapour: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.totalColumnIntegratedWaterVapour.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var updraft: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.updraft.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var uvIndex: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.uvIndex.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var uvIndexClearSky: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.uvIndexClearSky.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var isDay: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.isDay.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilTemperature0To10cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature0To10cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilTemperature10To40cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature10To40cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilTemperature40To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature40To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilTemperature100To200cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature100To200cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture0To10cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture0To10cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture10To40cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture10To40cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture40To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture40To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoisture100To200cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture100To200cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var growingDegreeDaysBase0Limit50: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.growingDegreeDaysBase0Limit50.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var leafWetnessProbability: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.leafWetnessProbability.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoistureIndex0To7cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To7cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoistureIndex7To28cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex7To28cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoistureIndex28To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex28To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoistureIndex100To255cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex100To255cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var soilMoistureIndex0To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var lightningPotential: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.lightningPotential.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var vaporPressureDeficit: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.vaporPressureDeficit.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var visibility: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.visibility.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var weathercode: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.weathercode.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection100m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection100m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection10m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection10m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection120m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection120m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection150m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection150m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection180m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection180m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection200m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection200m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection20m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection20m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection40m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection40m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection50m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection50m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection80m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection80m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windgusts10m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windgusts10m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed100m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed100m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed10m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed120m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed120m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed150m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed150m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed180m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed180m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed200m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed200m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed20m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed20m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed40m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed40m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed50m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed50m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed80m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed80m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelTemperature: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelTemperature.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelDewpoint: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelDewpoint.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelRelativehumidity: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelRelativehumidity.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
@@ -383,84 +443,114 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public var pressureLevelWinddirection: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelWinddirection.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelVerticalVelocity: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelVerticalVelocity.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelGeopotentialHeight: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelGeopotentialHeight.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 85) }
+  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 115) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
-  public static func add(temperature2m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2m, at: VTOFFSET.temperature2m.p) }
+  public static func add(apparentTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperature, at: VTOFFSET.apparentTemperature.p) }
+  public static func add(cape: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cape, at: VTOFFSET.cape.p) }
   public static func add(cloudcover: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcover, at: VTOFFSET.cloudcover.p) }
+  public static func add(cloudcoverHigh: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverHigh, at: VTOFFSET.cloudcoverHigh.p) }
   public static func add(cloudcoverLow: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverLow, at: VTOFFSET.cloudcoverLow.p) }
   public static func add(cloudcoverMid: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverMid, at: VTOFFSET.cloudcoverMid.p) }
-  public static func add(cloudcoverHigh: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverHigh, at: VTOFFSET.cloudcoverHigh.p) }
-  public static func add(pressureMsl: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureMsl, at: VTOFFSET.pressureMsl.p) }
-  public static func add(relativehumidity2m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity2m, at: VTOFFSET.relativehumidity2m.p) }
-  public static func add(precipitation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitation, at: VTOFFSET.precipitation.p) }
-  public static func add(precipitationProbability: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationProbability, at: VTOFFSET.precipitationProbability.p) }
-  public static func add(weathercode: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: weathercode, at: VTOFFSET.weathercode.p) }
-  public static func add(temperature80m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature80m, at: VTOFFSET.temperature80m.p) }
-  public static func add(temperature120m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature120m, at: VTOFFSET.temperature120m.p) }
-  public static func add(temperature180m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature180m, at: VTOFFSET.temperature180m.p) }
-  public static func add(soilTemperature0cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature0cm, at: VTOFFSET.soilTemperature0cm.p) }
-  public static func add(soilTemperature6cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature6cm, at: VTOFFSET.soilTemperature6cm.p) }
-  public static func add(soilTemperature18cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature18cm, at: VTOFFSET.soilTemperature18cm.p) }
-  public static func add(soilTemperature54cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature54cm, at: VTOFFSET.soilTemperature54cm.p) }
-  public static func add(soilMoisture01cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture01cm, at: VTOFFSET.soilMoisture01cm.p) }
-  public static func add(soilMoisture13cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture13cm, at: VTOFFSET.soilMoisture13cm.p) }
-  public static func add(soilMoisture39cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture39cm, at: VTOFFSET.soilMoisture39cm.p) }
-  public static func add(soilMoisture927cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture927cm, at: VTOFFSET.soilMoisture927cm.p) }
-  public static func add(soilMoisture2781cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture2781cm, at: VTOFFSET.soilMoisture2781cm.p) }
-  public static func add(snowDepth: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowDepth, at: VTOFFSET.snowDepth.p) }
-  public static func add(snowHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowHeight, at: VTOFFSET.snowHeight.p) }
-  public static func add(sensibleHeatflux: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sensibleHeatflux, at: VTOFFSET.sensibleHeatflux.p) }
-  public static func add(latentHeatflux: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: latentHeatflux, at: VTOFFSET.latentHeatflux.p) }
-  public static func add(showers: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: showers, at: VTOFFSET.showers.p) }
-  public static func add(rain: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: rain, at: VTOFFSET.rain.p) }
-  public static func add(windgusts10m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windgusts10m, at: VTOFFSET.windgusts10m.p) }
-  public static func add(freezinglevelHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: freezinglevelHeight, at: VTOFFSET.freezinglevelHeight.p) }
   public static func add(dewpoint2m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint2m, at: VTOFFSET.dewpoint2m.p) }
   public static func add(diffuseRadiation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: diffuseRadiation, at: VTOFFSET.diffuseRadiation.p) }
-  public static func add(directRadiation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: directRadiation, at: VTOFFSET.directRadiation.p) }
-  public static func add(apparentTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperature, at: VTOFFSET.apparentTemperature.p) }
-  public static func add(windspeed10m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10m, at: VTOFFSET.windspeed10m.p) }
-  public static func add(winddirection10m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection10m, at: VTOFFSET.winddirection10m.p) }
-  public static func add(windspeed80m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed80m, at: VTOFFSET.windspeed80m.p) }
-  public static func add(winddirection80m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection80m, at: VTOFFSET.winddirection80m.p) }
-  public static func add(windspeed120m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed120m, at: VTOFFSET.windspeed120m.p) }
-  public static func add(winddirection120m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection120m, at: VTOFFSET.winddirection120m.p) }
-  public static func add(windspeed180m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed180m, at: VTOFFSET.windspeed180m.p) }
-  public static func add(winddirection180m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection180m, at: VTOFFSET.winddirection180m.p) }
+  public static func add(diffuseRadiationInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: diffuseRadiationInstant, at: VTOFFSET.diffuseRadiationInstant.p) }
   public static func add(directNormalIrradiance: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: directNormalIrradiance, at: VTOFFSET.directNormalIrradiance.p) }
-  public static func add(evapotranspiration: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: evapotranspiration, at: VTOFFSET.evapotranspiration.p) }
+  public static func add(directNormalIrradianceInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: directNormalIrradianceInstant, at: VTOFFSET.directNormalIrradianceInstant.p) }
+  public static func add(directRadiation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: directRadiation, at: VTOFFSET.directRadiation.p) }
+  public static func add(directRadiationInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: directRadiationInstant, at: VTOFFSET.directRadiationInstant.p) }
   public static func add(et0FaoEvapotranspiration: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: et0FaoEvapotranspiration, at: VTOFFSET.et0FaoEvapotranspiration.p) }
-  public static func add(vaporPressureDeficit: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: vaporPressureDeficit, at: VTOFFSET.vaporPressureDeficit.p) }
+  public static func add(evapotranspiration: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: evapotranspiration, at: VTOFFSET.evapotranspiration.p) }
+  public static func add(freezinglevelHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: freezinglevelHeight, at: VTOFFSET.freezinglevelHeight.p) }
+  public static func add(growingDegreeDaysBase0Limit50: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: growingDegreeDaysBase0Limit50, at: VTOFFSET.growingDegreeDaysBase0Limit50.p) }
+  public static func add(isDay: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: isDay, at: VTOFFSET.isDay.p) }
+  public static func add(latentHeatflux: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: latentHeatflux, at: VTOFFSET.latentHeatflux.p) }
+  public static func add(leafWetnessProbability: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: leafWetnessProbability, at: VTOFFSET.leafWetnessProbability.p) }
+  public static func add(lightningPotential: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: lightningPotential, at: VTOFFSET.lightningPotential.p) }
+  public static func add(precipitation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitation, at: VTOFFSET.precipitation.p) }
+  public static func add(precipitationProbability: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationProbability, at: VTOFFSET.precipitationProbability.p) }
+  public static func add(pressureMsl: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureMsl, at: VTOFFSET.pressureMsl.p) }
+  public static func add(rain: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: rain, at: VTOFFSET.rain.p) }
+  public static func add(relativehumidity2m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativehumidity2m, at: VTOFFSET.relativehumidity2m.p) }
+  public static func add(runoff: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: runoff, at: VTOFFSET.runoff.p) }
+  public static func add(sensibleHeatflux: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sensibleHeatflux, at: VTOFFSET.sensibleHeatflux.p) }
   public static func add(shortwaveRadiation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: shortwaveRadiation, at: VTOFFSET.shortwaveRadiation.p) }
+  public static func add(shortwaveRadiationInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: shortwaveRadiationInstant, at: VTOFFSET.shortwaveRadiationInstant.p) }
+  public static func add(showers: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: showers, at: VTOFFSET.showers.p) }
+  public static func add(skinTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: skinTemperature, at: VTOFFSET.skinTemperature.p) }
+  public static func add(snowDepth: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowDepth, at: VTOFFSET.snowDepth.p) }
+  public static func add(snowHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowHeight, at: VTOFFSET.snowHeight.p) }
   public static func add(snowfall: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowfall, at: VTOFFSET.snowfall.p) }
+  public static func add(snowfallWaterEquivalent: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowfallWaterEquivalent, at: VTOFFSET.snowfallWaterEquivalent.p) }
+  public static func add(soilMoisture01cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture01cm, at: VTOFFSET.soilMoisture01cm.p) }
+  public static func add(soilMoisture0To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture0To100cm, at: VTOFFSET.soilMoisture0To100cm.p) }
+  public static func add(soilMoisture0To10cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture0To10cm, at: VTOFFSET.soilMoisture0To10cm.p) }
+  public static func add(soilMoisture0To7cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture0To7cm, at: VTOFFSET.soilMoisture0To7cm.p) }
+  public static func add(soilMoisture100To200cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture100To200cm, at: VTOFFSET.soilMoisture100To200cm.p) }
+  public static func add(soilMoisture100To255cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture100To255cm, at: VTOFFSET.soilMoisture100To255cm.p) }
+  public static func add(soilMoisture10To40cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture10To40cm, at: VTOFFSET.soilMoisture10To40cm.p) }
+  public static func add(soilMoisture13cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture13cm, at: VTOFFSET.soilMoisture13cm.p) }
+  public static func add(soilMoisture2781cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture2781cm, at: VTOFFSET.soilMoisture2781cm.p) }
+  public static func add(soilMoisture28To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture28To100cm, at: VTOFFSET.soilMoisture28To100cm.p) }
+  public static func add(soilMoisture39cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture39cm, at: VTOFFSET.soilMoisture39cm.p) }
+  public static func add(soilMoisture40To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture40To100cm, at: VTOFFSET.soilMoisture40To100cm.p) }
+  public static func add(soilMoisture7To28cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture7To28cm, at: VTOFFSET.soilMoisture7To28cm.p) }
+  public static func add(soilMoisture927cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture927cm, at: VTOFFSET.soilMoisture927cm.p) }
+  public static func add(soilMoistureIndex0To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex0To100cm, at: VTOFFSET.soilMoistureIndex0To100cm.p) }
+  public static func add(soilMoistureIndex0To7cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex0To7cm, at: VTOFFSET.soilMoistureIndex0To7cm.p) }
+  public static func add(soilMoistureIndex100To255cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex100To255cm, at: VTOFFSET.soilMoistureIndex100To255cm.p) }
+  public static func add(soilMoistureIndex28To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex28To100cm, at: VTOFFSET.soilMoistureIndex28To100cm.p) }
+  public static func add(soilMoistureIndex7To28cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex7To28cm, at: VTOFFSET.soilMoistureIndex7To28cm.p) }
+  public static func add(soilTemperature0To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature0To100cm, at: VTOFFSET.soilTemperature0To100cm.p) }
+  public static func add(soilTemperature0To10cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature0To10cm, at: VTOFFSET.soilTemperature0To10cm.p) }
+  public static func add(soilTemperature0To7cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature0To7cm, at: VTOFFSET.soilTemperature0To7cm.p) }
+  public static func add(soilTemperature0cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature0cm, at: VTOFFSET.soilTemperature0cm.p) }
+  public static func add(soilTemperature100To200cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature100To200cm, at: VTOFFSET.soilTemperature100To200cm.p) }
+  public static func add(soilTemperature100To255cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature100To255cm, at: VTOFFSET.soilTemperature100To255cm.p) }
+  public static func add(soilTemperature10To40cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature10To40cm, at: VTOFFSET.soilTemperature10To40cm.p) }
+  public static func add(soilTemperature18cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature18cm, at: VTOFFSET.soilTemperature18cm.p) }
+  public static func add(soilTemperature28To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature28To100cm, at: VTOFFSET.soilTemperature28To100cm.p) }
+  public static func add(soilTemperature40To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature40To100cm, at: VTOFFSET.soilTemperature40To100cm.p) }
+  public static func add(soilTemperature54cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature54cm, at: VTOFFSET.soilTemperature54cm.p) }
+  public static func add(soilTemperature6cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature6cm, at: VTOFFSET.soilTemperature6cm.p) }
+  public static func add(soilTemperature7To28cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature7To28cm, at: VTOFFSET.soilTemperature7To28cm.p) }
+  public static func add(surfaceAirPressure: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfaceAirPressure, at: VTOFFSET.surfaceAirPressure.p) }
   public static func add(surfacePressure: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfacePressure, at: VTOFFSET.surfacePressure.p) }
+  public static func add(surfaceTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfaceTemperature, at: VTOFFSET.surfaceTemperature.p) }
+  public static func add(temperature120m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature120m, at: VTOFFSET.temperature120m.p) }
+  public static func add(temperature180m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature180m, at: VTOFFSET.temperature180m.p) }
+  public static func add(temperature2m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2m, at: VTOFFSET.temperature2m.p) }
+  public static func add(temperature40m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature40m, at: VTOFFSET.temperature40m.p) }
+  public static func add(temperature80m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature80m, at: VTOFFSET.temperature80m.p) }
   public static func add(terrestrialRadiation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: terrestrialRadiation, at: VTOFFSET.terrestrialRadiation.p) }
   public static func add(terrestrialRadiationInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: terrestrialRadiationInstant, at: VTOFFSET.terrestrialRadiationInstant.p) }
-  public static func add(shortwaveRadiationInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: shortwaveRadiationInstant, at: VTOFFSET.shortwaveRadiationInstant.p) }
-  public static func add(diffuseRadiationInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: diffuseRadiationInstant, at: VTOFFSET.diffuseRadiationInstant.p) }
-  public static func add(directRadiationInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: directRadiationInstant, at: VTOFFSET.directRadiationInstant.p) }
-  public static func add(directNormalIrradianceInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: directNormalIrradianceInstant, at: VTOFFSET.directNormalIrradianceInstant.p) }
-  public static func add(visibility: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: visibility, at: VTOFFSET.visibility.p) }
-  public static func add(cape: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cape, at: VTOFFSET.cape.p) }
+  public static func add(totalColumnIntegratedWaterVapour: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: totalColumnIntegratedWaterVapour, at: VTOFFSET.totalColumnIntegratedWaterVapour.p) }
+  public static func add(updraft: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: updraft, at: VTOFFSET.updraft.p) }
   public static func add(uvIndex: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndex, at: VTOFFSET.uvIndex.p) }
   public static func add(uvIndexClearSky: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndexClearSky, at: VTOFFSET.uvIndexClearSky.p) }
-  public static func add(isDay: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: isDay, at: VTOFFSET.isDay.p) }
-  public static func add(soilTemperature0To10cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature0To10cm, at: VTOFFSET.soilTemperature0To10cm.p) }
-  public static func add(soilTemperature10To40cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature10To40cm, at: VTOFFSET.soilTemperature10To40cm.p) }
-  public static func add(soilTemperature40To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature40To100cm, at: VTOFFSET.soilTemperature40To100cm.p) }
-  public static func add(soilTemperature100To200cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature100To200cm, at: VTOFFSET.soilTemperature100To200cm.p) }
-  public static func add(soilMoisture0To10cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture0To10cm, at: VTOFFSET.soilMoisture0To10cm.p) }
-  public static func add(soilMoisture10To40cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture10To40cm, at: VTOFFSET.soilMoisture10To40cm.p) }
-  public static func add(soilMoisture40To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture40To100cm, at: VTOFFSET.soilMoisture40To100cm.p) }
-  public static func add(soilMoisture100To200cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture100To200cm, at: VTOFFSET.soilMoisture100To200cm.p) }
-  public static func add(growingDegreeDaysBase0Limit50: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: growingDegreeDaysBase0Limit50, at: VTOFFSET.growingDegreeDaysBase0Limit50.p) }
-  public static func add(leafWetnessProbability: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: leafWetnessProbability, at: VTOFFSET.leafWetnessProbability.p) }
-  public static func add(soilMoistureIndex0To7cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex0To7cm, at: VTOFFSET.soilMoistureIndex0To7cm.p) }
-  public static func add(soilMoistureIndex7To28cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex7To28cm, at: VTOFFSET.soilMoistureIndex7To28cm.p) }
-  public static func add(soilMoistureIndex28To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex28To100cm, at: VTOFFSET.soilMoistureIndex28To100cm.p) }
-  public static func add(soilMoistureIndex100To255cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex100To255cm, at: VTOFFSET.soilMoistureIndex100To255cm.p) }
-  public static func add(soilMoistureIndex0To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex0To100cm, at: VTOFFSET.soilMoistureIndex0To100cm.p) }
-  public static func add(lightningPotential: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: lightningPotential, at: VTOFFSET.lightningPotential.p) }
+  public static func add(vaporPressureDeficit: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: vaporPressureDeficit, at: VTOFFSET.vaporPressureDeficit.p) }
+  public static func add(visibility: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: visibility, at: VTOFFSET.visibility.p) }
+  public static func add(weathercode: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: weathercode, at: VTOFFSET.weathercode.p) }
+  public static func add(winddirection100m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection100m, at: VTOFFSET.winddirection100m.p) }
+  public static func add(winddirection10m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection10m, at: VTOFFSET.winddirection10m.p) }
+  public static func add(winddirection120m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection120m, at: VTOFFSET.winddirection120m.p) }
+  public static func add(winddirection150m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection150m, at: VTOFFSET.winddirection150m.p) }
+  public static func add(winddirection180m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection180m, at: VTOFFSET.winddirection180m.p) }
+  public static func add(winddirection200m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection200m, at: VTOFFSET.winddirection200m.p) }
+  public static func add(winddirection20m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection20m, at: VTOFFSET.winddirection20m.p) }
+  public static func add(winddirection40m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection40m, at: VTOFFSET.winddirection40m.p) }
+  public static func add(winddirection50m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection50m, at: VTOFFSET.winddirection50m.p) }
+  public static func add(winddirection80m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection80m, at: VTOFFSET.winddirection80m.p) }
+  public static func add(windgusts10m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windgusts10m, at: VTOFFSET.windgusts10m.p) }
+  public static func add(windspeed100m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed100m, at: VTOFFSET.windspeed100m.p) }
+  public static func add(windspeed10m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10m, at: VTOFFSET.windspeed10m.p) }
+  public static func add(windspeed120m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed120m, at: VTOFFSET.windspeed120m.p) }
+  public static func add(windspeed150m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed150m, at: VTOFFSET.windspeed150m.p) }
+  public static func add(windspeed180m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed180m, at: VTOFFSET.windspeed180m.p) }
+  public static func add(windspeed200m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed200m, at: VTOFFSET.windspeed200m.p) }
+  public static func add(windspeed20m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed20m, at: VTOFFSET.windspeed20m.p) }
+  public static func add(windspeed40m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed40m, at: VTOFFSET.windspeed40m.p) }
+  public static func add(windspeed50m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed50m, at: VTOFFSET.windspeed50m.p) }
+  public static func add(windspeed80m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed80m, at: VTOFFSET.windspeed80m.p) }
   public static func add(pressureLevelTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelTemperature, at: VTOFFSET.pressureLevelTemperature.p) }
   public static func add(pressureLevelDewpoint: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelDewpoint, at: VTOFFSET.pressureLevelDewpoint.p) }
   public static func add(pressureLevelRelativehumidity: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelRelativehumidity, at: VTOFFSET.pressureLevelRelativehumidity.p) }
@@ -473,82 +563,112 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public static func createWeatherHourly(
     _ fbb: inout FlatBufferBuilder,
     time: com_openmeteo_TimeRange,
-    temperature2mOffset temperature2m: Offset = Offset(),
+    apparentTemperatureOffset apparentTemperature: Offset = Offset(),
+    capeOffset cape: Offset = Offset(),
     cloudcoverOffset cloudcover: Offset = Offset(),
+    cloudcoverHighOffset cloudcoverHigh: Offset = Offset(),
     cloudcoverLowOffset cloudcoverLow: Offset = Offset(),
     cloudcoverMidOffset cloudcoverMid: Offset = Offset(),
-    cloudcoverHighOffset cloudcoverHigh: Offset = Offset(),
-    pressureMslOffset pressureMsl: Offset = Offset(),
-    relativehumidity2mOffset relativehumidity2m: Offset = Offset(),
-    precipitationOffset precipitation: Offset = Offset(),
-    precipitationProbabilityOffset precipitationProbability: Offset = Offset(),
-    weathercodeOffset weathercode: Offset = Offset(),
-    temperature80mOffset temperature80m: Offset = Offset(),
-    temperature120mOffset temperature120m: Offset = Offset(),
-    temperature180mOffset temperature180m: Offset = Offset(),
-    soilTemperature0cmOffset soilTemperature0cm: Offset = Offset(),
-    soilTemperature6cmOffset soilTemperature6cm: Offset = Offset(),
-    soilTemperature18cmOffset soilTemperature18cm: Offset = Offset(),
-    soilTemperature54cmOffset soilTemperature54cm: Offset = Offset(),
-    soilMoisture01cmOffset soilMoisture01cm: Offset = Offset(),
-    soilMoisture13cmOffset soilMoisture13cm: Offset = Offset(),
-    soilMoisture39cmOffset soilMoisture39cm: Offset = Offset(),
-    soilMoisture927cmOffset soilMoisture927cm: Offset = Offset(),
-    soilMoisture2781cmOffset soilMoisture2781cm: Offset = Offset(),
-    snowDepthOffset snowDepth: Offset = Offset(),
-    snowHeightOffset snowHeight: Offset = Offset(),
-    sensibleHeatfluxOffset sensibleHeatflux: Offset = Offset(),
-    latentHeatfluxOffset latentHeatflux: Offset = Offset(),
-    showersOffset showers: Offset = Offset(),
-    rainOffset rain: Offset = Offset(),
-    windgusts10mOffset windgusts10m: Offset = Offset(),
-    freezinglevelHeightOffset freezinglevelHeight: Offset = Offset(),
     dewpoint2mOffset dewpoint2m: Offset = Offset(),
     diffuseRadiationOffset diffuseRadiation: Offset = Offset(),
-    directRadiationOffset directRadiation: Offset = Offset(),
-    apparentTemperatureOffset apparentTemperature: Offset = Offset(),
-    windspeed10mOffset windspeed10m: Offset = Offset(),
-    winddirection10mOffset winddirection10m: Offset = Offset(),
-    windspeed80mOffset windspeed80m: Offset = Offset(),
-    winddirection80mOffset winddirection80m: Offset = Offset(),
-    windspeed120mOffset windspeed120m: Offset = Offset(),
-    winddirection120mOffset winddirection120m: Offset = Offset(),
-    windspeed180mOffset windspeed180m: Offset = Offset(),
-    winddirection180mOffset winddirection180m: Offset = Offset(),
+    diffuseRadiationInstantOffset diffuseRadiationInstant: Offset = Offset(),
     directNormalIrradianceOffset directNormalIrradiance: Offset = Offset(),
-    evapotranspirationOffset evapotranspiration: Offset = Offset(),
+    directNormalIrradianceInstantOffset directNormalIrradianceInstant: Offset = Offset(),
+    directRadiationOffset directRadiation: Offset = Offset(),
+    directRadiationInstantOffset directRadiationInstant: Offset = Offset(),
     et0FaoEvapotranspirationOffset et0FaoEvapotranspiration: Offset = Offset(),
-    vaporPressureDeficitOffset vaporPressureDeficit: Offset = Offset(),
+    evapotranspirationOffset evapotranspiration: Offset = Offset(),
+    freezinglevelHeightOffset freezinglevelHeight: Offset = Offset(),
+    growingDegreeDaysBase0Limit50Offset growingDegreeDaysBase0Limit50: Offset = Offset(),
+    isDayOffset isDay: Offset = Offset(),
+    latentHeatfluxOffset latentHeatflux: Offset = Offset(),
+    leafWetnessProbabilityOffset leafWetnessProbability: Offset = Offset(),
+    lightningPotentialOffset lightningPotential: Offset = Offset(),
+    precipitationOffset precipitation: Offset = Offset(),
+    precipitationProbabilityOffset precipitationProbability: Offset = Offset(),
+    pressureMslOffset pressureMsl: Offset = Offset(),
+    rainOffset rain: Offset = Offset(),
+    relativehumidity2mOffset relativehumidity2m: Offset = Offset(),
+    runoffOffset runoff: Offset = Offset(),
+    sensibleHeatfluxOffset sensibleHeatflux: Offset = Offset(),
     shortwaveRadiationOffset shortwaveRadiation: Offset = Offset(),
+    shortwaveRadiationInstantOffset shortwaveRadiationInstant: Offset = Offset(),
+    showersOffset showers: Offset = Offset(),
+    skinTemperatureOffset skinTemperature: Offset = Offset(),
+    snowDepthOffset snowDepth: Offset = Offset(),
+    snowHeightOffset snowHeight: Offset = Offset(),
     snowfallOffset snowfall: Offset = Offset(),
+    snowfallWaterEquivalentOffset snowfallWaterEquivalent: Offset = Offset(),
+    soilMoisture01cmOffset soilMoisture01cm: Offset = Offset(),
+    soilMoisture0To100cmOffset soilMoisture0To100cm: Offset = Offset(),
+    soilMoisture0To10cmOffset soilMoisture0To10cm: Offset = Offset(),
+    soilMoisture0To7cmOffset soilMoisture0To7cm: Offset = Offset(),
+    soilMoisture100To200cmOffset soilMoisture100To200cm: Offset = Offset(),
+    soilMoisture100To255cmOffset soilMoisture100To255cm: Offset = Offset(),
+    soilMoisture10To40cmOffset soilMoisture10To40cm: Offset = Offset(),
+    soilMoisture13cmOffset soilMoisture13cm: Offset = Offset(),
+    soilMoisture2781cmOffset soilMoisture2781cm: Offset = Offset(),
+    soilMoisture28To100cmOffset soilMoisture28To100cm: Offset = Offset(),
+    soilMoisture39cmOffset soilMoisture39cm: Offset = Offset(),
+    soilMoisture40To100cmOffset soilMoisture40To100cm: Offset = Offset(),
+    soilMoisture7To28cmOffset soilMoisture7To28cm: Offset = Offset(),
+    soilMoisture927cmOffset soilMoisture927cm: Offset = Offset(),
+    soilMoistureIndex0To100cmOffset soilMoistureIndex0To100cm: Offset = Offset(),
+    soilMoistureIndex0To7cmOffset soilMoistureIndex0To7cm: Offset = Offset(),
+    soilMoistureIndex100To255cmOffset soilMoistureIndex100To255cm: Offset = Offset(),
+    soilMoistureIndex28To100cmOffset soilMoistureIndex28To100cm: Offset = Offset(),
+    soilMoistureIndex7To28cmOffset soilMoistureIndex7To28cm: Offset = Offset(),
+    soilTemperature0To100cmOffset soilTemperature0To100cm: Offset = Offset(),
+    soilTemperature0To10cmOffset soilTemperature0To10cm: Offset = Offset(),
+    soilTemperature0To7cmOffset soilTemperature0To7cm: Offset = Offset(),
+    soilTemperature0cmOffset soilTemperature0cm: Offset = Offset(),
+    soilTemperature100To200cmOffset soilTemperature100To200cm: Offset = Offset(),
+    soilTemperature100To255cmOffset soilTemperature100To255cm: Offset = Offset(),
+    soilTemperature10To40cmOffset soilTemperature10To40cm: Offset = Offset(),
+    soilTemperature18cmOffset soilTemperature18cm: Offset = Offset(),
+    soilTemperature28To100cmOffset soilTemperature28To100cm: Offset = Offset(),
+    soilTemperature40To100cmOffset soilTemperature40To100cm: Offset = Offset(),
+    soilTemperature54cmOffset soilTemperature54cm: Offset = Offset(),
+    soilTemperature6cmOffset soilTemperature6cm: Offset = Offset(),
+    soilTemperature7To28cmOffset soilTemperature7To28cm: Offset = Offset(),
+    surfaceAirPressureOffset surfaceAirPressure: Offset = Offset(),
     surfacePressureOffset surfacePressure: Offset = Offset(),
+    surfaceTemperatureOffset surfaceTemperature: Offset = Offset(),
+    temperature120mOffset temperature120m: Offset = Offset(),
+    temperature180mOffset temperature180m: Offset = Offset(),
+    temperature2mOffset temperature2m: Offset = Offset(),
+    temperature40mOffset temperature40m: Offset = Offset(),
+    temperature80mOffset temperature80m: Offset = Offset(),
     terrestrialRadiationOffset terrestrialRadiation: Offset = Offset(),
     terrestrialRadiationInstantOffset terrestrialRadiationInstant: Offset = Offset(),
-    shortwaveRadiationInstantOffset shortwaveRadiationInstant: Offset = Offset(),
-    diffuseRadiationInstantOffset diffuseRadiationInstant: Offset = Offset(),
-    directRadiationInstantOffset directRadiationInstant: Offset = Offset(),
-    directNormalIrradianceInstantOffset directNormalIrradianceInstant: Offset = Offset(),
-    visibilityOffset visibility: Offset = Offset(),
-    capeOffset cape: Offset = Offset(),
+    totalColumnIntegratedWaterVapourOffset totalColumnIntegratedWaterVapour: Offset = Offset(),
+    updraftOffset updraft: Offset = Offset(),
     uvIndexOffset uvIndex: Offset = Offset(),
     uvIndexClearSkyOffset uvIndexClearSky: Offset = Offset(),
-    isDayOffset isDay: Offset = Offset(),
-    soilTemperature0To10cmOffset soilTemperature0To10cm: Offset = Offset(),
-    soilTemperature10To40cmOffset soilTemperature10To40cm: Offset = Offset(),
-    soilTemperature40To100cmOffset soilTemperature40To100cm: Offset = Offset(),
-    soilTemperature100To200cmOffset soilTemperature100To200cm: Offset = Offset(),
-    soilMoisture0To10cmOffset soilMoisture0To10cm: Offset = Offset(),
-    soilMoisture10To40cmOffset soilMoisture10To40cm: Offset = Offset(),
-    soilMoisture40To100cmOffset soilMoisture40To100cm: Offset = Offset(),
-    soilMoisture100To200cmOffset soilMoisture100To200cm: Offset = Offset(),
-    growingDegreeDaysBase0Limit50Offset growingDegreeDaysBase0Limit50: Offset = Offset(),
-    leafWetnessProbabilityOffset leafWetnessProbability: Offset = Offset(),
-    soilMoistureIndex0To7cmOffset soilMoistureIndex0To7cm: Offset = Offset(),
-    soilMoistureIndex7To28cmOffset soilMoistureIndex7To28cm: Offset = Offset(),
-    soilMoistureIndex28To100cmOffset soilMoistureIndex28To100cm: Offset = Offset(),
-    soilMoistureIndex100To255cmOffset soilMoistureIndex100To255cm: Offset = Offset(),
-    soilMoistureIndex0To100cmOffset soilMoistureIndex0To100cm: Offset = Offset(),
-    lightningPotentialOffset lightningPotential: Offset = Offset(),
+    vaporPressureDeficitOffset vaporPressureDeficit: Offset = Offset(),
+    visibilityOffset visibility: Offset = Offset(),
+    weathercodeOffset weathercode: Offset = Offset(),
+    winddirection100mOffset winddirection100m: Offset = Offset(),
+    winddirection10mOffset winddirection10m: Offset = Offset(),
+    winddirection120mOffset winddirection120m: Offset = Offset(),
+    winddirection150mOffset winddirection150m: Offset = Offset(),
+    winddirection180mOffset winddirection180m: Offset = Offset(),
+    winddirection200mOffset winddirection200m: Offset = Offset(),
+    winddirection20mOffset winddirection20m: Offset = Offset(),
+    winddirection40mOffset winddirection40m: Offset = Offset(),
+    winddirection50mOffset winddirection50m: Offset = Offset(),
+    winddirection80mOffset winddirection80m: Offset = Offset(),
+    windgusts10mOffset windgusts10m: Offset = Offset(),
+    windspeed100mOffset windspeed100m: Offset = Offset(),
+    windspeed10mOffset windspeed10m: Offset = Offset(),
+    windspeed120mOffset windspeed120m: Offset = Offset(),
+    windspeed150mOffset windspeed150m: Offset = Offset(),
+    windspeed180mOffset windspeed180m: Offset = Offset(),
+    windspeed200mOffset windspeed200m: Offset = Offset(),
+    windspeed20mOffset windspeed20m: Offset = Offset(),
+    windspeed40mOffset windspeed40m: Offset = Offset(),
+    windspeed50mOffset windspeed50m: Offset = Offset(),
+    windspeed80mOffset windspeed80m: Offset = Offset(),
     pressureLevelTemperatureOffset pressureLevelTemperature: Offset = Offset(),
     pressureLevelDewpointOffset pressureLevelDewpoint: Offset = Offset(),
     pressureLevelRelativehumidityOffset pressureLevelRelativehumidity: Offset = Offset(),
@@ -560,82 +680,112 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   ) -> Offset {
     let __start = com_openmeteo_WeatherHourly.startWeatherHourly(&fbb)
     com_openmeteo_WeatherHourly.add(time: time, &fbb)
-    com_openmeteo_WeatherHourly.add(temperature2m: temperature2m, &fbb)
+    com_openmeteo_WeatherHourly.add(apparentTemperature: apparentTemperature, &fbb)
+    com_openmeteo_WeatherHourly.add(cape: cape, &fbb)
     com_openmeteo_WeatherHourly.add(cloudcover: cloudcover, &fbb)
+    com_openmeteo_WeatherHourly.add(cloudcoverHigh: cloudcoverHigh, &fbb)
     com_openmeteo_WeatherHourly.add(cloudcoverLow: cloudcoverLow, &fbb)
     com_openmeteo_WeatherHourly.add(cloudcoverMid: cloudcoverMid, &fbb)
-    com_openmeteo_WeatherHourly.add(cloudcoverHigh: cloudcoverHigh, &fbb)
-    com_openmeteo_WeatherHourly.add(pressureMsl: pressureMsl, &fbb)
-    com_openmeteo_WeatherHourly.add(relativehumidity2m: relativehumidity2m, &fbb)
-    com_openmeteo_WeatherHourly.add(precipitation: precipitation, &fbb)
-    com_openmeteo_WeatherHourly.add(precipitationProbability: precipitationProbability, &fbb)
-    com_openmeteo_WeatherHourly.add(weathercode: weathercode, &fbb)
-    com_openmeteo_WeatherHourly.add(temperature80m: temperature80m, &fbb)
-    com_openmeteo_WeatherHourly.add(temperature120m: temperature120m, &fbb)
-    com_openmeteo_WeatherHourly.add(temperature180m: temperature180m, &fbb)
-    com_openmeteo_WeatherHourly.add(soilTemperature0cm: soilTemperature0cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilTemperature6cm: soilTemperature6cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilTemperature18cm: soilTemperature18cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilTemperature54cm: soilTemperature54cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture01cm: soilMoisture01cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture13cm: soilMoisture13cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture39cm: soilMoisture39cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture927cm: soilMoisture927cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture2781cm: soilMoisture2781cm, &fbb)
-    com_openmeteo_WeatherHourly.add(snowDepth: snowDepth, &fbb)
-    com_openmeteo_WeatherHourly.add(snowHeight: snowHeight, &fbb)
-    com_openmeteo_WeatherHourly.add(sensibleHeatflux: sensibleHeatflux, &fbb)
-    com_openmeteo_WeatherHourly.add(latentHeatflux: latentHeatflux, &fbb)
-    com_openmeteo_WeatherHourly.add(showers: showers, &fbb)
-    com_openmeteo_WeatherHourly.add(rain: rain, &fbb)
-    com_openmeteo_WeatherHourly.add(windgusts10m: windgusts10m, &fbb)
-    com_openmeteo_WeatherHourly.add(freezinglevelHeight: freezinglevelHeight, &fbb)
     com_openmeteo_WeatherHourly.add(dewpoint2m: dewpoint2m, &fbb)
     com_openmeteo_WeatherHourly.add(diffuseRadiation: diffuseRadiation, &fbb)
-    com_openmeteo_WeatherHourly.add(directRadiation: directRadiation, &fbb)
-    com_openmeteo_WeatherHourly.add(apparentTemperature: apparentTemperature, &fbb)
-    com_openmeteo_WeatherHourly.add(windspeed10m: windspeed10m, &fbb)
-    com_openmeteo_WeatherHourly.add(winddirection10m: winddirection10m, &fbb)
-    com_openmeteo_WeatherHourly.add(windspeed80m: windspeed80m, &fbb)
-    com_openmeteo_WeatherHourly.add(winddirection80m: winddirection80m, &fbb)
-    com_openmeteo_WeatherHourly.add(windspeed120m: windspeed120m, &fbb)
-    com_openmeteo_WeatherHourly.add(winddirection120m: winddirection120m, &fbb)
-    com_openmeteo_WeatherHourly.add(windspeed180m: windspeed180m, &fbb)
-    com_openmeteo_WeatherHourly.add(winddirection180m: winddirection180m, &fbb)
+    com_openmeteo_WeatherHourly.add(diffuseRadiationInstant: diffuseRadiationInstant, &fbb)
     com_openmeteo_WeatherHourly.add(directNormalIrradiance: directNormalIrradiance, &fbb)
-    com_openmeteo_WeatherHourly.add(evapotranspiration: evapotranspiration, &fbb)
+    com_openmeteo_WeatherHourly.add(directNormalIrradianceInstant: directNormalIrradianceInstant, &fbb)
+    com_openmeteo_WeatherHourly.add(directRadiation: directRadiation, &fbb)
+    com_openmeteo_WeatherHourly.add(directRadiationInstant: directRadiationInstant, &fbb)
     com_openmeteo_WeatherHourly.add(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
-    com_openmeteo_WeatherHourly.add(vaporPressureDeficit: vaporPressureDeficit, &fbb)
+    com_openmeteo_WeatherHourly.add(evapotranspiration: evapotranspiration, &fbb)
+    com_openmeteo_WeatherHourly.add(freezinglevelHeight: freezinglevelHeight, &fbb)
+    com_openmeteo_WeatherHourly.add(growingDegreeDaysBase0Limit50: growingDegreeDaysBase0Limit50, &fbb)
+    com_openmeteo_WeatherHourly.add(isDay: isDay, &fbb)
+    com_openmeteo_WeatherHourly.add(latentHeatflux: latentHeatflux, &fbb)
+    com_openmeteo_WeatherHourly.add(leafWetnessProbability: leafWetnessProbability, &fbb)
+    com_openmeteo_WeatherHourly.add(lightningPotential: lightningPotential, &fbb)
+    com_openmeteo_WeatherHourly.add(precipitation: precipitation, &fbb)
+    com_openmeteo_WeatherHourly.add(precipitationProbability: precipitationProbability, &fbb)
+    com_openmeteo_WeatherHourly.add(pressureMsl: pressureMsl, &fbb)
+    com_openmeteo_WeatherHourly.add(rain: rain, &fbb)
+    com_openmeteo_WeatherHourly.add(relativehumidity2m: relativehumidity2m, &fbb)
+    com_openmeteo_WeatherHourly.add(runoff: runoff, &fbb)
+    com_openmeteo_WeatherHourly.add(sensibleHeatflux: sensibleHeatflux, &fbb)
     com_openmeteo_WeatherHourly.add(shortwaveRadiation: shortwaveRadiation, &fbb)
+    com_openmeteo_WeatherHourly.add(shortwaveRadiationInstant: shortwaveRadiationInstant, &fbb)
+    com_openmeteo_WeatherHourly.add(showers: showers, &fbb)
+    com_openmeteo_WeatherHourly.add(skinTemperature: skinTemperature, &fbb)
+    com_openmeteo_WeatherHourly.add(snowDepth: snowDepth, &fbb)
+    com_openmeteo_WeatherHourly.add(snowHeight: snowHeight, &fbb)
     com_openmeteo_WeatherHourly.add(snowfall: snowfall, &fbb)
+    com_openmeteo_WeatherHourly.add(snowfallWaterEquivalent: snowfallWaterEquivalent, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture01cm: soilMoisture01cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture0To100cm: soilMoisture0To100cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture0To10cm: soilMoisture0To10cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture0To7cm: soilMoisture0To7cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture100To200cm: soilMoisture100To200cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture100To255cm: soilMoisture100To255cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture10To40cm: soilMoisture10To40cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture13cm: soilMoisture13cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture2781cm: soilMoisture2781cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture28To100cm: soilMoisture28To100cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture39cm: soilMoisture39cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture40To100cm: soilMoisture40To100cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture7To28cm: soilMoisture7To28cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoisture927cm: soilMoisture927cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoistureIndex0To100cm: soilMoistureIndex0To100cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoistureIndex0To7cm: soilMoistureIndex0To7cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoistureIndex100To255cm: soilMoistureIndex100To255cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoistureIndex28To100cm: soilMoistureIndex28To100cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilMoistureIndex7To28cm: soilMoistureIndex7To28cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature0To100cm: soilTemperature0To100cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature0To10cm: soilTemperature0To10cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature0To7cm: soilTemperature0To7cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature0cm: soilTemperature0cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature100To200cm: soilTemperature100To200cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature100To255cm: soilTemperature100To255cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature10To40cm: soilTemperature10To40cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature18cm: soilTemperature18cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature28To100cm: soilTemperature28To100cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature40To100cm: soilTemperature40To100cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature54cm: soilTemperature54cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature6cm: soilTemperature6cm, &fbb)
+    com_openmeteo_WeatherHourly.add(soilTemperature7To28cm: soilTemperature7To28cm, &fbb)
+    com_openmeteo_WeatherHourly.add(surfaceAirPressure: surfaceAirPressure, &fbb)
     com_openmeteo_WeatherHourly.add(surfacePressure: surfacePressure, &fbb)
+    com_openmeteo_WeatherHourly.add(surfaceTemperature: surfaceTemperature, &fbb)
+    com_openmeteo_WeatherHourly.add(temperature120m: temperature120m, &fbb)
+    com_openmeteo_WeatherHourly.add(temperature180m: temperature180m, &fbb)
+    com_openmeteo_WeatherHourly.add(temperature2m: temperature2m, &fbb)
+    com_openmeteo_WeatherHourly.add(temperature40m: temperature40m, &fbb)
+    com_openmeteo_WeatherHourly.add(temperature80m: temperature80m, &fbb)
     com_openmeteo_WeatherHourly.add(terrestrialRadiation: terrestrialRadiation, &fbb)
     com_openmeteo_WeatherHourly.add(terrestrialRadiationInstant: terrestrialRadiationInstant, &fbb)
-    com_openmeteo_WeatherHourly.add(shortwaveRadiationInstant: shortwaveRadiationInstant, &fbb)
-    com_openmeteo_WeatherHourly.add(diffuseRadiationInstant: diffuseRadiationInstant, &fbb)
-    com_openmeteo_WeatherHourly.add(directRadiationInstant: directRadiationInstant, &fbb)
-    com_openmeteo_WeatherHourly.add(directNormalIrradianceInstant: directNormalIrradianceInstant, &fbb)
-    com_openmeteo_WeatherHourly.add(visibility: visibility, &fbb)
-    com_openmeteo_WeatherHourly.add(cape: cape, &fbb)
+    com_openmeteo_WeatherHourly.add(totalColumnIntegratedWaterVapour: totalColumnIntegratedWaterVapour, &fbb)
+    com_openmeteo_WeatherHourly.add(updraft: updraft, &fbb)
     com_openmeteo_WeatherHourly.add(uvIndex: uvIndex, &fbb)
     com_openmeteo_WeatherHourly.add(uvIndexClearSky: uvIndexClearSky, &fbb)
-    com_openmeteo_WeatherHourly.add(isDay: isDay, &fbb)
-    com_openmeteo_WeatherHourly.add(soilTemperature0To10cm: soilTemperature0To10cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilTemperature10To40cm: soilTemperature10To40cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilTemperature40To100cm: soilTemperature40To100cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilTemperature100To200cm: soilTemperature100To200cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture0To10cm: soilMoisture0To10cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture10To40cm: soilMoisture10To40cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture40To100cm: soilMoisture40To100cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoisture100To200cm: soilMoisture100To200cm, &fbb)
-    com_openmeteo_WeatherHourly.add(growingDegreeDaysBase0Limit50: growingDegreeDaysBase0Limit50, &fbb)
-    com_openmeteo_WeatherHourly.add(leafWetnessProbability: leafWetnessProbability, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoistureIndex0To7cm: soilMoistureIndex0To7cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoistureIndex7To28cm: soilMoistureIndex7To28cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoistureIndex28To100cm: soilMoistureIndex28To100cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoistureIndex100To255cm: soilMoistureIndex100To255cm, &fbb)
-    com_openmeteo_WeatherHourly.add(soilMoistureIndex0To100cm: soilMoistureIndex0To100cm, &fbb)
-    com_openmeteo_WeatherHourly.add(lightningPotential: lightningPotential, &fbb)
+    com_openmeteo_WeatherHourly.add(vaporPressureDeficit: vaporPressureDeficit, &fbb)
+    com_openmeteo_WeatherHourly.add(visibility: visibility, &fbb)
+    com_openmeteo_WeatherHourly.add(weathercode: weathercode, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection100m: winddirection100m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection10m: winddirection10m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection120m: winddirection120m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection150m: winddirection150m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection180m: winddirection180m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection200m: winddirection200m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection20m: winddirection20m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection40m: winddirection40m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection50m: winddirection50m, &fbb)
+    com_openmeteo_WeatherHourly.add(winddirection80m: winddirection80m, &fbb)
+    com_openmeteo_WeatherHourly.add(windgusts10m: windgusts10m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed100m: windspeed100m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed10m: windspeed10m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed120m: windspeed120m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed150m: windspeed150m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed180m: windspeed180m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed200m: windspeed200m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed20m: windspeed20m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed40m: windspeed40m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed50m: windspeed50m, &fbb)
+    com_openmeteo_WeatherHourly.add(windspeed80m: windspeed80m, &fbb)
     com_openmeteo_WeatherHourly.add(pressureLevelTemperature: pressureLevelTemperature, &fbb)
     com_openmeteo_WeatherHourly.add(pressureLevelDewpoint: pressureLevelDewpoint, &fbb)
     com_openmeteo_WeatherHourly.add(pressureLevelRelativehumidity: pressureLevelRelativehumidity, &fbb)
@@ -650,82 +800,112 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
     try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: true, type: com_openmeteo_TimeRange.self)
-    try _v.visit(field: VTOFFSET.temperature2m.p, fieldName: "temperature2m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.apparentTemperature.p, fieldName: "apparentTemperature", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.cape.p, fieldName: "cape", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.cloudcover.p, fieldName: "cloudcover", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.cloudcoverHigh.p, fieldName: "cloudcoverHigh", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.cloudcoverLow.p, fieldName: "cloudcoverLow", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.cloudcoverMid.p, fieldName: "cloudcoverMid", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.cloudcoverHigh.p, fieldName: "cloudcoverHigh", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.pressureMsl.p, fieldName: "pressureMsl", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.relativehumidity2m.p, fieldName: "relativehumidity2m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.precipitation.p, fieldName: "precipitation", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.precipitationProbability.p, fieldName: "precipitationProbability", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.weathercode.p, fieldName: "weathercode", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.temperature80m.p, fieldName: "temperature80m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.temperature120m.p, fieldName: "temperature120m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.temperature180m.p, fieldName: "temperature180m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilTemperature0cm.p, fieldName: "soilTemperature0cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilTemperature6cm.p, fieldName: "soilTemperature6cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilTemperature18cm.p, fieldName: "soilTemperature18cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilTemperature54cm.p, fieldName: "soilTemperature54cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture01cm.p, fieldName: "soilMoisture01cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture13cm.p, fieldName: "soilMoisture13cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture39cm.p, fieldName: "soilMoisture39cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture927cm.p, fieldName: "soilMoisture927cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture2781cm.p, fieldName: "soilMoisture2781cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.snowDepth.p, fieldName: "snowDepth", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.snowHeight.p, fieldName: "snowHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.sensibleHeatflux.p, fieldName: "sensibleHeatflux", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.latentHeatflux.p, fieldName: "latentHeatflux", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.showers.p, fieldName: "showers", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.rain.p, fieldName: "rain", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windgusts10m.p, fieldName: "windgusts10m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.freezinglevelHeight.p, fieldName: "freezinglevelHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.dewpoint2m.p, fieldName: "dewpoint2m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.diffuseRadiation.p, fieldName: "diffuseRadiation", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.directRadiation.p, fieldName: "directRadiation", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.apparentTemperature.p, fieldName: "apparentTemperature", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windspeed10m.p, fieldName: "windspeed10m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.winddirection10m.p, fieldName: "winddirection10m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windspeed80m.p, fieldName: "windspeed80m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.winddirection80m.p, fieldName: "winddirection80m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windspeed120m.p, fieldName: "windspeed120m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.winddirection120m.p, fieldName: "winddirection120m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windspeed180m.p, fieldName: "windspeed180m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.winddirection180m.p, fieldName: "winddirection180m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.diffuseRadiationInstant.p, fieldName: "diffuseRadiationInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.directNormalIrradiance.p, fieldName: "directNormalIrradiance", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.evapotranspiration.p, fieldName: "evapotranspiration", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.directNormalIrradianceInstant.p, fieldName: "directNormalIrradianceInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.directRadiation.p, fieldName: "directRadiation", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.directRadiationInstant.p, fieldName: "directRadiationInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.et0FaoEvapotranspiration.p, fieldName: "et0FaoEvapotranspiration", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.vaporPressureDeficit.p, fieldName: "vaporPressureDeficit", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.evapotranspiration.p, fieldName: "evapotranspiration", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.freezinglevelHeight.p, fieldName: "freezinglevelHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.growingDegreeDaysBase0Limit50.p, fieldName: "growingDegreeDaysBase0Limit50", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.isDay.p, fieldName: "isDay", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.latentHeatflux.p, fieldName: "latentHeatflux", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.leafWetnessProbability.p, fieldName: "leafWetnessProbability", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.lightningPotential.p, fieldName: "lightningPotential", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.precipitation.p, fieldName: "precipitation", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.precipitationProbability.p, fieldName: "precipitationProbability", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.pressureMsl.p, fieldName: "pressureMsl", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.rain.p, fieldName: "rain", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.relativehumidity2m.p, fieldName: "relativehumidity2m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.runoff.p, fieldName: "runoff", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.sensibleHeatflux.p, fieldName: "sensibleHeatflux", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.shortwaveRadiation.p, fieldName: "shortwaveRadiation", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.shortwaveRadiationInstant.p, fieldName: "shortwaveRadiationInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.showers.p, fieldName: "showers", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.skinTemperature.p, fieldName: "skinTemperature", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.snowDepth.p, fieldName: "snowDepth", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.snowHeight.p, fieldName: "snowHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.snowfall.p, fieldName: "snowfall", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.snowfallWaterEquivalent.p, fieldName: "snowfallWaterEquivalent", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture01cm.p, fieldName: "soilMoisture01cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture0To100cm.p, fieldName: "soilMoisture0To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture0To10cm.p, fieldName: "soilMoisture0To10cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture0To7cm.p, fieldName: "soilMoisture0To7cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture100To200cm.p, fieldName: "soilMoisture100To200cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture100To255cm.p, fieldName: "soilMoisture100To255cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture10To40cm.p, fieldName: "soilMoisture10To40cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture13cm.p, fieldName: "soilMoisture13cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture2781cm.p, fieldName: "soilMoisture2781cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture28To100cm.p, fieldName: "soilMoisture28To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture39cm.p, fieldName: "soilMoisture39cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture40To100cm.p, fieldName: "soilMoisture40To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture7To28cm.p, fieldName: "soilMoisture7To28cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture927cm.p, fieldName: "soilMoisture927cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex0To100cm.p, fieldName: "soilMoistureIndex0To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex0To7cm.p, fieldName: "soilMoistureIndex0To7cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex100To255cm.p, fieldName: "soilMoistureIndex100To255cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex28To100cm.p, fieldName: "soilMoistureIndex28To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex7To28cm.p, fieldName: "soilMoistureIndex7To28cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature0To100cm.p, fieldName: "soilTemperature0To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature0To10cm.p, fieldName: "soilTemperature0To10cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature0To7cm.p, fieldName: "soilTemperature0To7cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature0cm.p, fieldName: "soilTemperature0cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature100To200cm.p, fieldName: "soilTemperature100To200cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature100To255cm.p, fieldName: "soilTemperature100To255cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature10To40cm.p, fieldName: "soilTemperature10To40cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature18cm.p, fieldName: "soilTemperature18cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature28To100cm.p, fieldName: "soilTemperature28To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature40To100cm.p, fieldName: "soilTemperature40To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature54cm.p, fieldName: "soilTemperature54cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature6cm.p, fieldName: "soilTemperature6cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature7To28cm.p, fieldName: "soilTemperature7To28cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.surfaceAirPressure.p, fieldName: "surfaceAirPressure", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.surfacePressure.p, fieldName: "surfacePressure", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.surfaceTemperature.p, fieldName: "surfaceTemperature", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.temperature120m.p, fieldName: "temperature120m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.temperature180m.p, fieldName: "temperature180m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.temperature2m.p, fieldName: "temperature2m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.temperature40m.p, fieldName: "temperature40m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.temperature80m.p, fieldName: "temperature80m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.terrestrialRadiation.p, fieldName: "terrestrialRadiation", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.terrestrialRadiationInstant.p, fieldName: "terrestrialRadiationInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.shortwaveRadiationInstant.p, fieldName: "shortwaveRadiationInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.diffuseRadiationInstant.p, fieldName: "diffuseRadiationInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.directRadiationInstant.p, fieldName: "directRadiationInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.directNormalIrradianceInstant.p, fieldName: "directNormalIrradianceInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.visibility.p, fieldName: "visibility", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.cape.p, fieldName: "cape", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.totalColumnIntegratedWaterVapour.p, fieldName: "totalColumnIntegratedWaterVapour", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.updraft.p, fieldName: "updraft", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.uvIndex.p, fieldName: "uvIndex", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.uvIndexClearSky.p, fieldName: "uvIndexClearSky", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.isDay.p, fieldName: "isDay", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilTemperature0To10cm.p, fieldName: "soilTemperature0To10cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilTemperature10To40cm.p, fieldName: "soilTemperature10To40cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilTemperature40To100cm.p, fieldName: "soilTemperature40To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilTemperature100To200cm.p, fieldName: "soilTemperature100To200cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture0To10cm.p, fieldName: "soilMoisture0To10cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture10To40cm.p, fieldName: "soilMoisture10To40cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture40To100cm.p, fieldName: "soilMoisture40To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoisture100To200cm.p, fieldName: "soilMoisture100To200cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.growingDegreeDaysBase0Limit50.p, fieldName: "growingDegreeDaysBase0Limit50", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.leafWetnessProbability.p, fieldName: "leafWetnessProbability", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex0To7cm.p, fieldName: "soilMoistureIndex0To7cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex7To28cm.p, fieldName: "soilMoistureIndex7To28cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex28To100cm.p, fieldName: "soilMoistureIndex28To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex100To255cm.p, fieldName: "soilMoistureIndex100To255cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.soilMoistureIndex0To100cm.p, fieldName: "soilMoistureIndex0To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.lightningPotential.p, fieldName: "lightningPotential", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.vaporPressureDeficit.p, fieldName: "vaporPressureDeficit", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.visibility.p, fieldName: "visibility", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.weathercode.p, fieldName: "weathercode", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection100m.p, fieldName: "winddirection100m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection10m.p, fieldName: "winddirection10m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection120m.p, fieldName: "winddirection120m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection150m.p, fieldName: "winddirection150m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection180m.p, fieldName: "winddirection180m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection200m.p, fieldName: "winddirection200m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection20m.p, fieldName: "winddirection20m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection40m.p, fieldName: "winddirection40m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection50m.p, fieldName: "winddirection50m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection80m.p, fieldName: "winddirection80m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windgusts10m.p, fieldName: "windgusts10m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed100m.p, fieldName: "windspeed100m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed10m.p, fieldName: "windspeed10m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed120m.p, fieldName: "windspeed120m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed150m.p, fieldName: "windspeed150m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed180m.p, fieldName: "windspeed180m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed200m.p, fieldName: "windspeed200m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed20m.p, fieldName: "windspeed20m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed40m.p, fieldName: "windspeed40m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed50m.p, fieldName: "windspeed50m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed80m.p, fieldName: "windspeed80m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.pressureLevelTemperature.p, fieldName: "pressureLevelTemperature", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
     try _v.visit(field: VTOFFSET.pressureLevelDewpoint.p, fieldName: "pressureLevelDewpoint", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
     try _v.visit(field: VTOFFSET.pressureLevelRelativehumidity.p, fieldName: "pressureLevelRelativehumidity", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
@@ -749,78 +929,127 @@ public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
 
   private enum VTOFFSET: VOffset {
     case time = 4
-    case temperature2mMax = 6
-    case temperature2mMin = 8
-    case temperature2mMean = 10
-    case apparentTemperatureMax = 12
-    case apparentTemperatureMin = 14
-    case apparentTemperatureMean = 16
-    case precipitationSum = 18
-    case precipitationProbabilityMax = 20
-    case precipitationProbabilityMin = 22
-    case precipitationProbabilityMean = 24
-    case snowfallSum = 26
-    case rainSum = 28
-    case showersSum = 30
-    case weathercode = 32
-    case shortwaveRadiationSum = 34
-    case windspeed10mMax = 36
-    case windspeed10mMin = 38
-    case windspeed10mMean = 40
-    case windgusts10mMax = 42
-    case windgusts10mMin = 44
-    case windgusts10mMean = 46
-    case winddirection10mDominant = 48
-    case precipitationHours = 50
-    case sunrise = 52
-    case sunset = 54
-    case et0FaoEvapotranspiration = 56
-    case visibilityMax = 58
-    case visibilityMin = 60
-    case visibilityMean = 62
-    case pressureMslMax = 64
-    case pressureMslMin = 66
-    case pressureMslMean = 68
-    case surfacePressureMax = 70
-    case surfacePressureMin = 72
-    case surfacePressureMean = 74
-    case capeMax = 76
-    case capeMin = 78
-    case capeMean = 80
-    case cloudcoverMax = 82
-    case cloudcoverMin = 84
-    case cloudcoverMean = 86
-    case uvIndexMax = 88
-    case uvIndexClearSkyMax = 90
+    case apparentTemperatureMax = 6
+    case apparentTemperatureMean = 8
+    case apparentTemperatureMin = 10
+    case capeMax = 12
+    case capeMean = 14
+    case capeMin = 16
+    case cloudcoverMax = 18
+    case cloudcoverMean = 20
+    case cloudcoverMin = 22
+    case dewpoint2mMax = 24
+    case dewpoint2mMean = 26
+    case dewpoint2mMin = 28
+    case et0FaoEvapotranspiration = 30
+    case et0FaoEvapotranspirationSum = 32
+    case growingDegreeDaysBase0Limit50 = 34
+    case leafWetnessProbabilityMean = 36
+    case precipitationHours = 38
+    case precipitationProbabilityMax = 40
+    case precipitationProbabilityMean = 42
+    case precipitationProbabilityMin = 44
+    case precipitationSum = 46
+    case pressureMslMax = 48
+    case pressureMslMean = 50
+    case pressureMslMin = 52
+    case rainSum = 54
+    case relativeHumidity2mMax = 56
+    case relativeHumidity2mMean = 58
+    case relativeHumidity2mMin = 60
+    case shortwaveRadiationSum = 62
+    case showersSum = 64
+    case snowfallSum = 66
+    case snowfallWaterEquivalentSum = 68
+    case soilMoisture0To100cmMean = 70
+    case soilMoisture0To10cmMean = 72
+    case soilMoisture0To7cmMean = 74
+    case soilMoisture28To100cmMean = 76
+    case soilMoisture7To28cmMean = 78
+    case soilMoistureIndex0To100cmMean = 80
+    case soilMoistureIndex0To7cmMean = 82
+    case soilMoistureIndex100To255cmMean = 84
+    case soilMoistureIndex28To100cmMean = 86
+    case soilMoistureIndex7To28cmMean = 88
+    case soilTemperature0To100cmMean = 90
+    case soilTemperature0To7cmMean = 92
+    case soilTemperature28To100cmMean = 94
+    case soilTemperature7To28cmMean = 96
+    case sunrise = 98
+    case sunset = 100
+    case surfacePressureMax = 102
+    case surfacePressureMean = 104
+    case surfacePressureMin = 106
+    case temperature2mMax = 108
+    case temperature2mMean = 110
+    case temperature2mMin = 112
+    case updraftMax = 114
+    case uvIndexClearSkyMax = 116
+    case uvIndexMax = 118
+    case vaporPressureDeficitMax = 120
+    case visibilityMax = 122
+    case visibilityMean = 124
+    case visibilityMin = 126
+    case weathercode = 128
+    case winddirection10mDominant = 130
+    case windgusts10mMax = 132
+    case windgusts10mMean = 134
+    case windgusts10mMin = 136
+    case windspeed10mMax = 138
+    case windspeed10mMean = 140
+    case windspeed10mMin = 142
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
 
   public var time: com_openmeteo_TimeRange! { let o = _accessor.offset(VTOFFSET.time.v); return _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
   public var mutableTime: com_openmeteo_TimeRange_Mutable! { let o = _accessor.offset(VTOFFSET.time.v); return com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public var temperature2mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature2mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var temperature2mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature2mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var temperature2mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature2mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var apparentTemperatureMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.apparentTemperatureMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var apparentTemperatureMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.apparentTemperatureMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var apparentTemperatureMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.apparentTemperatureMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var precipitationSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var precipitationProbabilityMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var precipitationProbabilityMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var precipitationProbabilityMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var snowfallSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowfallSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var rainSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.rainSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var showersSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.showersSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var weathercode: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.weathercode.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var shortwaveRadiationSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.shortwaveRadiationSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windspeed10mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windspeed10mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windspeed10mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windgusts10mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windgusts10mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windgusts10mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windgusts10mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var windgusts10mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windgusts10mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var winddirection10mDominant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection10mDominant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var apparentTemperatureMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.apparentTemperatureMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var capeMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.capeMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var capeMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.capeMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var capeMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.capeMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var cloudcoverMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var cloudcoverMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var cloudcoverMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var dewpoint2mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.dewpoint2mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var dewpoint2mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.dewpoint2mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var dewpoint2mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.dewpoint2mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var et0FaoEvapotranspiration: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.et0FaoEvapotranspiration.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var et0FaoEvapotranspirationSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.et0FaoEvapotranspirationSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var growingDegreeDaysBase0Limit50: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.growingDegreeDaysBase0Limit50.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var leafWetnessProbabilityMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.leafWetnessProbabilityMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var precipitationHours: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationHours.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var precipitationProbabilityMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var precipitationProbabilityMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var precipitationProbabilityMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationProbabilityMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var precipitationSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.precipitationSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var pressureMslMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pressureMslMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var pressureMslMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pressureMslMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var pressureMslMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pressureMslMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var rainSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.rainSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var relativeHumidity2mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.relativeHumidity2mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var relativeHumidity2mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.relativeHumidity2mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var relativeHumidity2mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.relativeHumidity2mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var shortwaveRadiationSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.shortwaveRadiationSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var showersSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.showersSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var snowfallSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowfallSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var snowfallWaterEquivalentSum: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowfallWaterEquivalentSum.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture0To100cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture0To100cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture0To10cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture0To10cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture0To7cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture0To7cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture28To100cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture28To100cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoisture7To28cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoisture7To28cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex0To100cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To100cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex0To7cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To7cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex100To255cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex100To255cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex28To100cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex28To100cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilMoistureIndex7To28cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex7To28cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature0To100cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature0To100cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature0To7cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature0To7cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature28To100cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature28To100cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var soilTemperature7To28cmMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature7To28cmMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var hasSunrise: Bool { let o = _accessor.offset(VTOFFSET.sunrise.v); return o == 0 ? false : true }
   public var sunriseCount: Int32 { let o = _accessor.offset(VTOFFSET.sunrise.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func sunrise(at index: Int32) -> Int64 { let o = _accessor.offset(VTOFFSET.sunrise.v); return o == 0 ? 0 : _accessor.directRead(of: Int64.self, offset: _accessor.vector(at: o) + index * 8) }
@@ -829,211 +1058,318 @@ public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
   public var sunsetCount: Int32 { let o = _accessor.offset(VTOFFSET.sunset.v); return o == 0 ? 0 : _accessor.vector(count: o) }
   public func sunset(at index: Int32) -> Int64 { let o = _accessor.offset(VTOFFSET.sunset.v); return o == 0 ? 0 : _accessor.directRead(of: Int64.self, offset: _accessor.vector(at: o) + index * 8) }
   public var sunset: [Int64] { return _accessor.getVector(at: VTOFFSET.sunset.v) ?? [] }
-  public var et0FaoEvapotranspiration: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.et0FaoEvapotranspiration.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var visibilityMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.visibilityMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var visibilityMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.visibilityMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var visibilityMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.visibilityMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var pressureMslMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pressureMslMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var pressureMslMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pressureMslMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var pressureMslMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.pressureMslMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var surfacePressureMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfacePressureMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var surfacePressureMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfacePressureMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var surfacePressureMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfacePressureMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var capeMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.capeMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var capeMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.capeMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var capeMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.capeMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var cloudcoverMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var cloudcoverMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var cloudcoverMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.cloudcoverMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var uvIndexMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.uvIndexMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var surfacePressureMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfacePressureMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var temperature2mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature2mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var temperature2mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature2mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var temperature2mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature2mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var updraftMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.updraftMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var uvIndexClearSkyMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.uvIndexClearSkyMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startWeatherDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 44) }
+  public var uvIndexMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.uvIndexMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var vaporPressureDeficitMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.vaporPressureDeficitMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var visibilityMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.visibilityMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var visibilityMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.visibilityMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var visibilityMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.visibilityMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var weathercode: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.weathercode.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var winddirection10mDominant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.winddirection10mDominant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windgusts10mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windgusts10mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windgusts10mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windgusts10mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windgusts10mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windgusts10mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed10mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed10mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var windspeed10mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public static func startWeatherDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 70) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
-  public static func add(temperature2mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMax, at: VTOFFSET.temperature2mMax.p) }
-  public static func add(temperature2mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMin, at: VTOFFSET.temperature2mMin.p) }
-  public static func add(temperature2mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMean, at: VTOFFSET.temperature2mMean.p) }
   public static func add(apparentTemperatureMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperatureMax, at: VTOFFSET.apparentTemperatureMax.p) }
-  public static func add(apparentTemperatureMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperatureMin, at: VTOFFSET.apparentTemperatureMin.p) }
   public static func add(apparentTemperatureMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperatureMean, at: VTOFFSET.apparentTemperatureMean.p) }
-  public static func add(precipitationSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationSum, at: VTOFFSET.precipitationSum.p) }
-  public static func add(precipitationProbabilityMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationProbabilityMax, at: VTOFFSET.precipitationProbabilityMax.p) }
-  public static func add(precipitationProbabilityMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationProbabilityMin, at: VTOFFSET.precipitationProbabilityMin.p) }
-  public static func add(precipitationProbabilityMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationProbabilityMean, at: VTOFFSET.precipitationProbabilityMean.p) }
-  public static func add(snowfallSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowfallSum, at: VTOFFSET.snowfallSum.p) }
-  public static func add(rainSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: rainSum, at: VTOFFSET.rainSum.p) }
-  public static func add(showersSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: showersSum, at: VTOFFSET.showersSum.p) }
-  public static func add(weathercode: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: weathercode, at: VTOFFSET.weathercode.p) }
-  public static func add(shortwaveRadiationSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: shortwaveRadiationSum, at: VTOFFSET.shortwaveRadiationSum.p) }
-  public static func add(windspeed10mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMax, at: VTOFFSET.windspeed10mMax.p) }
-  public static func add(windspeed10mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMin, at: VTOFFSET.windspeed10mMin.p) }
-  public static func add(windspeed10mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMean, at: VTOFFSET.windspeed10mMean.p) }
-  public static func add(windgusts10mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windgusts10mMax, at: VTOFFSET.windgusts10mMax.p) }
-  public static func add(windgusts10mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windgusts10mMin, at: VTOFFSET.windgusts10mMin.p) }
-  public static func add(windgusts10mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windgusts10mMean, at: VTOFFSET.windgusts10mMean.p) }
-  public static func add(winddirection10mDominant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection10mDominant, at: VTOFFSET.winddirection10mDominant.p) }
+  public static func add(apparentTemperatureMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperatureMin, at: VTOFFSET.apparentTemperatureMin.p) }
+  public static func add(capeMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: capeMax, at: VTOFFSET.capeMax.p) }
+  public static func add(capeMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: capeMean, at: VTOFFSET.capeMean.p) }
+  public static func add(capeMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: capeMin, at: VTOFFSET.capeMin.p) }
+  public static func add(cloudcoverMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverMax, at: VTOFFSET.cloudcoverMax.p) }
+  public static func add(cloudcoverMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverMean, at: VTOFFSET.cloudcoverMean.p) }
+  public static func add(cloudcoverMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverMin, at: VTOFFSET.cloudcoverMin.p) }
+  public static func add(dewpoint2mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint2mMax, at: VTOFFSET.dewpoint2mMax.p) }
+  public static func add(dewpoint2mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint2mMean, at: VTOFFSET.dewpoint2mMean.p) }
+  public static func add(dewpoint2mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: dewpoint2mMin, at: VTOFFSET.dewpoint2mMin.p) }
+  public static func add(et0FaoEvapotranspiration: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: et0FaoEvapotranspiration, at: VTOFFSET.et0FaoEvapotranspiration.p) }
+  public static func add(et0FaoEvapotranspirationSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: et0FaoEvapotranspirationSum, at: VTOFFSET.et0FaoEvapotranspirationSum.p) }
+  public static func add(growingDegreeDaysBase0Limit50: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: growingDegreeDaysBase0Limit50, at: VTOFFSET.growingDegreeDaysBase0Limit50.p) }
+  public static func add(leafWetnessProbabilityMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: leafWetnessProbabilityMean, at: VTOFFSET.leafWetnessProbabilityMean.p) }
   public static func add(precipitationHours: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationHours, at: VTOFFSET.precipitationHours.p) }
+  public static func add(precipitationProbabilityMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationProbabilityMax, at: VTOFFSET.precipitationProbabilityMax.p) }
+  public static func add(precipitationProbabilityMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationProbabilityMean, at: VTOFFSET.precipitationProbabilityMean.p) }
+  public static func add(precipitationProbabilityMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationProbabilityMin, at: VTOFFSET.precipitationProbabilityMin.p) }
+  public static func add(precipitationSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: precipitationSum, at: VTOFFSET.precipitationSum.p) }
+  public static func add(pressureMslMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureMslMax, at: VTOFFSET.pressureMslMax.p) }
+  public static func add(pressureMslMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureMslMean, at: VTOFFSET.pressureMslMean.p) }
+  public static func add(pressureMslMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureMslMin, at: VTOFFSET.pressureMslMin.p) }
+  public static func add(rainSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: rainSum, at: VTOFFSET.rainSum.p) }
+  public static func add(relativeHumidity2mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativeHumidity2mMax, at: VTOFFSET.relativeHumidity2mMax.p) }
+  public static func add(relativeHumidity2mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativeHumidity2mMean, at: VTOFFSET.relativeHumidity2mMean.p) }
+  public static func add(relativeHumidity2mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: relativeHumidity2mMin, at: VTOFFSET.relativeHumidity2mMin.p) }
+  public static func add(shortwaveRadiationSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: shortwaveRadiationSum, at: VTOFFSET.shortwaveRadiationSum.p) }
+  public static func add(showersSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: showersSum, at: VTOFFSET.showersSum.p) }
+  public static func add(snowfallSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowfallSum, at: VTOFFSET.snowfallSum.p) }
+  public static func add(snowfallWaterEquivalentSum: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowfallWaterEquivalentSum, at: VTOFFSET.snowfallWaterEquivalentSum.p) }
+  public static func add(soilMoisture0To100cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture0To100cmMean, at: VTOFFSET.soilMoisture0To100cmMean.p) }
+  public static func add(soilMoisture0To10cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture0To10cmMean, at: VTOFFSET.soilMoisture0To10cmMean.p) }
+  public static func add(soilMoisture0To7cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture0To7cmMean, at: VTOFFSET.soilMoisture0To7cmMean.p) }
+  public static func add(soilMoisture28To100cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture28To100cmMean, at: VTOFFSET.soilMoisture28To100cmMean.p) }
+  public static func add(soilMoisture7To28cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoisture7To28cmMean, at: VTOFFSET.soilMoisture7To28cmMean.p) }
+  public static func add(soilMoistureIndex0To100cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex0To100cmMean, at: VTOFFSET.soilMoistureIndex0To100cmMean.p) }
+  public static func add(soilMoistureIndex0To7cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex0To7cmMean, at: VTOFFSET.soilMoistureIndex0To7cmMean.p) }
+  public static func add(soilMoistureIndex100To255cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex100To255cmMean, at: VTOFFSET.soilMoistureIndex100To255cmMean.p) }
+  public static func add(soilMoistureIndex28To100cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex28To100cmMean, at: VTOFFSET.soilMoistureIndex28To100cmMean.p) }
+  public static func add(soilMoistureIndex7To28cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex7To28cmMean, at: VTOFFSET.soilMoistureIndex7To28cmMean.p) }
+  public static func add(soilTemperature0To100cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature0To100cmMean, at: VTOFFSET.soilTemperature0To100cmMean.p) }
+  public static func add(soilTemperature0To7cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature0To7cmMean, at: VTOFFSET.soilTemperature0To7cmMean.p) }
+  public static func add(soilTemperature28To100cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature28To100cmMean, at: VTOFFSET.soilTemperature28To100cmMean.p) }
+  public static func add(soilTemperature7To28cmMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature7To28cmMean, at: VTOFFSET.soilTemperature7To28cmMean.p) }
   public static func addVectorOf(sunrise: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sunrise, at: VTOFFSET.sunrise.p) }
   public static func addVectorOf(sunset: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sunset, at: VTOFFSET.sunset.p) }
-  public static func add(et0FaoEvapotranspiration: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: et0FaoEvapotranspiration, at: VTOFFSET.et0FaoEvapotranspiration.p) }
-  public static func add(visibilityMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: visibilityMax, at: VTOFFSET.visibilityMax.p) }
-  public static func add(visibilityMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: visibilityMin, at: VTOFFSET.visibilityMin.p) }
-  public static func add(visibilityMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: visibilityMean, at: VTOFFSET.visibilityMean.p) }
-  public static func add(pressureMslMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureMslMax, at: VTOFFSET.pressureMslMax.p) }
-  public static func add(pressureMslMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureMslMin, at: VTOFFSET.pressureMslMin.p) }
-  public static func add(pressureMslMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureMslMean, at: VTOFFSET.pressureMslMean.p) }
   public static func add(surfacePressureMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfacePressureMax, at: VTOFFSET.surfacePressureMax.p) }
-  public static func add(surfacePressureMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfacePressureMin, at: VTOFFSET.surfacePressureMin.p) }
   public static func add(surfacePressureMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfacePressureMean, at: VTOFFSET.surfacePressureMean.p) }
-  public static func add(capeMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: capeMax, at: VTOFFSET.capeMax.p) }
-  public static func add(capeMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: capeMin, at: VTOFFSET.capeMin.p) }
-  public static func add(capeMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: capeMean, at: VTOFFSET.capeMean.p) }
-  public static func add(cloudcoverMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverMax, at: VTOFFSET.cloudcoverMax.p) }
-  public static func add(cloudcoverMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverMin, at: VTOFFSET.cloudcoverMin.p) }
-  public static func add(cloudcoverMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cloudcoverMean, at: VTOFFSET.cloudcoverMean.p) }
-  public static func add(uvIndexMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndexMax, at: VTOFFSET.uvIndexMax.p) }
+  public static func add(surfacePressureMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfacePressureMin, at: VTOFFSET.surfacePressureMin.p) }
+  public static func add(temperature2mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMax, at: VTOFFSET.temperature2mMax.p) }
+  public static func add(temperature2mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMean, at: VTOFFSET.temperature2mMean.p) }
+  public static func add(temperature2mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature2mMin, at: VTOFFSET.temperature2mMin.p) }
+  public static func add(updraftMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: updraftMax, at: VTOFFSET.updraftMax.p) }
   public static func add(uvIndexClearSkyMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndexClearSkyMax, at: VTOFFSET.uvIndexClearSkyMax.p) }
+  public static func add(uvIndexMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: uvIndexMax, at: VTOFFSET.uvIndexMax.p) }
+  public static func add(vaporPressureDeficitMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: vaporPressureDeficitMax, at: VTOFFSET.vaporPressureDeficitMax.p) }
+  public static func add(visibilityMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: visibilityMax, at: VTOFFSET.visibilityMax.p) }
+  public static func add(visibilityMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: visibilityMean, at: VTOFFSET.visibilityMean.p) }
+  public static func add(visibilityMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: visibilityMin, at: VTOFFSET.visibilityMin.p) }
+  public static func add(weathercode: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: weathercode, at: VTOFFSET.weathercode.p) }
+  public static func add(winddirection10mDominant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: winddirection10mDominant, at: VTOFFSET.winddirection10mDominant.p) }
+  public static func add(windgusts10mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windgusts10mMax, at: VTOFFSET.windgusts10mMax.p) }
+  public static func add(windgusts10mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windgusts10mMean, at: VTOFFSET.windgusts10mMean.p) }
+  public static func add(windgusts10mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windgusts10mMin, at: VTOFFSET.windgusts10mMin.p) }
+  public static func add(windspeed10mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMax, at: VTOFFSET.windspeed10mMax.p) }
+  public static func add(windspeed10mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMean, at: VTOFFSET.windspeed10mMean.p) }
+  public static func add(windspeed10mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMin, at: VTOFFSET.windspeed10mMin.p) }
   public static func endWeatherDaily(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
   public static func createWeatherDaily(
     _ fbb: inout FlatBufferBuilder,
     time: com_openmeteo_TimeRange,
-    temperature2mMaxOffset temperature2mMax: Offset = Offset(),
-    temperature2mMinOffset temperature2mMin: Offset = Offset(),
-    temperature2mMeanOffset temperature2mMean: Offset = Offset(),
     apparentTemperatureMaxOffset apparentTemperatureMax: Offset = Offset(),
-    apparentTemperatureMinOffset apparentTemperatureMin: Offset = Offset(),
     apparentTemperatureMeanOffset apparentTemperatureMean: Offset = Offset(),
-    precipitationSumOffset precipitationSum: Offset = Offset(),
-    precipitationProbabilityMaxOffset precipitationProbabilityMax: Offset = Offset(),
-    precipitationProbabilityMinOffset precipitationProbabilityMin: Offset = Offset(),
-    precipitationProbabilityMeanOffset precipitationProbabilityMean: Offset = Offset(),
-    snowfallSumOffset snowfallSum: Offset = Offset(),
-    rainSumOffset rainSum: Offset = Offset(),
-    showersSumOffset showersSum: Offset = Offset(),
-    weathercodeOffset weathercode: Offset = Offset(),
-    shortwaveRadiationSumOffset shortwaveRadiationSum: Offset = Offset(),
-    windspeed10mMaxOffset windspeed10mMax: Offset = Offset(),
-    windspeed10mMinOffset windspeed10mMin: Offset = Offset(),
-    windspeed10mMeanOffset windspeed10mMean: Offset = Offset(),
-    windgusts10mMaxOffset windgusts10mMax: Offset = Offset(),
-    windgusts10mMinOffset windgusts10mMin: Offset = Offset(),
-    windgusts10mMeanOffset windgusts10mMean: Offset = Offset(),
-    winddirection10mDominantOffset winddirection10mDominant: Offset = Offset(),
+    apparentTemperatureMinOffset apparentTemperatureMin: Offset = Offset(),
+    capeMaxOffset capeMax: Offset = Offset(),
+    capeMeanOffset capeMean: Offset = Offset(),
+    capeMinOffset capeMin: Offset = Offset(),
+    cloudcoverMaxOffset cloudcoverMax: Offset = Offset(),
+    cloudcoverMeanOffset cloudcoverMean: Offset = Offset(),
+    cloudcoverMinOffset cloudcoverMin: Offset = Offset(),
+    dewpoint2mMaxOffset dewpoint2mMax: Offset = Offset(),
+    dewpoint2mMeanOffset dewpoint2mMean: Offset = Offset(),
+    dewpoint2mMinOffset dewpoint2mMin: Offset = Offset(),
+    et0FaoEvapotranspirationOffset et0FaoEvapotranspiration: Offset = Offset(),
+    et0FaoEvapotranspirationSumOffset et0FaoEvapotranspirationSum: Offset = Offset(),
+    growingDegreeDaysBase0Limit50Offset growingDegreeDaysBase0Limit50: Offset = Offset(),
+    leafWetnessProbabilityMeanOffset leafWetnessProbabilityMean: Offset = Offset(),
     precipitationHoursOffset precipitationHours: Offset = Offset(),
+    precipitationProbabilityMaxOffset precipitationProbabilityMax: Offset = Offset(),
+    precipitationProbabilityMeanOffset precipitationProbabilityMean: Offset = Offset(),
+    precipitationProbabilityMinOffset precipitationProbabilityMin: Offset = Offset(),
+    precipitationSumOffset precipitationSum: Offset = Offset(),
+    pressureMslMaxOffset pressureMslMax: Offset = Offset(),
+    pressureMslMeanOffset pressureMslMean: Offset = Offset(),
+    pressureMslMinOffset pressureMslMin: Offset = Offset(),
+    rainSumOffset rainSum: Offset = Offset(),
+    relativeHumidity2mMaxOffset relativeHumidity2mMax: Offset = Offset(),
+    relativeHumidity2mMeanOffset relativeHumidity2mMean: Offset = Offset(),
+    relativeHumidity2mMinOffset relativeHumidity2mMin: Offset = Offset(),
+    shortwaveRadiationSumOffset shortwaveRadiationSum: Offset = Offset(),
+    showersSumOffset showersSum: Offset = Offset(),
+    snowfallSumOffset snowfallSum: Offset = Offset(),
+    snowfallWaterEquivalentSumOffset snowfallWaterEquivalentSum: Offset = Offset(),
+    soilMoisture0To100cmMeanOffset soilMoisture0To100cmMean: Offset = Offset(),
+    soilMoisture0To10cmMeanOffset soilMoisture0To10cmMean: Offset = Offset(),
+    soilMoisture0To7cmMeanOffset soilMoisture0To7cmMean: Offset = Offset(),
+    soilMoisture28To100cmMeanOffset soilMoisture28To100cmMean: Offset = Offset(),
+    soilMoisture7To28cmMeanOffset soilMoisture7To28cmMean: Offset = Offset(),
+    soilMoistureIndex0To100cmMeanOffset soilMoistureIndex0To100cmMean: Offset = Offset(),
+    soilMoistureIndex0To7cmMeanOffset soilMoistureIndex0To7cmMean: Offset = Offset(),
+    soilMoistureIndex100To255cmMeanOffset soilMoistureIndex100To255cmMean: Offset = Offset(),
+    soilMoistureIndex28To100cmMeanOffset soilMoistureIndex28To100cmMean: Offset = Offset(),
+    soilMoistureIndex7To28cmMeanOffset soilMoistureIndex7To28cmMean: Offset = Offset(),
+    soilTemperature0To100cmMeanOffset soilTemperature0To100cmMean: Offset = Offset(),
+    soilTemperature0To7cmMeanOffset soilTemperature0To7cmMean: Offset = Offset(),
+    soilTemperature28To100cmMeanOffset soilTemperature28To100cmMean: Offset = Offset(),
+    soilTemperature7To28cmMeanOffset soilTemperature7To28cmMean: Offset = Offset(),
     sunriseVectorOffset sunrise: Offset = Offset(),
     sunsetVectorOffset sunset: Offset = Offset(),
-    et0FaoEvapotranspirationOffset et0FaoEvapotranspiration: Offset = Offset(),
-    visibilityMaxOffset visibilityMax: Offset = Offset(),
-    visibilityMinOffset visibilityMin: Offset = Offset(),
-    visibilityMeanOffset visibilityMean: Offset = Offset(),
-    pressureMslMaxOffset pressureMslMax: Offset = Offset(),
-    pressureMslMinOffset pressureMslMin: Offset = Offset(),
-    pressureMslMeanOffset pressureMslMean: Offset = Offset(),
     surfacePressureMaxOffset surfacePressureMax: Offset = Offset(),
-    surfacePressureMinOffset surfacePressureMin: Offset = Offset(),
     surfacePressureMeanOffset surfacePressureMean: Offset = Offset(),
-    capeMaxOffset capeMax: Offset = Offset(),
-    capeMinOffset capeMin: Offset = Offset(),
-    capeMeanOffset capeMean: Offset = Offset(),
-    cloudcoverMaxOffset cloudcoverMax: Offset = Offset(),
-    cloudcoverMinOffset cloudcoverMin: Offset = Offset(),
-    cloudcoverMeanOffset cloudcoverMean: Offset = Offset(),
+    surfacePressureMinOffset surfacePressureMin: Offset = Offset(),
+    temperature2mMaxOffset temperature2mMax: Offset = Offset(),
+    temperature2mMeanOffset temperature2mMean: Offset = Offset(),
+    temperature2mMinOffset temperature2mMin: Offset = Offset(),
+    updraftMaxOffset updraftMax: Offset = Offset(),
+    uvIndexClearSkyMaxOffset uvIndexClearSkyMax: Offset = Offset(),
     uvIndexMaxOffset uvIndexMax: Offset = Offset(),
-    uvIndexClearSkyMaxOffset uvIndexClearSkyMax: Offset = Offset()
+    vaporPressureDeficitMaxOffset vaporPressureDeficitMax: Offset = Offset(),
+    visibilityMaxOffset visibilityMax: Offset = Offset(),
+    visibilityMeanOffset visibilityMean: Offset = Offset(),
+    visibilityMinOffset visibilityMin: Offset = Offset(),
+    weathercodeOffset weathercode: Offset = Offset(),
+    winddirection10mDominantOffset winddirection10mDominant: Offset = Offset(),
+    windgusts10mMaxOffset windgusts10mMax: Offset = Offset(),
+    windgusts10mMeanOffset windgusts10mMean: Offset = Offset(),
+    windgusts10mMinOffset windgusts10mMin: Offset = Offset(),
+    windspeed10mMaxOffset windspeed10mMax: Offset = Offset(),
+    windspeed10mMeanOffset windspeed10mMean: Offset = Offset(),
+    windspeed10mMinOffset windspeed10mMin: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_WeatherDaily.startWeatherDaily(&fbb)
     com_openmeteo_WeatherDaily.add(time: time, &fbb)
-    com_openmeteo_WeatherDaily.add(temperature2mMax: temperature2mMax, &fbb)
-    com_openmeteo_WeatherDaily.add(temperature2mMin: temperature2mMin, &fbb)
-    com_openmeteo_WeatherDaily.add(temperature2mMean: temperature2mMean, &fbb)
     com_openmeteo_WeatherDaily.add(apparentTemperatureMax: apparentTemperatureMax, &fbb)
-    com_openmeteo_WeatherDaily.add(apparentTemperatureMin: apparentTemperatureMin, &fbb)
     com_openmeteo_WeatherDaily.add(apparentTemperatureMean: apparentTemperatureMean, &fbb)
-    com_openmeteo_WeatherDaily.add(precipitationSum: precipitationSum, &fbb)
-    com_openmeteo_WeatherDaily.add(precipitationProbabilityMax: precipitationProbabilityMax, &fbb)
-    com_openmeteo_WeatherDaily.add(precipitationProbabilityMin: precipitationProbabilityMin, &fbb)
-    com_openmeteo_WeatherDaily.add(precipitationProbabilityMean: precipitationProbabilityMean, &fbb)
-    com_openmeteo_WeatherDaily.add(snowfallSum: snowfallSum, &fbb)
-    com_openmeteo_WeatherDaily.add(rainSum: rainSum, &fbb)
-    com_openmeteo_WeatherDaily.add(showersSum: showersSum, &fbb)
-    com_openmeteo_WeatherDaily.add(weathercode: weathercode, &fbb)
-    com_openmeteo_WeatherDaily.add(shortwaveRadiationSum: shortwaveRadiationSum, &fbb)
-    com_openmeteo_WeatherDaily.add(windspeed10mMax: windspeed10mMax, &fbb)
-    com_openmeteo_WeatherDaily.add(windspeed10mMin: windspeed10mMin, &fbb)
-    com_openmeteo_WeatherDaily.add(windspeed10mMean: windspeed10mMean, &fbb)
-    com_openmeteo_WeatherDaily.add(windgusts10mMax: windgusts10mMax, &fbb)
-    com_openmeteo_WeatherDaily.add(windgusts10mMin: windgusts10mMin, &fbb)
-    com_openmeteo_WeatherDaily.add(windgusts10mMean: windgusts10mMean, &fbb)
-    com_openmeteo_WeatherDaily.add(winddirection10mDominant: winddirection10mDominant, &fbb)
+    com_openmeteo_WeatherDaily.add(apparentTemperatureMin: apparentTemperatureMin, &fbb)
+    com_openmeteo_WeatherDaily.add(capeMax: capeMax, &fbb)
+    com_openmeteo_WeatherDaily.add(capeMean: capeMean, &fbb)
+    com_openmeteo_WeatherDaily.add(capeMin: capeMin, &fbb)
+    com_openmeteo_WeatherDaily.add(cloudcoverMax: cloudcoverMax, &fbb)
+    com_openmeteo_WeatherDaily.add(cloudcoverMean: cloudcoverMean, &fbb)
+    com_openmeteo_WeatherDaily.add(cloudcoverMin: cloudcoverMin, &fbb)
+    com_openmeteo_WeatherDaily.add(dewpoint2mMax: dewpoint2mMax, &fbb)
+    com_openmeteo_WeatherDaily.add(dewpoint2mMean: dewpoint2mMean, &fbb)
+    com_openmeteo_WeatherDaily.add(dewpoint2mMin: dewpoint2mMin, &fbb)
+    com_openmeteo_WeatherDaily.add(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
+    com_openmeteo_WeatherDaily.add(et0FaoEvapotranspirationSum: et0FaoEvapotranspirationSum, &fbb)
+    com_openmeteo_WeatherDaily.add(growingDegreeDaysBase0Limit50: growingDegreeDaysBase0Limit50, &fbb)
+    com_openmeteo_WeatherDaily.add(leafWetnessProbabilityMean: leafWetnessProbabilityMean, &fbb)
     com_openmeteo_WeatherDaily.add(precipitationHours: precipitationHours, &fbb)
+    com_openmeteo_WeatherDaily.add(precipitationProbabilityMax: precipitationProbabilityMax, &fbb)
+    com_openmeteo_WeatherDaily.add(precipitationProbabilityMean: precipitationProbabilityMean, &fbb)
+    com_openmeteo_WeatherDaily.add(precipitationProbabilityMin: precipitationProbabilityMin, &fbb)
+    com_openmeteo_WeatherDaily.add(precipitationSum: precipitationSum, &fbb)
+    com_openmeteo_WeatherDaily.add(pressureMslMax: pressureMslMax, &fbb)
+    com_openmeteo_WeatherDaily.add(pressureMslMean: pressureMslMean, &fbb)
+    com_openmeteo_WeatherDaily.add(pressureMslMin: pressureMslMin, &fbb)
+    com_openmeteo_WeatherDaily.add(rainSum: rainSum, &fbb)
+    com_openmeteo_WeatherDaily.add(relativeHumidity2mMax: relativeHumidity2mMax, &fbb)
+    com_openmeteo_WeatherDaily.add(relativeHumidity2mMean: relativeHumidity2mMean, &fbb)
+    com_openmeteo_WeatherDaily.add(relativeHumidity2mMin: relativeHumidity2mMin, &fbb)
+    com_openmeteo_WeatherDaily.add(shortwaveRadiationSum: shortwaveRadiationSum, &fbb)
+    com_openmeteo_WeatherDaily.add(showersSum: showersSum, &fbb)
+    com_openmeteo_WeatherDaily.add(snowfallSum: snowfallSum, &fbb)
+    com_openmeteo_WeatherDaily.add(snowfallWaterEquivalentSum: snowfallWaterEquivalentSum, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoisture0To100cmMean: soilMoisture0To100cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoisture0To10cmMean: soilMoisture0To10cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoisture0To7cmMean: soilMoisture0To7cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoisture28To100cmMean: soilMoisture28To100cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoisture7To28cmMean: soilMoisture7To28cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoistureIndex0To100cmMean: soilMoistureIndex0To100cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoistureIndex0To7cmMean: soilMoistureIndex0To7cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoistureIndex100To255cmMean: soilMoistureIndex100To255cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoistureIndex28To100cmMean: soilMoistureIndex28To100cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilMoistureIndex7To28cmMean: soilMoistureIndex7To28cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilTemperature0To100cmMean: soilTemperature0To100cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilTemperature0To7cmMean: soilTemperature0To7cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilTemperature28To100cmMean: soilTemperature28To100cmMean, &fbb)
+    com_openmeteo_WeatherDaily.add(soilTemperature7To28cmMean: soilTemperature7To28cmMean, &fbb)
     com_openmeteo_WeatherDaily.addVectorOf(sunrise: sunrise, &fbb)
     com_openmeteo_WeatherDaily.addVectorOf(sunset: sunset, &fbb)
-    com_openmeteo_WeatherDaily.add(et0FaoEvapotranspiration: et0FaoEvapotranspiration, &fbb)
-    com_openmeteo_WeatherDaily.add(visibilityMax: visibilityMax, &fbb)
-    com_openmeteo_WeatherDaily.add(visibilityMin: visibilityMin, &fbb)
-    com_openmeteo_WeatherDaily.add(visibilityMean: visibilityMean, &fbb)
-    com_openmeteo_WeatherDaily.add(pressureMslMax: pressureMslMax, &fbb)
-    com_openmeteo_WeatherDaily.add(pressureMslMin: pressureMslMin, &fbb)
-    com_openmeteo_WeatherDaily.add(pressureMslMean: pressureMslMean, &fbb)
     com_openmeteo_WeatherDaily.add(surfacePressureMax: surfacePressureMax, &fbb)
-    com_openmeteo_WeatherDaily.add(surfacePressureMin: surfacePressureMin, &fbb)
     com_openmeteo_WeatherDaily.add(surfacePressureMean: surfacePressureMean, &fbb)
-    com_openmeteo_WeatherDaily.add(capeMax: capeMax, &fbb)
-    com_openmeteo_WeatherDaily.add(capeMin: capeMin, &fbb)
-    com_openmeteo_WeatherDaily.add(capeMean: capeMean, &fbb)
-    com_openmeteo_WeatherDaily.add(cloudcoverMax: cloudcoverMax, &fbb)
-    com_openmeteo_WeatherDaily.add(cloudcoverMin: cloudcoverMin, &fbb)
-    com_openmeteo_WeatherDaily.add(cloudcoverMean: cloudcoverMean, &fbb)
-    com_openmeteo_WeatherDaily.add(uvIndexMax: uvIndexMax, &fbb)
+    com_openmeteo_WeatherDaily.add(surfacePressureMin: surfacePressureMin, &fbb)
+    com_openmeteo_WeatherDaily.add(temperature2mMax: temperature2mMax, &fbb)
+    com_openmeteo_WeatherDaily.add(temperature2mMean: temperature2mMean, &fbb)
+    com_openmeteo_WeatherDaily.add(temperature2mMin: temperature2mMin, &fbb)
+    com_openmeteo_WeatherDaily.add(updraftMax: updraftMax, &fbb)
     com_openmeteo_WeatherDaily.add(uvIndexClearSkyMax: uvIndexClearSkyMax, &fbb)
+    com_openmeteo_WeatherDaily.add(uvIndexMax: uvIndexMax, &fbb)
+    com_openmeteo_WeatherDaily.add(vaporPressureDeficitMax: vaporPressureDeficitMax, &fbb)
+    com_openmeteo_WeatherDaily.add(visibilityMax: visibilityMax, &fbb)
+    com_openmeteo_WeatherDaily.add(visibilityMean: visibilityMean, &fbb)
+    com_openmeteo_WeatherDaily.add(visibilityMin: visibilityMin, &fbb)
+    com_openmeteo_WeatherDaily.add(weathercode: weathercode, &fbb)
+    com_openmeteo_WeatherDaily.add(winddirection10mDominant: winddirection10mDominant, &fbb)
+    com_openmeteo_WeatherDaily.add(windgusts10mMax: windgusts10mMax, &fbb)
+    com_openmeteo_WeatherDaily.add(windgusts10mMean: windgusts10mMean, &fbb)
+    com_openmeteo_WeatherDaily.add(windgusts10mMin: windgusts10mMin, &fbb)
+    com_openmeteo_WeatherDaily.add(windspeed10mMax: windspeed10mMax, &fbb)
+    com_openmeteo_WeatherDaily.add(windspeed10mMean: windspeed10mMean, &fbb)
+    com_openmeteo_WeatherDaily.add(windspeed10mMin: windspeed10mMin, &fbb)
     return com_openmeteo_WeatherDaily.endWeatherDaily(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
     try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: true, type: com_openmeteo_TimeRange.self)
-    try _v.visit(field: VTOFFSET.temperature2mMax.p, fieldName: "temperature2mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.temperature2mMin.p, fieldName: "temperature2mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.temperature2mMean.p, fieldName: "temperature2mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.apparentTemperatureMax.p, fieldName: "apparentTemperatureMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.apparentTemperatureMin.p, fieldName: "apparentTemperatureMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.apparentTemperatureMean.p, fieldName: "apparentTemperatureMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.precipitationSum.p, fieldName: "precipitationSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.precipitationProbabilityMax.p, fieldName: "precipitationProbabilityMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.precipitationProbabilityMin.p, fieldName: "precipitationProbabilityMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.precipitationProbabilityMean.p, fieldName: "precipitationProbabilityMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.snowfallSum.p, fieldName: "snowfallSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.rainSum.p, fieldName: "rainSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.showersSum.p, fieldName: "showersSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.weathercode.p, fieldName: "weathercode", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.shortwaveRadiationSum.p, fieldName: "shortwaveRadiationSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windspeed10mMax.p, fieldName: "windspeed10mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windspeed10mMin.p, fieldName: "windspeed10mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windspeed10mMean.p, fieldName: "windspeed10mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windgusts10mMax.p, fieldName: "windgusts10mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windgusts10mMin.p, fieldName: "windgusts10mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.windgusts10mMean.p, fieldName: "windgusts10mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.winddirection10mDominant.p, fieldName: "winddirection10mDominant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.apparentTemperatureMin.p, fieldName: "apparentTemperatureMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.capeMax.p, fieldName: "capeMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.capeMean.p, fieldName: "capeMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.capeMin.p, fieldName: "capeMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.cloudcoverMax.p, fieldName: "cloudcoverMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.cloudcoverMean.p, fieldName: "cloudcoverMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.cloudcoverMin.p, fieldName: "cloudcoverMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.dewpoint2mMax.p, fieldName: "dewpoint2mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.dewpoint2mMean.p, fieldName: "dewpoint2mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.dewpoint2mMin.p, fieldName: "dewpoint2mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.et0FaoEvapotranspiration.p, fieldName: "et0FaoEvapotranspiration", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.et0FaoEvapotranspirationSum.p, fieldName: "et0FaoEvapotranspirationSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.growingDegreeDaysBase0Limit50.p, fieldName: "growingDegreeDaysBase0Limit50", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.leafWetnessProbabilityMean.p, fieldName: "leafWetnessProbabilityMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.precipitationHours.p, fieldName: "precipitationHours", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.precipitationProbabilityMax.p, fieldName: "precipitationProbabilityMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.precipitationProbabilityMean.p, fieldName: "precipitationProbabilityMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.precipitationProbabilityMin.p, fieldName: "precipitationProbabilityMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.precipitationSum.p, fieldName: "precipitationSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.pressureMslMax.p, fieldName: "pressureMslMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.pressureMslMean.p, fieldName: "pressureMslMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.pressureMslMin.p, fieldName: "pressureMslMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.rainSum.p, fieldName: "rainSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.relativeHumidity2mMax.p, fieldName: "relativeHumidity2mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.relativeHumidity2mMean.p, fieldName: "relativeHumidity2mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.relativeHumidity2mMin.p, fieldName: "relativeHumidity2mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.shortwaveRadiationSum.p, fieldName: "shortwaveRadiationSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.showersSum.p, fieldName: "showersSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.snowfallSum.p, fieldName: "snowfallSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.snowfallWaterEquivalentSum.p, fieldName: "snowfallWaterEquivalentSum", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture0To100cmMean.p, fieldName: "soilMoisture0To100cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture0To10cmMean.p, fieldName: "soilMoisture0To10cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture0To7cmMean.p, fieldName: "soilMoisture0To7cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture28To100cmMean.p, fieldName: "soilMoisture28To100cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoisture7To28cmMean.p, fieldName: "soilMoisture7To28cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex0To100cmMean.p, fieldName: "soilMoistureIndex0To100cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex0To7cmMean.p, fieldName: "soilMoistureIndex0To7cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex100To255cmMean.p, fieldName: "soilMoistureIndex100To255cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex28To100cmMean.p, fieldName: "soilMoistureIndex28To100cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilMoistureIndex7To28cmMean.p, fieldName: "soilMoistureIndex7To28cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature0To100cmMean.p, fieldName: "soilTemperature0To100cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature0To7cmMean.p, fieldName: "soilTemperature0To7cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature28To100cmMean.p, fieldName: "soilTemperature28To100cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.soilTemperature7To28cmMean.p, fieldName: "soilTemperature7To28cmMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.sunrise.p, fieldName: "sunrise", required: false, type: ForwardOffset<Vector<Int64, Int64>>.self)
     try _v.visit(field: VTOFFSET.sunset.p, fieldName: "sunset", required: false, type: ForwardOffset<Vector<Int64, Int64>>.self)
-    try _v.visit(field: VTOFFSET.et0FaoEvapotranspiration.p, fieldName: "et0FaoEvapotranspiration", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.visibilityMax.p, fieldName: "visibilityMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.visibilityMin.p, fieldName: "visibilityMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.visibilityMean.p, fieldName: "visibilityMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.pressureMslMax.p, fieldName: "pressureMslMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.pressureMslMin.p, fieldName: "pressureMslMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.pressureMslMean.p, fieldName: "pressureMslMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.surfacePressureMax.p, fieldName: "surfacePressureMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.surfacePressureMin.p, fieldName: "surfacePressureMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.surfacePressureMean.p, fieldName: "surfacePressureMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.capeMax.p, fieldName: "capeMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.capeMin.p, fieldName: "capeMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.capeMean.p, fieldName: "capeMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.cloudcoverMax.p, fieldName: "cloudcoverMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.cloudcoverMin.p, fieldName: "cloudcoverMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.cloudcoverMean.p, fieldName: "cloudcoverMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.uvIndexMax.p, fieldName: "uvIndexMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.surfacePressureMin.p, fieldName: "surfacePressureMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.temperature2mMax.p, fieldName: "temperature2mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.temperature2mMean.p, fieldName: "temperature2mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.temperature2mMin.p, fieldName: "temperature2mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.updraftMax.p, fieldName: "updraftMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.uvIndexClearSkyMax.p, fieldName: "uvIndexClearSkyMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.uvIndexMax.p, fieldName: "uvIndexMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.vaporPressureDeficitMax.p, fieldName: "vaporPressureDeficitMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.visibilityMax.p, fieldName: "visibilityMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.visibilityMean.p, fieldName: "visibilityMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.visibilityMin.p, fieldName: "visibilityMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.weathercode.p, fieldName: "weathercode", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.winddirection10mDominant.p, fieldName: "winddirection10mDominant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windgusts10mMax.p, fieldName: "windgusts10mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windgusts10mMean.p, fieldName: "windgusts10mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windgusts10mMin.p, fieldName: "windgusts10mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed10mMax.p, fieldName: "windspeed10mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed10mMean.p, fieldName: "windspeed10mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.windspeed10mMin.p, fieldName: "windspeed10mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     _v.finish()
   }
 }

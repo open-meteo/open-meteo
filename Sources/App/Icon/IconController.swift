@@ -172,7 +172,7 @@ enum DailyWeatherVariable: String, RawRepresentableString {
 }
 
 /// one value 6-18h and then 18-6h
-enum DayNightWeatherVariable: String {
+/*enum DayNightWeatherVariable: String {
     case temperature_2m_max
     case temperature_2m_min
     case apparent_temperature_max
@@ -197,7 +197,7 @@ enum OvernightMorningAfternoonEveningWeatherVariable: String {
     case winddirection_10m_dominant
     case cloudcover_total_average
     case relative_humidity_max
-}
+}*/
 
 typealias IconApiVariable = VariableOrDerived<IconVariable, IconVariableDerived>
 

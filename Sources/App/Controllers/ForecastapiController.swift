@@ -348,69 +348,113 @@ enum ModelError: AbortError {
 
 /// Define all available surface weather variables
 enum ForecastSurfaceVariable: String, GenericVariableMixable {
-    case temperature_2m
+    case apparent_temperature
+    case cape
     case cloudcover
+    case cloudcover_high
     case cloudcover_low
     case cloudcover_mid
-    case cloudcover_high
-    case pressure_msl
-    case relativehumidity_2m
-    case precipitation
-    case precipitation_probability
-    case weathercode
-    case temperature_80m
-    case temperature_120m
-    case temperature_180m
-    case soil_temperature_0cm
-    case soil_temperature_6cm
-    case soil_temperature_18cm
-    case soil_temperature_54cm
-    case soil_moisture_0_1cm
-    case soil_moisture_1_3cm
-    case soil_moisture_3_9cm
-    case soil_moisture_9_27cm
-    case soil_moisture_27_81cm
-    case snow_depth
-    case snow_height
-    case sensible_heatflux
-    case latent_heatflux
-    case showers
-    case rain
-    case windgusts_10m
-    case freezinglevel_height
     case dewpoint_2m
     case diffuse_radiation
-    case direct_radiation
-    case apparent_temperature
-    case windspeed_10m
-    case winddirection_10m
-    case windspeed_80m
-    case winddirection_80m
-    case windspeed_120m
-    case winddirection_120m
-    case windspeed_180m
-    case winddirection_180m
+    case diffuse_radiation_instant
     case direct_normal_irradiance
-    case evapotranspiration
+    case direct_normal_irradiance_instant
+    case direct_radiation
+    case direct_radiation_instant
     case et0_fao_evapotranspiration
-    case vapor_pressure_deficit
+    case evapotranspiration
+    case freezinglevel_height
+    case growing_degree_days_base_0_limit_50
+    case is_day
+    case latent_heatflux
+    case leaf_wetness_probability
+    case lightning_potential
+    case precipitation
+    case precipitation_probability
+    case pressure_msl
+    case rain
+    case relativehumidity_2m
+    case runoff
+    case sensible_heatflux
     case shortwave_radiation
+    case shortwave_radiation_instant
+    case showers
+    case skin_temperature
+    case snow_depth
+    case snow_height
     case snowfall
+    case snowfall_water_equivalent
+    case soil_moisture_0_1cm
+    case soil_moisture_0_to_100cm
+    case soil_moisture_0_to_10cm
+    case soil_moisture_0_to_7cm
+    case soil_moisture_100_to_200cm
+    case soil_moisture_100_to_255cm
+    case soil_moisture_10_to_40cm
+    case soil_moisture_1_3cm
+    case soil_moisture_27_81cm
+    case soil_moisture_28_to_100cm
+    case soil_moisture_3_9cm
+    case soil_moisture_40_to_100cm
+    case soil_moisture_7_to_28cm
+    case soil_moisture_9_27cm
+    case soil_moisture_index_0_to_100cm
+    case soil_moisture_index_0_to_7cm
+    case soil_moisture_index_100_to_255cm
+    case soil_moisture_index_28_to_100cm
+    case soil_moisture_index_7_to_28cm
+    case soil_temperature_0_to_100cm
+    case soil_temperature_0_to_10cm
+    case soil_temperature_0_to_7cm
+    case soil_temperature_0cm
+    case soil_temperature_100_to_200cm
+    case soil_temperature_100_to_255cm
+    case soil_temperature_10_to_40cm
+    case soil_temperature_18cm
+    case soil_temperature_28_to_100cm
+    case soil_temperature_40_to_100cm
+    case soil_temperature_54cm
+    case soil_temperature_6cm
+    case soil_temperature_7_to_28cm
+    case surface_air_pressure
     case surface_pressure
+    case surface_temperature
+    case temperature_120m
+    case temperature_180m
+    case temperature_2m
+    case temperature_40m
+    case temperature_80m
     case terrestrial_radiation
     case terrestrial_radiation_instant
-    case shortwave_radiation_instant
-    case diffuse_radiation_instant
-    case direct_radiation_instant
-    case direct_normal_irradiance_instant
-    case visibility
-    case cape
+    case total_column_integrated_water_vapour
+    case updraft
     case uv_index
     case uv_index_clear_sky
-    case is_day
-    
-    /// Currently only from icon-d2
-    case lightning_potential
+    case vapor_pressure_deficit
+    case visibility
+    case weathercode
+    case winddirection_100m
+    case winddirection_10m
+    case winddirection_120m
+    case winddirection_150m
+    case winddirection_180m
+    case winddirection_200m
+    case winddirection_20m
+    case winddirection_40m
+    case winddirection_50m
+    case winddirection_80m
+    case windgusts_10m
+    case windspeed_100m
+    case windspeed_10m
+    case windspeed_120m
+    case windspeed_150m
+    case windspeed_180m
+    case windspeed_200m
+    case windspeed_20m
+    case windspeed_40m
+    case windspeed_50m
+    case windspeed_80m
+
     
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
@@ -454,49 +498,76 @@ typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable,
 
 /// Available daily aggregations
 enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableString {
-    case temperature_2m_max
-    case temperature_2m_min
-    case temperature_2m_mean
     case apparent_temperature_max
-    case apparent_temperature_min
     case apparent_temperature_mean
-    case precipitation_sum
-    case precipitation_probability_max
-    case precipitation_probability_min
-    case precipitation_probability_mean
-    case snowfall_sum
-    case rain_sum
-    case showers_sum
-    case weathercode
-    case shortwave_radiation_sum
-    case windspeed_10m_max
-    case windspeed_10m_min
-    case windspeed_10m_mean
-    case windgusts_10m_max
-    case windgusts_10m_min
-    case windgusts_10m_mean
-    case winddirection_10m_dominant
+    case apparent_temperature_min
+    case cape_max
+    case cape_mean
+    case cape_min
+    case cloudcover_max
+    case cloudcover_mean
+    case cloudcover_min
+    case dewpoint_2m_max
+    case dewpoint_2m_mean
+    case dewpoint_2m_min
+    case et0_fao_evapotranspiration
+    case et0_fao_evapotranspiration_sum
+    case growing_degree_days_base_0_limit_50
+    case leaf_wetness_probability_mean
     case precipitation_hours
+    case precipitation_probability_max
+    case precipitation_probability_mean
+    case precipitation_probability_min
+    case precipitation_sum
+    case pressure_msl_max
+    case pressure_msl_mean
+    case pressure_msl_min
+    case rain_sum
+    case relative_humidity_2m_max
+    case relative_humidity_2m_mean
+    case relative_humidity_2m_min
+    case shortwave_radiation_sum
+    case showers_sum
+    case snowfall_sum
+    case snowfall_water_equivalent_sum
+    case soil_moisture_0_to_100cm_mean
+    case soil_moisture_0_to_10cm_mean
+    case soil_moisture_0_to_7cm_mean
+    case soil_moisture_28_to_100cm_mean
+    case soil_moisture_7_to_28cm_mean
+    case soil_moisture_index_0_to_100cm_mean
+    case soil_moisture_index_0_to_7cm_mean
+    case soil_moisture_index_100_to_255cm_mean
+    case soil_moisture_index_28_to_100cm_mean
+    case soil_moisture_index_7_to_28cm_mean
+    case soil_temperature_0_to_100cm_mean
+    case soil_temperature_0_to_7cm_mean
+    case soil_temperature_28_to_100cm_mean
+    case soil_temperature_7_to_28cm_mean
     case sunrise
     case sunset
-    case et0_fao_evapotranspiration
-    case visibility_max
-    case visibility_min
-    case visibility_mean
-    case pressure_msl_max
-    case pressure_msl_min
-    case pressure_msl_mean
     case surface_pressure_max
-    case surface_pressure_min
     case surface_pressure_mean
-    case cape_max
-    case cape_min
-    case cape_mean
-    case cloudcover_max
-    case cloudcover_min
-    case cloudcover_mean
-    case uv_index_max
+    case surface_pressure_min
+    case temperature_2m_max
+    case temperature_2m_mean
+    case temperature_2m_min
+    case updraft_max
     case uv_index_clear_sky_max
+    case uv_index_max
+    case vapor_pressure_deficit_max
+    case visibility_max
+    case visibility_mean
+    case visibility_min
+    case weathercode
+    case winddirection_10m_dominant
+    case windgusts_10m_max
+    case windgusts_10m_mean
+    case windgusts_10m_min
+    case windspeed_10m_max
+    case windspeed_10m_mean
+    case windspeed_10m_min
+    
     
     var aggregation: DailyAggregation<ForecastVariable> {
         switch self {
@@ -586,6 +657,58 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .max(.surface(.precipitation_probability))
         case .precipitation_probability_mean:
             return .max(.surface(.precipitation_probability))
+        case .dewpoint_2m_max:
+            return .max(.surface(.dewpoint_2m))
+        case .dewpoint_2m_mean:
+            return .mean(.surface(.dewpoint_2m))
+        case .dewpoint_2m_min:
+            return .min(.surface(.dewpoint_2m))
+        case .et0_fao_evapotranspiration_sum:
+            return .sum(.surface(.et0_fao_evapotranspiration))
+        case .growing_degree_days_base_0_limit_50:
+            return .sum(.surface(.growing_degree_days_base_0_limit_50))
+        case .leaf_wetness_probability_mean:
+            return .mean(.surface(.leaf_wetness_probability))
+        case .relative_humidity_2m_max:
+            return .max(.surface(.relativehumidity_2m))
+        case .relative_humidity_2m_mean:
+            return .mean(.surface(.relativehumidity_2m))
+        case .relative_humidity_2m_min:
+            return .min(.surface(.relativehumidity_2m))
+        case .snowfall_water_equivalent_sum:
+            return .sum(.surface(.snowfall_water_equivalent))
+        case .soil_moisture_0_to_100cm_mean:
+            return .mean(.surface(.soil_moisture_0_to_100cm))
+        case .soil_moisture_0_to_10cm_mean:
+            return .mean(.surface(.soil_moisture_0_to_10cm))
+        case .soil_moisture_0_to_7cm_mean:
+            return .mean(.surface(.soil_moisture_0_to_7cm))
+        case .soil_moisture_28_to_100cm_mean:
+            return .mean(.surface(.soil_moisture_28_to_100cm))
+        case .soil_moisture_7_to_28cm_mean:
+            return .mean(.surface(.soil_moisture_7_to_28cm))
+        case .soil_moisture_index_0_to_100cm_mean:
+            return .mean(.surface(.soil_moisture_index_0_to_100cm))
+        case .soil_moisture_index_0_to_7cm_mean:
+            return .mean(.surface(.soil_moisture_index_0_to_7cm))
+        case .soil_moisture_index_100_to_255cm_mean:
+            return .mean(.surface(.soil_moisture_index_100_to_255cm))
+        case .soil_moisture_index_28_to_100cm_mean:
+            return .mean(.surface(.soil_moisture_index_28_to_100cm))
+        case .soil_moisture_index_7_to_28cm_mean:
+            return .mean(.surface(.soil_moisture_index_7_to_28cm))
+        case .soil_temperature_0_to_100cm_mean:
+            return .mean(.surface(.soil_temperature_0_to_100cm))
+        case .soil_temperature_0_to_7cm_mean:
+            return .mean(.surface(.soil_temperature_0_to_7cm))
+        case .soil_temperature_28_to_100cm_mean:
+            return .mean(.surface(.soil_temperature_28_to_100cm))
+        case .soil_temperature_7_to_28cm_mean:
+            return .mean(.surface(.soil_temperature_7_to_28cm))
+        case .updraft_max:
+            return .max(.surface(.updraft))
+        case .vapor_pressure_deficit_max:
+            return .max(.surface(.vapor_pressure_deficit))
         }
     }
 }
