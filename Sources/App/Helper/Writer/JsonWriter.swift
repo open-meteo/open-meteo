@@ -55,18 +55,21 @@ extension ForecastapiResultSet {
     }
 }
 
-extension ForecastapiResult {
+extension ForecastapiResultMulti {
     fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
-        let current_weather = try current_weather?()
-        let current = try current?()
+        guard let first = results.first else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        let current_weather = try first.current_weather?()
+        let current = try first.current?()
         let sections = try runAllSections()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
         b.buffer.writeString("""
-        {"latitude":\(latitude),"longitude":\(longitude),"generationtime_ms":\(generationTimeMs),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
+        {"latitude":\(first.latitude),"longitude":\(first.longitude),"generationtime_ms":\(generationTimeMs),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
         """)
-        if let elevation = elevation, elevation.isFinite {
+        if let elevation = first.elevation, elevation.isFinite {
             b.buffer.writeString(",\"elevation\":\(elevation)")
         }
         if let current_weather = current_weather {

@@ -6,7 +6,8 @@ import Vapor
  */
 struct CamsController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain("air-quality-api")
+        fatalError()
+        /*try req.ensureSubdomain("air-quality-api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 6)
@@ -60,7 +61,7 @@ struct CamsController {
             )
         })
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        return result.response(format: params.format ?? .json)*/
     }
 }
 

@@ -86,7 +86,8 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
 struct GloFasController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain("flood-api")
+        fatalError()
+        /*try req.ensureSubdomain("flood-api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
@@ -161,7 +162,7 @@ struct GloFasController {
             )
         })
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        return result.response(format: params.format ?? .json)*/
     }
 }
 

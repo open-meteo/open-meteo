@@ -3,6 +3,8 @@ import Vapor
 
 public struct JmaController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
+        fatalError()
+        /*
         try req.ensureSubdomain("api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
@@ -108,7 +110,7 @@ public struct JmaController {
             )
         })
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        return result.response(format: params.format ?? .json)*/
     }
 }
 

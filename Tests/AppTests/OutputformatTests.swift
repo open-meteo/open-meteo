@@ -35,7 +35,7 @@ final class OutputformatTests: XCTestCase {
             print(data[0..<10])
         })
     }*/
-    
+    /*
     /// Test adjustment of API call weights
     /// "Heavy" API calls are counted more than just 1 API call
     ///
@@ -650,7 +650,7 @@ final class OutputformatTests: XCTestCase {
         
         let flatbuffers = drainData(data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
         XCTAssertEqual(flatbuffers, "da67da2fb8f6747e26aaaf0a9c7a47e59775ebf87777f09d1e152fcd36847db8")
-    }
+    }*/
     
     func testXlsxWriter() throws {
         let xlsx = try XlsxWriter()

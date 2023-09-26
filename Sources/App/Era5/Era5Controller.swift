@@ -8,6 +8,8 @@ import Vapor
  */
 struct Era5Controller {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
+        fatalError()
+        /*
         try req.ensureSubdomain("archive-api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
@@ -110,7 +112,7 @@ struct Era5Controller {
             )
         })
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        return result.response(format: params.format ?? .json)*/
     }
 }
 
