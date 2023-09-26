@@ -444,7 +444,108 @@ extension ForecastVariable: VariableFlatbufferSerialisable {
 }
 extension ForecastVariableDaily: VariableFlatbufferSerialisable {
     static func toFlatbuffers(section: ApiSection<Self>, _ fbb: inout FlatBuffers.FlatBufferBuilder) -> FlatBuffers.Offset {
-        fatalError()
+        let offsets: [Offset] = section.columns.map { v in
+            switch v.data {
+            case .float(let float):
+                return com_openmeteo_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: fbb.createVector(float), unit: v.unit)
+            case .timestamp(let time):
+                return fbb.createVector(time.map({$0.timeIntervalSince1970}))
+            }
+        }
+        
+        let start = com_openmeteo_WeatherDaily.startWeatherDaily(&fbb)
+        com_openmeteo_WeatherDaily.add(time: section.timeFlatBuffers(), &fbb)
+        for (variable, offset) in zip(section.columns, offsets) {
+            switch variable.variable {
+            case .temperature_2m_max:
+                com_openmeteo_WeatherDaily.add(temperature2mMax: offset, &fbb)
+            case .temperature_2m_min:
+                com_openmeteo_WeatherDaily.add(temperature2mMin: offset, &fbb)
+            case .temperature_2m_mean:
+                com_openmeteo_WeatherDaily.add(temperature2mMean: offset, &fbb)
+            case .apparent_temperature_max:
+                com_openmeteo_WeatherDaily.add(apparentTemperatureMax: offset, &fbb)
+            case .apparent_temperature_min:
+                com_openmeteo_WeatherDaily.add(apparentTemperatureMin: offset, &fbb)
+            case .apparent_temperature_mean:
+                com_openmeteo_WeatherDaily.add(apparentTemperatureMean: offset, &fbb)
+            case .precipitation_sum:
+                com_openmeteo_WeatherDaily.add(precipitationSum: offset, &fbb)
+            case .precipitation_probability_max:
+                com_openmeteo_WeatherDaily.add(precipitationProbabilityMax: offset, &fbb)
+            case .precipitation_probability_min:
+                com_openmeteo_WeatherDaily.add(precipitationProbabilityMin: offset, &fbb)
+            case .precipitation_probability_mean:
+                com_openmeteo_WeatherDaily.add(precipitationProbabilityMean: offset, &fbb)
+            case .snowfall_sum:
+                com_openmeteo_WeatherDaily.add(snowfallSum: offset, &fbb)
+            case .rain_sum:
+                com_openmeteo_WeatherDaily.add(rainSum: offset, &fbb)
+            case .showers_sum:
+                com_openmeteo_WeatherDaily.add(showersSum: offset, &fbb)
+            case .weathercode:
+                com_openmeteo_WeatherDaily.add(weathercode: offset, &fbb)
+            case .shortwave_radiation_sum:
+                com_openmeteo_WeatherDaily.add(shortwaveRadiationSum: offset, &fbb)
+            case .windspeed_10m_max:
+                com_openmeteo_WeatherDaily.add(windspeed10mMax: offset, &fbb)
+            case .windspeed_10m_min:
+                com_openmeteo_WeatherDaily.add(windspeed10mMin: offset, &fbb)
+            case .windspeed_10m_mean:
+                com_openmeteo_WeatherDaily.add(windspeed10mMean: offset, &fbb)
+            case .windgusts_10m_max:
+                com_openmeteo_WeatherDaily.add(windgusts10mMax: offset, &fbb)
+            case .windgusts_10m_min:
+                com_openmeteo_WeatherDaily.add(windgusts10mMin: offset, &fbb)
+            case .windgusts_10m_mean:
+                com_openmeteo_WeatherDaily.add(windgusts10mMean: offset, &fbb)
+            case .winddirection_10m_dominant:
+                com_openmeteo_WeatherDaily.add(winddirection10mDominant: offset, &fbb)
+            case .precipitation_hours:
+                com_openmeteo_WeatherDaily.add(precipitationSum: offset, &fbb)
+            case .sunrise:
+                com_openmeteo_WeatherDaily.addVectorOf(sunrise: offset, &fbb)
+            case .sunset:
+                com_openmeteo_WeatherDaily.addVectorOf(sunset: offset, &fbb)
+            case .et0_fao_evapotranspiration:
+                com_openmeteo_WeatherDaily.add(et0FaoEvapotranspiration: offset, &fbb)
+            case .visibility_max:
+                com_openmeteo_WeatherDaily.add(visibilityMax: offset, &fbb)
+            case .visibility_min:
+                com_openmeteo_WeatherDaily.add(visibilityMin: offset, &fbb)
+            case .visibility_mean:
+                com_openmeteo_WeatherDaily.add(visibilityMean: offset, &fbb)
+            case .pressure_msl_max:
+                com_openmeteo_WeatherDaily.add(pressureMslMax: offset, &fbb)
+            case .pressure_msl_min:
+                com_openmeteo_WeatherDaily.add(pressureMslMin: offset, &fbb)
+            case .pressure_msl_mean:
+                com_openmeteo_WeatherDaily.add(pressureMslMean: offset, &fbb)
+            case .surface_pressure_max:
+                com_openmeteo_WeatherDaily.add(surfacePressureMax: offset, &fbb)
+            case .surface_pressure_min:
+                com_openmeteo_WeatherDaily.add(surfacePressureMin: offset, &fbb)
+            case .surface_pressure_mean:
+                com_openmeteo_WeatherDaily.add(surfacePressureMean: offset, &fbb)
+            case .cape_max:
+                com_openmeteo_WeatherDaily.add(capeMax: offset, &fbb)
+            case .cape_min:
+                com_openmeteo_WeatherDaily.add(capeMin: offset, &fbb)
+            case .cape_mean:
+                com_openmeteo_WeatherDaily.add(capeMean: offset, &fbb)
+            case .cloudcover_max:
+                com_openmeteo_WeatherDaily.add(cloudcoverMax: offset, &fbb)
+            case .cloudcover_min:
+                com_openmeteo_WeatherDaily.add(cloudcoverMin: offset, &fbb)
+            case .cloudcover_mean:
+                com_openmeteo_WeatherDaily.add(cloudcoverMean: offset, &fbb)
+            case .uv_index_max:
+                com_openmeteo_WeatherDaily.add(uvIndexMax: offset, &fbb)
+            case .uv_index_clear_sky_max:
+                com_openmeteo_WeatherDaily.add(uvIndexClearSkyMax: offset, &fbb)
+            }
+        }
+        return com_openmeteo_WeatherDaily.endWeatherDaily(&fbb, start: start)
     }
 }
 
