@@ -1,7 +1,7 @@
 // Flatbuffers API result format for open-meteo weather data
 // 
 // Generate swift code with: 
-// flatc -o Sources/App/Helper/Writer/ --swift format/api_result.fbs
+// flatc -o Sources/App/Helper/FlatBuffers/ --swift format/*.fbs
 //
 // Make sure flatbuffers is installed with `brew install flatbuffers`
 
