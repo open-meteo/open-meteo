@@ -419,6 +419,96 @@ extension ForecastVariable: VariableFlatbufferSerialisable {
                 com_openmeteo_WeatherHourly.add(isDay: offset, &fbb)
             case .lightning_potential:
                 com_openmeteo_WeatherHourly.add(lightningPotential: offset, &fbb)
+            case .growing_degree_days_base_0_limit_50:
+                com_openmeteo_WeatherHourly.add(growingDegreeDaysBase0Limit50: offset, &fbb)
+            case .leaf_wetness_probability:
+                com_openmeteo_WeatherHourly.add(leafWetnessProbability: offset, &fbb)
+            case .runoff:
+                com_openmeteo_WeatherHourly.add(runoff: offset, &fbb)
+            case .skin_temperature:
+                com_openmeteo_WeatherHourly.add(skinTemperature: offset, &fbb)
+            case .snowfall_water_equivalent:
+                com_openmeteo_WeatherHourly.add(snowfallWaterEquivalent: offset, &fbb)
+            case .soil_moisture_0_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture0To100cm: offset, &fbb)
+            case .soil_moisture_0_to_10cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture0To10cm: offset, &fbb)
+            case .soil_moisture_0_to_7cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture0To7cm: offset, &fbb)
+            case .soil_moisture_100_to_200cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture100To200cm: offset, &fbb)
+            case .soil_moisture_100_to_255cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture100To255cm: offset, &fbb)
+            case .soil_moisture_10_to_40cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture10To40cm: offset, &fbb)
+            case .soil_moisture_28_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture28To100cm: offset, &fbb)
+            case .soil_moisture_40_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture40To100cm: offset, &fbb)
+            case .soil_moisture_7_to_28cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture7To28cm: offset, &fbb)
+            case .soil_moisture_index_0_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex0To100cm: offset, &fbb)
+            case .soil_moisture_index_0_to_7cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex0To7cm: offset, &fbb)
+            case .soil_moisture_index_100_to_255cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex100To255cm: offset, &fbb)
+            case .soil_moisture_index_28_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex28To100cm: offset, &fbb)
+            case .soil_moisture_index_7_to_28cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex7To28cm: offset, &fbb)
+            case .soil_temperature_0_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature0To100cm: offset, &fbb)
+            case .soil_temperature_0_to_10cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature0To10cm: offset, &fbb)
+            case .soil_temperature_0_to_7cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature0To7cm: offset, &fbb)
+            case .soil_temperature_100_to_200cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature100To200cm: offset, &fbb)
+            case .soil_temperature_100_to_255cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature100To255cm: offset, &fbb)
+            case .soil_temperature_10_to_40cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature10To40cm: offset, &fbb)
+            case .soil_temperature_28_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature28To100cm: offset, &fbb)
+            case .soil_temperature_40_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature40To100cm: offset, &fbb)
+            case .soil_temperature_7_to_28cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature7To28cm: offset, &fbb)
+            case .surface_air_pressure:
+                com_openmeteo_WeatherHourly.add(surfaceAirPressure: offset, &fbb)
+            case .surface_temperature:
+                com_openmeteo_WeatherHourly.add(surfaceTemperature: offset, &fbb)
+            case .temperature_40m:
+                com_openmeteo_WeatherHourly.add(temperature40m: offset, &fbb)
+            case .total_column_integrated_water_vapour:
+                com_openmeteo_WeatherHourly.add(totalColumnIntegratedWaterVapour: offset, &fbb)
+            case .updraft:
+                com_openmeteo_WeatherHourly.add(updraft: offset, &fbb)
+            case .winddirection_100m:
+                com_openmeteo_WeatherHourly.add(winddirection100m: offset, &fbb)
+            case .winddirection_150m:
+                com_openmeteo_WeatherHourly.add(winddirection150m: offset, &fbb)
+            case .winddirection_200m:
+                com_openmeteo_WeatherHourly.add(winddirection200m: offset, &fbb)
+            case .winddirection_20m:
+                com_openmeteo_WeatherHourly.add(winddirection20m: offset, &fbb)
+            case .winddirection_40m:
+                com_openmeteo_WeatherHourly.add(winddirection40m: offset, &fbb)
+            case .winddirection_50m:
+                com_openmeteo_WeatherHourly.add(winddirection50m: offset, &fbb)
+            case .windspeed_100m:
+                com_openmeteo_WeatherHourly.add(windspeed100m: offset, &fbb)
+            case .windspeed_150m:
+                com_openmeteo_WeatherHourly.add(windspeed150m: offset, &fbb)
+            case .windspeed_200m:
+                com_openmeteo_WeatherHourly.add(windspeed200m: offset, &fbb)
+            case .windspeed_20m:
+                com_openmeteo_WeatherHourly.add(windspeed20m: offset, &fbb)
+            case .windspeed_40m:
+                com_openmeteo_WeatherHourly.add(windspeed40m: offset, &fbb)
+            case .windspeed_50m:
+                com_openmeteo_WeatherHourly.add(windspeed50m: offset, &fbb)
             }
         }
         for (pressure, offset) in pressureVectors {
@@ -543,6 +633,58 @@ extension ForecastVariableDaily: VariableFlatbufferSerialisable {
                 com_openmeteo_WeatherDaily.add(uvIndexMax: offset, &fbb)
             case .uv_index_clear_sky_max:
                 com_openmeteo_WeatherDaily.add(uvIndexClearSkyMax: offset, &fbb)
+            case .dewpoint_2m_max:
+                com_openmeteo_WeatherDaily.add(dewpoint2mMax: offset, &fbb)
+            case .dewpoint_2m_mean:
+                com_openmeteo_WeatherDaily.add(dewpoint2mMean: offset, &fbb)
+            case .dewpoint_2m_min:
+                com_openmeteo_WeatherDaily.add(dewpoint2mMin: offset, &fbb)
+            case .et0_fao_evapotranspiration_sum:
+                com_openmeteo_WeatherDaily.add(et0FaoEvapotranspirationSum: offset, &fbb)
+            case .growing_degree_days_base_0_limit_50:
+                com_openmeteo_WeatherDaily.add(growingDegreeDaysBase0Limit50: offset, &fbb)
+            case .leaf_wetness_probability_mean:
+                com_openmeteo_WeatherDaily.add(leafWetnessProbabilityMean: offset, &fbb)
+            case .relative_humidity_2m_max:
+                com_openmeteo_WeatherDaily.add(relativeHumidity2mMax: offset, &fbb)
+            case .relative_humidity_2m_mean:
+                com_openmeteo_WeatherDaily.add(relativeHumidity2mMean: offset, &fbb)
+            case .relative_humidity_2m_min:
+                com_openmeteo_WeatherDaily.add(relativeHumidity2mMin: offset, &fbb)
+            case .snowfall_water_equivalent_sum:
+                com_openmeteo_WeatherDaily.add(snowfallWaterEquivalentSum: offset, &fbb)
+            case .soil_moisture_0_to_100cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoisture0To100cmMean: offset, &fbb)
+            case .soil_moisture_0_to_10cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoisture0To10cmMean: offset, &fbb)
+            case .soil_moisture_0_to_7cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoisture0To7cmMean:  offset, &fbb)
+            case .soil_moisture_28_to_100cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoisture28To100cmMean: offset, &fbb)
+            case .soil_moisture_7_to_28cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoisture7To28cmMean: offset, &fbb)
+            case .soil_moisture_index_0_to_100cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoistureIndex0To100cmMean: offset, &fbb)
+            case .soil_moisture_index_0_to_7cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoistureIndex0To7cmMean: offset, &fbb)
+            case .soil_moisture_index_100_to_255cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoistureIndex100To255cmMean: offset, &fbb)
+            case .soil_moisture_index_28_to_100cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoistureIndex28To100cmMean: offset, &fbb)
+            case .soil_moisture_index_7_to_28cm_mean:
+                com_openmeteo_WeatherDaily.add(soilMoistureIndex7To28cmMean: offset, &fbb)
+            case .soil_temperature_0_to_100cm_mean:
+                com_openmeteo_WeatherDaily.add(soilTemperature0To100cmMean: offset, &fbb)
+            case .soil_temperature_0_to_7cm_mean:
+                com_openmeteo_WeatherDaily.add(soilTemperature0To7cmMean: offset, &fbb)
+            case .soil_temperature_28_to_100cm_mean:
+                com_openmeteo_WeatherDaily.add(soilTemperature28To100cmMean: offset, &fbb)
+            case .soil_temperature_7_to_28cm_mean:
+                com_openmeteo_WeatherDaily.add(soilTemperature7To28cmMean: offset, &fbb)
+            case .updraft_max:
+                com_openmeteo_WeatherDaily.add(updraftMax: offset, &fbb)
+            case .vapor_pressure_deficit_max:
+                com_openmeteo_WeatherDaily.add(vaporPressureDeficitMax: offset, &fbb)
             }
         }
         return com_openmeteo_WeatherDaily.endWeatherDaily(&fbb, start: start)
