@@ -41,6 +41,53 @@ enum WeatherModel: byte {
   noaa_cfs
 }
 
+table ValuesAndLevel {
+  level: int32;
+  values: [float] (required);
+}
+
+table ValuesUnitPressureLevel {
+  /*hPa_1015: [float];
+  hPa_1000: [float];
+  hPa_985hPa: [float];
+  hPa_975hPa: [float];
+  hPa_970hPa: [float];
+  hPa_950hPa: [float];
+  hPa_925hPa: [float];
+  hPa_900hPa: [float];
+  hPa_875hPa: [float];
+  hPa_850hPa: [float];
+  hPa_800hPa: [float];
+  hPa_750hPa: [float];
+  hPa_700hPa: [float];
+  hPa_650hPa: [float];
+  hPa_600hPa: [float];
+  hPa_550hPa: [float];
+  hPa_500hPa: [float];
+  hPa_450hPa: [float];
+  hPa_400hPa: [float];
+  hPa_350hPa: [float];
+  hPa_300hPa: [float];
+  hPa_275hPa: [float];
+  hPa_250hPa: [float];
+  hPa_225hPa: [float];
+  hPa_200hPa: [float];
+  hPa_175hPa: [float];
+  hPa_150hPa: [float];
+  hPa_125hPa: [float];
+  hPa_100hPa: [float];
+  hPa_70hPa: [float];
+  hPa_50hPa: [float];
+  hPa_40hPa: [float];
+  hPa_30hPa: [float];
+  hPa_20hPa: [float];
+  hPa_15hPa: [float];
+  hPa_10hPa: [float];*/
+
+  unit: SiUnit;
+  values: [ValuesAndLevel];
+}
+
 table WeatherHourly {
   time: TimeRange (required);
   temperature_2m: ValuesAndUnit;
@@ -120,7 +167,16 @@ table WeatherHourly {
   soil_moisture_index_0_to_100cm: ValuesAndUnit;
   lightning_potential: ValuesAndUnit;
 
-  temperature_1015hPa: ValuesAndUnit;
+  pressure_level_temperature_: ValuesUnitPressureLevel;
+  pressure_level_dewpoint: ValuesUnitPressureLevel;
+  pressure_level_relativehumidity: ValuesUnitPressureLevel;
+  pressure_level_cloudcover: ValuesUnitPressureLevel;
+  pressure_level_windspeed: ValuesUnitPressureLevel;
+  pressure_level_winddirection: ValuesUnitPressureLevel;
+  pressure_level_vertical_velocity: ValuesUnitPressureLevel;
+  pressure_level_geopotential_height: ValuesUnitPressureLevel;
+
+  /*temperature_1015hPa: ValuesAndUnit;
   temperature_1000hPa: ValuesAndUnit;
   temperature_985hPa: ValuesAndUnit;
   temperature_975hPa: ValuesAndUnit;
@@ -414,7 +470,7 @@ table WeatherHourly {
   geopotential_height_30hPa: ValuesAndUnit;
   geopotential_height_20hPa: ValuesAndUnit;
   geopotential_height_15hPa: ValuesAndUnit;
-  geopotential_height_10hPa: ValuesAndUnit;
+  geopotential_height_10hPa: ValuesAndUnit;*/
 }
 
 table WeatherDaily {
