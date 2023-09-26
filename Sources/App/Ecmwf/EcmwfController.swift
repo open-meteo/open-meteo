@@ -4,7 +4,8 @@ import Vapor
 
 struct EcmwfController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain("api")
+        fatalError()
+        /*try req.ensureSubdomain("api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 16)
@@ -67,7 +68,7 @@ struct EcmwfController {
             )
         })
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        return result.response(format: params.format ?? .json)*/
     }
 }
 

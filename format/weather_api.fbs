@@ -478,7 +478,6 @@ table WeatherApi {
   longitude: float;
   elevation: float;
   model: WeatherModel;
-  ensemble_member: int16;
   generationtime_ms: float;
   utc_offset_seconds: int32;
   timezone: string;

@@ -4,7 +4,8 @@ import Vapor
 
 struct IconWaveController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain("marine-api")
+        fatalError()
+        /*try req.ensureSubdomain("marine-api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 11)
@@ -69,7 +70,7 @@ struct IconWaveController {
             )
         })
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        return result.response(format: params.format ?? .json)*/
     }
 }
 

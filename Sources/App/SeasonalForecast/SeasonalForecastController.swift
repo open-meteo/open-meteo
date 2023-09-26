@@ -124,6 +124,8 @@ extension SeasonalForecastReader {
  */
 struct SeasonalForecastController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
+        fatalError()
+        /*
         try req.ensureSubdomain("seasonal-api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
@@ -202,7 +204,7 @@ struct SeasonalForecastController {
             )
         })
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        return result.response(format: params.format ?? .json)*/
     }
 }
 

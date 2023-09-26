@@ -41,10 +41,11 @@ extension ForecastapiResultSet {
     }
 }
 
-fileprivate extension ForecastapiResult {
+fileprivate extension ForecastapiResultMulti {
     /// Write data into `FlatBufferBuilder` and finish the message
     func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, fixedGenerationTime: Double?) throws {
-        let generationTimeStart = Date()
+        fatalError()
+        /*let generationTimeStart = Date()
         let current_weather = try current_weather?()
         let current = try current?()
         let sections = try runAllSections()
@@ -84,7 +85,7 @@ fileprivate extension ForecastapiResult {
             currentTime: (current?.time.timeIntervalSince1970).map(Int64.init) ?? 0,
             currentIntervalSeconds: (current?.dtSeconds).map(Int32.init) ?? 0
         )
-        fbb.finish(offset: result, addPrefix: true)
+        fbb.finish(offset: result, addPrefix: true)*/
     }
     
     /// Roughly estimate the required size to keep the flatbuffer message in memory. Overestimation is expected.
@@ -102,9 +103,9 @@ fileprivate extension FlatBuffers.ByteBuffer {
 }
 
 fileprivate extension ApiSection {
-    var estimatedFlatbufferSize: Int {
+    /*var estimatedFlatbufferSize: Int {
         24 + columns.reduce(0, {$0 + $1.unit.abbreviation.count + $1.variable.count + $1.data.count * 4 + 24})
-    }
+    }*/
         
     func toFlatbuffers(_ fbb: inout FlatBufferBuilder) -> Offset {
         return fbb.createVector(ofOffsets: columns.compactMap({ $0.toFlatbuffers(&fbb, timerange: time) }))

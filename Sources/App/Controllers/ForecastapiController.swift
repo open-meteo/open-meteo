@@ -50,7 +50,7 @@ public struct ForecastapiController: RouteCollection {
         let nParamsDaily = paramsDaily?.count ?? 0
         let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
         
-        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
+        let locations: [ForecastapiResultMulti<MultiDomains, ForecastVariable, ForecastVariableDaily>] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -63,142 +63,116 @@ public struct ForecastapiController: RouteCollection {
             // limited to 3 forecast days
             let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92).range.range(dtSeconds: 3600/4)
             
-            let readers = try domains.compactMap {
-                try GenericReaderMulti<ForecastVariable>(domain: $0, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land)
-            }
-            
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            
-            return ForecastapiResult(
-                latitude: readers[0].modelLat,
-                longitude: readers[0].modelLon,
-                elevation: readers[0].targetElevation,
-                timezone: timezone,
-                time: time,
-                prefetch: {
-                    if let paramsCurrent {
-                        for reader in readers {
+            let readers: [ForecastapiResult<MultiDomains, ForecastVariable, ForecastVariableDaily>] = try domains.compactMap { domain in
+                guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                    return nil
+                }
+                
+                return ForecastapiResult<MultiDomains, ForecastVariable, ForecastVariableDaily>(
+                    model: domain,
+                    latitude: reader.modelLat,
+                    longitude: reader.modelLon,
+                    elevation: reader.targetElevation,
+                    prefetch: {
+                        if let paramsCurrent {
                             try reader.prefetchData(variables: paramsCurrent, time: minutelyTime)
                         }
-                    }
-                    if let paramsMinutely {
-                        for reader in readers {
+                        if let paramsMinutely {
                             try reader.prefetchData(variables: paramsMinutely, time: minutelyTime)
                         }
-                    }
-                    if let paramsHourly {
-                        for reader in readers {
+                        if let paramsHourly {
                             try reader.prefetchData(variables: paramsHourly, time: hourlyTime)
                         }
-                    }
-                    if let paramsDaily {
-                        for reader in readers {
+                        if let paramsDaily {
                             try reader.prefetchData(variables: paramsDaily, time: dailyTime)
                         }
-                    }
-                },
-                current_weather: (params.current_weather == true ? {
-                    let temperature = try readers[0].get(variable: ForecastVariable.surface(.temperature_2m), time: currentTimeRange)!.convertAndRound(params: params)
-                    let winddirection = try readers[0].get(variable: ForecastVariable.surface(.winddirection_10m), time: currentTimeRange)!.convertAndRound(params: params)
-                    let windspeed = try readers[0].get(variable: ForecastVariable.surface(.windspeed_10m), time: currentTimeRange)!.convertAndRound(params: params)
-                    let weathercode = try readers[0].get(variable: ForecastVariable.surface(.weathercode), time: currentTimeRange)!.convertAndRound(params: params)
-                    return ForecastapiResult.CurrentWeather(
-                        temperature: temperature.data[0],
-                        windspeed: windspeed.data[0],
-                        winddirection: winddirection.data[0],
-                        weathercode: weathercode.data[0],
-                        is_day: try readers[0].get(variable: .surface(.is_day), time: currentTimeRange)!.convertAndRound(params: params).data[0],
-                        temperature_unit: temperature.unit,
-                        windspeed_unit: windspeed.unit,
-                        winddirection_unit: winddirection.unit,
-                        weathercode_unit: weathercode.unit,
-                        time: currentTimeRange.range.lowerBound
-                    )
-                } : nil),
-                current: paramsCurrent.map { variables in
-                    return {
-                        var res = [ApiColumnSingle]()
-                        res.reserveCapacity(variables.count * readers.count)
-                        for reader in readers {
-                            for variable in variables {
-                                let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                                guard let d = try reader.get(variable: variable, time: currentTimeRange)?.convertAndRound(params: params).toApiSingle(name: name) else {
-                                    continue
+                    },
+                    current_weather: (params.current_weather == true ? {
+                        let temperature = try reader.get(variable: ForecastVariable.surface(.temperature_2m), time: currentTimeRange)!.convertAndRound(params: params)
+                        let winddirection = try reader.get(variable: ForecastVariable.surface(.winddirection_10m), time: currentTimeRange)!.convertAndRound(params: params)
+                        let windspeed = try reader.get(variable: ForecastVariable.surface(.windspeed_10m), time: currentTimeRange)!.convertAndRound(params: params)
+                        let weathercode = try reader.get(variable: ForecastVariable.surface(.weathercode), time: currentTimeRange)!.convertAndRound(params: params)
+                        return CurrentWeather(
+                            temperature: temperature.data[0],
+                            windspeed: windspeed.data[0],
+                            winddirection: winddirection.data[0],
+                            weathercode: weathercode.data[0],
+                            is_day: try reader.get(variable: .surface(.is_day), time: currentTimeRange)!.convertAndRound(params: params).data[0],
+                            temperature_unit: temperature.unit,
+                            windspeed_unit: windspeed.unit,
+                            winddirection_unit: winddirection.unit,
+                            weathercode_unit: weathercode.unit,
+                            time: currentTimeRange.range.lowerBound
+                        )
+                    } : nil),
+                    current: paramsCurrent.map { variables in
+                        return {
+                            var res = [ApiColumnSingle]()
+                            res.reserveCapacity(variables.count)
+                                for variable in variables {
+                                    // TODO
+                                    let name = variable.rawValue
+                                    guard let d = try reader.get(variable: variable, time: currentTimeRange)?.convertAndRound(params: params).toApiSingle(name: name) else {
+                                        continue
+                                    }
+                                    res.append(d)
                                 }
-                                res.append(d)
-                            }
+                            return ApiSectionSingle(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: res)
                         }
-                        return ApiSectionSingle(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: res)
-                    }
-                },
-                hourly: paramsHourly.map { variables in
-                    return {
-                        var res = [ApiColumn]()
-                        res.reserveCapacity(variables.count * readers.count)
-                        for reader in readers {
-                            for variable in variables {
-                                let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                                guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params).toApi(name: name) else {
-                                    continue
+                    },
+                    hourly: paramsHourly.map { variables in
+                        return {
+                            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable -> ApiColumn<ForecastVariable>? in
+                                guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params) else {
+                                    return nil
                                 }
                                 assert(hourlyTime.count == d.data.count)
-                                res.append(d)
-                            }
+                                return ApiColumn<ForecastVariable>(variable: variable, unit: d.unit, data: .float(d.data))
+                            })
                         }
-                        return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-                    }
-                },
-                daily: paramsDaily.map { dailyVariables in
-                    return {
-                        var res = [ApiColumn]()
-                        res.reserveCapacity(dailyVariables.count * readers.count)
-                        var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
-                        for reader in readers {
-                            for variable in dailyVariables {
+                    },
+                    daily: paramsDaily.map { dailyVariables in
+                        return {
+                            var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
+                            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.compactMap { variable -> ApiColumn<ForecastVariableDaily>? in
                                 if variable == .sunrise || variable == .sunset {
                                     // only calculate sunrise/set once
                                     let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: coordinates.latitude, lon: coordinates.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
                                     riseSet = times
                                     if variable == .sunset {
-                                        res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set)))
+                                        return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set))
                                     } else {
-                                        res.append(ApiColumn(variable: variable.rawValue, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise)))
+                                        return ApiColumn(variable: .sunrise, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise))
                                     }
-                                    continue
                                 }
-                                let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                                guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime)?.toApi(name: name) else {
-                                    continue
+                                guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime) else {
+                                    return nil
                                 }
                                 assert(dailyTime.count == d.data.count)
-                                res.append(d)
-                            }
+                                return ApiColumn<ForecastVariableDaily>(variable: variable, unit: d.unit, data: .float(d.data))
+                            })
                         }
-                        return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: res)
-                    }
-                },
-                sixHourly: nil,
-                minutely15: paramsMinutely.map { variables in
-                    return {
-                        var res = [ApiColumn]()
-                        res.reserveCapacity(variables.count * readers.count)
-                        for reader in readers {
-                            for variable in variables {
-                                let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : variable.rawValue
-                                guard let d = try reader.get(variable: variable, time: minutelyTime)?.convertAndRound(params: params).toApi(name: name) else {
-                                    continue
+                    },
+                    sixHourly: nil,
+                    minutely15: paramsMinutely.map { variables in
+                        return {
+                            return ApiSection(name: "minutely_15", time: minutelyTime.add(utcOffsetShift), columns: try variables.compactMap { variable -> ApiColumn<ForecastVariable>? in
+                                guard let d = try reader.get(variable: variable, time: minutelyTime)?.convertAndRound(params: params) else {
+                                    return nil
                                 }
                                 assert(minutelyTime.count == d.data.count)
-                                res.append(d)
-                            }
+                                return ApiColumn<ForecastVariable>(variable: variable, unit: d.unit, data: .float(d.data))
+                            })
                         }
-                        return ApiSection(name: "minutely_15", time: minutelyTime.add(utcOffsetShift), columns: res)
                     }
-                }
-            )
-        })
+                )
+            }
+            guard !readers.isEmpty else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return ForecastapiResultMulti<MultiDomains, ForecastVariable, ForecastVariableDaily>(timezone: timezone, time: time, results: readers)
+        }
+        let result = ForecastapiResultSet<MultiDomains, ForecastVariable, ForecastVariableDaily>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }

@@ -1,5 +1,5 @@
 import Foundation
-
+/*
 protocol DecodableApiVariable {
     static func from(api: ApiVariable) -> Self?
 }
@@ -269,3 +269,4 @@ extension com_openmeteo_api_result_VariableType {
         }
     }
 }
+*/

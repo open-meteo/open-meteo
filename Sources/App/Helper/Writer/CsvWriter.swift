@@ -13,15 +13,18 @@ extension ForecastapiResultSet {
                 var b = BufferAndWriter(writer: writer)
                 let multiLocation = results.count > 1
                 
-                if results.count == 1, let location = results.first {
+                if results.count == 1, let location = results.first, let first = location.results.first {
                     b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
-                    let elevation = location.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                    b.buffer.writeString("\(location.latitude),\(location.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                    let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
+                    b.buffer.writeString("\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
                 } else {
                     b.buffer.writeString("location_id,latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
                     for (i, location) in results.enumerated() {
-                        let elevation = location.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                        b.buffer.writeString("\(i+1),\(location.latitude),\(location.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                        guard let first = location.results.first else {
+                            continue
+                        }
+                        let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
+                        b.buffer.writeString("\(i+1),\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
                     }
                 }
 
@@ -78,7 +81,7 @@ extension ForecastapiResultSet {
         }, count: -1))
 
         response.headers.replaceOrAdd(name: .contentType, value: "text/csv; charset=utf-8")
-        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.formatedCoordinatesFilename ?? "").csv\"")
+        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.results.first?.formatedCoordinatesFilename ?? "").csv\"")
         return response
     }
 }
@@ -117,7 +120,7 @@ extension ApiSectionSingle {
 }
 
 
-extension ApiSection {
+extension ApiSectionString {
     /// Write a single API section into the output buffer
     fileprivate func writeCsv(into b: inout BufferAndWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {

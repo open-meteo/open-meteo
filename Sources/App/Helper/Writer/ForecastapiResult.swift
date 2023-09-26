@@ -3,47 +3,74 @@ import Foundation
 import Vapor
 
 
+struct ForecastapiResultMulti<Model, HourlyVariable, DailyVariable> {
+    let timezone: TimezoneWithOffset
+    let time: TimerangeLocal
+    let results: [ForecastapiResult<Model, HourlyVariable, DailyVariable>]
+    
+    var utc_offset_seconds: Int {
+        timezone.utcOffsetSeconds
+    }
+    
+    func runAllSections() throws -> [ApiSectionString] {
+        return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({$0})
+    }
+    
+    var current_weather: (() throws -> CurrentWeather)? {
+        results.first?.current_weather
+    }
+    var current: (() throws -> ApiSectionSingle)? {
+        results.first?.current
+    }
+    var hourly: (() throws -> ApiSectionString)? {
+        fatalError()
+    }
+    var daily: (() throws -> ApiSectionString)? {
+        fatalError()
+    }
+    var sixHourly: (() throws -> ApiSectionString)? {
+        fatalError()
+    }
+    var minutely15: (() throws -> ApiSectionString)? {
+        fatalError()
+    }
+}
+
+struct CurrentWeather {
+    let temperature: Float
+    let windspeed: Float
+    let winddirection: Float
+    let weathercode: Float
+    let is_day: Float
+    let temperature_unit: SiUnit
+    let windspeed_unit: SiUnit
+    let winddirection_unit: SiUnit
+    let weathercode_unit: SiUnit
+    let time: Timestamp
+}
+
 /**
  Store the result of a API forecast result and converion to JSON
  */
-struct ForecastapiResult {
+struct ForecastapiResult<Model, HourlyVariable, DailyVariable> {
+    let model: Model
     let latitude: Float
     let longitude: Float
     
     /// Desired elevation from a DEM. Used in statistical downscaling
     let elevation: Float?
     
-    let timezone: TimezoneWithOffset
-    let time: TimerangeLocal
-    
     let prefetch: (() throws -> ())
     let current_weather: (() throws -> CurrentWeather)?
     let current: (() throws -> ApiSectionSingle)?
-    let hourly: (() throws -> ApiSection)?
-    let daily: (() throws -> ApiSection)?
-    let sixHourly: (() throws -> ApiSection)?
-    let minutely15: (() throws -> ApiSection)?
+    let hourly: (() throws -> ApiSection<HourlyVariable>)?
+    let daily: (() throws -> ApiSection<DailyVariable>)?
+    let sixHourly: (() throws -> ApiSection<HourlyVariable>)?
+    let minutely15: (() throws -> ApiSection<HourlyVariable>)?
     
-    func runAllSections() throws -> [ApiSection] {
-        return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({$0})
-    }
-    
-    var utc_offset_seconds: Int {
-        timezone.utcOffsetSeconds
-    }
-    
-    struct CurrentWeather {
-        let temperature: Float
-        let windspeed: Float
-        let winddirection: Float
-        let weathercode: Float
-        let is_day: Float
-        let temperature_unit: SiUnit
-        let windspeed_unit: SiUnit
-        let winddirection_unit: SiUnit
-        let weathercode_unit: SiUnit
-        let time: Timestamp
-    }
+
+
+
     
     /// e.g. `52.52N13.42E38m`
     var formatedCoordinatesFilename: String {
@@ -56,16 +83,19 @@ struct ForecastapiResult {
 
 
 /// Stores the API output for multiple locations
-struct ForecastapiResultSet {
+struct ForecastapiResultSet<Model, HourlyVariable, DailyVariable> {
     let timeformat: Timeformat
-    let results: [ForecastapiResult]
+    /// per location, per model
+    let results: [ForecastapiResultMulti<Model, HourlyVariable, DailyVariable>]
     
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
     func response(format: ForecastResultFormat, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil) -> EventLoopFuture<Response> {
         return ForecastapiController.runLoop.next().submit {
             for location in results {
-                try location.prefetch()
+                for model in location.results {
+                    try model.prefetch()
+                }
             }
             switch format {
             case .json:
@@ -117,7 +147,13 @@ enum ApiArray {
     }
 }
 
-struct ApiColumn {
+struct ApiColumn<Variable> {
+    let variable: Variable
+    let unit: SiUnit
+    let data: ApiArray
+}
+
+struct ApiColumnString {
     let variable: String
     let unit: SiUnit
     let data: ApiArray
@@ -130,11 +166,19 @@ struct ApiColumnSingle {
     let value: Float
 }
 
-struct ApiSection {
+struct ApiSection<Variable> {
     // e.g. hourly or daily
     let name: String
     let time: TimerangeDt
-    let columns: [ApiColumn]
+    let columns: [ApiColumn<Variable>]
+}
+
+
+struct ApiSectionString {
+    // e.g. hourly or daily
+    let name: String
+    let time: TimerangeDt
+    let columns: [ApiColumnString]
 }
 
 /// Sfore current weather information giving only a single value per variable

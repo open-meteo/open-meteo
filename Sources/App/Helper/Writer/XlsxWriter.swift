@@ -24,12 +24,15 @@ extension ForecastapiResultSet {
         
         for (i, location) in results.enumerated() {
             sheet.startRow()
+            guard let first = location.results.first else {
+                continue
+            }
             if multiLocation {
                 sheet.write(i+1)
             }
-            sheet.write(location.latitude)
-            sheet.write(location.longitude)
-            sheet.write(location.elevation ?? .nan)
+            sheet.write(first.latitude)
+            sheet.write(first.longitude)
+            sheet.write(first.elevation ?? .nan)
             sheet.write(location.utc_offset_seconds)
             sheet.write(location.timezone.identifier)
             sheet.write(location.timezone.abbreviation)
@@ -87,12 +90,12 @@ extension ForecastapiResultSet {
         let data = sheet.write(timestamp: timestamp)
         let response = Response(body: .init(buffer: data))
         response.headers.replaceOrAdd(name: .contentType, value: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.formatedCoordinatesFilename ?? "").xlsx\"")
+        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.results.first?.formatedCoordinatesFilename ?? "").xlsx\"")
         return response
     }
 }
 
-extension ApiSection {
+extension ApiSectionString {
     fileprivate func writeXlsx(into sheet: XlsxWriter, utc_offset_seconds: Int, location_id: Int?) throws {
         if location_id == nil || location_id == 0 {
             sheet.startRow()
