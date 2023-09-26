@@ -3,7 +3,7 @@ import Foundation
 import Vapor
 
 
-struct ForecastapiResultMulti<Model, HourlyVariable, DailyVariable> {
+struct ForecastapiResultMulti<Model: RawRepresentableString, HourlyVariable: RawRepresentableString, DailyVariable: RawRepresentableString> {
     let timezone: TimezoneWithOffset
     let time: TimerangeLocal
     let results: [ForecastapiResult<Model, HourlyVariable, DailyVariable>]
@@ -22,17 +22,63 @@ struct ForecastapiResultMulti<Model, HourlyVariable, DailyVariable> {
     var current: (() throws -> ApiSectionSingle)? {
         results.first?.current
     }
+    
+    /// Merge all hourly sections and prefix with the domain name if required
     var hourly: (() throws -> ApiSectionString)? {
-        fatalError()
+        let run = results.compactMap({ m in m.hourly.map{ ModelAndSection(model: m.model, section: $0)} })
+        guard run.count > 0 else {
+            return nil
+        }
+        return {
+            try ModelAndSection.run(sections: run)
+        }
     }
+    
     var daily: (() throws -> ApiSectionString)? {
-        fatalError()
+        let run = results.compactMap({ m in m.daily.map{ ModelAndSection(model: m.model, section: $0)} })
+        guard run.count > 0 else {
+            return nil
+        }
+        return {
+            try ModelAndSection.run(sections: run)
+        }
     }
     var sixHourly: (() throws -> ApiSectionString)? {
-        fatalError()
+        let run = results.compactMap({ m in m.sixHourly.map{ ModelAndSection(model: m.model, section: $0)} })
+        guard run.count > 0 else {
+            return nil
+        }
+        return {
+            try ModelAndSection.run(sections: run)
+        }
     }
     var minutely15: (() throws -> ApiSectionString)? {
-        fatalError()
+        let run = results.compactMap({ m in m.minutely15.map{ ModelAndSection(model: m.model, section: $0)} })
+        guard run.count > 0 else {
+            return nil
+        }
+        return {
+            try ModelAndSection.run(sections: run)
+        }
+    }
+}
+
+fileprivate struct ModelAndSection<Model: RawRepresentableString, Variable: RawRepresentableString> {
+    let model: Model
+    let section: () throws -> ApiSection<Variable>
+    
+    static func run(sections: [Self]) throws -> ApiSectionString {
+        let run = try sections.compactMap({ m in
+            let h = try m.section()
+            return ApiSectionString(name: h.name, time: h.time, columns: h.columns.map {
+                let variable = sections.count > 1 ? "\($0.variable.rawValue)_\(m.model.rawValue)" : $0.variable.rawValue
+                return ApiColumnString(variable: variable, unit: $0.unit, data: $0.data)
+            })
+        })
+        guard let first = run.first else {
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        return ApiSectionString(name: first.name, time: first.time, columns: run.flatMap { $0.columns})
     }
 }
 
@@ -52,7 +98,7 @@ struct CurrentWeather {
 /**
  Store the result of a API forecast result and converion to JSON
  */
-struct ForecastapiResult<Model, HourlyVariable, DailyVariable> {
+struct ForecastapiResult<Model: RawRepresentableString, HourlyVariable: RawRepresentableString, DailyVariable: RawRepresentableString> {
     let model: Model
     let latitude: Float
     let longitude: Float
@@ -68,10 +114,6 @@ struct ForecastapiResult<Model, HourlyVariable, DailyVariable> {
     let sixHourly: (() throws -> ApiSection<HourlyVariable>)?
     let minutely15: (() throws -> ApiSection<HourlyVariable>)?
     
-
-
-
-    
     /// e.g. `52.52N13.42E38m`
     var formatedCoordinatesFilename: String {
         let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
@@ -83,7 +125,7 @@ struct ForecastapiResult<Model, HourlyVariable, DailyVariable> {
 
 
 /// Stores the API output for multiple locations
-struct ForecastapiResultSet<Model, HourlyVariable, DailyVariable> {
+struct ForecastapiResultSet<Model: RawRepresentableString, HourlyVariable: RawRepresentableString, DailyVariable: RawRepresentableString> {
     let timeformat: Timeformat
     /// per location, per model
     let results: [ForecastapiResultMulti<Model, HourlyVariable, DailyVariable>]
@@ -124,11 +166,12 @@ struct ForecastapiResultSet<Model, HourlyVariable, DailyVariable> {
         let referenceVariables = 10
         // Sum up weights for each location. Technically each location can have a different time interval
         return results.reduce(0, {
+            let nDomains = Float($1.results.count)
             let nDays = $1.time.range.durationSeconds / 86400
             let timeFraction = Float(nDays) / Float(referenceDays)
             let variablesFraction = Float(nVariablesModels) / Float(referenceVariables)
             let weight = max(variablesFraction, timeFraction * variablesFraction)
-            return $0 + max(1, weight)
+            return $0 + max(1, weight) * nDomains
         })
     }
 }
