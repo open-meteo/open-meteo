@@ -1,9 +1,19 @@
 
 import Foundation
 import Vapor
+import FlatBuffers
 
+protocol VariableFlatbufferSerialisable {
+    var rawValue: String { get }
+    static func toFlatbuffers(section: ApiSection<Self>, _ fbb: inout FlatBufferBuilder) -> Offset
+}
 
-struct ForecastapiResultMulti<Model: RawRepresentableString, HourlyVariable: RawRepresentableString, DailyVariable: RawRepresentableString> {
+protocol ModelFlatbufferSerialisable {
+    var rawValue: String { get }
+    static func writeToFlatbuffer<HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable>(section: ForecastapiResult<Self, HourlyVariable, DailyVariable>, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws
+}
+
+struct ForecastapiResultMulti<Model: ModelFlatbufferSerialisable, HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
     let timezone: TimezoneWithOffset
     let time: TimerangeLocal
     let results: [ForecastapiResult<Model, HourlyVariable, DailyVariable>]
@@ -63,7 +73,7 @@ struct ForecastapiResultMulti<Model: RawRepresentableString, HourlyVariable: Raw
     }
 }
 
-fileprivate struct ModelAndSection<Model: RawRepresentableString, Variable: RawRepresentableString> {
+fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable: VariableFlatbufferSerialisable> {
     let model: Model
     let section: () throws -> ApiSection<Variable>
     
@@ -98,7 +108,7 @@ struct CurrentWeather {
 /**
  Store the result of a API forecast result and converion to JSON
  */
-struct ForecastapiResult<Model: RawRepresentableString, HourlyVariable: RawRepresentableString, DailyVariable: RawRepresentableString> {
+struct ForecastapiResult<Model: ModelFlatbufferSerialisable, HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
     let model: Model
     let latitude: Float
     let longitude: Float
@@ -125,7 +135,7 @@ struct ForecastapiResult<Model: RawRepresentableString, HourlyVariable: RawRepre
 
 
 /// Stores the API output for multiple locations
-struct ForecastapiResultSet<Model: RawRepresentableString, HourlyVariable: RawRepresentableString, DailyVariable: RawRepresentableString> {
+struct ForecastapiResultSet<Model: ModelFlatbufferSerialisable, HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
     let timeformat: Timeformat
     /// per location, per model
     let results: [ForecastapiResultMulti<Model, HourlyVariable, DailyVariable>]

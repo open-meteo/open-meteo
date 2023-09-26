@@ -1,11 +1,12 @@
 import Foundation
 
-typealias SiUnit = com_openmeteo_api_result_Unit
+typealias SiUnit = com_openmeteo_SiUnit
 
 extension SiUnit {
     /// Short form e.g. `°C`
     var abbreviation: String {
         switch self {
+        case .undefined: return "undefined"
         case .celsius: return "°C"
         case .fahrenheit: return "°F"
         case .kelvin: return "°K"
@@ -51,6 +52,7 @@ extension SiUnit {
     
     var significantDigits: Int {
         switch self {
+        case .undefined: return 0
         case .celsius: return 1
         case .fahrenheit: return 1
         case .kelvin: return 1
