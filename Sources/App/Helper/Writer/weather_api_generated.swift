@@ -285,7 +285,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     case soilMoistureIndex100To255cm = 152
     case soilMoistureIndex0To100cm = 154
     case lightningPotential = 156
-    case pressureLevelTemperature_ = 158
+    case pressureLevelTemperature = 158
     case pressureLevelDewpoint = 160
     case pressureLevelRelativehumidity = 162
     case pressureLevelCloudcover = 164
@@ -375,7 +375,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public var soilMoistureIndex100To255cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex100To255cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var soilMoistureIndex0To100cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilMoistureIndex0To100cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var lightningPotential: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.lightningPotential.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var pressureLevelTemperature_: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelTemperature_.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var pressureLevelTemperature: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelTemperature.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelDewpoint: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelDewpoint.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelRelativehumidity: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelRelativehumidity.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelCloudcover: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelCloudcover.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
@@ -461,7 +461,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public static func add(soilMoistureIndex100To255cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex100To255cm, at: VTOFFSET.soilMoistureIndex100To255cm.p) }
   public static func add(soilMoistureIndex0To100cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilMoistureIndex0To100cm, at: VTOFFSET.soilMoistureIndex0To100cm.p) }
   public static func add(lightningPotential: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: lightningPotential, at: VTOFFSET.lightningPotential.p) }
-  public static func add(pressureLevelTemperature_: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelTemperature_, at: VTOFFSET.pressureLevelTemperature_.p) }
+  public static func add(pressureLevelTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelTemperature, at: VTOFFSET.pressureLevelTemperature.p) }
   public static func add(pressureLevelDewpoint: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelDewpoint, at: VTOFFSET.pressureLevelDewpoint.p) }
   public static func add(pressureLevelRelativehumidity: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelRelativehumidity, at: VTOFFSET.pressureLevelRelativehumidity.p) }
   public static func add(pressureLevelCloudcover: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelCloudcover, at: VTOFFSET.pressureLevelCloudcover.p) }
@@ -549,7 +549,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     soilMoistureIndex100To255cmOffset soilMoistureIndex100To255cm: Offset = Offset(),
     soilMoistureIndex0To100cmOffset soilMoistureIndex0To100cm: Offset = Offset(),
     lightningPotentialOffset lightningPotential: Offset = Offset(),
-    pressureLevelTemperature_Offset pressureLevelTemperature_: Offset = Offset(),
+    pressureLevelTemperatureOffset pressureLevelTemperature: Offset = Offset(),
     pressureLevelDewpointOffset pressureLevelDewpoint: Offset = Offset(),
     pressureLevelRelativehumidityOffset pressureLevelRelativehumidity: Offset = Offset(),
     pressureLevelCloudcoverOffset pressureLevelCloudcover: Offset = Offset(),
@@ -636,7 +636,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     com_openmeteo_WeatherHourly.add(soilMoistureIndex100To255cm: soilMoistureIndex100To255cm, &fbb)
     com_openmeteo_WeatherHourly.add(soilMoistureIndex0To100cm: soilMoistureIndex0To100cm, &fbb)
     com_openmeteo_WeatherHourly.add(lightningPotential: lightningPotential, &fbb)
-    com_openmeteo_WeatherHourly.add(pressureLevelTemperature_: pressureLevelTemperature_, &fbb)
+    com_openmeteo_WeatherHourly.add(pressureLevelTemperature: pressureLevelTemperature, &fbb)
     com_openmeteo_WeatherHourly.add(pressureLevelDewpoint: pressureLevelDewpoint, &fbb)
     com_openmeteo_WeatherHourly.add(pressureLevelRelativehumidity: pressureLevelRelativehumidity, &fbb)
     com_openmeteo_WeatherHourly.add(pressureLevelCloudcover: pressureLevelCloudcover, &fbb)
@@ -726,7 +726,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.soilMoistureIndex100To255cm.p, fieldName: "soilMoistureIndex100To255cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.soilMoistureIndex0To100cm.p, fieldName: "soilMoistureIndex0To100cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.lightningPotential.p, fieldName: "lightningPotential", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.pressureLevelTemperature_.p, fieldName: "pressureLevelTemperature_", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
+    try _v.visit(field: VTOFFSET.pressureLevelTemperature.p, fieldName: "pressureLevelTemperature", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
     try _v.visit(field: VTOFFSET.pressureLevelDewpoint.p, fieldName: "pressureLevelDewpoint", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
     try _v.visit(field: VTOFFSET.pressureLevelRelativehumidity.p, fieldName: "pressureLevelRelativehumidity", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
     try _v.visit(field: VTOFFSET.pressureLevelCloudcover.p, fieldName: "pressureLevelCloudcover", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
