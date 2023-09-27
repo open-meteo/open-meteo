@@ -2,7 +2,7 @@ import Foundation
 import Vapor
 
 
-extension ForecastapiResultSet {
+extension ForecastapiResult {
     func toXlsxResponse(timestamp: Timestamp) throws -> Response {
         let multiLocation = results.count > 1
         if results.count > 100 {

@@ -18,7 +18,7 @@ public struct EnsembleApiController {
         let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
         let nVariables = (paramsHourly?.count ?? 0) * 20
         
-        let locations: [ForecastapiResultMulti<EnsembleMultiDomains, EnsembleSurfaceVariable, EnsemblePressureVariable, EnsembleVariable>] = try prepared.map { prepared in
+        let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 35, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -27,11 +27,11 @@ public struct EnsembleApiController {
             
             let hourlyTime = time.range.range(dtSeconds: 3600)
             
-            let readers: [ForecastapiResult<EnsembleMultiDomains, EnsembleVariableWithoutMember, EnsembleVariableWithoutMember>] = try domains.compactMap { domain in
+            let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try GenericReaderMulti<EnsembleVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
-                    return nil
+                    fatalError()
                 }
-                return ForecastapiResult<EnsembleMultiDomains, EnsembleVariableWithoutMember, EnsembleVariableWithoutMember>(
+                return .init(
                     model: domain,
                     latitude: reader.modelLat,
                     longitude: reader.modelLon,
@@ -50,14 +50,24 @@ public struct EnsembleApiController {
                     current: nil,
                     hourly: paramsHourly.map { variables in
                         return {
-                            return ApiSection<EnsembleVariableWithoutMember>(name: "hourly", time: hourlyTime.add(utcOffsetShift), variables: variables.map { variable in
-                                return ApiColumn<EnsembleVariableWithoutMember>(variable: variable, unit: .celsius, data: (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                    guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params) else {
+                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.map { variable in
+                                let vari: ForecastapiResult<EnsembleMultiDomains>.SurfaceAndPressureVariable
+                                switch variable {
+                                case .pressure(let p):
+                                    vari = .pressure(.init(p.variable, p.level))
+                                case .surface(let s):
+                                    vari = .surface(s)
+                                }
+                                var unit: SiUnit? = nil
+                                let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
+                                    guard let d = try reader.get(variable: .init(variable, member), time: hourlyTime)?.convertAndRound(params: params) else {
                                         return nil
                                     }
+                                    unit = d.unit
                                     assert(hourlyTime.count == d.data.count)
-                                    return d
-                                })
+                                    return ApiArray.float(d.data)
+                                }
+                                return .init(variable: vari, unit: unit ?? .undefined, variables: allMembers)
                             })
                         }
                     },
@@ -69,9 +79,9 @@ public struct EnsembleApiController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return ForecastapiResultMulti<EnsembleMultiDomains, EnsembleVariable, EnsembleVariable>(timezone: timezone, time: time, results: readers)
+            return .init(timezone: timezone, time: time, results: readers)
         }
-        let result = ForecastapiResultSet<EnsembleMultiDomains, EnsembleVariable, EnsembleVariable>(timeformat: params.timeformatOrDefault, results: locations)
+        let result = ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return result.response(format: params.format ?? .json)
     }
@@ -150,7 +160,7 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
 
 
 /// Define all available surface weather variables
-enum EnsembleSurfaceVariable: String, GenericVariableMixable {
+enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepresentableString {
     case weathercode
     case temperature_2m
     case temperature_80m

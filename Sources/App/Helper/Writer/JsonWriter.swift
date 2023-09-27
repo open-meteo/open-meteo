@@ -12,7 +12,7 @@ extension BodyStreamWriter {
     }
 }
 
-extension ForecastapiResultSet {
+extension ForecastapiResult {
     /**
      Stream a potentially very large resultset to the client. The JSON file could easily be 20 MB.
      Instead of generating a massive string in memory, we only allocate 18kb and flush every time the buffer exceeds 16kb.
@@ -55,7 +55,7 @@ extension ForecastapiResultSet {
     }
 }
 
-extension ForecastapiResultMulti {
+extension ForecastapiResult.PerLocation {
     fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
         guard let first = results.first else {

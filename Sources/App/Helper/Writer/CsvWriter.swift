@@ -2,7 +2,7 @@ import Foundation
 import Vapor
 
 
-extension ForecastapiResultSet {
+extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
     func toCsvResponse() throws -> Response {
         if results.count > 1000 {

@@ -3,80 +3,15 @@ import Foundation
 import Vapor
 import FlatBuffers
 
-protocol VariableFlatbufferSerialisable: RawRepresentableString {
-    //var rawValue: String { get }
-    static func toFlatbuffers(section: ApiSection<Self>, _ fbb: inout FlatBufferBuilder) -> Offset
-}
-
 protocol ModelFlatbufferSerialisable: RawRepresentableString {
+    associatedtype HourlyVariable: RawRepresentableString
+    associatedtype HourlyPressureType: RawRepresentableString, RawRepresentable, Equatable
+    associatedtype DailyVariable: RawRepresentableString
+    
     //var rawValue: String { get }
-    static func writeToFlatbuffer<HourlySurfaceVariable: VariableFlatbufferSerialisable, HourlyPressureVariableType: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable>(section: ForecastapiResult<Self, HourlySurfaceVariable, HourlyPressureVariableType, DailyVariable>, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws
+    static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws
 }
 
-struct ForecastapiResultMulti<
-    Model: ModelFlatbufferSerialisable,
-        HourlySurfaceVariable: VariableFlatbufferSerialisable,
-    HourlyPressureVariableType: VariableFlatbufferSerialisable,
-        DailyVariable: VariableFlatbufferSerialisable>
-{
-    let timezone: TimezoneWithOffset
-    let time: TimerangeLocal
-    let results: [ForecastapiResult<Model, HourlySurfaceVariable, HourlyPressureVariableType, DailyVariable>]
-    
-    var utc_offset_seconds: Int {
-        timezone.utcOffsetSeconds
-    }
-    
-    func runAllSections() throws -> [ApiSectionString] {
-        return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({$0})
-    }
-    
-    var current_weather: (() throws -> CurrentWeather)? {
-        results.first?.current_weather
-    }
-    var current: (() throws -> ApiSectionSingle)? {
-        results.first?.current
-    }
-    
-    /// Merge all hourly sections and prefix with the domain name if required
-    var hourly: (() throws -> ApiSectionString)? {
-        let run = results.compactMap({ m in m.hourly.map{ ModelAndSection(model: m.model, section: $0)} })
-        guard run.count > 0 else {
-            return nil
-        }
-        return {
-            try ModelAndSection.run(sections: run)
-        }
-    }
-    
-    var daily: (() throws -> ApiSectionString)? {
-        let run = results.compactMap({ m in m.daily.map{ ModelAndSection(model: m.model, section: $0)} })
-        guard run.count > 0 else {
-            return nil
-        }
-        return {
-            try ModelAndSection.run(sections: run)
-        }
-    }
-    var sixHourly: (() throws -> ApiSectionString)? {
-        let run = results.compactMap({ m in m.sixHourly.map{ ModelAndSection(model: m.model, section: $0)} })
-        guard run.count > 0 else {
-            return nil
-        }
-        return {
-            try ModelAndSection.run(sections: run)
-        }
-    }
-    var minutely15: (() throws -> ApiSectionString)? {
-        let run = results.compactMap({ m in m.minutely15.map{ ModelAndSection(model: m.model, section: $0)} })
-        guard run.count > 0 else {
-            return nil
-        }
-        return {
-            try ModelAndSection.run(sections: run)
-        }
-    }
-}
 
 fileprivate struct ModelAndSection<Model: RawRepresentableString, Variable: RawRepresentableString> {
     let model: Model
@@ -113,42 +48,124 @@ struct CurrentWeather {
     let time: Timestamp
 }
 
-/**
- Store the result of a API forecast result and converion to JSON
- */
-struct ForecastapiResult<Model: ModelFlatbufferSerialisable, HourlySurfaceVariable: VariableFlatbufferSerialisable, HourlyPressureVariableType: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
-    let model: Model
-    let latitude: Float
-    let longitude: Float
-    
-    typealias HourlyVariable = SurfaceAndPressureVariable<HourlySurfaceVariable, Pressure HourlyPressureVariable>
-    
-    /// Desired elevation from a DEM. Used in statistical downscaling
-    let elevation: Float?
-    
-    let prefetch: (() throws -> ())
-    let current_weather: (() throws -> CurrentWeather)?
-    let current: (() throws -> ApiSectionSingle)?
-    let hourly: (() throws -> ApiSection<HourlyVariable>)?
-    let daily: (() throws -> ApiSection<DailyVariable>)?
-    let sixHourly: (() throws -> ApiSection<HourlyVariable>)?
-    let minutely15: (() throws -> ApiSection<HourlyVariable>)?
-    
-    /// e.g. `52.52N13.42E38m`
-    var formatedCoordinatesFilename: String {
-        let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
-        let ele = elevation.map { $0.isFinite ? String(format: "%.0fm", $0) : "" } ?? ""
-        return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
-    }
-}
-
-
-
 /// Stores the API output for multiple locations
-struct ForecastapiResultSet<Model: ModelFlatbufferSerialisable, HourlySurfaceVariable: VariableFlatbufferSerialisable, HourlyPressureVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
+struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     let timeformat: Timeformat
     /// per location, per model
-    let results: [ForecastapiResultMulti<Model, HourlySurfaceVariable, HourlyPressureVariable, DailyVariable>]
+    let results: [PerLocation]
+    
+    struct PerLocation {
+        let timezone: TimezoneWithOffset
+        let time: TimerangeLocal
+        let results: [PerModel]
+        
+        var utc_offset_seconds: Int {
+            timezone.utcOffsetSeconds
+        }
+        
+        func runAllSections() throws -> [ApiSectionString] {
+            return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({$0})
+        }
+        
+        var current_weather: (() throws -> CurrentWeather)? {
+            results.first?.current_weather
+        }
+        var current: (() throws -> ApiSectionSingle)? {
+            results.first?.current
+        }
+        
+        /// Merge all hourly sections and prefix with the domain name if required
+        var hourly: (() throws -> ApiSectionString)? {
+            let run = results.compactMap({ m in m.hourly.map{ ModelAndSection(model: m.model, section: $0)} })
+            guard run.count > 0 else {
+                return nil
+            }
+            return {
+                try ModelAndSection.run(sections: run)
+            }
+        }
+        
+        var daily: (() throws -> ApiSectionString)? {
+            let run = results.compactMap({ m in m.daily.map{ ModelAndSection(model: m.model, section: $0)} })
+            guard run.count > 0 else {
+                return nil
+            }
+            return {
+                try ModelAndSection.run(sections: run)
+            }
+        }
+        var sixHourly: (() throws -> ApiSectionString)? {
+            let run = results.compactMap({ m in m.sixHourly.map{ ModelAndSection(model: m.model, section: $0)} })
+            guard run.count > 0 else {
+                return nil
+            }
+            return {
+                try ModelAndSection.run(sections: run)
+            }
+        }
+        var minutely15: (() throws -> ApiSectionString)? {
+            let run = results.compactMap({ m in m.minutely15.map{ ModelAndSection(model: m.model, section: $0)} })
+            guard run.count > 0 else {
+                return nil
+            }
+            return {
+                try ModelAndSection.run(sections: run)
+            }
+        }
+    }
+    
+    struct PerModel {
+        let model: Model
+        let latitude: Float
+        let longitude: Float
+        
+        /// Desired elevation from a DEM. Used in statistical downscaling
+        let elevation: Float?
+        
+        let prefetch: (() throws -> ())
+        let current_weather: (() throws -> CurrentWeather)?
+        let current: (() throws -> ApiSectionSingle)?
+        let hourly: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
+        let daily: (() throws -> ApiSection<Model.DailyVariable>)?
+        let sixHourly: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
+        let minutely15: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
+        
+        /// e.g. `52.52N13.42E38m`
+        var formatedCoordinatesFilename: String {
+            let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
+            let ele = elevation.map { $0.isFinite ? String(format: "%.0fm", $0) : "" } ?? ""
+            return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
+        }
+    }
+    
+    struct PressureVariableAndLevel {
+        let variable: Model.HourlyPressureType
+        let level: Int
+        
+        init(_ variable: Model.HourlyPressureType, _ level: Int) {
+            self.variable = variable
+            self.level = level
+        }
+    }
+
+    /// Enum with surface and pressure variable
+    enum SurfaceAndPressureVariable: RawRepresentableString {
+        init?(rawValue: String) {
+            fatalError()
+        }
+        
+        var rawValue: String {
+            switch self {
+            case .surface(let v):
+                return v.rawValue
+            case .pressure(let v):
+                return "\(v.variable.rawValue)_\(v.level)hPa"
+            }
+        }
+        
+        case surface(Model.HourlyVariable)
+        case pressure(PressureVariableAndLevel)
+    }
     
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
