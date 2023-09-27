@@ -460,10 +460,19 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
         case .soil_moisture_0_1cm: return true
+        case .soil_moisture_0_to_100cm: return true
+        case .soil_moisture_0_to_10cm: return true
+        case .soil_moisture_0_to_7cm: return true
+        case .soil_moisture_100_to_200cm: return true
+        case .soil_moisture_100_to_255cm: return true
+        case .soil_moisture_10_to_40cm: return true
         case .soil_moisture_1_3cm: return true
-        case .soil_moisture_3_9cm: return true
-        case .soil_moisture_9_27cm: return true
         case .soil_moisture_27_81cm: return true
+        case .soil_moisture_28_to_100cm: return true
+        case .soil_moisture_3_9cm: return true
+        case .soil_moisture_40_to_100cm: return true
+        case .soil_moisture_7_to_28cm: return true
+        case .soil_moisture_9_27cm: return true
         case .snow_depth: return true
         default: return false
         }
