@@ -43,60 +43,6 @@ extension ForecastapiResult {
     }
 }
 
-/*fileprivate extension ForecastapiResultMulti {
-    /// Write data into `FlatBufferBuilder` and finish the message
-    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, fixedGenerationTime: Double?) throws {
-        fatalError()
-        /*let generationTimeStart = Date()
-        let current_weather = try current_weather?()
-        let current = try current?()
-        let sections = try runAllSections()
-        let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
-        
-        let currentWeather = current_weather.map { c in
-            com_openmeteo_api_result_CurrentWeather(
-                time: Int64(c.time.timeIntervalSince1970),
-                temperature: c.temperature,
-                weathercode: c.weathercode,
-                windspeed: c.windspeed,
-                winddirection: c.winddirection,
-                isDay: c.is_day
-            )
-        }
-        let time = sections.first?.time.range.lowerBound.timeIntervalSince1970 ?? 0
-        let hourly = sections.first(where: {$0.name == "hourly"})?.toFlatbuffers(&fbb) ?? Offset()
-        let daily = sections.first(where: {$0.name == "daily"})?.toFlatbuffers(&fbb) ?? Offset()
-        let minutely15 = sections.first(where: {$0.name == "minutely_15"})?.toFlatbuffers(&fbb) ?? Offset()
-        let sixHourly = sections.first(where: {$0.name == "six_hourly"})?.toFlatbuffers(&fbb) ?? Offset()
-        let result = com_openmeteo_api_result_Result.createResult(
-            &fbb,
-            latitude: self.latitude,
-            longitude: self.longitude,
-            elevation: self.elevation ?? .nan,
-            generationtimeMs: Float32(generationTimeMs),
-            utcOffsetSeconds: Int32(self.utc_offset_seconds),
-            timezoneOffset: fbb.create(string: self.timezone.identifier),
-            timezoneAbbreviationOffset: fbb.create(string: self.timezone.abbreviation),
-            currentWeather: currentWeather,
-            timeStart: Int64(time),
-            dailyVectorOffset: daily,
-            hourlyVectorOffset: hourly,
-            sixHourlyVectorOffset: sixHourly,
-            minutely15VectorOffset: minutely15,
-            currentVectorOffset: current?.toFlatbuffers(&fbb) ?? Offset(),
-            currentTime: (current?.time.timeIntervalSince1970).map(Int64.init) ?? 0,
-            currentIntervalSeconds: (current?.dtSeconds).map(Int32.init) ?? 0
-        )
-        fbb.finish(offset: result, addPrefix: true)*/
-    }
-    
-    /// Roughly estimate the required size to keep the flatbuffer message in memory. Overestimation is expected.
-    /*var estimatedFlatbufferSize: Int {
-        let dataSize = 24 + sections.reduce(0, {$0 + $1.estimatedFlatbufferSize})
-        return dataSize + 512
-    }*/
-}*/
-
 fileprivate extension FlatBuffers.ByteBuffer {
     /// Create a pointer to the data region. Flatbuffer is filling the buffer backwards.
     var unsafeRawBufferPointer: UnsafeRawBufferPointer {
