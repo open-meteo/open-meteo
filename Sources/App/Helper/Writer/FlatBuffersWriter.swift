@@ -253,6 +253,32 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .ecmwfIfs04
         case .metno_nordic:
             return .metnoNordic
+        case .era5_seamless:
+            return .era5Seamless
+        case .era5:
+            return .era5
+        case .cerra:
+            return .cerra
+        case .era5_land:
+            return .era5Land
+        case .ecmwf_ifs:
+            return .ecmwfIfs
+        case .meteofrance_arpege_seamless:
+            return .meteofranceArpegeSeamless
+        case .meteofrance_arome_seamless:
+            return .meteofranceAromeSeamless
+        case .arpege_seamless:
+            return .meteofranceArpegeSeamless
+        case .arpege_world:
+            return .meteofranceArpegeEurope
+        case .arpege_europe:
+            return .meteofranceArpegeEurope
+        case .arome_seamless:
+            return .meteofranceAromeSeamless
+        case .arome_france:
+            return .meteofranceAromeFrance
+        case .arome_france_hd:
+            return .meteofranceAromeFranceHd
         }
     }
 }
