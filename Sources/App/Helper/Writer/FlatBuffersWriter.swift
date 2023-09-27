@@ -358,15 +358,25 @@ extension ForecastVariable: VariableFlatbufferSerialisable {
             case .soil_temperature_54cm:
                 com_openmeteo_WeatherHourly.add(soilTemperature54cm: offset, &fbb)
             case .soil_moisture_0_1cm:
-                com_openmeteo_WeatherHourly.add(soilMoisture01cm: offset, &fbb)
+                fallthrough
+            case .soil_moisture_0_to_1cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture0To1cm: offset, &fbb)
             case .soil_moisture_1_3cm:
-                com_openmeteo_WeatherHourly.add(soilMoisture13cm: offset, &fbb)
+                fallthrough
+            case .soil_moisture_1_to_3cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture1To3cm: offset, &fbb)
             case .soil_moisture_3_9cm:
-                com_openmeteo_WeatherHourly.add(soilMoisture39cm: offset, &fbb)
+                fallthrough
+            case .soil_moisture_3_to_9cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture3To9cm: offset, &fbb)
             case .soil_moisture_9_27cm:
-                com_openmeteo_WeatherHourly.add(soilMoisture927cm: offset, &fbb)
+                fallthrough
+            case .soil_moisture_9_to_27cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture9To27cm: offset, &fbb)
             case .soil_moisture_27_81cm:
-                com_openmeteo_WeatherHourly.add(soilMoisture2781cm: offset, &fbb)
+                fallthrough
+            case .soil_moisture_27_to_81cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture27To81cm: offset, &fbb)
             case .snow_depth:
                 com_openmeteo_WeatherHourly.add(snowDepth: offset, &fbb)
             case .snow_height:
