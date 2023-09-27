@@ -14,35 +14,95 @@ public struct ForecastapiController: RouteCollection {
         ))
         let corsGroup = routes.grouped(cors, ErrorMiddleware.default(environment: try .detect()))
         let categoriesRoute = corsGroup.grouped("v1")
-        categoriesRoute.get("forecast", use: self.query)
-        categoriesRoute.get("dwd-icon", use: IconController().query)
-        categoriesRoute.get("ecmwf", use: EcmwfController().query)
-        categoriesRoute.get("marine", use: IconWaveController().query)
-        categoriesRoute.get("era5", use: Era5Controller().query)
-        categoriesRoute.get("archive", use: Era5Controller().query)
+        let era5 = WeatherApiController(
+            forecastDay: 1,
+            forecastDaysMax: 1,
+            historyStartDate: Timestamp(1940, 1, 1),
+            has15minutely: false,
+            hasCurrentWeather: false,
+            defaultModel: .era5_seamless,
+            subdomain: "archive-api")
+        categoriesRoute.get("era5", use: era5.query)
+        categoriesRoute.get("archive", use: era5.query)
+        
+        categoriesRoute.get("forecast", use: WeatherApiController(
+            defaultModel: .best_match).query
+        )
+        categoriesRoute.get("dwd-icon", use: WeatherApiController(
+            defaultModel: .icon_seamless).query
+        )
+        categoriesRoute.get("gfs", use: WeatherApiController(
+            has15minutely: true,
+            defaultModel: .gfs_seamless).query
+        )
+        categoriesRoute.get("meteofrance", use: WeatherApiController(
+            forecastDay: 4,
+            has15minutely: false,
+            defaultModel: .meteofrance_seamless).query
+        )
+        categoriesRoute.get("jma", use: WeatherApiController(
+            has15minutely: false,
+            defaultModel: .jma_seamless).query
+        )
+        categoriesRoute.get("metno", use: WeatherApiController(
+            forecastDay: 3,
+            has15minutely: false,
+            defaultModel: .metno_nordic).query
+        )
+        categoriesRoute.get("gem", use: WeatherApiController(
+            has15minutely: false,
+            defaultModel: .gem_seamless).query
+        )
+        categoriesRoute.get("ecmwf", use: WeatherApiController(
+            forecastDay: 10,
+            has15minutely: false,
+            hasCurrentWeather: false,
+            defaultModel: .ecmwf_ifs04,
+            put3HourlyDataIntoHourly: true).query
+        )
+        
         categoriesRoute.get("elevation", use: DemController().query)
         categoriesRoute.get("air-quality", use: CamsController().query)
         categoriesRoute.get("seasonal", use: SeasonalForecastController().query)
-        categoriesRoute.get("gfs", use: GfsController().query)
-        categoriesRoute.get("meteofrance", use: MeteoFranceController().query)
-        categoriesRoute.get("jma", use: JmaController().query)
-        categoriesRoute.get("metno", use: MetNoController().query)
-        categoriesRoute.get("gem", use: GemController().query)
         categoriesRoute.get("flood", use: GloFasController().query)
         categoriesRoute.get("climate", use: CmipController().query)
+        categoriesRoute.get("marine", use: IconWaveController().query)
         categoriesRoute.get("ensemble", use: EnsembleApiController().query)
+    }
+}
+
+struct WeatherApiController {
+    let forecastDay: Int
+    let forecastDaysMax: Int
+    let historyStartDate: Timestamp
+    let has15minutely: Bool
+    let hasCurrentWeather: Bool
+    let defaultModel: MultiDomains
+    let subdomain: String
+    /// ecmwf v1 uses 3 hourly data in hourly field..
+    let put3HourlyDataIntoHourly: Bool
+    
+    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2022, 6, 8), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", put3HourlyDataIntoHourly: Bool = false) {
+        self.forecastDay = forecastDay
+        self.forecastDaysMax = forecastDaysMax
+        self.historyStartDate = historyStartDate
+        self.has15minutely = has15minutely
+        self.hasCurrentWeather = hasCurrentWeather
+        self.defaultModel = defaultModel
+        self.subdomain = subdomain
+        self.put3HourlyDataIntoHourly = put3HourlyDataIntoHourly
     }
     
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain("api")
+        try req.ensureSubdomain(subdomain)
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 16)
+        let allowedRange = historyStartDate ..< currentTime.add(days: forecastDaysMax)
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
-        let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [.best_match]
-        let paramsMinutely = try ForecastVariable.load(commaSeparatedOptional: params.minutely_15)
-        let paramsCurrent = try ForecastVariable.load(commaSeparatedOptional: params.current)
+        let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [defaultModel]
+        let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
+        let paramsCurrent = hasCurrentWeather ? try ForecastVariable.load(commaSeparatedOptional: params.current) : nil
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
         let nParamsHourly = paramsHourly?.count ?? 0
@@ -54,15 +114,15 @@ public struct ForecastapiController: RouteCollection {
         let locations: [ForecastapiResultMulti<MultiDomains, ForecastVariable, ForecastVariableDaily>] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
             /// For fractional timezones, shift data to show only for full timestamps
             let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
             
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
-            let hourlyTime = time.range.range(dtSeconds: 3600)
+            let hourlyTime = time.range.range(dtSeconds: put3HourlyDataIntoHourly ? 3*3600 : 3600)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             // limited to 3 forecast days
-            let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92).range.range(dtSeconds: 3600/4)
+            let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92).range.range(dtSeconds: 3600/4)
             
             let readers: [ForecastapiResult<MultiDomains, ForecastVariable, ForecastVariableDaily>] = try domains.compactMap { domain in
                 guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
@@ -88,7 +148,7 @@ public struct ForecastapiController: RouteCollection {
                             try reader.prefetchData(variables: paramsDaily, time: dailyTime)
                         }
                     },
-                    current_weather: (params.current_weather == true ? {
+                    current_weather: (hasCurrentWeather && params.current_weather == true ? {
                         let temperature = try reader.get(variable: ForecastVariable.surface(.temperature_2m), time: currentTimeRange)!.convertAndRound(params: params)
                         let winddirection = try reader.get(variable: ForecastVariable.surface(.winddirection_10m), time: currentTimeRange)!.convertAndRound(params: params)
                         let windspeed = try reader.get(variable: ForecastVariable.surface(.windspeed_10m), time: currentTimeRange)!.convertAndRound(params: params)
@@ -199,10 +259,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     case meteofrance_seamless
     case meteofrance_mix
+    case meteofrance_arpege_seamless
     case meteofrance_arpege_world
     case meteofrance_arpege_europe
+    case meteofrance_arome_seamless
     case meteofrance_arome_france
     case meteofrance_arome_france_hd
+    case arpege_seamless
+    case arpege_world
+    case arpege_europe
+    case arome_seamless
+    case arome_france
+    case arome_france_hd
     
     case jma_seamless
     case jma_mix
@@ -224,6 +292,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ecmwf_ifs04
     
     case metno_nordic
+    
+    case era5_seamless
+    case era5
+    case cerra
+    case era5_land
+    case ecmwf_ifs
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -289,12 +363,28 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             fallthrough
         case .meteofrance_mix:
             return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+        case .meteofrance_arpege_seamless:
+            fallthrough
+        case .arpege_seamless:
+            return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+        case .meteofrance_arome_seamless:
+            fallthrough
+        case .arome_seamless:
+            return try MeteoFranceMixer(domains: [.arome_france, .arome_france_hd], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+        case .arpege_world:
+            fallthrough
         case .meteofrance_arpege_world:
             return try MeteoFranceReader(domain: .arpege_world, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .arpege_europe:
+            fallthrough
         case .meteofrance_arpege_europe:
             return try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .arome_france:
+            fallthrough
         case .meteofrance_arome_france:
             return try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .arome_france_hd:
+            fallthrough
         case .meteofrance_arome_france_hd:
             return try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .jma_seamless:
@@ -329,6 +419,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gem_hrdps_continental:
             return try GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .era5_seamless:
+            return [try Era5Factory.makeEra5CombinedLand(lat: lat, lon: lon, elevation: elevation, mode: mode)]
+        case .era5:
+            return [try Era5Factory.makeReader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode)]
+        case .era5_land:
+            return [try Era5Factory.makeReader(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode)]
+        case .cerra:
+            return try CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .ecmwf_ifs:
+            return [try Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode)]
         }
     }
     
