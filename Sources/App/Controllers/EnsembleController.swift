@@ -29,7 +29,7 @@ public struct EnsembleApiController {
             
             let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try GenericReaderMulti<EnsembleVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
-                    fatalError()
+                    return nil
                 }
                 return .init(
                     model: domain,
@@ -50,14 +50,7 @@ public struct EnsembleApiController {
                     current: nil,
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.map { variable in
-                                let vari: ForecastapiResult<EnsembleMultiDomains>.SurfaceAndPressureVariable
-                                switch variable {
-                                case .pressure(let p):
-                                    vari = .pressure(.init(p.variable, p.level))
-                                case .surface(let s):
-                                    vari = .surface(s)
-                                }
+                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
                                     guard let d = try reader.get(variable: .init(variable, member), time: hourlyTime)?.convertAndRound(params: params) else {
@@ -67,7 +60,10 @@ public struct EnsembleApiController {
                                     assert(hourlyTime.count == d.data.count)
                                     return ApiArray.float(d.data)
                                 }
-                                return .init(variable: vari, unit: unit ?? .undefined, variables: allMembers)
+                                guard allMembers.count > 0 else {
+                                    return nil
+                                }
+                                return .init(variable: variable.resultVariable, unit: unit ?? .undefined, variables: allMembers)
                             })
                         }
                     },
@@ -87,6 +83,16 @@ public struct EnsembleApiController {
     }
 }
 
+extension EnsembleVariableWithoutMember {
+    var resultVariable: ForecastapiResult<EnsembleMultiDomains>.SurfaceAndPressureVariable {
+        switch self {
+        case .pressure(let p):
+            return .pressure(.init(p.variable, p.level))
+        case .surface(let s):
+            return .surface(s)
+        }
+    }
+}
 
 
 

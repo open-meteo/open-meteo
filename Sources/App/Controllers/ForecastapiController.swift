@@ -111,7 +111,7 @@ struct WeatherApiController {
         let nParamsDaily = paramsDaily?.count ?? 0
         let nVariables = nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily
         
-        /*let locations: [ForecastapiResultMulti<MultiDomains, ForecastVariable, ForecastVariableDaily>] = try prepared.map { prepared in
+        let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -124,12 +124,12 @@ struct WeatherApiController {
             // limited to 3 forecast days
             let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92).range.range(dtSeconds: 3600/4)
             
-            let readers: [ForecastapiResult<MultiDomains, ForecastVariable, ForecastVariableDaily>] = try domains.compactMap { domain in
+            let readers: [ForecastapiResult<MultiDomains>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
                     return nil
                 }
                 
-                return ForecastapiResult<MultiDomains, ForecastVariable, ForecastVariableDaily>(
+                return .init(
                     model: domain,
                     latitude: reader.modelLat,
                     longitude: reader.modelLon,
@@ -183,12 +183,12 @@ struct WeatherApiController {
                     },
                     hourly: paramsHourly.map { variables in
                         return {
-                            return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable -> ApiColumn<ForecastVariable>? in
+                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
                                 guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(hourlyTime.count == d.data.count)
-                                return ApiColumn<ForecastVariable>(variable: variable, unit: d.unit, data: .float(d.data))
+                                return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
                     },
@@ -201,28 +201,28 @@ struct WeatherApiController {
                                     let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: coordinates.latitude, lon: coordinates.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
                                     riseSet = times
                                     if variable == .sunset {
-                                        return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, data: .timestamp(times.set))
+                                        return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
                                     } else {
-                                        return ApiColumn(variable: .sunrise, unit: params.timeformatOrDefault.unit, data: .timestamp(times.rise))
+                                        return ApiColumn(variable: .sunrise, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
                                     }
                                 }
                                 guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime) else {
                                     return nil
                                 }
                                 assert(dailyTime.count == d.data.count)
-                                return ApiColumn<ForecastVariableDaily>(variable: variable, unit: d.unit, data: .float(d.data))
+                                return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
                     },
                     sixHourly: nil,
                     minutely15: paramsMinutely.map { variables in
                         return {
-                            return ApiSection(name: "minutely_15", time: minutelyTime.add(utcOffsetShift), columns: try variables.compactMap { variable -> ApiColumn<ForecastVariable>? in
+                            return .init(name: "minutely_15", time: minutelyTime, columns: try variables.compactMap { variable in
                                 guard let d = try reader.get(variable: variable, time: minutelyTime)?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(minutelyTime.count == d.data.count)
-                                return ApiColumn<ForecastVariable>(variable: variable, unit: d.unit, data: .float(d.data))
+                                return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
                     }
@@ -231,14 +231,25 @@ struct WeatherApiController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return ForecastapiResultMulti<MultiDomains, ForecastVariable, ForecastVariableDaily>(timezone: timezone, time: time, results: readers)
+            return .init(timezone: timezone, time: time, results: readers)
         }
-        let result = ForecastapiResultSet<MultiDomains, ForecastVariable, ForecastVariableDaily>(timeformat: params.timeformatOrDefault, results: locations)
+        let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)*/
-        fatalError()
+        return result.response(format: params.format ?? .json)
     }
 }
+
+extension ForecastVariable {
+    var resultVariable: ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable {
+        switch self {
+        case .pressure(let p):
+            return .pressure(.init(p.variable, p.level))
+        case .surface(let s):
+            return .surface(s)
+        }
+    }
+}
+
 
 /**
  Automatic domain selection rules:
