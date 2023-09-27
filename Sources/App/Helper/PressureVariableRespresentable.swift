@@ -53,10 +53,12 @@ protocol RawRepresentableString {
 }
 
 /// Enum with surface and pressure variable
-enum SurfaceAndPressureVariable<Surface: RawRepresentableString, Pressure: RawRepresentableString>: RawRepresentableString {
+enum SurfaceAndPressureVariable<Surface, Pressure> {
     case surface(Surface)
     case pressure(Pressure)
-    
+}
+
+extension SurfaceAndPressureVariable: RawRepresentableString where Pressure: RawRepresentableString, Surface: RawRepresentableString {
     init?(rawValue: String) {
         if let variable = Pressure(rawValue: rawValue) {
             self = .pressure(variable)
