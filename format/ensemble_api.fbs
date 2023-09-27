@@ -16,13 +16,23 @@ enum EnsembleModel: byte {
 }
 
 table ValuesAndMember {
-  level: int32;
+  member: int32;
   values: [float] (required);
 }
 
 table ValuesUnitAndMember {
   unit: SiUnit;
   values: [ValuesAndMember];
+}
+
+table ValuesAndLevelAndMember {
+  level: int32;
+  values: [ValuesAndMember];
+}
+
+table ValuesUnitPressureLevelAndMember {
+  unit: SiUnit;
+  values: [ValuesAndLevelAndMember];
 }
 
 table EnsembleHourly {
@@ -74,6 +84,15 @@ table EnsembleHourly {
   windspeed_80m: ValuesUnitAndMember;
   weathercode: ValuesUnitAndMember;
 
+  pressure_level_temperature: ValuesUnitPressureLevelAndMember;
+  pressure_level_dewpoint: ValuesUnitPressureLevelAndMember;
+  pressure_level_relativehumidity: ValuesUnitPressureLevelAndMember;
+  pressure_level_cloudcover: ValuesUnitPressureLevelAndMember;
+  pressure_level_windspeed: ValuesUnitPressureLevelAndMember;
+  pressure_level_winddirection: ValuesUnitPressureLevelAndMember;
+  pressure_level_vertical_velocity: ValuesUnitPressureLevelAndMember;
+  pressure_level_geopotential_height: ValuesUnitPressureLevelAndMember;
+
   /*pressure_level_temperature: ValuesUnitPressureLevel;
   pressure_level_dewpoint: ValuesUnitPressureLevel;
   pressure_level_relativehumidity: ValuesUnitPressureLevel;
@@ -84,7 +103,7 @@ table EnsembleHourly {
   pressure_level_geopotential_height: ValuesUnitPressureLevel;*/
 }
 
-table EnsembleDaily {
+/*table EnsembleDaily {
   time: TimeRange (required);
   apparent_temperature_max: ValuesAndUnit;
   apparent_temperature_mean: ValuesAndUnit;
@@ -155,7 +174,7 @@ table EnsembleDaily {
   windspeed_10m_max: ValuesAndUnit;
   windspeed_10m_mean: ValuesAndUnit;
   windspeed_10m_min: ValuesAndUnit;
-}
+}*/
  
 table EnsembleApi {
   latitude: float;
