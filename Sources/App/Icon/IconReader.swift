@@ -305,6 +305,16 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .direct_radiation, member: member, time: time)
             case .is_day:
                 break
+            case .soil_moisture_0_to_1cm:
+                try prefetchData(raw: .soil_moisture_0_1cm, member: member, time: time)
+            case .soil_moisture_1_to_3cm:
+                try prefetchData(raw: .soil_moisture_1_3cm, member: member, time: time)
+            case .soil_moisture_3_to_9cm:
+                try prefetchData(raw: .soil_moisture_3_9cm, member: member, time: time)
+            case .soil_moisture_9_to_27cm:
+                try prefetchData(raw: .soil_moisture_9_27cm, member: member, time: time)
+            case .soil_moisture_27_to_81cm:
+                try prefetchData(raw: .soil_moisture_27_81cm, member: member, time: time)
             }
         case .pressure(let variable):
             let level = variable.level
@@ -464,6 +474,16 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 //return DataAndUnit(zip(dni.data, factor).map(*), dni.unit)
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+            case .soil_moisture_0_to_1cm:
+                return try get(raw: .soil_moisture_0_1cm, member: member, time: time)
+            case .soil_moisture_1_to_3cm:
+                return try get(raw: .soil_moisture_1_3cm, member: member, time: time)
+            case .soil_moisture_3_to_9cm:
+                return try get(raw: .soil_moisture_3_9cm, member: member, time: time)
+            case .soil_moisture_9_to_27cm:
+                return try get(raw: .soil_moisture_9_27cm, member: member, time: time)
+            case .soil_moisture_27_to_81cm:
+                return try get(raw: .soil_moisture_27_81cm, member: member, time: time)
             }
         case .pressure(let variable):
             let level = variable.level

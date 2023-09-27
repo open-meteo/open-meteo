@@ -83,6 +83,11 @@ enum IconSurfaceVariableDerived: String, CaseIterable, GenericVariableMixable {
     case direct_radiation_instant
     case direct_normal_irradiance_instant
     case is_day
+    case soil_moisture_0_to_1cm
+    case soil_moisture_1_to_3cm
+    case soil_moisture_3_to_9cm
+    case soil_moisture_9_to_27cm
+    case soil_moisture_27_to_81cm
     
     var requiresOffsetCorrectionForMixing: Bool {
         return self == .snow_height
