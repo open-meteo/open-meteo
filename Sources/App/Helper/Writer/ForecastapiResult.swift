@@ -3,20 +3,25 @@ import Foundation
 import Vapor
 import FlatBuffers
 
-protocol VariableFlatbufferSerialisable {
-    var rawValue: String { get }
+protocol VariableFlatbufferSerialisable: RawRepresentableString {
+    //var rawValue: String { get }
     static func toFlatbuffers(section: ApiSection<Self>, _ fbb: inout FlatBufferBuilder) -> Offset
 }
 
-protocol ModelFlatbufferSerialisable {
-    var rawValue: String { get }
-    static func writeToFlatbuffer<HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable>(section: ForecastapiResult<Self, HourlyVariable, DailyVariable>, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws
+protocol ModelFlatbufferSerialisable: RawRepresentableString {
+    //var rawValue: String { get }
+    static func writeToFlatbuffer<HourlySurfaceVariable: VariableFlatbufferSerialisable, HourlyPressureVariableType: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable>(section: ForecastapiResult<Self, HourlySurfaceVariable, HourlyPressureVariableType, DailyVariable>, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws
 }
 
-struct ForecastapiResultMulti<Model: ModelFlatbufferSerialisable, HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
+struct ForecastapiResultMulti<
+    Model: ModelFlatbufferSerialisable,
+        HourlySurfaceVariable: VariableFlatbufferSerialisable,
+    HourlyPressureVariableType: VariableFlatbufferSerialisable,
+        DailyVariable: VariableFlatbufferSerialisable>
+{
     let timezone: TimezoneWithOffset
     let time: TimerangeLocal
-    let results: [ForecastapiResult<Model, HourlyVariable, DailyVariable>]
+    let results: [ForecastapiResult<Model, HourlySurfaceVariable, HourlyPressureVariableType, DailyVariable>]
     
     var utc_offset_seconds: Int {
         timezone.utcOffsetSeconds
@@ -73,16 +78,19 @@ struct ForecastapiResultMulti<Model: ModelFlatbufferSerialisable, HourlyVariable
     }
 }
 
-fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable: VariableFlatbufferSerialisable> {
+fileprivate struct ModelAndSection<Model: RawRepresentableString, Variable: RawRepresentableString> {
     let model: Model
     let section: () throws -> ApiSection<Variable>
     
     static func run(sections: [Self]) throws -> ApiSectionString {
         let run = try sections.compactMap({ m in
             let h = try m.section()
-            return ApiSectionString(name: h.name, time: h.time, columns: h.columns.map {
-                let variable = sections.count > 1 ? "\($0.variable.rawValue)_\(m.model.rawValue)" : $0.variable.rawValue
-                return ApiColumnString(variable: variable, unit: $0.unit, data: $0.data)
+            return ApiSectionString(name: h.name, time: h.time, columns: h.columns.flatMap { c in
+                return c.variables.enumerated().map { (member, data) in
+                    let variableAndMember = member > 0 ? "\(c.variable.rawValue)_member\(member.zeroPadded(len: 2))" : c.variable.rawValue
+                    let variable = sections.count > 1 ? "\(variableAndMember)_\(m.model.rawValue)" : variableAndMember
+                    return ApiColumnString(variable: variable, unit: c.unit, data: data)
+                }
             })
         })
         guard let first = run.first else {
@@ -108,10 +116,12 @@ struct CurrentWeather {
 /**
  Store the result of a API forecast result and converion to JSON
  */
-struct ForecastapiResult<Model: ModelFlatbufferSerialisable, HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
+struct ForecastapiResult<Model: ModelFlatbufferSerialisable, HourlySurfaceVariable: VariableFlatbufferSerialisable, HourlyPressureVariableType: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
     let model: Model
     let latitude: Float
     let longitude: Float
+    
+    typealias HourlyVariable = SurfaceAndPressureVariable<HourlySurfaceVariable, Pressure HourlyPressureVariable>
     
     /// Desired elevation from a DEM. Used in statistical downscaling
     let elevation: Float?
@@ -135,10 +145,10 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable, HourlyVariable: Var
 
 
 /// Stores the API output for multiple locations
-struct ForecastapiResultSet<Model: ModelFlatbufferSerialisable, HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
+struct ForecastapiResultSet<Model: ModelFlatbufferSerialisable, HourlySurfaceVariable: VariableFlatbufferSerialisable, HourlyPressureVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable> {
     let timeformat: Timeformat
     /// per location, per model
-    let results: [ForecastapiResultMulti<Model, HourlyVariable, DailyVariable>]
+    let results: [ForecastapiResultMulti<Model, HourlySurfaceVariable, HourlyPressureVariable, DailyVariable>]
     
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
@@ -200,10 +210,12 @@ enum ApiArray {
     }
 }
 
+
 struct ApiColumn<Variable> {
     let variable: Variable
     let unit: SiUnit
-    let data: ApiArray
+    // one entry per ensemble member
+    let variables: [ApiArray]
 }
 
 struct ApiColumnString {

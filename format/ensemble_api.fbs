@@ -1,0 +1,181 @@
+include "units.fbs";
+
+namespace com.openmeteo;
+
+enum EnsembleModel: byte {
+  undefined = 0,
+  icon_seamless,
+  icon_global,
+  icon_eu,
+  icon_d2,
+  ecmwf_ifs04,
+  gem_global,
+  gfs_seamless,
+  gfs025,
+  gfs05
+}
+
+table ValuesAndMember {
+  level: int32;
+  values: [float] (required);
+}
+
+table ValuesUnitAndMember {
+  unit: SiUnit;
+  values: [ValuesAndMember];
+}
+
+table EnsembleHourly {
+  time: TimeRange (required);
+  apparent_temperature: ValuesUnitAndMember;
+  cape: ValuesUnitAndMember;
+  cloudcover: ValuesUnitAndMember;
+  dewpoint_2m: ValuesUnitAndMember;
+  diffuse_radiation: ValuesUnitAndMember;
+  diffuse_radiation_instant: ValuesUnitAndMember;
+  direct_normal_irradiance: ValuesUnitAndMember;
+  direct_normal_irradiance_instant: ValuesUnitAndMember;
+  direct_radiation: ValuesUnitAndMember;
+  direct_radiation_instant: ValuesUnitAndMember;
+  et0_fao_evapotranspiration: ValuesUnitAndMember;
+  freezinglevel_height: ValuesUnitAndMember;
+  is_day: ValuesUnitAndMember;
+  precipitation: ValuesUnitAndMember;
+  pressure_msl: ValuesUnitAndMember;
+  rain: ValuesUnitAndMember;
+  relativehumidity_2m: ValuesUnitAndMember;
+  shortwave_radiation: ValuesUnitAndMember;
+  shortwave_radiation_instant: ValuesUnitAndMember;
+  snow_depth: ValuesUnitAndMember;
+  snowfall: ValuesUnitAndMember;
+  soil_moisture_0_to_10cm: ValuesUnitAndMember;
+  soil_moisture_100_to_200cm: ValuesUnitAndMember;
+  soil_moisture_10_to_40cm: ValuesUnitAndMember;
+  soil_moisture_40_to_100cm: ValuesUnitAndMember;
+  soil_temperature_0_to_10cm: ValuesUnitAndMember;
+  soil_temperature_100_to_200cm: ValuesUnitAndMember;
+  soil_temperature_10_to_40cm: ValuesUnitAndMember;
+  soil_temperature_40_to_100cm: ValuesUnitAndMember;
+  surface_pressure: ValuesUnitAndMember;
+  surface_temperature: ValuesUnitAndMember;
+  temperature_120m: ValuesUnitAndMember;
+  temperature_2m: ValuesUnitAndMember;
+  temperature_80m: ValuesUnitAndMember;
+  uv_index: ValuesUnitAndMember;
+  uv_index_clear_sky: ValuesUnitAndMember;
+  vapor_pressure_deficit: ValuesUnitAndMember;
+  visibility: ValuesUnitAndMember;
+  winddirection_10m: ValuesUnitAndMember;
+  winddirection_120m: ValuesUnitAndMember;
+  winddirection_80m: ValuesUnitAndMember;
+  windgusts_10m: ValuesUnitAndMember;
+  windspeed_10m: ValuesUnitAndMember;
+  windspeed_120m: ValuesUnitAndMember;
+  windspeed_80m: ValuesUnitAndMember;
+  weathercode: ValuesUnitAndMember;
+
+  /*pressure_level_temperature: ValuesUnitPressureLevel;
+  pressure_level_dewpoint: ValuesUnitPressureLevel;
+  pressure_level_relativehumidity: ValuesUnitPressureLevel;
+  pressure_level_cloudcover: ValuesUnitPressureLevel;
+  pressure_level_windspeed: ValuesUnitPressureLevel;
+  pressure_level_winddirection: ValuesUnitPressureLevel;
+  pressure_level_vertical_velocity: ValuesUnitPressureLevel;
+  pressure_level_geopotential_height: ValuesUnitPressureLevel;*/
+}
+
+table EnsembleDaily {
+  time: TimeRange (required);
+  apparent_temperature_max: ValuesAndUnit;
+  apparent_temperature_mean: ValuesAndUnit;
+  apparent_temperature_min: ValuesAndUnit;
+  cape_max: ValuesAndUnit;
+  cape_mean: ValuesAndUnit;
+  cape_min: ValuesAndUnit;
+  cloudcover_max: ValuesAndUnit;
+  cloudcover_mean: ValuesAndUnit;
+  cloudcover_min: ValuesAndUnit;
+  dewpoint_2m_max: ValuesAndUnit;
+  dewpoint_2m_mean: ValuesAndUnit;
+  dewpoint_2m_min: ValuesAndUnit;
+  et0_fao_evapotranspiration: ValuesAndUnit;
+  et0_fao_evapotranspiration_sum: ValuesAndUnit;
+  growing_degree_days_base_0_limit_50: ValuesAndUnit;
+  leaf_wetness_probability_mean: ValuesAndUnit;
+  precipitation_hours: ValuesAndUnit;
+  precipitation_probability_max: ValuesAndUnit;
+  precipitation_probability_mean: ValuesAndUnit;
+  precipitation_probability_min: ValuesAndUnit;
+  precipitation_sum: ValuesAndUnit;
+  pressure_msl_max: ValuesAndUnit;
+  pressure_msl_mean: ValuesAndUnit;
+  pressure_msl_min: ValuesAndUnit;
+  rain_sum: ValuesAndUnit;
+  relative_humidity_2m_max: ValuesAndUnit;
+  relative_humidity_2m_mean: ValuesAndUnit;
+  relative_humidity_2m_min: ValuesAndUnit;
+  shortwave_radiation_sum: ValuesAndUnit;
+  showers_sum: ValuesAndUnit;
+  snowfall_sum: ValuesAndUnit;
+  snowfall_water_equivalent_sum: ValuesAndUnit;
+  soil_moisture_0_to_100cm_mean: ValuesAndUnit;
+  soil_moisture_0_to_10cm_mean: ValuesAndUnit;
+  soil_moisture_0_to_7cm_mean: ValuesAndUnit;
+  soil_moisture_28_to_100cm_mean: ValuesAndUnit;
+  soil_moisture_7_to_28cm_mean: ValuesAndUnit;
+  soil_moisture_index_0_to_100cm_mean: ValuesAndUnit;
+  soil_moisture_index_0_to_7cm_mean: ValuesAndUnit;
+  soil_moisture_index_100_to_255cm_mean: ValuesAndUnit;
+  soil_moisture_index_28_to_100cm_mean: ValuesAndUnit;
+  soil_moisture_index_7_to_28cm_mean: ValuesAndUnit;
+  soil_temperature_0_to_100cm_mean: ValuesAndUnit;
+  soil_temperature_0_to_7cm_mean: ValuesAndUnit;
+  soil_temperature_28_to_100cm_mean: ValuesAndUnit;
+  soil_temperature_7_to_28cm_mean: ValuesAndUnit;
+  sunrise: [int64];
+  sunset: [int64];
+  surface_pressure_max: ValuesAndUnit;
+  surface_pressure_mean: ValuesAndUnit;
+  surface_pressure_min: ValuesAndUnit;
+  temperature_2m_max: ValuesAndUnit;
+  temperature_2m_mean: ValuesAndUnit;
+  temperature_2m_min: ValuesAndUnit;
+  updraft_max: ValuesAndUnit;
+  uv_index_clear_sky_max: ValuesAndUnit;
+  uv_index_max: ValuesAndUnit;
+  vapor_pressure_deficit_max: ValuesAndUnit;
+  visibility_max: ValuesAndUnit;
+  visibility_mean: ValuesAndUnit;
+  visibility_min: ValuesAndUnit;
+  weathercode: ValuesAndUnit;
+  winddirection_10m_dominant: ValuesAndUnit;
+  windgusts_10m_max: ValuesAndUnit;
+  windgusts_10m_mean: ValuesAndUnit;
+  windgusts_10m_min: ValuesAndUnit;
+  windspeed_10m_max: ValuesAndUnit;
+  windspeed_10m_mean: ValuesAndUnit;
+  windspeed_10m_min: ValuesAndUnit;
+}
+ 
+table EnsembleApi {
+  latitude: float;
+  longitude: float;
+  elevation: float;
+  model: EnsembleModel;
+  generationtime_ms: float;
+  utc_offset_seconds: int32;
+  timezone: string;
+  timezone_abbreviation: string;
+  //current_weather: CurrentWeather;
+  //daily: WeatherDaily;
+  hourly: EnsembleHourly;
+  //six_hourly: WeatherHourly;
+  //minutely_15: WeatherHourly;
+  //current: [VariableSingle];
+  //current_time: int64;
+  //current_interval_seconds: int32;
+  //monthly: [Variable];
+}
+ 
+root_type EnsembleApi;
+

@@ -111,7 +111,7 @@ struct WeatherApiController {
         let nParamsDaily = paramsDaily?.count ?? 0
         let nVariables = nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily
         
-        let locations: [ForecastapiResultMulti<MultiDomains, ForecastVariable, ForecastVariableDaily>] = try prepared.map { prepared in
+        /*let locations: [ForecastapiResultMulti<MultiDomains, ForecastVariable, ForecastVariableDaily>] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -235,7 +235,8 @@ struct WeatherApiController {
         }
         let result = ForecastapiResultSet<MultiDomains, ForecastVariable, ForecastVariableDaily>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        return result.response(format: params.format ?? .json)*/
+        fatalError()
     }
 }
 

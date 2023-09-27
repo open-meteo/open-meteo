@@ -148,7 +148,7 @@ fileprivate extension ApiColumn {
 }*/
 
 extension MultiDomains: ModelFlatbufferSerialisable {
-    static func writeToFlatbuffer<HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable>(section: ForecastapiResult<Self, HourlyVariable, DailyVariable>, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
+    static func writeToFlatbuffer<HourlySurfaceVariable: VariableFlatbufferSerialisable, HourlyPressureVariableType: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable>(section: ForecastapiResult<Self, HourlySurfaceVariable, HourlyPressureVariableType, DailyVariable>, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
         
         let generationTimeStart = Date()
         let current_weather = try section.current_weather?()
@@ -166,6 +166,32 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 isDay: c.is_day
             )
         }
+        let hourly = (try section.hourly?()).map { section in
+            var surfaces = [(variable: HourlySurfaceVariable, offset: Offset)]()
+            surfaces.reserveCapacity(section.columns.count)
+            var pressures = [(variable: HourlyPressureVariableType, unit: SiUnit, offsets: [Offset])]()
+            
+            for v in section.columns {
+                switch v.variable {
+                case .surface(let surface):
+                    let offset = com_openmeteo_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: v.variables[0].expectFloatArray(&fbb), unit: v.unit)
+                    surfaces.append((surface, offset))
+                case .pressure(let pressure):
+                    let offset = com_openmeteo_ValuesAndLevel.createValuesAndLevel(&fbb, level: Int32(pressure.level), valuesVectorOffset: v.variables[0].expectFloatArray(&fbb))
+                    if let pos = pressures.firstIndex(where: {$0.variable == pressure.variable}) {
+                        pressures[pos].offsets.append(offset)
+                    } else {
+                        pressures.append((pressure.variable, v.unit, [offset]))
+                    }
+                }
+            }
+            
+            let pressureVectors: [(variable: ForecastPressureVariableType, offset: Offset)] = pressures.map { (variable, unit, offsets) in
+                return (variable, com_openmeteo_ValuesUnitPressureLevel.createValuesUnitPressureLevel(&fbb, unit: unit, valuesVectorOffset: fbb.createVector(ofOffsets: offsets)))
+            }
+            
+        } ?? Offset()
+        
         //let time = section. section.sections.first?.time.range.lowerBound.timeIntervalSince1970 ?? 0
         let minutely15 = (try section.minutely15?()).map { HourlyVariable.toFlatbuffers(section: $0, &fbb) } ?? Offset()
         let sixHourly = (try section.sixHourly?()).map { HourlyVariable.toFlatbuffers(section: $0, &fbb) } ?? Offset()
@@ -294,6 +320,15 @@ extension ApiArray {
     }
 }
 
+extension ForecastSurfaceVariable: VariableFlatbufferSerialisable {
+    static func toFlatbuffers(section: ApiSection<ForecastSurfaceVariable>, _ fbb: inout FlatBuffers.FlatBufferBuilder) -> FlatBuffers.Offset {
+        <#code#>
+    }
+    
+    
+}
+
+
 extension ForecastVariable: VariableFlatbufferSerialisable {
     static func toFlatbuffers(section: ApiSection<Self>, _ fbb: inout FlatBuffers.FlatBufferBuilder) -> FlatBuffers.Offset {
         var surfaces = [(variable: ForecastSurfaceVariable, offset: Offset)]()
@@ -303,10 +338,10 @@ extension ForecastVariable: VariableFlatbufferSerialisable {
         for v in section.columns {
             switch v.variable {
             case .surface(let surface):
-                let offset = com_openmeteo_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: v.data.expectFloatArray(&fbb), unit: v.unit)
+                let offset = com_openmeteo_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: v.variables[0].expectFloatArray(&fbb), unit: v.unit)
                 surfaces.append((surface, offset))
             case .pressure(let pressure):
-                let offset = com_openmeteo_ValuesAndLevel.createValuesAndLevel(&fbb, level: Int32(pressure.level), valuesVectorOffset: v.data.expectFloatArray(&fbb))
+                let offset = com_openmeteo_ValuesAndLevel.createValuesAndLevel(&fbb, level: Int32(pressure.level), valuesVectorOffset: v.variables[0].expectFloatArray(&fbb))
                 if let pos = pressures.firstIndex(where: {$0.variable == pressure.variable}) {
                     pressures[pos].offsets.append(offset)
                 } else {
@@ -737,3 +772,329 @@ extension ApiSection {
         )
     }
 }
+
+
+extension EnsembleVariable: VariableFlatbufferSerialisable {
+    static func toFlatbuffers(section: ApiSection<Self>, _ fbb: inout FlatBuffers.FlatBufferBuilder) -> FlatBuffers.Offset {
+        var surfaces = [(variable: EnsembleSurfaceVariable, offset: Offset)]()
+        surfaces.reserveCapacity(section.columns.count)
+        var pressures = [(variable: ForecastPressureVariableType, unit: SiUnit, offsets: [Offset])]()
+        
+        for v in section.columns {
+            switch v.variable {
+            case .surface(let surface):
+                let offset = com_openmeteo_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: v.data.expectFloatArray(&fbb), unit: v.unit)
+                surfaces.append((surface, offset))
+            case .pressure(let pressure):
+                let offset = com_openmeteo_ValuesAndLevel.createValuesAndLevel(&fbb, level: Int32(pressure.level), valuesVectorOffset: v.data.expectFloatArray(&fbb))
+                if let pos = pressures.firstIndex(where: {$0.variable == pressure.variable}) {
+                    pressures[pos].offsets.append(offset)
+                } else {
+                    pressures.append((pressure.variable, v.unit, [offset]))
+                }
+            }
+        }
+        
+        let pressureVectors: [(variable: ForecastPressureVariableType, offset: Offset)] = pressures.map { (variable, unit, offsets) in
+            return (variable, com_openmeteo_ValuesUnitPressureLevel.createValuesUnitPressureLevel(&fbb, unit: unit, valuesVectorOffset: fbb.createVector(ofOffsets: offsets)))
+        }
+        
+        let start = com_openmeteo_WeatherHourly.startWeatherHourly(&fbb)
+        com_openmeteo_WeatherHourly.add(time: section.timeFlatBuffers(), &fbb)
+        for (surface, offset) in surfaces {
+            switch surface {
+            case .temperature_2m:
+                com_openmeteo_WeatherHourly.add(temperature2m: offset, &fbb)
+            case .cloudcover:
+                com_openmeteo_WeatherHourly.add(cloudcover: offset, &fbb)
+            case .cloudcover_low:
+                com_openmeteo_WeatherHourly.add(cloudcoverLow: offset, &fbb)
+            case .cloudcover_mid:
+                com_openmeteo_WeatherHourly.add(cloudcoverMid: offset, &fbb)
+            case .cloudcover_high:
+                com_openmeteo_WeatherHourly.add(cloudcoverHigh: offset, &fbb)
+            case .pressure_msl:
+                com_openmeteo_WeatherHourly.add(pressureMsl: offset, &fbb)
+            case .relativehumidity_2m:
+                com_openmeteo_WeatherHourly.add(relativehumidity2m: offset, &fbb)
+            case .precipitation:
+                com_openmeteo_WeatherHourly.add(precipitation: offset, &fbb)
+            case .precipitation_probability:
+                com_openmeteo_WeatherHourly.add(precipitationProbability: offset, &fbb)
+            case .weathercode:
+                com_openmeteo_WeatherHourly.add(weathercode: offset, &fbb)
+            case .temperature_80m:
+                com_openmeteo_WeatherHourly.add(temperature80m: offset, &fbb)
+            case .temperature_120m:
+                com_openmeteo_WeatherHourly.add(temperature120m: offset, &fbb)
+            case .temperature_180m:
+                com_openmeteo_WeatherHourly.add(temperature180m: offset, &fbb)
+            case .soil_temperature_0cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature0cm: offset, &fbb)
+            case .soil_temperature_6cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature6cm: offset, &fbb)
+            case .soil_temperature_18cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature18cm: offset, &fbb)
+            case .soil_temperature_54cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature54cm: offset, &fbb)
+            case .soil_moisture_0_1cm:
+                fallthrough
+            case .soil_moisture_0_to_1cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture0To1cm: offset, &fbb)
+            case .soil_moisture_1_3cm:
+                fallthrough
+            case .soil_moisture_1_to_3cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture1To3cm: offset, &fbb)
+            case .soil_moisture_3_9cm:
+                fallthrough
+            case .soil_moisture_3_to_9cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture3To9cm: offset, &fbb)
+            case .soil_moisture_9_27cm:
+                fallthrough
+            case .soil_moisture_9_to_27cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture9To27cm: offset, &fbb)
+            case .soil_moisture_27_81cm:
+                fallthrough
+            case .soil_moisture_27_to_81cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture27To81cm: offset, &fbb)
+            case .snow_depth:
+                com_openmeteo_WeatherHourly.add(snowDepth: offset, &fbb)
+            case .snow_height:
+                com_openmeteo_WeatherHourly.add(snowHeight: offset, &fbb)
+            case .sensible_heatflux:
+                com_openmeteo_WeatherHourly.add(sensibleHeatflux: offset, &fbb)
+            case .latent_heatflux:
+                com_openmeteo_WeatherHourly.add(latentHeatflux: offset, &fbb)
+            case .showers:
+                com_openmeteo_WeatherHourly.add(showers: offset, &fbb)
+            case .rain:
+                com_openmeteo_WeatherHourly.add(rain: offset, &fbb)
+            case .windgusts_10m:
+                com_openmeteo_WeatherHourly.add(windgusts10m: offset, &fbb)
+            case .freezinglevel_height:
+                com_openmeteo_WeatherHourly.add(freezinglevelHeight: offset, &fbb)
+            case .dewpoint_2m:
+                com_openmeteo_WeatherHourly.add(dewpoint2m: offset, &fbb)
+            case .diffuse_radiation:
+                com_openmeteo_WeatherHourly.add(diffuseRadiation: offset, &fbb)
+            case .direct_radiation:
+                com_openmeteo_WeatherHourly.add(directRadiation: offset, &fbb)
+            case .apparent_temperature:
+                com_openmeteo_WeatherHourly.add(apparentTemperature: offset, &fbb)
+            case .windspeed_10m:
+                com_openmeteo_WeatherHourly.add(windspeed10m: offset, &fbb)
+            case .winddirection_10m:
+                com_openmeteo_WeatherHourly.add(winddirection10m: offset, &fbb)
+            case .windspeed_80m:
+                com_openmeteo_WeatherHourly.add(windspeed80m: offset, &fbb)
+            case .winddirection_80m:
+                com_openmeteo_WeatherHourly.add(winddirection80m: offset, &fbb)
+            case .windspeed_120m:
+                com_openmeteo_WeatherHourly.add(windspeed120m: offset, &fbb)
+            case .winddirection_120m:
+                com_openmeteo_WeatherHourly.add(winddirection120m: offset, &fbb)
+            case .windspeed_180m:
+                com_openmeteo_WeatherHourly.add(windspeed180m: offset, &fbb)
+            case .winddirection_180m:
+                com_openmeteo_WeatherHourly.add(winddirection180m: offset, &fbb)
+            case .direct_normal_irradiance:
+                com_openmeteo_WeatherHourly.add(directNormalIrradiance: offset, &fbb)
+            case .evapotranspiration:
+                com_openmeteo_WeatherHourly.add(evapotranspiration: offset, &fbb)
+            case .et0_fao_evapotranspiration:
+                com_openmeteo_WeatherHourly.add(et0FaoEvapotranspiration: offset, &fbb)
+            case .vapor_pressure_deficit:
+                com_openmeteo_WeatherHourly.add(vaporPressureDeficit: offset, &fbb)
+            case .shortwave_radiation:
+                com_openmeteo_WeatherHourly.add(shortwaveRadiation: offset, &fbb)
+            case .snowfall:
+                com_openmeteo_WeatherHourly.add(snowfall: offset, &fbb)
+            case .surface_pressure:
+                com_openmeteo_WeatherHourly.add(surfacePressure: offset, &fbb)
+            case .terrestrial_radiation:
+                com_openmeteo_WeatherHourly.add(terrestrialRadiation: offset, &fbb)
+            case .terrestrial_radiation_instant:
+                com_openmeteo_WeatherHourly.add(terrestrialRadiationInstant: offset, &fbb)
+            case .shortwave_radiation_instant:
+                com_openmeteo_WeatherHourly.add(shortwaveRadiationInstant: offset, &fbb)
+            case .diffuse_radiation_instant:
+                com_openmeteo_WeatherHourly.add(diffuseRadiationInstant: offset, &fbb)
+            case .direct_radiation_instant:
+                com_openmeteo_WeatherHourly.add(directRadiationInstant: offset, &fbb)
+            case .direct_normal_irradiance_instant:
+                com_openmeteo_WeatherHourly.add(directNormalIrradianceInstant: offset, &fbb)
+            case .visibility:
+                com_openmeteo_WeatherHourly.add(visibility: offset, &fbb)
+            case .cape:
+                com_openmeteo_WeatherHourly.add(cape: offset, &fbb)
+            case .uv_index:
+                com_openmeteo_WeatherHourly.add(uvIndex: offset, &fbb)
+            case .uv_index_clear_sky:
+                com_openmeteo_WeatherHourly.add(uvIndexClearSky: offset, &fbb)
+            case .is_day:
+                com_openmeteo_WeatherHourly.add(isDay: offset, &fbb)
+            case .lightning_potential:
+                com_openmeteo_WeatherHourly.add(lightningPotential: offset, &fbb)
+            case .growing_degree_days_base_0_limit_50:
+                com_openmeteo_WeatherHourly.add(growingDegreeDaysBase0Limit50: offset, &fbb)
+            case .leaf_wetness_probability:
+                com_openmeteo_WeatherHourly.add(leafWetnessProbability: offset, &fbb)
+            case .runoff:
+                com_openmeteo_WeatherHourly.add(runoff: offset, &fbb)
+            case .skin_temperature:
+                com_openmeteo_WeatherHourly.add(skinTemperature: offset, &fbb)
+            case .snowfall_water_equivalent:
+                com_openmeteo_WeatherHourly.add(snowfallWaterEquivalent: offset, &fbb)
+            case .soil_moisture_0_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture0To100cm: offset, &fbb)
+            case .soil_moisture_0_to_10cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture0To10cm: offset, &fbb)
+            case .soil_moisture_0_to_7cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture0To7cm: offset, &fbb)
+            case .soil_moisture_100_to_200cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture100To200cm: offset, &fbb)
+            case .soil_moisture_100_to_255cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture100To255cm: offset, &fbb)
+            case .soil_moisture_10_to_40cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture10To40cm: offset, &fbb)
+            case .soil_moisture_28_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture28To100cm: offset, &fbb)
+            case .soil_moisture_40_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture40To100cm: offset, &fbb)
+            case .soil_moisture_7_to_28cm:
+                com_openmeteo_WeatherHourly.add(soilMoisture7To28cm: offset, &fbb)
+            case .soil_moisture_index_0_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex0To100cm: offset, &fbb)
+            case .soil_moisture_index_0_to_7cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex0To7cm: offset, &fbb)
+            case .soil_moisture_index_100_to_255cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex100To255cm: offset, &fbb)
+            case .soil_moisture_index_28_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex28To100cm: offset, &fbb)
+            case .soil_moisture_index_7_to_28cm:
+                com_openmeteo_WeatherHourly.add(soilMoistureIndex7To28cm: offset, &fbb)
+            case .soil_temperature_0_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature0To100cm: offset, &fbb)
+            case .soil_temperature_0_to_10cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature0To10cm: offset, &fbb)
+            case .soil_temperature_0_to_7cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature0To7cm: offset, &fbb)
+            case .soil_temperature_100_to_200cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature100To200cm: offset, &fbb)
+            case .soil_temperature_100_to_255cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature100To255cm: offset, &fbb)
+            case .soil_temperature_10_to_40cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature10To40cm: offset, &fbb)
+            case .soil_temperature_28_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature28To100cm: offset, &fbb)
+            case .soil_temperature_40_to_100cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature40To100cm: offset, &fbb)
+            case .soil_temperature_7_to_28cm:
+                com_openmeteo_WeatherHourly.add(soilTemperature7To28cm: offset, &fbb)
+            case .surface_air_pressure:
+                com_openmeteo_WeatherHourly.add(surfaceAirPressure: offset, &fbb)
+            case .surface_temperature:
+                com_openmeteo_WeatherHourly.add(surfaceTemperature: offset, &fbb)
+            case .temperature_40m:
+                com_openmeteo_WeatherHourly.add(temperature40m: offset, &fbb)
+            case .total_column_integrated_water_vapour:
+                com_openmeteo_WeatherHourly.add(totalColumnIntegratedWaterVapour: offset, &fbb)
+            case .updraft:
+                com_openmeteo_WeatherHourly.add(updraft: offset, &fbb)
+            case .winddirection_100m:
+                com_openmeteo_WeatherHourly.add(winddirection100m: offset, &fbb)
+            case .winddirection_150m:
+                com_openmeteo_WeatherHourly.add(winddirection150m: offset, &fbb)
+            case .winddirection_200m:
+                com_openmeteo_WeatherHourly.add(winddirection200m: offset, &fbb)
+            case .winddirection_20m:
+                com_openmeteo_WeatherHourly.add(winddirection20m: offset, &fbb)
+            case .winddirection_40m:
+                com_openmeteo_WeatherHourly.add(winddirection40m: offset, &fbb)
+            case .winddirection_50m:
+                com_openmeteo_WeatherHourly.add(winddirection50m: offset, &fbb)
+            case .windspeed_100m:
+                com_openmeteo_WeatherHourly.add(windspeed100m: offset, &fbb)
+            case .windspeed_150m:
+                com_openmeteo_WeatherHourly.add(windspeed150m: offset, &fbb)
+            case .windspeed_200m:
+                com_openmeteo_WeatherHourly.add(windspeed200m: offset, &fbb)
+            case .windspeed_20m:
+                com_openmeteo_WeatherHourly.add(windspeed20m: offset, &fbb)
+            case .windspeed_40m:
+                com_openmeteo_WeatherHourly.add(windspeed40m: offset, &fbb)
+            case .windspeed_50m:
+                com_openmeteo_WeatherHourly.add(windspeed50m: offset, &fbb)
+            }
+        }
+        for (pressure, offset) in pressureVectors {
+            switch pressure {
+            case .temperature:
+                com_openmeteo_WeatherHourly.add(pressureLevelTemperature: offset, &fbb)
+            case .geopotential_height:
+                com_openmeteo_WeatherHourly.add(pressureLevelGeopotentialHeight: offset, &fbb)
+            case .relativehumidity:
+                com_openmeteo_WeatherHourly.add(pressureLevelRelativehumidity: offset, &fbb)
+            case .windspeed:
+                com_openmeteo_WeatherHourly.add(pressureLevelWindspeed: offset, &fbb)
+            case .winddirection:
+                com_openmeteo_WeatherHourly.add(pressureLevelWinddirection: offset, &fbb)
+            case .dewpoint:
+                com_openmeteo_WeatherHourly.add(pressureLevelDewpoint: offset, &fbb)
+            case .cloudcover:
+                com_openmeteo_WeatherHourly.add(pressureLevelCloudcover: offset, &fbb)
+            }
+        }
+        return com_openmeteo_WeatherHourly.endWeatherHourly(&fbb, start: start)
+    }
+}
+
+
+extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
+    
+    var flatBufferModel: com_openmeteo_EnsembleModel {
+        switch self {
+        case .icon_seamless:
+            return .iconSeamless
+        case .icon_global:
+            return .iconGlobal
+        case .icon_eu:
+            return .iconEu
+        case .icon_d2:
+            return .iconD2
+        case .ecmwf_ifs04:
+            return .ecmwfIfs04
+        case .gem_global:
+            return .gemGlobal
+        case .gfs_seamless:
+            return .gfsSeamless
+        case .gfs025:
+            return .gfs025
+        case .gfs05:
+            return .gfs025
+        }
+    }
+    
+    static func writeToFlatbuffer<HourlyVariable: VariableFlatbufferSerialisable, DailyVariable: VariableFlatbufferSerialisable>(section: ForecastapiResult<Self, HourlyVariable, DailyVariable>, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
+        let generationTimeStart = Date()
+
+        let hourly = (try section.hourly?()).map { HourlyVariable.toFlatbuffers(section: $0, &fbb) } ?? Offset()
+        
+        let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
+        
+        let result = com_openmeteo_EnsembleApi.createEnsembleApi(
+            &fbb,
+            latitude: section.latitude,
+            longitude: section.longitude,
+            elevation: section.elevation ?? .nan,
+            model: section.model.flatBufferModel,
+            generationtimeMs: Float32(generationTimeMs),
+            utcOffsetSeconds: Int32(timezone.utcOffsetSeconds),
+            timezoneOffset: fbb.create(string: timezone.identifier),
+            timezoneAbbreviationOffset: fbb.create(string: timezone.abbreviation),
+            hourlyOffset: hourly
+        )
+        fbb.finish(offset: result, addPrefix: true)
+    }
+}
+

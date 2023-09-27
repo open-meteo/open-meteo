@@ -8,8 +8,6 @@ import Vapor
  */
 public struct EnsembleApiController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        fatalError()
-        /*
         try req.ensureSubdomain("ensemble-api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
@@ -18,9 +16,9 @@ public struct EnsembleApiController {
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
         let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
-        let nVariables = (paramsHourly?.count ?? 0) * domains.reduce(0, {$0 + $1.countEnsembleMember})
+        let nVariables = (paramsHourly?.count ?? 0) * 20
         
-        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
+        let locations: [ForecastapiResultMulti<EnsembleMultiDomains, EnsembleSurfaceVariable, EnsemblePressureVariable, EnsembleVariable>] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 35, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -29,23 +27,17 @@ public struct EnsembleApiController {
             
             let hourlyTime = time.range.range(dtSeconds: 3600)
             
-            let readers = try domains.compactMap {
-                try GenericReaderMulti<EnsembleVariable>(domain: $0, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land)
-            }
-            
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            
-            return ForecastapiResult(
-                latitude: readers[0].modelLat,
-                longitude: readers[0].modelLon,
-                elevation: readers[0].targetElevation,
-                timezone: timezone,
-                time: time,
-                prefetch: {
-                    if let hourlyVariables = paramsHourly {
-                        for reader in readers {
+            let readers: [ForecastapiResult<EnsembleMultiDomains, EnsembleVariableWithoutMember, EnsembleVariableWithoutMember>] = try domains.compactMap { domain in
+                guard let reader = try GenericReaderMulti<EnsembleVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                    return nil
+                }
+                return ForecastapiResult<EnsembleMultiDomains, EnsembleVariableWithoutMember, EnsembleVariableWithoutMember>(
+                    model: domain,
+                    latitude: reader.modelLat,
+                    longitude: reader.modelLon,
+                    elevation: reader.targetElevation,
+                    prefetch: {
+                        if let hourlyVariables = paramsHourly {
                             let variables = hourlyVariables.flatMap { variable in
                                 (0..<reader.domain.countEnsembleMember).map {
                                     EnsembleVariable(variable, $0)
@@ -53,40 +45,39 @@ public struct EnsembleApiController {
                             }
                             try reader.prefetchData(variables: variables, time: hourlyTime)
                         }
-                    }
-                },
-                current_weather: nil,
-                current: nil,
-                hourly: paramsHourly.map { variables in
-                    return {
-                        var res = [ApiColumn]()
-                        res.reserveCapacity(variables.count * readers.reduce(0, {$0 + $1.domain.countEnsembleMember}))
-                        for reader in readers {
-                            for variable in variables {
-                                for member in 0..<reader.domain.countEnsembleMember {
-                                    let variable = EnsembleVariable(variable, member)
-                                    let name = readers.count > 1 ? "\(variable.rawValue)_\(reader.domain.rawValue)" : "\(variable.rawValue)"
-                                    guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params).toApi(name: name) else {
-                                        continue
+                    },
+                    current_weather: nil,
+                    current: nil,
+                    hourly: paramsHourly.map { variables in
+                        return {
+                            return ApiSection<EnsembleVariableWithoutMember>(name: "hourly", time: hourlyTime.add(utcOffsetShift), variables: variables.map { variable in
+                                return ApiColumn<EnsembleVariableWithoutMember>(variable: variable, unit: .celsius, data: (0..<reader.domain.countEnsembleMember).compactMap { member in
+                                    guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params) else {
+                                        return nil
                                     }
                                     assert(hourlyTime.count == d.data.count)
-                                    res.append(d)
-                                }
-                                
-                            }
+                                    return d
+                                })
+                            })
                         }
-                        return ApiSection(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: res)
-                    }
-                },
-                daily: nil,
-                sixHourly: nil,
-                minutely15: nil
-            )
-        })
+                    },
+                    daily: nil,
+                    sixHourly: nil,
+                    minutely15: nil
+                )
+            }
+            guard !readers.isEmpty else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return ForecastapiResultMulti<EnsembleMultiDomains, EnsembleVariable, EnsembleVariable>(timezone: timezone, time: time, results: readers)
+        }
+        let result = ForecastapiResultSet<EnsembleMultiDomains, EnsembleVariable, EnsembleVariable>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)*/
+        return result.response(format: params.format ?? .json)
     }
 }
+
+
 
 
 /**
