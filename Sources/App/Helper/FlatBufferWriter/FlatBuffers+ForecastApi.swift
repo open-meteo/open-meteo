@@ -154,7 +154,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             case .runoff:
                 com_openmeteo_WeatherHourly.add(runoff: offset, &fbb)
             case .skin_temperature:
-                com_openmeteo_WeatherHourly.add(skinTemperature: offset, &fbb)
+                com_openmeteo_WeatherHourly.add(surfaceTemperature: offset, &fbb)
             case .snowfall_water_equivalent:
                 com_openmeteo_WeatherHourly.add(snowfallWaterEquivalent: offset, &fbb)
             case .soil_moisture_0_to_100cm:
@@ -408,7 +408,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 case .runoff:
                     com_openmeteo_WeatherCurrent.add(runoff: v, &fbb)
                 case .skin_temperature:
-                    com_openmeteo_WeatherCurrent.add(skinTemperature: v, &fbb)
+                    com_openmeteo_WeatherCurrent.add(surfaceTemperature: v, &fbb)
                 case .snowfall_water_equivalent:
                     com_openmeteo_WeatherCurrent.add(snowfallWaterEquivalent: v, &fbb)
                 case .soil_moisture_0_to_100cm:

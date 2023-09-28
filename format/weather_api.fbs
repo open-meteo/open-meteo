@@ -134,7 +134,6 @@ table WeatherHourly {
   shortwave_radiation: ValuesAndUnit;
   shortwave_radiation_instant: ValuesAndUnit;
   showers: ValuesAndUnit;
-  skin_temperature: ValuesAndUnit;
   snow_depth: ValuesAndUnit;
   snow_height: ValuesAndUnit;
   snowfall: ValuesAndUnit;
@@ -550,7 +549,6 @@ table WeatherCurrent {
   shortwave_radiation: ValueAndUnit;
   shortwave_radiation_instant: ValueAndUnit;
   showers: ValueAndUnit;
-  skin_temperature: ValueAndUnit;
   snow_depth: ValueAndUnit;
   snow_height: ValueAndUnit;
   snowfall: ValueAndUnit;
