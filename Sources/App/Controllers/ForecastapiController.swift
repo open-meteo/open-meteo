@@ -168,17 +168,12 @@ struct WeatherApiController {
                     } : nil),
                     current: paramsCurrent.map { variables in
                         return {
-                            var res = [ApiColumnSingle]()
-                            res.reserveCapacity(variables.count)
-                                for variable in variables {
-                                    // TODO
-                                    let name = variable.rawValue
-                                    guard let d = try reader.get(variable: variable, time: currentTimeRange)?.convertAndRound(params: params).toApiSingle(name: name) else {
-                                        continue
-                                    }
-                                    res.append(d)
+                            .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
+                                guard let d = try reader.get(variable: variable, time: currentTimeRange)?.convertAndRound(params: params) else {
+                                    return nil
                                 }
-                            return ApiSectionSingle(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: res)
+                                return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
+                            })
                         }
                     },
                     hourly: paramsHourly.map { variables in

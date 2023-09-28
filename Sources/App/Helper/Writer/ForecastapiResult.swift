@@ -70,8 +70,24 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
         var current_weather: (() throws -> CurrentWeather)? {
             results.first?.current_weather
         }
-        var current: (() throws -> ApiSectionSingle)? {
-            results.first?.current
+        var current: (() throws -> ApiSectionSingle<String>)? {
+            let run = results.compactMap({ m in m.current.map{ (model: m.model, section: $0)} })
+            guard run.count > 0 else {
+                return nil
+            }
+            return {
+                let run = try run.compactMap({ m in
+                    let h = try m.section()
+                    return ApiSectionSingle<String>(name: h.name, time: h.time, dtSeconds: h.dtSeconds, columns: h.columns.map { c in
+                        let variable = run.count > 1 ? "\(c.variable.rawValue)_\(m.model.rawValue)" : c.variable.rawValue
+                        return ApiColumnSingle<String>(variable: variable, unit: c.unit, value: c.value)
+                    })
+                })
+                guard let first = run.first else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                return ApiSectionSingle<String>(name: first.name, time: first.time, dtSeconds: first.dtSeconds, columns: run.flatMap { $0.columns})
+            }
         }
         
         /// Merge all hourly sections and prefix with the domain name if required
@@ -124,7 +140,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
         
         let prefetch: (() throws -> ())
         let current_weather: (() throws -> CurrentWeather)?
-        let current: (() throws -> ApiSectionSingle)?
+        let current: (() throws -> ApiSectionSingle<SurfaceAndPressureVariable>)?
         let hourly: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
         let daily: (() throws -> ApiSection<Model.DailyVariable>)?
         let sixHourly: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
@@ -242,7 +258,13 @@ struct ApiColumnString {
 }
 
 /// Contain a single value
-struct ApiColumnSingle {
+struct ApiColumnSingle<Variable> {
+    let variable: Variable
+    let unit: SiUnit
+    let value: Float
+}
+
+struct ApiColumnSingleString {
     let variable: String
     let unit: SiUnit
     let value: Float
@@ -264,11 +286,11 @@ struct ApiSectionString {
 }
 
 /// Sfore current weather information giving only a single value per variable
-struct ApiSectionSingle {
+struct ApiSectionSingle<Variable> {
     let name: String
     let time: Timestamp
     let dtSeconds: Int
-    let columns: [ApiColumnSingle]
+    let columns: [ApiColumnSingle<Variable>]
 }
 
 enum ForecastResultFormat: String, Codable {
