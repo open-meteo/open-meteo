@@ -93,7 +93,7 @@ table ValuesUnitPressureLevel {
 
 table WeatherHourly {
   time: TimeRange (required);
-    apparent_temperature: ValuesAndUnit;
+  apparent_temperature: ValuesAndUnit;
   cape: ValuesAndUnit;
   cloudcover: ValuesAndUnit;
   cloudcover_high: ValuesAndUnit;
@@ -161,7 +161,6 @@ table WeatherHourly {
   soil_temperature_54cm: ValuesAndUnit;
   soil_temperature_6cm: ValuesAndUnit;
   soil_temperature_7_to_28cm: ValuesAndUnit;
-  surface_air_pressure: ValuesAndUnit;
   surface_pressure: ValuesAndUnit;
   surface_temperature: ValuesAndUnit;
   temperature_120m: ValuesAndUnit;
