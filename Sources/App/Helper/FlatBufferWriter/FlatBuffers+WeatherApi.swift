@@ -662,15 +662,11 @@ extension MultiDomains: ModelFlatbufferSerialisable {
     
     static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
         let generationTimeStart = Date()
-        let current = try (try section.current?()).map { try encodeCurrent(section: $0, &fbb) } ?? Offset()
-        
         let hourly = (try section.hourly?()).map { encodeHourly(section: $0, &fbb) } ?? Offset()
-        
-        //let time = section. section.sections.first?.time.range.lowerBound.timeIntervalSince1970 ?? 0
         let minutely15 = (try section.minutely15?()).map { encodeHourly(section: $0, &fbb) } ?? Offset()
         let sixHourly = (try section.sixHourly?()).map { encodeHourly(section: $0, &fbb) } ?? Offset()
         let daily = (try section.daily?()).map { encodeDaily(section: $0, &fbb) } ?? Offset()
-        
+        let current = try (try section.current?()).map { try encodeCurrent(section: $0, &fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
         let result = com_openmeteo_WeatherApi.createWeatherApi(

@@ -44,6 +44,44 @@ table AirQualityHourly {
   us_aqi_o3: ValuesAndUnit;
   us_aqi_so2: ValuesAndUnit;
   us_aqi_co: ValuesAndUnit;
+  is_day: ValuesAndUnit;
+}
+
+table AirQualityCurrent {
+  time: int64;
+  interval: int32;
+
+  pm10: ValueAndUnit;
+  pm2_5: ValueAndUnit;
+  dust: ValueAndUnit;
+  aerosol_optical_depth: ValueAndUnit;
+  carbon_monoxide: ValueAndUnit;
+  nitrogen_dioxide: ValueAndUnit;
+  ammonia: ValueAndUnit;
+  ozone: ValueAndUnit;
+  sulphur_dioxide: ValueAndUnit;
+  uv_index: ValueAndUnit;
+  uv_index_clear_sky: ValueAndUnit;
+  alder_pollen: ValueAndUnit;
+  birch_pollen: ValueAndUnit;
+  grass_pollen: ValueAndUnit;
+  mugwort_pollen: ValueAndUnit;
+  olive_pollen: ValueAndUnit;
+  ragweed_pollen: ValueAndUnit;
+  european_aqi: ValueAndUnit;
+  european_aqi_pm2_5: ValueAndUnit;
+  european_aqi_pm10: ValueAndUnit;
+  european_aqi_no2: ValueAndUnit;
+  european_aqi_o3: ValueAndUnit;
+  european_aqi_so2: ValueAndUnit;
+  us_aqi: ValueAndUnit;
+  us_aqi_pm2_5: ValueAndUnit;
+  us_aqi_pm10: ValueAndUnit;
+  us_aqi_no2: ValueAndUnit;
+  us_aqi_o3: ValueAndUnit;
+  us_aqi_so2: ValueAndUnit;
+  us_aqi_co: ValueAndUnit;
+  is_day: ValueAndUnit;
 }
 
 
@@ -59,6 +97,7 @@ table AirQualityApi {
   time: TimeRange;
   //daily: AirQualityDaily;
   hourly: AirQualityHourly;
+  current: AirQualityCurrent;
 }
 
 root_type AirQualityApi;
