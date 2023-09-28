@@ -51,6 +51,7 @@ fileprivate extension FlatBuffers.ByteBuffer {
 }
 
 extension ForecastapiResult {
+    /// Encodes daily data to eigher `ValuesAndUnit` or just plain `int64` for timestamps (e.g. sunrise/set)
     static func encode(section: ApiSection<Model.DailyVariable>, _ fbb: inout FlatBufferBuilder) -> [Offset] {
         let offsets: [Offset] = section.columns.map { v in
             switch v.variables[0] {
@@ -63,7 +64,7 @@ extension ForecastapiResult {
         return offsets
     }
     
-    
+    /// Encodes hourly/minutely data
     static func encode(section: ApiSection<SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) -> (surface: [(variable: Model.HourlyVariable, offset: Offset)], pressure: [(variable: Model.HourlyPressureType, offset: Offset)]) {
         var surfaces = [(variable: Model.HourlyVariable, offset: Offset)]()
         surfaces.reserveCapacity(section.columns.count)
@@ -90,7 +91,6 @@ extension ForecastapiResult {
         
         return (surfaces, pressureVectors)
     }
-    
     
     /// Encode hourly variable for surface and pressure variables
     static func encodeEnsemble(section: ApiSection<SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) -> (surface: [(variable: Model.HourlyVariable, offset: Offset)], pressure: [(variable: Model.HourlyPressureType, offset: Offset)]) {
