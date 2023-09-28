@@ -243,88 +243,87 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     case shortwaveRadiation = 62
     case shortwaveRadiationInstant = 64
     case showers = 66
-    case skinTemperature = 68
-    case snowDepth = 70
-    case snowHeight = 72
-    case snowfall = 74
-    case snowfallWaterEquivalent = 76
-    case soilMoisture0To1cm = 78
-    case soilMoisture0To100cm = 80
-    case soilMoisture0To10cm = 82
-    case soilMoisture0To7cm = 84
-    case soilMoisture100To200cm = 86
-    case soilMoisture100To255cm = 88
-    case soilMoisture10To40cm = 90
-    case soilMoisture1To3cm = 92
-    case soilMoisture27To81cm = 94
-    case soilMoisture28To100cm = 96
-    case soilMoisture3To9cm = 98
-    case soilMoisture40To100cm = 100
-    case soilMoisture7To28cm = 102
-    case soilMoisture9To27cm = 104
-    case soilMoistureIndex0To100cm = 106
-    case soilMoistureIndex0To7cm = 108
-    case soilMoistureIndex100To255cm = 110
-    case soilMoistureIndex28To100cm = 112
-    case soilMoistureIndex7To28cm = 114
-    case soilTemperature0To100cm = 116
-    case soilTemperature0To10cm = 118
-    case soilTemperature0To7cm = 120
-    case soilTemperature0cm = 122
-    case soilTemperature100To200cm = 124
-    case soilTemperature100To255cm = 126
-    case soilTemperature10To40cm = 128
-    case soilTemperature18cm = 130
-    case soilTemperature28To100cm = 132
-    case soilTemperature40To100cm = 134
-    case soilTemperature54cm = 136
-    case soilTemperature6cm = 138
-    case soilTemperature7To28cm = 140
-    case surfacePressure = 142
-    case surfaceTemperature = 144
-    case temperature120m = 146
-    case temperature180m = 148
-    case temperature2m = 150
-    case temperature40m = 152
-    case temperature80m = 154
-    case terrestrialRadiation = 156
-    case terrestrialRadiationInstant = 158
-    case totalColumnIntegratedWaterVapour = 160
-    case updraft = 162
-    case uvIndex = 164
-    case uvIndexClearSky = 166
-    case vaporPressureDeficit = 168
-    case visibility = 170
-    case weathercode = 172
-    case winddirection100m = 174
-    case winddirection10m = 176
-    case winddirection120m = 178
-    case winddirection150m = 180
-    case winddirection180m = 182
-    case winddirection200m = 184
-    case winddirection20m = 186
-    case winddirection40m = 188
-    case winddirection50m = 190
-    case winddirection80m = 192
-    case windgusts10m = 194
-    case windspeed100m = 196
-    case windspeed10m = 198
-    case windspeed120m = 200
-    case windspeed150m = 202
-    case windspeed180m = 204
-    case windspeed200m = 206
-    case windspeed20m = 208
-    case windspeed40m = 210
-    case windspeed50m = 212
-    case windspeed80m = 214
-    case pressureLevelTemperature = 216
-    case pressureLevelDewpoint = 218
-    case pressureLevelRelativehumidity = 220
-    case pressureLevelCloudcover = 222
-    case pressureLevelWindspeed = 224
-    case pressureLevelWinddirection = 226
-    case pressureLevelVerticalVelocity = 228
-    case pressureLevelGeopotentialHeight = 230
+    case snowDepth = 68
+    case snowHeight = 70
+    case snowfall = 72
+    case snowfallWaterEquivalent = 74
+    case soilMoisture0To1cm = 76
+    case soilMoisture0To100cm = 78
+    case soilMoisture0To10cm = 80
+    case soilMoisture0To7cm = 82
+    case soilMoisture100To200cm = 84
+    case soilMoisture100To255cm = 86
+    case soilMoisture10To40cm = 88
+    case soilMoisture1To3cm = 90
+    case soilMoisture27To81cm = 92
+    case soilMoisture28To100cm = 94
+    case soilMoisture3To9cm = 96
+    case soilMoisture40To100cm = 98
+    case soilMoisture7To28cm = 100
+    case soilMoisture9To27cm = 102
+    case soilMoistureIndex0To100cm = 104
+    case soilMoistureIndex0To7cm = 106
+    case soilMoistureIndex100To255cm = 108
+    case soilMoistureIndex28To100cm = 110
+    case soilMoistureIndex7To28cm = 112
+    case soilTemperature0To100cm = 114
+    case soilTemperature0To10cm = 116
+    case soilTemperature0To7cm = 118
+    case soilTemperature0cm = 120
+    case soilTemperature100To200cm = 122
+    case soilTemperature100To255cm = 124
+    case soilTemperature10To40cm = 126
+    case soilTemperature18cm = 128
+    case soilTemperature28To100cm = 130
+    case soilTemperature40To100cm = 132
+    case soilTemperature54cm = 134
+    case soilTemperature6cm = 136
+    case soilTemperature7To28cm = 138
+    case surfacePressure = 140
+    case surfaceTemperature = 142
+    case temperature120m = 144
+    case temperature180m = 146
+    case temperature2m = 148
+    case temperature40m = 150
+    case temperature80m = 152
+    case terrestrialRadiation = 154
+    case terrestrialRadiationInstant = 156
+    case totalColumnIntegratedWaterVapour = 158
+    case updraft = 160
+    case uvIndex = 162
+    case uvIndexClearSky = 164
+    case vaporPressureDeficit = 166
+    case visibility = 168
+    case weathercode = 170
+    case winddirection100m = 172
+    case winddirection10m = 174
+    case winddirection120m = 176
+    case winddirection150m = 178
+    case winddirection180m = 180
+    case winddirection200m = 182
+    case winddirection20m = 184
+    case winddirection40m = 186
+    case winddirection50m = 188
+    case winddirection80m = 190
+    case windgusts10m = 192
+    case windspeed100m = 194
+    case windspeed10m = 196
+    case windspeed120m = 198
+    case windspeed150m = 200
+    case windspeed180m = 202
+    case windspeed200m = 204
+    case windspeed20m = 206
+    case windspeed40m = 208
+    case windspeed50m = 210
+    case windspeed80m = 212
+    case pressureLevelTemperature = 214
+    case pressureLevelDewpoint = 216
+    case pressureLevelRelativehumidity = 218
+    case pressureLevelCloudcover = 220
+    case pressureLevelWindspeed = 222
+    case pressureLevelWinddirection = 224
+    case pressureLevelVerticalVelocity = 226
+    case pressureLevelGeopotentialHeight = 228
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -362,7 +361,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public var shortwaveRadiation: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.shortwaveRadiation.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var shortwaveRadiationInstant: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.shortwaveRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var showers: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.showers.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var skinTemperature: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.skinTemperature.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var snowDepth: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowDepth.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var snowHeight: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowHeight.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var snowfall: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.snowfall.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
@@ -444,7 +442,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public var pressureLevelWinddirection: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelWinddirection.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelVerticalVelocity: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelVerticalVelocity.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelGeopotentialHeight: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelGeopotentialHeight.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 114) }
+  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 113) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func add(apparentTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperature, at: VTOFFSET.apparentTemperature.p) }
   public static func add(cape: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cape, at: VTOFFSET.cape.p) }
@@ -477,7 +475,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public static func add(shortwaveRadiation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: shortwaveRadiation, at: VTOFFSET.shortwaveRadiation.p) }
   public static func add(shortwaveRadiationInstant: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: shortwaveRadiationInstant, at: VTOFFSET.shortwaveRadiationInstant.p) }
   public static func add(showers: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: showers, at: VTOFFSET.showers.p) }
-  public static func add(skinTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: skinTemperature, at: VTOFFSET.skinTemperature.p) }
   public static func add(snowDepth: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowDepth, at: VTOFFSET.snowDepth.p) }
   public static func add(snowHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowHeight, at: VTOFFSET.snowHeight.p) }
   public static func add(snowfall: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: snowfall, at: VTOFFSET.snowfall.p) }
@@ -594,7 +591,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     shortwaveRadiationOffset shortwaveRadiation: Offset = Offset(),
     shortwaveRadiationInstantOffset shortwaveRadiationInstant: Offset = Offset(),
     showersOffset showers: Offset = Offset(),
-    skinTemperatureOffset skinTemperature: Offset = Offset(),
     snowDepthOffset snowDepth: Offset = Offset(),
     snowHeightOffset snowHeight: Offset = Offset(),
     snowfallOffset snowfall: Offset = Offset(),
@@ -710,7 +706,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     com_openmeteo_WeatherHourly.add(shortwaveRadiation: shortwaveRadiation, &fbb)
     com_openmeteo_WeatherHourly.add(shortwaveRadiationInstant: shortwaveRadiationInstant, &fbb)
     com_openmeteo_WeatherHourly.add(showers: showers, &fbb)
-    com_openmeteo_WeatherHourly.add(skinTemperature: skinTemperature, &fbb)
     com_openmeteo_WeatherHourly.add(snowDepth: snowDepth, &fbb)
     com_openmeteo_WeatherHourly.add(snowHeight: snowHeight, &fbb)
     com_openmeteo_WeatherHourly.add(snowfall: snowfall, &fbb)
@@ -829,7 +824,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.shortwaveRadiation.p, fieldName: "shortwaveRadiation", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.shortwaveRadiationInstant.p, fieldName: "shortwaveRadiationInstant", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.showers.p, fieldName: "showers", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.skinTemperature.p, fieldName: "skinTemperature", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.snowDepth.p, fieldName: "snowDepth", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.snowHeight.p, fieldName: "snowHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.snowfall.p, fieldName: "snowfall", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
@@ -958,80 +952,79 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
     case shortwaveRadiation = 64
     case shortwaveRadiationInstant = 66
     case showers = 68
-    case skinTemperature = 70
-    case snowDepth = 72
-    case snowHeight = 74
-    case snowfall = 76
-    case snowfallWaterEquivalent = 78
-    case soilMoisture0To1cm = 80
-    case soilMoisture0To100cm = 82
-    case soilMoisture0To10cm = 84
-    case soilMoisture0To7cm = 86
-    case soilMoisture100To200cm = 88
-    case soilMoisture100To255cm = 90
-    case soilMoisture10To40cm = 92
-    case soilMoisture1To3cm = 94
-    case soilMoisture27To81cm = 96
-    case soilMoisture28To100cm = 98
-    case soilMoisture3To9cm = 100
-    case soilMoisture40To100cm = 102
-    case soilMoisture7To28cm = 104
-    case soilMoisture9To27cm = 106
-    case soilMoistureIndex0To100cm = 108
-    case soilMoistureIndex0To7cm = 110
-    case soilMoistureIndex100To255cm = 112
-    case soilMoistureIndex28To100cm = 114
-    case soilMoistureIndex7To28cm = 116
-    case soilTemperature0To100cm = 118
-    case soilTemperature0To10cm = 120
-    case soilTemperature0To7cm = 122
-    case soilTemperature0cm = 124
-    case soilTemperature100To200cm = 126
-    case soilTemperature100To255cm = 128
-    case soilTemperature10To40cm = 130
-    case soilTemperature18cm = 132
-    case soilTemperature28To100cm = 134
-    case soilTemperature40To100cm = 136
-    case soilTemperature54cm = 138
-    case soilTemperature6cm = 140
-    case soilTemperature7To28cm = 142
-    case surfacePressure = 144
-    case surfaceTemperature = 146
-    case temperature120m = 148
-    case temperature180m = 150
-    case temperature2m = 152
-    case temperature40m = 154
-    case temperature80m = 156
-    case terrestrialRadiation = 158
-    case terrestrialRadiationInstant = 160
-    case totalColumnIntegratedWaterVapour = 162
-    case updraft = 164
-    case uvIndex = 166
-    case uvIndexClearSky = 168
-    case vaporPressureDeficit = 170
-    case visibility = 172
-    case weathercode = 174
-    case winddirection100m = 176
-    case winddirection10m = 178
-    case winddirection120m = 180
-    case winddirection150m = 182
-    case winddirection180m = 184
-    case winddirection200m = 186
-    case winddirection20m = 188
-    case winddirection40m = 190
-    case winddirection50m = 192
-    case winddirection80m = 194
-    case windgusts10m = 196
-    case windspeed100m = 198
-    case windspeed10m = 200
-    case windspeed120m = 202
-    case windspeed150m = 204
-    case windspeed180m = 206
-    case windspeed200m = 208
-    case windspeed20m = 210
-    case windspeed40m = 212
-    case windspeed50m = 214
-    case windspeed80m = 216
+    case snowDepth = 70
+    case snowHeight = 72
+    case snowfall = 74
+    case snowfallWaterEquivalent = 76
+    case soilMoisture0To1cm = 78
+    case soilMoisture0To100cm = 80
+    case soilMoisture0To10cm = 82
+    case soilMoisture0To7cm = 84
+    case soilMoisture100To200cm = 86
+    case soilMoisture100To255cm = 88
+    case soilMoisture10To40cm = 90
+    case soilMoisture1To3cm = 92
+    case soilMoisture27To81cm = 94
+    case soilMoisture28To100cm = 96
+    case soilMoisture3To9cm = 98
+    case soilMoisture40To100cm = 100
+    case soilMoisture7To28cm = 102
+    case soilMoisture9To27cm = 104
+    case soilMoistureIndex0To100cm = 106
+    case soilMoistureIndex0To7cm = 108
+    case soilMoistureIndex100To255cm = 110
+    case soilMoistureIndex28To100cm = 112
+    case soilMoistureIndex7To28cm = 114
+    case soilTemperature0To100cm = 116
+    case soilTemperature0To10cm = 118
+    case soilTemperature0To7cm = 120
+    case soilTemperature0cm = 122
+    case soilTemperature100To200cm = 124
+    case soilTemperature100To255cm = 126
+    case soilTemperature10To40cm = 128
+    case soilTemperature18cm = 130
+    case soilTemperature28To100cm = 132
+    case soilTemperature40To100cm = 134
+    case soilTemperature54cm = 136
+    case soilTemperature6cm = 138
+    case soilTemperature7To28cm = 140
+    case surfacePressure = 142
+    case surfaceTemperature = 144
+    case temperature120m = 146
+    case temperature180m = 148
+    case temperature2m = 150
+    case temperature40m = 152
+    case temperature80m = 154
+    case terrestrialRadiation = 156
+    case terrestrialRadiationInstant = 158
+    case totalColumnIntegratedWaterVapour = 160
+    case updraft = 162
+    case uvIndex = 164
+    case uvIndexClearSky = 166
+    case vaporPressureDeficit = 168
+    case visibility = 170
+    case weathercode = 172
+    case winddirection100m = 174
+    case winddirection10m = 176
+    case winddirection120m = 178
+    case winddirection150m = 180
+    case winddirection180m = 182
+    case winddirection200m = 184
+    case winddirection20m = 186
+    case winddirection40m = 188
+    case winddirection50m = 190
+    case winddirection80m = 192
+    case windgusts10m = 194
+    case windspeed100m = 196
+    case windspeed10m = 198
+    case windspeed120m = 200
+    case windspeed150m = 202
+    case windspeed180m = 204
+    case windspeed200m = 206
+    case windspeed20m = 208
+    case windspeed40m = 210
+    case windspeed50m = 212
+    case windspeed80m = 214
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -1100,8 +1093,6 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
   public var mutableShortwaveRadiationInstant: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.shortwaveRadiationInstant.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var showers: com_openmeteo_ValueAndUnit? { let o = _accessor.offset(VTOFFSET.showers.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_ValueAndUnit.self, at: o) }
   public var mutableShowers: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.showers.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public var skinTemperature: com_openmeteo_ValueAndUnit? { let o = _accessor.offset(VTOFFSET.skinTemperature.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_ValueAndUnit.self, at: o) }
-  public var mutableSkinTemperature: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.skinTemperature.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var snowDepth: com_openmeteo_ValueAndUnit? { let o = _accessor.offset(VTOFFSET.snowDepth.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_ValueAndUnit.self, at: o) }
   public var mutableSnowDepth: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.snowDepth.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var snowHeight: com_openmeteo_ValueAndUnit? { let o = _accessor.offset(VTOFFSET.snowHeight.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_ValueAndUnit.self, at: o) }
@@ -1248,7 +1239,7 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
   public var mutableWindspeed50m: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.windspeed50m.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var windspeed80m: com_openmeteo_ValueAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed80m.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_ValueAndUnit.self, at: o) }
   public var mutableWindspeed80m: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.windspeed80m.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public static func startWeatherCurrent(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 107) }
+  public static func startWeatherCurrent(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 106) }
   public static func add(time: Int64, _ fbb: inout FlatBufferBuilder) { fbb.add(element: time, def: 0, at: VTOFFSET.time.p) }
   public static func add(interval: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: interval, def: 0, at: VTOFFSET.interval.p) }
   public static func add(apparentTemperature: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let apparentTemperature = apparentTemperature else { return }; fbb.create(struct: apparentTemperature, position: VTOFFSET.apparentTemperature.p) }
@@ -1282,7 +1273,6 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
   public static func add(shortwaveRadiation: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let shortwaveRadiation = shortwaveRadiation else { return }; fbb.create(struct: shortwaveRadiation, position: VTOFFSET.shortwaveRadiation.p) }
   public static func add(shortwaveRadiationInstant: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let shortwaveRadiationInstant = shortwaveRadiationInstant else { return }; fbb.create(struct: shortwaveRadiationInstant, position: VTOFFSET.shortwaveRadiationInstant.p) }
   public static func add(showers: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let showers = showers else { return }; fbb.create(struct: showers, position: VTOFFSET.showers.p) }
-  public static func add(skinTemperature: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let skinTemperature = skinTemperature else { return }; fbb.create(struct: skinTemperature, position: VTOFFSET.skinTemperature.p) }
   public static func add(snowDepth: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let snowDepth = snowDepth else { return }; fbb.create(struct: snowDepth, position: VTOFFSET.snowDepth.p) }
   public static func add(snowHeight: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let snowHeight = snowHeight else { return }; fbb.create(struct: snowHeight, position: VTOFFSET.snowHeight.p) }
   public static func add(snowfall: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let snowfall = snowfall else { return }; fbb.create(struct: snowfall, position: VTOFFSET.snowfall.p) }
@@ -1392,7 +1382,6 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
     shortwaveRadiation: com_openmeteo_ValueAndUnit? = nil,
     shortwaveRadiationInstant: com_openmeteo_ValueAndUnit? = nil,
     showers: com_openmeteo_ValueAndUnit? = nil,
-    skinTemperature: com_openmeteo_ValueAndUnit? = nil,
     snowDepth: com_openmeteo_ValueAndUnit? = nil,
     snowHeight: com_openmeteo_ValueAndUnit? = nil,
     snowfall: com_openmeteo_ValueAndUnit? = nil,
@@ -1501,7 +1490,6 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
     com_openmeteo_WeatherCurrent.add(shortwaveRadiation: shortwaveRadiation, &fbb)
     com_openmeteo_WeatherCurrent.add(shortwaveRadiationInstant: shortwaveRadiationInstant, &fbb)
     com_openmeteo_WeatherCurrent.add(showers: showers, &fbb)
-    com_openmeteo_WeatherCurrent.add(skinTemperature: skinTemperature, &fbb)
     com_openmeteo_WeatherCurrent.add(snowDepth: snowDepth, &fbb)
     com_openmeteo_WeatherCurrent.add(snowHeight: snowHeight, &fbb)
     com_openmeteo_WeatherCurrent.add(snowfall: snowfall, &fbb)
@@ -1613,7 +1601,6 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.shortwaveRadiation.p, fieldName: "shortwaveRadiation", required: false, type: com_openmeteo_ValueAndUnit.self)
     try _v.visit(field: VTOFFSET.shortwaveRadiationInstant.p, fieldName: "shortwaveRadiationInstant", required: false, type: com_openmeteo_ValueAndUnit.self)
     try _v.visit(field: VTOFFSET.showers.p, fieldName: "showers", required: false, type: com_openmeteo_ValueAndUnit.self)
-    try _v.visit(field: VTOFFSET.skinTemperature.p, fieldName: "skinTemperature", required: false, type: com_openmeteo_ValueAndUnit.self)
     try _v.visit(field: VTOFFSET.snowDepth.p, fieldName: "snowDepth", required: false, type: com_openmeteo_ValueAndUnit.self)
     try _v.visit(field: VTOFFSET.snowHeight.p, fieldName: "snowHeight", required: false, type: com_openmeteo_ValueAndUnit.self)
     try _v.visit(field: VTOFFSET.snowfall.p, fieldName: "snowfall", required: false, type: com_openmeteo_ValueAndUnit.self)
