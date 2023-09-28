@@ -33,7 +33,7 @@ table ClimateDaily {
   swell_wave_peak_period_max: ValuesAndUnit;
 }
 
-table ClimateApiResponse {
+table ClimateApi {
   latitude: float;
   longitude: float;
   elevation: float;
@@ -46,4 +46,4 @@ table ClimateApiResponse {
   daily: ClimateDaily;
 }
 
-root_type ClimateApiResponse;
+root_type ClimateApi;

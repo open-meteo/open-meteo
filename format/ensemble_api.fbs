@@ -15,25 +15,7 @@ enum EnsembleModel: byte {
   gfs05
 }
 
-table ValuesAndMember {
-  member: int32;
-  values: [float] (required);
-}
 
-table ValuesUnitAndMember {
-  unit: SiUnit;
-  values: [ValuesAndMember];
-}
-
-table ValuesAndLevelAndMember {
-  level: int32;
-  values: [ValuesAndMember];
-}
-
-table ValuesUnitPressureLevelAndMember {
-  unit: SiUnit;
-  values: [ValuesAndLevelAndMember];
-}
 
 table EnsembleHourly {
   time: TimeRange (required);

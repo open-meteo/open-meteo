@@ -194,3 +194,176 @@ public struct com_openmeteo_ValuesAndUnit: FlatBufferObject, Verifiable {
   }
 }
 
+public struct com_openmeteo_ValuesAndMember: FlatBufferObject, Verifiable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Table
+
+  private init(_ t: Table) { _accessor = t }
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
+
+  private enum VTOFFSET: VOffset {
+    case member = 4
+    case values = 6
+    var v: Int32 { Int32(self.rawValue) }
+    var p: VOffset { self.rawValue }
+  }
+
+  public var member: Int32 { let o = _accessor.offset(VTOFFSET.member.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var hasValues: Bool { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? false : true }
+  public var valuesCount: Int32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func values(at index: Int32) -> Float32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.directRead(of: Float32.self, offset: _accessor.vector(at: o) + index * 4) }
+  public var values: [Float32] { return _accessor.getVector(at: VTOFFSET.values.v) ?? [] }
+  public static func startValuesAndMember(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 2) }
+  public static func add(member: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: member, def: 0, at: VTOFFSET.member.p) }
+  public static func addVectorOf(values: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: values, at: VTOFFSET.values.p) }
+  public static func endValuesAndMember(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [6]); return end }
+  public static func createValuesAndMember(
+    _ fbb: inout FlatBufferBuilder,
+    member: Int32 = 0,
+    valuesVectorOffset values: Offset
+  ) -> Offset {
+    let __start = com_openmeteo_ValuesAndMember.startValuesAndMember(&fbb)
+    com_openmeteo_ValuesAndMember.add(member: member, &fbb)
+    com_openmeteo_ValuesAndMember.addVectorOf(values: values, &fbb)
+    return com_openmeteo_ValuesAndMember.endValuesAndMember(&fbb, start: __start)
+  }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.member.p, fieldName: "member", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.values.p, fieldName: "values", required: true, type: ForwardOffset<Vector<Float32, Float32>>.self)
+    _v.finish()
+  }
+}
+
+public struct com_openmeteo_ValuesUnitAndMember: FlatBufferObject, Verifiable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Table
+
+  private init(_ t: Table) { _accessor = t }
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
+
+  private enum VTOFFSET: VOffset {
+    case unit = 4
+    case values = 6
+    var v: Int32 { Int32(self.rawValue) }
+    var p: VOffset { self.rawValue }
+  }
+
+  public var unit: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.unit.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var hasValues: Bool { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? false : true }
+  public var valuesCount: Int32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func values(at index: Int32) -> com_openmeteo_ValuesAndMember? { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? nil : com_openmeteo_ValuesAndMember(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
+  public static func startValuesUnitAndMember(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 2) }
+  public static func add(unit: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: unit.rawValue, def: 0, at: VTOFFSET.unit.p) }
+  public static func addVectorOf(values: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: values, at: VTOFFSET.values.p) }
+  public static func endValuesUnitAndMember(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createValuesUnitAndMember(
+    _ fbb: inout FlatBufferBuilder,
+    unit: com_openmeteo_SiUnit = .undefined,
+    valuesVectorOffset values: Offset = Offset()
+  ) -> Offset {
+    let __start = com_openmeteo_ValuesUnitAndMember.startValuesUnitAndMember(&fbb)
+    com_openmeteo_ValuesUnitAndMember.add(unit: unit, &fbb)
+    com_openmeteo_ValuesUnitAndMember.addVectorOf(values: values, &fbb)
+    return com_openmeteo_ValuesUnitAndMember.endValuesUnitAndMember(&fbb, start: __start)
+  }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.values.p, fieldName: "values", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_ValuesAndMember>, com_openmeteo_ValuesAndMember>>.self)
+    _v.finish()
+  }
+}
+
+public struct com_openmeteo_ValuesAndLevelAndMember: FlatBufferObject, Verifiable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Table
+
+  private init(_ t: Table) { _accessor = t }
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
+
+  private enum VTOFFSET: VOffset {
+    case level = 4
+    case values = 6
+    var v: Int32 { Int32(self.rawValue) }
+    var p: VOffset { self.rawValue }
+  }
+
+  public var level: Int32 { let o = _accessor.offset(VTOFFSET.level.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int32.self, at: o) }
+  public var hasValues: Bool { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? false : true }
+  public var valuesCount: Int32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func values(at index: Int32) -> com_openmeteo_ValuesAndMember? { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? nil : com_openmeteo_ValuesAndMember(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
+  public static func startValuesAndLevelAndMember(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 2) }
+  public static func add(level: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: level, def: 0, at: VTOFFSET.level.p) }
+  public static func addVectorOf(values: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: values, at: VTOFFSET.values.p) }
+  public static func endValuesAndLevelAndMember(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createValuesAndLevelAndMember(
+    _ fbb: inout FlatBufferBuilder,
+    level: Int32 = 0,
+    valuesVectorOffset values: Offset = Offset()
+  ) -> Offset {
+    let __start = com_openmeteo_ValuesAndLevelAndMember.startValuesAndLevelAndMember(&fbb)
+    com_openmeteo_ValuesAndLevelAndMember.add(level: level, &fbb)
+    com_openmeteo_ValuesAndLevelAndMember.addVectorOf(values: values, &fbb)
+    return com_openmeteo_ValuesAndLevelAndMember.endValuesAndLevelAndMember(&fbb, start: __start)
+  }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.level.p, fieldName: "level", required: false, type: Int32.self)
+    try _v.visit(field: VTOFFSET.values.p, fieldName: "values", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_ValuesAndMember>, com_openmeteo_ValuesAndMember>>.self)
+    _v.finish()
+  }
+}
+
+public struct com_openmeteo_ValuesUnitPressureLevelAndMember: FlatBufferObject, Verifiable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Table
+
+  private init(_ t: Table) { _accessor = t }
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Table(bb: bb, position: o) }
+
+  private enum VTOFFSET: VOffset {
+    case unit = 4
+    case values = 6
+    var v: Int32 { Int32(self.rawValue) }
+    var p: VOffset { self.rawValue }
+  }
+
+  public var unit: com_openmeteo_SiUnit { let o = _accessor.offset(VTOFFSET.unit.v); return o == 0 ? .undefined : com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: o)) ?? .undefined }
+  public var hasValues: Bool { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? false : true }
+  public var valuesCount: Int32 { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? 0 : _accessor.vector(count: o) }
+  public func values(at index: Int32) -> com_openmeteo_ValuesAndLevelAndMember? { let o = _accessor.offset(VTOFFSET.values.v); return o == 0 ? nil : com_openmeteo_ValuesAndLevelAndMember(_accessor.bb, o: _accessor.indirect(_accessor.vector(at: o) + index * 4)) }
+  public static func startValuesUnitPressureLevelAndMember(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 2) }
+  public static func add(unit: com_openmeteo_SiUnit, _ fbb: inout FlatBufferBuilder) { fbb.add(element: unit.rawValue, def: 0, at: VTOFFSET.unit.p) }
+  public static func addVectorOf(values: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: values, at: VTOFFSET.values.p) }
+  public static func endValuesUnitPressureLevelAndMember(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createValuesUnitPressureLevelAndMember(
+    _ fbb: inout FlatBufferBuilder,
+    unit: com_openmeteo_SiUnit = .undefined,
+    valuesVectorOffset values: Offset = Offset()
+  ) -> Offset {
+    let __start = com_openmeteo_ValuesUnitPressureLevelAndMember.startValuesUnitPressureLevelAndMember(&fbb)
+    com_openmeteo_ValuesUnitPressureLevelAndMember.add(unit: unit, &fbb)
+    com_openmeteo_ValuesUnitPressureLevelAndMember.addVectorOf(values: values, &fbb)
+    return com_openmeteo_ValuesUnitPressureLevelAndMember.endValuesUnitPressureLevelAndMember(&fbb, start: __start)
+  }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    var _v = try verifier.visitTable(at: position)
+    try _v.visit(field: VTOFFSET.unit.p, fieldName: "unit", required: false, type: com_openmeteo_SiUnit.self)
+    try _v.visit(field: VTOFFSET.values.p, fieldName: "values", required: false, type: ForwardOffset<Vector<ForwardOffset<com_openmeteo_ValuesAndLevelAndMember>, com_openmeteo_ValuesAndLevelAndMember>>.self)
+    _v.finish()
+  }
+}
+
