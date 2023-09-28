@@ -25,7 +25,7 @@ extension ForecastapiResult {
                 //    fbb.clear()
                 //}
                 //first = nil
-                try await b.flushIfRequired()
+                //try await b.flushIfRequired()
                 for location in results {
                     for model in location.results {
                         try Model.writeToFlatbuffer(section: model, &fbb, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime)
