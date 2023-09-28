@@ -237,6 +237,12 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 com_openmeteo_WeatherHourly.add(windspeed40m: offset, &fbb)
             case .windspeed_50m:
                 com_openmeteo_WeatherHourly.add(windspeed50m: offset, &fbb)
+            case .temperature:
+                com_openmeteo_WeatherHourly.add(temperature2m: offset, &fbb)
+            case .windspeed:
+                com_openmeteo_WeatherHourly.add(windspeed10m: offset, &fbb)
+            case .winddirection:
+                com_openmeteo_WeatherHourly.add(winddirection10m: offset, &fbb)
             }
         }
         for (pressure, offset) in offsets.pressure {
@@ -491,6 +497,12 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                     com_openmeteo_WeatherCurrent.add(windspeed40m: v, &fbb)
                 case .windspeed_50m:
                     com_openmeteo_WeatherCurrent.add(windspeed50m: v, &fbb)
+                case .temperature:
+                    com_openmeteo_WeatherCurrent.add(temperature2m: v, &fbb)
+                case .windspeed:
+                    com_openmeteo_WeatherCurrent.add(windspeed10m: v, &fbb)
+                case .winddirection:
+                    com_openmeteo_WeatherCurrent.add(winddirection10m: v, &fbb)
                 }
             case .pressure(_):
                 throw ForecastapiError.generic(message: "Pressure level variables currently not supported for flatbuffers encoding in current block")
@@ -650,19 +662,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
     
     static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
         let generationTimeStart = Date()
-        let current_weather = try section.current_weather?()
         let current = try (try section.current?()).map { try encodeCurrent(section: $0, &fbb) } ?? Offset()
         
-        let currentWeather = current_weather.map { c in
-            com_openmeteo_CurrentWeather(
-                time: Int64(c.time.timeIntervalSince1970),
-                temperature: c.temperature,
-                weathercode: c.weathercode,
-                windspeed: c.windspeed,
-                winddirection: c.winddirection,
-                isDay: c.is_day
-            )
-        }
         let hourly = (try section.hourly?()).map { encodeHourly(section: $0, &fbb) } ?? Offset()
         
         //let time = section. section.sections.first?.time.range.lowerBound.timeIntervalSince1970 ?? 0
@@ -682,16 +683,11 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             utcOffsetSeconds: Int32(timezone.utcOffsetSeconds),
             timezoneOffset: timezone.identifier == "GMT" ? Offset() : fbb.create(string: timezone.identifier),
             timezoneAbbreviationOffset: timezone.abbreviation == "GMT" ? Offset() : fbb.create(string: timezone.abbreviation),
-            currentWeather: currentWeather,
-            //timeStart: Int64(time),
             dailyOffset: daily,
             hourlyOffset: hourly,
             sixHourlyOffset: sixHourly,
             minutely15Offset: minutely15,
             currentOffset: current
-            //currentVectorOffset: current?.toFlatbuffers(&fbb) ?? Offset(),
-            //currentTime: (current?.time.timeIntervalSince1970).map(Int64.init) ?? 0,
-            //currentIntervalSeconds: (current?.dtSeconds).map(Int32.init) ?? 0
         )
         fbb.finish(offset: result, addPrefix: true)
     }

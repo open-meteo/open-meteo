@@ -705,15 +705,6 @@ table WeatherDaily {
   windspeed_10m_mean: ValuesAndUnit;
   windspeed_10m_min: ValuesAndUnit;
 }
-
-struct CurrentWeather {
-  time: int64;
-  temperature: float;
-  weathercode: float;
-  windspeed: float;
-  winddirection: float;
-  is_day: float;
-}
  
 table WeatherApi {
   latitude: float;
@@ -724,13 +715,11 @@ table WeatherApi {
   utc_offset_seconds: int32;
   timezone: string;
   timezone_abbreviation: string;
-  current_weather: CurrentWeather;
   daily: WeatherDaily;
   hourly: WeatherHourly;
   six_hourly: WeatherHourly;
   minutely_15: WeatherHourly;
   current: WeatherCurrent;
-  //monthly: [Variable];
 }
  
 root_type WeatherApi;
