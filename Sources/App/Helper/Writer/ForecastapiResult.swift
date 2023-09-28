@@ -251,6 +251,7 @@ struct ApiColumn<Variable> {
     let variables: [ApiArray]
 }
 
+/// Similar to ApiColumn, but no separation for multipl ensemble members anymore
 struct ApiColumnString {
     let variable: String
     let unit: SiUnit
@@ -318,6 +319,9 @@ struct BufferAndWriter {
     }
     
     @inlinable mutating func flush() async throws {
+        guard buffer.writerIndex > 0 else {
+            return
+        }
         let bufferCopy = buffer
         let writer = writer
         try await writer.eventLoop.flatSubmit { writer.write(.buffer(bufferCopy)) }.get()

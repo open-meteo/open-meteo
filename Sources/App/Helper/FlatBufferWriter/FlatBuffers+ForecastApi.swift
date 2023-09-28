@@ -653,8 +653,6 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         let current_weather = try section.current_weather?()
         let current = try (try section.current?()).map { try encodeCurrent(section: $0, &fbb) } ?? Offset()
         
-        // TODO current
-        
         let currentWeather = current_weather.map { c in
             com_openmeteo_CurrentWeather(
                 time: Int64(c.time.timeIntervalSince1970),
