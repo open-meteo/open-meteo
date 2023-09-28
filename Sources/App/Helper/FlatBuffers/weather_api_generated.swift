@@ -46,74 +46,6 @@ public enum com_openmeteo_WeatherModel: Int8, Enum, Verifiable {
 }
 
 
-public struct com_openmeteo_CurrentWeather: NativeStruct, Verifiable, FlatbuffersInitializable {
-
-  static func validateVersion() { FlatBuffersVersion_23_5_26() }
-
-  private var _time: Int64
-  private var _temperature: Float32
-  private var _weathercode: Float32
-  private var _windspeed: Float32
-  private var _winddirection: Float32
-  private var _isDay: Float32
-  private let padding0__: UInt32 = 0
-
-  public init(_ bb: ByteBuffer, o: Int32) {
-    let _accessor = Struct(bb: bb, position: o)
-    _time = _accessor.readBuffer(of: Int64.self, at: 0)
-    _temperature = _accessor.readBuffer(of: Float32.self, at: 8)
-    _weathercode = _accessor.readBuffer(of: Float32.self, at: 12)
-    _windspeed = _accessor.readBuffer(of: Float32.self, at: 16)
-    _winddirection = _accessor.readBuffer(of: Float32.self, at: 20)
-    _isDay = _accessor.readBuffer(of: Float32.self, at: 24)
-  }
-
-  public init(time: Int64, temperature: Float32, weathercode: Float32, windspeed: Float32, winddirection: Float32, isDay: Float32) {
-    _time = time
-    _temperature = temperature
-    _weathercode = weathercode
-    _windspeed = windspeed
-    _winddirection = winddirection
-    _isDay = isDay
-  }
-
-  public init() {
-    _time = 0
-    _temperature = 0.0
-    _weathercode = 0.0
-    _windspeed = 0.0
-    _winddirection = 0.0
-    _isDay = 0.0
-  }
-
-  public var time: Int64 { _time }
-  public var temperature: Float32 { _temperature }
-  public var weathercode: Float32 { _weathercode }
-  public var windspeed: Float32 { _windspeed }
-  public var winddirection: Float32 { _winddirection }
-  public var isDay: Float32 { _isDay }
-
-  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
-    try verifier.inBuffer(position: position, of: com_openmeteo_CurrentWeather.self)
-  }
-}
-
-public struct com_openmeteo_CurrentWeather_Mutable: FlatBufferObject {
-
-  static func validateVersion() { FlatBuffersVersion_23_5_26() }
-  public var __buffer: ByteBuffer! { return _accessor.bb }
-  private var _accessor: Struct
-
-  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Struct(bb: bb, position: o) }
-
-  public var time: Int64 { return _accessor.readBuffer(of: Int64.self, at: 0) }
-  public var temperature: Float32 { return _accessor.readBuffer(of: Float32.self, at: 8) }
-  public var weathercode: Float32 { return _accessor.readBuffer(of: Float32.self, at: 12) }
-  public var windspeed: Float32 { return _accessor.readBuffer(of: Float32.self, at: 16) }
-  public var winddirection: Float32 { return _accessor.readBuffer(of: Float32.self, at: 20) }
-  public var isDay: Float32 { return _accessor.readBuffer(of: Float32.self, at: 24) }
-}
-
 public struct com_openmeteo_ValuesAndLevel: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
@@ -2152,12 +2084,11 @@ public struct com_openmeteo_WeatherApi: FlatBufferObject, Verifiable {
     case utcOffsetSeconds = 14
     case timezone = 16
     case timezoneAbbreviation = 18
-    case currentWeather = 20
-    case daily = 22
-    case hourly = 24
-    case sixHourly = 26
-    case minutely15 = 28
-    case current = 30
+    case daily = 20
+    case hourly = 22
+    case sixHourly = 24
+    case minutely15 = 26
+    case current = 28
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -2172,14 +2103,12 @@ public struct com_openmeteo_WeatherApi: FlatBufferObject, Verifiable {
   public var timezoneSegmentArray: [UInt8]? { return _accessor.getVector(at: VTOFFSET.timezone.v) }
   public var timezoneAbbreviation: String? { let o = _accessor.offset(VTOFFSET.timezoneAbbreviation.v); return o == 0 ? nil : _accessor.string(at: o) }
   public var timezoneAbbreviationSegmentArray: [UInt8]? { return _accessor.getVector(at: VTOFFSET.timezoneAbbreviation.v) }
-  public var currentWeather: com_openmeteo_CurrentWeather? { let o = _accessor.offset(VTOFFSET.currentWeather.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_CurrentWeather.self, at: o) }
-  public var mutableCurrentWeather: com_openmeteo_CurrentWeather_Mutable? { let o = _accessor.offset(VTOFFSET.currentWeather.v); return o == 0 ? nil : com_openmeteo_CurrentWeather_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var daily: com_openmeteo_WeatherDaily? { let o = _accessor.offset(VTOFFSET.daily.v); return o == 0 ? nil : com_openmeteo_WeatherDaily(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var hourly: com_openmeteo_WeatherHourly? { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? nil : com_openmeteo_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var sixHourly: com_openmeteo_WeatherHourly? { let o = _accessor.offset(VTOFFSET.sixHourly.v); return o == 0 ? nil : com_openmeteo_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var minutely15: com_openmeteo_WeatherHourly? { let o = _accessor.offset(VTOFFSET.minutely15.v); return o == 0 ? nil : com_openmeteo_WeatherHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var current: com_openmeteo_WeatherCurrent? { let o = _accessor.offset(VTOFFSET.current.v); return o == 0 ? nil : com_openmeteo_WeatherCurrent(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startWeatherApi(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 14) }
+  public static func startWeatherApi(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 13) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -2188,7 +2117,6 @@ public struct com_openmeteo_WeatherApi: FlatBufferObject, Verifiable {
   public static func add(utcOffsetSeconds: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: utcOffsetSeconds, def: 0, at: VTOFFSET.utcOffsetSeconds.p) }
   public static func add(timezone: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezone, at: VTOFFSET.timezone.p) }
   public static func add(timezoneAbbreviation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezoneAbbreviation, at: VTOFFSET.timezoneAbbreviation.p) }
-  public static func add(currentWeather: com_openmeteo_CurrentWeather?, _ fbb: inout FlatBufferBuilder) { guard let currentWeather = currentWeather else { return }; fbb.create(struct: currentWeather, position: VTOFFSET.currentWeather.p) }
   public static func add(daily: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: daily, at: VTOFFSET.daily.p) }
   public static func add(hourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourly, at: VTOFFSET.hourly.p) }
   public static func add(sixHourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: sixHourly, at: VTOFFSET.sixHourly.p) }
@@ -2205,7 +2133,6 @@ public struct com_openmeteo_WeatherApi: FlatBufferObject, Verifiable {
     utcOffsetSeconds: Int32 = 0,
     timezoneOffset timezone: Offset = Offset(),
     timezoneAbbreviationOffset timezoneAbbreviation: Offset = Offset(),
-    currentWeather: com_openmeteo_CurrentWeather? = nil,
     dailyOffset daily: Offset = Offset(),
     hourlyOffset hourly: Offset = Offset(),
     sixHourlyOffset sixHourly: Offset = Offset(),
@@ -2221,7 +2148,6 @@ public struct com_openmeteo_WeatherApi: FlatBufferObject, Verifiable {
     com_openmeteo_WeatherApi.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
     com_openmeteo_WeatherApi.add(timezone: timezone, &fbb)
     com_openmeteo_WeatherApi.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
-    com_openmeteo_WeatherApi.add(currentWeather: currentWeather, &fbb)
     com_openmeteo_WeatherApi.add(daily: daily, &fbb)
     com_openmeteo_WeatherApi.add(hourly: hourly, &fbb)
     com_openmeteo_WeatherApi.add(sixHourly: sixHourly, &fbb)
@@ -2240,7 +2166,6 @@ public struct com_openmeteo_WeatherApi: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.utcOffsetSeconds.p, fieldName: "utcOffsetSeconds", required: false, type: Int32.self)
     try _v.visit(field: VTOFFSET.timezone.p, fieldName: "timezone", required: false, type: ForwardOffset<String>.self)
     try _v.visit(field: VTOFFSET.timezoneAbbreviation.p, fieldName: "timezoneAbbreviation", required: false, type: ForwardOffset<String>.self)
-    try _v.visit(field: VTOFFSET.currentWeather.p, fieldName: "currentWeather", required: false, type: com_openmeteo_CurrentWeather.self)
     try _v.visit(field: VTOFFSET.daily.p, fieldName: "daily", required: false, type: ForwardOffset<com_openmeteo_WeatherDaily>.self)
     try _v.visit(field: VTOFFSET.hourly.p, fieldName: "hourly", required: false, type: ForwardOffset<com_openmeteo_WeatherHourly>.self)
     try _v.visit(field: VTOFFSET.sixHourly.p, fieldName: "sixHourly", required: false, type: ForwardOffset<com_openmeteo_WeatherHourly>.self)
