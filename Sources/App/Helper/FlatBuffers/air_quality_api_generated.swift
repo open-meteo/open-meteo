@@ -233,7 +233,7 @@ public struct com_openmeteo_AirQualityHourly: FlatBufferObject, Verifiable {
   }
 }
 
-public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable {
+public struct com_openmeteo_AirQualityApi: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -270,7 +270,7 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
   public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
   public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var hourly: com_openmeteo_AirQualityHourly? { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? nil : com_openmeteo_AirQualityHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startAirQualityApiResponse(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
+  public static func startAirQualityApi(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -281,8 +281,8 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
   public static func add(timezoneAbbreviation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezoneAbbreviation, at: VTOFFSET.timezoneAbbreviation.p) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func add(hourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourly, at: VTOFFSET.hourly.p) }
-  public static func endAirQualityApiResponse(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
-  public static func createAirQualityApiResponse(
+  public static func endAirQualityApi(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createAirQualityApi(
     _ fbb: inout FlatBufferBuilder,
     latitude: Float32 = 0.0,
     longitude: Float32 = 0.0,
@@ -295,18 +295,18 @@ public struct com_openmeteo_AirQualityApiResponse: FlatBufferObject, Verifiable 
     time: com_openmeteo_TimeRange? = nil,
     hourlyOffset hourly: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_AirQualityApiResponse.startAirQualityApiResponse(&fbb)
-    com_openmeteo_AirQualityApiResponse.add(latitude: latitude, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(longitude: longitude, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(elevation: elevation, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(model: model, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(generationtimeMs: generationtimeMs, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(timezone: timezone, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(time: time, &fbb)
-    com_openmeteo_AirQualityApiResponse.add(hourly: hourly, &fbb)
-    return com_openmeteo_AirQualityApiResponse.endAirQualityApiResponse(&fbb, start: __start)
+    let __start = com_openmeteo_AirQualityApi.startAirQualityApi(&fbb)
+    com_openmeteo_AirQualityApi.add(latitude: latitude, &fbb)
+    com_openmeteo_AirQualityApi.add(longitude: longitude, &fbb)
+    com_openmeteo_AirQualityApi.add(elevation: elevation, &fbb)
+    com_openmeteo_AirQualityApi.add(model: model, &fbb)
+    com_openmeteo_AirQualityApi.add(generationtimeMs: generationtimeMs, &fbb)
+    com_openmeteo_AirQualityApi.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
+    com_openmeteo_AirQualityApi.add(timezone: timezone, &fbb)
+    com_openmeteo_AirQualityApi.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
+    com_openmeteo_AirQualityApi.add(time: time, &fbb)
+    com_openmeteo_AirQualityApi.add(hourly: hourly, &fbb)
+    return com_openmeteo_AirQualityApi.endAirQualityApi(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {

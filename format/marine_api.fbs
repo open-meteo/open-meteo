@@ -41,7 +41,7 @@ table MarineDaily {
     swell_wave_peak_period_max: ValuesAndUnit;
 }
 
-table MarineApiResponse {
+table MarineApi {
     latitude: float;
     longitude: float;
     elevation: float;
@@ -54,4 +54,4 @@ table MarineApiResponse {
     hourly: MarineHourly;
 }
 
-root_type MarineApiResponse;
+root_type MarineApi;

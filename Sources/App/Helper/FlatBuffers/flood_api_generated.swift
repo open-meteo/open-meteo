@@ -32,26 +32,29 @@ public struct com_openmeteo_FloodDaily: FlatBufferObject, Verifiable {
 
   private enum VTOFFSET: VOffset {
     case time = 4
-    case riverDischargeMean = 6
-    case riverDischargeMin = 8
-    case riverDischargeMax = 10
-    case riverDischargeMedian = 12
-    case riverDischargeP25 = 14
-    case riverDischargeP75 = 16
+    case riverDischarge = 6
+    case riverDischargeMean = 8
+    case riverDischargeMin = 10
+    case riverDischargeMax = 12
+    case riverDischargeMedian = 14
+    case riverDischargeP25 = 16
+    case riverDischargeP75 = 18
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
 
   public var time: com_openmeteo_TimeRange! { let o = _accessor.offset(VTOFFSET.time.v); return _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
   public var mutableTime: com_openmeteo_TimeRange_Mutable! { let o = _accessor.offset(VTOFFSET.time.v); return com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
+  public var riverDischarge: com_openmeteo_ValuesUnitAndMember? { let o = _accessor.offset(VTOFFSET.riverDischarge.v); return o == 0 ? nil : com_openmeteo_ValuesUnitAndMember(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var riverDischargeMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.riverDischargeMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var riverDischargeMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.riverDischargeMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var riverDischargeMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.riverDischargeMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var riverDischargeMedian: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.riverDischargeMedian.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var riverDischargeP25: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.riverDischargeP25.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var riverDischargeP75: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.riverDischargeP75.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startFloodDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 7) }
+  public static func startFloodDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 8) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
+  public static func add(riverDischarge: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: riverDischarge, at: VTOFFSET.riverDischarge.p) }
   public static func add(riverDischargeMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: riverDischargeMean, at: VTOFFSET.riverDischargeMean.p) }
   public static func add(riverDischargeMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: riverDischargeMin, at: VTOFFSET.riverDischargeMin.p) }
   public static func add(riverDischargeMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: riverDischargeMax, at: VTOFFSET.riverDischargeMax.p) }
@@ -62,6 +65,7 @@ public struct com_openmeteo_FloodDaily: FlatBufferObject, Verifiable {
   public static func createFloodDaily(
     _ fbb: inout FlatBufferBuilder,
     time: com_openmeteo_TimeRange,
+    riverDischargeOffset riverDischarge: Offset = Offset(),
     riverDischargeMeanOffset riverDischargeMean: Offset = Offset(),
     riverDischargeMinOffset riverDischargeMin: Offset = Offset(),
     riverDischargeMaxOffset riverDischargeMax: Offset = Offset(),
@@ -71,6 +75,7 @@ public struct com_openmeteo_FloodDaily: FlatBufferObject, Verifiable {
   ) -> Offset {
     let __start = com_openmeteo_FloodDaily.startFloodDaily(&fbb)
     com_openmeteo_FloodDaily.add(time: time, &fbb)
+    com_openmeteo_FloodDaily.add(riverDischarge: riverDischarge, &fbb)
     com_openmeteo_FloodDaily.add(riverDischargeMean: riverDischargeMean, &fbb)
     com_openmeteo_FloodDaily.add(riverDischargeMin: riverDischargeMin, &fbb)
     com_openmeteo_FloodDaily.add(riverDischargeMax: riverDischargeMax, &fbb)
@@ -83,6 +88,7 @@ public struct com_openmeteo_FloodDaily: FlatBufferObject, Verifiable {
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
     var _v = try verifier.visitTable(at: position)
     try _v.visit(field: VTOFFSET.time.p, fieldName: "time", required: true, type: com_openmeteo_TimeRange.self)
+    try _v.visit(field: VTOFFSET.riverDischarge.p, fieldName: "riverDischarge", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitAndMember>.self)
     try _v.visit(field: VTOFFSET.riverDischargeMean.p, fieldName: "riverDischargeMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.riverDischargeMin.p, fieldName: "riverDischargeMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.riverDischargeMax.p, fieldName: "riverDischargeMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
@@ -93,7 +99,7 @@ public struct com_openmeteo_FloodDaily: FlatBufferObject, Verifiable {
   }
 }
 
-public struct com_openmeteo_FloodApiResponse: FlatBufferObject, Verifiable {
+public struct com_openmeteo_FloodApi: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -130,7 +136,7 @@ public struct com_openmeteo_FloodApiResponse: FlatBufferObject, Verifiable {
   public var time: com_openmeteo_TimeRange? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_TimeRange.self, at: o) }
   public var mutableTime: com_openmeteo_TimeRange_Mutable? { let o = _accessor.offset(VTOFFSET.time.v); return o == 0 ? nil : com_openmeteo_TimeRange_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var daily: com_openmeteo_FloodDaily? { let o = _accessor.offset(VTOFFSET.daily.v); return o == 0 ? nil : com_openmeteo_FloodDaily(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startFloodApiResponse(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
+  public static func startFloodApi(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -141,8 +147,8 @@ public struct com_openmeteo_FloodApiResponse: FlatBufferObject, Verifiable {
   public static func add(timezoneAbbreviation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezoneAbbreviation, at: VTOFFSET.timezoneAbbreviation.p) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func add(daily: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: daily, at: VTOFFSET.daily.p) }
-  public static func endFloodApiResponse(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
-  public static func createFloodApiResponse(
+  public static func endFloodApi(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createFloodApi(
     _ fbb: inout FlatBufferBuilder,
     latitude: Float32 = 0.0,
     longitude: Float32 = 0.0,
@@ -155,18 +161,18 @@ public struct com_openmeteo_FloodApiResponse: FlatBufferObject, Verifiable {
     time: com_openmeteo_TimeRange? = nil,
     dailyOffset daily: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_FloodApiResponse.startFloodApiResponse(&fbb)
-    com_openmeteo_FloodApiResponse.add(latitude: latitude, &fbb)
-    com_openmeteo_FloodApiResponse.add(longitude: longitude, &fbb)
-    com_openmeteo_FloodApiResponse.add(elevation: elevation, &fbb)
-    com_openmeteo_FloodApiResponse.add(model: model, &fbb)
-    com_openmeteo_FloodApiResponse.add(generationtimeMs: generationtimeMs, &fbb)
-    com_openmeteo_FloodApiResponse.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
-    com_openmeteo_FloodApiResponse.add(timezone: timezone, &fbb)
-    com_openmeteo_FloodApiResponse.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
-    com_openmeteo_FloodApiResponse.add(time: time, &fbb)
-    com_openmeteo_FloodApiResponse.add(daily: daily, &fbb)
-    return com_openmeteo_FloodApiResponse.endFloodApiResponse(&fbb, start: __start)
+    let __start = com_openmeteo_FloodApi.startFloodApi(&fbb)
+    com_openmeteo_FloodApi.add(latitude: latitude, &fbb)
+    com_openmeteo_FloodApi.add(longitude: longitude, &fbb)
+    com_openmeteo_FloodApi.add(elevation: elevation, &fbb)
+    com_openmeteo_FloodApi.add(model: model, &fbb)
+    com_openmeteo_FloodApi.add(generationtimeMs: generationtimeMs, &fbb)
+    com_openmeteo_FloodApi.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
+    com_openmeteo_FloodApi.add(timezone: timezone, &fbb)
+    com_openmeteo_FloodApi.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
+    com_openmeteo_FloodApi.add(time: time, &fbb)
+    com_openmeteo_FloodApi.add(daily: daily, &fbb)
+    return com_openmeteo_FloodApi.endFloodApi(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {

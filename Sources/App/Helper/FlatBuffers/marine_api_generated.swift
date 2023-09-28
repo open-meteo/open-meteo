@@ -221,7 +221,7 @@ public struct com_openmeteo_MarineDaily: FlatBufferObject, Verifiable {
   }
 }
 
-public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
+public struct com_openmeteo_MarineApi: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -257,7 +257,7 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
   public var timezoneAbbreviationSegmentArray: [UInt8]? { return _accessor.getVector(at: VTOFFSET.timezoneAbbreviation.v) }
   public var daily: com_openmeteo_MarineDaily? { let o = _accessor.offset(VTOFFSET.daily.v); return o == 0 ? nil : com_openmeteo_MarineDaily(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var hourly: com_openmeteo_MarineHourly? { let o = _accessor.offset(VTOFFSET.hourly.v); return o == 0 ? nil : com_openmeteo_MarineHourly(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startMarineApiResponse(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
+  public static func startMarineApi(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -268,8 +268,8 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
   public static func add(timezoneAbbreviation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezoneAbbreviation, at: VTOFFSET.timezoneAbbreviation.p) }
   public static func add(daily: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: daily, at: VTOFFSET.daily.p) }
   public static func add(hourly: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: hourly, at: VTOFFSET.hourly.p) }
-  public static func endMarineApiResponse(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
-  public static func createMarineApiResponse(
+  public static func endMarineApi(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createMarineApi(
     _ fbb: inout FlatBufferBuilder,
     latitude: Float32 = 0.0,
     longitude: Float32 = 0.0,
@@ -282,18 +282,18 @@ public struct com_openmeteo_MarineApiResponse: FlatBufferObject, Verifiable {
     dailyOffset daily: Offset = Offset(),
     hourlyOffset hourly: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_MarineApiResponse.startMarineApiResponse(&fbb)
-    com_openmeteo_MarineApiResponse.add(latitude: latitude, &fbb)
-    com_openmeteo_MarineApiResponse.add(longitude: longitude, &fbb)
-    com_openmeteo_MarineApiResponse.add(elevation: elevation, &fbb)
-    com_openmeteo_MarineApiResponse.add(model: model, &fbb)
-    com_openmeteo_MarineApiResponse.add(generationtimeMs: generationtimeMs, &fbb)
-    com_openmeteo_MarineApiResponse.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
-    com_openmeteo_MarineApiResponse.add(timezone: timezone, &fbb)
-    com_openmeteo_MarineApiResponse.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
-    com_openmeteo_MarineApiResponse.add(daily: daily, &fbb)
-    com_openmeteo_MarineApiResponse.add(hourly: hourly, &fbb)
-    return com_openmeteo_MarineApiResponse.endMarineApiResponse(&fbb, start: __start)
+    let __start = com_openmeteo_MarineApi.startMarineApi(&fbb)
+    com_openmeteo_MarineApi.add(latitude: latitude, &fbb)
+    com_openmeteo_MarineApi.add(longitude: longitude, &fbb)
+    com_openmeteo_MarineApi.add(elevation: elevation, &fbb)
+    com_openmeteo_MarineApi.add(model: model, &fbb)
+    com_openmeteo_MarineApi.add(generationtimeMs: generationtimeMs, &fbb)
+    com_openmeteo_MarineApi.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
+    com_openmeteo_MarineApi.add(timezone: timezone, &fbb)
+    com_openmeteo_MarineApi.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
+    com_openmeteo_MarineApi.add(daily: daily, &fbb)
+    com_openmeteo_MarineApi.add(hourly: hourly, &fbb)
+    return com_openmeteo_MarineApi.endMarineApi(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {

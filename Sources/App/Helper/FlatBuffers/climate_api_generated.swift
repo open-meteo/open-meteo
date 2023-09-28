@@ -125,7 +125,7 @@ public struct com_openmeteo_ClimateDaily: FlatBufferObject, Verifiable {
   }
 }
 
-public struct com_openmeteo_ClimateApiResponse: FlatBufferObject, Verifiable {
+public struct com_openmeteo_ClimateApi: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }
   public var __buffer: ByteBuffer! { return _accessor.bb }
@@ -161,7 +161,7 @@ public struct com_openmeteo_ClimateApiResponse: FlatBufferObject, Verifiable {
   public var timezoneAbbreviationSegmentArray: [UInt8]? { return _accessor.getVector(at: VTOFFSET.timezoneAbbreviation.v) }
   public var timeStart: Int64 { let o = _accessor.offset(VTOFFSET.timeStart.v); return o == 0 ? 0 : _accessor.readBuffer(of: Int64.self, at: o) }
   public var daily: com_openmeteo_ClimateDaily? { let o = _accessor.offset(VTOFFSET.daily.v); return o == 0 ? nil : com_openmeteo_ClimateDaily(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startClimateApiResponse(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
+  public static func startClimateApi(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 10) }
   public static func add(latitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: latitude, def: 0.0, at: VTOFFSET.latitude.p) }
   public static func add(longitude: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: longitude, def: 0.0, at: VTOFFSET.longitude.p) }
   public static func add(elevation: Float32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: elevation, def: 0.0, at: VTOFFSET.elevation.p) }
@@ -172,8 +172,8 @@ public struct com_openmeteo_ClimateApiResponse: FlatBufferObject, Verifiable {
   public static func add(timezoneAbbreviation: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: timezoneAbbreviation, at: VTOFFSET.timezoneAbbreviation.p) }
   public static func add(timeStart: Int64, _ fbb: inout FlatBufferBuilder) { fbb.add(element: timeStart, def: 0, at: VTOFFSET.timeStart.p) }
   public static func add(daily: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: daily, at: VTOFFSET.daily.p) }
-  public static func endClimateApiResponse(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
-  public static func createClimateApiResponse(
+  public static func endClimateApi(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
+  public static func createClimateApi(
     _ fbb: inout FlatBufferBuilder,
     latitude: Float32 = 0.0,
     longitude: Float32 = 0.0,
@@ -186,18 +186,18 @@ public struct com_openmeteo_ClimateApiResponse: FlatBufferObject, Verifiable {
     timeStart: Int64 = 0,
     dailyOffset daily: Offset = Offset()
   ) -> Offset {
-    let __start = com_openmeteo_ClimateApiResponse.startClimateApiResponse(&fbb)
-    com_openmeteo_ClimateApiResponse.add(latitude: latitude, &fbb)
-    com_openmeteo_ClimateApiResponse.add(longitude: longitude, &fbb)
-    com_openmeteo_ClimateApiResponse.add(elevation: elevation, &fbb)
-    com_openmeteo_ClimateApiResponse.add(model: model, &fbb)
-    com_openmeteo_ClimateApiResponse.add(generationtimeMs: generationtimeMs, &fbb)
-    com_openmeteo_ClimateApiResponse.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
-    com_openmeteo_ClimateApiResponse.add(timezone: timezone, &fbb)
-    com_openmeteo_ClimateApiResponse.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
-    com_openmeteo_ClimateApiResponse.add(timeStart: timeStart, &fbb)
-    com_openmeteo_ClimateApiResponse.add(daily: daily, &fbb)
-    return com_openmeteo_ClimateApiResponse.endClimateApiResponse(&fbb, start: __start)
+    let __start = com_openmeteo_ClimateApi.startClimateApi(&fbb)
+    com_openmeteo_ClimateApi.add(latitude: latitude, &fbb)
+    com_openmeteo_ClimateApi.add(longitude: longitude, &fbb)
+    com_openmeteo_ClimateApi.add(elevation: elevation, &fbb)
+    com_openmeteo_ClimateApi.add(model: model, &fbb)
+    com_openmeteo_ClimateApi.add(generationtimeMs: generationtimeMs, &fbb)
+    com_openmeteo_ClimateApi.add(utcOffsetSeconds: utcOffsetSeconds, &fbb)
+    com_openmeteo_ClimateApi.add(timezone: timezone, &fbb)
+    com_openmeteo_ClimateApi.add(timezoneAbbreviation: timezoneAbbreviation, &fbb)
+    com_openmeteo_ClimateApi.add(timeStart: timeStart, &fbb)
+    com_openmeteo_ClimateApi.add(daily: daily, &fbb)
+    return com_openmeteo_ClimateApi.endClimateApi(&fbb, start: __start)
   }
 
   public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {

@@ -18,6 +18,7 @@ enum FloodModel: byte {
 
 table FloodDaily {
   time: TimeRange (required);
+  river_discharge: ValuesUnitAndMember;
   river_discharge_mean: ValuesAndUnit;
   river_discharge_min: ValuesAndUnit;
   river_discharge_max: ValuesAndUnit;
@@ -26,7 +27,7 @@ table FloodDaily {
   river_discharge_p75: ValuesAndUnit;
 }
 
-table FloodApiResponse {
+table FloodApi {
   latitude: float;
   longitude: float;
   elevation: float;
@@ -39,4 +40,4 @@ table FloodApiResponse {
   daily: FloodDaily;
 }
 
-root_type FloodApiResponse;
+root_type FloodApi;

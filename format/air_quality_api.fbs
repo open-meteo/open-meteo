@@ -47,7 +47,7 @@ table AirQualityHourly {
 }
 
 
-table AirQualityApiResponse {
+table AirQualityApi {
   latitude: float;
   longitude: float;
   elevation: float;
@@ -61,4 +61,4 @@ table AirQualityApiResponse {
   hourly: AirQualityHourly;
 }
 
-root_type AirQualityApiResponse;
+root_type AirQualityApi;
