@@ -60,8 +60,11 @@ struct CamsController {
                     longitude: reader.modelLon,
                     elevation: reader.targetElevation,
                     prefetch: {
-                        if let hourlyVariables = paramsHourly {
-                            try reader.prefetchData(variables: hourlyVariables, time: hourlyTime)
+                        if let paramsCurrent {
+                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange)
+                        }
+                        if let paramsHourly {
+                            try reader.prefetchData(variables: paramsHourly, time: hourlyTime)
                         }
                     },
                     current: currentFn,

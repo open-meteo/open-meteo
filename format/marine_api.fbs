@@ -26,6 +26,23 @@ table MarineHourly {
     swell_wave_direction: ValuesAndUnit;
 }
 
+table MarineCurrent {
+    time: int64;
+    interval: int32;
+
+    wave_height: ValueAndUnit;
+    wave_period: ValueAndUnit;
+    wave_direction: ValueAndUnit;
+    wind_wave_height: ValueAndUnit;
+    wind_wave_period: ValueAndUnit;
+    wind_wave_peak_period: ValueAndUnit;
+    wind_wave_direction: ValueAndUnit;
+    swell_wave_height: ValueAndUnit;
+    swell_wave_period: ValueAndUnit;
+    swell_wave_peak_period: ValueAndUnit;
+    swell_wave_direction: ValueAndUnit;
+}
+
 table MarineDaily {
     time: TimeRange (required);
     wave_height_max: ValuesAndUnit;
@@ -52,6 +69,7 @@ table MarineApi {
     timezone_abbreviation: string;
     daily: MarineDaily;
     hourly: MarineHourly;
+    current: MarineCurrent;
 }
 
 root_type MarineApi;
