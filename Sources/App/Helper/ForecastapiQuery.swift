@@ -79,7 +79,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Reads coordinates, elevation, timezones and start/end dataparameter and prepares an array.
     /// For each element, an API response object will be returned later
     func prepareCoordinates(allowTimezones: Bool) throws -> [CoordinatesAndTimeZonesAndDates] {
-        if !allowTimezones && daily?.count ?? 0 > 0 && timezone == nil {
+        if allowTimezones && daily?.count ?? 0 > 0 && timezone == nil {
             throw ForecastapiError.timezoneRequired
         }
         
