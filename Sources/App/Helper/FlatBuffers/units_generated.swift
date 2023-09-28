@@ -105,6 +105,51 @@ public struct com_openmeteo_TimeRange_Mutable: FlatBufferObject {
   public var interval: Int32 { return _accessor.readBuffer(of: Int32.self, at: 16) }
 }
 
+public struct com_openmeteo_ValueAndUnit: NativeStruct, Verifiable, FlatbuffersInitializable {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+
+  private var _value: Float32
+  private var _unit: Int8
+  private let padding0__: UInt8 = 0
+  private let padding1__: UInt16 = 0
+
+  public init(_ bb: ByteBuffer, o: Int32) {
+    let _accessor = Struct(bb: bb, position: o)
+    _value = _accessor.readBuffer(of: Float32.self, at: 0)
+    _unit = _accessor.readBuffer(of: Int8.self, at: 4)
+  }
+
+  public init(value: Float32, unit: com_openmeteo_SiUnit) {
+    _value = value
+    _unit = unit.value
+  }
+
+  public init() {
+    _value = 0.0
+    _unit = 0
+  }
+
+  public var value: Float32 { _value }
+  public var unit: com_openmeteo_SiUnit { com_openmeteo_SiUnit(rawValue: _unit)! }
+
+  public static func verify<T>(_ verifier: inout Verifier, at position: Int, of type: T.Type) throws where T: Verifiable {
+    try verifier.inBuffer(position: position, of: com_openmeteo_ValueAndUnit.self)
+  }
+}
+
+public struct com_openmeteo_ValueAndUnit_Mutable: FlatBufferObject {
+
+  static func validateVersion() { FlatBuffersVersion_23_5_26() }
+  public var __buffer: ByteBuffer! { return _accessor.bb }
+  private var _accessor: Struct
+
+  public init(_ bb: ByteBuffer, o: Int32) { _accessor = Struct(bb: bb, position: o) }
+
+  public var value: Float32 { return _accessor.readBuffer(of: Float32.self, at: 0) }
+  public var unit: com_openmeteo_SiUnit { return com_openmeteo_SiUnit(rawValue: _accessor.readBuffer(of: Int8.self, at: 4)) ?? .undefined }
+}
+
 public struct com_openmeteo_ValuesAndUnit: FlatBufferObject, Verifiable {
 
   static func validateVersion() { FlatBuffersVersion_23_5_26() }

@@ -260,6 +260,245 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         return com_openmeteo_WeatherHourly.endWeatherHourly(&fbb, start: start)
     }
     
+    static func encodeCurrent(section: ApiSectionSingle<ForecastapiResult<Self>.SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) throws -> Offset {
+        let start = com_openmeteo_WeatherCurrent.startWeatherCurrent(&fbb)
+        com_openmeteo_WeatherCurrent.add(time: Int64(section.time.timeIntervalSince1970), &fbb)
+        com_openmeteo_WeatherCurrent.add(interval: Int32(section.dtSeconds), &fbb)
+        for column in section.columns {
+            switch column.variable {
+            case .surface(let surface):
+                let v = com_openmeteo_ValueAndUnit(value: column.value, unit: column.unit)
+                switch surface {
+                case .temperature_2m:
+                    com_openmeteo_WeatherCurrent.add(temperature2m: v, &fbb)
+                case .cloudcover:
+                    com_openmeteo_WeatherCurrent.add(cloudcover: v, &fbb)
+                case .cloudcover_low:
+                    com_openmeteo_WeatherCurrent.add(cloudcoverLow: v, &fbb)
+                case .cloudcover_mid:
+                    com_openmeteo_WeatherCurrent.add(cloudcoverMid: v, &fbb)
+                case .cloudcover_high:
+                    com_openmeteo_WeatherCurrent.add(cloudcoverHigh: v, &fbb)
+                case .pressure_msl:
+                    com_openmeteo_WeatherCurrent.add(pressureMsl: v, &fbb)
+                case .relativehumidity_2m:
+                    com_openmeteo_WeatherCurrent.add(relativehumidity2m: v, &fbb)
+                case .precipitation:
+                    com_openmeteo_WeatherCurrent.add(precipitation: v, &fbb)
+                case .precipitation_probability:
+                    com_openmeteo_WeatherCurrent.add(precipitationProbability: v, &fbb)
+                case .weathercode:
+                    com_openmeteo_WeatherCurrent.add(weathercode: v, &fbb)
+                case .temperature_80m:
+                    com_openmeteo_WeatherCurrent.add(temperature80m: v, &fbb)
+                case .temperature_120m:
+                    com_openmeteo_WeatherCurrent.add(temperature120m: v, &fbb)
+                case .temperature_180m:
+                    com_openmeteo_WeatherCurrent.add(temperature180m: v, &fbb)
+                case .soil_temperature_0cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature0cm: v, &fbb)
+                case .soil_temperature_6cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature6cm: v, &fbb)
+                case .soil_temperature_18cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature18cm: v, &fbb)
+                case .soil_temperature_54cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature54cm: v, &fbb)
+                case .soil_moisture_0_1cm:
+                    fallthrough
+                case .soil_moisture_0_to_1cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture0To1cm: v, &fbb)
+                case .soil_moisture_1_3cm:
+                    fallthrough
+                case .soil_moisture_1_to_3cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture1To3cm: v, &fbb)
+                case .soil_moisture_3_9cm:
+                    fallthrough
+                case .soil_moisture_3_to_9cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture3To9cm: v, &fbb)
+                case .soil_moisture_9_27cm:
+                    fallthrough
+                case .soil_moisture_9_to_27cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture9To27cm: v, &fbb)
+                case .soil_moisture_27_81cm:
+                    fallthrough
+                case .soil_moisture_27_to_81cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture27To81cm: v, &fbb)
+                case .snow_depth:
+                    com_openmeteo_WeatherCurrent.add(snowDepth: v, &fbb)
+                case .snow_height:
+                    com_openmeteo_WeatherCurrent.add(snowHeight: v, &fbb)
+                case .sensible_heatflux:
+                    com_openmeteo_WeatherCurrent.add(sensibleHeatflux: v, &fbb)
+                case .latent_heatflux:
+                    com_openmeteo_WeatherCurrent.add(latentHeatflux: v, &fbb)
+                case .showers:
+                    com_openmeteo_WeatherCurrent.add(showers: v, &fbb)
+                case .rain:
+                    com_openmeteo_WeatherCurrent.add(rain: v, &fbb)
+                case .windgusts_10m:
+                    com_openmeteo_WeatherCurrent.add(windgusts10m: v, &fbb)
+                case .freezinglevel_height:
+                    com_openmeteo_WeatherCurrent.add(freezinglevelHeight: v, &fbb)
+                case .dewpoint_2m:
+                    com_openmeteo_WeatherCurrent.add(dewpoint2m: v, &fbb)
+                case .diffuse_radiation:
+                    com_openmeteo_WeatherCurrent.add(diffuseRadiation: v, &fbb)
+                case .direct_radiation:
+                    com_openmeteo_WeatherCurrent.add(directRadiation: v, &fbb)
+                case .apparent_temperature:
+                    com_openmeteo_WeatherCurrent.add(apparentTemperature: v, &fbb)
+                case .windspeed_10m:
+                    com_openmeteo_WeatherCurrent.add(windspeed10m: v, &fbb)
+                case .winddirection_10m:
+                    com_openmeteo_WeatherCurrent.add(winddirection10m: v, &fbb)
+                case .windspeed_80m:
+                    com_openmeteo_WeatherCurrent.add(windspeed80m: v, &fbb)
+                case .winddirection_80m:
+                    com_openmeteo_WeatherCurrent.add(winddirection80m: v, &fbb)
+                case .windspeed_120m:
+                    com_openmeteo_WeatherCurrent.add(windspeed120m: v, &fbb)
+                case .winddirection_120m:
+                    com_openmeteo_WeatherCurrent.add(winddirection120m: v, &fbb)
+                case .windspeed_180m:
+                    com_openmeteo_WeatherCurrent.add(windspeed180m: v, &fbb)
+                case .winddirection_180m:
+                    com_openmeteo_WeatherCurrent.add(winddirection180m: v, &fbb)
+                case .direct_normal_irradiance:
+                    com_openmeteo_WeatherCurrent.add(directNormalIrradiance: v, &fbb)
+                case .evapotranspiration:
+                    com_openmeteo_WeatherCurrent.add(evapotranspiration: v, &fbb)
+                case .et0_fao_evapotranspiration:
+                    com_openmeteo_WeatherCurrent.add(et0FaoEvapotranspiration: v, &fbb)
+                case .vapor_pressure_deficit:
+                    com_openmeteo_WeatherCurrent.add(vaporPressureDeficit: v, &fbb)
+                case .shortwave_radiation:
+                    com_openmeteo_WeatherCurrent.add(shortwaveRadiation: v, &fbb)
+                case .snowfall:
+                    com_openmeteo_WeatherCurrent.add(snowfall: v, &fbb)
+                case .surface_pressure:
+                    com_openmeteo_WeatherCurrent.add(surfacePressure: v, &fbb)
+                case .terrestrial_radiation:
+                    com_openmeteo_WeatherCurrent.add(terrestrialRadiation: v, &fbb)
+                case .terrestrial_radiation_instant:
+                    com_openmeteo_WeatherCurrent.add(terrestrialRadiationInstant: v, &fbb)
+                case .shortwave_radiation_instant:
+                    com_openmeteo_WeatherCurrent.add(shortwaveRadiationInstant: v, &fbb)
+                case .diffuse_radiation_instant:
+                    com_openmeteo_WeatherCurrent.add(diffuseRadiationInstant: v, &fbb)
+                case .direct_radiation_instant:
+                    com_openmeteo_WeatherCurrent.add(directRadiationInstant: v, &fbb)
+                case .direct_normal_irradiance_instant:
+                    com_openmeteo_WeatherCurrent.add(directNormalIrradianceInstant: v, &fbb)
+                case .visibility:
+                    com_openmeteo_WeatherCurrent.add(visibility: v, &fbb)
+                case .cape:
+                    com_openmeteo_WeatherCurrent.add(cape: v, &fbb)
+                case .uv_index:
+                    com_openmeteo_WeatherCurrent.add(uvIndex: v, &fbb)
+                case .uv_index_clear_sky:
+                    com_openmeteo_WeatherCurrent.add(uvIndexClearSky: v, &fbb)
+                case .is_day:
+                    com_openmeteo_WeatherCurrent.add(isDay: v, &fbb)
+                case .lightning_potential:
+                    com_openmeteo_WeatherCurrent.add(lightningPotential: v, &fbb)
+                case .growing_degree_days_base_0_limit_50:
+                    com_openmeteo_WeatherCurrent.add(growingDegreeDaysBase0Limit50: v, &fbb)
+                case .leaf_wetness_probability:
+                    com_openmeteo_WeatherCurrent.add(leafWetnessProbability: v, &fbb)
+                case .runoff:
+                    com_openmeteo_WeatherCurrent.add(runoff: v, &fbb)
+                case .skin_temperature:
+                    com_openmeteo_WeatherCurrent.add(skinTemperature: v, &fbb)
+                case .snowfall_water_equivalent:
+                    com_openmeteo_WeatherCurrent.add(snowfallWaterEquivalent: v, &fbb)
+                case .soil_moisture_0_to_100cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture0To100cm: v, &fbb)
+                case .soil_moisture_0_to_10cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture0To10cm: v, &fbb)
+                case .soil_moisture_0_to_7cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture0To7cm: v, &fbb)
+                case .soil_moisture_100_to_200cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture100To200cm: v, &fbb)
+                case .soil_moisture_100_to_255cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture100To255cm: v, &fbb)
+                case .soil_moisture_10_to_40cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture10To40cm: v, &fbb)
+                case .soil_moisture_28_to_100cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture28To100cm: v, &fbb)
+                case .soil_moisture_40_to_100cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture40To100cm: v, &fbb)
+                case .soil_moisture_7_to_28cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoisture7To28cm: v, &fbb)
+                case .soil_moisture_index_0_to_100cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoistureIndex0To100cm: v, &fbb)
+                case .soil_moisture_index_0_to_7cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoistureIndex0To7cm: v, &fbb)
+                case .soil_moisture_index_100_to_255cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoistureIndex100To255cm: v, &fbb)
+                case .soil_moisture_index_28_to_100cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoistureIndex28To100cm: v, &fbb)
+                case .soil_moisture_index_7_to_28cm:
+                    com_openmeteo_WeatherCurrent.add(soilMoistureIndex7To28cm: v, &fbb)
+                case .soil_temperature_0_to_100cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature0To100cm: v, &fbb)
+                case .soil_temperature_0_to_10cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature0To10cm: v, &fbb)
+                case .soil_temperature_0_to_7cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature0To7cm: v, &fbb)
+                case .soil_temperature_100_to_200cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature100To200cm: v, &fbb)
+                case .soil_temperature_100_to_255cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature100To255cm: v, &fbb)
+                case .soil_temperature_10_to_40cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature10To40cm: v, &fbb)
+                case .soil_temperature_28_to_100cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature28To100cm: v, &fbb)
+                case .soil_temperature_40_to_100cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature40To100cm: v, &fbb)
+                case .soil_temperature_7_to_28cm:
+                    com_openmeteo_WeatherCurrent.add(soilTemperature7To28cm: v, &fbb)
+                case .surface_air_pressure:
+                    com_openmeteo_WeatherCurrent.add(surfacePressure: v, &fbb)
+                case .surface_temperature:
+                    com_openmeteo_WeatherCurrent.add(surfaceTemperature: v, &fbb)
+                case .temperature_40m:
+                    com_openmeteo_WeatherCurrent.add(temperature40m: v, &fbb)
+                case .total_column_integrated_water_vapour:
+                    com_openmeteo_WeatherCurrent.add(totalColumnIntegratedWaterVapour: v, &fbb)
+                case .updraft:
+                    com_openmeteo_WeatherCurrent.add(updraft: v, &fbb)
+                case .winddirection_100m:
+                    com_openmeteo_WeatherCurrent.add(winddirection100m: v, &fbb)
+                case .winddirection_150m:
+                    com_openmeteo_WeatherCurrent.add(winddirection150m: v, &fbb)
+                case .winddirection_200m:
+                    com_openmeteo_WeatherCurrent.add(winddirection200m: v, &fbb)
+                case .winddirection_20m:
+                    com_openmeteo_WeatherCurrent.add(winddirection20m: v, &fbb)
+                case .winddirection_40m:
+                    com_openmeteo_WeatherCurrent.add(winddirection40m: v, &fbb)
+                case .winddirection_50m:
+                    com_openmeteo_WeatherCurrent.add(winddirection50m: v, &fbb)
+                case .windspeed_100m:
+                    com_openmeteo_WeatherCurrent.add(windspeed100m: v, &fbb)
+                case .windspeed_150m:
+                    com_openmeteo_WeatherCurrent.add(windspeed150m: v, &fbb)
+                case .windspeed_200m:
+                    com_openmeteo_WeatherCurrent.add(windspeed200m: v, &fbb)
+                case .windspeed_20m:
+                    com_openmeteo_WeatherCurrent.add(windspeed20m: v, &fbb)
+                case .windspeed_40m:
+                    com_openmeteo_WeatherCurrent.add(windspeed40m: v, &fbb)
+                case .windspeed_50m:
+                    com_openmeteo_WeatherCurrent.add(windspeed50m: v, &fbb)
+                }
+            case .pressure(_):
+                throw ForecastapiError.generic(message: "Pressure level variables currently not supported for flatbuffers encoding in current block")
+            }
+        }
+        return com_openmeteo_WeatherCurrent.endWeatherCurrent(&fbb, start: start)
+    }
+    
     static func encodeDaily(section: ApiSection<DailyVariable>, _ fbb: inout FlatBufferBuilder) -> Offset {
         let offsets = ForecastapiResult<Self>.encode(section: section, &fbb)
         let start = com_openmeteo_WeatherDaily.startWeatherDaily(&fbb)
@@ -412,7 +651,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
     static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
         let generationTimeStart = Date()
         let current_weather = try section.current_weather?()
-        let current = try section.current?()
+        let current = try (try section.current?()).map { try encodeCurrent(section: $0, &fbb) } ?? Offset()
         
         // TODO current
         
@@ -450,7 +689,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             dailyOffset: daily,
             hourlyOffset: hourly,
             sixHourlyOffset: sixHourly,
-            minutely15Offset: minutely15
+            minutely15Offset: minutely15,
+            currentOffset: current
             //currentVectorOffset: current?.toFlatbuffers(&fbb) ?? Offset(),
             //currentTime: (current?.time.timeIntervalSince1970).map(Int64.init) ?? 0,
             //currentIntervalSeconds: (current?.dtSeconds).map(Int32.init) ?? 0

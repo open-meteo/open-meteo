@@ -55,3 +55,8 @@ table ValuesAndUnit {
   values: [float] (required);
   unit: SiUnit;
 }
+
+struct ValueAndUnit {
+  value: float;
+  unit: SiUnit;
+}
