@@ -204,7 +204,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             case .soil_temperature_7_to_28cm:
                 com_openmeteo_WeatherHourly.add(soilTemperature7To28cm: offset, &fbb)
             case .surface_air_pressure:
-                com_openmeteo_WeatherHourly.add(surfaceAirPressure: offset, &fbb)
+                com_openmeteo_WeatherHourly.add(surfacePressure: offset, &fbb)
             case .surface_temperature:
                 com_openmeteo_WeatherHourly.add(surfaceTemperature: offset, &fbb)
             case .temperature_40m:

@@ -280,52 +280,51 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     case soilTemperature54cm = 136
     case soilTemperature6cm = 138
     case soilTemperature7To28cm = 140
-    case surfaceAirPressure = 142
-    case surfacePressure = 144
-    case surfaceTemperature = 146
-    case temperature120m = 148
-    case temperature180m = 150
-    case temperature2m = 152
-    case temperature40m = 154
-    case temperature80m = 156
-    case terrestrialRadiation = 158
-    case terrestrialRadiationInstant = 160
-    case totalColumnIntegratedWaterVapour = 162
-    case updraft = 164
-    case uvIndex = 166
-    case uvIndexClearSky = 168
-    case vaporPressureDeficit = 170
-    case visibility = 172
-    case weathercode = 174
-    case winddirection100m = 176
-    case winddirection10m = 178
-    case winddirection120m = 180
-    case winddirection150m = 182
-    case winddirection180m = 184
-    case winddirection200m = 186
-    case winddirection20m = 188
-    case winddirection40m = 190
-    case winddirection50m = 192
-    case winddirection80m = 194
-    case windgusts10m = 196
-    case windspeed100m = 198
-    case windspeed10m = 200
-    case windspeed120m = 202
-    case windspeed150m = 204
-    case windspeed180m = 206
-    case windspeed200m = 208
-    case windspeed20m = 210
-    case windspeed40m = 212
-    case windspeed50m = 214
-    case windspeed80m = 216
-    case pressureLevelTemperature = 218
-    case pressureLevelDewpoint = 220
-    case pressureLevelRelativehumidity = 222
-    case pressureLevelCloudcover = 224
-    case pressureLevelWindspeed = 226
-    case pressureLevelWinddirection = 228
-    case pressureLevelVerticalVelocity = 230
-    case pressureLevelGeopotentialHeight = 232
+    case surfacePressure = 142
+    case surfaceTemperature = 144
+    case temperature120m = 146
+    case temperature180m = 148
+    case temperature2m = 150
+    case temperature40m = 152
+    case temperature80m = 154
+    case terrestrialRadiation = 156
+    case terrestrialRadiationInstant = 158
+    case totalColumnIntegratedWaterVapour = 160
+    case updraft = 162
+    case uvIndex = 164
+    case uvIndexClearSky = 166
+    case vaporPressureDeficit = 168
+    case visibility = 170
+    case weathercode = 172
+    case winddirection100m = 174
+    case winddirection10m = 176
+    case winddirection120m = 178
+    case winddirection150m = 180
+    case winddirection180m = 182
+    case winddirection200m = 184
+    case winddirection20m = 186
+    case winddirection40m = 188
+    case winddirection50m = 190
+    case winddirection80m = 192
+    case windgusts10m = 194
+    case windspeed100m = 196
+    case windspeed10m = 198
+    case windspeed120m = 200
+    case windspeed150m = 202
+    case windspeed180m = 204
+    case windspeed200m = 206
+    case windspeed20m = 208
+    case windspeed40m = 210
+    case windspeed50m = 212
+    case windspeed80m = 214
+    case pressureLevelTemperature = 216
+    case pressureLevelDewpoint = 218
+    case pressureLevelRelativehumidity = 220
+    case pressureLevelCloudcover = 222
+    case pressureLevelWindspeed = 224
+    case pressureLevelWinddirection = 226
+    case pressureLevelVerticalVelocity = 228
+    case pressureLevelGeopotentialHeight = 230
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -400,7 +399,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public var soilTemperature54cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature54cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var soilTemperature6cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature6cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var soilTemperature7To28cm: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.soilTemperature7To28cm.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public var surfaceAirPressure: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfaceAirPressure.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var surfacePressure: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfacePressure.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var surfaceTemperature: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.surfaceTemperature.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var temperature120m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.temperature120m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
@@ -446,7 +444,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public var pressureLevelWinddirection: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelWinddirection.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelVerticalVelocity: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelVerticalVelocity.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelGeopotentialHeight: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelGeopotentialHeight.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 115) }
+  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 114) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func add(apparentTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperature, at: VTOFFSET.apparentTemperature.p) }
   public static func add(cape: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cape, at: VTOFFSET.cape.p) }
@@ -516,7 +514,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public static func add(soilTemperature54cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature54cm, at: VTOFFSET.soilTemperature54cm.p) }
   public static func add(soilTemperature6cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature6cm, at: VTOFFSET.soilTemperature6cm.p) }
   public static func add(soilTemperature7To28cm: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: soilTemperature7To28cm, at: VTOFFSET.soilTemperature7To28cm.p) }
-  public static func add(surfaceAirPressure: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfaceAirPressure, at: VTOFFSET.surfaceAirPressure.p) }
   public static func add(surfacePressure: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfacePressure, at: VTOFFSET.surfacePressure.p) }
   public static func add(surfaceTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: surfaceTemperature, at: VTOFFSET.surfaceTemperature.p) }
   public static func add(temperature120m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: temperature120m, at: VTOFFSET.temperature120m.p) }
@@ -634,7 +631,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     soilTemperature54cmOffset soilTemperature54cm: Offset = Offset(),
     soilTemperature6cmOffset soilTemperature6cm: Offset = Offset(),
     soilTemperature7To28cmOffset soilTemperature7To28cm: Offset = Offset(),
-    surfaceAirPressureOffset surfaceAirPressure: Offset = Offset(),
     surfacePressureOffset surfacePressure: Offset = Offset(),
     surfaceTemperatureOffset surfaceTemperature: Offset = Offset(),
     temperature120mOffset temperature120m: Offset = Offset(),
@@ -751,7 +747,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     com_openmeteo_WeatherHourly.add(soilTemperature54cm: soilTemperature54cm, &fbb)
     com_openmeteo_WeatherHourly.add(soilTemperature6cm: soilTemperature6cm, &fbb)
     com_openmeteo_WeatherHourly.add(soilTemperature7To28cm: soilTemperature7To28cm, &fbb)
-    com_openmeteo_WeatherHourly.add(surfaceAirPressure: surfaceAirPressure, &fbb)
     com_openmeteo_WeatherHourly.add(surfacePressure: surfacePressure, &fbb)
     com_openmeteo_WeatherHourly.add(surfaceTemperature: surfaceTemperature, &fbb)
     com_openmeteo_WeatherHourly.add(temperature120m: temperature120m, &fbb)
@@ -871,7 +866,6 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.soilTemperature54cm.p, fieldName: "soilTemperature54cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.soilTemperature6cm.p, fieldName: "soilTemperature6cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.soilTemperature7To28cm.p, fieldName: "soilTemperature7To28cm", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
-    try _v.visit(field: VTOFFSET.surfaceAirPressure.p, fieldName: "surfaceAirPressure", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.surfacePressure.p, fieldName: "surfacePressure", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.surfaceTemperature.p, fieldName: "surfaceTemperature", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.temperature120m.p, fieldName: "temperature120m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
