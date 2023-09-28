@@ -38,39 +38,6 @@ extension ForecastapiResult {
             sheet.write(location.timezone.abbreviation)
             sheet.endRow()
         }
-        
-        for (i, location) in results.enumerated() {
-            if let current_weather = try location.current_weather?() {
-                if i == 0 {
-                    sheet.startRow()
-                    sheet.endRow()
-                    sheet.startRow()
-                    if multiLocation {
-                        sheet.write("location_id")
-                    }
-                    sheet.write("current_weather_time")
-                    sheet.write("temperature (\(current_weather.temperature_unit.abbreviation))")
-                    sheet.write("windspeed (\(current_weather.windspeed_unit.abbreviation))")
-                    sheet.write("winddirection (\(current_weather.winddirection_unit.abbreviation))")
-                    sheet.write("weathercode (\(current_weather.weathercode_unit.abbreviation))")
-                    sheet.write("is_day")
-                    sheet.endRow()
-                }
-                
-                sheet.startRow()
-                if multiLocation {
-                    sheet.write(i+1)
-                }
-                sheet.writeTimestamp(current_weather.time.add(location.utc_offset_seconds))
-                sheet.write(current_weather.temperature)
-                sheet.write(current_weather.windspeed)
-                sheet.write(current_weather.winddirection)
-                sheet.write(current_weather.weathercode)
-                sheet.write(current_weather.is_day)
-                sheet.endRow()
-            }
-        }
-        
         for (i, location) in results.enumerated() {
             try location.current?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
         }

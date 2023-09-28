@@ -35,19 +35,6 @@ fileprivate struct ModelAndSection<Model: RawRepresentableString, Variable: RawR
     }
 }
 
-struct CurrentWeather {
-    let temperature: Float
-    let windspeed: Float
-    let winddirection: Float
-    let weathercode: Float
-    let is_day: Float
-    let temperature_unit: SiUnit
-    let windspeed_unit: SiUnit
-    let winddirection_unit: SiUnit
-    let weathercode_unit: SiUnit
-    let time: Timestamp
-}
-
 /// Stores the API output for multiple locations
 struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     let timeformat: Timeformat
@@ -67,9 +54,6 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
             return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({$0})
         }
         
-        var current_weather: (() throws -> CurrentWeather)? {
-            results.first?.current_weather
-        }
         var current: (() throws -> ApiSectionSingle<String>)? {
             let run = results.compactMap({ m in m.current.map{ (model: m.model, section: $0)} })
             guard run.count > 0 else {
@@ -139,7 +123,6 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
         let elevation: Float?
         
         let prefetch: (() throws -> ())
-        let current_weather: (() throws -> CurrentWeather)?
         let current: (() throws -> ApiSectionSingle<SurfaceAndPressureVariable>)?
         let hourly: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
         let daily: (() throws -> ApiSection<Model.DailyVariable>)?

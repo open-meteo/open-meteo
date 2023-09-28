@@ -27,38 +27,6 @@ extension ForecastapiResult {
                         b.buffer.writeString("\(i+1),\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
                     }
                 }
-
-                if results.count == 1, let location = results.first {
-                    if let current_weather = try location.current_weather?() {
-                        b.buffer.writeString("\n")
-                        b.buffer.writeString("current_weather_time,temperature (\(current_weather.temperature_unit.abbreviation)),windspeed (\(current_weather.windspeed_unit.abbreviation)),winddirection (\(current_weather.winddirection_unit.abbreviation)),weathercode (\(current_weather.weathercode_unit.abbreviation)),is_day\n")
-                        b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: location.utc_offset_seconds, quotedString: false))
-                        let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "NaN"
-                        let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "NaN"
-                        let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "NaN"
-                        let windspeed = current_weather.windspeed.isFinite ? "\(current_weather.windspeed)" : "NaN"
-                        let temperature = current_weather.temperature.isFinite ? "\(current_weather.temperature)" : "NaN"
-                        b.buffer.writeString(",\(temperature),\(windspeed),\(winddirection),\(ww),\(is_day)\n")
-                    }
-                } else {
-                    for (i, location) in results.enumerated() {
-                        if let current_weather = try location.current_weather?() {
-                            if i == 0 {
-                                b.buffer.writeString("\n")
-                                b.buffer.writeString("location_id,current_weather_time,temperature (\(current_weather.temperature_unit.abbreviation)),windspeed (\(current_weather.windspeed_unit.abbreviation)),winddirection (\(current_weather.winddirection_unit.abbreviation)),weathercode (\(current_weather.weathercode_unit.abbreviation)),is_day\n")
-                            }
-                            b.buffer.writeString("\(i+1),")
-                            b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: location.utc_offset_seconds, quotedString: false))
-                            let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "NaN"
-                            let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "NaN"
-                            let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "NaN"
-                            let windspeed = current_weather.windspeed.isFinite ? "\(current_weather.windspeed)" : "NaN"
-                            let temperature = current_weather.temperature.isFinite ? "\(current_weather.temperature)" : "NaN"
-                            b.buffer.writeString(",\(temperature),\(windspeed),\(winddirection),\(ww),\(is_day)\n")
-                        }
-                    }
-                }
-                
                 for (i, location) in results.enumerated() {
                     try await location.current?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
                 }

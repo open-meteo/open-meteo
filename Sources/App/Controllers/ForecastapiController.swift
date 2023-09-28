@@ -102,7 +102,8 @@ struct WeatherApiController {
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [defaultModel]
         let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
-        let paramsCurrent = hasCurrentWeather ? try ForecastVariable.load(commaSeparatedOptional: params.current) : nil
+        let defaultCurrentWeather = [ForecastVariable.surface(.temperature), .surface(.windspeed), .surface(.winddirection), .surface(.is_day), .surface(.weathercode)]
+        let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
         let nParamsHourly = paramsHourly?.count ?? 0
@@ -148,28 +149,10 @@ struct WeatherApiController {
                             try reader.prefetchData(variables: paramsDaily, time: dailyTime)
                         }
                     },
-                    current_weather: (hasCurrentWeather && params.current_weather == true ? {
-                        let temperature = try reader.get(variable: ForecastVariable.surface(.temperature_2m), time: currentTimeRange)!.convertAndRound(params: params)
-                        let winddirection = try reader.get(variable: ForecastVariable.surface(.winddirection_10m), time: currentTimeRange)!.convertAndRound(params: params)
-                        let windspeed = try reader.get(variable: ForecastVariable.surface(.windspeed_10m), time: currentTimeRange)!.convertAndRound(params: params)
-                        let weathercode = try reader.get(variable: ForecastVariable.surface(.weathercode), time: currentTimeRange)!.convertAndRound(params: params)
-                        return CurrentWeather(
-                            temperature: temperature.data[0],
-                            windspeed: windspeed.data[0],
-                            winddirection: winddirection.data[0],
-                            weathercode: weathercode.data[0],
-                            is_day: try reader.get(variable: .surface(.is_day), time: currentTimeRange)!.convertAndRound(params: params).data[0],
-                            temperature_unit: temperature.unit,
-                            windspeed_unit: windspeed.unit,
-                            winddirection_unit: winddirection.unit,
-                            weathercode_unit: weathercode.unit,
-                            time: currentTimeRange.range.lowerBound
-                        )
-                    } : nil),
                     current: paramsCurrent.map { variables in
                         return {
-                            .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable, time: currentTimeRange)?.convertAndRound(params: params) else {
+                            .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
+                                guard let d = try reader.get(variable: variable.remapped, time: currentTimeRange)?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
@@ -179,7 +162,7 @@ struct WeatherApiController {
                     hourly: paramsHourly.map { variables in
                         return {
                             return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params) else {
+                                guard let d = try reader.get(variable: variable.remapped, time: hourlyTime)?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(hourlyTime.count == d.data.count)
@@ -213,7 +196,7 @@ struct WeatherApiController {
                     minutely15: paramsMinutely.map { variables in
                         return {
                             return .init(name: "minutely_15", time: minutelyTime, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable, time: minutelyTime)?.convertAndRound(params: params) else {
+                                guard let d = try reader.get(variable: variable.remapped, time: minutelyTime)?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(minutelyTime.count == d.data.count)
@@ -455,6 +438,13 @@ enum ModelError: AbortError {
 
 /// Define all available surface weather variables
 enum ForecastSurfaceVariable: String, GenericVariableMixable {
+    /// Maps to `temperature_2m`. Used for compatibility with `current_weather` block
+    case temperature
+    /// Maps to `windspeed_10m`. Used for compatibility with `current_weather` block
+    case windspeed
+    /// Maps to `winddirection_10m`. Used for compatibility with `current_weather` block
+    case winddirection
+    
     case apparent_temperature
     case cape
     case cloudcover
@@ -566,6 +556,22 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case windspeed_40m
     case windspeed_50m
     case windspeed_80m
+    
+    /// Some variables are kept for backwards compatibility
+    var remapped: Self {
+        switch self {
+        case .temperature:
+            return .temperature_2m
+        case .windspeed:
+            return .windspeed_10m
+        case .winddirection:
+            return .winddirection_10m
+        case .surface_air_pressure:
+            return .surface_pressure
+        default:
+            return self
+        }
+    }
 
     
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
@@ -616,6 +622,18 @@ struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariable
 }
 
 typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable, ForecastPressureVariable>
+
+extension ForecastVariable {
+    /// Some variables are kept for backwards compatibility
+    var remapped: Self {
+        switch self {
+        case .surface(let surface):
+            return .surface(surface.remapped)
+        case .pressure(_):
+            return self
+        }
+    }
+}
 
 /// Available daily aggregations
 enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableString {

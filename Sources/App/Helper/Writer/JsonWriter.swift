@@ -61,9 +61,8 @@ extension ForecastapiResult.PerLocation {
         guard let first = results.first else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        let current_weather = try first.current_weather?()
-        let current = try first.current?()
         let sections = try runAllSections()
+        let current = try first.current?()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
         b.buffer.writeString("""
@@ -71,18 +70,6 @@ extension ForecastapiResult.PerLocation {
         """)
         if let elevation = first.elevation, elevation.isFinite {
             b.buffer.writeString(",\"elevation\":\(elevation)")
-        }
-        if let current_weather = current_weather {
-            let ww = current_weather.weathercode.isFinite ? String(format: "%.0f", current_weather.weathercode) : "null"
-            let is_day = current_weather.is_day.isFinite ? String(format: "%.0f", current_weather.is_day) : "null"
-            let winddirection = current_weather.winddirection.isFinite ? String(format: "%.0f", current_weather.winddirection) : "null"
-            let windspeed = current_weather.windspeed.isFinite ? "\(current_weather.windspeed)" : "null"
-            let temperature = current_weather.temperature.isFinite ? "\(current_weather.temperature)" : "null"
-            b.buffer.writeString("""
-                ,"current_weather":{"temperature":\(temperature),"windspeed":\(windspeed),"winddirection":\(winddirection),"weathercode":\(ww),"is_day":\(is_day),"time":
-                """)
-            b.buffer.writeString(current_weather.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
-            b.buffer.writeString("}")
         }
         
         if let current {
@@ -95,7 +82,7 @@ extension ForecastapiResult.PerLocation {
                 b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.abbreviation)\"")
             }
             for e in current.columns {
-                b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.abbreviation)\"")
+                b.buffer.writeString(",\"\(e.variable.rawValue)\":\"\(e.unit.abbreviation)\"")
             }
             b.buffer.writeString("}")
             b.buffer.writeString(",\"\(current.name)_interval_seconds\":\(current.dtSeconds)")
@@ -108,7 +95,7 @@ extension ForecastapiResult.PerLocation {
             for e in current.columns {
                 let format = "%.\(e.unit.significantDigits)f"
                 b.buffer.writeString(",")
-                b.buffer.writeString("\"\(e.variable)\":\(e.value.isFinite ? String(format: format, e.value) : "null")")
+                b.buffer.writeString("\"\(e.variable.rawValue)\":\(e.value.isFinite ? String(format: format, e.value) : "null")")
             }
             b.buffer.writeString("}")
             try await b.flushIfRequired()
