@@ -168,8 +168,8 @@ extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
             model: section.model.flatBufferModel,
             generationtimeMs: Float32(generationTimeMs),
             utcOffsetSeconds: Int32(timezone.utcOffsetSeconds),
-            timezoneOffset: fbb.create(string: timezone.identifier),
-            timezoneAbbreviationOffset: fbb.create(string: timezone.abbreviation),
+            timezoneOffset: timezone.identifier == "GMT" ? Offset() : fbb.create(string: timezone.identifier),
+            timezoneAbbreviationOffset: timezone.abbreviation == "GMT" ? Offset() : fbb.create(string: timezone.abbreviation),
             hourlyOffset: hourly
         )
         fbb.finish(offset: result, addPrefix: true)
