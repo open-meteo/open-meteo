@@ -40,8 +40,7 @@ enum WeatherModel: byte {
   era5,
   cerra,
   era5_land,
-  ecmwf_ifs,
-  noaa_cfs
+  ecmwf_ifs
 }
 
 table ValuesAndLevel {

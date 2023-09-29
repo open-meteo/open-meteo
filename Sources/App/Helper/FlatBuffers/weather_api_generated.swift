@@ -39,9 +39,8 @@ public enum com_openmeteo_WeatherModel: Int8, Enum, Verifiable {
   case cerra = 28
   case era5Land = 29
   case ecmwfIfs = 30
-  case noaaCfs = 31
 
-  public static var max: com_openmeteo_WeatherModel { return .noaaCfs }
+  public static var max: com_openmeteo_WeatherModel { return .ecmwfIfs }
   public static var min: com_openmeteo_WeatherModel { return .undefined }
 }
 

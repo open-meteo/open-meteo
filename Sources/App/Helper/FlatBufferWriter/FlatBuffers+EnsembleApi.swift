@@ -33,7 +33,7 @@ extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
     }
     
     static func encodeHourly(section: ApiSection<ForecastapiResult<Self>.SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) -> Offset {
-        let offsets = ForecastapiResult.encode(section: section, &fbb)
+        let offsets = ForecastapiResult.encodeEnsemble(section: section, &fbb)
         let start = com_openmeteo_EnsembleHourly.startEnsembleHourly(&fbb)
         com_openmeteo_EnsembleHourly.add(time: section.timeFlatBuffers(), &fbb)
         for (surface, offset) in offsets.surface {
