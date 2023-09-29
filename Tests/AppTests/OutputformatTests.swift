@@ -301,7 +301,7 @@ final class OutputformatTests: XCTestCase {
         
         /// needs to set a timestamp, because of zip compression headers
         let xlsx = drainData(data.response(format: .xlsx, timestamp: Timestamp(2022,7,13))).sha256
-        XCTAssertEqual(xlsx, "8f4ec02a188bc18ec9ed210e96d2b198c00bd2710084c7a56d9bcc0a417bced3")
+        XCTAssertEqual(xlsx, "fe097d32e320d1d122a1f391400e8cdb718d41c23bab8b976fdf8ad3db491024")
         
         let flatbuffers = drainData(data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
         XCTAssertEqual(flatbuffers, "8b9deedff8e1401ef0cb8a6296af8dbe7ee6bf875bb81d56b8a5972df358f131")
@@ -605,7 +605,7 @@ final class OutputformatTests: XCTestCase {
         
         /// needs to set a timestamp, because of zip compression headers
         let xlsx = drainData(data.response(format: .xlsx, timestamp: Timestamp(2022,7,13))).sha256
-        XCTAssertEqual(xlsx, "ba041e176e866f9d4ace631232992f87be635e7386f1cefb5658abd26cdf3855")
+        XCTAssertEqual(xlsx, "cdbeec4c3f64c339c812db4254017d1310a94ec3209ae44119727ea0865034c7")
         
         let flatbuffers = drainData(data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
         XCTAssertEqual(flatbuffers, "c538f06878fa10f9d2f8d643b6895ca93edf021788ca9b5855eec0a8eaf9f7a8")
@@ -616,7 +616,7 @@ final class OutputformatTests: XCTestCase {
         xlsx.startRow()
         xlsx.write(5)
         xlsx.writeTimestamp(Timestamp(2022,07,10,5,6))
-        xlsx.write(42.1)
+        xlsx.write(42.1, significantDigits: 1)
         xlsx.endRow()
         var data = xlsx.write(timestamp: Timestamp(2022,7,10))
         //try data.write(to: URL(fileURLWithPath: "/Users/patrick/Downloads/test.xlsx"))

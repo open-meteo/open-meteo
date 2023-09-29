@@ -30,9 +30,9 @@ extension ForecastapiResult {
             if multiLocation {
                 sheet.write(i+1)
             }
-            sheet.write(first.latitude)
-            sheet.write(first.longitude)
-            sheet.write(first.elevation ?? .nan)
+            sheet.write(first.latitude, significantDigits: 4)
+            sheet.write(first.longitude, significantDigits: 4)
+            sheet.write(first.elevation ?? .nan, significantDigits: 0)
             sheet.write(location.utc_offset_seconds)
             sheet.write(location.timezone.identifier)
             sheet.write(location.timezone.abbreviation)
@@ -87,7 +87,7 @@ extension ApiSectionString {
             for e in columns {
                 switch e.data {
                 case .float(let a):
-                    sheet.write(a[i])
+                    sheet.write(a[i], significantDigits: e.unit.significantDigits)
                 case .timestamp(let a):
                     sheet.writeTimestamp(a[i].add(utc_offset_seconds))
                 }
@@ -119,7 +119,7 @@ extension ApiSectionSingle {
         }
         sheet.writeTimestamp(time.add(utc_offset_seconds))
         for e in columns {
-            sheet.write(e.value)
+            sheet.write(e.value, significantDigits: e.unit.significantDigits)
         }
         sheet.endRow()
     }
