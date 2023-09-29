@@ -100,7 +100,7 @@ struct WeatherApiController {
         let allowedRange = historyStartDate ..< currentTime.add(days: forecastDaysMax)
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
-        let domains = try MultiDomains.load(commaSeparatedOptional: params.models) ?? [defaultModel]
+        let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
         let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
         let defaultCurrentWeather = [ForecastVariable.surface(.temperature), .surface(.windspeed), .surface(.winddirection), .surface(.is_day), .surface(.weathercode)]
         let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
