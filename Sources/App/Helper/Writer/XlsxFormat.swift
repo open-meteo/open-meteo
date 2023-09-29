@@ -81,11 +81,11 @@ public final class XlsxWriter {
     
     /// Write Float
     /// See https://docs.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.cell
-    public func write(_ float: Float) {
+    public func write(_ float: Float, significantDigits: Int) {
         if float.isInfinite || float.isNaN {
             sheet_xml.write("<c t=\"e\"><v>#NUM!</v></c>")
         } else {
-            sheet_xml.write("<c><v>\(float)</v></c>")
+            sheet_xml.write("<c><v>\(String(format: "%.\(significantDigits)f", float))</v></c>")
         }
     }
     

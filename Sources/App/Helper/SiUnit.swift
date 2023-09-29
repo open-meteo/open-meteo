@@ -143,6 +143,7 @@ struct DataAndUnit {
     }
     
     /// Convert a given array to target units
+    /// Note: Rounding is now done in the writers
     func convertAndRound<Query: ApiUnitsSelectable>(params: Query) -> DataAndUnit {
         var data = self.data
         var unit = self.unit
@@ -193,19 +194,6 @@ struct DataAndUnit {
             }
             unit = .feet
         }
-        // TODO: rounding it not required for flatbuffers
-        // round to 0 to 3 digits
-        data.rounded(digits: unit.significantDigits)
-        
         return DataAndUnit(data, unit)
     }
-    
-    /*func toApi(name: String) -> ApiColumn {
-        return ApiColumn(variable: name, unit: unit, data: .float(data))
-    }
-    
-    func toApiSingle(name: String) -> ApiColumnSingle {
-        assert(data.count == 1)
-        return ApiColumnSingle(variable: name, unit: unit, value: data[0])
-    }*/
 }
