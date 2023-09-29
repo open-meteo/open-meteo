@@ -304,7 +304,7 @@ final class OutputformatTests: XCTestCase {
         XCTAssertEqual(xlsx, "8f4ec02a188bc18ec9ed210e96d2b198c00bd2710084c7a56d9bcc0a417bced3")
         
         let flatbuffers = drainData(data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
-        XCTAssertEqual(flatbuffers, "c4ddf4a0fd73a52ab44369e8b63b1a6a04f2f4c7c613c7e4b19ab751b3de4fbb")
+        XCTAssertEqual(flatbuffers, "f52fadae36db57253edc1cc673d08f27620eff63df47571bdd4d784236099745")
     }
     
     /// Test output formats for 2 locations
@@ -608,7 +608,7 @@ final class OutputformatTests: XCTestCase {
         XCTAssertEqual(xlsx, "ba041e176e866f9d4ace631232992f87be635e7386f1cefb5658abd26cdf3855")
         
         let flatbuffers = drainData(data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
-        XCTAssertEqual(flatbuffers, "f4fab34a536318a129e18e38ad179e2cbd2cbe3f3f119d3a33ace41ade1b7380")
+        XCTAssertEqual(flatbuffers, "6a8369fe1354ed37255cad8be3840d2159e214743c796871dedac531610c8d79")
     }
     
     func testXlsxWriter() throws {
