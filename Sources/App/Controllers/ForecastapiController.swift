@@ -464,6 +464,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case growing_degree_days_base_0_limit_50
     case is_day
     case latent_heatflux
+    case lifted_index
     case leaf_wetness_probability
     case lightning_potential
     case precipitation
@@ -612,6 +613,16 @@ enum ForecastPressureVariableType: String, GenericVariableMixable {
     case winddirection
     case dewpoint
     case cloudcover
+    case vertical_velocity
+    case relative_humidity
+    
+    /// Some variables are kept for backwards compatibility
+    var remapped: Self {
+        switch self {
+        case .relative_humidity: return .relativehumidity
+        default: return self
+        }
+    }
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -635,8 +646,8 @@ extension ForecastVariable {
         switch self {
         case .surface(let surface):
             return .surface(surface.remapped)
-        case .pressure(_):
-            return self
+        case .pressure(let pressure):
+            return .pressure(ForecastPressureVariable(variable: pressure.variable.remapped, level: pressure.level))
         }
     }
 }

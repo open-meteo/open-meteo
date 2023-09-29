@@ -122,6 +122,7 @@ table WeatherHourly {
   is_day: ValuesAndUnit;
   latent_heatflux: ValuesAndUnit;
   leaf_wetness_probability: ValuesAndUnit;
+  lifted_index: ValuesAndUnit;
   lightning_potential: ValuesAndUnit;
   precipitation: ValuesAndUnit;
   precipitation_probability: ValuesAndUnit;
@@ -543,6 +544,7 @@ table WeatherCurrent {
   is_day: ValueAndUnit;
   latent_heatflux: ValueAndUnit;
   leaf_wetness_probability: ValueAndUnit;
+  lifted_index: ValueAndUnit;
   lightning_potential: ValueAndUnit;
   precipitation: ValueAndUnit;
   precipitation_probability: ValueAndUnit;

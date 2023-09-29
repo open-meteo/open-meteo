@@ -255,6 +255,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 com_openmeteo_WeatherHourly.add(temperature200m: offset, &fbb)
             case .temperature_50m:
                 com_openmeteo_WeatherHourly.add(temperature50m: offset, &fbb)
+            case .lifted_index:
+                com_openmeteo_WeatherHourly.add(liftedIndex: offset, &fbb)
             }
         }
         for (pressure, offset) in offsets.pressure {
@@ -273,6 +275,10 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 com_openmeteo_WeatherHourly.add(pressureLevelDewpoint: offset, &fbb)
             case .cloudcover:
                 com_openmeteo_WeatherHourly.add(pressureLevelCloudcover: offset, &fbb)
+            case .vertical_velocity:
+                com_openmeteo_WeatherHourly.add(pressureLevelVerticalVelocity: offset, &fbb)
+            case .relative_humidity:
+                com_openmeteo_WeatherHourly.add(pressureLevelRelativehumidity: offset, &fbb)
             }
         }
         return com_openmeteo_WeatherHourly.endWeatherHourly(&fbb, start: start)
@@ -525,6 +531,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                     com_openmeteo_WeatherCurrent.add(temperature20m: v, &fbb)
                 case .temperature_200m:
                     com_openmeteo_WeatherCurrent.add(temperature200m: v, &fbb)
+                case .lifted_index:
+                    com_openmeteo_WeatherCurrent.add(liftedIndex: v, &fbb)
                 case .temperature_50m:
                     com_openmeteo_WeatherCurrent.add(temperature50m: v, &fbb)
                 }
