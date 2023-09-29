@@ -521,9 +521,14 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case surface_air_pressure
     case surface_pressure
     case surface_temperature
+    case temperature_100m
     case temperature_120m
+    case temperature_150m
     case temperature_180m
     case temperature_2m
+    case temperature_20m
+    case temperature_200m
+    case temperature_50m
     case temperature_40m
     case temperature_80m
     case terrestrial_radiation

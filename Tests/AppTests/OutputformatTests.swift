@@ -35,47 +35,37 @@ final class OutputformatTests: XCTestCase {
             print(data[0..<10])
         })
     }*/
-    /*
+    
     /// Test adjustment of API call weights
     /// "Heavy" API calls are counted more than just 1 API call
     ///
     /// See: https://github.com/open-meteo/open-meteo/issues/438#issuecomment-1722945326
     func testApiWeight() {
-        let location20year = ForecastapiResult(
+        let dataContainer = ForecastapiResult<MultiDomains>.PerModel(
+            model: .best_match,
             latitude: 41,
             longitude: 2,
             elevation: nil,
-            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
-            time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 0),
+            //timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
+            //time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 0),
             prefetch: {},
-            current_weather: nil,
+            //current_weather: nil,
             current: nil,
             hourly: nil,
             daily: nil,
             sixHourly: nil,
             minutely15: nil
         )
-        let result20year = ForecastapiResultSet(timeformat: .iso8601, results: [location20year])
+        let location20year = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 3600), results: [dataContainer])
+        let result20year = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location20year])
         // 20 year data, one location, one variable
         XCTAssertEqual(result20year.calculateQueryWeight(nVariablesModels: 1), 54.79286)
         // 20 year data, one location, two variables
         XCTAssertEqual(result20year.calculateQueryWeight(nVariablesModels: 2), 109.58572)
         
-        let location7day = ForecastapiResult(
-            latitude: 41,
-            longitude: 2,
-            elevation: nil,
-            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
-            time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 0),
-            prefetch: {},
-            current_weather: nil,
-            current: nil,
-            hourly: nil,
-            daily: nil,
-            sixHourly: nil,
-            minutely15: nil
-        )
-        let result7day = ForecastapiResultSet(timeformat: .iso8601, results: [location7day])
+        let location7day = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 3600), results: [dataContainer])
+        
+        let result7day = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location7day])
         // 7 day data, one location, one variable
         XCTAssertEqual(result7day.calculateQueryWeight(nVariablesModels: 1), 1)
         // 7 day data, one location, two variables
@@ -85,21 +75,9 @@ final class OutputformatTests: XCTestCase {
         // 7 day data, one location, 30 variables
         XCTAssertEqual(result7day.calculateQueryWeight(nVariablesModels: 30), 3)
         
-        let location1month = ForecastapiResult(
-            latitude: 41,
-            longitude: 2,
-            elevation: nil,
-            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
-            time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 0),
-            prefetch: {},
-            current_weather: nil,
-            current: nil,
-            hourly: nil,
-            daily: nil,
-            sixHourly: nil,
-            minutely15: nil
-        )
-        let result1month = ForecastapiResultSet(timeformat: .iso8601, results: [location1month, location1month])
+        let location1month = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 3600), results: [dataContainer])
+        
+        let result1month = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location1month, location1month])
         // 1 month data, two locations, one variable
         XCTAssertEqual(result1month.calculateQueryWeight(nVariablesModels: 1), 2.0)
         // 1 month data, two locations, two variables
@@ -132,7 +110,7 @@ final class OutputformatTests: XCTestCase {
     }
     
     func testFormats() throws {
-        let current = ForecastapiResult.CurrentWeather(
+        /*let current = ForecastapiResult.CurrentWeather(
             temperature: 23,
             windspeed: 12,
             winddirection: 90,
@@ -142,31 +120,29 @@ final class OutputformatTests: XCTestCase {
             windspeed_unit: .kmh,
             winddirection_unit: .degreeDirection,
             weathercode_unit: .wmoCode,
-            time: Timestamp(2022,7,13,15,0))
+            time: Timestamp(2022,7,13,15,0))*/
         
-        let daily = ApiSection(name: "daily", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 2, dtSeconds: 86400), columns: [
-            ApiColumn(variable: "temperature_2m_mean", unit: .celsius, data: .float(.init(repeating: 20, count: 2))),
-            ApiColumn(variable: "windspeed_10m_mean", unit: .kmh, data: .float(.init(repeating: 10, count: 2))),
+        let daily = ApiSection<ForecastVariableDaily>(name: "daily", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 2, dtSeconds: 86400), columns: [
+            ApiColumn(variable: .temperature_2m_mean, unit: .celsius, variables: [.float(.init(repeating: 20, count: 2))]),
+            ApiColumn(variable: .windspeed_10m_mean, unit: .kmh, variables: [.float(.init(repeating: 10, count: 2))]),
         ])
         
-        let hourly = ApiSection(name: "hourly", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 48, dtSeconds: 3600), columns: [
-            ApiColumn(variable: "temperature_2m", unit: .celsius, data: .float(.init(repeating: 20, count: 48))),
-            ApiColumn(variable: "windspeed_10m", unit: .kmh, data: .float(.init(repeating: 10, count: 48))),
+        let hourly = ApiSection<ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable>(name: "hourly", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 48, dtSeconds: 3600), columns: [
+            ApiColumn(variable: .surface(.temperature_2m), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
+            ApiColumn(variable: .surface(.windspeed_10m), unit: .kmh, variables: [.float(.init(repeating: 10, count: 48))]),
         ])
         
-        let currentSection = ApiSectionSingle(name: "current", time: Timestamp(2022,7,12,1,15), dtSeconds: 3600/4, columns: [
-            ApiColumnSingle(variable: "temperature_20m", unit: .celsius, value: 20),
-            ApiColumnSingle(variable: "windspeed_100m", unit: .kmh, value: 10),
+        let currentSection = ApiSectionSingle<ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable>(name: "current_weather", time: Timestamp(2022,7,12,1,15), dtSeconds: 3600/4, columns: [
+            ApiColumnSingle(variable: .surface(.temperature_20m), unit: .celsius, value: 20),
+            ApiColumnSingle(variable: .surface(.windspeed_100m), unit: .kmh, value: 10),
         ])
         
-        let res = ForecastapiResult(
+        let res = ForecastapiResult<MultiDomains>.PerModel(
+            model: .best_match,
             latitude: 41,
             longitude: 2,
             elevation: nil,
-            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
-            time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0),
             prefetch: {},
-            current_weather: {current},
             current: {currentSection},
             hourly: {
                 hourly
@@ -177,7 +153,7 @@ final class OutputformatTests: XCTestCase {
             sixHourly: nil,
             minutely15: nil
         )
-        let data = ForecastapiResultSet(timeformat: .iso8601, results: [res])
+        let data = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0), results: [res])])
         
         XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 2), 1)
         XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 15), 1.5)
@@ -185,14 +161,14 @@ final class OutputformatTests: XCTestCase {
         
         let json = drainString(data.response(format: .json, fixedGenerationTime: 12))
         XCTAssertEqual(json, """
-            {"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather":{"temperature":23.0,"windspeed":12.0,"winddirection":90,"weathercode":5,"is_day":1,"time":"2022-07-13T16:00"},"current_units":{"time":"iso8601","temperature_20m":"°C","windspeed_100m":"km/h"},"current_interval_seconds":900,"current":{"time":"2022-07-12T02:15","temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}
+            {"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"iso8601","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather_interval_seconds":900,"current_weather":{"time":"2022-07-12T02:15","temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}
             """)
         
-        let dataUnix = ForecastapiResultSet(timeformat: .unixtime, results: [res])
+        let dataUnix = ForecastapiResult<MultiDomains>(timeformat: .unixtime, results: [ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0), results: [res])])
         
         let jsonUnix = drainString(dataUnix.response(format: .json, fixedGenerationTime: 12))
         XCTAssertEqual(jsonUnix, """
-            {"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather":{"temperature":23.0,"windspeed":12.0,"winddirection":90,"weathercode":5,"is_day":1,"time":1657724400},"current_units":{"time":"unixtime","temperature_20m":"°C","windspeed_100m":"km/h"},"current_interval_seconds":900,"current":{"time":1657588500,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"unixtime","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":[1657584000,1657587600,1657591200,1657594800,1657598400,1657602000,1657605600,1657609200,1657612800,1657616400,1657620000,1657623600,1657627200,1657630800,1657634400,1657638000,1657641600,1657645200,1657648800,1657652400,1657656000,1657659600,1657663200,1657666800,1657670400,1657674000,1657677600,1657681200,1657684800,1657688400,1657692000,1657695600,1657699200,1657702800,1657706400,1657710000,1657713600,1657717200,1657720800,1657724400,1657728000,1657731600,1657735200,1657738800,1657742400,1657746000,1657749600,1657753200],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"unixtime","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":[1657584000,1657670400],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}
+            {"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"unixtime","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather_interval_seconds":900,"current_weather":{"time":1657588500,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"unixtime","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":[1657584000,1657587600,1657591200,1657594800,1657598400,1657602000,1657605600,1657609200,1657612800,1657616400,1657620000,1657623600,1657627200,1657630800,1657634400,1657638000,1657641600,1657645200,1657648800,1657652400,1657656000,1657659600,1657663200,1657666800,1657670400,1657674000,1657677600,1657681200,1657684800,1657688400,1657692000,1657695600,1657699200,1657702800,1657706400,1657710000,1657713600,1657717200,1657720800,1657724400,1657728000,1657731600,1657735200,1657738800,1657742400,1657746000,1657749600,1657753200],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"unixtime","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":[1657584000,1657670400],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}
             """)
         
         let csv = drainString(data.response(format: .csv))
@@ -200,9 +176,6 @@ final class OutputformatTests: XCTestCase {
             latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation
             41.0,2.0,NaN,3600,GMT,GMT
 
-            current_weather_time,temperature (°C),windspeed (km/h),winddirection (°),weathercode (wmo code),is_day
-            2022-07-13T16:00,23.0,12.0,90,5,1
-            
             time,temperature_20m (°C),windspeed_100m (km/h)
             2022-07-12T02:15,20.0,10.0
 
@@ -267,9 +240,6 @@ final class OutputformatTests: XCTestCase {
             latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation
             41.0,2.0,NaN,3600,GMT,GMT
 
-            current_weather_time,temperature (°C),windspeed (km/h),winddirection (°),weathercode (wmo code),is_day
-            1657724400,23.0,12.0,90,5,1
-            
             time,temperature_20m (°C),windspeed_100m (km/h)
             1657588500,20.0,10.0
 
@@ -331,15 +301,15 @@ final class OutputformatTests: XCTestCase {
         
         /// needs to set a timestamp, because of zip compression headers
         let xlsx = drainData(data.response(format: .xlsx, timestamp: Timestamp(2022,7,13))).sha256
-        XCTAssertEqual(xlsx, "31b3657c6a7fab3417d15962fd2aa68c2a2be90594271e03e98a2396af482bab")
+        XCTAssertEqual(xlsx, "8f4ec02a188bc18ec9ed210e96d2b198c00bd2710084c7a56d9bcc0a417bced3")
         
         let flatbuffers = drainData(data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
-        XCTAssertEqual(flatbuffers, "7964fbe57f2d8dc16e14cbb0b3a4201bb652625573feb9c88948d49d245b018c")
+        XCTAssertEqual(flatbuffers, "c4ddf4a0fd73a52ab44369e8b63b1a6a04f2f4c7c613c7e4b19ab751b3de4fbb")
     }
     
     /// Test output formats for 2 locations
     func testFormatsMultiLocation() throws {
-        let current = ForecastapiResult.CurrentWeather(
+        /*let current = ForecastapiResult.CurrentWeather(
             temperature: 23,
             windspeed: 12,
             winddirection: 90,
@@ -349,31 +319,29 @@ final class OutputformatTests: XCTestCase {
             windspeed_unit: .kmh,
             winddirection_unit: .degreeDirection,
             weathercode_unit: .wmoCode,
-            time: Timestamp(2022,7,13,15,0))
+            time: Timestamp(2022,7,13,15,0))*/
         
-        let daily = ApiSection(name: "daily", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 2, dtSeconds: 86400), columns: [
-            ApiColumn(variable: "temperature_2m_mean", unit: .celsius, data: .float(.init(repeating: 20, count: 2))),
-            ApiColumn(variable: "windspeed_10m_mean", unit: .kmh, data: .float(.init(repeating: 10, count: 2))),
+        let daily = ApiSection<ForecastVariableDaily>(name: "daily", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 2, dtSeconds: 86400), columns: [
+            ApiColumn(variable: .temperature_2m_mean, unit: .celsius, variables: [.float(.init(repeating: 20, count: 2))]),
+            ApiColumn(variable: .windspeed_10m_mean, unit: .kmh, variables: [.float(.init(repeating: 10, count: 2))]),
         ])
         
-        let hourly = ApiSection(name: "hourly", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 48, dtSeconds: 3600), columns: [
-            ApiColumn(variable: "temperature_2m", unit: .celsius, data: .float(.init(repeating: 20, count: 48))),
-            ApiColumn(variable: "windspeed_10m", unit: .kmh, data: .float(.init(repeating: 10, count: 48))),
+        let hourly = ApiSection<ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable>(name: "hourly", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 48, dtSeconds: 3600), columns: [
+            ApiColumn(variable: .surface(.temperature_2m), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
+            ApiColumn(variable: .surface(.windspeed_10m), unit: .kmh, variables: [.float(.init(repeating: 10, count: 48))]),
         ])
         
-        let currentSection = ApiSectionSingle(name: "current", time: Timestamp(2022,7,12,1,15), dtSeconds: 3600/4, columns: [
-            ApiColumnSingle(variable: "temperature_20m", unit: .celsius, value: 20),
-            ApiColumnSingle(variable: "windspeed_100m", unit: .kmh, value: 10),
+        let currentSection = ApiSectionSingle<ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable>(name: "current_weather", time: Timestamp(2022,7,12,1,15), dtSeconds: 3600/4, columns: [
+            ApiColumnSingle(variable: .surface(.temperature_20m), unit: .celsius, value: 20),
+            ApiColumnSingle(variable: .surface(.windspeed_100m), unit: .kmh, value: 10),
         ])
         
-        let res = ForecastapiResult(
+        let res = ForecastapiResult<MultiDomains>.PerModel(
+            model: .best_match,
             latitude: 41,
             longitude: 2,
             elevation: nil,
-            timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
-            time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0),
             prefetch: {},
-            current_weather: {current},
             current: {currentSection},
             hourly: {
                 hourly
@@ -384,9 +352,8 @@ final class OutputformatTests: XCTestCase {
             sixHourly: nil,
             minutely15: nil
         )
-        
-        
-        let data = ForecastapiResultSet(timeformat: .iso8601, results: [res, res])
+        let location = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0), results: [res])
+        let data = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location, location])
         
         XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 2), 2)
         XCTAssertEqual(data.calculateQueryWeight(nVariablesModels: 15), 3)
@@ -394,14 +361,14 @@ final class OutputformatTests: XCTestCase {
         
         let json = drainString(data.response(format: .json, fixedGenerationTime: 12))
         XCTAssertEqual(json, """
-            [{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather":{"temperature":23.0,"windspeed":12.0,"winddirection":90,"weathercode":5,"is_day":1,"time":"2022-07-13T16:00"},"current_units":{"time":"iso8601","temperature_20m":"°C","windspeed_100m":"km/h"},"current_interval_seconds":900,"current":{"time":"2022-07-12T02:15","temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}},{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather":{"temperature":23.0,"windspeed":12.0,"winddirection":90,"weathercode":5,"is_day":1,"time":"2022-07-13T16:00"},"current_units":{"time":"iso8601","temperature_20m":"°C","windspeed_100m":"km/h"},"current_interval_seconds":900,"current":{"time":"2022-07-12T02:15","temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}]
+            [{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"iso8601","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather_interval_seconds":900,"current_weather":{"time":"2022-07-12T02:15","temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}},{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"iso8601","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather_interval_seconds":900,"current_weather":{"time":"2022-07-12T02:15","temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}]
             """)
         
-        let dataUnix = ForecastapiResultSet(timeformat: .unixtime, results: [res, res])
+        let dataUnix = ForecastapiResult<MultiDomains>(timeformat: .unixtime, results: [location, location])
         
         let jsonUnix = drainString(dataUnix.response(format: .json, fixedGenerationTime: 12))
         XCTAssertEqual(jsonUnix, """
-            [{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather":{"temperature":23.0,"windspeed":12.0,"winddirection":90,"weathercode":5,"is_day":1,"time":1657724400},"current_units":{"time":"unixtime","temperature_20m":"°C","windspeed_100m":"km/h"},"current_interval_seconds":900,"current":{"time":1657588500,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"unixtime","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":[1657584000,1657587600,1657591200,1657594800,1657598400,1657602000,1657605600,1657609200,1657612800,1657616400,1657620000,1657623600,1657627200,1657630800,1657634400,1657638000,1657641600,1657645200,1657648800,1657652400,1657656000,1657659600,1657663200,1657666800,1657670400,1657674000,1657677600,1657681200,1657684800,1657688400,1657692000,1657695600,1657699200,1657702800,1657706400,1657710000,1657713600,1657717200,1657720800,1657724400,1657728000,1657731600,1657735200,1657738800,1657742400,1657746000,1657749600,1657753200],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"unixtime","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":[1657584000,1657670400],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}},{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather":{"temperature":23.0,"windspeed":12.0,"winddirection":90,"weathercode":5,"is_day":1,"time":1657724400},"current_units":{"time":"unixtime","temperature_20m":"°C","windspeed_100m":"km/h"},"current_interval_seconds":900,"current":{"time":1657588500,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"unixtime","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":[1657584000,1657587600,1657591200,1657594800,1657598400,1657602000,1657605600,1657609200,1657612800,1657616400,1657620000,1657623600,1657627200,1657630800,1657634400,1657638000,1657641600,1657645200,1657648800,1657652400,1657656000,1657659600,1657663200,1657666800,1657670400,1657674000,1657677600,1657681200,1657684800,1657688400,1657692000,1657695600,1657699200,1657702800,1657706400,1657710000,1657713600,1657717200,1657720800,1657724400,1657728000,1657731600,1657735200,1657738800,1657742400,1657746000,1657749600,1657753200],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"unixtime","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":[1657584000,1657670400],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}]
+            [{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"unixtime","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather_interval_seconds":900,"current_weather":{"time":1657588500,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"unixtime","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":[1657584000,1657587600,1657591200,1657594800,1657598400,1657602000,1657605600,1657609200,1657612800,1657616400,1657620000,1657623600,1657627200,1657630800,1657634400,1657638000,1657641600,1657645200,1657648800,1657652400,1657656000,1657659600,1657663200,1657666800,1657670400,1657674000,1657677600,1657681200,1657684800,1657688400,1657692000,1657695600,1657699200,1657702800,1657706400,1657710000,1657713600,1657717200,1657720800,1657724400,1657728000,1657731600,1657735200,1657738800,1657742400,1657746000,1657749600,1657753200],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"unixtime","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":[1657584000,1657670400],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}},{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"unixtime","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather_interval_seconds":900,"current_weather":{"time":1657588500,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"unixtime","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":[1657584000,1657587600,1657591200,1657594800,1657598400,1657602000,1657605600,1657609200,1657612800,1657616400,1657620000,1657623600,1657627200,1657630800,1657634400,1657638000,1657641600,1657645200,1657648800,1657652400,1657656000,1657659600,1657663200,1657666800,1657670400,1657674000,1657677600,1657681200,1657684800,1657688400,1657692000,1657695600,1657699200,1657702800,1657706400,1657710000,1657713600,1657717200,1657720800,1657724400,1657728000,1657731600,1657735200,1657738800,1657742400,1657746000,1657749600,1657753200],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"unixtime","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":[1657584000,1657670400],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}]
             """)
         
         let csv = drainString(data.response(format: .csv))
@@ -409,10 +376,6 @@ final class OutputformatTests: XCTestCase {
             location_id,latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation
             1,41.0,2.0,NaN,3600,GMT,GMT
             2,41.0,2.0,NaN,3600,GMT,GMT
-
-            location_id,current_weather_time,temperature (°C),windspeed (km/h),winddirection (°),weathercode (wmo code),is_day
-            1,2022-07-13T16:00,23.0,12.0,90,5,1
-            2,2022-07-13T16:00,23.0,12.0,90,5,1
             
             location_id,time,temperature_20m (°C),windspeed_100m (km/h)
             1,2022-07-12T02:15,20.0,10.0
@@ -529,10 +492,6 @@ final class OutputformatTests: XCTestCase {
             location_id,latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation
             1,41.0,2.0,NaN,3600,GMT,GMT
             2,41.0,2.0,NaN,3600,GMT,GMT
-
-            location_id,current_weather_time,temperature (°C),windspeed (km/h),winddirection (°),weathercode (wmo code),is_day
-            1,1657724400,23.0,12.0,90,5,1
-            2,1657724400,23.0,12.0,90,5,1
             
             location_id,time,temperature_20m (°C),windspeed_100m (km/h)
             1,1657588500,20.0,10.0
@@ -646,11 +605,11 @@ final class OutputformatTests: XCTestCase {
         
         /// needs to set a timestamp, because of zip compression headers
         let xlsx = drainData(data.response(format: .xlsx, timestamp: Timestamp(2022,7,13))).sha256
-        XCTAssertEqual(xlsx, "2c588392d729829ee89666c9ea1e5dccf6972c06d0c197a678371c6cf6d1a260")
+        XCTAssertEqual(xlsx, "ba041e176e866f9d4ace631232992f87be635e7386f1cefb5658abd26cdf3855")
         
         let flatbuffers = drainData(data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
-        XCTAssertEqual(flatbuffers, "da67da2fb8f6747e26aaaf0a9c7a47e59775ebf87777f09d1e152fcd36847db8")
-    }*/
+        XCTAssertEqual(flatbuffers, "f4fab34a536318a129e18e38ad179e2cbd2cbe3f3f119d3a33ace41ade1b7380")
+    }
     
     func testXlsxWriter() throws {
         let xlsx = try XlsxWriter()
