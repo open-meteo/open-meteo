@@ -14,10 +14,9 @@ struct CamsController {
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
         let paramsCurrent = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.current)
-
-        let nVariables = (paramsHourly?.count ?? 0)
-        
         let domains = try (params.domains.map({[$0]}) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
+
+        let nVariables = (paramsHourly?.count ?? 0) * domains.count
         
         let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate

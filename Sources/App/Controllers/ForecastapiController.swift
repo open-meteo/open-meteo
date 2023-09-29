@@ -110,7 +110,7 @@ struct WeatherApiController {
         let nParamsMinutely = paramsMinutely?.count ?? 0
         let nParamsCurrent = paramsCurrent?.count ?? 0
         let nParamsDaily = paramsDaily?.count ?? 0
-        let nVariables = nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily
+        let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
         
         let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate

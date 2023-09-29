@@ -212,12 +212,11 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
         let referenceVariables = 10
         // Sum up weights for each location. Technically each location can have a different time interval
         return results.reduce(0, {
-            let nDomains = Float($1.results.count)
             let nDays = $1.time.range.durationSeconds / 86400
             let timeFraction = Float(nDays) / Float(referenceDays)
             let variablesFraction = Float(nVariablesModels) / Float(referenceVariables)
             let weight = max(variablesFraction, timeFraction * variablesFraction)
-            return $0 + max(1, weight) * nDomains
+            return $0 + max(1, weight)
         })
     }
 }

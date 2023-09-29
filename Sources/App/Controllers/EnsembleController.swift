@@ -16,7 +16,7 @@ public struct EnsembleApiController {
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
         let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
-        let nVariables = (paramsHourly?.count ?? 0) * 20
+        let nVariables = (paramsHourly?.count ?? 0) * domains.reduce(0, {$0 + $1.countEnsembleMember})
         
         let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate

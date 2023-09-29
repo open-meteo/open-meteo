@@ -31,7 +31,7 @@ struct IconWaveController {
         let paramsHourly = try IconWaveVariable.load(commaSeparatedOptional: params.hourly)
         let paramsCurrent = try IconWaveVariable.load(commaSeparatedOptional: params.current)
         let paramsDaily = try IconWaveVariableDaily.load(commaSeparatedOptional: params.daily)
-        let nVariables = (paramsHourly?.count ?? 0) * (paramsDaily?.count ?? 0)
+        let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.count
         
         let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
