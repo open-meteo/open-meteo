@@ -1092,8 +1092,6 @@ struct DownloadCmipCommand: AsyncCommandFix {
                             let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)\(month.zeroPadded(len: 2))01-\(year)\(month.zeroPadded(len: 2))\(day).nc"
                             try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                             
-                            // TODO: support for specific humdity to relative humidity if required
-                            
                             let isLeapMonth = month == 2 && Timestamp(year, 2, 28).add(days: 1).toComponents().day == 29
                             let duplicateTimeStep = (domain.needsLeapYearFix && isLeapMonth) ? 27..<28 : nil
                             let array = try NetCDF.read(path: ncFile, short: short, fma: variable.getMultiplyAdd(domain: domain), duplicateTimeStep: duplicateTimeStep)
