@@ -5,6 +5,16 @@ typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableD
 
 typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, VariableAndMember<CfsVariable>>
 
+enum SeasonalForecastDomainApi: String, RawRepresentableString, CaseIterable {
+    case cfsv2
+    
+    var forecastDomain: SeasonalForecastDomain {
+        switch self {
+        case .cfsv2:
+            return .ncep
+        }
+    }
+}
 
 enum CfsVariableDerived: String, RawRepresentableString {
     case windspeed_10m
@@ -120,12 +130,10 @@ extension SeasonalForecastReader {
 /**
  TODO:
  - integrate more providers
- - daily data
+ - more daily data
  */
 struct SeasonalForecastController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        fatalError()
-        /*
         try req.ensureSubdomain("seasonal-api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
@@ -133,78 +141,94 @@ struct SeasonalForecastController {
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         /// Will be configurable by API later
-        let domain = SeasonalForecastDomain.ncep
-        let members = 1..<domain.nMembers+1
+        let domains = [SeasonalForecastDomainApi.cfsv2]
         
         let paramsSixHourly = try SeasonalForecastVariable.load(commaSeparatedOptional: params.six_hourly)
         let paramsDaily = try DailyCfsVariable.load(commaSeparatedOptional: params.daily)
-        let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * members.count
+        let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) //* members.count
         
-        let result = ForecastapiResultSet(timeformat: params.timeformatOrDefault, results: try prepared.map { prepared in
+        let locations: [ForecastapiResult<SeasonalForecastDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
             let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
             /// For fractional timezones, shift data to show only for full timestamps
             let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
-            let hourlyTime = time.range.range(dtSeconds: domain.dtSeconds)
+            let sixHourlyTime = time.range.range(dtSeconds: 3600*6)
             let dailyTime = time.range.range(dtSeconds: 3600*24)
             
-            guard let reader = try SeasonalForecastReader(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+            let readers: [ForecastapiResult<SeasonalForecastDomainApi>.PerModel] = try domains.compactMap { domain in
+                guard let reader = try SeasonalForecastReader(domain: domain.forecastDomain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                    return nil
+                }
+                let members = 1..<domain.forecastDomain.nMembers+1
+                return .init(
+                    model: domain,
+                    latitude: reader.modelLat,
+                    longitude: reader.modelLon,
+                    elevation: reader.targetElevation,
+                    prefetch: {
+                        if let paramsSixHourly {
+                            for varible in paramsSixHourly {
+                                for member in members {
+                                    try reader.prefetchData(variable: varible, member: member, time: sixHourlyTime)
+                                }
+                            }
+                        }
+                        if let paramsDaily {
+                            for varible in paramsDaily {
+                                for member in members {
+                                    try reader.prefetchData(variable: varible, member: member, time: dailyTime)
+                                }
+                            }
+                        }
+                    },
+                    current: nil,
+                    hourly: nil,
+                    daily: paramsDaily.map { variables in
+                        return {
+                            return ApiSection<DailyCfsVariable>(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
+                                var unit: SiUnit? = nil
+                                let allMembers: [ApiArray] = try (0..<domain.forecastDomain.nMembers).compactMap { member in
+                                    let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime)
+                                    unit = d.unit
+                                    assert(dailyTime.count == d.data.count)
+                                    return ApiArray.float(d.data)
+                                }
+                                guard allMembers.count > 0 else {
+                                    return nil
+                                }
+                                return ApiColumn<DailyCfsVariable>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+                            })
+                        }
+                    },
+                    sixHourly: paramsSixHourly.map { variables in
+                        return {
+                            return .init(name: "six_hourly", time: sixHourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
+                                var unit: SiUnit? = nil
+                                let allMembers: [ApiArray] = try (0..<domain.forecastDomain.nMembers).compactMap { member in
+                                    let d = try reader.get(variable: variable, member: member, time: sixHourlyTime).convertAndRound(params: params)
+                                    unit = d.unit
+                                    assert(sixHourlyTime.count == d.data.count)
+                                    return ApiArray.float(d.data)
+                                }
+                                guard allMembers.count > 0 else {
+                                    return nil
+                                }
+                                return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
+                            })
+                        }
+                    },
+                    minutely15: nil
+                )
+            }
+            guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            
-            return ForecastapiResult(
-                latitude: reader.modelLat,
-                longitude: reader.modelLon,
-                elevation: reader.targetElevation,
-                timezone: timezone,
-                time: time,
-                prefetch: {
-                    if let hourlyVariables = paramsSixHourly {
-                        for varible in hourlyVariables {
-                            for member in members {
-                                try reader.prefetchData(variable: varible, member: member, time: hourlyTime)
-                            }
-                        }
-                    }
-                    if let dailyVariables = paramsDaily {
-                        for varible in dailyVariables {
-                            for member in members {
-                                try reader.prefetchData(variable: varible, member: member, time: dailyTime)
-                            }
-                        }
-                    }
-                },
-                current_weather: nil,
-                current: nil,
-                hourly: nil,
-                daily: paramsDaily.map { dailyVariables in
-                    return {
-                        return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.flatMap { variable in
-                            try members.map { member in
-                                let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime).convertAndRound(params: params).toApi(name: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))")
-                                assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
-                                return d
-                            }
-                        })
-                    }
-                },
-                sixHourly: paramsSixHourly.map { variables in
-                    return {
-                        return ApiSection(name: "six_hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.flatMap { variable in
-                            try members.map { member in
-                                let d = try reader.get(variable: variable, member: member, time: hourlyTime).convertAndRound(params: params).toApi(name: "\(variable.name)_member\(member.zeroPadded(len: 2))")
-                                assert(hourlyTime.count == d.data.count, "hours \(hourlyTime.count), values \(d.data.count)")
-                                return d
-                            }
-                        })
-                    }
-                },
-                minutely15: nil
-            )
-        })
+            return .init(timezone: timezone, time: time, results: readers)
+        }
+        let result = ForecastapiResult<SeasonalForecastDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)*/
+        return result.response(format: params.format ?? .json)
     }
 }
 

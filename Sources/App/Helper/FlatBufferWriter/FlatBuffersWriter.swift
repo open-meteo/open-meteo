@@ -125,6 +125,22 @@ extension ForecastapiResult {
         
         return (surfaces, pressureVectors)
     }
+    
+    /// Encodes daily data to eigher `ValuesAndUnit` or just plain `int64` for timestamps (e.g. sunrise/set)
+    static func encodeEnsemble(section: ApiSection<Model.DailyVariable>, _ fbb: inout FlatBufferBuilder) -> [Offset] {
+        let offsets: [Offset] = section.columns.map { v in
+            let oo = v.variables.enumerated().map { (member, array) in
+                switch array {
+                case .float(let float):
+                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member), valuesVectorOffset: fbb.createVector(float))
+                case .timestamp(let time):
+                    return fbb.createVector(time.map({$0.timeIntervalSince1970}))
+                }
+            }
+            return com_openmeteo_ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
+        }
+        return offsets
+    }
 }
 
 extension ApiArray {
