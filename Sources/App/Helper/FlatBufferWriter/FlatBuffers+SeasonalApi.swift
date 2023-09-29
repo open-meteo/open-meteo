@@ -16,6 +16,10 @@ extension SeasonalForecastDomainApi: ModelFlatbufferSerialisable {
         }
     }
     
+    static var memberOffset: Int {
+        return 1
+    }
+    
     static func encodeHourly(section: ApiSection<ForecastapiResult<Self>.SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) -> Offset {
         let offsets = ForecastapiResult.encodeEnsemble(section: section, &fbb)
         let start = com_openmeteo_EnsembleHourly.startEnsembleHourly(&fbb)
