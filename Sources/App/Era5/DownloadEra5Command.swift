@@ -272,8 +272,6 @@ struct DownloadEra5Command: AsyncCommandFix {
                 
                 // Read location one-by-one... Multi location support does not work with derived varibales
                 for (l, gridpoint) in locationRange.enumerated() {
-                    // TODO: calculate bias for era5-land et0... this needs to read ERA5 precip, etc as well
-                    
                     let gridpointNext = min(gridpoint+1, writer.dim0-1)
                     let readerNext = GenericReaderMulti<ForecastVariable>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpointNext)))])
                     try readerNext.prefetchData(variables: [era5Variable], time: time)

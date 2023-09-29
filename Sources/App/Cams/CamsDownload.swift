@@ -42,8 +42,6 @@ struct DownloadCamsCommand: AsyncCommandFix {
         let logger = context.application.logger
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        // todo dust multi level
-        
         let variables = onlyVariables ?? CamsVariable.allCases
         switch domain {
         case .cams_global:

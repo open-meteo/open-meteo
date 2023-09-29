@@ -103,8 +103,6 @@ final class BufferedParquetFileWriter {
  `ncpdq -O -a time,LAT,LON test.nc test2.nc`
  To remove compression and chunks `ncpdq -O --cnk_plc=unchunk -L 0 -a time,LAT,LON wind_gust_normals.nc wind_gust_normals_transposed.nc`
  
- TODO:
- - Support arbitrary resampling to other grids
  */
 struct ExportCommand: AsyncCommandFix {
     var help: String {

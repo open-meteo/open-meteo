@@ -42,7 +42,6 @@ struct QuantileDeltaMappingBiasCorrection {
     
     /// Calculate CDFs over the entire  control and forecast timespan using sliding windows
     /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
-    /// TODO: check if dry periods are still correct
     static func quantileDeltaMappingMonthly(reference: ArraySlice<Float>, referenceTime: TimerangeDt, controlAndForecast: ArraySlice<Float>, controlAndForecastTime: TimerangeDt, type: ChangeType) -> [Float] {
         let nQuantiles = 100
         
@@ -87,7 +86,6 @@ struct QuantileDeltaMappingBiasCorrection {
     
     /// Calculate CDFs over the entire  control and forecast timespan using sliding windows
     /// Important note: If CDF of `forecast` is the same as `control` the climate change signal might be canceled out. It can be used however to just do a simple BIAS transfer from one model to another
-    /// TODO: check if dry periods are still correct
     static func quantileDeltaMappingMonthlyDetrend(reference: ArraySlice<Float>, referenceTime: TimerangeDt, controlAndForecast: ArraySlice<Float>, controlAndForecastTime: TimerangeDt, type: ChangeType) -> [Float] {
         let nQuantiles = 100
         
