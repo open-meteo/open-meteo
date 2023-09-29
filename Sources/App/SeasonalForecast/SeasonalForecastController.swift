@@ -139,7 +139,7 @@ struct SeasonalForecastController {
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
         
-        let prepared = try params.prepareCoordinates(allowTimezones: true)
+        let prepared = try params.prepareCoordinates(allowTimezones: false)
         /// Will be configurable by API later
         let domains = [SeasonalForecastDomainApi.cfsv2]
         

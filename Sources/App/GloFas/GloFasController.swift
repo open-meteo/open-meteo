@@ -92,7 +92,7 @@ struct GloFasController {
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
         
-        let prepared = try params.prepareCoordinates(allowTimezones: true)
+        let prepared = try params.prepareCoordinates(allowTimezones: false)
         let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
         guard let paramsDaily = try GloFasVariableOrDerived.load(commaSeparatedOptional: params.daily) else {
             throw ForecastapiError.generic(message: "Parameter 'daily' required")
