@@ -10,10 +10,19 @@ protocol ModelFlatbufferSerialisable: RawRepresentableString {
     
     //var rawValue: String { get }
     static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws
+    
+    /// 0=all members start at control, 1=Members start at `member01` (Used in CFSv2)
+    static var memberOffset: Int { get }
+}
+
+extension ModelFlatbufferSerialisable {
+    static var memberOffset: Int {
+        return 0
+    }
 }
 
 
-fileprivate struct ModelAndSection<Model: RawRepresentableString, Variable: RawRepresentableString> {
+fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable: RawRepresentableString> {
     let model: Model
     let section: () throws -> ApiSection<Variable>
     
@@ -22,6 +31,7 @@ fileprivate struct ModelAndSection<Model: RawRepresentableString, Variable: RawR
             let h = try m.section()
             return ApiSectionString(name: h.name, time: h.time, columns: h.columns.flatMap { c in
                 return c.variables.enumerated().map { (member, data) in
+                    let member = member + Model.memberOffset
                     let variableAndMember = member > 0 ? "\(c.variable.rawValue)_member\(member.zeroPadded(len: 2))" : c.variable.rawValue
                     let variable = sections.count > 1 ? "\(variableAndMember)_\(m.model.rawValue)" : variableAndMember
                     return ApiColumnString(variable: variable, unit: c.unit, data: data)

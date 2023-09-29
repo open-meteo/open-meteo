@@ -102,13 +102,13 @@ extension ForecastapiResult {
             switch v.variable {
             case .surface(let surface):
                 let oo = v.variables.enumerated().map { (member, data) in
-                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member), valuesVectorOffset: data.expectFloatArray(&fbb))
+                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: data.expectFloatArray(&fbb))
                 }
                 let offset = com_openmeteo_ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
                 surfaces.append((surface, offset))
             case .pressure(let pressure):
                 let oo = v.variables.enumerated().map { (member, data) in
-                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member), valuesVectorOffset: data.expectFloatArray(&fbb))
+                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: data.expectFloatArray(&fbb))
                 }
                 let offset = com_openmeteo_ValuesAndLevelAndMember.createValuesAndLevelAndMember(&fbb, level: Int32(pressure.level), valuesVectorOffset: fbb.createVector(ofOffsets: oo))
                 if let pos = pressures.firstIndex(where: {$0.variable == pressure.variable}) {
@@ -132,7 +132,7 @@ extension ForecastapiResult {
             let oo = v.variables.enumerated().map { (member, array) in
                 switch array {
                 case .float(let float):
-                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member), valuesVectorOffset: fbb.createVector(float))
+                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: fbb.createVector(float))
                 case .timestamp(let time):
                     return fbb.createVector(time.map({$0.timeIntervalSince1970}))
                 }
