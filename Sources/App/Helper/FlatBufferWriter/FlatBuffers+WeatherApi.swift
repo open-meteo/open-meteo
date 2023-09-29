@@ -121,6 +121,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 com_openmeteo_WeatherHourly.add(shortwaveRadiation: offset, &fbb)
             case .snowfall:
                 com_openmeteo_WeatherHourly.add(snowfall: offset, &fbb)
+            case .snowfall_height:
+                com_openmeteo_WeatherHourly.add(snowfallHeight: offset, &fbb)
             case .surface_pressure:
                 com_openmeteo_WeatherHourly.add(surfacePressure: offset, &fbb)
             case .terrestrial_radiation:
@@ -391,6 +393,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                     com_openmeteo_WeatherCurrent.add(shortwaveRadiation: v, &fbb)
                 case .snowfall:
                     com_openmeteo_WeatherCurrent.add(snowfall: v, &fbb)
+                case .snowfall_height:
+                    com_openmeteo_WeatherCurrent.add(snowfallHeight: v, &fbb)
                 case .surface_pressure:
                     com_openmeteo_WeatherCurrent.add(surfacePressure: v, &fbb)
                 case .terrestrial_radiation:
