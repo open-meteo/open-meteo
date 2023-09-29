@@ -136,6 +136,7 @@ table WeatherHourly {
   snow_depth: ValuesAndUnit;
   snow_height: ValuesAndUnit;
   snowfall: ValuesAndUnit;
+  snowfall_height: ValuesAndUnit;
   snowfall_water_equivalent: ValuesAndUnit;
   soil_moisture_0_to_1cm: ValuesAndUnit;
   soil_moisture_0_to_100cm: ValuesAndUnit;
@@ -556,6 +557,7 @@ table WeatherCurrent {
   snow_depth: ValueAndUnit;
   snow_height: ValueAndUnit;
   snowfall: ValueAndUnit;
+  snowfall_height: ValueAndUnit;
   snowfall_water_equivalent: ValueAndUnit;
   soil_moisture_0_to_1cm: ValueAndUnit;
   soil_moisture_0_to_100cm: ValueAndUnit;
