@@ -4,10 +4,6 @@ import XCTest
 @_implementationOnly import CTurboPFor
 
 final class SwiftPFor2DTests: XCTestCase {
-    override func tearDown() {
-        try! FileManager.default.removeItemIfExists(at: "writetest.om")
-    }
-    
     func testInMemory() throws {
         let data: [Float] = [0.0, 5.0, 2.0, 3.0, 2.0, 5.0, 6.0, 2.0, 8.0, 3.0, 10.0, 14.0, 12.0, 15.0, 14.0, 15.0, 66.0, 17.0, 12.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         let compressed = try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: 10).writeInMemory(compressionType: .p4nzdec256, scalefactor: 1, all: data)
@@ -52,7 +48,7 @@ final class SwiftPFor2DTests: XCTestCase {
             }
             fatalError("Not expected")
         }))
-        
+        try FileManager.default.removeItem(atPath: "\(file)~")
     }
     
     func testWrite() throws {
@@ -127,6 +123,7 @@ final class SwiftPFor2DTests: XCTestCase {
         XCTAssertEqualArray(try read.readInterpolated(dim0X: 0, dim0XFraction: 0.9, dim0Y: 0, dim0YFraction: 0.2, dim0Nx: 2, dim1: 0..<5), [6.5, 7.5, 8.5, 9.5, 10.5], accuracy: 0.001)
         XCTAssertEqualArray(try read.readInterpolated(dim0X: 0, dim0XFraction: 0.1, dim0Y: 0, dim0YFraction: 0.9, dim0Nx: 2, dim1: 0..<5), [9.5, 10.499999, 11.499999, 12.5, 13.499999], accuracy: 0.001)
         XCTAssertEqualArray(try read.readInterpolated(dim0X: 0, dim0XFraction: 0.8, dim0Y: 0, dim0YFraction: 0.9, dim0Nx: 2, dim1: 0..<5), [12.999999, 14.0, 15.0, 16.0, 17.0], accuracy: 0.001)
+        try FileManager.default.removeItem(atPath: file)
     }
     
     func testNaN() throws {
@@ -140,6 +137,7 @@ final class SwiftPFor2DTests: XCTestCase {
         let data2 = try read.read(dim0Slow: nil, dim1: nil)
         print(data2)
         XCTAssertTrue(try read.read(dim0Slow: 1..<2, dim1: 1..<2)[0].isNaN)
+        try FileManager.default.removeItem(atPath: file)
     }
     
     func testWriteFpx() throws {
@@ -207,6 +205,7 @@ final class SwiftPFor2DTests: XCTestCase {
         for x in 0..<read.dim0 {
             XCTAssertEqual(try read.read(dim0Slow: 0..<5, dim1: x..<x+1), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
         }
+        try FileManager.default.removeItem(atPath: file)
     }
     
     func testNaNfpx() throws {
@@ -220,5 +219,6 @@ final class SwiftPFor2DTests: XCTestCase {
         let data2 = try read.read(dim0Slow: nil, dim1: nil)
         print(data2)
         XCTAssertTrue(try read.read(dim0Slow: 1..<2, dim1: 1..<2)[0].isNaN)
+        try FileManager.default.removeItem(atPath: file)
     }
 }
