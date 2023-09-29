@@ -243,6 +243,16 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 com_openmeteo_WeatherHourly.add(windspeed10m: offset, &fbb)
             case .winddirection:
                 com_openmeteo_WeatherHourly.add(winddirection10m: offset, &fbb)
+            case .temperature_100m:
+                com_openmeteo_WeatherHourly.add(temperature100m: offset, &fbb)
+            case .temperature_150m:
+                com_openmeteo_WeatherHourly.add(temperature150m: offset, &fbb)
+            case .temperature_20m:
+                com_openmeteo_WeatherHourly.add(temperature20m: offset, &fbb)
+            case .temperature_200m:
+                com_openmeteo_WeatherHourly.add(temperature200m: offset, &fbb)
+            case .temperature_50m:
+                com_openmeteo_WeatherHourly.add(temperature50m: offset, &fbb)
             }
         }
         for (pressure, offset) in offsets.pressure {
@@ -503,6 +513,16 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                     com_openmeteo_WeatherCurrent.add(windspeed10m: v, &fbb)
                 case .winddirection:
                     com_openmeteo_WeatherCurrent.add(winddirection10m: v, &fbb)
+                case .temperature_100m:
+                    com_openmeteo_WeatherCurrent.add(temperature100m: v, &fbb)
+                case .temperature_150m:
+                    com_openmeteo_WeatherCurrent.add(temperature150m: v, &fbb)
+                case .temperature_20m:
+                    com_openmeteo_WeatherCurrent.add(temperature20m: v, &fbb)
+                case .temperature_200m:
+                    com_openmeteo_WeatherCurrent.add(temperature200m: v, &fbb)
+                case .temperature_50m:
+                    com_openmeteo_WeatherCurrent.add(temperature50m: v, &fbb)
                 }
             case .pressure(_):
                 throw ForecastapiError.generic(message: "Pressure level variables currently not supported for flatbuffers encoding in current block")
