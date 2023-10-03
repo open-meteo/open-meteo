@@ -158,7 +158,10 @@ Options:
 ### Digital elevation model
 To download the 90 meter elevation model for the Elevation API as well as improving weather forecast accuracy, you first have to download the Copernicus DEM: https://copernicus-dem-30m.s3.amazonaws.com/readme.html
 
-A fast way is to use `aws s3 sync --no-sign-request --exclude "*" --include "Copernicus_DSM_COG_30*/*_DEM.tif" s3://copernicus-dem-90m/ dem-90m`.
+A fast way is to use ```
+sudo apt-get install awscli
+aws s3 sync --no-sign-request --exclude "*" --include "Copernicus_DSM_COG_30*/*_DEM.tif" s3://copernicus-dem-90m/ dem-90m
+```
 
 Requirements: Install gdal and make sure the command `gdal_translate` is available. Mac: `brew install gdal` Linux: `apt install gdal`
 
