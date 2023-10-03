@@ -163,6 +163,8 @@ A fast way is to use:
 sudo apt-get install awscli
 aws s3 sync --no-sign-request --exclude "*" --include "Copernicus_DSM_COG_30*/*_DEM.tif" s3://copernicus-dem-90m/ dem-90m
 ```
+For further installation instructions see, [Install or update the latest version of the AWS CLI
+](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
 
 Requirements: Install gdal and make sure the command `gdal_translate` is available. Mac: `brew install gdal` Linux: `apt install gdal`
 
