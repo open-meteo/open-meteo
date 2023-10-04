@@ -5,6 +5,11 @@ import SwiftEccodes
 
 
 final class MeteorologyTests: XCTestCase {
+    func testWetbulbTemperature() {
+        XCTAssertEqual(Meteorology.wetBulbTemperature(temperature: 10, relativeHumidity: 50), 5.10125499, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.wetBulbTemperature(temperature: 5, relativeHumidity: 90), 3.99465138, accuracy: 0.001)
+    }
+    
     func testRelativeHumidity() {
         XCTAssertEqual(Meteorology.relativeHumidity(temperature: 20, dewpoint: 15), 72.93877)
         XCTAssertEqual(Meteorology.relativeHumidity(temperature: 30, dewpoint: 15), 40.17284)

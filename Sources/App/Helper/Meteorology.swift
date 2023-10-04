@@ -220,6 +220,15 @@ struct Meteorology {
         }
     }
     
+    /// Wetbulb temperature
+    /// See https://www.omnicalculator.com/physics/wet-bulb
+    public static func wetBulbTemperature(temperature t: Float, relativeHumidity rh: Float) -> Float {
+        return t * atan(0.151977*pow(rh+8.313659,1/2))
+        + atan(t+rh) - atan(rh-1.676331)
+        + 0.00391838*pow(rh,3/2) * atan(0.023101*rh)
+        - 4.686035
+    }
+    
     /// Convert pressure vertical velocity `omega` (Pa/s) to geometric vertical velocity `w` (m/s)
     /// See https://www.ncl.ucar.edu/Document/Functions/Contributed/omega_to_w.shtml
     /// Temperature in Celsius

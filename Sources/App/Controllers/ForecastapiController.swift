@@ -445,6 +445,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     /// Maps to `winddirection_10m`. Used for compatibility with `current_weather` block
     case winddirection
     
+    case wet_bulb_temperature_2m
     case apparent_temperature
     case cape
     case cloudcover
@@ -723,6 +724,9 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case windspeed_10m_max
     case windspeed_10m_mean
     case windspeed_10m_min
+    case wet_bulb_temperature_2m_max
+    case wet_bulb_temperature_2m_mean
+    case wet_bulb_temperature_2m_min
     
     
     var aggregation: DailyAggregation<ForecastVariable> {
@@ -865,6 +869,12 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .max(.surface(.updraft))
         case .vapor_pressure_deficit_max:
             return .max(.surface(.vapor_pressure_deficit))
+        case .wet_bulb_temperature_2m_max:
+            return .max(.surface(.wet_bulb_temperature_2m))
+        case .wet_bulb_temperature_2m_min:
+            return .min(.surface(.wet_bulb_temperature_2m))
+        case .wet_bulb_temperature_2m_mean:
+            return .mean(.surface(.wet_bulb_temperature_2m))
         }
     }
 }
