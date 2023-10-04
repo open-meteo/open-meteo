@@ -103,7 +103,7 @@ As a minimum requirement, ICON global should be downloaded. To download the 00 r
 
 For the first run, the ICON downloader will download additional domain geometry information and prepare reproduction weights. It might take a while.
 
-A list of all ICON weather variables that can be downloaded is available here: [IconVariables](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/Icon/IconVariableDownloadable.swift#L84). To save resource on the public DWD servers, please only downloaded required weather variables.
+A list of all ICON weather variables that can be downloaded is available here: [IconVariables](https://github.com/open-meteo/open-meteo/blob/82a73573e2cb4d3dbecb972f5ce3924030b3a37e/Sources/App/Icon/IconVariable.swift#L90). To save resource on the public DWD servers, please only downloaded required weather variables.
 
 The icon download command has the following arguments:
 ```
