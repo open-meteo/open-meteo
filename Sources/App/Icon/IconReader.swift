@@ -315,6 +315,9 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .soil_moisture_9_27cm, member: member, time: time)
             case .soil_moisture_27_to_81cm:
                 try prefetchData(raw: .soil_moisture_27_81cm, member: member, time: time)
+            case .wet_bulb_temperature_2m:
+                try prefetchData(raw: .temperature_2m, member: member, time: time)
+                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
             }
         case .pressure(let variable):
             let level = variable.level
@@ -484,6 +487,10 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 return try get(raw: .soil_moisture_9_27cm, member: member, time: time)
             case .soil_moisture_27_to_81cm:
                 return try get(raw: .soil_moisture_27_81cm, member: member, time: time)
+            case .wet_bulb_temperature_2m:
+                let temperature = try get(raw: .temperature_2m, member: member, time: time)
+                let rh = try get(raw: .relativehumidity_2m, member: member, time: time).data
+                return DataAndUnit(zip(temperature.data, rh).map(Meteorology.wetBulbTemperature), temperature.unit)
             }
         case .pressure(let variable):
             let level = variable.level

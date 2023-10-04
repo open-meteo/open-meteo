@@ -23,6 +23,7 @@ enum JmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case weathercode
     case snowfall
     case is_day
+    case wet_bulb_temperature_2m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -141,6 +142,9 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .precipitation, time: time)
             case .is_day:
                 break
+            case .wet_bulb_temperature_2m:
+                try prefetchData(raw: .temperature_2m, time: time)
+                try prefetchData(raw: .relativehumidity_2m, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -263,6 +267,10 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+            case .wet_bulb_temperature_2m:
+                let temperature = try get(raw: .temperature_2m, time: time)
+                let rh = try get(raw: .relativehumidity_2m, time: time)
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
             }
         case .pressure(let v):
             switch v.variable {

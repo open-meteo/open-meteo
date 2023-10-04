@@ -32,6 +32,7 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case terrestrial_radiation_instant
     case weathercode
     case is_day
+    case wet_bulb_temperature_2m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -268,6 +269,9 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 break
             case .temperature_120m:
                 try prefetchData(raw: .init(.surface(.temperature_100m), member), time: time)
+            case .wet_bulb_temperature_2m:
+                try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
+                try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -447,6 +451,10 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
             case .temperature_120m:
                 return try get(raw: .init(.surface(.temperature_100m), member), time: time)
+            case .wet_bulb_temperature_2m:
+                let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time)
+                let rh = try get(raw: .init(.surface(.relativehumidity_2m), member), time: time)
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
             }
         case .pressure(let v):
             switch v.variable {

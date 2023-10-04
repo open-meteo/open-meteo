@@ -257,6 +257,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 com_openmeteo_WeatherHourly.add(temperature50m: offset, &fbb)
             case .lifted_index:
                 com_openmeteo_WeatherHourly.add(liftedIndex: offset, &fbb)
+            case .wet_bulb_temperature_2m:
+                com_openmeteo_WeatherHourly.add(wetBulbTemperature2m: offset, &fbb)
             }
         }
         for (pressure, offset) in offsets.pressure {
@@ -535,6 +537,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                     com_openmeteo_WeatherCurrent.add(liftedIndex: v, &fbb)
                 case .temperature_50m:
                     com_openmeteo_WeatherCurrent.add(temperature50m: v, &fbb)
+                case .wet_bulb_temperature_2m:
+                    com_openmeteo_WeatherCurrent.add(wetBulbTemperature2m: v, &fbb)
                 }
             case .pressure(_):
                 throw ForecastapiError.generic(message: "Pressure level variables currently not supported for flatbuffers encoding in current block")
@@ -687,6 +691,12 @@ extension MultiDomains: ModelFlatbufferSerialisable {
                 com_openmeteo_WeatherDaily.add(updraftMax: offset, &fbb)
             case .vapor_pressure_deficit_max:
                 com_openmeteo_WeatherDaily.add(vaporPressureDeficitMax: offset, &fbb)
+            case .wet_bulb_temperature_2m_max:
+                com_openmeteo_WeatherDaily.add(wetBulbTemperature2mMax: offset, &fbb)
+            case .wet_bulb_temperature_2m_mean:
+                com_openmeteo_WeatherDaily.add(wetBulbTemperature2mMean: offset, &fbb)
+            case .wet_bulb_temperature_2m_min:
+                com_openmeteo_WeatherDaily.add(wetBulbTemperature2mMin: offset, &fbb)
             }
         }
         return com_openmeteo_WeatherDaily.endWeatherDaily(&fbb, start: start)

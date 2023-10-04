@@ -262,6 +262,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     case pressureLevelWinddirection = 238
     case pressureLevelVerticalVelocity = 240
     case pressureLevelGeopotentialHeight = 242
+    case wetBulbTemperature2m = 244
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -387,7 +388,8 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public var pressureLevelWinddirection: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelWinddirection.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelVerticalVelocity: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelVerticalVelocity.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var pressureLevelGeopotentialHeight: com_openmeteo_ValuesUnitPressureLevel? { let o = _accessor.offset(VTOFFSET.pressureLevelGeopotentialHeight.v); return o == 0 ? nil : com_openmeteo_ValuesUnitPressureLevel(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 120) }
+  public var wetBulbTemperature2m: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.wetBulbTemperature2m.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public static func startWeatherHourly(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 121) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func add(apparentTemperature: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperature, at: VTOFFSET.apparentTemperature.p) }
   public static func add(cape: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: cape, at: VTOFFSET.cape.p) }
@@ -508,6 +510,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
   public static func add(pressureLevelWinddirection: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelWinddirection, at: VTOFFSET.pressureLevelWinddirection.p) }
   public static func add(pressureLevelVerticalVelocity: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelVerticalVelocity, at: VTOFFSET.pressureLevelVerticalVelocity.p) }
   public static func add(pressureLevelGeopotentialHeight: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: pressureLevelGeopotentialHeight, at: VTOFFSET.pressureLevelGeopotentialHeight.p) }
+  public static func add(wetBulbTemperature2m: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: wetBulbTemperature2m, at: VTOFFSET.wetBulbTemperature2m.p) }
   public static func endWeatherHourly(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
   public static func createWeatherHourly(
     _ fbb: inout FlatBufferBuilder,
@@ -630,7 +633,8 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     pressureLevelWindspeedOffset pressureLevelWindspeed: Offset = Offset(),
     pressureLevelWinddirectionOffset pressureLevelWinddirection: Offset = Offset(),
     pressureLevelVerticalVelocityOffset pressureLevelVerticalVelocity: Offset = Offset(),
-    pressureLevelGeopotentialHeightOffset pressureLevelGeopotentialHeight: Offset = Offset()
+    pressureLevelGeopotentialHeightOffset pressureLevelGeopotentialHeight: Offset = Offset(),
+    wetBulbTemperature2mOffset wetBulbTemperature2m: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_WeatherHourly.startWeatherHourly(&fbb)
     com_openmeteo_WeatherHourly.add(time: time, &fbb)
@@ -753,6 +757,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     com_openmeteo_WeatherHourly.add(pressureLevelWinddirection: pressureLevelWinddirection, &fbb)
     com_openmeteo_WeatherHourly.add(pressureLevelVerticalVelocity: pressureLevelVerticalVelocity, &fbb)
     com_openmeteo_WeatherHourly.add(pressureLevelGeopotentialHeight: pressureLevelGeopotentialHeight, &fbb)
+    com_openmeteo_WeatherHourly.add(wetBulbTemperature2m: wetBulbTemperature2m, &fbb)
     return com_openmeteo_WeatherHourly.endWeatherHourly(&fbb, start: __start)
   }
 
@@ -878,6 +883,7 @@ public struct com_openmeteo_WeatherHourly: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.pressureLevelWinddirection.p, fieldName: "pressureLevelWinddirection", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
     try _v.visit(field: VTOFFSET.pressureLevelVerticalVelocity.p, fieldName: "pressureLevelVerticalVelocity", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
     try _v.visit(field: VTOFFSET.pressureLevelGeopotentialHeight.p, fieldName: "pressureLevelGeopotentialHeight", required: false, type: ForwardOffset<com_openmeteo_ValuesUnitPressureLevel>.self)
+    try _v.visit(field: VTOFFSET.wetBulbTemperature2m.p, fieldName: "wetBulbTemperature2m", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     _v.finish()
   }
 }
@@ -1005,6 +1011,7 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
     case windspeed40m = 224
     case windspeed50m = 226
     case windspeed80m = 228
+    case wetBulbTemperature2m = 230
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -1233,7 +1240,9 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
   public var mutableWindspeed50m: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.windspeed50m.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
   public var windspeed80m: com_openmeteo_ValueAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed80m.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_ValueAndUnit.self, at: o) }
   public var mutableWindspeed80m: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.windspeed80m.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
-  public static func startWeatherCurrent(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 113) }
+  public var wetBulbTemperature2m: com_openmeteo_ValueAndUnit? { let o = _accessor.offset(VTOFFSET.wetBulbTemperature2m.v); return o == 0 ? nil : _accessor.readBuffer(of: com_openmeteo_ValueAndUnit.self, at: o) }
+  public var mutableWetBulbTemperature2m: com_openmeteo_ValueAndUnit_Mutable? { let o = _accessor.offset(VTOFFSET.wetBulbTemperature2m.v); return o == 0 ? nil : com_openmeteo_ValueAndUnit_Mutable(_accessor.bb, o: o + _accessor.postion) }
+  public static func startWeatherCurrent(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 114) }
   public static func add(time: Int64, _ fbb: inout FlatBufferBuilder) { fbb.add(element: time, def: 0, at: VTOFFSET.time.p) }
   public static func add(interval: Int32, _ fbb: inout FlatBufferBuilder) { fbb.add(element: interval, def: 0, at: VTOFFSET.interval.p) }
   public static func add(apparentTemperature: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let apparentTemperature = apparentTemperature else { return }; fbb.create(struct: apparentTemperature, position: VTOFFSET.apparentTemperature.p) }
@@ -1347,6 +1356,7 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
   public static func add(windspeed40m: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let windspeed40m = windspeed40m else { return }; fbb.create(struct: windspeed40m, position: VTOFFSET.windspeed40m.p) }
   public static func add(windspeed50m: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let windspeed50m = windspeed50m else { return }; fbb.create(struct: windspeed50m, position: VTOFFSET.windspeed50m.p) }
   public static func add(windspeed80m: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let windspeed80m = windspeed80m else { return }; fbb.create(struct: windspeed80m, position: VTOFFSET.windspeed80m.p) }
+  public static func add(wetBulbTemperature2m: com_openmeteo_ValueAndUnit?, _ fbb: inout FlatBufferBuilder) { guard let wetBulbTemperature2m = wetBulbTemperature2m else { return }; fbb.create(struct: wetBulbTemperature2m, position: VTOFFSET.wetBulbTemperature2m.p) }
   public static func endWeatherCurrent(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); return end }
   public static func createWeatherCurrent(
     _ fbb: inout FlatBufferBuilder,
@@ -1462,7 +1472,8 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
     windspeed20m: com_openmeteo_ValueAndUnit? = nil,
     windspeed40m: com_openmeteo_ValueAndUnit? = nil,
     windspeed50m: com_openmeteo_ValueAndUnit? = nil,
-    windspeed80m: com_openmeteo_ValueAndUnit? = nil
+    windspeed80m: com_openmeteo_ValueAndUnit? = nil,
+    wetBulbTemperature2m: com_openmeteo_ValueAndUnit? = nil
   ) -> Offset {
     let __start = com_openmeteo_WeatherCurrent.startWeatherCurrent(&fbb)
     com_openmeteo_WeatherCurrent.add(time: time, &fbb)
@@ -1578,6 +1589,7 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
     com_openmeteo_WeatherCurrent.add(windspeed40m: windspeed40m, &fbb)
     com_openmeteo_WeatherCurrent.add(windspeed50m: windspeed50m, &fbb)
     com_openmeteo_WeatherCurrent.add(windspeed80m: windspeed80m, &fbb)
+    com_openmeteo_WeatherCurrent.add(wetBulbTemperature2m: wetBulbTemperature2m, &fbb)
     return com_openmeteo_WeatherCurrent.endWeatherCurrent(&fbb, start: __start)
   }
 
@@ -1696,6 +1708,7 @@ public struct com_openmeteo_WeatherCurrent: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.windspeed40m.p, fieldName: "windspeed40m", required: false, type: com_openmeteo_ValueAndUnit.self)
     try _v.visit(field: VTOFFSET.windspeed50m.p, fieldName: "windspeed50m", required: false, type: com_openmeteo_ValueAndUnit.self)
     try _v.visit(field: VTOFFSET.windspeed80m.p, fieldName: "windspeed80m", required: false, type: com_openmeteo_ValueAndUnit.self)
+    try _v.visit(field: VTOFFSET.wetBulbTemperature2m.p, fieldName: "wetBulbTemperature2m", required: false, type: com_openmeteo_ValueAndUnit.self)
     _v.finish()
   }
 }
@@ -1780,6 +1793,9 @@ public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
     case windspeed10mMax = 138
     case windspeed10mMean = 140
     case windspeed10mMin = 142
+    case wetBulbTemperature2mMax = 144
+    case wetBulbTemperature2mMean = 146
+    case wetBulbTemperature2mMin = 148
     var v: Int32 { Int32(self.rawValue) }
     var p: VOffset { self.rawValue }
   }
@@ -1861,7 +1877,10 @@ public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
   public var windspeed10mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var windspeed10mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
   public var windspeed10mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.windspeed10mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
-  public static func startWeatherDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 70) }
+  public var wetBulbTemperature2mMax: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.wetBulbTemperature2mMax.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var wetBulbTemperature2mMean: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.wetBulbTemperature2mMean.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public var wetBulbTemperature2mMin: com_openmeteo_ValuesAndUnit? { let o = _accessor.offset(VTOFFSET.wetBulbTemperature2mMin.v); return o == 0 ? nil : com_openmeteo_ValuesAndUnit(_accessor.bb, o: _accessor.indirect(o + _accessor.postion)) }
+  public static func startWeatherDaily(_ fbb: inout FlatBufferBuilder) -> UOffset { fbb.startTable(with: 73) }
   public static func add(time: com_openmeteo_TimeRange?, _ fbb: inout FlatBufferBuilder) { guard let time = time else { return }; fbb.create(struct: time, position: VTOFFSET.time.p) }
   public static func add(apparentTemperatureMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperatureMax, at: VTOFFSET.apparentTemperatureMax.p) }
   public static func add(apparentTemperatureMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: apparentTemperatureMean, at: VTOFFSET.apparentTemperatureMean.p) }
@@ -1932,6 +1951,9 @@ public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
   public static func add(windspeed10mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMax, at: VTOFFSET.windspeed10mMax.p) }
   public static func add(windspeed10mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMean, at: VTOFFSET.windspeed10mMean.p) }
   public static func add(windspeed10mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: windspeed10mMin, at: VTOFFSET.windspeed10mMin.p) }
+  public static func add(wetBulbTemperature2mMax: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: wetBulbTemperature2mMax, at: VTOFFSET.wetBulbTemperature2mMax.p) }
+  public static func add(wetBulbTemperature2mMean: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: wetBulbTemperature2mMean, at: VTOFFSET.wetBulbTemperature2mMean.p) }
+  public static func add(wetBulbTemperature2mMin: Offset, _ fbb: inout FlatBufferBuilder) { fbb.add(offset: wetBulbTemperature2mMin, at: VTOFFSET.wetBulbTemperature2mMin.p) }
   public static func endWeatherDaily(_ fbb: inout FlatBufferBuilder, start: UOffset) -> Offset { let end = Offset(offset: fbb.endTable(at: start)); fbb.require(table: end, fields: [4]); return end }
   public static func createWeatherDaily(
     _ fbb: inout FlatBufferBuilder,
@@ -2004,7 +2026,10 @@ public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
     windgusts10mMinOffset windgusts10mMin: Offset = Offset(),
     windspeed10mMaxOffset windspeed10mMax: Offset = Offset(),
     windspeed10mMeanOffset windspeed10mMean: Offset = Offset(),
-    windspeed10mMinOffset windspeed10mMin: Offset = Offset()
+    windspeed10mMinOffset windspeed10mMin: Offset = Offset(),
+    wetBulbTemperature2mMaxOffset wetBulbTemperature2mMax: Offset = Offset(),
+    wetBulbTemperature2mMeanOffset wetBulbTemperature2mMean: Offset = Offset(),
+    wetBulbTemperature2mMinOffset wetBulbTemperature2mMin: Offset = Offset()
   ) -> Offset {
     let __start = com_openmeteo_WeatherDaily.startWeatherDaily(&fbb)
     com_openmeteo_WeatherDaily.add(time: time, &fbb)
@@ -2077,6 +2102,9 @@ public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
     com_openmeteo_WeatherDaily.add(windspeed10mMax: windspeed10mMax, &fbb)
     com_openmeteo_WeatherDaily.add(windspeed10mMean: windspeed10mMean, &fbb)
     com_openmeteo_WeatherDaily.add(windspeed10mMin: windspeed10mMin, &fbb)
+    com_openmeteo_WeatherDaily.add(wetBulbTemperature2mMax: wetBulbTemperature2mMax, &fbb)
+    com_openmeteo_WeatherDaily.add(wetBulbTemperature2mMean: wetBulbTemperature2mMean, &fbb)
+    com_openmeteo_WeatherDaily.add(wetBulbTemperature2mMin: wetBulbTemperature2mMin, &fbb)
     return com_openmeteo_WeatherDaily.endWeatherDaily(&fbb, start: __start)
   }
 
@@ -2152,6 +2180,9 @@ public struct com_openmeteo_WeatherDaily: FlatBufferObject, Verifiable {
     try _v.visit(field: VTOFFSET.windspeed10mMax.p, fieldName: "windspeed10mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.windspeed10mMean.p, fieldName: "windspeed10mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     try _v.visit(field: VTOFFSET.windspeed10mMin.p, fieldName: "windspeed10mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.wetBulbTemperature2mMax.p, fieldName: "wetBulbTemperature2mMax", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.wetBulbTemperature2mMean.p, fieldName: "wetBulbTemperature2mMean", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
+    try _v.visit(field: VTOFFSET.wetBulbTemperature2mMin.p, fieldName: "wetBulbTemperature2mMin", required: false, type: ForwardOffset<com_openmeteo_ValuesAndUnit>.self)
     _v.finish()
   }
 }

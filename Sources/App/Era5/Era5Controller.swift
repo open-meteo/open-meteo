@@ -38,6 +38,7 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case diffuse_radiation_instant
     case direct_radiation_instant
     case direct_normal_irradiance_instant
+    case wet_bulb_temperature_2m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

@@ -30,6 +30,7 @@ enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixabl
     case diffuse_radiation_instant
     case direct_radiation_instant
     case direct_normal_irradiance_instant
+    case wet_bulb_temperature_2m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -132,6 +133,9 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .direct_radiation, time: time)
         case .direct_normal_irradiance_instant:
             try prefetchData(raw: .direct_radiation, time: time)
+        case .wet_bulb_temperature_2m:
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .relativehumidity_2m, time: time)
         }
     }
     
@@ -266,6 +270,10 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let diff = try get(derived: .diffuse_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
+        case .wet_bulb_temperature_2m:
+            let relhum = try get(raw: .relativehumidity_2m, time: time)
+            let temperature = try get(raw: .temperature_2m, time: time)
+            return DataAndUnit(zip(temperature.data,relhum.data).map(Meteorology.wetBulbTemperature), temperature.unit)
         }
     }
 }

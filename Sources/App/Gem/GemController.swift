@@ -24,6 +24,7 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case rain
     case weathercode
     case is_day
+    case wet_bulb_temperature_2m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -143,6 +144,9 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.windgusts_10m), member), time: time)
             case .is_day:
                 break
+            case .wet_bulb_temperature_2m:
+                try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
+                try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -280,6 +284,10 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+            case .wet_bulb_temperature_2m:
+                let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time)
+                let rh = try get(raw: .init(.surface(.relativehumidity_2m), member), time: time)
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
             }
         case .pressure(let v):
             switch v.variable {

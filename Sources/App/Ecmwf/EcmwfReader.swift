@@ -269,6 +269,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let rh = try get(derived: .init(.relativehumidity_2m, member), time: time).data
             let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
+        case .wet_bulb_temperature_2m:
+            let temperature = try get(raw: .init(.temperature_2m, member), time: time)
+            let rh = try get(derived: .init(.relativehumidity_2m, member), time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
         }
     }
     
@@ -425,12 +429,16 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .init(.relative_humidity_1000hPa, member), time: time)
         case .dewpoint_2m:
             try prefetchData(raw: .init(.relative_humidity_1000hPa, member), time: time)
+            try prefetchData(raw: .init(.temperature_2m, member), time: time)
         case .apparent_temperature:
             try prefetchData(derived: .init(.relativehumidity_2m, member), time: time)
             try prefetchData(raw: .init(.temperature_2m, member), time: time)
             try prefetchData(derived: .init(.windspeed_10m, member), time: time)
         case .vapor_pressure_deficit:
             try prefetchData(derived: .init(.relativehumidity_2m, member), time: time)
+            try prefetchData(raw: .init(.temperature_2m, member), time: time)
+        case .wet_bulb_temperature_2m:
+            try prefetchData(raw: .init(.relative_humidity_1000hPa, member), time: time)
             try prefetchData(raw: .init(.temperature_2m, member), time: time)
         }
     }

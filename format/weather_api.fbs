@@ -223,6 +223,8 @@ table WeatherHourly {
   pressure_level_vertical_velocity: ValuesUnitPressureLevel;
   pressure_level_geopotential_height: ValuesUnitPressureLevel;
 
+  wet_bulb_temperature_2m: ValuesAndUnit;
+
   /*temperature_1015hPa: ValuesAndUnit;
   temperature_1000hPa: ValuesAndUnit;
   temperature_985hPa: ValuesAndUnit;
@@ -636,6 +638,8 @@ table WeatherCurrent {
   windspeed_50m: ValueAndUnit;
   windspeed_80m: ValueAndUnit;
 
+  wet_bulb_temperature_2m: ValueAndUnit;
+
   /*pressure_level_temperature: ValueUnitPressureLevel;
   pressure_level_dewpoint: ValueUnitPressureLevel;
   pressure_level_relativehumidity: ValueUnitPressureLevel;
@@ -717,6 +721,10 @@ table WeatherDaily {
   windspeed_10m_max: ValuesAndUnit;
   windspeed_10m_mean: ValuesAndUnit;
   windspeed_10m_min: ValuesAndUnit;
+
+  wet_bulb_temperature_2m_max: ValuesAndUnit;
+  wet_bulb_temperature_2m_mean: ValuesAndUnit;
+  wet_bulb_temperature_2m_min: ValuesAndUnit;
 }
  
 table WeatherApi {

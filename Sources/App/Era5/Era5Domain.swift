@@ -435,6 +435,9 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .direct_radiation, time: time)
         case .direct_normal_irradiance_instant:
             try prefetchData(raw: .direct_radiation, time: time)
+        case .wet_bulb_temperature_2m:
+            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
         }
     }
     
@@ -640,6 +643,11 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let diff = try get(derived: .diffuse_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
+        case .wet_bulb_temperature_2m:
+            let temperature = try get(raw: .temperature_2m, time: time)
+            let dew = try get(raw: .dewpoint_2m, time: time).data
+            let rh = zip(temperature.data, dew).map(Meteorology.relativeHumidity)
+            return DataAndUnit(zip(temperature.data, rh).map(Meteorology.wetBulbTemperature), temperature.unit)
         }
     }
 }

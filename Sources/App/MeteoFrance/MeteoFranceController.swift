@@ -47,6 +47,7 @@ enum MeteoFranceVariableDerivedSurface: String, CaseIterable, GenericVariableMix
     case weathercode
     case is_day
     case showers
+    case wet_bulb_temperature_2m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -279,6 +280,9 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .temperature_200m, time: time)
             case .showers:
                 try prefetchData(variable: .precipitation, time: time)
+            case .wet_bulb_temperature_2m:
+                try prefetchData(variable: .temperature_2m, time: time)
+                try prefetchData(variable: .relativehumidity_2m, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -472,6 +476,10 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
             case .showers:
                 let precipitation = try get(raw: .precipitation, time: time)
                 return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
+            case .wet_bulb_temperature_2m:
+                let temperature = try get(raw: .temperature_2m, time: time)
+                let rh = try get(raw: .relativehumidity_2m, time: time)
+                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
             }
         case .pressure(let v):
             switch v.variable {

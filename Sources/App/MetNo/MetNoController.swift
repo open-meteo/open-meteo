@@ -79,6 +79,9 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .temperature_2m, time: time)
         case .showers:
             try prefetchData(raw: .precipitation, time: time)
+        case .wet_bulb_temperature_2m:
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .relativehumidity_2m, time: time)
         }
     }
     
@@ -188,6 +191,10 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             // always 0, but only if any data is available in precipitation.
             let precipitation = try get(raw: .precipitation, time: time)
             return DataAndUnit(precipitation.data.map({ min($0, 0) }), precipitation.unit)
+        case .wet_bulb_temperature_2m:
+            let temperature = try get(raw: .temperature_2m, time: time)
+            let rh = try get(raw: .relativehumidity_2m, time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
         }
     }
 }
@@ -217,6 +224,7 @@ enum MetNoVariableDerived: String, GenericVariableMixable {
     case is_day
     case rain
     case showers
+    case wet_bulb_temperature_2m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
