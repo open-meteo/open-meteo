@@ -11,7 +11,7 @@ The HTTP server and download commands are developed using the Vapor Swift framew
 Once the binary is available, you can start an HTTP server and download weather data from open-data sources. The file-based database is automatically created, as soon as the first datasets are downloaded.
 
 Hardware requirements:
-- A relatively modern CPU with SIMD instructions. Both `x86-64` and `Arm®` are supported.
+- A relatively modern CPU with SIMD (or Intel® AVX2) instructions. Both `x86-64` and `Arm®` are supported.
 - At least 8 GB of memory, 16 GB recommended.
 - For all forecast data, 150 GB of disk space is recommended (for best performance, SSD with high number of IOPS). If only a small selection for weather variables is used, just a couple of GB are fine (32 - 48 GB).
 
