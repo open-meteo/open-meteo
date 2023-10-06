@@ -16,7 +16,7 @@ Hardware requirements:
 - For all forecast data, 150 GB disk space are recommended. If only a small selection for weather variables is used, just a couple of GB are fine.
 
 ## Running the API
-There are different option to run Open-Meteo: Docker or with prebuilt ubuntu jammy packages.
+There are different option to run Open-Meteo: Docker or with prebuilt Ubuntu 22.04 (Jammy Jellyfish) packages.
 
 ### Running on Docker
 To quickly run Open-Meteo, Docker can be used. It will run an container which exposes the Open-Meteo API to http://127.0.0.1:8080. Afterwards weather datasets can be downloaded. 
