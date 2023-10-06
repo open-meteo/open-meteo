@@ -172,6 +172,15 @@
       }
     },
     {
+      "identity" : "swift-sdk",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/open-meteo/swift-sdk.git",
+      "state" : {
+        "revision" : "c58aa3faee13e8bdc1ee4753c4d894001e4f5610",
+        "version" : "1.1.0"
+      }
+    },
+    {
       "identity" : "swifteccodes",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftEccodes.git",

@@ -1,6 +1,8 @@
 import Foundation
 import FlatBuffers
 import Vapor
+import OpenMeteo
+
 
 extension ForecastapiResult {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
@@ -56,7 +58,7 @@ extension ForecastapiResult {
         let offsets: [Offset] = section.columns.map { v in
             switch v.variables[0] {
             case .float(let float):
-                return com_openmeteo_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: fbb.createVector(float), unit: v.unit)
+                return ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: fbb.createVector(float), unit: v.unit)
             case .timestamp(let time):
                 return fbb.createVector(time.map({$0.timeIntervalSince1970}))
             }
@@ -73,10 +75,10 @@ extension ForecastapiResult {
         for v in section.columns {
             switch v.variable {
             case .surface(let surface):
-                let offset = com_openmeteo_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: v.variables[0].expectFloatArray(&fbb), unit: v.unit)
+                let offset = ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: v.variables[0].expectFloatArray(&fbb), unit: v.unit)
                 surfaces.append((surface, offset))
             case .pressure(let pressure):
-                let offset = com_openmeteo_ValuesAndLevel.createValuesAndLevel(&fbb, level: Int32(pressure.level), valuesVectorOffset: v.variables[0].expectFloatArray(&fbb))
+                let offset = ValuesAndLevel.createValuesAndLevel(&fbb, level: Int32(pressure.level), valuesVectorOffset: v.variables[0].expectFloatArray(&fbb))
                 if let pos = pressures.firstIndex(where: {$0.variable == pressure.variable}) {
                     pressures[pos].offsets.append(offset)
                 } else {
@@ -86,7 +88,7 @@ extension ForecastapiResult {
         }
         
         let pressureVectors: [(variable: Model.HourlyPressureType, offset: Offset)] = pressures.map { (variable, unit, offsets) in
-            return (variable, com_openmeteo_ValuesUnitPressureLevel.createValuesUnitPressureLevel(&fbb, unit: unit, valuesVectorOffset: fbb.createVector(ofOffsets: offsets)))
+            return (variable, ValuesUnitPressureLevel.createValuesUnitPressureLevel(&fbb, unit: unit, valuesVectorOffset: fbb.createVector(ofOffsets: offsets)))
         }
         
         return (surfaces, pressureVectors)
@@ -102,15 +104,15 @@ extension ForecastapiResult {
             switch v.variable {
             case .surface(let surface):
                 let oo = v.variables.enumerated().map { (member, data) in
-                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: data.expectFloatArray(&fbb))
+                    return ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: data.expectFloatArray(&fbb))
                 }
-                let offset = com_openmeteo_ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
+                let offset = ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
                 surfaces.append((surface, offset))
             case .pressure(let pressure):
                 let oo = v.variables.enumerated().map { (member, data) in
-                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: data.expectFloatArray(&fbb))
+                    return ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: data.expectFloatArray(&fbb))
                 }
-                let offset = com_openmeteo_ValuesAndLevelAndMember.createValuesAndLevelAndMember(&fbb, level: Int32(pressure.level), valuesVectorOffset: fbb.createVector(ofOffsets: oo))
+                let offset = ValuesAndLevelAndMember.createValuesAndLevelAndMember(&fbb, level: Int32(pressure.level), valuesVectorOffset: fbb.createVector(ofOffsets: oo))
                 if let pos = pressures.firstIndex(where: {$0.variable == pressure.variable}) {
                     pressures[pos].offsets.append(offset)
                 } else {
@@ -120,7 +122,7 @@ extension ForecastapiResult {
         }
         
         let pressureVectors: [(variable: Model.HourlyPressureType, offset: Offset)] = pressures.map { (variable, unit, offsets) in
-            return (variable, com_openmeteo_ValuesUnitPressureLevelAndMember.createValuesUnitPressureLevelAndMember(&fbb, unit: unit, valuesVectorOffset: fbb.createVector(ofOffsets: offsets)))
+            return (variable, ValuesUnitPressureLevelAndMember.createValuesUnitPressureLevelAndMember(&fbb, unit: unit, valuesVectorOffset: fbb.createVector(ofOffsets: offsets)))
         }
         
         return (surfaces, pressureVectors)
@@ -132,12 +134,12 @@ extension ForecastapiResult {
             let oo = v.variables.enumerated().map { (member, array) in
                 switch array {
                 case .float(let float):
-                    return com_openmeteo_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: fbb.createVector(float))
+                    return ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: fbb.createVector(float))
                 case .timestamp(let time):
                     return fbb.createVector(time.map({$0.timeIntervalSince1970}))
                 }
             }
-            return com_openmeteo_ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
+            return ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
         }
         return offsets
     }
@@ -155,7 +157,7 @@ extension ApiArray {
 }
 
 extension ApiSection {
-    func timeFlatBuffers() -> com_openmeteo_TimeRange {
+    func timeFlatBuffers() -> TimeRange {
         return .init(
             start: Int64(time.range.lowerBound.timeIntervalSince1970),
             end: Int64(time.range.upperBound.timeIntervalSince1970),
