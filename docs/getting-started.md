@@ -107,17 +107,21 @@ Additionally all download instructions as a cronjob file are available [here](ht
 
 ### DWD ICON
 The DWD ICON models are the most important source for the 7 days weather API. There are 3 different domains available:
-- ICON global, via `icon`
-- - 11 km resolution
-- - Runs at `00, 06, 12, 18`
-- ICON EU, via `icon-eu`
-- - 7 km resolution
-- - Runs at `00, 03, 06, 09, 12, 15, 18, 21`
-- ICON D2 Central Europe, via `icon-d2`
-- - 2 km resolution
-- - Runs at `00, 03, 06, 09, 12, 15, 18, 21`
 
-As a minimum requirement, ICON global should be downloaded. To download the 00 run: `<exe> download icon --run 00 --only-variables temperature_2m,weathercode`. If `only-variables` is omitted, all ICON weather variables are downloaded, which could take a couple of hours.
+| Model               | Resolution | Runs at                          |
+|---------------------|------------|----------------------------------|
+| ICON global `icon`  | 11 km      | `00, 06, 12, 18`                 |
+| ICON EU `icon-eu`   | 7 km       | `00, 03, 06, 09, 12, 15, 18, 21` |
+| ICON D2 `icon-d2`   | 2 km       | `00, 03, 06, 09, 12, 15, 18, 21` |
+
+
+As a minimum requirement, ICON global should be downloaded. To download the 00 run:
+
+```bash
+<exe> download icon --run 00 --only-variables temperature_2m,weathercode
+``` 
+ 
+If `only-variables` is omitted, all ICON weather variables are downloaded, which could take a couple of hours.
 
 For the first run, the ICON downloader will download additional domain geometry information and prepare reproduction weights. It might take a while.
 
