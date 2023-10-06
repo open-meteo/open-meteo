@@ -39,8 +39,8 @@ docker run -it --rm -v ${PWD}/data:/app/data ghcr.io/open-meteo/open-meteo downl
 curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs04&hourly=temperature_2m"
 ```
 
-### Using prebuilt Ubuntu jammy packages
-If you are running Ubuntu 22.04 jammy, you can use prebuilt binaries.
+### Using prebuilt Ubuntu Jammy Jellyfish packages
+If you are running Ubuntu 22.04 Jammy Jellyfish, you can use prebuilt binaries.
 
 They can be installed via APT:
 ```bash
