@@ -165,6 +165,8 @@ aws s3 sync --no-sign-request --exclude "*" --include "Copernicus_DSM_COG_30*/*_
 ```
 For further installation instructions see, [Install or update the latest version of the AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
 
-Requirements: Install gdal and make sure the command `gdal_translate` is available. Mac: `brew install gdal` Linux: `apt install gdal`
+**Requirements**: Install gdal and make sure the command `gdal_translate` is available.
+- Mac: `brew install gdal`
+- Linux: `apt install gdal`
 
 Afterwards it can be converted with `<exe> download-dem dem-90m` and input data can be removed with `rm -R dem-90m data/dem90/`. The converted files will be available at `data/omfile-dem90`
