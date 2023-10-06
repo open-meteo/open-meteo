@@ -8,8 +8,8 @@ protocol DecodableApiVariable {
 struct ApiVariable {
     /// Reference to the original. Could be `soil_moisture_7_to_28cm` or `soil_moisture_7_28cm`
     let original: Substring
-    let variable: com_openmeteo_api_result_VariableType
-    let aggregation: com_openmeteo_api_result_Aggregation
+    let variable: api_result_VariableType
+    let aggregation: api_result_Aggregation
     let altitude: Int32
     let pressure: Int32
     let depth: Int32
@@ -33,14 +33,14 @@ struct ApiVariable {
 /// Returned API data
 struct ApiVariableAndModel {
     let variable: ApiVariable
-    let model: com_openmeteo_api_result_Model
+    let model: api_result_Model
     let unit: SiUnit
     let ensembleMember: Int32
     let values: ApiArray
 }
 
 
-extension com_openmeteo_api_result_VariableType {
+extension api_result_VariableType {
     /// Find the longest matching variable name and return it along with its length
     static func startsWith(s: Substring) -> (Self, Int)? {
         var match: (Self, Int)? = nil

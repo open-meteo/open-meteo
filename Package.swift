@@ -30,6 +30,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.67.4"),
         .package(url: "https://github.com/google/flatbuffers.git", from: "23.3.3"),
+        .package(url: "https://github.com/open-meteo/swift-sdk.git", from: "1.1.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.0.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.1"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "0.1.5"),
@@ -42,6 +43,7 @@ let package = Package(
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
                 .product(name: "FlatBuffers", package: "flatbuffers"),
+                .product(name: "OpenMeteo", package: "swift-sdk"),
                 .product(name: "SwiftNetCDF", package: "SwiftNetCDF"),
                 .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),
                 .product(name: "SwiftEccodes", package: "SwiftEccodes"),
