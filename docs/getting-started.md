@@ -40,9 +40,8 @@ curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf
 ```
 
 ### Using prebuilt Ubuntu Jammy Jellyfish packages
-If you are running Ubuntu 22.04 Jammy Jellyfish, you can use prebuilt binaries.
+If you are running Ubuntu 22.04 Jammy Jellyfish, you can use prebuilt binaries. They can be installed via APT:
 
-They can be installed via APT:
 ```bash
 curl -L https://apt.open-meteo.com/public.key | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/openmeteo.gpg
 echo "deb [arch=amd64] https://apt.open-meteo.com $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/openmeteo-api.list
@@ -63,7 +62,7 @@ sudo systemctl restart openmeteo-api
 sudo journalctl -u openmeteo-api.service
 ```
 
-Per default, port 8080 is bound to 127.0.0.1 and not exposed to the network. You can set `API_BIND="0.0.0.0:8080"` in `/etc/default/openmeteo-api.env` and restart the service to expose the service. However, it is recommended to use a proxy like nginx.
+Per default, port 8080 is bound to 127.0.0.1 and **not** exposed to the network. You can set `API_BIND="0.0.0.0:8080"` in `/etc/default/openmeteo-api.env` and restart the service to expose the service. However, it is recommended to use a proxy like nginx.
 
 ## Downloading datasets
 The instruction above, setup an API instance, but do not download any weather data yet. Because data is consumed from different national weather services with different open-data servers and update times, many different downloaders are available.
@@ -108,9 +107,15 @@ Additionally all download instructions as a cronjob file are available [here](ht
 
 ### DWD ICON
 The DWD ICON models are the most important source for the 7 days weather API. There are 3 different domains available:
-- ICON global at 11 km resolution, runs `00,06,12,18`
-- ICON EU with 7 km, runs `00,03,06,09,12,15,18,21`
-- ICON D2 Central Europe with 2 km resolution, runs `00,03,06,09,12,15,18,21`
+- ICON global, via `icon`
+- - 11 km resolution
+- - Runs at `00, 06, 12, 18`
+- ICON EU, via `icon-eu`
+- - 7 km resolution
+- - Runs at `00, 03, 06, 09, 12, 15, 18, 21`
+- ICON D2 Central Europe, via `icon-d2`
+- - 2 km resolution
+- - Runs at `00, 03, 06, 09, 12, 15, 18, 21`
 
 As a minimum requirement, ICON global should be downloaded. To download the 00 run: `<exe> download icon --run 00 --only-variables temperature_2m,weathercode`. If `only-variables` is omitted, all ICON weather variables are downloaded, which could take a couple of hours.
 
