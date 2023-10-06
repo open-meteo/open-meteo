@@ -1,0 +1,22 @@
+version: 2
+updates:
+- package-ecosystem: swift
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "13:00"
+  open-pull-requests-limit: 10
+  reviewers:
+  - patrick-zippenfenig
+  allow:
+  - dependency-type: direct
+  - dependency-type: indirect
+  commit-message:
+    prefix: "fix: "
+- package-ecosystem: "github-actions"
+  directory: "/"
+  schedule:
+    interval: daily
+    time: "13:00"
+  commit-message:
+    prefix: "fix: "
