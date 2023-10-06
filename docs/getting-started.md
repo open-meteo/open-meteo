@@ -68,25 +68,38 @@ Per default, port 8080 is bound to 127.0.0.1 and not exposed to the network. You
 ## Downloading datasets
 The instruction above, setup an API instance, but do not download any weather data yet. Because data is consumed from different national weather services with different open-data servers and update times, many different downloaders are available.
 
-Please note, that only the command arguments are listed below. Whether you are using Docker, prebuilt or native, the command differs a bit. There is an example to download ECMWF forecasts at each installation method above. All arguments that are available for the binary, are accessible via `<exe> --help`, `<exe> --help` should be the path to your executable:
+Please note, that only the command arguments are listed below. Whether you are using Docker, prebuilt or native, the command differs a bit. There is an example to download ECMWF forecasts at each installation method above. All arguments that are available for the binary, are accessible via `<exe> --help`. Please mind that `<exe> --help` should be the path to your executable:
 
 ```
-# openmeteo-api --help
-Usage: openmeteo-api <command>
+# openmeteo-api --help                          
+Usage: /usr/local/bin/openmeteo-api <command>
 
 Commands:
-          benchmark Run benchmark
-               boot Boots the application's providers.
-            cronjob Emits the cronjob definition
-           download Download a specified icon model run
-       download-dem Download digital elevation model
-     download-ecmwf Download a specified ecmwf model run
-      download-era5 Download ERA5 from the ECMWF climate data store and convert
-  download-iconwave Download a specified wave model run
-             routes Displays all registered routes.
-              serve Begins serving the app over HTTP.
+                   benchmark Benchmark Open-Meteo core functions like data manipulation and compression
+                        boot Boots the application's providers.
+                  convert-om Convert an om file to to NetCDF
+                     cronjob Emits the cronjob definition
+                    download Download a specified icon model run
+               download-cams Download global and european CAMS air quality forecasts
+              download-cmip6 Download CMIP6 data and convert
+                download-dem Convert digital elevation model
+              download-ecmwf Download a specified ecmwf model run
+               download-era5 Download ERA5 from the ECMWF climate data store and convert
+                download-gem Download Gem models
+                download-gfs Download GFS from NOAA NCEP
+             download-glofas Download river discharge data from GloFAS
+           download-iconwave Download a specified wave model run
+                download-jma Download JMA models
+        download-meteofrance Download MeteoFrance models
+              download-metno Download MetNo models
+          download-satellite Download satellite datasets
+  download-seasonal-forecast Download seasonal forecasts from Copernicus
+                      export Export to dataset to NetCDF
+                      routes Displays all registered routes.
+                       serve Begins serving the app over HTTP.
+                        sync Synchronise weather database from a remote server
 
-Use `openmeteo-api <command> [--help,-h]` for more information on a command.
+Use `/usr/local/bin/openmeteo-api <command> [--help,-h]` for more information on a command.
 ```
 
 All data is stored in the current working directory in `./data`. Please make sure that your current working directory is correct. All downloaders will create the required directories automatically. All subsequent downloader invocations will update weather data in this directory. Deleting it, will delete all historical weather data.
