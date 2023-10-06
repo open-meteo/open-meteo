@@ -66,9 +66,9 @@ sudo journalctl -u openmeteo-api.service
 Per default, port 8080 is bound to 127.0.0.1 and not exposed to the network. You can set `API_BIND="0.0.0.0:8080"` in `/etc/default/openmeteo-api.env` and restart the service to expose the service. However, it is recommended to use a proxy like NGINX.
 
 ## Downloading datasets
-The instruction above, setup an API instance, but do not download any weather data yet. Because data is consumed from different national weather services with different open-data servers and update times, many different downloader are available.
+The instruction above, setup an API instance, but do not download any weather data yet. Because data is consumed from different national weather services with different open-data servers and update times, many different downloaders are available.
 
-Please note, that only the command arguments are listed below. Whether you are using Docker, prebuilt or native, the command differs a bit. There is an example to download ECMWF forecasts at each installation method above. All arguments are available for the binary are available with `<exe> --help`:
+Please note, that only the command arguments are listed below. Whether you are using Docker, prebuilt or native, the command differs a bit. There is an example to download ECMWF forecasts at each installation method above. All arguments that are available for the binary, are accessible via `<exe> --help`, `<exe> --help` should be the path to your executable:
 
 ```
 # openmeteo-api --help
