@@ -45,7 +45,7 @@ struct IconWaveController {
             
             let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try IconWaveMixer(domains: domain.wavemodels, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea) else {
-                    fatalError()
+                    return nil
                 }
                 
                 return .init(
