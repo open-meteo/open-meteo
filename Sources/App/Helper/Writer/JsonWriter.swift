@@ -81,16 +81,16 @@ extension ForecastapiResult.PerLocation {
             case .unixtime:
                 b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.abbreviation)\"")
             }
+            b.buffer.writeString(",\"interval\":\"seconds\"")
             for e in current.columns {
                 b.buffer.writeString(",\"\(e.variable.rawValue)\":\"\(e.unit.abbreviation)\"")
             }
             b.buffer.writeString("}")
-            b.buffer.writeString(",\"\(current.name)_interval_seconds\":\(current.dtSeconds)")
             b.buffer.writeString(",\"\(current.name)\":")
             b.buffer.writeString("{")
             b.buffer.writeString("\"time\":")
             b.buffer.writeString(current.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true))
-            
+            b.buffer.writeString(",\"interval\":\(current.dtSeconds)")
             /// Write data
             for e in current.columns {
                 let format = "%.\(e.unit.significantDigits)f"
