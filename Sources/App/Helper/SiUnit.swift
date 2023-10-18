@@ -1,6 +1,7 @@
 import Foundation
-@_exported import enum OpenMeteo.SiUnit
+import enum OpenMeteoSdk.openmeteo_sdk_SiUnit
 
+typealias SiUnit = openmeteo_sdk_SiUnit
 
 enum TemperatureUnit: String, Codable {
     case celsius
