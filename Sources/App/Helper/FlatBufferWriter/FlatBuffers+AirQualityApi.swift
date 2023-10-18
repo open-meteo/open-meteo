@@ -1,6 +1,6 @@
 import Foundation
 import FlatBuffers
-import OpenMeteo
+import OpenMeteoSdk
 
 
 extension CamsQuery.Domain: ModelFlatbufferSerialisable {
@@ -12,169 +12,169 @@ extension CamsQuery.Domain: ModelFlatbufferSerialisable {
     
     static func encodeHourly(section: ApiSection<ForecastapiResult<Self>.SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) -> Offset {
         let offsets = ForecastapiResult.encode(section: section, &fbb)
-        let start = AirQualityHourly.startAirQualityHourly(&fbb)
-        AirQualityHourly.add(time: section.timeFlatBuffers(), &fbb)
+        let start = openmeteo_sdk_AirQualityHourly.startAirQualityHourly(&fbb)
+        openmeteo_sdk_AirQualityHourly.add(time: section.timeFlatBuffers(), &fbb)
         for (surface, offset) in offsets.surface {
             switch surface {
             case .raw(let v):
                 switch v {
                 case .pm10:
-                    AirQualityHourly.add(pm10: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(pm10: offset, &fbb)
                 case .pm2_5:
-                    AirQualityHourly.add(pm25: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(pm25: offset, &fbb)
                 case .dust:
-                    AirQualityHourly.add(dust: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(dust: offset, &fbb)
                 case .aerosol_optical_depth:
-                    AirQualityHourly.add(aerosolOpticalDepth: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(aerosolOpticalDepth: offset, &fbb)
                 case .carbon_monoxide:
-                    AirQualityHourly.add(carbonMonoxide: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(carbonMonoxide: offset, &fbb)
                 case .nitrogen_dioxide:
-                    AirQualityHourly.add(nitrogenDioxide: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(nitrogenDioxide: offset, &fbb)
                 case .ammonia:
-                    AirQualityHourly.add(ammonia: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(ammonia: offset, &fbb)
                 case .ozone:
-                    AirQualityHourly.add(ozone: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(ozone: offset, &fbb)
                 case .sulphur_dioxide:
-                    AirQualityHourly.add(sulphurDioxide: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(sulphurDioxide: offset, &fbb)
                 case .uv_index:
-                    AirQualityHourly.add(uvIndex: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(uvIndex: offset, &fbb)
                 case .uv_index_clear_sky:
-                    AirQualityHourly.add(uvIndexClearSky: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(uvIndexClearSky: offset, &fbb)
                 case .alder_pollen:
-                    AirQualityHourly.add(alderPollen: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(alderPollen: offset, &fbb)
                 case .birch_pollen:
-                    AirQualityHourly.add(birchPollen: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(birchPollen: offset, &fbb)
                 case .grass_pollen:
-                    AirQualityHourly.add(grassPollen: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(grassPollen: offset, &fbb)
                 case .mugwort_pollen:
-                    AirQualityHourly.add(mugwortPollen: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(mugwortPollen: offset, &fbb)
                 case .olive_pollen:
-                    AirQualityHourly.add(olivePollen: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(olivePollen: offset, &fbb)
                 case .ragweed_pollen:
-                    AirQualityHourly.add(ragweedPollen: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(ragweedPollen: offset, &fbb)
                 }
             case .derived(let v):
                 switch v {
                 case .european_aqi:
-                    AirQualityHourly.add(europeanAqi: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(europeanAqi: offset, &fbb)
                 case .european_aqi_pm2_5:
-                    AirQualityHourly.add(europeanAqiPm25: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(europeanAqiPm25: offset, &fbb)
                 case .european_aqi_pm10:
-                    AirQualityHourly.add(europeanAqiPm10: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(europeanAqiPm10: offset, &fbb)
                 case .european_aqi_no2:
-                    AirQualityHourly.add(europeanAqiNo2: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(europeanAqiNo2: offset, &fbb)
                 case .european_aqi_o3:
-                    AirQualityHourly.add(europeanAqiO3: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(europeanAqiO3: offset, &fbb)
                 case .european_aqi_so2:
-                    AirQualityHourly.add(europeanAqiSo2: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(europeanAqiSo2: offset, &fbb)
                 case .us_aqi:
-                    AirQualityHourly.add(usAqi: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(usAqi: offset, &fbb)
                 case .us_aqi_pm2_5:
-                    AirQualityHourly.add(usAqiPm25: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(usAqiPm25: offset, &fbb)
                 case .us_aqi_pm10:
-                    AirQualityHourly.add(usAqiPm10: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(usAqiPm10: offset, &fbb)
                 case .us_aqi_no2:
-                    AirQualityHourly.add(usAqiNo2: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(usAqiNo2: offset, &fbb)
                 case .us_aqi_o3:
-                    AirQualityHourly.add(usAqiO3: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(usAqiO3: offset, &fbb)
                 case .us_aqi_so2:
-                    AirQualityHourly.add(usAqiSo2: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(usAqiSo2: offset, &fbb)
                 case .us_aqi_co:
-                    AirQualityHourly.add(usAqiCo: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(usAqiCo: offset, &fbb)
                 case .is_day:
-                    AirQualityHourly.add(isDay: offset, &fbb)
+                    openmeteo_sdk_AirQualityHourly.add(isDay: offset, &fbb)
                 }
             }
         }
         for (_, _) in offsets.pressure {
             fatalError("No pressure levels")
         }
-        return AirQualityHourly.endAirQualityHourly(&fbb, start: start)
+        return openmeteo_sdk_AirQualityHourly.endAirQualityHourly(&fbb, start: start)
     }
     
     static func encodeCurrent(section: ApiSectionSingle<ForecastapiResult<Self>.SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) throws -> Offset {
-        let start = AirQualityCurrent.startAirQualityCurrent(&fbb)
-        AirQualityCurrent.add(time: Int64(section.time.timeIntervalSince1970), &fbb)
-        AirQualityCurrent.add(interval: Int32(section.dtSeconds), &fbb)
+        let start = openmeteo_sdk_AirQualityCurrent.startAirQualityCurrent(&fbb)
+        openmeteo_sdk_AirQualityCurrent.add(time: Int64(section.time.timeIntervalSince1970), &fbb)
+        openmeteo_sdk_AirQualityCurrent.add(interval: Int32(section.dtSeconds), &fbb)
         for column in section.columns {
             switch column.variable {
             case .surface(let surface):
-                let offset = ValueAndUnit(value: column.value, unit: column.unit)
+                let offset = openmeteo_sdk_ValueAndUnit(value: column.value, unit: column.unit)
                 switch surface {
                 case .raw(let v):
                     switch v {
                     case .pm10:
-                        AirQualityCurrent.add(pm10: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(pm10: offset, &fbb)
                     case .pm2_5:
-                        AirQualityCurrent.add(pm25: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(pm25: offset, &fbb)
                     case .dust:
-                        AirQualityCurrent.add(dust: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(dust: offset, &fbb)
                     case .aerosol_optical_depth:
-                        AirQualityCurrent.add(aerosolOpticalDepth: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(aerosolOpticalDepth: offset, &fbb)
                     case .carbon_monoxide:
-                        AirQualityCurrent.add(carbonMonoxide: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(carbonMonoxide: offset, &fbb)
                     case .nitrogen_dioxide:
-                        AirQualityCurrent.add(nitrogenDioxide: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(nitrogenDioxide: offset, &fbb)
                     case .ammonia:
-                        AirQualityCurrent.add(ammonia: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(ammonia: offset, &fbb)
                     case .ozone:
-                        AirQualityCurrent.add(ozone: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(ozone: offset, &fbb)
                     case .sulphur_dioxide:
-                        AirQualityCurrent.add(sulphurDioxide: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(sulphurDioxide: offset, &fbb)
                     case .uv_index:
-                        AirQualityCurrent.add(uvIndex: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(uvIndex: offset, &fbb)
                     case .uv_index_clear_sky:
-                        AirQualityCurrent.add(uvIndexClearSky: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(uvIndexClearSky: offset, &fbb)
                     case .alder_pollen:
-                        AirQualityCurrent.add(alderPollen: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(alderPollen: offset, &fbb)
                     case .birch_pollen:
-                        AirQualityCurrent.add(birchPollen: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(birchPollen: offset, &fbb)
                     case .grass_pollen:
-                        AirQualityCurrent.add(grassPollen: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(grassPollen: offset, &fbb)
                     case .mugwort_pollen:
-                        AirQualityCurrent.add(mugwortPollen: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(mugwortPollen: offset, &fbb)
                     case .olive_pollen:
-                        AirQualityCurrent.add(olivePollen: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(olivePollen: offset, &fbb)
                     case .ragweed_pollen:
-                        AirQualityCurrent.add(ragweedPollen: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(ragweedPollen: offset, &fbb)
                     }
                 case .derived(let v):
                     switch v {
                     case .european_aqi:
-                        AirQualityCurrent.add(europeanAqi: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(europeanAqi: offset, &fbb)
                     case .european_aqi_pm2_5:
-                        AirQualityCurrent.add(europeanAqiPm25: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(europeanAqiPm25: offset, &fbb)
                     case .european_aqi_pm10:
-                        AirQualityCurrent.add(europeanAqiPm10: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(europeanAqiPm10: offset, &fbb)
                     case .european_aqi_no2:
-                        AirQualityCurrent.add(europeanAqiNo2: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(europeanAqiNo2: offset, &fbb)
                     case .european_aqi_o3:
-                        AirQualityCurrent.add(europeanAqiO3: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(europeanAqiO3: offset, &fbb)
                     case .european_aqi_so2:
-                        AirQualityCurrent.add(europeanAqiSo2: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(europeanAqiSo2: offset, &fbb)
                     case .us_aqi:
-                        AirQualityCurrent.add(usAqi: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(usAqi: offset, &fbb)
                     case .us_aqi_pm2_5:
-                        AirQualityCurrent.add(usAqiPm25: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(usAqiPm25: offset, &fbb)
                     case .us_aqi_pm10:
-                        AirQualityCurrent.add(usAqiPm10: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(usAqiPm10: offset, &fbb)
                     case .us_aqi_no2:
-                        AirQualityCurrent.add(usAqiNo2: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(usAqiNo2: offset, &fbb)
                     case .us_aqi_o3:
-                        AirQualityCurrent.add(usAqiO3: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(usAqiO3: offset, &fbb)
                     case .us_aqi_so2:
-                        AirQualityCurrent.add(usAqiSo2: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(usAqiSo2: offset, &fbb)
                     case .us_aqi_co:
-                        AirQualityCurrent.add(usAqiCo: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(usAqiCo: offset, &fbb)
                     case .is_day:
-                        AirQualityCurrent.add(isDay: offset, &fbb)
+                        openmeteo_sdk_AirQualityCurrent.add(isDay: offset, &fbb)
                     }
                 }
             case .pressure(_):
                 throw ForecastapiError.generic(message: "Pressure level variables currently not supported for flatbuffers encoding in current block")
             }
         }
-        return AirQualityCurrent.endAirQualityCurrent(&fbb, start: start)
+        return openmeteo_sdk_AirQualityCurrent.endAirQualityCurrent(&fbb, start: start)
     }
     
     static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
@@ -183,7 +183,7 @@ extension CamsQuery.Domain: ModelFlatbufferSerialisable {
         let current = try (try section.current?()).map { try encodeCurrent(section: $0, &fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
-        let result = AirQualityApiResponse.createAirQualityApiResponse(
+        let result = openmeteo_sdk_AirQualityApiResponse.createAirQualityApiResponse(
             &fbb,
             latitude: section.latitude,
             longitude: section.longitude,
@@ -199,7 +199,7 @@ extension CamsQuery.Domain: ModelFlatbufferSerialisable {
         fbb.finish(offset: result, addPrefix: true)
     }
     
-    var flatBufferModel: AirQualityModel {
+    var flatBufferModel: openmeteo_sdk_AirQualityModel {
         switch self {
         case .auto:
             return .bestMatch

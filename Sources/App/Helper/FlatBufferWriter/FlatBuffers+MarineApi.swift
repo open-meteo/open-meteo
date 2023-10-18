@@ -1,6 +1,6 @@
 import Foundation
 import FlatBuffers
-import OpenMeteo
+import OpenMeteoSdk
 
 
 extension IconWaveDomainApi: ModelFlatbufferSerialisable {
@@ -12,112 +12,112 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
     
     static func encodeHourly(section: ApiSection<ForecastapiResult<Self>.SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) -> Offset {
         let offsets = ForecastapiResult.encode(section: section, &fbb)
-        let start = MarineHourly.startMarineHourly(&fbb)
-        MarineHourly.add(time: section.timeFlatBuffers(), &fbb)
+        let start = openmeteo_sdk_MarineHourly.startMarineHourly(&fbb)
+        openmeteo_sdk_MarineHourly.add(time: section.timeFlatBuffers(), &fbb)
         for (surface, offset) in offsets.surface {
             switch surface {
             case .wave_height:
-                MarineHourly.add(waveHeight: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(waveHeight: offset, &fbb)
             case .wave_period:
-                MarineHourly.add(wavePeriod: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(wavePeriod: offset, &fbb)
             case .wave_direction:
-                MarineHourly.add(waveDirection: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(waveDirection: offset, &fbb)
             case .wind_wave_height:
-                MarineHourly.add(windWaveHeight: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(windWaveHeight: offset, &fbb)
             case .wind_wave_period:
-                MarineHourly.add(windWavePeriod: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(windWavePeriod: offset, &fbb)
             case .wind_wave_peak_period:
-                MarineHourly.add(windWavePeakPeriod: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(windWavePeakPeriod: offset, &fbb)
             case .wind_wave_direction:
-                MarineHourly.add(windWaveDirection: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(windWaveDirection: offset, &fbb)
             case .swell_wave_height:
-                MarineHourly.add(swellWaveHeight: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(swellWaveHeight: offset, &fbb)
             case .swell_wave_period:
-                MarineHourly.add(swellWavePeriod: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(swellWavePeriod: offset, &fbb)
             case .swell_wave_peak_period:
-                MarineHourly.add(swellWavePeakPeriod: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(swellWavePeakPeriod: offset, &fbb)
             case .swell_wave_direction:
-                MarineHourly.add(swellWaveDirection: offset, &fbb)
+                openmeteo_sdk_MarineHourly.add(swellWaveDirection: offset, &fbb)
             }
         }
         for (_, _) in offsets.pressure {
             fatalError("No pressure levels")
         }
-        return MarineHourly.endMarineHourly(&fbb, start: start)
+        return openmeteo_sdk_MarineHourly.endMarineHourly(&fbb, start: start)
     }
     
     static func encodeCurrent(section: ApiSectionSingle<ForecastapiResult<Self>.SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) throws -> Offset {
-        let start = MarineCurrent.startMarineCurrent(&fbb)
-        MarineCurrent.add(time: Int64(section.time.timeIntervalSince1970), &fbb)
-        MarineCurrent.add(interval: Int32(section.dtSeconds), &fbb)
+        let start = openmeteo_sdk_MarineCurrent.startMarineCurrent(&fbb)
+        openmeteo_sdk_MarineCurrent.add(time: Int64(section.time.timeIntervalSince1970), &fbb)
+        openmeteo_sdk_MarineCurrent.add(interval: Int32(section.dtSeconds), &fbb)
         for column in section.columns {
             switch column.variable {
             case .surface(let v):
-                let offset = ValueAndUnit(value: column.value, unit: column.unit)
+                let offset = openmeteo_sdk_ValueAndUnit(value: column.value, unit: column.unit)
                 switch v {
                 case .wave_height:
-                    MarineCurrent.add(waveHeight: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(waveHeight: offset, &fbb)
                 case .wave_period:
-                    MarineCurrent.add(wavePeriod: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(wavePeriod: offset, &fbb)
                 case .wave_direction:
-                    MarineCurrent.add(waveDirection: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(waveDirection: offset, &fbb)
                 case .wind_wave_height:
-                    MarineCurrent.add(windWaveHeight: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(windWaveHeight: offset, &fbb)
                 case .wind_wave_period:
-                    MarineCurrent.add(windWavePeriod: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(windWavePeriod: offset, &fbb)
                 case .wind_wave_peak_period:
-                    MarineCurrent.add(windWavePeakPeriod: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(windWavePeakPeriod: offset, &fbb)
                 case .wind_wave_direction:
-                    MarineCurrent.add(windWaveDirection: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(windWaveDirection: offset, &fbb)
                 case .swell_wave_height:
-                    MarineCurrent.add(swellWaveHeight: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(swellWaveHeight: offset, &fbb)
                 case .swell_wave_period:
-                    MarineCurrent.add(swellWavePeriod: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(swellWavePeriod: offset, &fbb)
                 case .swell_wave_peak_period:
-                    MarineCurrent.add(swellWavePeakPeriod: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(swellWavePeakPeriod: offset, &fbb)
                 case .swell_wave_direction:
-                    MarineCurrent.add(swellWaveDirection: offset, &fbb)
+                    openmeteo_sdk_MarineCurrent.add(swellWaveDirection: offset, &fbb)
                 }
                 
             case .pressure(_):
                 throw ForecastapiError.generic(message: "Pressure level variables currently not supported for flatbuffers encoding in current block")
             }
         }
-        return MarineCurrent.endMarineCurrent(&fbb, start: start)
+        return openmeteo_sdk_MarineCurrent.endMarineCurrent(&fbb, start: start)
     }
     
     
     static func encodeDaily(section: ApiSection<DailyVariable>, _ fbb: inout FlatBufferBuilder) -> Offset {
         let offsets = ForecastapiResult<Self>.encode(section: section, &fbb)
-        let start = MarineDaily.startMarineDaily(&fbb)
-        MarineDaily.add(time: section.timeFlatBuffers(), &fbb)
+        let start = openmeteo_sdk_MarineDaily.startMarineDaily(&fbb)
+        openmeteo_sdk_MarineDaily.add(time: section.timeFlatBuffers(), &fbb)
         for (variable, offset) in zip(section.columns, offsets) {
             switch variable.variable {
             case .wave_height_max:
-                MarineDaily.add(waveHeightMax: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(waveHeightMax: offset, &fbb)
             case .wind_wave_height_max:
-                MarineDaily.add(windWaveHeightMax: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(windWaveHeightMax: offset, &fbb)
             case .swell_wave_height_max:
-                MarineDaily.add(swellWaveHeightMax: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(swellWaveHeightMax: offset, &fbb)
             case .wave_direction_dominant:
-                MarineDaily.add(waveDirectionDominant: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(waveDirectionDominant: offset, &fbb)
             case .wind_wave_direction_dominant:
-                MarineDaily.add(windWaveDirectionDominant: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(windWaveDirectionDominant: offset, &fbb)
             case .swell_wave_direction_dominant:
-                MarineDaily.add(swellWaveDirectionDominant: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(swellWaveDirectionDominant: offset, &fbb)
             case .wave_period_max:
-                MarineDaily.add(wavePeriodMax: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(wavePeriodMax: offset, &fbb)
             case .wind_wave_period_max:
-                MarineDaily.add(windWavePeriodMax: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(windWavePeriodMax: offset, &fbb)
             case .wind_wave_peak_period_max:
-                MarineDaily.add(windWavePeakPeriodMax: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(windWavePeakPeriodMax: offset, &fbb)
             case .swell_wave_period_max:
-                MarineDaily.add(swellWaveHeightMax: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(swellWaveHeightMax: offset, &fbb)
             case .swell_wave_peak_period_max:
-                MarineDaily.add(swellWavePeakPeriodMax: offset, &fbb)
+                openmeteo_sdk_MarineDaily.add(swellWavePeakPeriodMax: offset, &fbb)
             }
         }
-        return MarineDaily.endMarineDaily(&fbb, start: start)
+        return openmeteo_sdk_MarineDaily.endMarineDaily(&fbb, start: start)
     }
     
     static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
@@ -126,7 +126,7 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
         let current = try (try section.current?()).map { try encodeCurrent(section: $0, &fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
-        let result = MarineApiResponse.createMarineApiResponse(
+        let result = openmeteo_sdk_MarineApiResponse.createMarineApiResponse(
             &fbb,
             latitude: section.latitude,
             longitude: section.longitude,
@@ -142,7 +142,7 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
         fbb.finish(offset: result, addPrefix: true)
     }
     
-    var flatBufferModel: MarineModel {
+    var flatBufferModel: openmeteo_sdk_MarineModel {
         switch self {
         case.best_match:
             return .bestMatch

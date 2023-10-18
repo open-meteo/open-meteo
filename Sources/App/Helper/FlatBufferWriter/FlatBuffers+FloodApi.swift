@@ -1,6 +1,6 @@
 import Foundation
 import FlatBuffers
-import OpenMeteo
+import OpenMeteoSdk
 
 
 extension GlofasDomainApi: ModelFlatbufferSerialisable {
@@ -10,7 +10,7 @@ extension GlofasDomainApi: ModelFlatbufferSerialisable {
     
     typealias DailyVariable = GloFasVariableOrDerived
     
-    var flatBufferModel: FloodModel {
+    var flatBufferModel: openmeteo_sdk_FloodModel {
         switch self {
         case .best_match:
             return .bestMatch
@@ -35,47 +35,47 @@ extension GlofasDomainApi: ModelFlatbufferSerialisable {
             case .raw(_):
                 /// ensemble data `river_dischage`
                 let oo = v.variables.enumerated().map { (member, data) in
-                    ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member), valuesVectorOffset: data.expectFloatArray(&fbb))
+                    openmeteo_sdk_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member), valuesVectorOffset: data.expectFloatArray(&fbb))
                 }
-                return ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
+                return openmeteo_sdk_ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
             case .derived(_):
                 /// Single e.g. `river_dischage_max`
                 switch v.variables[0] {
                 case .float(let float):
-                    return ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: fbb.createVector(float), unit: v.unit)
+                    return openmeteo_sdk_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: fbb.createVector(float), unit: v.unit)
                 case .timestamp(let time):
                     return fbb.createVector(time.map({$0.timeIntervalSince1970}))
                 }
             }
         }
         
-        let start = FloodDaily.startFloodDaily(&fbb)
-        FloodDaily.add(time: section.timeFlatBuffers(), &fbb)
+        let start = openmeteo_sdk_FloodDaily.startFloodDaily(&fbb)
+        openmeteo_sdk_FloodDaily.add(time: section.timeFlatBuffers(), &fbb)
         for (variable, offset) in zip(section.columns, offsets) {
             switch variable.variable {
             case .derived(let v):
                 switch v {
                 case .river_discharge_mean:
-                    FloodDaily.add(riverDischargeMean: offset, &fbb)
+                    openmeteo_sdk_FloodDaily.add(riverDischargeMean: offset, &fbb)
                 case .river_discharge_min:
-                    FloodDaily.add(riverDischargeMin: offset, &fbb)
+                    openmeteo_sdk_FloodDaily.add(riverDischargeMin: offset, &fbb)
                 case .river_discharge_max:
-                    FloodDaily.add(riverDischargeMax: offset, &fbb)
+                    openmeteo_sdk_FloodDaily.add(riverDischargeMax: offset, &fbb)
                 case .river_discharge_median:
-                    FloodDaily.add(riverDischargeMedian: offset, &fbb)
+                    openmeteo_sdk_FloodDaily.add(riverDischargeMedian: offset, &fbb)
                 case .river_discharge_p25:
-                    FloodDaily.add(riverDischargeP25: offset, &fbb)
+                    openmeteo_sdk_FloodDaily.add(riverDischargeP25: offset, &fbb)
                 case .river_discharge_p75:
-                    FloodDaily.add(riverDischargeP75: offset, &fbb)
+                    openmeteo_sdk_FloodDaily.add(riverDischargeP75: offset, &fbb)
                 }
             case .raw(let v):
                 switch v {
                 case .river_discharge:
-                    FloodDaily.add(riverDischarge: offset, &fbb)
+                    openmeteo_sdk_FloodDaily.add(riverDischarge: offset, &fbb)
                 }
             }
         }
-        return FloodDaily.endFloodDaily(&fbb, start: start)
+        return openmeteo_sdk_FloodDaily.endFloodDaily(&fbb, start: start)
     }
     
     static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
@@ -83,7 +83,7 @@ extension GlofasDomainApi: ModelFlatbufferSerialisable {
         let daily = (try section.daily?()).map { encodeDaily(section: $0, &fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
-        let result = FloodApiResponse.createFloodApiResponse(
+        let result = openmeteo_sdk_FloodApiResponse.createFloodApiResponse(
             &fbb,
             latitude: section.latitude,
             longitude: section.longitude,
