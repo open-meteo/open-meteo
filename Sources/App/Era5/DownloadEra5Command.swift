@@ -636,7 +636,8 @@ struct DownloadEra5Command: AsyncCommandFix {
             let expver = 1
             let levtype = "sfc"
             let param: [String]
-            let step = (0...12).map({$0})
+            /// Use forecast hours 1...12. Skip hour 0, as the model is instable at hour 0
+            let step = (1...12).map({$0})
             let stream = "oper"
             /// init time "00:00:00"
             let time = ["00:00:00", "12:00:00"]
