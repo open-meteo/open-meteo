@@ -166,16 +166,15 @@ extension ForecastapiResult.PerModel {
             latitude: latitude,
             longitude: longitude,
             elevation: elevation ?? .nan,
+            generationTimeMilliseconds: Float32(generationTimeMs),
             model: model.flatBufferModel,
-            generationtimeMs: Float32(generationTimeMs),
             utcOffsetSeconds: Int32(timezone.utcOffsetSeconds),
             timezoneOffset: timezone.identifier == "GMT" ? Offset() : fbb.create(string: timezone.identifier),
             timezoneAbbreviationOffset: timezone.abbreviation == "GMT" ? Offset() : fbb.create(string: timezone.abbreviation),
             currentOffset: current, 
             dailyOffset: daily,
             hourlyOffset: hourly,
-            sixHourlyOffset: sixHourly,
-            minutely15Offset: minutely15
+            minutely15Offset: minutely15, sixHourlyOffset: sixHourly
         )
         fbb.finish(offset: result, addPrefix: true)
     }
