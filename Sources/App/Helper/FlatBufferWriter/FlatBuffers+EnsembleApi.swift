@@ -5,7 +5,7 @@ import OpenMeteoSdk
 extension EnsembleSurfaceVariable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
-        case .weathercode:
+        case .weathercode, .weather_code:
             return .init(variable: .weatherCode)
         case .temperature_2m:
             return .init(variable: .temperature, altitude: 2)
@@ -13,19 +13,19 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .temperature, altitude: 80)
         case .temperature_120m:
             return .init(variable: .temperature, altitude: 120)
-        case .cloudcover:
+        case .cloudcover, .cloud_cover:
             return .init(variable: .cloudCover)
         case .pressure_msl:
             return .init(variable: .pressureMsl)
-        case .relativehumidity_2m:
+        case .relativehumidity_2m, .relative_humidity_2m:
             return .init(variable: .relativeHumidity, altitude: 2)
         case .precipitation:
             return .init(variable: .precipitation)
         case .rain:
             return .init(variable: .rain)
-        case .windgusts_10m:
+        case .windgusts_10m, .wind_gusts_10m:
             return .init(variable: .windGusts, altitude: 10)
-        case .dewpoint_2m:
+        case .dewpoint_2m, .dew_point_2m:
             return .init(variable: .dewPoint, altitude: 2)
         case .diffuse_radiation:
             return .init(variable: .diffuseRadiation)
@@ -33,23 +33,23 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .directRadiation)
         case .apparent_temperature:
             return .init(variable: .apparentTemperature, altitude: 2)
-        case .windspeed_10m:
+        case .windspeed_10m, .wind_speed_10m:
             return .init(variable: .windSpeed, altitude: 10)
-        case .winddirection_10m:
+        case .winddirection_10m, .wind_direction_10m:
             return .init(variable: .windDirection, altitude: 10)
-        case .windspeed_80m:
+        case .windspeed_80m, .wind_speed_80m:
             return .init(variable: .windSpeed, altitude: 80)
-        case .winddirection_80m:
+        case .winddirection_80m, .wind_direction_80m:
             return .init(variable: .windDirection, altitude: 80)
-        case .windspeed_120m:
+        case .windspeed_120m, .wind_speed_120m:
             return .init(variable: .windSpeed, altitude: 120)
-        case .winddirection_120m:
+        case .winddirection_120m, .wind_direction_120m:
             return .init(variable: .windDirection, altitude: 120)
         case .direct_normal_irradiance:
             return .init(variable: .directNormalIrradiance)
         case .et0_fao_evapotranspiration:
             return .init(variable: .et0FaoEvapotranspiration)
-        case .vapor_pressure_deficit:
+        case .vapor_pressure_deficit, .vapour_pressure_deficit:
             return .init(variable: .vapourPressureDeficit)
         case .shortwave_radiation:
             return .init(variable: .shortwaveRadiation)
@@ -71,7 +71,7 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .isDay)
         case .visibility:
             return .init(variable: .visibility)
-        case .freezinglevel_height:
+        case .freezinglevel_height, .freezing_level_height:
             return .init(variable: .freezingLevelHeight)
         case .uv_index:
             return .init(variable: .uvIndex)
@@ -108,15 +108,15 @@ extension EnsemblePressureVariableType: FlatBuffersVariable {
             return .init(variable: .temperature)
         case .geopotential_height:
             return .init(variable: .geopotentialHeight)
-        case .relativehumidity:
+        case .relativehumidity, .relative_humidity:
             return .init(variable: .relativeHumidity)
-        case .windspeed:
+        case .windspeed, .wind_speed:
             return .init(variable: .windSpeed)
-        case .winddirection:
+        case .winddirection, .wind_direction:
             return .init(variable: .windDirection)
-        case .dewpoint:
+        case .dewpoint, .dew_point:
             return .init(variable: .dewPoint)
-        case .cloudcover:
+        case .cloudcover, .cloud_cover:
             return .init(variable: .cloudCover)
         case .vertical_velocity:
             return .init(variable: .verticalVelocity)

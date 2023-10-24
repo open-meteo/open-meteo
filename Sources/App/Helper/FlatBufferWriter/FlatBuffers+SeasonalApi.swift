@@ -46,10 +46,14 @@ extension CfsVariable: FlatBuffersVariable {
 extension CfsVariableDerived: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
-        case .windspeed_10m:
+        case .windspeed_10m, .wind_speed_10m:
             return .init(variable: .windSpeed, altitude: 10)
-        case .winddirection_10m:
+        case .winddirection_10m, .wind_direction_10m:
             return .init(variable: .windDirection, altitude: 10)
+        case .cloud_cover:
+            return .init(variable: .cloudCover)
+        case .relative_humidity_2m:
+            return .init(variable: .relativeHumidity, altitude: 2)
         }
     }
 }
@@ -67,9 +71,9 @@ extension DailyCfsVariable: FlatBuffersVariable {
             return .init(variable: .showers, aggregation: .sum)
         case .shortwave_radiation_sum:
             return .init(variable: .shortwaveRadiation, aggregation: .sum)
-        case .windspeed_10m_max:
+        case .windspeed_10m_max, .wind_speed_10m_max:
             return .init(variable: .windSpeed, aggregation: .maximum, altitude: 10)
-        case .winddirection_10m_dominant:
+        case .winddirection_10m_dominant, .wind_direction_10m_dominant:
             return .init(variable: .windDirection, aggregation: .dominant, altitude: 2)
         case .precipitation_hours:
             return .init(variable: .precipitationHours)

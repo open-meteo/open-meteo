@@ -26,7 +26,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .windspeed_10m, time: time)
             try prefetchData(raw: .relativehumidity_2m, time: time)
             try prefetchData(raw: .shortwave_radiation, time: time)
-        case .vapor_pressure_deficit:
+        case .vapor_pressure_deficit, .vapour_pressure_deficit:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .relativehumidity_2m, time: time)
         case .et0_fao_evapotranspiration:
@@ -41,7 +41,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             break
         case .terrestrial_radiation_instant:
             break
-        case .dewpoint_2m:
+        case .dewpoint_2m, .dew_point_2m:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .relativehumidity_2m, time: time)
         case .diffuse_radiation:
@@ -67,7 +67,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .snowfall:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .precipitation, time: time)
-        case .weathercode:
+        case .weathercode, .weather_code:
             try prefetchData(raw: .cloudcover, time: time)
             try prefetchData(variable: .derived(.snowfall), time: time)
             try prefetchData(raw: .precipitation, time: time)
@@ -82,6 +82,16 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .wet_bulb_temperature_2m:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .relativehumidity_2m, time: time)
+        case .cloud_cover:
+            try prefetchData(raw: .cloudcover, time: time)
+        case .relative_humidity_2m:
+            try prefetchData(raw: .relativehumidity_2m, time: time)
+        case .wind_speed_10m:
+            try prefetchData(raw: .windspeed_10m, time: time)
+        case .wind_direction_10m:
+            try prefetchData(raw: .winddirection_10m, time: time)
+        case .wind_gusts_10m:
+            try prefetchData(raw: .windgusts_10m, time: time)
         }
     }
     
@@ -93,7 +103,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let relhum = try get(raw: .relativehumidity_2m, time: time).data
             let radiation = try get(raw: .shortwave_radiation, time: time).data
             return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
-        case .vapor_pressure_deficit:
+        case .vapor_pressure_deficit, .vapour_pressure_deficit:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let rh = try get(raw: .relativehumidity_2m, time: time).data
             let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
@@ -122,7 +132,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             /// Use center averaged
             let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
             return DataAndUnit(solar, .wattPerSquareMetre)
-        case .dewpoint_2m:
+        case .dewpoint_2m, .dew_point_2m:
             let temperature = try get(raw: .temperature_2m, time: time)
             let rh = try get(raw: .relativehumidity_2m, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
@@ -164,7 +174,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let temperature = try get(raw: .temperature_2m, time: time)
             let precipitation = try get(raw: .precipitation, time: time)
             return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimetre)
-        case .weathercode:
+        case .weathercode, .weather_code:
             let cloudcover = try get(raw: .cloudcover, time: time).data
             let precipitation = try get(raw: .precipitation, time: time).data
             let snowfall = try get(derived: .snowfall, time: time).data
@@ -195,6 +205,16 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let temperature = try get(raw: .temperature_2m, time: time)
             let rh = try get(raw: .relativehumidity_2m, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
+        case .cloud_cover:
+            return try get(raw: .cloudcover, time: time)
+        case .relative_humidity_2m:
+            return try get(raw: .relativehumidity_2m, time: time)
+        case .wind_speed_10m:
+            return try get(raw: .windspeed_10m, time: time)
+        case .wind_direction_10m:
+            return try get(raw: .winddirection_10m, time: time)
+        case .wind_gusts_10m:
+            return try get(raw: .windgusts_10m, time: time)
         }
     }
 }
@@ -207,6 +227,7 @@ enum MetNoVariableDerived: String, GenericVariableMixable {
     
     case apparent_temperature
     case dewpoint_2m
+    case dew_point_2m
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -215,16 +236,23 @@ enum MetNoVariableDerived: String, GenericVariableMixable {
     case diffuse_radiation
     case shortwave_radiation_instant
     case et0_fao_evapotranspiration
+    case vapour_pressure_deficit
     case vapor_pressure_deficit
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case snowfall
+    case weather_code
     case weathercode
     case is_day
     case rain
     case showers
     case wet_bulb_temperature_2m
+    case cloud_cover
+    case relative_humidity_2m
+    case wind_speed_10m
+    case wind_direction_10m
+    case wind_gusts_10m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
