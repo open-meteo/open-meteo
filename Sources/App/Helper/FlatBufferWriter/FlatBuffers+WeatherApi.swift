@@ -9,9 +9,9 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
         case .temperature:
             return .init(variable: .temperature, altitude: 2)
         case .windspeed:
-            return .init(variable: .windspeed, altitude: 10)
+            return .init(variable: .windSpeed, altitude: 10)
         case .winddirection:
-            return .init(variable: .winddirection, altitude: 10)
+            return .init(variable: .windDirection, altitude: 10)
         case .wet_bulb_temperature_2m:
             return .init(variable: .wetBulbTemperature, altitude: 2)
         case .apparent_temperature:
@@ -19,15 +19,15 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
         case .cape:
             return .init(variable: .cape)
         case .cloudcover:
-            return .init(variable: .cloudcover)
+            return .init(variable: .cloudCover)
         case .cloudcover_high:
-            return .init(variable: .cloudcoverHigh)
+            return .init(variable: .cloudCoverHigh)
         case .cloudcover_low:
-            return .init(variable: .cloudcoverLow)
+            return .init(variable: .cloudCoverLow)
         case .cloudcover_mid:
-            return .init(variable: .cloudcoverMid)
+            return .init(variable: .cloudCoverMid)
         case .dewpoint_2m:
-            return .init(variable: .dewpoint, altitude: 2)
+            return .init(variable: .dewPoint, altitude: 2)
         case .diffuse_radiation:
             return .init(variable: .diffuseRadiation)
         case .diffuse_radiation_instant:
@@ -45,13 +45,13 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
         case .evapotranspiration:
             return .init(variable: .evapotranspiration)
         case .freezinglevel_height:
-            return .init(variable: .freezinglevelHeight)
+            return .init(variable: .freezingLevelHeight)
         case .growing_degree_days_base_0_limit_50:
             return .init(variable: .growingDegreeDays)
         case .is_day:
             return .init(variable: .isDay)
         case .latent_heatflux:
-            return .init(variable: .latentHeatflux)
+            return .init(variable: .latentHeatFlux)
         case .lifted_index:
             return .init(variable: .liftedIndex)
         case .leaf_wetness_probability:
@@ -67,11 +67,11 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
         case .rain:
             return .init(variable: .rain)
         case .relativehumidity_2m:
-            return .init(variable: .relativehumidity)
+            return .init(variable: .relativeHumidity)
         case .runoff:
             return .init(variable: .runoff)
         case .sensible_heatflux:
-            return .init(variable: .sensibleHeatflux)
+            return .init(variable: .sensibleHeatFlux)
         case .shortwave_radiation:
             return .init(variable: .shortwaveRadiation)
         case .shortwave_radiation_instant:
@@ -203,53 +203,53 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
         case .uv_index_clear_sky:
             return .init(variable: .uvIndexClearSky)
         case .vapor_pressure_deficit:
-            return .init(variable: .vaporPressureDeficit)
+            return .init(variable: .vapourPressureDeficit)
         case .visibility:
             return .init(variable: .visibility)
         case .weathercode:
-            return .init(variable: .weathercode)
+            return .init(variable: .weatherCode)
         case .winddirection_100m:
-            return .init(variable: .winddirection, altitude: 100)
+            return .init(variable: .windDirection, altitude: 100)
         case .winddirection_10m:
-            return .init(variable: .winddirection, altitude: 10)
+            return .init(variable: .windDirection, altitude: 10)
         case .winddirection_120m:
-            return .init(variable: .winddirection, altitude: 120)
+            return .init(variable: .windDirection, altitude: 120)
         case .winddirection_150m:
-            return .init(variable: .winddirection, altitude: 150)
+            return .init(variable: .windDirection, altitude: 150)
         case .winddirection_180m:
-            return .init(variable: .winddirection, altitude: 180)
+            return .init(variable: .windDirection, altitude: 180)
         case .winddirection_200m:
-            return .init(variable: .winddirection, altitude: 200)
+            return .init(variable: .windDirection, altitude: 200)
         case .winddirection_20m:
-            return .init(variable: .winddirection, altitude: 20)
+            return .init(variable: .windDirection, altitude: 20)
         case .winddirection_40m:
-            return .init(variable: .winddirection, altitude: 40)
+            return .init(variable: .windDirection, altitude: 40)
         case .winddirection_50m:
-            return .init(variable: .winddirection, altitude: 50)
+            return .init(variable: .windDirection, altitude: 50)
         case .winddirection_80m:
-            return .init(variable: .winddirection, altitude: 80)
+            return .init(variable: .windDirection, altitude: 80)
         case .windgusts_10m:
-            return .init(variable: .windgusts, altitude: 10)
+            return .init(variable: .windGusts, altitude: 10)
         case .windspeed_100m:
-            return .init(variable: .windspeed, altitude: 100)
+            return .init(variable: .windSpeed, altitude: 100)
         case .windspeed_10m:
-            return .init(variable: .windspeed, altitude: 10)
+            return .init(variable: .windSpeed, altitude: 10)
         case .windspeed_120m:
-            return .init(variable: .windspeed, altitude: 120)
+            return .init(variable: .windSpeed, altitude: 120)
         case .windspeed_150m:
-            return .init(variable: .windspeed, altitude: 150)
+            return .init(variable: .windSpeed, altitude: 150)
         case .windspeed_180m:
-            return .init(variable: .windspeed, altitude: 180)
+            return .init(variable: .windSpeed, altitude: 180)
         case .windspeed_200m:
-            return .init(variable: .windspeed, altitude: 200)
+            return .init(variable: .windSpeed, altitude: 200)
         case .windspeed_20m:
-            return .init(variable: .windspeed, altitude: 20)
+            return .init(variable: .windSpeed, altitude: 20)
         case .windspeed_40m:
-            return .init(variable: .windspeed, altitude: 40)
+            return .init(variable: .windSpeed, altitude: 40)
         case .windspeed_50m:
-            return .init(variable: .windspeed, altitude: 50)
+            return .init(variable: .windSpeed, altitude: 50)
         case .windspeed_80m:
-            return .init(variable: .windspeed, altitude: 80)
+            return .init(variable: .windSpeed, altitude: 80)
         }
     }
 }
@@ -262,19 +262,19 @@ extension ForecastPressureVariableType: FlatBuffersVariable {
         case .geopotential_height:
             return .init(variable: .geopotentialHeight)
         case .relativehumidity:
-            return .init(variable: .relativehumidity)
+            return .init(variable: .relativeHumidity)
         case .windspeed:
-            return .init(variable: .windspeed)
+            return .init(variable: .windSpeed)
         case .winddirection:
-            return .init(variable: .winddirection)
+            return .init(variable: .windDirection)
         case .dewpoint:
-            return .init(variable: .dewpoint)
+            return .init(variable: .dewPoint)
         case .cloudcover:
-            return .init(variable: .cloudcover)
+            return .init(variable: .cloudCover)
         case .vertical_velocity:
             return .init(variable: .verticalVelocity)
         case .relative_humidity:
-            return .init(variable: .relativehumidity)
+            return .init(variable: .relativeHumidity)
         }
     }
 }
@@ -295,17 +295,17 @@ extension ForecastVariableDaily: FlatBuffersVariable {
         case .cape_min:
             return .init(variable: .cape, aggregation: .minimum)
         case .cloudcover_max:
-            return .init(variable: .cloudcover, aggregation: .maximum)
+            return .init(variable: .cloudCover, aggregation: .maximum)
         case .cloudcover_mean:
-            return .init(variable: .cloudcover, aggregation: .mean)
+            return .init(variable: .cloudCover, aggregation: .mean)
         case .cloudcover_min:
-            return .init(variable: .cloudcover, aggregation: .minimum)
+            return .init(variable: .cloudCover, aggregation: .minimum)
         case .dewpoint_2m_max:
-            return .init(variable: .dewpoint, aggregation: .maximum, altitude: 2)
+            return .init(variable: .dewPoint, aggregation: .maximum, altitude: 2)
         case .dewpoint_2m_mean:
-            return .init(variable: .dewpoint, aggregation: .mean, altitude: 2)
+            return .init(variable: .dewPoint, aggregation: .mean, altitude: 2)
         case .dewpoint_2m_min:
-            return .init(variable: .dewpoint, aggregation: .minimum, altitude: 2)
+            return .init(variable: .dewPoint, aggregation: .minimum, altitude: 2)
         case .et0_fao_evapotranspiration:
             return .init(variable: .et0FaoEvapotranspiration)
         case .et0_fao_evapotranspiration_sum:
@@ -333,11 +333,11 @@ extension ForecastVariableDaily: FlatBuffersVariable {
         case .rain_sum:
             return .init(variable: .rain, aggregation: .sum)
         case .relative_humidity_2m_max:
-            return .init(variable: .relativehumidity, aggregation: .maximum, altitude: 2)
+            return .init(variable: .relativeHumidity, aggregation: .maximum, altitude: 2)
         case .relative_humidity_2m_mean:
-            return .init(variable: .relativehumidity, aggregation: .mean, altitude: 2)
+            return .init(variable: .relativeHumidity, aggregation: .mean, altitude: 2)
         case .relative_humidity_2m_min:
-            return .init(variable: .relativehumidity, aggregation: .minimum, altitude: 2)
+            return .init(variable: .relativeHumidity, aggregation: .minimum, altitude: 2)
         case .shortwave_radiation_sum:
             return .init(variable: .shortwaveRadiation, aggregation: .sum)
         case .showers_sum:
@@ -397,7 +397,7 @@ extension ForecastVariableDaily: FlatBuffersVariable {
         case .uv_index_max:
             return .init(variable: .uvIndex, aggregation: .maximum)
         case .vapor_pressure_deficit_max:
-            return .init(variable: .vaporPressureDeficit, aggregation: .maximum)
+            return .init(variable: .vapourPressureDeficit, aggregation: .maximum)
         case .visibility_max:
             return .init(variable: .visibility, aggregation: .maximum)
         case .visibility_mean:
@@ -405,21 +405,21 @@ extension ForecastVariableDaily: FlatBuffersVariable {
         case .visibility_min:
             return .init(variable: .visibility, aggregation: .minimum)
         case .weathercode:
-            return .init(variable: .weathercode)
+            return .init(variable: .weatherCode)
         case .winddirection_10m_dominant:
-            return .init(variable: .winddirection, aggregation: .dominant, altitude: 10)
+            return .init(variable: .windDirection, aggregation: .dominant, altitude: 10)
         case .windgusts_10m_max:
-            return .init(variable: .windgusts, aggregation: .maximum, altitude: 10)
+            return .init(variable: .windGusts, aggregation: .maximum, altitude: 10)
         case .windgusts_10m_mean:
-            return .init(variable: .windgusts, aggregation: .mean, altitude: 10)
+            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
         case .windgusts_10m_min:
-            return .init(variable: .windgusts, aggregation: .minimum, altitude: 10)
+            return .init(variable: .windGusts, aggregation: .minimum, altitude: 10)
         case .windspeed_10m_max:
-            return .init(variable: .windspeed, aggregation: .maximum, altitude: 10)
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 10)
         case .windspeed_10m_mean:
-            return .init(variable: .windspeed, aggregation: .mean, altitude: 10)
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 10)
         case .windspeed_10m_min:
-            return .init(variable: .windspeed, aggregation: .minimum, altitude: 10)
+            return .init(variable: .windSpeed, aggregation: .minimum, altitude: 10)
         case .wet_bulb_temperature_2m_max:
             return .init(variable: .wetBulbTemperature, aggregation: .maximum, altitude: 2)
         case .wet_bulb_temperature_2m_mean:

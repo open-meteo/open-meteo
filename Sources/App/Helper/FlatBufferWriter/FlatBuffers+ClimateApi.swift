@@ -15,21 +15,21 @@ extension Cmip6Variable: FlatBuffersVariable {
         case .pressure_msl_mean:
             return .init(variable: .pressureMsl, aggregation: .mean)
         case .cloudcover_mean:
-            return .init(variable: .cloudcover, aggregation: .mean)
+            return .init(variable: .cloudCover, aggregation: .mean)
         case .precipitation_sum:
             return .init(variable: .precipitation, aggregation: .sum)
         case .snowfall_water_equivalent_sum:
             return .init(variable: .snowfallWaterEquivalent, aggregation: .sum)
         case .relative_humidity_2m_min:
-            return .init(variable: .relativehumidity, aggregation: .minimum, altitude: 2)
+            return .init(variable: .relativeHumidity, aggregation: .minimum, altitude: 2)
         case .relative_humidity_2m_max:
             return .init(variable: .temperature, aggregation: .maximum, altitude: 2)
         case .relative_humidity_2m_mean:
             return .init(variable: .temperature, aggregation: .mean, altitude: 2)
         case .windspeed_10m_mean:
-            return .init(variable: .windspeed, aggregation: .mean, altitude: 10)
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 10)
         case .windspeed_10m_max:
-            return .init(variable: .windspeed, aggregation: .maximum, altitude: 10)
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 10)
         case .soil_moisture_0_to_10cm_mean:
             return .init(variable: .soilMoisture, aggregation: .mean, depth: 0, depthTo: 10)
         case .shortwave_radiation_sum:
@@ -46,11 +46,11 @@ extension Cmip6VariableDerivedPostBiasCorrection: FlatBuffersVariable {
         case .rain_sum:
             return .init(variable: .rain, aggregation: .sum)
         case .dewpoint_2m_max:
-            return .init(variable: .dewpoint, aggregation: .maximum, altitude: 2)
+            return .init(variable: .dewPoint, aggregation: .maximum, altitude: 2)
         case .dewpoint_2m_min:
-            return .init(variable: .dewpoint, aggregation: .minimum, altitude: 2)
+            return .init(variable: .dewPoint, aggregation: .minimum, altitude: 2)
         case .dewpoint_2m_mean:
-            return .init(variable: .dewpoint, aggregation: .mean, altitude: 2)
+            return .init(variable: .dewPoint, aggregation: .mean, altitude: 2)
         case .growing_degree_days_base_0_limit_50:
             return .init(variable: .growingDegreeDays)
         case .soil_moisture_index_0_to_10cm_mean:
@@ -60,9 +60,9 @@ extension Cmip6VariableDerivedPostBiasCorrection: FlatBuffersVariable {
         case .daylight_duration:
             return .init(variable: .daylightDuration)
         case .windspeed_2m_max:
-            return .init(variable: .windspeed, aggregation: .maximum, altitude: 2)
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 2)
         case .windspeed_2m_mean:
-            return .init(variable: .windspeed, aggregation: .mean, altitude: 2)
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 2)
         }
     }
 }
@@ -91,11 +91,11 @@ extension Cmip6VariableDerivedBiasCorrected: FlatBuffersVariable {
         case .soil_temperature_28_to_100cm_mean:
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
         case .vapor_pressure_deficit_max:
-            return .init(variable: .vaporPressureDeficit, aggregation: .maximum)
+            return .init(variable: .vapourPressureDeficit, aggregation: .maximum)
         case .windgusts_10m_mean:
-            return .init(variable: .windgusts, aggregation: .mean, altitude: 10)
+            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
         case .windgusts_10m_max:
-            return .init(variable: .windgusts, aggregation: .maximum, altitude: 10)
+            return .init(variable: .windGusts, aggregation: .maximum, altitude: 10)
         }
     }
 }
