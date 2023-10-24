@@ -227,43 +227,43 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .temperature_2m: return .celsius
         case .temperature_80m: return .celsius
         case .temperature_100m: return .celsius
-        case .cloudcover: return .percent
-        case .cloudcover_low: return .percent
-        case .cloudcover_mid: return .percent
-        case .cloudcover_high: return .percent
-        case .relativehumidity_2m: return .percent
-        case .precipitation: return .millimeter
-        case .wind_v_component_10m: return .ms
-        case .wind_u_component_10m: return .ms
-        case .wind_v_component_80m: return .ms
-        case .wind_u_component_80m: return .ms
-        case .wind_v_component_100m: return .ms
-        case .wind_u_component_100m: return .ms
+        case .cloudcover: return .percentage
+        case .cloudcover_low: return .percentage
+        case .cloudcover_mid: return .percentage
+        case .cloudcover_high: return .percentage
+        case .relativehumidity_2m: return .percentage
+        case .precipitation: return .millimetre
+        case .wind_v_component_10m: return .metrePerSecond
+        case .wind_u_component_10m: return .metrePerSecond
+        case .wind_v_component_80m: return .metrePerSecond
+        case .wind_u_component_80m: return .metrePerSecond
+        case .wind_v_component_100m: return .metrePerSecond
+        case .wind_u_component_100m: return .metrePerSecond
         case .surface_temperature: return .celsius
         case .soil_temperature_0_to_10cm: return .celsius
         case .soil_temperature_10_to_40cm: return .celsius
         case .soil_temperature_40_to_100cm: return .celsius
         case .soil_temperature_100_to_200cm: return .celsius
-        case .soil_moisture_0_to_10cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_10_to_40cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_40_to_100cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_100_to_200cm: return .qubicMeterPerQubicMeter
-        case .snow_depth: return .meter
-        case .sensible_heatflux: return .wattPerSquareMeter
-        case .latent_heatflux: return .wattPerSquareMeter
-        case .showers: return .millimeter
-        case .windgusts_10m: return .ms
-        case .freezinglevel_height: return .meter
-        case .pressure_msl: return .hectoPascal
-        case .shortwave_radiation: return .wattPerSquareMeter
-        case .frozen_precipitation_percent: return .percent
-        case .cape: return .joulesPerKilogram
+        case .soil_moisture_0_to_10cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_10_to_40cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_40_to_100cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_100_to_200cm: return .cubicMetrePerCubicMetre
+        case .snow_depth: return .metre
+        case .sensible_heatflux: return .wattPerSquareMetre
+        case .latent_heatflux: return .wattPerSquareMetre
+        case .showers: return .millimetre
+        case .windgusts_10m: return .metrePerSecond
+        case .freezinglevel_height: return .metre
+        case .pressure_msl: return .hectopascal
+        case .shortwave_radiation: return .wattPerSquareMetre
+        case .frozen_precipitation_percent: return .percentage
+        case .cape: return .joulePerKilogram
         case .lifted_index: return .dimensionless
-        case .visibility: return .meter
-        case .diffuse_radiation: return .wattPerSquareMeter
+        case .visibility: return .metre
+        case .diffuse_radiation: return .wattPerSquareMetre
         case .uv_index: return .dimensionless
         case .uv_index_clear_sky: return .dimensionless
-        case .precipitation_probability: return .percent
+        case .precipitation_probability: return .percentage
         case .categorical_freezing_rain: return .dimensionless
         }
     }
@@ -367,17 +367,17 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
         case .temperature:
             return .celsius
         case .wind_u_component:
-            return .ms
+            return .metrePerSecond
         case .wind_v_component:
-            return .ms
+            return .metrePerSecond
         case .geopotential_height:
-            return .meter
+            return .metre
         case .cloudcover:
-            return .percent
+            return .percentage
         case .relativehumidity:
-            return .percent
+            return .percentage
         case .vertical_velocity:
-            return .msNotUnitConverted
+            return .metrePerSecondNotUnitConverted
         }
     }
     

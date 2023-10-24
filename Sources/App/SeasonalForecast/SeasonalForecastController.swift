@@ -110,7 +110,7 @@ extension SeasonalForecastReader {
         case .shortwave_radiation_sum:
             let data = try get(variable: VariableAndMember(.shortwave_radiation, member), time: time).convertAndRound(params: params)
             // for 6h data
-            return DataAndUnit(data.data.sum(by: 4).map({$0*0.0036 * 6}).round(digits: 2), .megaJoulesPerSquareMeter)
+            return DataAndUnit(data.data.sum(by: 4).map({$0*0.0036 * 6}).round(digits: 2), .megajoulePerSquareMetre)
         case .windspeed_10m_max:
             let data = try get(variable: .derived(.windspeed_10m), member: member, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 4), data.unit)

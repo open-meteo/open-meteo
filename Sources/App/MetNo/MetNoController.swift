@@ -97,7 +97,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let temperature = try get(raw: .temperature_2m, time: time).data
             let rh = try get(raw: .relativehumidity_2m, time: time).data
             let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
+            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .et0_fao_evapotranspiration:
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
             let swrad = try get(raw: .shortwave_radiation, time: time).data
@@ -109,7 +109,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let et0 = swrad.indices.map { i in
                 return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
             }
-            return DataAndUnit(et0, .millimeter)
+            return DataAndUnit(et0, .millimetre)
         case .surface_pressure:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let pressure = try get(raw: .pressure_msl, time: time)
@@ -117,11 +117,11 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .terrestrial_radiation:
             /// Use center averaged
             let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-            return DataAndUnit(solar, .wattPerSquareMeter)
+            return DataAndUnit(solar, .wattPerSquareMetre)
         case .terrestrial_radiation_instant:
             /// Use center averaged
             let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-            return DataAndUnit(solar, .wattPerSquareMeter)
+            return DataAndUnit(solar, .wattPerSquareMetre)
         case .dewpoint_2m:
             let temperature = try get(raw: .temperature_2m, time: time)
             let rh = try get(raw: .relativehumidity_2m, time: time)
@@ -133,7 +133,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .direct_normal_irradiance:
             let dhi = try get(derived: .direct_radiation, time: time).data
             let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-            return DataAndUnit(dni, .wattPerSquareMeter)
+            return DataAndUnit(dni, .wattPerSquareMetre)
         case .direct_normal_irradiance_instant:
             let direct = try get(derived: .direct_radiation_instant, time: time)
             let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
@@ -163,7 +163,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .snowfall:
             let temperature = try get(raw: .temperature_2m, time: time)
             let precipitation = try get(raw: .precipitation, time: time)
-            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
+            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimetre)
         case .weathercode:
             let cloudcover = try get(raw: .cloudcover, time: time).data
             let precipitation = try get(raw: .precipitation, time: time).data

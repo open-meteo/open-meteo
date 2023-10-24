@@ -38,7 +38,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let v = try get(raw: .init(.northward_wind_10m, member), time: time)
             let u = try get(raw: .init(.eastward_wind_10m, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .winddirection_10m:
             let v = try get(raw: .init(.northward_wind_10m, member), time: time)
             let u = try get(raw: .init(.eastward_wind_10m, member), time: time)
@@ -48,47 +48,47 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let v = try get(raw: .init(.northward_wind_1000hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_1000hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .windspeed_925hPa:
             let v = try get(raw: .init(.northward_wind_925hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_925hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .windspeed_850hPa:
             let v = try get(raw: .init(.northward_wind_850hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_850hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .windspeed_700hPa:
             let v = try get(raw: .init(.northward_wind_700hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_700hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .windspeed_500hPa:
             let v = try get(raw: .init(.northward_wind_500hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_500hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .windspeed_300hPa:
             let v = try get(raw: .init(.northward_wind_300hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_300hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .windspeed_250hPa:
             let v = try get(raw: .init(.northward_wind_250hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_250hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .windspeed_200hPa:
             let v = try get(raw: .init(.northward_wind_200hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_200hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .windspeed_50hPa:
             let v = try get(raw: .init(.northward_wind_50hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_50hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .winddirection_1000hPa:
             let v = try get(raw: .init(.northward_wind_1000hPa, member), time: time)
             let u = try get(raw: .init(.eastward_wind_1000hPa, member), time: time)
@@ -158,39 +158,39 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             )
         case .cloudcover_1000hPa:
             let rh = try get(raw: .init(.relative_humidity_1000hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 1000)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 1000)}), .percentage)
         case .cloudcover_925hPa:
             let rh = try get(raw: .init(.relative_humidity_925hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 925)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 925)}), .percentage)
         case .cloudcover_850hPa:
             let rh = try get(raw: .init(.relative_humidity_850hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 850)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 850)}), .percentage)
         case .cloudcover_700hPa:
             let rh = try get(raw: .init(.relative_humidity_700hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 700)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 700)}), .percentage)
         case .cloudcover_500hPa:
             let rh = try get(raw: .init(.relative_humidity_500hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 500)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 500)}), .percentage)
         case .cloudcover_300hPa:
             let rh = try get(raw: .init(.relative_humidity_300hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 300)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 300)}), .percentage)
         case .cloudcover_250hPa:
             let rh = try get(raw: .init(.relative_humidity_250hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 250)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 250)}), .percentage)
         case .cloudcover_200hPa:
             let rh = try get(raw: .init(.relative_humidity_200hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 200)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 200)}), .percentage)
         case .cloudcover_50hPa:
             let rh = try get(raw: .init(.relative_humidity_50hPa, member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 50)}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 50)}), .percentage)
         case .snowfall:
             let temperature = try get(raw: .init(.temperature_2m, member), time: time)
             let precipitation = try get(raw: .init(.precipitation, member), time: time)
-            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimeter)
+            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 0 : 0.7) }), .centimetre)
         case .rain:
             let temperature = try get(raw: .init(.temperature_2m, member), time: time)
             let precipitation = try get(raw: .init(.precipitation, member), time: time)
-            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $0 >= 0 ? $1 : 0 }), .millimeter)
+            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $0 >= 0 ? $1 : 0 }), .millimetre)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .relativehumidity_1000hPa:
@@ -268,7 +268,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let temperature = try get(raw: .init(.temperature_2m, member), time: time).data
             let rh = try get(derived: .init(.relativehumidity_2m, member), time: time).data
             let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
+            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .wet_bulb_temperature_2m:
             let temperature = try get(raw: .init(.temperature_2m, member), time: time)
             let rh = try get(derived: .init(.relativehumidity_2m, member), time: time)

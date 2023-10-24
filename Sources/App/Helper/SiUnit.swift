@@ -64,37 +64,37 @@ struct DataAndUnit {
             }
             unit = .fahrenheit
         }
-        if unit == .ms && windspeedUnit == .kmh {
+        if unit == .metrePerSecond && windspeedUnit == .kmh {
             for i in data.indices {
                 data[i] *= 3.6
             }
-            unit = .kmh
+            unit = .kilometresPerHour
         }
-        if unit == .ms && windspeedUnit == .mph {
+        if unit == .metrePerSecond && windspeedUnit == .mph {
             for i in data.indices {
                 data[i] *= 2.237
             }
-            unit = .mph
+            unit = .milesPerHour
         }
-        if unit == .ms && windspeedUnit == .kn {
+        if unit == .metrePerSecond && windspeedUnit == .kn {
             for i in data.indices {
                 data[i] *= 1.94384
             }
             unit = .knots
         }
-        if unit == .millimeter && precipitationUnit == .inch {
+        if unit == .millimetre && precipitationUnit == .inch {
             for i in data.indices {
                 data[i] /= 25.4
             }
             unit = .inch
         }
-        if unit == .centimeter && precipitationUnit == .inch {
+        if unit == .centimetre && precipitationUnit == .inch {
             for i in data.indices {
                 data[i] /= 2.54
             }
             unit = .inch
         }
-        if unit == .meter && precipitationUnit == .inch {
+        if unit == .metre && precipitationUnit == .inch {
             for i in data.indices {
                 data[i] *= 3.280839895
             }

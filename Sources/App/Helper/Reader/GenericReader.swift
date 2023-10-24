@@ -94,7 +94,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         
         /// Scale pascal to hecto pasal. Case in era5
         if variable.unit == .pascal {
-            return DataAndUnit(data.map({$0 / 100}), .hectoPascal)
+            return DataAndUnit(data.map({$0 / 100}), .hectopascal)
         }
         
         if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.numeric.isNaN && !targetElevation.isNaN && targetElevation != modelElevation.numeric {

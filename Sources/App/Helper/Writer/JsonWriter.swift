@@ -79,7 +79,7 @@ extension ForecastapiResult.PerLocation {
             case .iso8601:
                 b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.abbreviation)\"")
             case .unixtime:
-                b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.abbreviation)\"")
+                b.buffer.writeString("\"time\":\"\(SiUnit.unixTime.abbreviation)\"")
             }
             b.buffer.writeString(",\"interval\":\"seconds\"")
             for e in current.columns {
@@ -109,7 +109,7 @@ extension ForecastapiResult.PerLocation {
             case .iso8601:
                 b.buffer.writeString("\"time\":\"\(SiUnit.iso8601.abbreviation)\"")
             case .unixtime:
-                b.buffer.writeString("\"time\":\"\(SiUnit.unixtime.abbreviation)\"")
+                b.buffer.writeString("\"time\":\"\(SiUnit.unixTime.abbreviation)\"")
             }
             for e in section.columns {
                 b.buffer.writeString(",\"\(e.variable)\":\"\(e.unit.abbreviation)\"")

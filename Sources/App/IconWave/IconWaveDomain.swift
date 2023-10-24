@@ -141,29 +141,29 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
     var unit: SiUnit {
         switch self {
         /*case .windspeed_10m:
-            return .ms
+            return .metrePerSecond
         case .winddirection_10m:
             return .degreeDirection*/
         case .wave_height:
-            return .meter
+            return .metre
         case .wave_period:
-            return .second
+            return .seconds
         case .wave_direction:
             return .degreeDirection
         case .wind_wave_height:
-            return .meter
+            return .metre
         case .wind_wave_period:
-            return .second
+            return .seconds
         case .wind_wave_peak_period:
-            return .second
+            return .seconds
         case .wind_wave_direction:
             return .degreeDirection
         case .swell_wave_height:
-            return .meter
+            return .metre
         case .swell_wave_period:
-            return .second
+            return .seconds
         case .swell_wave_peak_period:
-            return .second
+            return .seconds
         case .swell_wave_direction:
             return .degreeDirection
         }

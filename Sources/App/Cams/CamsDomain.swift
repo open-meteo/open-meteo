@@ -102,39 +102,39 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     var unit: SiUnit {
         switch self {
         case .pm10:
-            return .microgramsPerQuibicMeter
+            return .microgramsPerCubicMetre
         case .pm2_5:
-            return .microgramsPerQuibicMeter
+            return .microgramsPerCubicMetre
         case .dust:
-            return .microgramsPerQuibicMeter
+            return .microgramsPerCubicMetre
         case .aerosol_optical_depth:
             return .dimensionless
         case .carbon_monoxide:
-            return .microgramsPerQuibicMeter
+            return .microgramsPerCubicMetre
         case .nitrogen_dioxide:
-            return .microgramsPerQuibicMeter
+            return .microgramsPerCubicMetre
         case .ammonia:
-            return .microgramsPerQuibicMeter
+            return .microgramsPerCubicMetre
         case .ozone:
-            return .microgramsPerQuibicMeter
+            return .microgramsPerCubicMetre
         case .sulphur_dioxide:
-            return .microgramsPerQuibicMeter
+            return .microgramsPerCubicMetre
         case .uv_index:
             return .dimensionless
         case .uv_index_clear_sky:
             return .dimensionless
         case .alder_pollen:
-            return .grainsPerQuibicMeter
+            return .grainsPerCubicMetre
         case .birch_pollen:
-            return .grainsPerQuibicMeter
+            return .grainsPerCubicMetre
         case .grass_pollen:
-            return .grainsPerQuibicMeter
+            return .grainsPerCubicMetre
         case .mugwort_pollen:
-            return .grainsPerQuibicMeter
+            return .grainsPerCubicMetre
         case .olive_pollen:
-            return .grainsPerQuibicMeter
+            return .grainsPerCubicMetre
         case .ragweed_pollen:
-            return .grainsPerQuibicMeter
+            return .grainsPerCubicMetre
         }
     }
     

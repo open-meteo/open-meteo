@@ -311,7 +311,7 @@ enum Timeformat: String, Codable {
         case .iso8601:
             return .iso8601
         case .unixtime:
-            return .unixtime
+            return .unixTime
         }
     }
 }

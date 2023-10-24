@@ -155,7 +155,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let u = try get(variable: .wind_u_component_10m, time: time)
             let v = try get(variable: .wind_v_component_10m, time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)*/
+            return DataAndUnit(speed, .metrePerSecond)*/
         case .dewpoint_2m:
             let relhum = try get(raw: .relativehumidity_2m, time: time)
             let temperature = try get(raw: .temperature_2m, time: time)
@@ -170,7 +170,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let temperature = try get(variable: .temperature_2m, time: time).data
             let dew = try get(variable: .dewpoint_2m, time: time).data
             let relativeHumidity = zip(temperature, dew).map(Meteorology.relativeHumidity)
-            return DataAndUnit(relativeHumidity, .percent)
+            return DataAndUnit(relativeHumidity, .percentage)
         case .winddirection_10m:
             let u = try get(variable: .wind_u_component_10m, time: time).data
             let v = try get(variable: .wind_v_component_10m, time: time).data
@@ -180,7 +180,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let u = try get(variable: .wind_u_component_100m, time: time)
             let v = try get(variable: .wind_v_component_100m, time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .ms)
+            return DataAndUnit(speed, .metrePerSecond)
         case .winddirection_100m:
             let u = try get(variable: .wind_u_component_100m, time: time).data
             let v = try get(variable: .wind_v_component_100m, time: time).data
@@ -189,7 +189,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .vapor_pressure_deficit:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let dewpoint = try get(derived: .dewpoint_2m, time: time).data
-            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
+            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .et0_fao_evapotranspiration:
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time)
             let swrad = try get(raw: .shortwave_radiation, time: time).data
@@ -200,12 +200,12 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let et0 = swrad.indices.map { i in
                 return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: self.modelElevation.numeric, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
             }
-            return DataAndUnit(et0, .millimeter)
+            return DataAndUnit(et0, .millimetre)
         case .diffuse_radiation:
             let swrad = try get(raw: .shortwave_radiation, time: time).data
             let direct = try get(raw: .direct_radiation, time: time).data
             let diff = zip(swrad,direct).map(-)
-            return DataAndUnit(diff, .wattPerSquareMeter)
+            return DataAndUnit(diff, .wattPerSquareMetre)
         case .surface_pressure:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let pressure = try get(raw: .pressure_msl, time: time)
@@ -214,15 +214,15 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let low = try get(raw: .cloudcover_low, time: time).data
             let mid = try get(raw: .cloudcover_mid, time: time).data
             let high = try get(raw: .cloudcover_high, time: time).data
-            return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percent)
+            return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percentage)
         case .snowfall:
             let snowwater = try get(raw: .snowfall_water_equivalent, time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
-            return DataAndUnit(snowfall, .centimeter)
+            return DataAndUnit(snowfall, .centimetre)
         case .direct_normal_irradiance:
             let dhi = try get(raw: .direct_radiation, time: time).data
             let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, timerange: time)
-            return DataAndUnit(dni, .wattPerSquareMeter)
+            return DataAndUnit(dni, .wattPerSquareMetre)
         case .rain:
             let snowwater = try get(raw: .snowfall_water_equivalent, time: time)
             let precip = try get(raw: .precipitation, time: time)
@@ -250,10 +250,10 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .terrestrial_radiation:
             let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-            return DataAndUnit(solar, .wattPerSquareMeter)
+            return DataAndUnit(solar, .wattPerSquareMetre)
         case .terrestrial_radiation_instant:
             let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-            return DataAndUnit(solar, .wattPerSquareMeter)
+            return DataAndUnit(solar, .wattPerSquareMetre)
         case .shortwave_radiation_instant:
             let sw = try get(raw: .shortwave_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
@@ -425,19 +425,19 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         switch self {
         case .windspeed_10m: fallthrough
         case .windspeed_100m: fallthrough
-        case .windgusts_10m: return .ms
+        case .windgusts_10m: return .metrePerSecond
         case .winddirection_10m: return .degreeDirection
         case .winddirection_100m: return .degreeDirection
-        case .relativehumidity_2m: return .percent
+        case .relativehumidity_2m: return .percentage
         case .temperature_2m: return .celsius
-        case .cloudcover_low: return .percent
-        case .cloudcover_mid: return .percent
-        case .cloudcover_high: return .percent
+        case .cloudcover_low: return .percentage
+        case .cloudcover_mid: return .percentage
+        case .cloudcover_high: return .percentage
         case .pressure_msl: return .pascal
-        case .snowfall_water_equivalent: return .millimeter
-        case .shortwave_radiation: return .wattPerSquareMeter
-        case .precipitation: return .millimeter
-        case .direct_radiation: return .wattPerSquareMeter
+        case .snowfall_water_equivalent: return .millimetre
+        case .shortwave_radiation: return .wattPerSquareMetre
+        case .precipitation: return .millimetre
+        case .direct_radiation: return .wattPerSquareMetre
         }
     }
 }

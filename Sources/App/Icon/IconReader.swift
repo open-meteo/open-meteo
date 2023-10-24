@@ -55,14 +55,14 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let precipitation = try get(raw: .precipitation, member: member, time: time).data
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, member: member, time: time).data
                 let snow_con = try get(raw: .snowfall_convective_water_equivalent, member: member, time: time).data
-                return DataAndUnit(zip(precipitation, zip(snow_con, snow_gsp)).map({$0 - $1.0 - $1.1}), .millimeter)
+                return DataAndUnit(zip(precipitation, zip(snow_con, snow_gsp)).map({$0 - $1.0 - $1.1}), .millimetre)
             }
             
             // no dedicated rain field in ICON EPS and no snow, use temperautre
             if reader.domain == .iconEps, surface == .rain {
                 let precipitation = try get(raw: .precipitation, member: member, time: time).data
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
-                return DataAndUnit(zip(precipitation, temperature).map({$0 * ($1 <= 0 ? 0 : 1)}), .millimeter)
+                return DataAndUnit(zip(precipitation, temperature).map({$0 * ($1 <= 0 ? 0 : 1)}), .millimetre)
             }
             
             // EPS models do not have weather codes
@@ -346,7 +346,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let u = try get(raw: .wind_u_component_10m, member: member, time: time).data
                 let v = try get(raw: .wind_v_component_10m, member: member, time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
+                return DataAndUnit(speed, .metrePerSecond)
             case .winddirection_10m:
                 let u = try get(raw: .wind_u_component_10m, member: member, time: time).data
                 let v = try get(raw: .wind_v_component_10m, member: member, time: time).data
@@ -356,7 +356,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let u = try get(raw: .wind_u_component_80m, member: member, time: time).data
                 let v = try get(raw: .wind_v_component_80m, member: member, time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
+                return DataAndUnit(speed, .metrePerSecond)
             case .winddirection_80m:
                 let u = try get(raw: .wind_u_component_80m, member: member, time: time).data
                 let v = try get(raw: .wind_v_component_80m, member: member, time: time).data
@@ -366,7 +366,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let u = try get(raw: .wind_u_component_120m, member: member, time: time).data
                 let v = try get(raw: .wind_v_component_120m, member: member, time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
+                return DataAndUnit(speed, .metrePerSecond)
             case .winddirection_120m:
                 let u = try get(raw: .wind_u_component_120m, member: member, time: time).data
                 let v = try get(raw: .wind_v_component_120m, member: member, time: time).data
@@ -376,7 +376,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let u = try get(raw: .wind_u_component_180m, member: member, time: time).data
                 let v = try get(raw: .wind_v_component_180m, member: member, time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
+                return DataAndUnit(speed, .metrePerSecond)
             case .winddirection_180m:
                 let u = try get(raw: .wind_u_component_180m, member: member, time: time).data
                 let v = try get(raw: .wind_v_component_180m, member: member, time: time).data
@@ -394,20 +394,20 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let direct = try get(raw: .direct_radiation, member: member, time: time).data
                 let diffuse = try get(raw: .diffuse_radiation, member: member, time: time).data
                 let total = zip(direct, diffuse).map(+)
-                return DataAndUnit(total, .wattPerSquareMeter)
+                return DataAndUnit(total, .wattPerSquareMetre)
             case .evapotranspiration:
                 let latent = try get(raw: .latent_heatflux, member: member, time: time).data
                 let evapotranspiration = latent.map(Meteorology.evapotranspiration)
-                return DataAndUnit(evapotranspiration, .millimeter)
+                return DataAndUnit(evapotranspiration, .millimetre)
             case .vapor_pressure_deficit:
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
                 let rh = try get(raw: .relativehumidity_2m, member: member, time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
+                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .direct_normal_irradiance:
                 let dhi = try get(raw: .direct_radiation, member: member, time: time).data
                 let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-                return DataAndUnit(dni, .wattPerSquareMeter)
+                return DataAndUnit(dni, .wattPerSquareMetre)
             case .et0_fao_evapotranspiration:
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 let swrad = try get(derived: .init(.surface(.shortwave_radiation),  member), time: time).data
@@ -419,7 +419,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let et0 = swrad.indices.map { i in
                     return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
                 }
-                return DataAndUnit(et0, .millimeter)
+                return DataAndUnit(et0, .millimetre)
             case .snowfall:
                 if reader.domain == .iconEps {
                     let precipitation = try get(raw: .precipitation, member: member, time: time).data
@@ -428,14 +428,14 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     let snowfall = zip(precipitation, temperature).map({
                         $0 * ($1 < 0 ? 0.7 : 0)
                     })
-                    return DataAndUnit(snowfall, SiUnit.centimeter)
+                    return DataAndUnit(snowfall, SiUnit.centimetre)
                 }
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, member: member, time: time).data
                 let snow_con = try get(raw: .snowfall_convective_water_equivalent, member: member, time: time).data
                 let snowfall = zip(snow_gsp, snow_con).map({
                     ($0 + $1) * 0.7
                 })
-                return DataAndUnit(snowfall, SiUnit.centimeter)
+                return DataAndUnit(snowfall, SiUnit.centimetre)
             case .relativehumidity_2m:
                 return try get(raw: .relativehumidity_2m, member: member, time: time)
             case .dewpoint_2m:
@@ -449,11 +449,11 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .terrestrial_radiation:
                 /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-                return DataAndUnit(solar, .wattPerSquareMeter)
+                return DataAndUnit(solar, .wattPerSquareMetre)
             case .terrestrial_radiation_instant:
                 /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-                return DataAndUnit(solar, .wattPerSquareMeter)
+                return DataAndUnit(solar, .wattPerSquareMetre)
             case .shortwave_radiation_instant:
                 let sw = try get(derived: .init(.surface(.shortwave_radiation), member), time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
@@ -511,7 +511,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloudcover:
                 let rh = try get(raw: IconPressureVariable(variable: .relativehumidity, level: level), member: member, time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level))}), .percent)
+                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level))}), .percentage)
             }
         }
     }

@@ -279,31 +279,31 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
         case .temperature_2m_min:
             return .celsius
         case .soil_moisture_0_to_10cm:
-            return .qubicMeterPerQubicMeter
+            return .cubicMetrePerCubicMetre
         case .soil_moisture_10_to_40cm:
-            return .qubicMeterPerQubicMeter
+            return .cubicMetrePerCubicMetre
         case .soil_moisture_40_to_100cm:
-            return .qubicMeterPerQubicMeter
+            return .cubicMetrePerCubicMetre
         case .soil_moisture_100_to_200cm:
-            return .qubicMeterPerQubicMeter
+            return .cubicMetrePerCubicMetre
         case .soil_temperature_0_to_10cm:
             return .celsius
         case .shortwave_radiation:
-            return .wattPerSquareMeter
+            return .wattPerSquareMetre
         case .cloudcover:
-            return .percent
+            return .percentage
         case .wind_u_component_10m:
-            return .ms
+            return .metrePerSecond
         case .wind_v_component_10m:
-            return .ms
+            return .metrePerSecond
         case .precipitation:
-            return .millimeter
+            return .millimetre
         case .showers:
-            return .millimeter
+            return .millimetre
         case .relativehumidity_2m:
-            return .percent
+            return .percentage
         case .pressure_msl:
-            return .hectoPascal
+            return .hectopascal
         }
     }
 }

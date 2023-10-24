@@ -571,7 +571,7 @@ enum GloFasVariable: String, GenericVariable {
     }
     
     var unit: SiUnit {
-        return .qubicMeterPerSecond
+        return .cubicMetrePerSecond
     }
     
     var isElevationCorrectable: Bool {

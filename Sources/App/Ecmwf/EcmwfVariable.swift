@@ -167,7 +167,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     var unit: SiUnit {
         switch self {
         case .precipitation: fallthrough
-        case .runoff: return .millimeter
+        case .runoff: return .millimetre
         case .soil_temperature_0_to_7cm: fallthrough
         case .skin_temperature: return .celsius
         case .geopotential_height_1000hPa: fallthrough
@@ -178,7 +178,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .geopotential_height_300hPa: fallthrough
         case .geopotential_height_250hPa: fallthrough
         case .geopotential_height_200hPa: fallthrough
-        case .geopotential_height_50hPa: return .meter
+        case .geopotential_height_50hPa: return .metre
         case .northward_wind_1000hPa: fallthrough
         case .northward_wind_925hPa: fallthrough
         case .northward_wind_850hPa: fallthrough
@@ -196,7 +196,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .eastward_wind_300hPa: fallthrough
         case .eastward_wind_250hPa: fallthrough
         case .eastward_wind_200hPa: fallthrough
-        case .eastward_wind_50hPa: return .ms
+        case .eastward_wind_50hPa: return .metrePerSecond
         case .temperature_1000hPa: fallthrough
         case .temperature_925hPa: fallthrough
         case .temperature_850hPa: fallthrough
@@ -214,12 +214,12 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .relative_humidity_300hPa: fallthrough
         case .relative_humidity_250hPa: fallthrough
         case .relative_humidity_200hPa: fallthrough
-        case .relative_humidity_50hPa: return .percent
-        case .surface_air_pressure: return .hectoPascal
-        case .pressure_msl: return .hectoPascal
-        case .total_column_integrated_water_vapour: return .kilogramPerSquareMeter
-        case .northward_wind_10m: return .ms
-        case .eastward_wind_10m: return .ms
+        case .relative_humidity_50hPa: return .percentage
+        case .surface_air_pressure: return .hectopascal
+        case .pressure_msl: return .hectopascal
+        case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
+        case .northward_wind_10m: return .metrePerSecond
+        case .eastward_wind_10m: return .metrePerSecond
         case .specific_humidity_1000hPa: fallthrough
         case .specific_humidity_925hPa: fallthrough
         case .specific_humidity_850hPa: fallthrough
@@ -249,13 +249,13 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .divergence_of_wind_200hPa: fallthrough
         case .divergence_of_wind_50hPa: return .perSecond
         case .cloudcover:
-            return .percent
+            return .percentage
         case .cloudcover_low:
-            return .percent
+            return .percentage
         case .cloudcover_mid:
-            return .percent
+            return .percentage
         case .cloudcover_high:
-            return .percent
+            return .percentage
         }
     }
     

@@ -380,13 +380,13 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .temperature_2m:
             return .celsius
         case .cloudcover:
-            return .percent
+            return .percentage
         case .precipitation:
-            return .millimeter
+            return .millimetre
         case .pressure_msl:
-            return .hectoPascal
+            return .hectopascal
         case .shortwave_radiation:
-            return .wattPerSquareMeter
+            return .wattPerSquareMetre
         case .temperature_40m:
             return .celsius
         case .temperature_80m:
@@ -394,7 +394,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .temperature_120m:
             return .celsius
         case .relativehumidity_2m:
-            return .percent
+            return .percentage
         case .windspeed_10m:
             fallthrough
         case .windspeed_40m:
@@ -404,7 +404,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .windspeed_120m:
             fallthrough
         case .windgusts_10m:
-            return .ms
+            return .metrePerSecond
         case .winddirection_10m:
             fallthrough
         case .winddirection_40m:
@@ -414,17 +414,17 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .winddirection_120m:
             return .degreeDirection
         case .showers:
-            return .millimeter
+            return .millimetre
         case .snowfall_water_equivalent:
-            return .millimeter
+            return .millimetre
         case .soil_temperature_0_to_10cm:
             return .celsius
         case .soil_moisture_0_to_10cm:
-            return .qubicMeterPerQubicMeter
+            return .cubicMetrePerCubicMetre
         case .cape:
-            return .joulesPerKilogram
+            return .joulePerKilogram
         case .snow_depth:
-            return .meter
+            return .metre
         }
     }
     
@@ -571,13 +571,13 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         case .temperature:
             return .celsius
         case .windspeed:
-            return .ms
+            return .metrePerSecond
         case .winddirection:
             return .degreeDirection
         case .geopotential_height:
-            return .meter
+            return .metre
         case .relativehumidity:
-            return .percent
+            return .percentage
         }
     }
     
