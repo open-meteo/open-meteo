@@ -115,8 +115,11 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
     case soil_temperature_7_to_28cm_mean
     case soil_temperature_28_to_100cm_mean
     case vapor_pressure_deficit_max
+    case vapour_pressure_deficit_max
     case windgusts_10m_mean
     case windgusts_10m_max
+    case wind_gusts_10m_mean
+    case wind_gusts_10m_max
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -126,6 +129,8 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
         switch self {
         case .et0_fao_evapotranspiration_sum:
             return .relativeChange(maximum: nil)
+        case .vapour_pressure_deficit_max:
+            fallthrough
         case .vapor_pressure_deficit_max:
             return .relativeChange(maximum: nil)
         case .leaf_wetness_probability_mean:
@@ -146,8 +151,12 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
             return .absoluteChage(bounds: nil)
         case .soil_temperature_28_to_100cm_mean:
             return .absoluteChage(bounds: nil)
+        case .wind_gusts_10m_mean:
+            fallthrough
         case .windgusts_10m_mean:
             return .relativeChange(maximum: nil)
+        case .wind_gusts_10m_max:
+            fallthrough
         case .windgusts_10m_max:
             return .relativeChange(maximum: nil)
         }
@@ -674,6 +683,8 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                     relativeHumidity: rh))
             }
             return DataAndUnit(et0, .millimetre)
+        case .vapour_pressure_deficit_max:
+            fallthrough
         case .vapor_pressure_deficit_max:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
@@ -760,8 +771,12 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             let st7_28 = st0_7.indices.map { return st0_7[max(0, $0-5) ..< $0+1].mean() }
             let st28_100 = st7_28.indices.map { return st7_28[max(0, $0-51) ..< $0+1].mean() }
             return DataAndUnit(st28_100, t2m.unit)
+        case .wind_gusts_10m_mean:
+            fallthrough
         case .windgusts_10m_mean:
             return try get(raw: .windspeed_10m_mean, time: time)
+        case .wind_gusts_10m_max:
+            fallthrough
         case .windgusts_10m_max:
             return try get(raw: .windspeed_10m_max, time: time)
         }
@@ -782,6 +797,8 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             } else {
                 try prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
+        case .vapour_pressure_deficit_max:
+            fallthrough
         case .vapor_pressure_deficit_max:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
@@ -819,8 +836,12 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .temperature_2m_max, time: time)
         case .soil_temperature_28_to_100cm_mean:
             try prefetchData(raw: .temperature_2m_max, time: time)
+        case .wind_gusts_10m_mean:
+            fallthrough
         case .windgusts_10m_mean:
             try prefetchData(raw: .windspeed_10m_mean, time: time)
+        case .wind_gusts_10m_max:
+            fallthrough
         case .windgusts_10m_max:
             try prefetchData(raw: .windspeed_10m_max, time: time)
         }

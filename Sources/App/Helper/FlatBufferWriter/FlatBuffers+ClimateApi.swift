@@ -90,10 +90,16 @@ extension Cmip6VariableDerivedBiasCorrected: FlatBuffersVariable {
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
         case .soil_temperature_28_to_100cm_mean:
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
+        case .vapour_pressure_deficit_max:
+            fallthrough
         case .vapor_pressure_deficit_max:
             return .init(variable: .vapourPressureDeficit, aggregation: .maximum)
+        case .wind_gusts_10m_mean:
+            fallthrough
         case .windgusts_10m_mean:
             return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
+        case .wind_gusts_10m_max:
+            fallthrough
         case .windgusts_10m_max:
             return .init(variable: .windGusts, aggregation: .maximum, altitude: 10)
         }
