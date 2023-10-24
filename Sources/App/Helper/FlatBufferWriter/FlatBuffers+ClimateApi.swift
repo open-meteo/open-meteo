@@ -45,11 +45,11 @@ extension Cmip6VariableDerivedPostBiasCorrection: FlatBuffersVariable {
             return .init(variable: .snowfall, aggregation: .sum)
         case .rain_sum:
             return .init(variable: .rain, aggregation: .sum)
-        case .dewpoint_2m_max:
+        case .dewpoint_2m_max, .dew_point_2m_max:
             return .init(variable: .dewPoint, aggregation: .maximum, altitude: 2)
-        case .dewpoint_2m_min:
+        case .dewpoint_2m_min, .dew_point_2m_min:
             return .init(variable: .dewPoint, aggregation: .minimum, altitude: 2)
-        case .dewpoint_2m_mean:
+        case .dewpoint_2m_mean, .dew_point_2m_mean:
             return .init(variable: .dewPoint, aggregation: .mean, altitude: 2)
         case .growing_degree_days_base_0_limit_50:
             return .init(variable: .growingDegreeDays)
@@ -59,10 +59,16 @@ extension Cmip6VariableDerivedPostBiasCorrection: FlatBuffersVariable {
             return .init(variable: .soilMoistureIndex, aggregation: .mean, depth: 0, depthTo: 100)
         case .daylight_duration:
             return .init(variable: .daylightDuration)
-        case .windspeed_2m_max:
+        case .windspeed_2m_max, .wind_speed_2m_max:
             return .init(variable: .windSpeed, aggregation: .maximum, altitude: 2)
-        case .windspeed_2m_mean:
+        case .windspeed_2m_mean, .wind_speed_2m_mean:
             return .init(variable: .windSpeed, aggregation: .mean, altitude: 2)
+        case .vapour_pressure_deficit_max:
+            return .init(variable: .vapourPressureDeficit, aggregation: .maximum)
+        case .wind_gusts_10m_mean:
+            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
+        case .wind_gusts_10m_max:
+            return .init(variable: .windGusts, aggregation: .maximum, altitude: 10)
         }
     }
 }
@@ -90,16 +96,10 @@ extension Cmip6VariableDerivedBiasCorrected: FlatBuffersVariable {
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
         case .soil_temperature_28_to_100cm_mean:
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
-        case .vapour_pressure_deficit_max:
-            fallthrough
         case .vapor_pressure_deficit_max:
             return .init(variable: .vapourPressureDeficit, aggregation: .maximum)
-        case .wind_gusts_10m_mean:
-            fallthrough
         case .windgusts_10m_mean:
             return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
-        case .wind_gusts_10m_max:
-            fallthrough
         case .windgusts_10m_max:
             return .init(variable: .windGusts, aggregation: .maximum, altitude: 10)
         }
