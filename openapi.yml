@@ -30,33 +30,33 @@ paths:
             type: string
             enum:
             - temperature_2m
-            - relativehumidity_2m
-            - dewpoint_2m
+            - relative_humidity_2m
+            - dew_point_2m
             - apparent_temperature
             - pressure_msl
-            - cloudcover
-            - cloudcover_low
-            - cloudcover_mid
-            - cloudcover_high
-            - windspeed_10m
-            - windspeed_80m
-            - windspeed_120m
-            - windspeed_180m
-            - winddirection_10m
-            - winddirection_80m
-            - winddirection_120m
-            - winddirection_180m
-            - windgusts_10m
+            - cloud_cover
+            - cloud_cover_low
+            - cloud_cover_mid
+            - cloud_cover_high
+            - wind_speed_10m
+            - wind_speed_80m
+            - wind_speed_120m
+            - wind_speed_180m
+            - wind_direction_10m
+            - wind_direction_80m
+            - wind_direction_120m
+            - wind_direction_180m
+            - wind_gusts_10m
             - shortwave_radiation
             - direct_radiation
             - direct_normal_irradiance
             - diffuse_radiation
-            - vapor_pressure_deficit
+            - vapour_pressure_deficit
             - evapotranspiration
             - precipitation
-            - weathercode
+            - weather_code
             - snow_height
-            - freezinglevel_height
+            - freezing_level_height
             - soil_temperature_0cm
             - soil_temperature_6cm
             - soil_temperature_18cm
@@ -79,12 +79,12 @@ paths:
             - apparent_temperature_min
             - precipitation_sum
             - precipitation_hours
-            - weathercode
+            - weather_code
             - sunrise
             - sunset
-            - windspeed_10m_max
-            - windgusts_10m_max
-            - winddirection_10m_dominant
+            - wind_speed_10m_max
+            - wind_gusts_10m_max
+            - wind_direction_10m_dominant
             - shortwave_radiation_sum
             - uv_index_max
             - uv_index_clear_sky_max
@@ -115,7 +115,7 @@ paths:
           enum:
           - celsius
           - fahrenheit
-      - name: windspeed_unit
+      - name: wind_speed_unit
         in: query
         schema:
           type: string
@@ -193,7 +193,7 @@ paths:
                     description: For each selected daily weather variable, the unit will be listed here.
                   current_weather:
                     type: CurrentWeather
-                    description: "Current weather conditions with the attributes: time, temperature, windspeed, winddirection and weathercode"
+                    description: "Current weather conditions with the attributes: time, temperature, wind_speed, wind_direction and weather_code"
         400:
           description: Bad Request
           content:
@@ -223,11 +223,11 @@ components:
           type: array
           items:
             type: float
-        relativehumidity_2m:
+        relative_humidity_2m:
           type: array
           items:
             type: float
-        dewpoint_2m:
+        dew_point_2m:
           type: array
           items:
             type: float
@@ -239,55 +239,55 @@ components:
           type: array
           items:
             type: float
-        cloudcover:
+        cloud_cover:
           type: array
           items:
             type: float
-        cloudcover_low:
+        cloud_cover_low:
           type: array
           items:
             type: float
-        cloudcover_mid:
+        cloud_cover_mid:
           type: array
           items:
             type: float
-        cloudcover_high:
+        cloud_cover_high:
           type: array
           items:
             type: float
-        windspeed_10m:
+        wind_speed_10m:
           type: array
           items:
             type: float
-        windspeed_80m:
+        wind_speed_80m:
           type: array
           items:
             type: float
-        windspeed_120m:
+        wind_speed_120m:
           type: array
           items:
             type: float
-        windspeed_180m:
+        wind_speed_180m:
           type: array
           items:
             type: float
-        winddirection_10m:
+        wind_direction_10m:
           type: array
           items:
             type: float
-        winddirection_80m:
+        wind_direction_80m:
           type: array
           items:
             type: float
-        winddirection_120m:
+        wind_direction_120m:
           type: array
           items:
             type: float
-        winddirection_180m:
+        wind_direction_180m:
           type: array
           items:
             type: float
-        windgusts_10m:
+        wind_gusts_10m:
           type: array
           items:
             type: float
@@ -307,7 +307,7 @@ components:
           type: array
           items:
             type: float
-        vapor_pressure_deficit:
+        vapour_pressure_deficit:
           type: array
           items:
             type: float
@@ -319,7 +319,7 @@ components:
           type: array
           items:
             type: float
-        weathercode:
+        weather_code:
           type: array
           items:
             type: float
@@ -327,7 +327,7 @@ components:
           type: array
           items:
             type: float
-        freezinglevel_height:
+        freezing_level_height:
           type: array
           items:
             type: float
@@ -398,7 +398,7 @@ components:
           type: array
           items:
             type: float
-        weathercode:
+        weather_code:
           type: array
           items:
             type: float
@@ -410,15 +410,15 @@ components:
           type: array
           items:
             type: float
-        windspeed_10m_max:
+        wind_speed_10m_max:
           type: array
           items:
             type: float
-        windgusts_10m_max:
+        wind_gusts_10m_max:
           type: array
           items:
             type: float
-        winddirection_10m_dominant:
+        wind_direction_10m_dominant:
           type: array
           items:
             type: float
@@ -447,15 +447,15 @@ components:
           type: string
         temperature:
           type: float
-        windspeed:
+        wind_speed:
           type: float
-        winddirection:
+        wind_direction:
           type: float
-        weathercode:
+        weather_code:
           type: int
       required:
         - time
         - temperature
-        - windspeed
-        - winddirection
-        - weathercode
+        - wind_speed
+        - wind_direction
+        - weather_code

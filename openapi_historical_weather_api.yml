@@ -44,28 +44,28 @@ paths:
             type: string
             enum:
             - temperature_2m
-            - relativehumidity_2m
-            - dewpoint_2m
+            - relative_humidity_2m
+            - dew_point_2m
             - apparent_temperature
             - pressure_msl
-            - cloudcover
-            - cloudcover_low
-            - cloudcover_mid
-            - cloudcover_high
-            - windspeed_10m
-            - windspeed_100m
-            - winddirection_10m
-            - winddirection_100m
-            - windgusts_10m
+            - cloud_cover
+            - cloud_cover_low
+            - cloud_cover_mid
+            - cloud_cover_high
+            - wind_speed_10m
+            - wind_speed_100m
+            - wind_direction_10m
+            - wind_direction_100m
+            - wind_gusts_10m
             - shortwave_radiation
             - direct_radiation
             - direct_normal_irradiance
             - diffuse_radiation
-            - vapor_pressure_deficit
+            - vapour_pressure_deficit
             - et0_fao_evapotranspiration
             - precipitation
             - rain
-            - weathercode
+            - weather_code
             - snowfall
             - soil_temperature_0_to_7cm
             - soil_temperature_7_to_28cm
@@ -88,12 +88,12 @@ paths:
             - apparent_temperature_min
             - precipitation_sum
             - precipitation_hours
-            - weathercode
+            - weather_code
             - sunrise
             - sunset
-            - windspeed_10m_max
-            - windgusts_10m_max
-            - winddirection_10m_dominant
+            - wind_speed_10m_max
+            - wind_gusts_10m_max
+            - wind_direction_10m_dominant
             - shortwave_radiation_sum
             - et0_fao_evapotranspiration
       - name: latitude
@@ -118,7 +118,7 @@ paths:
           enum:
           - celsius
           - fahrenheit
-      - name: windspeed_unit
+      - name: wind_speed_unit
         in: query
         schema:
           type: string
