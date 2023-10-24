@@ -28,6 +28,7 @@ enum LengthUnit: String, Codable {
 struct ApiUnits: ApiUnitsSelectable {
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
+    let wind_speed_unit: WindspeedUnit?
     let precipitation_unit: PrecipitationUnit?
     let length_unit: LengthUnit?
 }
@@ -35,6 +36,7 @@ struct ApiUnits: ApiUnitsSelectable {
 protocol ApiUnitsSelectable {
     var temperature_unit: TemperatureUnit? { get }
     var windspeed_unit: WindspeedUnit? { get }
+    var wind_speed_unit: WindspeedUnit? { get }
     var precipitation_unit: PrecipitationUnit? { get }
     var length_unit: LengthUnit? { get }
 }
@@ -54,7 +56,7 @@ struct DataAndUnit {
         var data = self.data
         var unit = self.unit
         
-        let windspeedUnit = params.windspeed_unit ?? .kmh
+        let windspeedUnit = params.windspeed_unit ?? params.wind_speed_unit ?? .kmh
         let temperatureUnit = params.temperature_unit
         let precipitationUnit = params.precipitation_unit ?? (params.length_unit == .imperial ? .inch : nil)
         if unit == .celsius && temperatureUnit == .fahrenheit {

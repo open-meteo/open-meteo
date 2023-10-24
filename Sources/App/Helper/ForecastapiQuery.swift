@@ -18,6 +18,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let timezone: [String]?
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
+    let wind_speed_unit: WindspeedUnit?
     let precipitation_unit: PrecipitationUnit?
     let length_unit: LengthUnit?
     let timeformat: Timeformat?
