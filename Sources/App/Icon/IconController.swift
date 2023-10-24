@@ -40,6 +40,11 @@ enum IconPressureVariableDerivedType: String, CaseIterable {
     case winddirection
     case dewpoint
     case cloudcover
+    case wind_speed
+    case wind_direction
+    case dew_point
+    case cloud_cover
+    case relative_humidity
 }
 
 /**
@@ -58,8 +63,9 @@ typealias IconVariableDerived = SurfaceAndPressureVariable<IconSurfaceVariableDe
 
 enum IconSurfaceVariableDerived: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
-    case relativehumidity_2m
+    case relative_humidity_2m
     case dewpoint_2m
+    case dew_point_2m
     case windspeed_10m
     case winddirection_10m
     case windspeed_80m
@@ -68,9 +74,18 @@ enum IconSurfaceVariableDerived: String, CaseIterable, GenericVariableMixable {
     case winddirection_120m
     case windspeed_180m
     case winddirection_180m
+    case wind_speed_10m
+    case wind_direction_10m
+    case wind_speed_80m
+    case wind_direction_80m
+    case wind_speed_120m
+    case wind_direction_120m
+    case wind_speed_180m
+    case wind_direction_180m
     case direct_normal_irradiance
     case evapotranspiration
     case et0_fao_evapotranspiration
+    case vapour_pressure_deficit
     case vapor_pressure_deficit
     case shortwave_radiation
     case snow_height
@@ -89,6 +104,15 @@ enum IconSurfaceVariableDerived: String, CaseIterable, GenericVariableMixable {
     case soil_moisture_9_to_27cm
     case soil_moisture_27_to_81cm
     case wet_bulb_temperature_2m
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
+    case weather_code
+    case sensible_heat_flux
+    case latent_heat_flux
+    case wind_gusts_10m
+    case freezing_level_height
     
     var requiresOffsetCorrectionForMixing: Bool {
         return self == .snow_height
