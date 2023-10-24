@@ -54,11 +54,11 @@ extension CamsVariableDerived: FlatBuffersVariable {
         case .european_aqi_pm10:
             return .init(variable: .europeanAqiPm10)
         case .european_aqi_no2:
-            return .init(variable: .europeanAqiNo2)
+            return .init(variable: .europeanAqiNitrogenDioxide)
         case .european_aqi_o3:
-            return .init(variable: .europeanAqiO3)
+            return .init(variable: .europeanAqiOzone)
         case .european_aqi_so2:
-            return .init(variable: .europeanAqiSo2)
+            return .init(variable: .europeanAqiSulphurDioxide)
         case .us_aqi:
             return .init(variable: .usAqi)
         case .us_aqi_pm2_5:
@@ -66,13 +66,13 @@ extension CamsVariableDerived: FlatBuffersVariable {
         case .us_aqi_pm10:
             return .init(variable: .usAqiPm10)
         case .us_aqi_no2:
-            return .init(variable: .usAqiNo2)
+            return .init(variable: .usAqiNitrogenDioxide)
         case .us_aqi_o3:
-            return .init(variable: .usAqiO3)
+            return .init(variable: .usAqiOzone)
         case .us_aqi_so2:
-            return .init(variable: .usAqiSo2)
+            return .init(variable: .usAqiSulphurDioxide)
         case .us_aqi_co:
-            return .init(variable: .usAqiCo)
+            return .init(variable: .usAqiCarbonMonoxide)
         case .is_day:
             return .init(variable: .isDay)
         }
