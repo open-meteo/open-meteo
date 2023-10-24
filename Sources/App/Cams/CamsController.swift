@@ -91,6 +91,9 @@ enum CamsVariableDerived: String, GenericVariableMixable {
     case european_aqi_no2
     case european_aqi_o3
     case european_aqi_so2
+    case european_aqi_nitrogen_dioxide
+    case european_aqi_ozone
+    case european_aqi_sulphur_dioxide
     
     case us_aqi
     case us_aqi_pm2_5
@@ -99,6 +102,10 @@ enum CamsVariableDerived: String, GenericVariableMixable {
     case us_aqi_o3
     case us_aqi_so2
     case us_aqi_co
+    case us_aqi_nitrogen_dioxide
+    case us_aqi_ozone
+    case us_aqi_sulphur_dioxide
+    case us_aqi_carbon_monoxide
     
     case is_day
     
@@ -138,12 +145,18 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
             let pm10avg = try get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(pm10avg.map(EuropeanAirQuality.indexPm10), .europeanAirQualityIndex)
+        case .european_aqi_nitrogen_dioxide:
+            fallthrough
         case .european_aqi_no2:
             let no2 = try get(raw: .nitrogen_dioxide, time: time).data
             return DataAndUnit(no2.map(EuropeanAirQuality.indexNo2), .europeanAirQualityIndex)
+        case .european_aqi_ozone:
+            fallthrough
         case .european_aqi_o3:
             let o3 = try get(raw: .ozone, time: time).data
             return DataAndUnit(o3.map(EuropeanAirQuality.indexO3), .europeanAirQualityIndex)
+        case .european_aqi_sulphur_dioxide:
+            fallthrough
         case .european_aqi_so2:
             let so2 = try get(raw: .sulphur_dioxide, time: time).data
             return DataAndUnit(so2.map(EuropeanAirQuality.indexSo2), .europeanAirQualityIndex)
@@ -166,22 +179,30 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
             let pm10avg = try get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(pm10avg.map(UnitedStatesAirQuality.indexPm10), .usAirQualityIndex)
+        case .us_aqi_nitrogen_dioxide:
+            fallthrough
         case .us_aqi_no2:
             // need to convert from ugm3 to ppb
             let no2 = try get(raw: .nitrogen_dioxide, time: time).data
             return DataAndUnit(no2.map({UnitedStatesAirQuality.indexNo2(no2: $0 / 1.88) }), .usAirQualityIndex)
+        case .us_aqi_ozone:
+            fallthrough
         case .us_aqi_o3:
             // need to convert from ugm3 to ppb
             let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
             let o3 = try get(raw: .ozone, time: timeAhead).data
             let o3avg = o3.slidingAverageDroppingFirstDt(dt: 8)
             return DataAndUnit(zip(o3.dropFirst(8), o3avg).map({UnitedStatesAirQuality.indexO3(o3: $0.0 / 1.96, o3_8h_mean: $0.1 / 1.96)}), .usAirQualityIndex)
+        case .us_aqi_sulphur_dioxide:
+            fallthrough
         case .us_aqi_so2:
             // need to convert from ugm3 to ppb
             let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
             let so2 = try get(raw: .sulphur_dioxide, time: timeAhead).data
             let so2avg = so2.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(zip(so2.dropFirst(24), so2avg).map({UnitedStatesAirQuality.indexSo2(so2: $0.0 / 2.62, so2_24h_mean: $0.1 / 2.62)}), .usAirQualityIndex)
+        case .us_aqi_carbon_monoxide:
+            fallthrough
         case .us_aqi_co:
             // need to convert from ugm3 to ppm
             let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
@@ -204,10 +225,16 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24*3600)))
         case .european_aqi_pm10:
             try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24*3600)))
+        case .european_aqi_nitrogen_dioxide:
+            fallthrough
         case .european_aqi_no2:
             try prefetchData(raw: .nitrogen_dioxide, time: time)
+        case .european_aqi_ozone:
+            fallthrough
         case .european_aqi_o3:
             try prefetchData(raw: .ozone, time: time)
+        case .european_aqi_sulphur_dioxide:
+            fallthrough
         case .european_aqi_so2:
             try prefetchData(raw: .sulphur_dioxide, time: time)
         case .us_aqi:
@@ -221,12 +248,20 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24*3600)))
         case .us_aqi_pm10:
             try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24*3600)))
+        case .us_aqi_nitrogen_dioxide:
+            fallthrough
         case .us_aqi_no2:
             try prefetchData(raw: .nitrogen_dioxide, time: time)
+        case .us_aqi_ozone:
+            fallthrough
         case .us_aqi_o3:
             try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8*3600)))
+        case .us_aqi_sulphur_dioxide:
+            fallthrough
         case .us_aqi_so2:
             try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-24*3600)))
+        case .us_aqi_carbon_monoxide:
+            fallthrough
         case .us_aqi_co:
             try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8*3600)))
         case .is_day:
