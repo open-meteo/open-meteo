@@ -58,6 +58,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     struct PerLocation {
         let timezone: TimezoneWithOffset
         let time: TimerangeLocal
+        let locationId: Int
         let results: [PerModel]
         
         var utc_offset_seconds: Int {

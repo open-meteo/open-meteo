@@ -30,7 +30,7 @@ extension ForecastapiResult {
                 //try await b.flushIfRequired()
                 for location in results {
                     for model in location.results {
-                        try model.writeToFlatbuffer(&fbb, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime)
+                        try model.writeToFlatbuffer(&fbb, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
                         b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
                         fbb.clear()
                         try await b.flushIfRequired()
@@ -152,7 +152,7 @@ extension ApiSectionSingle where Variable: FlatBuffersVariable {
 }
 
 extension ForecastapiResult.PerModel {
-    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws {
+    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) throws {
         let generationTimeStart = Date()
         let hourly = (try hourly?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
         let minutely15 = (try minutely15?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
@@ -166,7 +166,8 @@ extension ForecastapiResult.PerModel {
             latitude: latitude,
             longitude: longitude,
             elevation: elevation ?? .nan,
-            generationTimeMilliseconds: Float32(generationTimeMs),
+            generationTimeMilliseconds: Float32(generationTimeMs), 
+            locationId: Int64(locationId),
             model: model.flatBufferModel,
             utcOffsetSeconds: Int32(timezone.utcOffsetSeconds),
             timezoneOffset: timezone.identifier == "GMT" ? Offset() : fbb.create(string: timezone.identifier),

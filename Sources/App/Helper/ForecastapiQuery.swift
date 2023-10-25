@@ -15,6 +15,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let six_hourly: [String]?
     let current_weather: Bool?
     let elevation: [String]?
+    let location_id: [String]?
     let timezone: [String]?
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
@@ -146,19 +147,35 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let latitude = try Float.load(commaSeparated: self.latitude)
         let longitude = try Float.load(commaSeparated: self.longitude)
         let elevation = try Float.load(commaSeparatedOptional: self.elevation)
+        let locationIds = try Int.load(commaSeparatedOptional: self.location_id)
         guard latitude.count == longitude.count else {
             throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
+        }
+        if let locationIds {
+            guard locationIds.count == longitude.count else {
+                throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
+            }
         }
         if let elevation {
             guard elevation.count == longitude.count else {
                 throw ForecastapiError.coordinatesAndElevationCountMustBeTheSame
             }
-            return try zip(latitude, zip(longitude, elevation)).map({
-                try CoordinatesAndElevation(latitude: $0.0, longitude: $0.1.0, elevation: $0.1.1)
+            return try zip(latitude, zip(longitude, elevation)).enumerated().map({
+                try CoordinatesAndElevation(
+                    latitude: $0.element.0,
+                    longitude: $0.element.1.0,
+                    locationId: locationIds?[$0.offset] ?? $0.offset,
+                    elevation: $0.element.1.1
+                )
             })
         }
-        return try zip(latitude, longitude).map({
-            try CoordinatesAndElevation(latitude: $0.0, longitude: $0.1, elevation: nil)
+        return try zip(latitude, longitude).enumerated().map({
+            try CoordinatesAndElevation(
+                latitude: $0.element.0,
+                longitude: $0.element.1,
+                locationId: locationIds?[$0.offset] ?? $0.offset,
+                elevation: nil
+            )
         })
     }
     
@@ -217,6 +234,7 @@ enum ForecastapiError: Error {
     case latitudeAndLongitudeNotEmpty
     case latitudeAndLongitudeMaximum(max: Int)
     case latitudeAndLongitudeCountMustBeTheSame
+    case locationIdCountMustBeTheSame
     case startAndEndDateCountMustBeTheSame
     case coordinatesAndStartEndDatesCountMustBeTheSame
     case coordinatesAndElevationCountMustBeTheSame
@@ -262,6 +280,8 @@ extension ForecastapiError: AbortError {
             return "Parameter 'latitude' and 'longitude' must not exceed \(max) coordinates."
         case .latitudeAndLongitudeCountMustBeTheSame:
             return "Parameter 'latitude' and 'longitude' must have the same number of elements"
+        case .locationIdCountMustBeTheSame:
+            return "Parameter 'location_id' and coordinates must have the same number of elements"
         case .noDataAvilableForThisLocation:
             return "No data is available for this location"
         case .startAndEndDateCountMustBeTheSame:
@@ -282,9 +302,10 @@ struct CoordinatesAndElevation {
     let latitude: Float
     let longitude: Float
     let elevation: Float
+    let locationId: Int
     
     /// If elevation is `nil` it will resolve it from DEM. If `NaN` it stays `NaN`.
-    init(latitude: Float, longitude: Float, elevation: Float? = .nan) throws {
+    init(latitude: Float, longitude: Float, locationId: Int, elevation: Float? = .nan) throws {
         if latitude > 90 || latitude < -90 || latitude.isNaN {
             throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
         }
@@ -294,6 +315,7 @@ struct CoordinatesAndElevation {
         self.latitude = latitude
         self.longitude = longitude
         self.elevation = try elevation ?? Dem90.read(lat: latitude, lon: longitude)
+        self.locationId = locationId
     }
 }
 

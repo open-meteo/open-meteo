@@ -81,3 +81,25 @@ extension Float {
         return try load(commaSeparated: commaSeparatedOptional)
     }
 }
+
+extension Int {
+    /// Initialise from string array and also decode comas
+    static func load(commaSeparated: [String]) throws -> [Int] {
+        return try commaSeparated.flatMap({ s in
+            try s.split(separator: ",").map {
+                guard let v = Int($0) else {
+                    throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: [], debugDescription: "Cannot initialize \(Self.self) from invalid String value \(s)", underlyingError: nil))
+                }
+                return v
+            }
+        })
+    }
+    
+    /// Initialise from string array and also decode comas
+    static func load(commaSeparatedOptional: [String]?) throws -> [Self]? {
+        guard let commaSeparatedOptional else {
+            return nil
+        }
+        return try load(commaSeparated: commaSeparatedOptional)
+    }
+}
