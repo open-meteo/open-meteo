@@ -61,15 +61,15 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
         case .temperature:
             return .celsius
         case .wind_u_component:
-            return .ms
+            return .metrePerSecond
         case .wind_v_component:
-            return .ms
+            return .metrePerSecond
         case .geopotential_height:
-            return .meter
+            return .metre
         //case .cloudcover:
-        //    return .percent
+        //    return .percentage
         case .relativehumidity:
-            return .percent
+            return .percentage
         }
     }
     
@@ -251,42 +251,42 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     var unit: SiUnit {
         switch self {
         case .temperature_2m: return .celsius
-        case .cloudcover: return .percent
-        case .cloudcover_low: return .percent
-        case .cloudcover_mid: return .percent
-        case .cloudcover_high: return .percent
-        case .precipitation: return .millimeter
+        case .cloudcover: return .percentage
+        case .cloudcover_low: return .percentage
+        case .cloudcover_mid: return .percentage
+        case .cloudcover_high: return .percentage
+        case .precipitation: return .millimetre
         case .weathercode: return .wmoCode
-        case .wind_v_component_10m: return .ms
-        case .wind_u_component_10m: return .ms
-        case .wind_v_component_80m: return .ms
-        case .wind_u_component_80m: return .ms
-        case .wind_v_component_120m: return .ms
-        case .wind_u_component_120m: return .ms
-        case .wind_v_component_180m: return .ms
-        case .wind_u_component_180m: return .ms
+        case .wind_v_component_10m: return .metrePerSecond
+        case .wind_u_component_10m: return .metrePerSecond
+        case .wind_v_component_80m: return .metrePerSecond
+        case .wind_u_component_80m: return .metrePerSecond
+        case .wind_v_component_120m: return .metrePerSecond
+        case .wind_u_component_120m: return .metrePerSecond
+        case .wind_v_component_180m: return .metrePerSecond
+        case .wind_u_component_180m: return .metrePerSecond
         case .soil_temperature_0cm: return .celsius
         case .soil_temperature_6cm: return .celsius
         case .soil_temperature_18cm: return .celsius
         case .soil_temperature_54cm: return .celsius
-        case .soil_moisture_0_1cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_1_3cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_3_9cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_9_27cm: return .qubicMeterPerQubicMeter
-        case .soil_moisture_27_81cm: return .qubicMeterPerQubicMeter
-        case .snow_depth: return .meter
-        case .sensible_heatflux: return .wattPerSquareMeter
-        case .latent_heatflux: return .wattPerSquareMeter
-        case .showers: return .millimeter
-        case .rain: return .millimeter
-        case .windgusts_10m: return .ms
-        case .freezinglevel_height: return .meter
-        case .relativehumidity_2m: return .percent
-        case .diffuse_radiation: return .wattPerSquareMeter
-        case .snowfall_convective_water_equivalent: return .millimeter
-        case .snowfall_water_equivalent: return .millimeter
-        case .direct_radiation: return .wattPerSquareMeter
-        case .pressure_msl: return .hectoPascal
+        case .soil_moisture_0_1cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_1_3cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_3_9cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_9_27cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_27_81cm: return .cubicMetrePerCubicMetre
+        case .snow_depth: return .metre
+        case .sensible_heatflux: return .wattPerSquareMetre
+        case .latent_heatflux: return .wattPerSquareMetre
+        case .showers: return .millimetre
+        case .rain: return .millimetre
+        case .windgusts_10m: return .metrePerSecond
+        case .freezinglevel_height: return .metre
+        case .relativehumidity_2m: return .percentage
+        case .diffuse_radiation: return .wattPerSquareMetre
+        case .snowfall_convective_water_equivalent: return .millimetre
+        case .snowfall_water_equivalent: return .millimetre
+        case .direct_radiation: return .wattPerSquareMetre
+        case .pressure_msl: return .hectopascal
         case .temperature_80m:
             return .celsius
         case .temperature_120m:
@@ -294,13 +294,13 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .temperature_180m:
             return .celsius
         case .cape:
-            return .joulesPerKilogram
+            return .joulePerKilogram
         case .lightning_potential:
-            return .joulesPerKilogram
+            return .joulePerKilogram
         case .snowfall_height:
-            return .meter
+            return .metre
         case .updraft:
-            return .msNotUnitConverted
+            return .metrePerSecondNotUnitConverted
         }
     }
     

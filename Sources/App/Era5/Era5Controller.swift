@@ -9,19 +9,30 @@ typealias Era5HourlyVariable = VariableOrDerived<Era5Variable, Era5VariableDeriv
 enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable {
     case apparent_temperature
     case relativehumidity_2m
+    case relative_humidity_2m
     case windspeed_10m
+    case wind_speed_10m
     case winddirection_10m
+    case wind_direction_10m
     case windspeed_100m
+    case wind_speed_100m
     case winddirection_100m
+    case wind_direction_100m
     case vapor_pressure_deficit
+    case vapour_pressure_deficit
     case diffuse_radiation
     case surface_pressure
     case snowfall
     case rain
     case et0_fao_evapotranspiration
     case cloudcover
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
     case direct_normal_irradiance
     case weathercode
+    case weather_code
     case soil_moisture_0_to_100cm
     case soil_temperature_0_to_100cm
     case growing_degree_days_base_0_limit_50
@@ -39,6 +50,8 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case direct_radiation_instant
     case direct_normal_irradiance_instant
     case wet_bulb_temperature_2m
+    case wind_gusts_10m
+    case dew_point_2m
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

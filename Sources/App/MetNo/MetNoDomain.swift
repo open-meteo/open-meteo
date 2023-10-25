@@ -132,19 +132,19 @@ enum MetNoVariable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case .temperature_2m:
             return .celsius
         case .cloudcover:
-            return .percent
+            return .percentage
         case .relativehumidity_2m:
-            return .percent
+            return .percentage
         case .precipitation:
-            return .millimeter
+            return .millimetre
         case .windgusts_10m:
-            return .ms
+            return .metrePerSecond
         case .pressure_msl:
-            return .hectoPascal
+            return .hectopascal
         case .shortwave_radiation:
-            return .wattPerSquareMeter
+            return .wattPerSquareMetre
         case .windspeed_10m:
-            return .ms
+            return .metrePerSecond
         case .winddirection_10m:
             return .degreeDirection
         }

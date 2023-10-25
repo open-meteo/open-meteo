@@ -85,7 +85,7 @@ extension GenericReaderMulti {
                 return nil
             }
             // 3600s only for hourly data of source
-            return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megaJoulesPerSquareMeter)
+            return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megajoulePerSquareMetre)
         case .precipitationHours(let variable):
             guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil

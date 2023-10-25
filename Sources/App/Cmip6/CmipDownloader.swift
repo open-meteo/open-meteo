@@ -391,7 +391,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     var unit: SiUnit {
         switch self {
         case .pressure_msl_mean:
-            return .hectoPascal
+            return .hectopascal
         case .temperature_2m_min:
             return .celsius
         case .temperature_2m_max:
@@ -399,27 +399,27 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case .temperature_2m_mean:
             return .celsius
         case .cloudcover_mean:
-            return .percent
+            return .percentage
         case .precipitation_sum:
-            return .millimeter
+            return .millimetre
         //case .runoff_sum:
-        //    return .millimeter
+        //    return .millimetre
         case .snowfall_water_equivalent_sum:
-            return .millimeter
+            return .millimetre
         case .relative_humidity_2m_min:
-            return .percent
+            return .percentage
         case .relative_humidity_2m_max:
-            return .percent
+            return .percentage
         case .relative_humidity_2m_mean:
-            return .percent
+            return .percentage
         case .windspeed_10m_mean:
-            return .ms
+            return .metrePerSecond
         case .windspeed_10m_max:
-            return .ms
+            return .metrePerSecond
         case .soil_moisture_0_to_10cm_mean:
-            return .qubicMeterPerQubicMeter
+            return .cubicMetrePerCubicMetre
         case .shortwave_radiation_sum:
-            return .megaJoulesPerSquareMeter
+            return .megajoulePerSquareMetre
         }
     }
     

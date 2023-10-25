@@ -2,17 +2,21 @@
 import Foundation
 import Vapor
 import FlatBuffers
+import OpenMeteoSdk
+
+protocol FlatBuffersVariable: RawRepresentableString {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta
+}
 
 protocol ModelFlatbufferSerialisable: RawRepresentableString {
-    associatedtype HourlyVariable: RawRepresentableString
-    associatedtype HourlyPressureType: RawRepresentableString, RawRepresentable, Equatable
-    associatedtype DailyVariable: RawRepresentableString
-    
-    //var rawValue: String { get }
-    static func writeToFlatbuffer(section: ForecastapiResult<Self>.PerModel, _ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?) throws
+    associatedtype HourlyVariable: FlatBuffersVariable
+    associatedtype HourlyPressureType: FlatBuffersVariable, RawRepresentable, Equatable
+    associatedtype DailyVariable: FlatBuffersVariable
     
     /// 0=all members start at control, 1=Members start at `member01` (Used in CFSv2)
     static var memberOffset: Int { get }
+    
+    var flatBufferModel: openmeteo_sdk_Model { get }
 }
 
 extension ModelFlatbufferSerialisable {
@@ -54,6 +58,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     struct PerLocation {
         let timezone: TimezoneWithOffset
         let time: TimerangeLocal
+        let locationId: Int
         let results: [PerModel]
         
         var utc_offset_seconds: Int {
@@ -158,7 +163,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     }
 
     /// Enum with surface and pressure variable
-    enum SurfaceAndPressureVariable: RawRepresentableString {
+    enum SurfaceAndPressureVariable: RawRepresentableString, FlatBuffersVariable {
         init?(rawValue: String) {
             fatalError()
         }
@@ -174,6 +179,23 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
         
         case surface(Model.HourlyVariable)
         case pressure(PressureVariableAndLevel)
+        
+        func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+            switch self {
+            case .surface(let hourlyVariable):
+                return hourlyVariable.getFlatBuffersMeta()
+            case .pressure(let pressureVariableAndLevel):
+                let meta = pressureVariableAndLevel.variable.getFlatBuffersMeta()
+                return FlatBufferVariableMeta(
+                    variable: meta.variable,
+                    aggregation: meta.aggregation,
+                    altitude: meta.altitude,
+                    pressureLevel: Int16(pressureVariableAndLevel.level),
+                    depth: meta.depth,
+                    depthTo: meta.depthTo
+                )
+            }
+        }
     }
     
     /// Output the given result set with a specified format

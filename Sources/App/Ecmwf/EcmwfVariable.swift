@@ -167,7 +167,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     var unit: SiUnit {
         switch self {
         case .precipitation: fallthrough
-        case .runoff: return .millimeter
+        case .runoff: return .millimetre
         case .soil_temperature_0_to_7cm: fallthrough
         case .skin_temperature: return .celsius
         case .geopotential_height_1000hPa: fallthrough
@@ -178,7 +178,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .geopotential_height_300hPa: fallthrough
         case .geopotential_height_250hPa: fallthrough
         case .geopotential_height_200hPa: fallthrough
-        case .geopotential_height_50hPa: return .meter
+        case .geopotential_height_50hPa: return .metre
         case .northward_wind_1000hPa: fallthrough
         case .northward_wind_925hPa: fallthrough
         case .northward_wind_850hPa: fallthrough
@@ -196,7 +196,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .eastward_wind_300hPa: fallthrough
         case .eastward_wind_250hPa: fallthrough
         case .eastward_wind_200hPa: fallthrough
-        case .eastward_wind_50hPa: return .ms
+        case .eastward_wind_50hPa: return .metrePerSecond
         case .temperature_1000hPa: fallthrough
         case .temperature_925hPa: fallthrough
         case .temperature_850hPa: fallthrough
@@ -214,12 +214,12 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .relative_humidity_300hPa: fallthrough
         case .relative_humidity_250hPa: fallthrough
         case .relative_humidity_200hPa: fallthrough
-        case .relative_humidity_50hPa: return .percent
-        case .surface_air_pressure: return .hectoPascal
-        case .pressure_msl: return .hectoPascal
-        case .total_column_integrated_water_vapour: return .kilogramPerSquareMeter
-        case .northward_wind_10m: return .ms
-        case .eastward_wind_10m: return .ms
+        case .relative_humidity_50hPa: return .percentage
+        case .surface_air_pressure: return .hectopascal
+        case .pressure_msl: return .hectopascal
+        case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
+        case .northward_wind_10m: return .metrePerSecond
+        case .eastward_wind_10m: return .metrePerSecond
         case .specific_humidity_1000hPa: fallthrough
         case .specific_humidity_925hPa: fallthrough
         case .specific_humidity_850hPa: fallthrough
@@ -249,13 +249,13 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .divergence_of_wind_200hPa: fallthrough
         case .divergence_of_wind_50hPa: return .perSecond
         case .cloudcover:
-            return .percent
+            return .percentage
         case .cloudcover_low:
-            return .percent
+            return .percentage
         case .cloudcover_mid:
-            return .percent
+            return .percentage
         case .cloudcover_high:
-            return .percent
+            return .percentage
         }
     }
     
@@ -615,9 +615,12 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
 
 enum EcmwfVariableDerived: String, GenericVariableMixable {
     case relativehumidity_2m
+    case relative_humidity_2m
     case dewpoint_2m
+    case dew_point_2m
     case apparent_temperature
     case vapor_pressure_deficit
+    case vapour_pressure_deficit
     case windspeed_10m
     case windspeed_1000hPa
     case windspeed_925hPa
@@ -628,6 +631,16 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case windspeed_250hPa
     case windspeed_200hPa
     case windspeed_50hPa
+    case wind_speed_10m
+    case wind_speed_1000hPa
+    case wind_speed_925hPa
+    case wind_speed_850hPa
+    case wind_speed_700hPa
+    case wind_speed_500hPa
+    case wind_speed_300hPa
+    case wind_speed_250hPa
+    case wind_speed_200hPa
+    case wind_speed_50hPa
     case winddirection_10m
     case winddirection_1000hPa
     case winddirection_925hPa
@@ -638,6 +651,16 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case winddirection_250hPa
     case winddirection_200hPa
     case winddirection_50hPa
+    case wind_direction_10m
+    case wind_direction_1000hPa
+    case wind_direction_925hPa
+    case wind_direction_850hPa
+    case wind_direction_700hPa
+    case wind_direction_500hPa
+    case wind_direction_300hPa
+    case wind_direction_250hPa
+    case wind_direction_200hPa
+    case wind_direction_50hPa
     case cloudcover_1000hPa
     case cloudcover_925hPa
     case cloudcover_850hPa
@@ -647,6 +670,15 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case cloudcover_250hPa
     case cloudcover_200hPa
     case cloudcover_50hPa
+    case cloud_cover_1000hPa
+    case cloud_cover_925hPa
+    case cloud_cover_850hPa
+    case cloud_cover_700hPa
+    case cloud_cover_500hPa
+    case cloud_cover_300hPa
+    case cloud_cover_250hPa
+    case cloud_cover_200hPa
+    case cloud_cover_50hPa
     case relativehumidity_1000hPa
     case relativehumidity_925hPa
     case relativehumidity_850hPa
@@ -665,10 +697,20 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case dewpoint_250hPa
     case dewpoint_200hPa
     case dewpoint_50hPa
+    case dew_point_1000hPa
+    case dew_point_925hPa
+    case dew_point_850hPa
+    case dew_point_700hPa
+    case dew_point_500hPa
+    case dew_point_300hPa
+    case dew_point_250hPa
+    case dew_point_200hPa
+    case dew_point_50hPa
     case soil_temperature_0_7cm
     case soil_temperature_0_10cm
     case soil_temperature_0_to_10cm
     case weathercode
+    case weather_code
     case snowfall
     case is_day
     case surface_pressure
@@ -676,6 +718,11 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case soil_temperature_0cm
     case rain
     case wet_bulb_temperature_2m
+    
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

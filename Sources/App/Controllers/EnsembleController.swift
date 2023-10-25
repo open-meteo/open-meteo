@@ -74,7 +74,7 @@ public struct EnsembleApiController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, results: readers)
+            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
@@ -167,17 +167,22 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
 /// Define all available surface weather variables
 enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepresentableString {
     case weathercode
+    case weather_code
     case temperature_2m
     case temperature_80m
     case temperature_120m
     case cloudcover
+    case cloud_cover
     case pressure_msl
     case relativehumidity_2m
+    case relative_humidity_2m
     case precipitation
     //case showers
     case rain
     case windgusts_10m
+    case wind_gusts_10m
     case dewpoint_2m
+    case dew_point_2m
     case diffuse_radiation
     case direct_radiation
     case apparent_temperature
@@ -187,15 +192,20 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepr
     case winddirection_80m
     case windspeed_120m
     case winddirection_120m
+    case wind_speed_10m
+    case wind_direction_10m
+    case wind_speed_80m
+    case wind_direction_80m
+    case wind_speed_120m
+    case wind_direction_120m
     case direct_normal_irradiance
     case et0_fao_evapotranspiration
+    case vapour_pressure_deficit
     case vapor_pressure_deficit
     case shortwave_radiation
     case snowfall
     case snow_depth
     case surface_pressure
-    //case terrestrial_radiation
-    //case terrestrial_radiation_instant
     case shortwave_radiation_instant
     case diffuse_radiation_instant
     case direct_radiation_instant
@@ -203,6 +213,7 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepr
     case is_day
     case visibility
     case freezinglevel_height
+    case freezing_level_height
     case uv_index
     case uv_index_clear_sky
     case cape
@@ -221,7 +232,12 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepr
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
-        default: return false
+        case .soil_moisture_0_to_10cm, .soil_moisture_10_to_40cm, .soil_moisture_40_to_100cm, .soil_moisture_100_to_200cm:
+            return true
+        case .snow_depth:
+            return true
+        default:
+            return false
         }
     }
 }
@@ -231,10 +247,15 @@ enum EnsemblePressureVariableType: String, GenericVariableMixable {
     case temperature
     case geopotential_height
     case relativehumidity
+    case relative_humidity
     case windspeed
+    case wind_speed
     case winddirection
+    case wind_direction
     case dewpoint
+    case dew_point
     case cloudcover
+    case cloud_cover
     case vertical_velocity
     
     var requiresOffsetCorrectionForMixing: Bool {

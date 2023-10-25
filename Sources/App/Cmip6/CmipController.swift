@@ -66,7 +66,7 @@ struct CmipController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, results: readers)
+            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<Cmip6Domain>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
@@ -91,12 +91,20 @@ enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, Cas
     case dewpoint_2m_max
     case dewpoint_2m_min
     case dewpoint_2m_mean
+    case dew_point_2m_max
+    case dew_point_2m_min
+    case dew_point_2m_mean
     case growing_degree_days_base_0_limit_50
     case soil_moisture_index_0_to_10cm_mean
     case soil_moisture_index_0_to_100cm_mean
     case daylight_duration
     case windspeed_2m_max
     case windspeed_2m_mean
+    case wind_speed_2m_max
+    case wind_speed_2m_mean
+    case wind_gusts_10m_mean
+    case wind_gusts_10m_max
+    case vapour_pressure_deficit_max
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -117,6 +125,7 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
     case vapor_pressure_deficit_max
     case windgusts_10m_mean
     case windgusts_10m_max
+
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -529,7 +538,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
         case .snowfall_sum:
             let snowwater = try get(raw: .raw(.snowfall_water_equivalent_sum), time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
-            return DataAndUnit(snowfall, .centimeter)
+            return DataAndUnit(snowfall, .centimetre)
         case .rain_sum:
             let snowwater = try get(raw: .raw(.snowfall_water_equivalent_sum), time: time)
             let precip = try get(raw: .raw(.precipitation_sum), time: time)
@@ -537,17 +546,17 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
                 return max($0.0-$0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
-        case .dewpoint_2m_max:
+        case .dewpoint_2m_max, .dew_point_2m_max:
             let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
             let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
             let rhMax = try get(raw: .raw(.relative_humidity_2m_max), time: time).data
             return DataAndUnit(zip(zip(tempMax, tempMin), rhMax).map(Meteorology.dewpointDaily), .celsius)
-        case .dewpoint_2m_min:
+        case .dewpoint_2m_min, .dew_point_2m_min:
             let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
             let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
             let rhMin = try get(raw: .raw(.relative_humidity_2m_min), time: time).data
             return DataAndUnit(zip(zip(tempMax, tempMin), rhMin).map(Meteorology.dewpointDaily), .celsius)
-        case .dewpoint_2m_mean:
+        case .dewpoint_2m_mean, .dew_point_2m_mean:
             let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
             let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
             let rhMean = try get(raw: .raw(.relative_humidity_2m_mean), time: time).data
@@ -581,15 +590,21 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .daylight_duration:
             // note: time should aldign to UTC 0 midnight
-            return DataAndUnit(Zensun.calculateDaylightDuration(utcMidnight: time.range, lat: modelLat, lon: modelLon), .second)
-        case .windspeed_2m_max:
+            return DataAndUnit(Zensun.calculateDaylightDuration(utcMidnight: time.range, lat: modelLat, lon: modelLon), .seconds)
+        case .windspeed_2m_max, .wind_speed_2m_max:
             let wind = try get(raw: .raw(.windspeed_10m_max), time: time)
             let scale = Meteorology.scaleWindFactor(from: 10, to: 2)
             return DataAndUnit(wind.data.map{$0*scale}, wind.unit)
-        case .windspeed_2m_mean:
+        case .windspeed_2m_mean, .wind_speed_2m_mean:
             let wind = try get(raw: .raw(.windspeed_10m_mean), time: time)
             let scale = Meteorology.scaleWindFactor(from: 10, to: 2)
             return DataAndUnit(wind.data.map{$0*scale}, wind.unit)
+        case .wind_gusts_10m_mean:
+            return try get(raw: .derived(.windgusts_10m_mean), time: time)
+        case .wind_gusts_10m_max:
+            return try get(raw: .derived(.windgusts_10m_max), time: time)
+        case .vapour_pressure_deficit_max:
+            return try get(raw: .derived(.vapor_pressure_deficit_max), time: time)
         }
     }
     
@@ -600,13 +615,13 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
         case .rain_sum:
             try prefetchData(raw: .raw(.precipitation_sum), time: time)
             try prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time)
-        case .dewpoint_2m_max:
+        case .dewpoint_2m_max, .dew_point_2m_max:
             try prefetchData(raw: .raw(.temperature_2m_min), time: time)
             try prefetchData(raw: .raw(.relative_humidity_2m_max), time: time)
-        case .dewpoint_2m_min:
+        case .dewpoint_2m_min, .dew_point_2m_min:
             try prefetchData(raw: .raw(.temperature_2m_max), time: time)
             try prefetchData(raw: .raw(.relative_humidity_2m_min), time: time)
-        case .dewpoint_2m_mean:
+        case .dewpoint_2m_mean, .dew_point_2m_mean:
             try prefetchData(raw: .raw(.temperature_2m_mean), time: time)
             try prefetchData(raw: .raw(.relative_humidity_2m_mean), time: time)
         case .growing_degree_days_base_0_limit_50:
@@ -618,10 +633,16 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
         case .daylight_duration:
             break
-        case .windspeed_2m_max:
+        case .windspeed_2m_max, .wind_speed_2m_max:
             try prefetchData(raw: .raw(.windspeed_10m_max), time: time)
-        case .windspeed_2m_mean:
+        case .windspeed_2m_mean, .wind_speed_2m_mean:
             try prefetchData(raw: .raw(.windspeed_10m_mean), time: time)
+        case .wind_gusts_10m_mean:
+            try prefetchData(raw: .derived(.windgusts_10m_mean), time: time)
+        case .wind_gusts_10m_max:
+            try prefetchData(raw: .derived(.windgusts_10m_max), time: time)
+        case .vapour_pressure_deficit_max:
+            try prefetchData(raw: .derived(.vapor_pressure_deficit_max), time: time)
         }
     }
 }
@@ -673,7 +694,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                     extraTerrestrialRadiationSum: exrad[i] * 0.0036,
                     relativeHumidity: rh))
             }
-            return DataAndUnit(et0, .millimeter)
+            return DataAndUnit(et0, .millimetre)
         case .vapor_pressure_deficit_max:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
@@ -695,7 +716,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                     temperature2mCelsiusDailyMin: tempmin[i],
                     relativeHumidity: rh))
             }
-            return DataAndUnit(vpd, .kiloPascal)
+            return DataAndUnit(vpd, .kilopascal)
         case .leaf_wetness_probability_mean:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
@@ -715,7 +736,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                 }
                 leafWetness.append(Meteorology.leafwetnessPorbabilityDaily(temperature2mCelsiusDaily: (max: tempmax[i], min: tempmin[i]), relativeHumidity: rh, precipitation: preciptitation[i]))
             }
-            return DataAndUnit(leafWetness, .percent)
+            return DataAndUnit(leafWetness, .percentage)
         case .soil_moisture_0_to_100cm_mean:
             // estimate soil moisture in 0-100 by a moving average over 0-10 cm moisture
             let sm0_10 = try get(raw: .soil_moisture_0_to_10cm_mean, time: time)

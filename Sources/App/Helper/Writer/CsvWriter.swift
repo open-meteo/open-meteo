@@ -9,7 +9,7 @@ extension ForecastapiResult {
             throw ForecastapiError.generic(message: "Only up to 1000 locations can be requested at once")
         }
         let response = Response(body: .init(stream: { writer in
-            _ = writer.eventLoop.performWithTask {
+            _ = writer.eventLoop.makeFutureWithTask {
                 var b = BufferAndWriter(writer: writer)
                 let multiLocation = results.count > 1
                 
@@ -19,28 +19,28 @@ extension ForecastapiResult {
                     b.buffer.writeString("\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
                 } else {
                     b.buffer.writeString("location_id,latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
-                    for (i, location) in results.enumerated() {
+                    for location in results {
                         guard let first = location.results.first else {
                             continue
                         }
                         let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                        b.buffer.writeString("\(i+1),\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                        b.buffer.writeString("\(location.locationId),\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
                     }
                 }
-                for (i, location) in results.enumerated() {
-                    try await location.current?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+                for location in results {
+                    try await location.current?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
-                for (i, location) in results.enumerated() {
-                    try await location.minutely15?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+                for location in results {
+                    try await location.minutely15?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
-                for (i, location) in results.enumerated() {
-                    try await location.hourly?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+                for location in results {
+                    try await location.hourly?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
-                for (i, location) in results.enumerated() {
-                    try await location.sixHourly?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+                for location in results {
+                    try await location.sixHourly?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
-                for (i, location) in results.enumerated() {
-                    try await location.daily?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+                for location in results {
+                    try await location.daily?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 try await b.flush()
                 try await b.end()
@@ -72,7 +72,7 @@ extension ApiSectionSingle {
         
         let time = self.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false)
         if let location_id {
-            b.buffer.writeString("\(location_id+1),")
+            b.buffer.writeString("\(location_id),")
         }
         b.buffer.writeString(time)
         for e in columns {
@@ -107,7 +107,7 @@ extension ApiSectionString {
         
         for (i, time) in time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false, onlyDate: time.dtSeconds == 86400).enumerated() {
             if let location_id {
-                b.buffer.writeString("\(location_id+1),")
+                b.buffer.writeString("\(location_id),")
             }
             b.buffer.writeString(time)
             for e in columns {

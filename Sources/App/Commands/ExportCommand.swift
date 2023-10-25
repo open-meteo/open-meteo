@@ -34,7 +34,7 @@ final class BufferedParquetFileWriter {
                 ("latitude", .float),
                 ("longitude", .float),
                 ("elevation", .float),
-                ("time", .timestamp(unit: .second))
+                ("time", .timestamp(unit: .seconds))
             ] + zip(variables, data).map{("\($0.0)_\($0.1.unit)", ArrowDataType.float)}
             
             let schema = try ArrowSchema(columns)
@@ -74,7 +74,7 @@ final class BufferedParquetFileWriter {
             try ArrowArray(float: latitudes),
             try ArrowArray(float: longitudes),
             try ArrowArray(float: elevations),
-            try ArrowArray(timestamp: times, unit: .second)
+            try ArrowArray(timestamp: times, unit: .seconds)
         ] + data.map( {try ArrowArray(float: $0)}))
         try writer.write(table: table, chunkSize: locations.count)
         

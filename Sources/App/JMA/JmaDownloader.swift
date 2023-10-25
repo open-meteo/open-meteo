@@ -344,25 +344,25 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         case .temperature_2m:
             return .celsius
         case .cloudcover:
-            return .percent
+            return .percentage
         case .cloudcover_low:
-            return .percent
+            return .percentage
         case .cloudcover_mid:
-            return .percent
+            return .percentage
         case .cloudcover_high:
-            return .percent
+            return .percentage
         case .relativehumidity_2m:
-            return .percent
+            return .percentage
         case .precipitation:
-            return .millimeter
+            return .millimetre
         case .pressure_msl:
-            return .hectoPascal
+            return .hectopascal
         case .wind_v_component_10m:
-            return .ms
+            return .metrePerSecond
         case .wind_u_component_10m:
-            return .ms
+            return .metrePerSecond
         case .shortwave_radiation:
-            return .wattPerSquareMeter
+            return .wattPerSquareMetre
         }
     }
     
@@ -469,15 +469,15 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
         case .temperature:
             return .celsius
         case .wind_u_component:
-            return .ms
+            return .metrePerSecond
         case .wind_v_component:
-            return .ms
+            return .metrePerSecond
         case .geopotential_height:
-            return .meter
+            return .metre
         case .vertical_velocity:
-            return .ms
+            return .metrePerSecond
         case .relativehumidity:
-            return .percent
+            return .percentage
         }
     }
     

@@ -209,7 +209,7 @@ struct WeatherApiController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, results: readers)
+            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
@@ -452,7 +452,12 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cloudcover_high
     case cloudcover_low
     case cloudcover_mid
+    case cloud_cover
+    case cloud_cover_high
+    case cloud_cover_low
+    case cloud_cover_mid
     case dewpoint_2m
+    case dew_point_2m
     case diffuse_radiation
     case diffuse_radiation_instant
     case direct_normal_irradiance
@@ -462,9 +467,11 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case et0_fao_evapotranspiration
     case evapotranspiration
     case freezinglevel_height
+    case freezing_level_height
     case growing_degree_days_base_0_limit_50
     case is_day
     case latent_heatflux
+    case latent_heat_flux
     case lifted_index
     case leaf_wetness_probability
     case lightning_potential
@@ -473,8 +480,10 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case pressure_msl
     case rain
     case relativehumidity_2m
+    case relative_humidity_2m
     case runoff
     case sensible_heatflux
+    case sensible_heat_flux
     case shortwave_radiation
     case shortwave_radiation_instant
     case showers
@@ -541,8 +550,10 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case uv_index
     case uv_index_clear_sky
     case vapor_pressure_deficit
+    case vapour_pressure_deficit
     case visibility
     case weathercode
+    case weather_code
     case winddirection_100m
     case winddirection_10m
     case winddirection_120m
@@ -564,6 +575,27 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case windspeed_40m
     case windspeed_50m
     case windspeed_80m
+    case wind_direction_100m
+    case wind_direction_10m
+    case wind_direction_120m
+    case wind_direction_150m
+    case wind_direction_180m
+    case wind_direction_200m
+    case wind_direction_20m
+    case wind_direction_40m
+    case wind_direction_50m
+    case wind_direction_80m
+    case wind_gusts_10m
+    case wind_speed_100m
+    case wind_speed_10m
+    case wind_speed_120m
+    case wind_speed_150m
+    case wind_speed_180m
+    case wind_speed_200m
+    case wind_speed_20m
+    case wind_speed_40m
+    case wind_speed_50m
+    case wind_speed_80m
     
     /// Some variables are kept for backwards compatibility
     var remapped: Self {
@@ -610,20 +642,16 @@ enum ForecastPressureVariableType: String, GenericVariableMixable {
     case temperature
     case geopotential_height
     case relativehumidity
-    case windspeed
-    case winddirection
-    case dewpoint
-    case cloudcover
-    case vertical_velocity
     case relative_humidity
-    
-    /// Some variables are kept for backwards compatibility
-    var remapped: Self {
-        switch self {
-        case .relative_humidity: return .relativehumidity
-        default: return self
-        }
-    }
+    case windspeed
+    case wind_speed
+    case winddirection
+    case wind_direction
+    case dewpoint
+    case dew_point
+    case cloudcover
+    case cloud_cover
+    case vertical_velocity
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -647,8 +675,8 @@ extension ForecastVariable {
         switch self {
         case .surface(let surface):
             return .surface(surface.remapped)
-        case .pressure(let pressure):
-            return .pressure(ForecastPressureVariable(variable: pressure.variable.remapped, level: pressure.level))
+        case .pressure(_):
+            return self
         }
     }
 }
@@ -664,9 +692,15 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case cloudcover_max
     case cloudcover_mean
     case cloudcover_min
+    case cloud_cover_max
+    case cloud_cover_mean
+    case cloud_cover_min
     case dewpoint_2m_max
     case dewpoint_2m_mean
     case dewpoint_2m_min
+    case dew_point_2m_max
+    case dew_point_2m_mean
+    case dew_point_2m_min
     case et0_fao_evapotranspiration
     case et0_fao_evapotranspiration_sum
     case growing_degree_days_base_0_limit_50
@@ -713,10 +747,12 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case uv_index_clear_sky_max
     case uv_index_max
     case vapor_pressure_deficit_max
+    case vapour_pressure_deficit_max
     case visibility_max
     case visibility_mean
     case visibility_min
     case weathercode
+    case weather_code
     case winddirection_10m_dominant
     case windgusts_10m_max
     case windgusts_10m_mean
@@ -724,6 +760,13 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case windspeed_10m_max
     case windspeed_10m_mean
     case windspeed_10m_min
+    case wind_direction_10m_dominant
+    case wind_gusts_10m_max
+    case wind_gusts_10m_mean
+    case wind_gusts_10m_min
+    case wind_speed_10m_max
+    case wind_speed_10m_mean
+    case wind_speed_10m_min
     case wet_bulb_temperature_2m_max
     case wet_bulb_temperature_2m_mean
     case wet_bulb_temperature_2m_min
@@ -751,23 +794,23 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .sum(.surface(.rain))
         case .showers_sum:
             return .sum(.surface(.showers))
-        case .weathercode:
+        case .weathercode, .weather_code:
             return .max(.surface(.weathercode))
         case .shortwave_radiation_sum:
             return .radiationSum(.surface(.shortwave_radiation))
-        case .windspeed_10m_max:
+        case .windspeed_10m_max, .wind_speed_10m_max:
             return .max(.surface(.windspeed_10m))
-        case .windspeed_10m_min:
+        case .windspeed_10m_min, .wind_speed_10m_min:
             return .min(.surface(.windspeed_10m))
-        case .windspeed_10m_mean:
+        case .windspeed_10m_mean, .wind_speed_10m_mean:
             return .mean(.surface(.windspeed_10m))
-        case .windgusts_10m_max:
+        case .windgusts_10m_max, .wind_gusts_10m_max:
             return .max(.surface(.windgusts_10m))
-        case .windgusts_10m_min:
+        case .windgusts_10m_min, .wind_gusts_10m_min:
             return .min(.surface(.windgusts_10m))
-        case .windgusts_10m_mean:
+        case .windgusts_10m_mean, .wind_gusts_10m_mean:
             return .mean(.surface(.windgusts_10m))
-        case .winddirection_10m_dominant:
+        case .winddirection_10m_dominant, .wind_direction_10m_dominant:
             return .dominantDirection(velocity: .surface(.windspeed_10m), direction: .surface(.winddirection_10m))
         case .precipitation_hours:
             return .precipitationHours(.surface(.precipitation))
@@ -801,11 +844,11 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .min(.surface(.cape))
         case .cape_mean:
             return .mean(.surface(.cape))
-        case .cloudcover_max:
+        case .cloudcover_max, .cloud_cover_max:
             return .max(.surface(.cloudcover))
-        case .cloudcover_min:
+        case .cloudcover_min, .cloud_cover_min:
             return .min(.surface(.cloudcover))
-        case .cloudcover_mean:
+        case .cloudcover_mean, .cloud_cover_mean:
             return .mean(.surface(.cloudcover))
         case .uv_index_max:
             return .max(.surface(.uv_index))
@@ -817,11 +860,11 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .max(.surface(.precipitation_probability))
         case .precipitation_probability_mean:
             return .max(.surface(.precipitation_probability))
-        case .dewpoint_2m_max:
+        case .dewpoint_2m_max, .dew_point_2m_max:
             return .max(.surface(.dewpoint_2m))
-        case .dewpoint_2m_mean:
+        case .dewpoint_2m_mean, .dew_point_2m_mean:
             return .mean(.surface(.dewpoint_2m))
-        case .dewpoint_2m_min:
+        case .dewpoint_2m_min, .dew_point_2m_min:
             return .min(.surface(.dewpoint_2m))
         case .et0_fao_evapotranspiration_sum:
             return .sum(.surface(.et0_fao_evapotranspiration))
@@ -867,7 +910,7 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .mean(.surface(.soil_temperature_7_to_28cm))
         case .updraft_max:
             return .max(.surface(.updraft))
-        case .vapor_pressure_deficit_max:
+        case .vapor_pressure_deficit_max, .vapour_pressure_deficit_max:
             return .max(.surface(.vapor_pressure_deficit))
         case .wet_bulb_temperature_2m_max:
             return .max(.surface(.wet_bulb_temperature_2m))

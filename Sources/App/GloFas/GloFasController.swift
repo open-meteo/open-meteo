@@ -54,33 +54,33 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try reader.get(variable: .init(.river_discharge, $0), time: time).data
         })
         if data[0].onlyNaN() {
-            return DataAndUnit(data[0], .qubicMeterPerSecond)
+            return DataAndUnit(data[0], .cubicMetrePerSecond)
         }
         switch derived {
         case .river_discharge_mean:
             return DataAndUnit((0..<time.count).map { t in
                 data.reduce(0, {$0 + $1[t]}) / Float(data.count)
-            }, .qubicMeterPerSecond)
+            }, .cubicMetrePerSecond)
         case .river_discharge_min:
             return DataAndUnit((0..<time.count).map { t in
                 data.reduce(Float.nan, { $0.isNaN || $1[t] < $0 ? $1[t] : $0 })
-            }, .qubicMeterPerSecond)
+            }, .cubicMetrePerSecond)
         case .river_discharge_max:
             return DataAndUnit((0..<time.count).map { t in
                 data.reduce(Float.nan, { $0.isNaN || $1[t] > $0 ? $1[t] : $0 })
-            }, .qubicMeterPerSecond)
+            }, .cubicMetrePerSecond)
         case .river_discharge_median:
             return DataAndUnit((0..<time.count).map { t in
                 data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.5), (Float(data.count)*0.5).truncatingRemainder(dividingBy: 1) )
-            }, .qubicMeterPerSecond)
+            }, .cubicMetrePerSecond)
         case .river_discharge_p25:
             return DataAndUnit((0..<time.count).map { t in
                 data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.25), (Float(data.count)*0.25).truncatingRemainder(dividingBy: 1) )
-            }, .qubicMeterPerSecond)
+            }, .cubicMetrePerSecond)
         case .river_discharge_p75:
             return DataAndUnit((0..<time.count).map { t in
                 data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.75), (Float(data.count)*0.75).truncatingRemainder(dividingBy: 1) )
-            }, .qubicMeterPerSecond)
+            }, .cubicMetrePerSecond)
         }
     }
 }
@@ -142,11 +142,11 @@ struct GloFasController {
                                     assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
                                     return ApiArray.float(d.data)
                                 }
-                                return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .qubicMeterPerSecond, variables: d)
+                                return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
                             case .derived(let derived):
                                 let d = try reader.get(variable: .derived(derived), time: dailyTime).convertAndRound(params: params)
                                 assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
-                                return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .qubicMeterPerSecond, variables: [.float(d.data)])
+                                return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
                             }
                         })
                     },
@@ -157,7 +157,7 @@ struct GloFasController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, results: readers)
+            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<GlofasDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))

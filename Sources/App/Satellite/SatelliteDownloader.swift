@@ -140,7 +140,7 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
             let year = time.toComponents().year
             let month = time.toComponents().month.zeroPadded(len: 2)
             let yyyymmdd = time.format_YYYYMMdd
-            let openDap = "https://gpm1.gesdisc.eosdis.nasa.gov/opendap/GPM_L3/GPM_3IMERGDL.06/\(year)/\(month)/3B-DAY-L.MS.MRG.3IMERG.\(yyyymmdd)-S000000-E235959.V06.nc4"
+            let openDap = "https://gpm1.gesdisc.eosdis.nasa.gov/opendap/GPM_L3/GPM_3IMERGDL.06/\(year)/\(month)/3B-DAY-L.metrePerSecond.MRG.3IMERG.\(yyyymmdd)-S000000-E235959.V06.nc4"
             let destination = "\(domain.downloadDirectory)precipitation_\(yyyymmdd).om"
             let domain = SatelliteDomain.imerg_daily
             
@@ -202,7 +202,7 @@ enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVar
     var unit: SiUnit {
         switch self {
         case .precipitation_sum:
-            return .millimeter
+            return .millimetre
         }
     }
     

@@ -19,6 +19,10 @@ enum SeasonalForecastDomainApi: String, RawRepresentableString, CaseIterable {
 enum CfsVariableDerived: String, RawRepresentableString {
     case windspeed_10m
     case winddirection_10m
+    case wind_speed_10m
+    case wind_direction_10m
+    case cloud_cover
+    case relative_humidity_2m
 }
 
 enum DailyCfsVariable: String, RawRepresentableString {
@@ -30,6 +34,8 @@ enum DailyCfsVariable: String, RawRepresentableString {
     case shortwave_radiation_sum
     case windspeed_10m_max
     case winddirection_10m_dominant
+    case wind_speed_10m_max
+    case wind_direction_10m_dominant
     case precipitation_hours
 }
 
@@ -40,11 +46,15 @@ extension SeasonalForecastReader {
             try prefetchData(variable: VariableAndMember(variable, member), time: time)
         case .derived(let variable):
             switch variable {
-            case .windspeed_10m:
+            case .windspeed_10m, .wind_speed_10m:
                 fallthrough
-            case .winddirection_10m:
+            case .winddirection_10m, .wind_direction_10m:
                 try prefetchData(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
                 try prefetchData(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
+            case .cloud_cover:
+                try prefetchData(variable: VariableAndMember(.cloudcover, member), time: time)
+            case .relative_humidity_2m:
+                try prefetchData(variable: VariableAndMember(.relativehumidity_2m, member), time: time)
             }
         }
     }
@@ -55,16 +65,20 @@ extension SeasonalForecastReader {
             return try get(variable: VariableAndMember(variable, member), time: time)
         case .derived(let variable):
             switch variable {
-            case .windspeed_10m:
+            case .windspeed_10m, .wind_speed_10m:
                 let u = try get(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
                 let v = try get(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
                 let speed = zip(u.data,v.data).map(Meteorology.windspeed)
                 return DataAndUnit(speed, u.unit)
-            case .winddirection_10m:
+            case .winddirection_10m, .wind_direction_10m:
                 let u = try get(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
                 let v = try get(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
                 let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
                 return DataAndUnit(direction, .degreeDirection)
+            case .cloud_cover:
+                return try get(variable: VariableAndMember(.cloudcover, member), time: time)
+            case .relative_humidity_2m:
+                return try get(variable: VariableAndMember(.relativehumidity_2m, member), time: time)
             }
         }
     }
@@ -82,9 +96,9 @@ extension SeasonalForecastReader {
             try prefetchData(variable: VariableAndMember(.showers, member), time: time)
         case .shortwave_radiation_sum:
             try prefetchData(variable: VariableAndMember(.shortwave_radiation, member), time: time)
-        case .windspeed_10m_max:
+        case .windspeed_10m_max, .wind_speed_10m_max:
             fallthrough
-        case .winddirection_10m_dominant:
+        case .winddirection_10m_dominant, .wind_direction_10m_dominant:
             try prefetchData(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
             try prefetchData(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
         case .precipitation_hours:
@@ -110,11 +124,11 @@ extension SeasonalForecastReader {
         case .shortwave_radiation_sum:
             let data = try get(variable: VariableAndMember(.shortwave_radiation, member), time: time).convertAndRound(params: params)
             // for 6h data
-            return DataAndUnit(data.data.sum(by: 4).map({$0*0.0036 * 6}).round(digits: 2), .megaJoulesPerSquareMeter)
-        case .windspeed_10m_max:
+            return DataAndUnit(data.data.sum(by: 4).map({$0*0.0036 * 6}).round(digits: 2), .megajoulePerSquareMetre)
+        case .windspeed_10m_max, .wind_speed_10m_max:
             let data = try get(variable: .derived(.windspeed_10m), member: member, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 4), data.unit)
-        case .winddirection_10m_dominant:
+        case .winddirection_10m_dominant, .wind_direction_10m_dominant:
             let u = try get(variable: VariableAndMember(.wind_u_component_10m, member), time: time).data.sum(by: 4)
             let v = try get(variable: VariableAndMember(.wind_v_component_10m, member), time: time).data.sum(by: 4)
             let direction = Meteorology.windirectionFast(u: u, v: v)
@@ -224,7 +238,7 @@ struct SeasonalForecastController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, results: readers)
+            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<SeasonalForecastDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))

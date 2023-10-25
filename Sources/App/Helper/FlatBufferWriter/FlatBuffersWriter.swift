@@ -30,7 +30,7 @@ extension ForecastapiResult {
                 //try await b.flushIfRequired()
                 for location in results {
                     for model in location.results {
-                        try Model.writeToFlatbuffer(section: model, &fbb, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime)
+                        try model.writeToFlatbuffer(&fbb, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
                         b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
                         fbb.clear()
                         try await b.flushIfRequired()
@@ -52,116 +52,133 @@ fileprivate extension FlatBuffers.ByteBuffer {
     }
 }
 
-extension ForecastapiResult {
-    /// Encodes daily data to eigher `ValuesAndUnit` or `ValuesInt64AndUnit` for timestamps (e.g. sunrise/set)
-    static func encode(section: ApiSection<Model.DailyVariable>, _ fbb: inout FlatBufferBuilder) -> [Offset] {
-        let offsets: [Offset] = section.columns.map { v in
-            switch v.variables[0] {
-            case .float(let float):
-                return openmeteo_sdk_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: fbb.createVector(float), unit: v.unit)
-            case .timestamp(let time):
-                return openmeteo_sdk_ValuesInt64AndUnit.createValuesInt64AndUnit(&fbb, valuesVectorOffset: fbb.createVector(time.map({$0.timeIntervalSince1970})), unit: v.unit)
-            }
-        }
-        return offsets
+/// Encode meta data for flatbuffer variables
+struct FlatBufferVariableMeta {
+    let variable: openmeteo_sdk_Variable
+    let aggregation: openmeteo_sdk_Aggregation
+    let altitude: Int16
+    let pressureLevel: Int16
+    let depth: Int16
+    let depthTo: Int16
+    
+    init(variable: openmeteo_sdk_Variable, aggregation: openmeteo_sdk_Aggregation = .none_, altitude: Int16 = 0, pressureLevel: Int16 = 0, depth: Int16 = 0, depthTo: Int16 = 0) {
+        self.variable = variable
+        self.aggregation = aggregation
+        self.altitude = altitude
+        self.pressureLevel = pressureLevel
+        self.depth = depth
+        self.depthTo = depthTo
     }
     
-    /// Encodes hourly/minutely data
-    static func encode(section: ApiSection<SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) -> (surface: [(variable: Model.HourlyVariable, offset: Offset)], pressure: [(variable: Model.HourlyPressureType, offset: Offset)]) {
-        var surfaces = [(variable: Model.HourlyVariable, offset: Offset)]()
-        surfaces.reserveCapacity(section.columns.count)
-        var pressures = [(variable: Model.HourlyPressureType, unit: SiUnit, offsets: [Offset])]()
-        
-        for v in section.columns {
-            switch v.variable {
-            case .surface(let surface):
-                let offset = openmeteo_sdk_ValuesAndUnit.createValuesAndUnit(&fbb, valuesVectorOffset: v.variables[0].expectFloatArray(&fbb), unit: v.unit)
-                surfaces.append((surface, offset))
-            case .pressure(let pressure):
-                let offset = openmeteo_sdk_ValuesAndLevel.createValuesAndLevel(&fbb, level: Int32(pressure.level), valuesVectorOffset: v.variables[0].expectFloatArray(&fbb))
-                if let pos = pressures.firstIndex(where: {$0.variable == pressure.variable}) {
-                    pressures[pos].offsets.append(offset)
-                } else {
-                    pressures.append((pressure.variable, v.unit, [offset]))
-                }
-            }
-        }
-        
-        let pressureVectors: [(variable: Model.HourlyPressureType, offset: Offset)] = pressures.map { (variable, unit, offsets) in
-            return (variable, openmeteo_sdk_ValuesUnitPressureLevel.createValuesUnitPressureLevel(&fbb, unit: unit, valuesVectorOffset: fbb.createVector(ofOffsets: offsets)))
-        }
-        
-        return (surfaces, pressureVectors)
+    fileprivate func encodeToFlatBuffers(_ fbb: inout FlatBufferBuilder) {
+        openmeteo_sdk_Series.add(variable: variable, &fbb)
+        openmeteo_sdk_Series.add(aggregation: aggregation, &fbb)
+        openmeteo_sdk_Series.add(altitude: altitude, &fbb)
+        openmeteo_sdk_Series.add(pressureLevel: pressureLevel, &fbb)
+        openmeteo_sdk_Series.add(depth: depth, &fbb)
+        openmeteo_sdk_Series.add(depthTo: depthTo, &fbb)
     }
-    
-    /// Encode hourly variable for surface and pressure variables
-    static func encodeEnsemble(section: ApiSection<SurfaceAndPressureVariable>, _ fbb: inout FlatBufferBuilder) -> (surface: [(variable: Model.HourlyVariable, offset: Offset)], pressure: [(variable: Model.HourlyPressureType, offset: Offset)]) {
-        var surfaces = [(variable: Model.HourlyVariable, offset: Offset)]()
-        surfaces.reserveCapacity(section.columns.count)
-        var pressures = [(variable: Model.HourlyPressureType, unit: SiUnit, offsets: [Offset])]()
-        
-        for v in section.columns {
-            switch v.variable {
-            case .surface(let surface):
-                let oo = v.variables.enumerated().map { (member, data) in
-                    return openmeteo_sdk_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: data.expectFloatArray(&fbb))
-                }
-                let offset = openmeteo_sdk_ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
-                surfaces.append((surface, offset))
-            case .pressure(let pressure):
-                let oo = v.variables.enumerated().map { (member, data) in
-                    return openmeteo_sdk_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: data.expectFloatArray(&fbb))
-                }
-                let offset = openmeteo_sdk_ValuesAndLevelAndMember.createValuesAndLevelAndMember(&fbb, level: Int32(pressure.level), valuesVectorOffset: fbb.createVector(ofOffsets: oo))
-                if let pos = pressures.firstIndex(where: {$0.variable == pressure.variable}) {
-                    pressures[pos].offsets.append(offset)
-                } else {
-                    pressures.append((pressure.variable, v.unit, [offset]))
-                }
-            }
+}
+
+extension VariableOrDerived: FlatBuffersVariable where Raw: FlatBuffersVariable, Derived: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .raw(let raw):
+            return raw.getFlatBuffersMeta()
+        case .derived(let derived):
+            return derived.getFlatBuffersMeta()
         }
-        
-        let pressureVectors: [(variable: Model.HourlyPressureType, offset: Offset)] = pressures.map { (variable, unit, offsets) in
-            return (variable, openmeteo_sdk_ValuesUnitPressureLevelAndMember.createValuesUnitPressureLevelAndMember(&fbb, unit: unit, valuesVectorOffset: fbb.createVector(ofOffsets: offsets)))
-        }
-        
-        return (surfaces, pressureVectors)
-    }
-    
-    /// Encodes daily data to eigher `ValuesAndUnit` or just plain `int64` for timestamps (e.g. sunrise/set)
-    static func encodeEnsemble(section: ApiSection<Model.DailyVariable>, _ fbb: inout FlatBufferBuilder) -> [Offset] {
-        let offsets: [Offset] = section.columns.map { v in
-            let oo = v.variables.enumerated().map { (member, array) in
-                switch array {
-                case .float(let float):
-                    return openmeteo_sdk_ValuesAndMember.createValuesAndMember(&fbb, member: Int32(member + Model.memberOffset), valuesVectorOffset: fbb.createVector(float))
-                case .timestamp(let time):
-                    return fbb.createVector(time.map({$0.timeIntervalSince1970}))
-                }
-            }
-            return openmeteo_sdk_ValuesUnitAndMember.createValuesUnitAndMember(&fbb, unit: v.unit, valuesVectorOffset: fbb.createVector(ofOffsets: oo))
-        }
-        return offsets
     }
 }
 
 extension ApiArray {
-    func expectFloatArray(_ fbb: inout FlatBuffers.FlatBufferBuilder) -> Offset {
+    func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder) -> Offset {
         switch self {
-        case .float(let array):
-            return fbb.createVector(array)
-        case .timestamp(_):
-            fatalError("Expected float array and not timestamps")
+        case .float(let values):
+            return fbb.createVector(values)
+        case .timestamp(let values):
+            return fbb.createVector(values.map({Int64($0.timeIntervalSince1970)}))
         }
     }
 }
 
-extension ApiSection {
-    func timeFlatBuffers() -> openmeteo_sdk_TimeRange {
-        return .init(
+extension ApiSection where Variable: FlatBuffersVariable {
+    func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
+        let offsets = fbb.createVector(ofOffsets: self.columns.flatMap { c -> [Offset] in
+            return c.variables.enumerated().map { (member,v) in
+                let data = v.encodeFlatBuffers(&fbb)
+                let series = openmeteo_sdk_Series.startSeries(&fbb)
+                c.variable.getFlatBuffersMeta().encodeToFlatBuffers(&fbb)
+                openmeteo_sdk_Series.add(unit: c.unit, &fbb)
+                if c.variables.count > 1 {
+                    openmeteo_sdk_Series.add(ensembleMember: Int16(member + memberOffset), &fbb)
+                }
+                switch v {
+                case .float(_):
+                    openmeteo_sdk_Series.addVectorOf(values: data, &fbb)
+                case .timestamp(_):
+                    openmeteo_sdk_Series.addVectorOf(valuesInt64: data, &fbb)
+                }
+                return openmeteo_sdk_Series.endSeries(&fbb, start: series)
+            }
+        })
+        return openmeteo_sdk_SeriesAndTime.createSeriesAndTime(
+            &fbb,
             start: Int64(time.range.lowerBound.timeIntervalSince1970),
             end: Int64(time.range.upperBound.timeIntervalSince1970),
-            interval: Int32(Int64(time.dtSeconds))
+            interval: Int32(time.dtSeconds), 
+            seriesVectorOffset: offsets
         )
     }
 }
+
+extension ApiSectionSingle where Variable: FlatBuffersVariable {
+    func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder) -> Offset {
+        let offsets = fbb.createVector(ofOffsets: self.columns.map { c -> Offset in
+            let series = openmeteo_sdk_Series.startSeries(&fbb)
+            c.variable.getFlatBuffersMeta().encodeToFlatBuffers(&fbb)
+            openmeteo_sdk_Series.add(unit: c.unit, &fbb)
+            openmeteo_sdk_Series.add(value: c.value, &fbb)
+            return openmeteo_sdk_Series.endSeries(&fbb, start: series)
+        })
+        return openmeteo_sdk_SeriesAndTime.createSeriesAndTime(
+            &fbb,
+            start: Int64(time.timeIntervalSince1970),
+            end: Int64(time.timeIntervalSince1970 + dtSeconds),
+            interval: Int32(dtSeconds),
+            seriesVectorOffset: offsets
+        )
+    }
+}
+
+extension ForecastapiResult.PerModel {
+    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) throws {
+        let generationTimeStart = Date()
+        let hourly = (try hourly?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
+        let minutely15 = (try minutely15?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
+        let sixHourly = (try sixHourly?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
+        let daily = (try daily?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
+        let current = (try current?()).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
+        let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
+        
+        let result = openmeteo_sdk_ApiResponse.createApiResponse (
+            &fbb,
+            latitude: latitude,
+            longitude: longitude,
+            elevation: elevation ?? .nan,
+            generationTimeMilliseconds: Float32(generationTimeMs), 
+            locationId: Int64(locationId),
+            model: model.flatBufferModel,
+            utcOffsetSeconds: Int32(timezone.utcOffsetSeconds),
+            timezoneOffset: timezone.identifier == "GMT" ? Offset() : fbb.create(string: timezone.identifier),
+            timezoneAbbreviationOffset: timezone.abbreviation == "GMT" ? Offset() : fbb.create(string: timezone.abbreviation),
+            currentOffset: current, 
+            dailyOffset: daily,
+            hourlyOffset: hourly,
+            minutely15Offset: minutely15, sixHourlyOffset: sixHourly
+        )
+        fbb.finish(offset: result, addPrefix: true)
+    }
+}
+
+

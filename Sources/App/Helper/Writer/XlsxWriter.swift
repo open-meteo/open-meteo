@@ -22,13 +22,13 @@ extension ForecastapiResult {
         sheet.write("timezone_abbreviation")
         sheet.endRow()
         
-        for (i, location) in results.enumerated() {
+        for location in results {
             sheet.startRow()
             guard let first = location.results.first else {
                 continue
             }
             if multiLocation {
-                sheet.write(i+1)
+                sheet.write(location.locationId)
             }
             sheet.write(first.latitude, significantDigits: 4)
             sheet.write(first.longitude, significantDigits: 4)
@@ -38,20 +38,20 @@ extension ForecastapiResult {
             sheet.write(location.timezone.abbreviation)
             sheet.endRow()
         }
-        for (i, location) in results.enumerated() {
-            try location.current?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+        for location in results {
+            try location.current?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
-        for (i, location) in results.enumerated() {
-            try location.minutely15?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+        for location in results {
+            try location.minutely15?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
-        for (i, location) in results.enumerated() {
-            try location.hourly?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+        for location in results {
+            try location.hourly?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
-        for (i, location) in results.enumerated() {
-            try location.sixHourly?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+        for location in results {
+            try location.sixHourly?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
-        for (i, location) in results.enumerated() {
-            try location.daily?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? i : nil)
+        for location in results {
+            try location.daily?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
         
         let data = sheet.write(timestamp: timestamp)
@@ -81,7 +81,7 @@ extension ApiSectionString {
         for (i, time) in time.enumerated() {
             sheet.startRow()
             if let location_id {
-                sheet.write(location_id + 1)
+                sheet.write(location_id)
             }
             sheet.writeTimestamp(time.add(utc_offset_seconds))
             for e in columns {
@@ -115,7 +115,7 @@ extension ApiSectionSingle {
 
         sheet.startRow()
         if let location_id {
-            sheet.write(location_id + 1)
+            sheet.write(location_id)
         }
         sheet.writeTimestamp(time.add(utc_offset_seconds))
         for e in columns {

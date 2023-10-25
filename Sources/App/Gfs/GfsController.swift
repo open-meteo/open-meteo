@@ -4,7 +4,6 @@ import Vapor
 
 enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
-    case relativehumitidy_2m
     case dewpoint_2m
     case temperature_120m
     case windspeed_10m
@@ -16,6 +15,16 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     // Map 100m wind to 120m level
     case windspeed_120m
     case winddirection_120m
+    case relative_humidity_2m
+    case dew_point_2m
+    case wind_speed_10m
+    case wind_direction_10m
+    case wind_speed_80m
+    case wind_direction_80m
+    case wind_speed_100m
+    case wind_direction_100m
+    case wind_speed_120m
+    case wind_direction_120m
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -25,14 +34,24 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case evapotranspiration
     case et0_fao_evapotranspiration
     case vapor_pressure_deficit
+    case vapour_pressure_deficit
     case snowfall
     case rain
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case weathercode
+    case weather_code
     case is_day
     case wet_bulb_temperature_2m
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
+    case sensible_heat_flux
+    case latent_heat_flux
+    case wind_gusts_10m
+    case freezing_level_height
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -46,6 +65,11 @@ enum GfsPressureVariableDerivedType: String, CaseIterable {
     case windspeed
     case winddirection
     case dewpoint
+    case wind_speed
+    case wind_direction
+    case dew_point
+    case cloud_cover
+    case relative_humidity
 }
 
 /**
@@ -130,7 +154,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
         if domain == .hrrr_conus, case let .pressure(pressure) = raw.variable, pressure.variable == .cloudcover {
             let rh = try reader.get(variable: .init(.pressure(GfsPressureVariable(variable: .relativehumidity, level: pressure.level)), member), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))}), .percent)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))}), .percentage)
         }
         
         /// Make sure showers are `0` instead of `NaN` in HRRR, otherwise it is mixed with GFS showers
@@ -189,32 +213,50 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.wind_v_component_10m), member), time: time)
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.shortwave_radiation), member), time: time)
-            case .relativehumitidy_2m:
+            case .relative_humidity_2m:
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
+            case .wind_speed_10m:
+                fallthrough
             case .windspeed_10m:
                 try prefetchData(raw: .init(.surface(.wind_u_component_10m), member), time: time)
                 try prefetchData(raw: .init(.surface(.wind_v_component_10m), member), time: time)
+            case .wind_direction_10m:
+                fallthrough
             case .winddirection_10m:
                 try prefetchData(raw: .init(.surface(.wind_u_component_10m), member), time: time)
                 try prefetchData(raw: .init(.surface(.wind_v_component_10m), member), time: time)
+            case .wind_speed_80m:
+                fallthrough
             case .windspeed_80m:
                 try prefetchData(raw: .init(.surface(.wind_u_component_80m), member), time: time)
                 try prefetchData(raw: .init(.surface(.wind_v_component_80m), member), time: time)
+            case .wind_direction_80m:
+                fallthrough
             case .winddirection_80m:
                 try prefetchData(raw: .init(.surface(.wind_u_component_80m), member), time: time)
                 try prefetchData(raw: .init(.surface(.wind_v_component_80m), member), time: time)
+            case .wind_speed_120m:
+                fallthrough
             case .windspeed_120m:
+                fallthrough
+            case .wind_speed_100m:
                 fallthrough
             case .windspeed_100m:
                 try prefetchData(raw: .init(.surface(.wind_u_component_100m), member), time: time)
                 try prefetchData(raw: .init(.surface(.wind_v_component_100m), member), time: time)
+            case .wind_direction_120m:
+                fallthrough
             case .winddirection_120m:
+                fallthrough
+            case .wind_direction_100m:
                 fallthrough
             case .winddirection_100m:
                 try prefetchData(raw: .init(.surface(.wind_u_component_100m), member), time: time)
                 try prefetchData(raw: .init(.surface(.wind_v_component_100m), member), time: time)
             case .evapotranspiration:
                 try prefetchData(raw: .init(.surface(.latent_heatflux), member), time: time)
+            case .vapour_pressure_deficit:
+                fallthrough
             case .vapor_pressure_deficit:
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
@@ -240,6 +282,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 break
             case .terrestrial_radiation_instant:
                 break
+            case .dew_point_2m:
+                fallthrough
             case .dewpoint_2m:
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
@@ -256,6 +300,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.diffuse_radiation), member), time: time)
             case .shortwave_radiation_instant:
                 try prefetchData(raw: .init(.surface(.shortwave_radiation), member), time: time)
+            case .weather_code:
+                fallthrough
             case .weathercode:
                 try prefetchData(raw: .init(.surface(.cloudcover), member), time: time)
                 try prefetchData(raw: .init(.surface(.precipitation), member), time: time)
@@ -272,16 +318,42 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .wet_bulb_temperature_2m:
                 try prefetchData(raw: .init(.surface(.temperature_2m), member), time: time)
                 try prefetchData(raw: .init(.surface(.relativehumidity_2m), member), time: time)
+            case .cloud_cover:
+                try prefetchData(raw: .init(.surface(.cloudcover), member), time: time)
+            case .cloud_cover_low:
+                try prefetchData(raw: .init(.surface(.cloudcover_low), member), time: time)
+            case .cloud_cover_mid:
+                try prefetchData(raw: .init(.surface(.cloudcover_mid), member), time: time)
+            case .cloud_cover_high:
+                try prefetchData(raw: .init(.surface(.cloudcover_high), member), time: time)
+            case .sensible_heat_flux:
+                try prefetchData(raw: .init(.surface(.sensible_heatflux), member), time: time)
+            case .latent_heat_flux:
+                try prefetchData(raw: .init(.surface(.latent_heatflux), member), time: time)
+            case .wind_gusts_10m:
+                try prefetchData(raw: .init(.surface(.windgusts_10m), member), time: time)
+            case .freezing_level_height:
+                try prefetchData(raw: .init(.surface(.freezinglevel_height), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
+            case .wind_speed:
+                fallthrough
             case .windspeed:
+                fallthrough
+            case .wind_direction:
                 fallthrough
             case .winddirection:
                 try prefetchData(raw: .init(.pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time)
                 try prefetchData(raw: .init(.pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time)
+            case .dew_point:
+                fallthrough
             case .dewpoint:
                 try prefetchData(raw: .init(.pressure(GfsPressureVariable(variable: .temperature, level: v.level)), member), time: time)
+                try prefetchData(raw: .init(.pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
+            case .cloud_cover:
+                try prefetchData(raw: .init(.pressure(GfsPressureVariable(variable: .cloudcover, level: v.level)), member), time: time)
+            case .relative_humidity:
                 try prefetchData(raw: .init(.pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
             }
         }
@@ -292,26 +364,36 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         switch derived.variable {
         case .surface(let gfsVariableDerivedSurface):
             switch gfsVariableDerivedSurface {
+            case .wind_speed_10m:
+                fallthrough
             case .windspeed_10m:
                 let u = try get(raw: .init(.surface(.wind_u_component_10m), member), time: time).data
                 let v = try get(raw: .init(.surface(.wind_v_component_10m), member), time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
+                return DataAndUnit(speed, .metrePerSecond)
+            case .wind_direction_10m:
+                fallthrough
             case .winddirection_10m:
                 let u = try get(raw: .init(.surface(.wind_u_component_10m), member), time: time).data
                 let v = try get(raw: .init(.surface(.wind_v_component_10m), member), time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
+            case .wind_speed_80m:
+                fallthrough
             case .windspeed_80m:
                 let u = try get(raw: .init(.surface(.wind_u_component_80m), member), time: time).data
                 let v = try get(raw: .init(.surface(.wind_v_component_80m), member), time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
+                return DataAndUnit(speed, .metrePerSecond)
+            case .wind_direction_80m:
+                fallthrough
             case .winddirection_80m:
                 let u = try get(raw: .init(.surface(.wind_u_component_80m), member), time: time).data
                 let v = try get(raw: .init(.surface(.wind_v_component_80m), member), time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
+            case .wind_speed_120m:
+                fallthrough
             case .windspeed_120m:
                 // Take 100m wind and scale to 120m
                 let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
@@ -319,13 +401,19 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 120)
                 var speed = zip(u,v).map(Meteorology.windspeed)
                 speed.multiplyAdd(multiply: scalefactor, add: 0)
-                return DataAndUnit(speed, .ms)
+                return DataAndUnit(speed, .metrePerSecond)
+            case .wind_speed_100m:
+                fallthrough
             case .windspeed_100m:
                 let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
                 let v = try get(raw: .init(.surface(.wind_v_component_100m), member), time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .ms)
+                return DataAndUnit(speed, .metrePerSecond)
+            case .wind_direction_120m:
+                fallthrough
             case .winddirection_120m:
+                fallthrough
+            case .wind_direction_100m:
                 fallthrough
             case .winddirection_100m:
                 let u = try get(raw: .init(.surface(.wind_u_component_100m), member), time: time).data
@@ -341,12 +429,14 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .evapotranspiration:
                 let latent = try get(raw: .init(.surface(.latent_heatflux), member), time: time).data
                 let evapotranspiration = latent.map(Meteorology.evapotranspiration)
-                return DataAndUnit(evapotranspiration, .millimeter)
+                return DataAndUnit(evapotranspiration, .millimetre)
+            case .vapour_pressure_deficit:
+                fallthrough
             case .vapor_pressure_deficit:
                 let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time).data
                 let rh = try get(raw: .init(.surface(.relativehumidity_2m), member), time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kiloPascal)
+                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .et0_fao_evapotranspiration:
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 let swrad = try get(raw: .init(.surface(.shortwave_radiation), member), time: time).data
@@ -358,14 +448,14 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let et0 = swrad.indices.map { i in
                     return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
                 }
-                return DataAndUnit(et0, .millimeter)
+                return DataAndUnit(et0, .millimetre)
             case .snowfall:
                 let frozen_precipitation_percent = try get(raw: .init(.surface(.frozen_precipitation_percent), member), time: time).data
                 let precipitation = try get(raw: .init(.surface(.precipitation), member), time: time).data
                 let snowfall = zip(frozen_precipitation_percent, precipitation).map({
                     max($0/100 * $1 * 0.7, 0)
                 })
-                return DataAndUnit(snowfall, SiUnit.centimeter)
+                return DataAndUnit(snowfall, SiUnit.centimetre)
             case .rain:
                 let frozen_precipitation_percent = try get(raw: .init(.surface(.frozen_precipitation_percent), member), time: time).data
                 let precipitation = try get(raw: .init(.surface(.precipitation), member), time: time).data
@@ -375,7 +465,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                         let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
                         return max(precipitation - snowfallWaterEqivalent , 0)
                     })
-                    return DataAndUnit(rain, .millimeter)
+                    return DataAndUnit(rain, .millimetre)
                 } else {
                     let showers = try get(raw: .init(.surface(.showers), member), time: time).data
                     let rain = zip(frozen_precipitation_percent, zip(precipitation, showers)).map({ (frozen_precipitation_percent, arg1) in
@@ -383,9 +473,9 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                         let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
                         return max(precipitation - snowfallWaterEqivalent - showers, 0)
                     })
-                    return DataAndUnit(rain, .millimeter)
+                    return DataAndUnit(rain, .millimetre)
                 }
-            case .relativehumitidy_2m:
+            case .relative_humidity_2m:
                 return try get(raw: .init(.surface(.relativehumidity_2m), member), time: time)
             case .surface_pressure:
                 let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time).data
@@ -393,10 +483,12 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure_msl.data, elevation: reader.targetElevation), pressure_msl.unit)
             case .terrestrial_radiation:
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-                return DataAndUnit(solar, .wattPerSquareMeter)
+                return DataAndUnit(solar, .wattPerSquareMetre)
             case .terrestrial_radiation_instant:
                 let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-                return DataAndUnit(solar, .wattPerSquareMeter)
+                return DataAndUnit(solar, .wattPerSquareMetre)
+            case .dew_point_2m:
+                fallthrough
             case .dewpoint_2m:
                 let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time)
                 let rh = try get(raw: .init(.surface(.relativehumidity_2m), member), time: time)
@@ -408,7 +500,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .direct_normal_irradiance:
                 let dhi = try get(derived: .init(.surface(.direct_radiation), member), time: time).data
                 let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
-                return DataAndUnit(dni, .wattPerSquareMeter)
+                return DataAndUnit(dni, .wattPerSquareMetre)
             case .direct_normal_irradiance_instant:
                 let direct = try get(derived: .init(.surface(.direct_radiation_instant), member), time: time)
                 let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
@@ -425,6 +517,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let diff = try get(raw: .init(.surface(.diffuse_radiation), member), time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
+            case .weather_code:
+                fallthrough
             case .weathercode:
                 let cloudcover = try get(raw: .init(.surface(.cloudcover), member), time: time).data
                 let precipitation = try get(raw: .init(.surface(.precipitation), member), time: time).data
@@ -455,23 +549,49 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .init(.surface(.temperature_2m), member), time: time)
                 let rh = try get(raw: .init(.surface(.relativehumidity_2m), member), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
+            case .cloud_cover:
+                return try get(raw: .init(.surface(.cloudcover), member), time: time)
+            case .cloud_cover_low:
+                return try get(raw: .init(.surface(.cloudcover_low), member), time: time)
+            case .cloud_cover_mid:
+                return try get(raw: .init(.surface(.cloudcover_mid), member), time: time)
+            case .cloud_cover_high:
+                return try get(raw: .init(.surface(.cloudcover_high), member), time: time)
+            case .sensible_heat_flux:
+                return try get(raw: .init(.surface(.sensible_heatflux), member), time: time)
+            case .latent_heat_flux:
+                return try get(raw: .init(.surface(.latent_heatflux), member), time: time)
+            case .wind_gusts_10m:
+                return try get(raw: .init(.surface(.windgusts_10m), member), time: time)
+            case .freezing_level_height:
+                return try get(raw: .init(.surface(.freezinglevel_height), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
+            case .wind_speed:
+                fallthrough
             case .windspeed:
                 let u = try get(raw: .init(.pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time)
                 let v = try get(raw: .init(.pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time)
                 let speed = zip(u.data,v.data).map(Meteorology.windspeed)
                 return DataAndUnit(speed, u.unit)
+            case .wind_direction:
+                fallthrough
             case .winddirection:
                 let u = try get(raw: .init(.pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), member), time: time).data
                 let v = try get(raw: .init(.pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), member), time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
+            case .dew_point:
+                fallthrough
             case .dewpoint:
                 let temperature = try get(raw: .init(.pressure(GfsPressureVariable(variable: .temperature, level: v.level)), member), time: time)
                 let rh = try get(raw: .init(.pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+            case .cloud_cover:
+                return try get(raw: .init(.pressure(GfsPressureVariable(variable: .cloudcover, level: v.level)), member), time: time)
+            case .relative_humidity:
+                return try get(raw: .init(.pressure(GfsPressureVariable(variable: .relativehumidity, level: v.level)), member), time: time)
             }
         }
     }

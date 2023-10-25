@@ -1,7 +1,7 @@
 import Foundation
-import enum OpenMeteoSdk.openmeteo_sdk_SiUnit
+import enum OpenMeteoSdk.openmeteo_sdk_Unit
 
-typealias SiUnit = openmeteo_sdk_SiUnit
+typealias SiUnit = openmeteo_sdk_Unit
 
 enum TemperatureUnit: String, Codable {
     case celsius
@@ -28,6 +28,7 @@ enum LengthUnit: String, Codable {
 struct ApiUnits: ApiUnitsSelectable {
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
+    let wind_speed_unit: WindspeedUnit?
     let precipitation_unit: PrecipitationUnit?
     let length_unit: LengthUnit?
 }
@@ -35,6 +36,7 @@ struct ApiUnits: ApiUnitsSelectable {
 protocol ApiUnitsSelectable {
     var temperature_unit: TemperatureUnit? { get }
     var windspeed_unit: WindspeedUnit? { get }
+    var wind_speed_unit: WindspeedUnit? { get }
     var precipitation_unit: PrecipitationUnit? { get }
     var length_unit: LengthUnit? { get }
 }
@@ -54,7 +56,7 @@ struct DataAndUnit {
         var data = self.data
         var unit = self.unit
         
-        let windspeedUnit = params.windspeed_unit ?? .kmh
+        let windspeedUnit = params.windspeed_unit ?? params.wind_speed_unit ?? .kmh
         let temperatureUnit = params.temperature_unit
         let precipitationUnit = params.precipitation_unit ?? (params.length_unit == .imperial ? .inch : nil)
         if unit == .celsius && temperatureUnit == .fahrenheit {
@@ -64,37 +66,37 @@ struct DataAndUnit {
             }
             unit = .fahrenheit
         }
-        if unit == .ms && windspeedUnit == .kmh {
+        if unit == .metrePerSecond && windspeedUnit == .kmh {
             for i in data.indices {
                 data[i] *= 3.6
             }
-            unit = .kmh
+            unit = .kilometresPerHour
         }
-        if unit == .ms && windspeedUnit == .mph {
+        if unit == .metrePerSecond && windspeedUnit == .mph {
             for i in data.indices {
                 data[i] *= 2.237
             }
-            unit = .mph
+            unit = .milesPerHour
         }
-        if unit == .ms && windspeedUnit == .kn {
+        if unit == .metrePerSecond && windspeedUnit == .kn {
             for i in data.indices {
                 data[i] *= 1.94384
             }
             unit = .knots
         }
-        if unit == .millimeter && precipitationUnit == .inch {
+        if unit == .millimetre && precipitationUnit == .inch {
             for i in data.indices {
                 data[i] /= 25.4
             }
             unit = .inch
         }
-        if unit == .centimeter && precipitationUnit == .inch {
+        if unit == .centimetre && precipitationUnit == .inch {
             for i in data.indices {
                 data[i] /= 2.54
             }
             unit = .inch
         }
-        if unit == .meter && precipitationUnit == .inch {
+        if unit == .metre && precipitationUnit == .inch {
             for i in data.indices {
                 data[i] *= 3.280839895
             }
