@@ -124,9 +124,9 @@ extension ApiSection where Variable: FlatBuffersVariable {
         })
         return openmeteo_sdk_SeriesAndTime.createSeriesAndTime(
             &fbb,
-            start: Int64(time.range.lowerBound.timeIntervalSince1970),
-            end: Int64(time.range.upperBound.timeIntervalSince1970),
-            interval: Int32(time.dtSeconds), 
+            time: Int64(time.range.lowerBound.timeIntervalSince1970),
+            timeEnd: Int64(time.range.upperBound.timeIntervalSince1970),
+            interval: Int32(time.dtSeconds),
             seriesVectorOffset: offsets
         )
     }
@@ -143,8 +143,8 @@ extension ApiSectionSingle where Variable: FlatBuffersVariable {
         })
         return openmeteo_sdk_SeriesAndTime.createSeriesAndTime(
             &fbb,
-            start: Int64(time.timeIntervalSince1970),
-            end: Int64(time.timeIntervalSince1970 + dtSeconds),
+            time: Int64(time.timeIntervalSince1970),
+            timeEnd: Int64(time.timeIntervalSince1970 + dtSeconds),
             interval: Int32(dtSeconds),
             seriesVectorOffset: offsets
         )

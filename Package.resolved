@@ -59,8 +59,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "eccba0d208c9e8fd6f6eb39ed2ad2cc78cae500f",
-        "version" : "1.1.0"
+        "revision" : "a547ec10aa5bfa988b287476bcc85d10a5fed48c",
+        "version" : "1.3.0"
       }
     },
     {
@@ -100,6 +100,15 @@
       }
     },
     {
+      "identity" : "swift-http-types",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-http-types",
+      "state" : {
+        "revision" : "99d066e29effa8845e4761dd3f2f831edfdf8925",
+        "version" : "1.0.0"
+      }
+    },
+    {
       "identity" : "swift-log",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
@@ -122,8 +131,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "3db5c4aeee8100d2db6f1eaf3864afdad5dc68fd",
-        "version" : "2.59.0"
+        "revision" : "54c85cb26308b89846d4671f23954dce088da2b0",
+        "version" : "2.60.0"
       }
     },
     {
@@ -131,8 +140,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-extras.git",
       "state" : {
-        "revision" : "fb70a0f5e984f23be48b11b4f1909f3bee016178",
-        "version" : "1.19.1"
+        "revision" : "798c962495593a23fdea0c0c63fd55571d8dff51",
+        "version" : "1.20.0"
       }
     },
     {
@@ -140,8 +149,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-http2.git",
       "state" : {
-        "revision" : "9c22e4f810ce780453f563fba98e1a1039f83d56",
-        "version" : "1.28.1"
+        "revision" : "3bd9004b9d685ed6b629760fc84903e48efec806",
+        "version" : "1.29.0"
       }
     },
     {
@@ -158,8 +167,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-transport-services.git",
       "state" : {
-        "revision" : "e7403c35ca6bb539a7ca353b91cc2d8ec0362d58",
-        "version" : "1.19.0"
+        "revision" : "ebf8b9c365a6ce043bf6e6326a04b15589bd285e",
+        "version" : "1.20.0"
       }
     },
     {
