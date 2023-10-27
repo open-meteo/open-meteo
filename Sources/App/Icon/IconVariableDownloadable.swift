@@ -153,6 +153,8 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 fallthrough
             case .showers:
                 fallthrough
+            case .snow_depth:
+                fallthrough
             case .temperature_180m:
                 if domain != .iconD2Eps {
                     return nil
