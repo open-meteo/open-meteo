@@ -67,7 +67,7 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
         case .rain:
             return .init(variable: .rain)
         case .relativehumidity_2m, .relative_humidity_2m:
-            return .init(variable: .relativeHumidity)
+            return .init(variable: .relativeHumidity, altitude: 2)
         case .runoff:
             return .init(variable: .runoff)
         case .sensible_heatflux, .sensible_heat_flux:

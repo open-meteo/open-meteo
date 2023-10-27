@@ -23,9 +23,9 @@ extension Cmip6Variable: FlatBuffersVariable {
         case .relative_humidity_2m_min:
             return .init(variable: .relativeHumidity, aggregation: .minimum, altitude: 2)
         case .relative_humidity_2m_max:
-            return .init(variable: .temperature, aggregation: .maximum, altitude: 2)
+            return .init(variable: .relativeHumidity, aggregation: .maximum, altitude: 2)
         case .relative_humidity_2m_mean:
-            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+            return .init(variable: .relativeHumidity, aggregation: .mean, altitude: 2)
         case .windspeed_10m_mean:
             return .init(variable: .windSpeed, aggregation: .mean, altitude: 10)
         case .windspeed_10m_max:
