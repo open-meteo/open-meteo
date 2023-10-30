@@ -6,7 +6,7 @@ import OpenMeteoSdk
 
 extension ForecastapiResult {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
-    /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-series require a lot of memory
+    /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-VariableWithValues require a lot of memory
     /// Data is using `size prefixed` flatbuffers to allow streaming of multiple messages for multiple locations
     func toFlatbuffersResponse(fixedGenerationTime: Double?) throws -> Response {
         // First excution outside stream, to capture potential errors better
@@ -71,12 +71,12 @@ struct FlatBufferVariableMeta {
     }
     
     fileprivate func encodeToFlatBuffers(_ fbb: inout FlatBufferBuilder) {
-        openmeteo_sdk_Series.add(variable: variable, &fbb)
-        openmeteo_sdk_Series.add(aggregation: aggregation, &fbb)
-        openmeteo_sdk_Series.add(altitude: altitude, &fbb)
-        openmeteo_sdk_Series.add(pressureLevel: pressureLevel, &fbb)
-        openmeteo_sdk_Series.add(depth: depth, &fbb)
-        openmeteo_sdk_Series.add(depthTo: depthTo, &fbb)
+        openmeteo_sdk_VariableWithValues.add(variable: variable, &fbb)
+        openmeteo_sdk_VariableWithValues.add(aggregation: aggregation, &fbb)
+        openmeteo_sdk_VariableWithValues.add(altitude: altitude, &fbb)
+        openmeteo_sdk_VariableWithValues.add(pressureLevel: pressureLevel, &fbb)
+        openmeteo_sdk_VariableWithValues.add(depth: depth, &fbb)
+        openmeteo_sdk_VariableWithValues.add(depthTo: depthTo, &fbb)
     }
 }
 
@@ -107,27 +107,27 @@ extension ApiSection where Variable: FlatBuffersVariable {
         let offsets = fbb.createVector(ofOffsets: self.columns.flatMap { c -> [Offset] in
             return c.variables.enumerated().map { (member,v) in
                 let data = v.encodeFlatBuffers(&fbb)
-                let series = openmeteo_sdk_Series.startSeries(&fbb)
+                let VariableWithValues = openmeteo_sdk_VariableWithValues.startVariableWithValues(&fbb)
                 c.variable.getFlatBuffersMeta().encodeToFlatBuffers(&fbb)
-                openmeteo_sdk_Series.add(unit: c.unit, &fbb)
+                openmeteo_sdk_VariableWithValues.add(unit: c.unit, &fbb)
                 if c.variables.count > 1 {
-                    openmeteo_sdk_Series.add(ensembleMember: Int16(member + memberOffset), &fbb)
+                    openmeteo_sdk_VariableWithValues.add(ensembleMember: Int16(member + memberOffset), &fbb)
                 }
                 switch v {
                 case .float(_):
-                    openmeteo_sdk_Series.addVectorOf(values: data, &fbb)
+                    openmeteo_sdk_VariableWithValues.addVectorOf(values: data, &fbb)
                 case .timestamp(_):
-                    openmeteo_sdk_Series.addVectorOf(valuesInt64: data, &fbb)
+                    openmeteo_sdk_VariableWithValues.addVectorOf(valuesInt64: data, &fbb)
                 }
-                return openmeteo_sdk_Series.endSeries(&fbb, start: series)
+                return openmeteo_sdk_VariableWithValues.endVariableWithValues(&fbb, start: VariableWithValues)
             }
         })
-        return openmeteo_sdk_SeriesAndTime.createSeriesAndTime(
+        return openmeteo_sdk_VariablesWithTime.createVariablesWithTime(
             &fbb,
             time: Int64(time.range.lowerBound.timeIntervalSince1970),
             timeEnd: Int64(time.range.upperBound.timeIntervalSince1970),
             interval: Int32(time.dtSeconds),
-            seriesVectorOffset: offsets
+            variablesVectorOffset: offsets
         )
     }
 }
@@ -135,18 +135,18 @@ extension ApiSection where Variable: FlatBuffersVariable {
 extension ApiSectionSingle where Variable: FlatBuffersVariable {
     func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder) -> Offset {
         let offsets = fbb.createVector(ofOffsets: self.columns.map { c -> Offset in
-            let series = openmeteo_sdk_Series.startSeries(&fbb)
+            let VariableWithValues = openmeteo_sdk_VariableWithValues.startVariableWithValues(&fbb)
             c.variable.getFlatBuffersMeta().encodeToFlatBuffers(&fbb)
-            openmeteo_sdk_Series.add(unit: c.unit, &fbb)
-            openmeteo_sdk_Series.add(value: c.value, &fbb)
-            return openmeteo_sdk_Series.endSeries(&fbb, start: series)
+            openmeteo_sdk_VariableWithValues.add(unit: c.unit, &fbb)
+            openmeteo_sdk_VariableWithValues.add(value: c.value, &fbb)
+            return openmeteo_sdk_VariableWithValues.endVariableWithValues(&fbb, start: VariableWithValues)
         })
-        return openmeteo_sdk_SeriesAndTime.createSeriesAndTime(
+        return openmeteo_sdk_VariablesWithTime.createVariablesWithTime(
             &fbb,
             time: Int64(time.timeIntervalSince1970),
             timeEnd: Int64(time.timeIntervalSince1970 + dtSeconds),
             interval: Int32(dtSeconds),
-            seriesVectorOffset: offsets
+            variablesVectorOffset: offsets
         )
     }
 }
@@ -161,7 +161,7 @@ extension ForecastapiResult.PerModel {
         let current = (try current?()).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
-        let result = openmeteo_sdk_ApiResponse.createApiResponse (
+        let result = openmeteo_sdk_WeatherApiResponse.createWeatherApiResponse (
             &fbb,
             latitude: latitude,
             longitude: longitude,
