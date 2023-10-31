@@ -420,6 +420,9 @@ extension TimeZone {
             return tz
         }
         guard let tz = TimeZone(identifier: identifier) else {
+            if identifier == "America/Ciudad_Juarez", let tz = TimeZone(identifier: "America/Mexico_City") {
+                return tz
+            }
             throw ForecastapiError.invalidTimezone
         }
         return tz
