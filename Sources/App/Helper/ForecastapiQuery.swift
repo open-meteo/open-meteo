@@ -81,10 +81,6 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Reads coordinates, elevation, timezones and start/end dataparameter and prepares an array.
     /// For each element, an API response object will be returned later
     func prepareCoordinates(allowTimezones: Bool) throws -> [CoordinatesAndTimeZonesAndDates] {
-        if allowTimezones && daily?.count ?? 0 > 0 && timezone == nil {
-            throw ForecastapiError.timezoneRequired
-        }
-        
         let dates = try getStartEndDates()
         let coordinates = try getCoordinatesWithTimezone(allowTimezones: allowTimezones)
         
@@ -227,7 +223,6 @@ enum ForecastapiError: Error {
     case invalidTimezone
     case timezoneNotSupported
     case noDataAvilableForThisLocation
-    case timezoneRequired
     case pastDaysParameterNotAllowedWithStartEndRange
     case forecastDaysParameterNotAllowedWithStartEndRange
     case latitudeAndLongitudeSameCount
@@ -258,8 +253,6 @@ extension ForecastapiError: AbortError {
             return "Forecast days is invalid. Allowed range \(allowed.lowerBound) to \(allowed.upperBound). Given \(given)."
         case .invalidTimezone:
             return "Invalid timezone"
-        case .timezoneRequired:
-            return "Timezone is required"
         case .enddateMustBeLargerEqualsThanStartdate:
             return "End-date must be larger or equals than start-date"
         case .dateOutOfRange(let paramater, let allowed):
