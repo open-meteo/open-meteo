@@ -20,7 +20,7 @@ public struct ForecastapiController: RouteCollection {
             historyStartDate: Timestamp(1940, 1, 1),
             has15minutely: false,
             hasCurrentWeather: false,
-            defaultModel: .era5_seamless,
+            defaultModel: .archive_best_match,
             subdomain: "archive-api")
         categoriesRoute.get("era5", use: era5.query)
         categoriesRoute.get("archive", use: era5.query)
@@ -283,6 +283,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     case metno_nordic
     
+    case archive_best_match
     case era5_seamless
     case era5
     case cerra
@@ -409,6 +410,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gem_hrdps_continental:
             return try GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .archive_best_match:
+            return [try Era5Factory.makeArchiveBestMatch(lat: lat, lon: lon, elevation: elevation, mode: mode)]
         case .era5_seamless:
             return [try Era5Factory.makeEra5CombinedLand(lat: lat, lon: lon, elevation: elevation, mode: mode)]
         case .era5:

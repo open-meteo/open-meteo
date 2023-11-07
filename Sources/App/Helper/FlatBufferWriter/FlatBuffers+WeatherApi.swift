@@ -519,6 +519,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .meteofranceAromeFrance
         case .arome_france_hd:
             return .meteofranceAromeFranceHd
+        case .archive_best_match:
+            return .bestMatch
         }
     }
 }
