@@ -600,6 +600,10 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case wind_speed_50m
     case wind_speed_80m
     
+    case wave_height
+    case wave_direction
+    case wave_period
+    
     /// Some variables are kept for backwards compatibility
     var remapped: Self {
         switch self {

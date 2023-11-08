@@ -29,6 +29,10 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     case precipitation
     case direct_radiation
     
+    case wave_height
+    case wave_direction
+    case wave_period
+    
     var isElevationCorrectable: Bool {
         return self == .temperature_2m || self == .dewpoint_2m ||
             self == .soil_temperature_0_to_7cm || self == .soil_temperature_7_to_28cm ||
@@ -67,6 +71,13 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         /// Others have to download snow depth water equivalent and density separately (not implemented)
         if self == .snow_depth {
             return domain == .era5_land
+        }
+        
+        // Waves are only available for ERA5 ocean at 0.5° resolution
+        switch self {
+        case .wave_height, .wave_period, .wave_direction:
+            return domain == .era5_ocean
+        default: break
         }
         
         // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
@@ -126,6 +137,9 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_100_to_255cm: return "volumetric_soil_water_layer_4"
             // NOTE: snow depth uses different definitions in ERA5 and ECMWF IFS. Only ERA5-land returns the actual height directly
         case .snow_depth: return "snow_depth"
+        case .wave_height: return "significant_height_of_combined_wind_waves_and_swell"
+        case .wave_direction: return "mean_wave_direction"
+        case .wave_period: return "mean_wave_period"
         }
     }
     
@@ -179,6 +193,12 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
             return "228.128"
         case .direct_radiation:
             return "21.228"
+        case .wave_height:
+            fatalError("Not supported")
+        case .wave_direction:
+            fatalError("Not supported")
+        case .wave_period:
+            fatalError("Not supported")
         }
     }
     
@@ -230,6 +250,12 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_28_to_100cm: return ["swvl3"]
         case .soil_moisture_100_to_255cm: return ["swvl4"]
         case .snow_depth: return ["sde"]
+        case .wave_height:
+            return ["swh"]
+        case .wave_direction:
+            return ["mwd"]
+        case .wave_period:
+            return ["mwp"]
         }
     }
     
@@ -260,6 +286,12 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_28_to_100cm: return 1000
         case .soil_moisture_100_to_255cm: return 1000
         case .snow_depth: return 100 // 1 cm resolution
+        case .wave_height:
+            return 50 // 0.002m resolution
+        case .wave_direction:
+            return 1
+        case .wave_period:
+            return 20 // 0.05s resolution
         }
     }
     
@@ -289,6 +321,12 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_28_to_100cm: return .cubicMetrePerCubicMetre
         case .soil_moisture_100_to_255cm: return .cubicMetrePerCubicMetre
         case .snow_depth: return .metre
+        case .wave_height:
+            return .metre
+        case .wave_direction:
+            return .degreeDirection
+        case .wave_period:
+            return .seconds
         }
     }
 }
@@ -308,13 +346,14 @@ struct Era5Factory {
      Derived variables are calculated after combinding both variables to make it possible to calculate ET0 evapotransipiration with temperature from ERA5-Land, but radiation from ERA5
      */
     public static func makeEra5CombinedLand(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
-        guard let era5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode),
+        guard /*let era5ocean = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode),*/
+              let era5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode),
               let era5land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode)
         else {
             // should not be possible
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        return .init(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]))
+        return .init(reader: GenericReaderMixerSameDomain(reader: [/*GenericReaderCached(reader: era5ocean), */GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]))
     }
     
     public static func makeArchiveBestMatch(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {

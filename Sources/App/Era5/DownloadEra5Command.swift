@@ -7,6 +7,7 @@ import SwiftPFor2D
 ///  ERA5: https://rmets.onlinelibrary.wiley.com/doi/10.1002/qj.3803
 enum CdsDomain: String, GenericDomain, CaseIterable {
     case era5
+    case era5_ocean
     case era5_land
     case cerra
     case ecmwf_ifs
@@ -21,7 +22,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     
     var cdsDatasetName: String {
         switch self {
-        case .era5:
+        case .era5, .era5_ocean:
             return "reanalysis-era5-single-levels"
         case .era5_land:
             return "reanalysis-era5-land"
@@ -46,6 +47,8 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         switch type {
         case .soilType:
             switch self {
+            case .era5_ocean:
+                return nil
             case .era5:
                 return Self.era5SoilTypeFile
             case .era5_land:
@@ -57,6 +60,8 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             }
         case .elevation:
             switch self {
+            case .era5_ocean:
+                return nil
             case .era5:
                 return Self.era5ElevationFile
             case .era5_land:
@@ -105,6 +110,8 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .era5:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+        case .era5_ocean:
+            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .era5_land:
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
@@ -344,6 +351,8 @@ struct DownloadEra5Command: AsyncCommandFix {
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
             switch domain {
+            case .era5_ocean:
+                return
             case .ecmwf_ifs:
                 guard let email else {
                     fatalError("email required")
@@ -487,9 +496,7 @@ struct DownloadEra5Command: AsyncCommandFix {
     
     func downloadDailyFiles(logger: Logger, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) throws -> TimerangeDt {
         switch domain {
-        case .era5:
-            fallthrough
-        case .era5_land:
+        case .era5_land, .era5, .era5_ocean:
             return try downloadDailyEra5Files(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
         case .cerra:
             return try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable])
