@@ -709,7 +709,7 @@ struct DownloadEra5Command: AsyncCommandFix {
                     
                     let previous = accumulated[variable]
                     accumulated[variable] = grib2d.array.data
-                    if let previous {
+                    if endStep >= 2, let previous {
                         for i in grib2d.array.data.indices {
                             grib2d.array.data[i] -= previous[i]
                         }
