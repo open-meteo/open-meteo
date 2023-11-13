@@ -41,9 +41,14 @@ public struct Zensun {
     /// Time MUST be 0 UTC, it will add the time to match the noon time based on longitude
     /// The correct time is important to get the correct sun declination at local noon
     public static func calculateDaylightDuration(utcMidnight: Range<Timestamp>, lat: Float, lon: Float) -> [Float] {
-        let noonTimeOffsetSeconds = Int((12-lon/15)*3600)
-        return utcMidnight.stride(dtSeconds: 86400).map { date in
-            let t1 = date.add(noonTimeOffsetSeconds).getSunDeclination().degreesToRadians
+        let utcOffsetApproximated = Int((-lon/15)*3600)
+        return calculateDaylightDuration(localMidnight: utcMidnight.add(utcOffsetApproximated), lat: lat)
+    }
+    
+    /// Calculate daylight duration. `localMidnight` should be be aligned to 0:00 localtime. E.g. 22 UTC for CEST.
+    public static func calculateDaylightDuration(localMidnight: Range<Timestamp>, lat: Float) -> [Float] {
+        return localMidnight.stride(dtSeconds: 86400).map { date in
+            let t1 = date.add(12*3600).getSunDeclination().degreesToRadians
             let alpha = Float(0.83333).degreesToRadians
             let t0 = lat.degreesToRadians
             let arg = -(sin(alpha)+sin(t0)*sin(t1))/(cos(t0)*cos(t1))
@@ -295,6 +300,15 @@ public struct Zensun {
             }
         }
         return out
+    }
+    
+    /// Approximate daylight duration (DNI > 120 w/m2) in seconds. `directRadiation` must be backwards averaged over dt.
+    /// Assumes a linear distribution over 60-180 watts. Could be improved with different distribution forms
+    public static func calculateBackwardsSunshineDuration(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+        let dt =  Float(timerange.dtSeconds)
+        return calculateBackwardsDNI(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange).map { dni in
+            return min(max(dni - 60, 0) / (180 - 60) * dt, dt)
+        }
     }
     
     /// Calculate DNI using super sampling
