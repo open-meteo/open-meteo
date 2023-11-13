@@ -26,7 +26,7 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.get("archive", use: era5.query)
         
         categoriesRoute.get("forecast", use: WeatherApiController(
-            defaultModel: .best_match).query
+            defaultModel: .best_match, alias: "forecast-archive-api").query
         )
         categoriesRoute.get("dwd-icon", use: WeatherApiController(
             defaultModel: .icon_seamless).query
@@ -79,10 +79,11 @@ struct WeatherApiController {
     let hasCurrentWeather: Bool
     let defaultModel: MultiDomains
     let subdomain: String
+    let alias: String?
     /// ecmwf v1 uses 3 hourly data in hourly field..
     let put3HourlyDataIntoHourly: Bool
     
-    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2022, 6, 8), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", put3HourlyDataIntoHourly: Bool = false) {
+    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2022, 6, 8), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: String? = nil, put3HourlyDataIntoHourly: Bool = false) {
         self.forecastDay = forecastDay
         self.forecastDaysMax = forecastDaysMax
         self.historyStartDate = historyStartDate
@@ -90,11 +91,12 @@ struct WeatherApiController {
         self.hasCurrentWeather = hasCurrentWeather
         self.defaultModel = defaultModel
         self.subdomain = subdomain
+        self.alias = alias
         self.put3HourlyDataIntoHourly = put3HourlyDataIntoHourly
     }
     
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain(subdomain)
+        try req.ensureSubdomain(subdomain, alias: alias)
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
         let allowedRange = historyStartDate ..< currentTime.add(days: forecastDaysMax)

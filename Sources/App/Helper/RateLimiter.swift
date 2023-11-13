@@ -177,18 +177,23 @@ enum RateLimitError: Error, AbortError {
 
 extension Request {
     /// On open-meteo servers, make sure, the right domain is active. For reserved API instances an API key required.
-    func ensureSubdomain(_ subdomain: String) throws {
-        if headers[.host].contains(where: { $0.contains("open-meteo.com") && !($0.starts(with: subdomain) || $0.starts(with: "customer-\(subdomain)")) }) {
+    func ensureSubdomain(_ subdomain: String, alias: String? = nil) throws {
+        guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
+            return
+        }
+        let isFreeApi = host.starts(with: subdomain) || alias.map({host.starts(with: $0)}) == true
+        let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.map({host.starts(with: "customer-\($0)")}) == true
+        
+        if !(isFreeApi || isCustomerApi) {
             throw Abort.init(.notFound)
         }
         
-        /// Free API
-        if headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "customer-") }) {
+        if isFreeApi {
             try RateLimiter.instance.check(request: self)
         }
         
         /// API node dedicated to customers
-        if !ApiKeyManager.apiKeys.isEmpty && headers[.host].contains(where: { $0.contains("open-meteo.com") && $0.starts(with: "customer-\(subdomain)") }) {
+        if !ApiKeyManager.apiKeys.isEmpty && isCustomerApi {
             guard let apikey: String = try query.get(at: "apikey") else {
                 throw ApiKeyManagerError.apiKeyRequired
             }
