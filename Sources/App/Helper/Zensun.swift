@@ -303,7 +303,7 @@ public struct Zensun {
     }
     
     /// Approximate daylight duration (DNI > 120 w/m2) in seconds. `directRadiation` must be backwards averaged over dt.
-    /// Assumes a linear distribution over 60-180 watts. Could be improved with different distribution forms
+    /// Assumes a linear distribution over 60-180 watts instead of a hard cut of 120 watts.
     /// Timeinterval `dt`is adjusted to sunrise and sunset to ensure. Only considering DNI will lead to sunshine greated than daylight duration.
     public static func calculateBackwardsSunshineDuration(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
         let dt =  Float(timerange.dtSeconds)
@@ -359,7 +359,7 @@ public struct Zensun {
             let p10_l = max(sunset, p1)
             
             // limit dt to sunrise/set
-            let dtBound = dt * (p1_l - p10_l) / (p10 - p1)
+            let dtBound = dt * abs((p1_l - p10_l) / (p10 - p1))
             
             // solve integral to get sun elevation dt
             // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
@@ -370,6 +370,7 @@ public struct Zensun {
             // Prevent possible division by zero
             // See https://github.com/open-meteo/open-meteo/discussions/395
             let dniBounded = zzBackwards <= 0.0001 ? dhi : dni
+            // >120 watts would be a "hard-cut" and not realistic as data is averaged over 1 hours. Instead, linearly interpolate between 60 and 180 watts.
             return min(max(dniBounded - 60, 0) / (180 - 60) * dtBound, dtBound)
         }
     }
