@@ -186,6 +186,11 @@ struct WeatherApiController {
                                         return ApiColumn(variable: .sunrise, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
                                     }
                                 }
+                                if variable == .daylight_duration {
+                                    let duration = Zensun.calculateDaylightDuration(localMidnight: dailyTime.range, lat: reader.modelLat)
+                                    return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
+                                }
+                                
                                 guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime) else {
                                     return nil
                                 }
@@ -497,6 +502,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case snow_height
     case snowfall
     case snowfall_water_equivalent
+    case sunshine_duration
     case soil_moisture_0_1cm
     case soil_moisture_0_to_1cm
     case soil_moisture_0_to_100cm
@@ -746,6 +752,8 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case soil_temperature_7_to_28cm_mean
     case sunrise
     case sunset
+    case daylight_duration
+    case sunshine_duration
     case surface_pressure_max
     case surface_pressure_mean
     case surface_pressure_min
@@ -927,6 +935,10 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .min(.surface(.wet_bulb_temperature_2m))
         case .wet_bulb_temperature_2m_mean:
             return .mean(.surface(.wet_bulb_temperature_2m))
+        case .daylight_duration:
+            return .none
+        case .sunshine_duration:
+            return .sum(.surface(.sunshine_duration))
         }
     }
 }

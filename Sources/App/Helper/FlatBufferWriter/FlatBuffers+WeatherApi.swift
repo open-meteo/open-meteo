@@ -256,6 +256,8 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .waveDirection)
         case .wave_period:
             return .init(variable: .wavePeriod)
+        case .sunshine_duration:
+            return .init(variable: .sunshineDuration)
         }
     }
 }
@@ -430,6 +432,10 @@ extension ForecastVariableDaily: FlatBuffersVariable {
             return .init(variable: .wetBulbTemperature, aggregation: .mean, altitude: 2)
         case .wet_bulb_temperature_2m_min:
             return .init(variable: .wetBulbTemperature, aggregation: .minimum, altitude: 2)
+        case .daylight_duration:
+            return .init(variable: .daylightDuration)
+        case .sunshine_duration:
+            return .init(variable: .sunshineDuration)
         }
     }
 }

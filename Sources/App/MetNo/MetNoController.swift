@@ -92,6 +92,8 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .winddirection_10m, time: time)
         case .wind_gusts_10m:
             try prefetchData(raw: .windgusts_10m, time: time)
+        case .sunshine_duration:
+            try prefetchData(derived: .direct_radiation, time: time)
         }
     }
     
@@ -215,6 +217,10 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             return try get(raw: .winddirection_10m, time: time)
         case .wind_gusts_10m:
             return try get(raw: .windgusts_10m, time: time)
+        case .sunshine_duration:
+            let directRadiation = try get(derived: .direct_radiation, time: time)
+            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            return DataAndUnit(duration, .seconds)
         }
     }
 }
@@ -253,6 +259,7 @@ enum MetNoVariableDerived: String, GenericVariableMixable {
     case wind_speed_10m
     case wind_direction_10m
     case wind_gusts_10m
+    case sunshine_duration
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

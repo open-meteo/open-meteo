@@ -352,7 +352,8 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .windgusts_10m, member: member, time: time)
             case .freezing_level_height:
                 try prefetchData(raw: .freezinglevel_height, member: member, time: time)
-            }
+            case .sunshine_duration:
+                try prefetchData(raw: .direct_radiation, member: member, time: time)            }
         case .pressure(let variable):
             let level = variable.level
             switch variable.variable {
@@ -568,6 +569,10 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 return try get(raw: .windgusts_10m, member: member, time: time)
             case .freezing_level_height:
                 return try get(raw: .freezinglevel_height, member: member, time: time)
+            case .sunshine_duration:
+                let directRadiation = try get(raw: .direct_radiation, member: member, time: time)
+                let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                return DataAndUnit(duration, .seconds)
             }
         case .pressure(let variable):
             let level = variable.level

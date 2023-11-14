@@ -53,6 +53,8 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case wind_gusts_10m
     case freezing_level_height
     
+    case sunshine_duration
+    
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -334,6 +336,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.windgusts_10m), member), time: time)
             case .freezing_level_height:
                 try prefetchData(raw: .init(.surface(.freezinglevel_height), member), time: time)
+            case .sunshine_duration:
+                try prefetchData(derived: .init(.surface(.direct_radiation), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -565,6 +569,10 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return try get(raw: .init(.surface(.windgusts_10m), member), time: time)
             case .freezing_level_height:
                 return try get(raw: .init(.surface(.freezinglevel_height), member), time: time)
+            case .sunshine_duration:
+                let directRadiation = try get(derived: .init(.surface(.direct_radiation), member), time: time)
+                let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                return DataAndUnit(duration, .seconds)
             }
         case .pressure(let v):
             switch v.variable {

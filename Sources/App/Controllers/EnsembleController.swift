@@ -229,6 +229,8 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepr
     case soil_moisture_40_to_100cm
     case soil_moisture_100_to_200cm
     
+    case sunshine_duration
+    
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {

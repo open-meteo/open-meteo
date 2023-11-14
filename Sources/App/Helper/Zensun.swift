@@ -41,9 +41,14 @@ public struct Zensun {
     /// Time MUST be 0 UTC, it will add the time to match the noon time based on longitude
     /// The correct time is important to get the correct sun declination at local noon
     public static func calculateDaylightDuration(utcMidnight: Range<Timestamp>, lat: Float, lon: Float) -> [Float] {
-        let noonTimeOffsetSeconds = Int((12-lon/15)*3600)
-        return utcMidnight.stride(dtSeconds: 86400).map { date in
-            let t1 = date.add(noonTimeOffsetSeconds).getSunDeclination().degreesToRadians
+        let utcOffsetApproximated = Int((-lon/15)*3600)
+        return calculateDaylightDuration(localMidnight: utcMidnight.add(utcOffsetApproximated), lat: lat)
+    }
+    
+    /// Calculate daylight duration. `localMidnight` should be be aligned to 0:00 localtime. E.g. 22 UTC for CEST.
+    public static func calculateDaylightDuration(localMidnight: Range<Timestamp>, lat: Float) -> [Float] {
+        return localMidnight.stride(dtSeconds: 86400).map { date in
+            let t1 = date.add(12*3600).getSunDeclination().degreesToRadians
             let alpha = Float(0.83333).degreesToRadians
             let t0 = lat.degreesToRadians
             let arg = -(sin(alpha)+sin(t0)*sin(t1))/(cos(t0)*cos(t1))
@@ -295,6 +300,79 @@ public struct Zensun {
             }
         }
         return out
+    }
+    
+    /// Approximate daylight duration (DNI > 120 w/m2) in seconds. `directRadiation` must be backwards averaged over dt.
+    /// Assumes a linear distribution over 60-180 watts instead of a hard cut of 120 watts.
+    /// Timeinterval `dt`is adjusted to sunrise and sunset to ensure. Only considering DNI will lead to sunshine greated than daylight duration.
+    public static func calculateBackwardsSunshineDuration(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+        let dt =  Float(timerange.dtSeconds)
+        
+        return zip(directRadiation, timerange).map { (dhi, timestamp) in
+            if dhi.isNaN {
+                return .nan
+            }
+            if dhi <= 0 {
+                return 0
+            }
+            
+            /// DNI is typically limted to 85° zenith. We apply 5° to the parallax in addition to atmospheric refraction
+            /// The parallax is then use to limit integral coefficients to sun rise/set
+            let alpha = Float(0.83333 - 5).degreesToRadians
+
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
+            
+            let latsun=decang
+            /// universal time
+            let ut = timestamp.hourWithFraction
+            let t1 = (90-latsun).degreesToRadians
+            
+            let lonsun = -15.0*(ut-12.0+eqtime)
+            
+            /// longitude of sun
+            let p1 = lonsun.degreesToRadians
+            
+            
+            let ut0 = ut - (Float(timerange.dtSeconds)/3600)
+            let lonsun0 = -15.0*(ut0-12.0+eqtime)
+            
+            let p10 = lonsun0.degreesToRadians
+            
+            let t0=(90-latitude).degreesToRadians
+
+            /// longitude of point
+            var p0 = longitude.degreesToRadians
+            if p0 < p1 - .pi {
+                p0 += 2 * .pi
+            }
+            if p0 > p1 + .pi {
+                p0 -= 2 * .pi
+            }
+
+            // limit p1 and p10 to sunrise/set
+            let arg = -(sin(alpha)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+            let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+            let sunrise = p0 + carg
+            let sunset = p0 - carg
+            let p1_l = min(sunrise, p10)
+            let p10_l = max(sunset, p1)
+            
+            // limit dt to sunrise/set
+            let dtBound = dt * abs((p1_l - p10_l) / (p10 - p1))
+            
+            // solve integral to get sun elevation dt
+            // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+            let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+            let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+            let zzBackwards = (left-right) / (p1_l - p10_l)
+            let dni = dhi / zzBackwards
+            // Prevent possible division by zero
+            // See https://github.com/open-meteo/open-meteo/discussions/395
+            let dniBounded = zzBackwards <= 0.0001 ? dhi : dni
+            // >120 watts would be a "hard-cut" and not realistic as data is averaged over 1 hours. Instead, linearly interpolate between 60 and 180 watts.
+            return min(max(dniBounded - 60, 0) / (180 - 60) * dtBound, dtBound)
+        }
     }
     
     /// Calculate DNI using super sampling

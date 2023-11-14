@@ -59,8 +59,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "d69218cb0fea5d455dd5f8ac4cc683a1a5f0d1e2",
-        "version" : "1.5.0"
+        "revision" : "f9f94bce409cda53f3c75f9eebf7d7f1ef7ad531",
+        "version" : "1.6.0"
       }
     },
     {
