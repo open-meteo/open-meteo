@@ -33,6 +33,7 @@ enum JmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
+    case sunshine_duration
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -176,6 +177,8 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .cloudcover_mid, time: time)
             case .cloud_cover_high:
                 try prefetchData(raw: .cloudcover_high, time: time)
+            case .sunshine_duration:
+                try prefetchData(derived: .surface(.direct_radiation), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -330,6 +333,10 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 return try get(raw: .cloudcover_mid, time: time)
             case .cloud_cover_high:
                 return try get(raw: .cloudcover_high, time: time)
+            case .sunshine_duration:
+                let directRadiation = try get(derived: .surface(.direct_radiation), time: time)
+                let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                return DataAndUnit(duration, .seconds)
             }
         case .pressure(let v):
             switch v.variable {

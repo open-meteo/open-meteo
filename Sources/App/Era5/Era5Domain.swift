@@ -516,6 +516,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .windgusts_10m, time: time)
         case .dew_point_2m:
             try prefetchData(raw: .dewpoint_2m, time: time)
+        case .sunshine_duration:
+            try prefetchData(raw: .direct_radiation, time: time)
         }
     }
     
@@ -752,6 +754,10 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return try get(raw: .windgusts_10m, time: time)
         case .dew_point_2m:
             return try get(raw: .dewpoint_2m, time: time)
+        case .sunshine_duration:
+            let directRadiation = try get(raw: .direct_radiation, time: time)
+            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            return DataAndUnit(duration, .seconds)
         }
     }
 }

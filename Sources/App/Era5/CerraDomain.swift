@@ -39,6 +39,7 @@ enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixabl
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
+    case sunshine_duration
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -155,6 +156,8 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .windspeed_100m, time: time)
         case .wind_direction_100m:
             try prefetchData(raw: .windspeed_100m, time: time)
+        case .sunshine_duration:
+            try prefetchData(raw: .direct_radiation, time: time)
         }
     }
     
@@ -294,6 +297,10 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             return try get(raw: .cloudcover_mid, time: time)
         case .cloud_cover_high:
             return try get(raw: .cloudcover_high, time: time)
+        case .sunshine_duration:
+            let directRadiation = try get(raw: .direct_radiation, time: time)
+            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            return DataAndUnit(duration, .seconds)
         }
     }
 }

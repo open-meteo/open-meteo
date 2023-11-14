@@ -97,6 +97,8 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .soilMoisture, depth: 40, depthTo: 100)
         case .soil_moisture_100_to_200cm:
             return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
+        case .sunshine_duration:
+            return .init(variable: .sunshineDuration)
         }
     }
 }

@@ -44,6 +44,8 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case wind_direction_120m
     case wind_gusts_10m
     
+    case sunshine_duration
+    
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -204,6 +206,8 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .init(.surface(.winddirection_120m), member), time: time)
             case .wind_gusts_10m:
                 try prefetchData(raw: .init(.surface(.windgusts_10m), member), time: time)
+            case .sunshine_duration:
+                try prefetchData(derived: .init(.surface(.direct_radiation), member), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -389,6 +393,10 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 return try get(raw: .init(.surface(.winddirection_120m), member), time: time)
             case .wind_gusts_10m:
                 return try get(raw: .init(.surface(.windgusts_10m), member), time: time)
+            case .sunshine_duration:
+                let directRadiation = try get(derived: .init(.surface(.direct_radiation), member), time: time)
+                let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                return DataAndUnit(duration, .seconds)
             }
         case .pressure(let v):
             switch v.variable {
