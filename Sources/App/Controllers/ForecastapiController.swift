@@ -874,9 +874,9 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
         case .precipitation_probability_max:
             return .max(.surface(.precipitation_probability))
         case .precipitation_probability_min:
-            return .max(.surface(.precipitation_probability))
+            return .min(.surface(.precipitation_probability))
         case .precipitation_probability_mean:
-            return .max(.surface(.precipitation_probability))
+            return .mean(.surface(.precipitation_probability))
         case .dewpoint_2m_max, .dew_point_2m_max:
             return .max(.surface(.dewpoint_2m))
         case .dewpoint_2m_mean, .dew_point_2m_mean:
