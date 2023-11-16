@@ -352,7 +352,22 @@ struct DownloadEra5Command: AsyncCommandFix {
             logger.info("Downloading elevation and sea mask")
             switch domain {
             case .era5_ocean:
-                return
+                // Just use wave data and mark all NaN areas as land
+                struct Query: Encodable {
+                    let product_type = "reanalysis"
+                    let format = "grib"
+                    let variable = ["significant_height_of_combined_wind_waves_and_swell"]
+                    let time = "00:00"
+                    let day = "01"
+                    let month = "01"
+                    let year = "2022"
+                }
+                try Process.cdsApi(
+                    dataset: domain.cdsDatasetName,
+                    key: cdskey,
+                    query: Query(),
+                    destinationFile: tempDownloadGribFile
+                )
             case .ecmwf_ifs:
                 guard let email else {
                     fatalError("email required")
@@ -433,6 +448,9 @@ struct DownloadEra5Command: AsyncCommandFix {
                     landmask = data
                 case "slt":
                     soilType = data
+                case "swh":
+                    elevation = .init(repeating: 0, count: data.count)
+                    landmask = data.map { $0.isNaN ? 1 : 0 }
                 default:
                     fatalError("Found \(shortName) in grib")
                 }
