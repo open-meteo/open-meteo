@@ -34,6 +34,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     }
     
     private static var era5ElevationFile = try? OmFileReader(file: Self.era5.surfaceElevationFileOm)
+    private static var era5OceanElevationFile = try? OmFileReader(file: Self.era5_ocean.surfaceElevationFileOm)
     private static var era5LandElevationFile = try? OmFileReader(file: Self.era5_land.surfaceElevationFileOm)
     private static var cerraElevationFile = try? OmFileReader(file: Self.cerra.surfaceElevationFileOm)
     private static var ifsElevationFile = try? OmFileReader(file: Self.ecmwf_ifs.surfaceElevationFileOm)
@@ -61,7 +62,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         case .elevation:
             switch self {
             case .era5_ocean:
-                return nil
+                return Self.era5OceanElevationFile
             case .era5:
                 return Self.era5ElevationFile
             case .era5_land:
@@ -352,7 +353,22 @@ struct DownloadEra5Command: AsyncCommandFix {
             logger.info("Downloading elevation and sea mask")
             switch domain {
             case .era5_ocean:
-                return
+                // Just use wave data and mark all NaN areas as land
+                struct Query: Encodable {
+                    let product_type = "reanalysis"
+                    let format = "grib"
+                    let variable = ["significant_height_of_combined_wind_waves_and_swell"]
+                    let time = "00:00"
+                    let day = "01"
+                    let month = "01"
+                    let year = "2022"
+                }
+                try Process.cdsApi(
+                    dataset: domain.cdsDatasetName,
+                    key: cdskey,
+                    query: Query(),
+                    destinationFile: tempDownloadGribFile
+                )
             case .ecmwf_ifs:
                 guard let email else {
                     fatalError("email required")
@@ -433,6 +449,9 @@ struct DownloadEra5Command: AsyncCommandFix {
                     landmask = data
                 case "slt":
                     soilType = data
+                case "swh":
+                    elevation = .init(repeating: .nan, count: data.count)
+                    landmask = data.map { $0.isNaN ? 1 : 0 }
                 default:
                     fatalError("Found \(shortName) in grib")
                 }

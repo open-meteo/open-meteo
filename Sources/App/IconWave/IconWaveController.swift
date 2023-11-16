@@ -2,19 +2,27 @@ import Foundation
 import Vapor
 
 
-enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString {
+enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomainMixerDomain {
     case best_match
     case ewam
     case gwam
+    case era5_ocean
     
-    var wavemodels: [IconWaveDomain] {
+    var countEnsembleMember: Int { return 1 }
+    
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol] {
         switch self {
         case .best_match:
-            return [.gwam, .ewam]
+            guard let reader: any GenericReaderProtocol = try IconWaveMixer(domains: [.gwam, .ewam], lat: lat, lon: lon, elevation: .nan, mode: mode) else {
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return [reader]
         case .ewam:
-            return [.ewam]
+            return try IconWaveReader(domain: .ewam, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gwam:
-            return [.gwam]
+            return try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .era5_ocean:
+            return [try Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode)]
         }
     }
 }
@@ -24,7 +32,7 @@ struct IconWaveController {
         try req.ensureSubdomain("marine-api")
         let params = try req.query.decode(ApiQueryParameter.self)
         let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 11)
+        let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 11)
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try IconWaveDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
@@ -44,7 +52,7 @@ struct IconWaveController {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
             let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try IconWaveMixer(domains: domain.wavemodels, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea) else {
+                guard let reader = try GenericReaderMulti<IconWaveVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea) else {
                     return nil
                 }
                 
@@ -66,16 +74,20 @@ struct IconWaveController {
                     },
                     current: paramsCurrent.map { variables in
                         return {
-                            return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
-                                let d = try reader.get(variable: variable, time: currentTimeRange).convertAndRound(params: params)
+                            return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
+                                guard let d = try reader.get(variable: variable, time: currentTimeRange)?.convertAndRound(params: params) else {
+                                    return nil
+                                }
                                 return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
                             })
                         }
                     },
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.map { variable in
-                                let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params)
+                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
+                                guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params) else {
+                                    return nil
+                                }
                                 assert(hourlyTime.count == d.data.count)
                                 return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
                             })
@@ -83,8 +95,10 @@ struct IconWaveController {
                     },
                     daily: paramsDaily.map { paramsDaily in
                         return {
-                            return ApiSection(name: "daily", time: dailyTime, columns: try paramsDaily.map { variable in
-                                let d = try reader.getDaily(variable: variable, time: dailyTime).convertAndRound(params: params)
+                            return ApiSection(name: "daily", time: dailyTime, columns: try paramsDaily.compactMap { variable in
+                                guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime) else {
+                                    return nil
+                                }
                                 assert(dailyTime.count == d.data.count)
                                 return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
                             })

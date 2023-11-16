@@ -76,6 +76,8 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
             return .gwam
         case .ewam:
             return .ewam
+        case .era5_ocean:
+            return .era5Ocean
         }
     }
 }

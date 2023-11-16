@@ -250,12 +250,6 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .windSpeed, altitude: 50)
         case .windspeed_80m, .wind_speed_80m:
             return .init(variable: .windSpeed, altitude: 80)
-        case .wave_height:
-            return .init(variable: .waveHeight)
-        case .wave_direction:
-            return .init(variable: .waveDirection)
-        case .wave_period:
-            return .init(variable: .wavePeriod)
         case .sunshine_duration:
             return .init(variable: .sunshineDuration)
         }
