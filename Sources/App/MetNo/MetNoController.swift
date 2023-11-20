@@ -198,7 +198,7 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .rain:
             let temperature = try get(raw: .temperature_2m, time: time)
             let precipitation = try get(raw: .precipitation, time: time)
-            return DataAndUnit(zip(temperature.data, precipitation.data).map({ ($0 >= 0 ? $1 : 0) }), precipitation.unit)
+            return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 1 : 0) }), precipitation.unit)
         case .showers:
             // always 0, but only if any data is available in precipitation.
             let precipitation = try get(raw: .precipitation, time: time)
