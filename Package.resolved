@@ -23,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/console-kit.git",
       "state" : {
-        "revision" : "f4ef965dadd999f7e4687053153c97b8b320819c",
-        "version" : "4.10.1"
+        "revision" : "2e3e205e8d7563d5c1a6f1c8992616d337f632e6",
+        "version" : "4.11.0"
       }
     },
     {
@@ -131,8 +131,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "853522d90871b4b63262843196685795b5008c46",
-        "version" : "2.61.1"
+        "revision" : "702cd7c56d5d44eeba73fdf83918339b26dc855c",
+        "version" : "2.62.0"
       }
     },
     {
@@ -203,8 +203,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git",
       "state" : {
-        "revision" : "768489c7f8eb5f623f009ef0bf7122d99e37cbb5",
-        "version" : "1.0.3"
+        "revision" : "55f3d6e384252d9c587f8736982c2af50d3828d3",
+        "version" : "1.0.4"
       }
     },
     {
