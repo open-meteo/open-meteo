@@ -67,16 +67,18 @@ struct JmaDownload: AsyncCommandFix {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         //try await downloadElevation(application: context.application, domain: domain)
-        try await download(application: context.application, domain: domain, run: run, server: server)
-        try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server)
+        try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf, handles: handles)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
     
     /// MSM or GSM domain
-    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws {
+    /// Return open file handles, to ensure overlapping runs are not conflicting
+    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws -> [(variable: JmaVariableDownloadable, hour: Int, fn: FileHandle)] {
         let logger = application.logger
-        let deadLineHours: Double = domain == .gsm ? 2.9 : 4
+        let deadLineHours: Double = domain == .gsm ? 3 : 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        defer { curl.printStatistics() }
         
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -103,11 +105,15 @@ struct JmaDownload: AsyncCommandFix {
             }
         }
         
-        for filename in filesToDownload {
-            for message in try await curl.downloadGrib(url: "\(server)\(filename)", bzip2Decode: false) {
+        return try await filesToDownload.asyncFlatMap { filename in
+            let grib = try await curl.downloadGrib(url: "\(server)\(filename)", bzip2Decode: false)
+            return try grib.compactMap { message -> (JmaVariableDownloadable, Int, FileHandle)? in
                 guard let variable = message.toJmaVariable(),
                       let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
-                    continue
+                    return nil
+                }
+                if hour == 0 && variable.skipHour0 {
+                    return nil
                 }
                 try grib2d.load(message: message)
                 if domain.isGlobal {
@@ -127,14 +133,15 @@ struct JmaDownload: AsyncCommandFix {
                 
                 logger.info("Compressing and writing data to \(variable.omFileName.file)_\(hour).om")
                 //let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                
+                return (variable, hour, fn)
             }
         }
-        curl.printStatistics()
     }
     
     /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: JmaDomain, variables: [JmaVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
+    func convert(logger: Logger, domain: JmaDomain, variables: [JmaVariableDownloadable], run: Timestamp, createNetcdf: Bool, handles: [(variable: JmaVariableDownloadable, hour: Int, fn: FileHandle)]) throws {
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour)
@@ -151,13 +158,12 @@ struct JmaDownload: AsyncCommandFix {
             let skip = variable.skipHour0 ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
             
-            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
-                if hour == 0 && variable.skipHour0 {
+            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try handles.compactMap({ handle in
+                guard handle.variable.omFileName == variable.omFileName else {
                     return nil
                 }
-                let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om")
-                try reader.willNeed()
-                return (hour, reader)
+                let reader = try OmFileReader(fn: handle.fn)
+                return (handle.hour, reader)
             })
             
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in

@@ -355,17 +355,17 @@ public final class OmFileWriter {
     /// Write new file. Throw error is file exists
     /// Uses a temporary file and then atomic move
     /// If `overwrite` is set, overwrite existing files atomically
-    public func write(file: String, compressionType: CompressionType, scalefactor: Float, overwrite: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+    @discardableResult
+    public func write(file: String, compressionType: CompressionType, scalefactor: Float, overwrite: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws -> FileHandle {
         if !overwrite && FileManager.default.fileExists(atPath: file) {
             throw SwiftPFor2DError.fileExistsAlready(filename: file)
         }
         let fileTemp = "\(file)~"
         try FileManager.default.removeItemIfExists(at: fileTemp)
-        try {
-            let fn = try FileHandle.createNewFile(file: fileTemp)
-            try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
-        }()
+        let fn = try FileHandle.createNewFile(file: fileTemp)
+        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
         try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
+        return fn
     }
     
     //public func write(file: String, compressionType: CompressionType, scalefactor: Float, readers: [OmFileR]) throws {
@@ -388,7 +388,8 @@ public final class OmFileWriter {
     
     /// Write all data at once without any streaming
     /// If `overwrite` is set, overwrite existing files atomically
-    public func write(file: String, compressionType: CompressionType, scalefactor: Float, all: [Float], overwrite: Bool = false) throws {
+    @discardableResult
+    public func write(file: String, compressionType: CompressionType, scalefactor: Float, all: [Float], overwrite: Bool = false) throws -> FileHandle {
         try write(file: file, compressionType: compressionType, scalefactor: scalefactor, overwrite: overwrite, supplyChunk: { range in
             return ArraySlice(all)
         })
@@ -671,6 +672,10 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
 extension OmFileReader where Backend == MmapFile {
     public convenience init(file: String) throws {
         let fn = try FileHandle.openFileReading(file: file)
+        try self.init(fn: fn)
+    }
+    
+    public convenience init(fn: FileHandle) throws {
         let mmap = try MmapFile(fn: fn)
         try self.init(fn: mmap)
     }

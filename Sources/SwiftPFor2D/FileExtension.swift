@@ -6,7 +6,7 @@ extension FileHandle {
     public static func createNewFile(file: String, size: Int? = nil) throws -> FileHandle {
         // 0644 permissions
         // O_TRUNC for overwrite
-        let fn = open(file, O_WRONLY | O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
+        let fn = open(file, O_RDWR | O_CREAT, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
         guard fn > 0 else {
             let error = String(cString: strerror(errno))
             throw SwiftPFor2DError.cannotOpenFile(filename: file, errno: errno, error: error)
