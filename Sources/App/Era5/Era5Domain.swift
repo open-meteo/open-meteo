@@ -74,10 +74,13 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         }
         
         // Waves are only available for ERA5 ocean at 0.5° resolution
-        switch self {
-        case .wave_height, .wave_period, .wave_direction:
-            return domain == .era5_ocean
-        default: break
+        if domain == .era5_ocean {
+            switch self {
+            case .wave_height, .wave_period, .wave_direction:
+                return true
+            default:
+                return false
+            }
         }
         
         // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
