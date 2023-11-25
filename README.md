@@ -52,6 +52,7 @@ Apps:
 - [Weather Please](https://github.com/ggaidelevicius/weather-please/) Clean and minimal new tab replacement for browsers
 - [QuickWeather](https://github.com/TylerWilliamson/QuickWeather) Fast, free, and open source Android app
 - [Rain](https://github.com/DarkMooNight/Rain) Free, open source, beautiful, minimal and fast weather app
+- [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
