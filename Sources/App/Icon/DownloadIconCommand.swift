@@ -191,11 +191,11 @@ struct DownloadIconCommand: AsyncCommandFix {
                         if variable == .precipitation {
                             precipitation[i] = grib2d.array
                         }
+                        if variable == .temperature_2m {
+                            // store in memory for this member
+                            temperature2m[i] = grib2d.array
+                        }
                         if [.iconEps, .iconEuEps].contains(domain) {
-                            if variable == .temperature_2m {
-                                // store in memory for this member
-                                temperature2m[i] = grib2d.array
-                            }
                             if variable == .pressure_msl {
                                 // ICON EPC is actually downloading surface level pressure
                                 // calculate sea level presure using temperature and elevation
