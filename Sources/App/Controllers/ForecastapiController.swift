@@ -28,6 +28,9 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.get("forecast", use: WeatherApiController(
             defaultModel: .best_match, alias: "forecast-archive-api").query
         )
+        categoriesRoute.on(.OPTIONS, "forecast", use: WeatherApiController(
+            defaultModel: .best_match, alias: "forecast-archive-api").query
+        )
         categoriesRoute.get("dwd-icon", use: WeatherApiController(
             defaultModel: .icon_seamless).query
         )
