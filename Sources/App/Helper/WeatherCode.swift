@@ -7,7 +7,7 @@ enum WeatherCode: Int {
     case partlyCloudy = 2
     case overcast = 3
     case fog = 45
-    case depositingTimeFog = 48
+    case depositingRimeFog = 48
     case lightDrizzle = 51
     case moderateDrizzle = 53
     case denseDrizzle = 55
@@ -126,5 +126,52 @@ enum WeatherCode: Int {
                 modelDtSeconds: modelDtSeconds
             ).map({Float($0.rawValue)}) ?? .nan
         }
+    }
+    
+    /// True if weather code is an precipitation event. Thunderstorm, return false as they may only indicate potential
+    var isPrecipitationEvent: Bool {
+        switch self {
+        case .lightDrizzle, .moderateDrizzle, .denseDrizzle:
+            fallthrough
+        case .lightFreezingDrizzle, .moderateOrDenseFreezingDrizzle:
+            fallthrough
+        case .lightRain, .moderateRain, .heavyRain:
+            fallthrough
+        case .lightFreezingRain, .moderateOrHeavyFreezingRain:
+            fallthrough
+        case .slightSnowfall, .moderateSnowfall, .heavySnowfall, .snowGrains:
+            fallthrough
+        case .slightRainShowers, .moderateRainShowers,.heavyRainShowers:
+            fallthrough
+        case .slightSnowShowers, .heavySnowShowers:
+            return true
+        default:
+            return false
+        }
+    }
+    
+    /// DWD ICON weather codes show rain although precipitation is 0
+    /// Similar for snow at +2°C or more
+    func correctDwdIconWeatherCode(temperature_2m: Float, precipitation: Float) -> WeatherCode {
+        if precipitation <= 0 && self.isPrecipitationEvent {
+            // Weather code shows drizzle, but no precipitation, demote to overcast
+            return .overcast
+        }
+        
+        if temperature_2m >= 2 {
+            // Weather code may show snow, although temperature is high
+            switch self {
+            case .slightSnowfall:
+                return .lightRain
+            case .moderateSnowfall:
+                return .moderateRain
+            case .heavySnowfall:
+                return .heavyRain
+            default:
+                break
+            }
+        }
+        
+        return self
     }
 }
