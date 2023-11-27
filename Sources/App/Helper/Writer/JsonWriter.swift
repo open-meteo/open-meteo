@@ -71,6 +71,9 @@ extension ForecastapiResult.PerLocation {
         if let elevation = first.elevation, elevation.isFinite {
             b.buffer.writeString(",\"elevation\":\(elevation)")
         }
+        if locationId != 0 {
+            b.buffer.writeString(",\"location_id\":\(locationId)")
+        }
         
         if let current {
             b.buffer.writeString(",\"\(current.name)_units\":")
