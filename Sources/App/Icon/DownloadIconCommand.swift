@@ -132,6 +132,9 @@ struct DownloadIconCommand: AsyncCommandFix {
             /// Keep temperature 2m in memory if required for sea level pressure conversion
             var temperature2m = [Int: Array2D]()
             
+            /// Keep precipitation in memory to correct weather codes
+            var precipitation = [Int: Array2D]()
+            
             for variable in variables {
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
                     continue
@@ -185,11 +188,14 @@ struct DownloadIconCommand: AsyncCommandFix {
                     }
                     
                     if let variable = variable as? IconSurfaceVariable {
+                        if variable == .precipitation {
+                            precipitation[i] = grib2d.array
+                        }
+                        if variable == .temperature_2m {
+                            // store in memory for this member
+                            temperature2m[i] = grib2d.array
+                        }
                         if [.iconEps, .iconEuEps].contains(domain) {
-                            if variable == .temperature_2m {
-                                // store in memory for this member
-                                temperature2m[i] = grib2d.array
-                            }
                             if variable == .pressure_msl {
                                 // ICON EPC is actually downloading surface level pressure
                                 // calculate sea level presure using temperature and elevation
@@ -202,10 +208,29 @@ struct DownloadIconCommand: AsyncCommandFix {
                         if domain == .iconEps && variable == .relativehumidity_2m {
                             // ICON EPS is using dewpoint, convert to relative humidity
                             guard let t2m = temperature2m[i] else {
-                                fatalError("Relative humidity calculation requires temperature 2m")
+                                fatalError("Relative humidity calculation requires temperature_2m")
                             }
                             grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                             grib2d.array.data = zip(t2m.data, grib2d.array.data).map(Meteorology.relativeHumidity)
+                        }
+                        // DWD ICON weather codes show rain although precipitation is 0
+                        // Similar for snow at +2°C or more
+                        if variable == .weathercode {
+                            guard let t2m = temperature2m[i] else {
+                                fatalError("Weather code correction requires temperature_2m")
+                            }
+                            guard let precip = precipitation[i] else {
+                                fatalError("Weather code correction requires precipitation")
+                            }
+                            for i in grib2d.array.data.indices {
+                                guard let weathercode = WeatherCode(rawValue: Int(grib2d.array.data[i])) else {
+                                    continue
+                                }
+                                grib2d.array.data[i] = Float(weathercode.correctDwdIconWeatherCode(
+                                    temperature_2m: t2m.data[i],
+                                    precipitation: precip.data[i]
+                                ).rawValue)
+                            }
                         }
                     }
                     
