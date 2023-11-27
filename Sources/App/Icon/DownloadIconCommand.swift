@@ -174,9 +174,9 @@ struct DownloadIconCommand: AsyncCommandFix {
                 }
                 
                 // Contains more than 1 message for ensemble models
-                for (i, message) in messages.enumerated() {
+                for (member, message) in messages.enumerated() {
                     try grib2d.load(message: message)
-                    let memberStr = i > 0 ? "_\(i)" : ""
+                    let memberStr = member > 0 ? "_\(member)" : ""
                     let filenameDest = "single-level_\(h3)_\(variable.omFileName.file.uppercased())\(memberStr).fpg"
                     
                     // Write data as encoded floats to disk
@@ -189,17 +189,17 @@ struct DownloadIconCommand: AsyncCommandFix {
                     
                     if let variable = variable as? IconSurfaceVariable {
                         if variable == .precipitation {
-                            precipitation[i] = grib2d.array
+                            precipitation[member] = grib2d.array
                         }
                         if variable == .temperature_2m {
                             // store in memory for this member
-                            temperature2m[i] = grib2d.array
+                            temperature2m[member] = grib2d.array
                         }
                         if [.iconEps, .iconEuEps].contains(domain) {
                             if variable == .pressure_msl {
                                 // ICON EPC is actually downloading surface level pressure
                                 // calculate sea level presure using temperature and elevation
-                                guard let t2m = temperature2m[i] else {
+                                guard let t2m = temperature2m[member] else {
                                     fatalError("Sea level pressure calculation required temperature 2m")
                                 }
                                 grib2d.array.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: grib2d.array.data, elevation: domainElevation)
@@ -207,7 +207,7 @@ struct DownloadIconCommand: AsyncCommandFix {
                         }
                         if domain == .iconEps && variable == .relativehumidity_2m {
                             // ICON EPS is using dewpoint, convert to relative humidity
-                            guard let t2m = temperature2m[i] else {
+                            guard let t2m = temperature2m[member] else {
                                 fatalError("Relative humidity calculation requires temperature_2m")
                             }
                             grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
@@ -216,10 +216,10 @@ struct DownloadIconCommand: AsyncCommandFix {
                         // DWD ICON weather codes show rain although precipitation is 0
                         // Similar for snow at +2°C or more
                         if variable == .weathercode {
-                            guard let t2m = temperature2m[i] else {
+                            guard let t2m = temperature2m[member] else {
                                 fatalError("Weather code correction requires temperature_2m")
                             }
-                            guard let precip = precipitation[i] else {
+                            guard let precip = precipitation[member] else {
                                 fatalError("Weather code correction requires precipitation")
                             }
                             for i in grib2d.array.data.indices {
@@ -230,6 +230,23 @@ struct DownloadIconCommand: AsyncCommandFix {
                                     temperature_2m: t2m.data[i],
                                     precipitation: precip.data[i]
                                 ).rawValue)
+                            }
+                        }
+                        
+                        /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
+                        /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
+                        /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
+                        if variable == .freezinglevel_height {
+                            guard let t2m = temperature2m[member] else {
+                                fatalError("Freezing level height correction requires temperature_2m")
+                            }
+                            for i in grib2d.array.data.indices {
+                                let freezingLevelHeight = grib2d.array.data[i]
+                                let temperature_2m = t2m.data[i]
+                                let newHeight = freezingLevelHeight - abs(-1 * temperature_2m) * 0.7 * 100
+                                if newHeight <= domainElevation[i] {
+                                    grib2d.array.data[i] = newHeight
+                                }
                             }
                         }
                     }
