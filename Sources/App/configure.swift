@@ -45,6 +45,13 @@ extension Application {
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone(abbreviation: "GMT")!
     
+    let corsConfiguration = CORSMiddleware.Configuration(
+        allowedOrigin: .all,
+        allowedMethods: [.GET, .POST, /*.PUT,*/ .OPTIONS /*, .DELETE, .PATCH*/],
+        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin]
+    )
+    app.middleware.use(CORSMiddleware(configuration: corsConfiguration))
+    app.middleware.use(ErrorMiddleware.default(environment: try .detect()))
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
@@ -78,7 +85,7 @@ public func configure(_ app: Application) throws {
     // Higher backlog value to handle more connections
     app.http.server.configuration.backlog = 4096
 
-    app.logger.logLevel = .debug
+    //app.logger.logLevel = .debug
 
     //app.views.use(.leaf)
     

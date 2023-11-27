@@ -7,13 +7,7 @@ public struct ForecastapiController: RouteCollection {
     static var runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     
     public func boot(routes: RoutesBuilder) throws {
-        let cors = CORSMiddleware(configuration: .init(
-            allowedOrigin: .all,
-            allowedMethods: [.GET, /*.POST, .PUT,*/ .OPTIONS, /*.DELETE, .PATCH*/],
-            allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith]
-        ))
-        let corsGroup = routes.grouped(cors, ErrorMiddleware.default(environment: try .detect()))
-        let categoriesRoute = corsGroup.grouped("v1")
+        let categoriesRoute = routes.grouped("v1")
         let era5 = WeatherApiController(
             forecastDay: 1,
             forecastDaysMax: 1,
