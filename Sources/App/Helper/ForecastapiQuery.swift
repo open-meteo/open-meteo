@@ -256,7 +256,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let hourly = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_hours, forecastSteps: forecast_hours, pastStepsMax: pastDaysMax * 24, forecastStepsMax: forecastDaysMax * 24, forecastStepsDefault: forecastDaysMax*24, dtSeconds: 3600) ?? daily.with(dtSeconds: 3600)
         
         // May default back to 3 day forecast
-        let minutely_15 = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_minutely_15, forecastSteps: forecast_minutely_15, pastStepsMax: pastDaysMax * 24 * 4, forecastStepsMax: forecastDaysMax * 24 * 4, forecastStepsDefault: 3 * 24 * 4, dtSeconds: 900) ?? Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: 3, dtSeconds: 86400).with(dtSeconds: 900)
+        let minutely_15 = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_minutely_15, forecastSteps: forecast_minutely_15, pastStepsMax: pastDaysMax * 24 * 4, forecastStepsMax: forecastDaysMax * 24 * 4, forecastStepsDefault: 3 * 24 * 4, dtSeconds: 900) ?? Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_days ?? 0, forecastSteps: forecast_days ?? 3, dtSeconds: 86400).with(dtSeconds: 900)
         
         return ForecastApiTimeRange(
             dailyDisplay: daily.add(-1 * actualUtcOffset),
