@@ -76,7 +76,7 @@ public struct IsoDateTime {
         guard str.count >= 10, str.count <= 19, str[4..<5] == "-", str[7..<8] == "-" else {
             throw TimeError.InvalidDateFromat
         }
-        guard let year = Int(str[0..<4]), let month = Int(str[5..<7]), let day = Int(str[8..<11]) else {
+        guard let year = Int(str[0..<4]), let month = Int(str[5..<7]), let day = Int(str[8..<10]) else {
             throw TimeError.InvalidDateFromat
         }
         guard year >= 1900, year <= 2050,
@@ -90,7 +90,7 @@ public struct IsoDateTime {
             return
         }
         
-        guard str.count >= 13, str[11..<12] == "T", let hour = Int(str[12..<14]) else {
+        guard str.count >= 13, str[10..<11] == "T", let hour = Int(str[11..<13]) else {
             throw TimeError.InvalidDateFromat
         }
         guard hour >= 0, hour <= 23 else {
@@ -100,7 +100,7 @@ public struct IsoDateTime {
             self.init(year: year, month: month, day: day, hour: hour, minute: 0, second: 0)
             return
         }
-        guard str.count >= 16, str[14..<15] == ":", let minute = Int(str[15..<16]) else {
+        guard str.count >= 16, str[13..<14] == ":", let minute = Int(str[14..<16]) else {
             throw TimeError.InvalidDateFromat
         }
         guard minute >= 0, minute <= 59 else {
@@ -110,7 +110,7 @@ public struct IsoDateTime {
             self.init(year: year, month: month, day: day, hour: hour, minute: minute, second: 0)
             return
         }
-        guard str.count >= 19, str[17..<18] == ":", let second = Int(str[18..<20]) else {
+        guard str.count >= 19, str[16..<17] == ":", let second = Int(str[17..<19]) else {
             throw TimeError.InvalidDateFromat
         }
         guard second >= 0, second <= 59 else {

@@ -61,7 +61,7 @@ public struct IsoDate: Codable {
         guard str.count == 10, str[4..<5] == "-", str[7..<8] == "-" else {
             throw TimeError.InvalidDateFromat
         }
-        guard let year = Int32(str[0..<4]), let month = Int32(str[5..<7]), let day = Int32(str[8..<11]) else {
+        guard let year = Int32(str[0..<4]), let month = Int32(str[5..<7]), let day = Int32(str[8..<10]) else {
             throw TimeError.InvalidDateFromat
         }
         guard year >= 1900, year <= 2050, month >= 1, month <= 12, day >= 1, day <= 31 else {
