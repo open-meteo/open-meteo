@@ -111,15 +111,9 @@ struct WeatherApiController {
         let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-            /// For fractional timezones, shift data to show only for full timestamps
-            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
-            
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
-            let hourlyTime = time.range.range(dtSeconds: put3HourlyDataIntoHourly ? 3*3600 : 3600)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
-            // limited to 3 forecast days
-            let minutelyTime = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: 3, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92).range.range(dtSeconds: 3600/4)
             
             let readers: [ForecastapiResult<MultiDomains>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
@@ -133,16 +127,16 @@ struct WeatherApiController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: minutelyTime)
+                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange)
                         }
                         if let paramsMinutely {
-                            try reader.prefetchData(variables: paramsMinutely, time: minutelyTime)
+                            try reader.prefetchData(variables: paramsMinutely, time: time.minutely15)
                         }
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: hourlyTime)
+                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead)
                         }
                         if let paramsDaily {
-                            try reader.prefetchData(variables: paramsDaily, time: dailyTime)
+                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead)
                         }
                     },
                     current: paramsCurrent.map { variables in
@@ -157,11 +151,11 @@ struct WeatherApiController {
                     },
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: hourlyTime)?.convertAndRound(params: params) else {
+                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
+                                guard let d = try reader.get(variable: variable.remapped, time: time.hourlyRead)?.convertAndRound(params: params) else {
                                     return nil
                                 }
-                                assert(hourlyTime.count == d.data.count)
+                                assert(time.hourlyRead.count == d.data.count)
                                 return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
@@ -169,10 +163,10 @@ struct WeatherApiController {
                     daily: paramsDaily.map { dailyVariables in
                         return {
                             var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
-                            return ApiSection(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try dailyVariables.compactMap { variable -> ApiColumn<ForecastVariableDaily>? in
+                            return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.compactMap { variable -> ApiColumn<ForecastVariableDaily>? in
                                 if variable == .sunrise || variable == .sunset {
                                     // only calculate sunrise/set once
-                                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.range, lat: coordinates.latitude, lon: coordinates.longitude, utcOffsetSeconds: time.utcOffsetSeconds)
+                                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyRead.range, lat: coordinates.latitude, lon: coordinates.longitude, utcOffsetSeconds: timezone.utcOffsetSeconds)
                                     riseSet = times
                                     if variable == .sunset {
                                         return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
@@ -181,14 +175,14 @@ struct WeatherApiController {
                                     }
                                 }
                                 if variable == .daylight_duration {
-                                    let duration = Zensun.calculateDaylightDuration(localMidnight: dailyTime.range, lat: reader.modelLat)
+                                    let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyRead.range, lat: reader.modelLat)
                                     return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
                                 }
                                 
-                                guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime) else {
+                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead) else {
                                     return nil
                                 }
-                                assert(dailyTime.count == d.data.count)
+                                assert(time.dailyRead.count == d.data.count)
                                 return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
@@ -196,11 +190,11 @@ struct WeatherApiController {
                     sixHourly: nil,
                     minutely15: paramsMinutely.map { variables in
                         return {
-                            return .init(name: "minutely_15", time: minutelyTime, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: minutelyTime)?.convertAndRound(params: params) else {
+                            return .init(name: "minutely_15", time: time.minutely15, columns: try variables.compactMap { variable in
+                                guard let d = try reader.get(variable: variable.remapped, time: time.minutely15)?.convertAndRound(params: params) else {
                                     return nil
                                 }
-                                assert(minutelyTime.count == d.data.count)
+                                assert(time.minutely15.count == d.data.count)
                                 return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
@@ -210,7 +204,7 @@ struct WeatherApiController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))

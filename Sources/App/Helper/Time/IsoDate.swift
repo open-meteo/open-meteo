@@ -72,16 +72,68 @@ public struct IsoDate: Codable {
 }
 
 extension IsoDate {
-    static func load(commaSeparatedOptional: [String]?) throws -> [IsoDate]? {
+    static func load(commaSeparated: [String]) throws -> [IsoDate] {
+        try commaSeparated.flatMap { s in
+            try s.split(separator: ",").map { date in
+                return try IsoDate.init(fromIsoString: String(date))
+            }
+        }
+    }
+    
+    static func loadRange(start: [String], end: [String]) throws -> [ClosedRange<Timestamp>] {
+        if start.isEmpty, end.isEmpty {
+            return []
+        }
+        let startDate = try load(commaSeparated: start)
+        let endDate = try load(commaSeparated: end)
+        guard startDate.count == endDate.count else {
+            throw ForecastapiError.startAndEndDateCountMustBeTheSame
+        }
+        return try zip(startDate, endDate).map { (startDate, endDate) in
+            let start = startDate.toTimestamp()
+            let includedEnd = endDate.toTimestamp()
+            guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
+                throw ForecastapiError.enddateMustBeLargerEqualsThanStartdate
+            }
+            return start...includedEnd
+        }
+    }
+}
+
+/// Start and end dates may be specified as full date `2022-12-23` or date time `2022-12-23T00:00`
+/// Keep cases separate, because the end date gets extended by dt
+/*enum IsoDateOrTime {
+    case date(IsoDate)
+    case time(IsoDateTime)
+    
+    static func load(commaSeparatedOptional: [String]?) throws -> [IsoDateOrTime]? {
         return try commaSeparatedOptional.map {
             try $0.flatMap { s in
                 try s.split(separator: ",").map { date in
-                    return try IsoDate.init(fromIsoString: String(date))
+                    if date.count == 10 {
+                        return .date(try IsoDate.init(fromIsoString: String(date)))
+                    } else {
+                        return .time(try IsoDateTime.init(fromIsoString: String(date)))
+                    }
                 }
             }
         }
     }
+    
+    var timestamp: Timestamp {
+        switch self {
+        case .date(let date):
+            return date.toTimestamp()
+        case .time(let time):
+            return time.toTimestamp()
+        }
+    }
 }
+
+enum TimestampOrDateRange {
+    case date(ClosedRange<Timestamp>)
+    case time(ClosedRange<Timestamp>)
+}*/
 
 extension String {
     subscript(_ range: Range<Int>) -> Substring {
