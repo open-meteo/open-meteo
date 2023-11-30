@@ -69,6 +69,10 @@ extension Cmip6VariableDerivedPostBiasCorrection: FlatBuffersVariable {
             return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
         case .wind_gusts_10m_max:
             return .init(variable: .windGusts, aggregation: .maximum, altitude: 10)
+        case .wind_speed_10m_max:
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 10)
+        case .wind_speed_10m_mean:
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 10)
         }
     }
 }

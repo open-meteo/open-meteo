@@ -102,6 +102,8 @@ enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, Cas
     case windspeed_2m_mean
     case wind_speed_2m_max
     case wind_speed_2m_mean
+    case wind_speed_10m_max
+    case wind_speed_10m_mean
     case wind_gusts_10m_mean
     case wind_gusts_10m_max
     case vapour_pressure_deficit_max
@@ -605,6 +607,10 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             return try get(raw: .derived(.windgusts_10m_max), time: time)
         case .vapour_pressure_deficit_max:
             return try get(raw: .derived(.vapor_pressure_deficit_max), time: time)
+        case .wind_speed_10m_max:
+            return try get(raw: .raw(.windspeed_10m_max), time: time)
+        case .wind_speed_10m_mean:
+            return try get(raw: .raw(.windspeed_10m_mean), time: time)
         }
     }
     
@@ -643,6 +649,10 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .derived(.windgusts_10m_max), time: time)
         case .vapour_pressure_deficit_max:
             try prefetchData(raw: .derived(.vapor_pressure_deficit_max), time: time)
+        case .wind_speed_10m_max:
+            try prefetchData(raw: .raw(.windspeed_10m_max), time: time)
+        case .wind_speed_10m_mean:
+            try prefetchData(raw: .raw(.windspeed_10m_mean), time: time)
         }
     }
 }
