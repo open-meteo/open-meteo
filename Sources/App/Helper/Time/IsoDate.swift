@@ -100,41 +100,6 @@ extension IsoDate {
     }
 }
 
-/// Start and end dates may be specified as full date `2022-12-23` or date time `2022-12-23T00:00`
-/// Keep cases separate, because the end date gets extended by dt
-/*enum IsoDateOrTime {
-    case date(IsoDate)
-    case time(IsoDateTime)
-    
-    static func load(commaSeparatedOptional: [String]?) throws -> [IsoDateOrTime]? {
-        return try commaSeparatedOptional.map {
-            try $0.flatMap { s in
-                try s.split(separator: ",").map { date in
-                    if date.count == 10 {
-                        return .date(try IsoDate.init(fromIsoString: String(date)))
-                    } else {
-                        return .time(try IsoDateTime.init(fromIsoString: String(date)))
-                    }
-                }
-            }
-        }
-    }
-    
-    var timestamp: Timestamp {
-        switch self {
-        case .date(let date):
-            return date.toTimestamp()
-        case .time(let time):
-            return time.toTimestamp()
-        }
-    }
-}
-
-enum TimestampOrDateRange {
-    case date(ClosedRange<Timestamp>)
-    case time(ClosedRange<Timestamp>)
-}*/
-
 extension String {
     subscript(_ range: Range<Int>) -> Substring {
         let start = index(startIndex, offsetBy: max(0, range.lowerBound))
