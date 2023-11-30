@@ -44,11 +44,8 @@ struct IconWaveController {
         let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-            /// For fractional timezones, shift data to show only for full timestamps
-            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
-            let hourlyTime = time.range.range(dtSeconds: 3600)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
             let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
@@ -63,13 +60,13 @@ struct IconWaveController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: hourlyTime)
+                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead)
                         }
                         if let paramsCurrent {
                             try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange)
                         }
                         if let paramsDaily {
-                            try reader.prefetchData(variables: paramsDaily, time: dailyTime)
+                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead)
                         }
                     },
                     current: paramsCurrent.map { variables in
@@ -84,22 +81,22 @@ struct IconWaveController {
                     },
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable, time: hourlyTime)?.convertAndRound(params: params) else {
+                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
+                                guard let d = try reader.get(variable: variable, time: time.hourlyRead)?.convertAndRound(params: params) else {
                                     return nil
                                 }
-                                assert(hourlyTime.count == d.data.count)
+                                assert(time.hourlyRead.count == d.data.count)
                                 return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
                             })
                         }
                     },
                     daily: paramsDaily.map { paramsDaily in
                         return {
-                            return ApiSection(name: "daily", time: dailyTime, columns: try paramsDaily.compactMap { variable in
-                                guard let d = try reader.getDaily(variable: variable, params: params, time: dailyTime) else {
+                            return ApiSection(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.compactMap { variable in
+                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead) else {
                                     return nil
                                 }
-                                assert(dailyTime.count == d.data.count)
+                                assert(time.dailyRead.count == d.data.count)
                                 return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
@@ -111,7 +108,7 @@ struct IconWaveController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<IconWaveDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))

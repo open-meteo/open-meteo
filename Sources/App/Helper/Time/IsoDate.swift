@@ -61,7 +61,7 @@ public struct IsoDate: Codable {
         guard str.count == 10, str[4..<5] == "-", str[7..<8] == "-" else {
             throw TimeError.InvalidDateFromat
         }
-        guard let year = Int32(str[0..<4]), let month = Int32(str[5..<7]), let day = Int32(str[8..<11]) else {
+        guard let year = Int32(str[0..<4]), let month = Int32(str[5..<7]), let day = Int32(str[8..<10]) else {
             throw TimeError.InvalidDateFromat
         }
         guard year >= 1900, year <= 2050, month >= 1, month <= 12, day >= 1, day <= 31 else {
@@ -72,13 +72,30 @@ public struct IsoDate: Codable {
 }
 
 extension IsoDate {
-    static func load(commaSeparatedOptional: [String]?) throws -> [IsoDate]? {
-        return try commaSeparatedOptional.map {
-            try $0.flatMap { s in
-                try s.split(separator: ",").map { date in
-                    return try IsoDate.init(fromIsoString: String(date))
-                }
+    static func load(commaSeparated: [String]) throws -> [IsoDate] {
+        try commaSeparated.flatMap { s in
+            try s.split(separator: ",").map { date in
+                return try IsoDate.init(fromIsoString: String(date))
             }
+        }
+    }
+    
+    static func loadRange(start: [String], end: [String]) throws -> [ClosedRange<Timestamp>] {
+        if start.isEmpty, end.isEmpty {
+            return []
+        }
+        let startDate = try load(commaSeparated: start)
+        let endDate = try load(commaSeparated: end)
+        guard startDate.count == endDate.count else {
+            throw ForecastapiError.startAndEndDateCountMustBeTheSame
+        }
+        return try zip(startDate, endDate).map { (startDate, endDate) in
+            let start = startDate.toTimestamp()
+            let includedEnd = endDate.toTimestamp()
+            guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
+                throw ForecastapiError.enddateMustBeLargerEqualsThanStartdate
+            }
+            return start...includedEnd
         }
     }
 }

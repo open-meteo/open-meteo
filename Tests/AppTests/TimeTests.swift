@@ -62,4 +62,38 @@ final class TimeTests: XCTestCase {
         XCTAssertEqual(range.count, 3)
         XCTAssertEqual(range.map{$0.month}, [11, 12, 1])
     }
+    
+    func testIsoDateTime() throws {
+        var date = try IsoDateTime(fromIsoString: "2021-11-23T10:15:34")
+        XCTAssertEqual(date.year, 2021)
+        XCTAssertEqual(date.month, 11)
+        XCTAssertEqual(date.day, 23)
+        XCTAssertEqual(date.hour, 10)
+        XCTAssertEqual(date.minute, 15)
+        XCTAssertEqual(date.second, 34)
+        
+        date = try IsoDateTime(fromIsoString: "2021-11-23T10:15")
+        XCTAssertEqual(date.year, 2021)
+        XCTAssertEqual(date.month, 11)
+        XCTAssertEqual(date.day, 23)
+        XCTAssertEqual(date.hour, 10)
+        XCTAssertEqual(date.minute, 15)
+        XCTAssertEqual(date.second, 0)
+        
+        date = try IsoDateTime(fromIsoString: "2021-11-23T10")
+        XCTAssertEqual(date.year, 2021)
+        XCTAssertEqual(date.month, 11)
+        XCTAssertEqual(date.day, 23)
+        XCTAssertEqual(date.hour, 10)
+        XCTAssertEqual(date.minute, 0)
+        XCTAssertEqual(date.second, 0)
+        
+        date = try IsoDateTime(fromIsoString: "2021-11-23")
+        XCTAssertEqual(date.year, 2021)
+        XCTAssertEqual(date.month, 11)
+        XCTAssertEqual(date.day, 23)
+        XCTAssertEqual(date.hour, 0)
+        XCTAssertEqual(date.minute, 0)
+        XCTAssertEqual(date.second, 0)
+    }
 }

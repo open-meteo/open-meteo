@@ -102,11 +102,8 @@ struct GloFasController {
         let locations: [ForecastapiResult<GlofasDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-            /// For fractional timezones, shift data to show only for full timestamps
-            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
-            
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             
             let readers: [ForecastapiResult<GlofasDomainApi>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest) else {
@@ -129,23 +126,23 @@ struct GloFasController {
                         }
                         /// Variables wih 51 members if requested
                         let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
-                        try reader.prefetchData(variables: variables, time: dailyTime)
+                        try reader.prefetchData(variables: variables, time: time.dailyRead)
                     },
                     current: nil,
                     hourly: nil,
                     daily: {
-                        return ApiSection<GloFasVariableOrDerived>(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try paramsDaily.map { variable in
+                        return ApiSection<GloFasVariableOrDerived>(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable in
                             switch variable {
                             case .raw(_):
                                 let d = try (params.ensemble ? (0..<51) : (0..<1)).map { member -> ApiArray in
-                                    let d = try reader.get(variable: .raw(.init(.river_discharge, member)), time: dailyTime).convertAndRound(params: params)
-                                    assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
+                                    let d = try reader.get(variable: .raw(.init(.river_discharge, member)), time: time.dailyRead).convertAndRound(params: params)
+                                    assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                     return ApiArray.float(d.data)
                                 }
                                 return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
                             case .derived(let derived):
-                                let d = try reader.get(variable: .derived(derived), time: dailyTime).convertAndRound(params: params)
-                                assert(dailyTime.count == d.data.count, "days \(dailyTime.count), values \(d.data.count)")
+                                let d = try reader.get(variable: .derived(derived), time: time.dailyRead).convertAndRound(params: params)
+                                assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                 return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
                             }
                         })
@@ -157,7 +154,7 @@ struct GloFasController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<GlofasDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
