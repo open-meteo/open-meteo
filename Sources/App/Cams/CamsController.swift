@@ -21,13 +21,10 @@ struct CamsController {
         let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 5, forecastDaysMax: 7, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-            /// For fractional timezones, shift data to show only for full timestamps
-            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 5, forecastDaysMax: 7, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
-            
-            let hourlyTime = time.range.range(dtSeconds: 3600)
             
             let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try CamsMixer(domains: domain.camsDomains, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .nearest) else {
@@ -36,9 +33,9 @@ struct CamsController {
                 
                 let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfaceAndPressureVariable>)? = paramsHourly.map { variables in
                     return {
-                        return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.map { variable in
-                            let d = try reader.get(variable: variable, time: hourlyTime).convertAndRound(params: params)
-                            assert(hourlyTime.count == d.data.count)
+                        return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
+                            let d = try reader.get(variable: variable, time: time.hourlyRead).convertAndRound(params: params)
+                            assert(time.hourlyRead.count == d.data.count)
                             return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
                         })
                     }
@@ -63,7 +60,7 @@ struct CamsController {
                             try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange)
                         }
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: hourlyTime)
+                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead)
                         }
                     },
                     current: currentFn,
@@ -76,7 +73,7 @@ struct CamsController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<CamsQuery.Domain>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))

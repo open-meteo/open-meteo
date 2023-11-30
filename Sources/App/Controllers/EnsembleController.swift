@@ -21,11 +21,8 @@ public struct EnsembleApiController {
         let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 35, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-            /// For fractional timezones, shift data to show only for full timestamps
-            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
-            
-            let hourlyTime = time.range.range(dtSeconds: 3600)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 35, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             
             let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try GenericReaderMulti<EnsembleVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
@@ -43,20 +40,20 @@ public struct EnsembleApiController {
                                     EnsembleVariable(variable, $0)
                                 }
                             }
-                            try reader.prefetchData(variables: variables, time: hourlyTime)
+                            try reader.prefetchData(variables: variables, time: time.hourlyRead)
                         }
                     },
                     current: nil,
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: hourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
+                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                    guard let d = try reader.get(variable: .init(variable, member), time: hourlyTime)?.convertAndRound(params: params) else {
+                                    guard let d = try reader.get(variable: .init(variable, member), time: time.hourlyRead)?.convertAndRound(params: params) else {
                                         return nil
                                     }
                                     unit = d.unit
-                                    assert(hourlyTime.count == d.data.count)
+                                    assert(time.hourlyRead.count == d.data.count)
                                     return ApiArray.float(d.data)
                                 }
                                 guard allMembers.count > 0 else {
@@ -74,7 +71,7 @@ public struct EnsembleApiController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))

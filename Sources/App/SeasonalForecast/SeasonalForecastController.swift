@@ -164,11 +164,11 @@ struct SeasonalForecastController {
         let locations: [ForecastapiResult<SeasonalForecastDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-            /// For fractional timezones, shift data to show only for full timestamps
-            let utcOffsetShift = time.utcOffsetSeconds - timezone.utcOffsetSeconds
-            let sixHourlyTime = time.range.range(dtSeconds: 3600*6)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+            
+            let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600*6)
+            let timeSixHourlyDisplay = time.dailyDisplay.with(dtSeconds: 3600*6)
             
             let readers: [ForecastapiResult<SeasonalForecastDomainApi>.PerModel] = try domains.compactMap { domain in
                 guard let reader = try SeasonalForecastReader(domain: domain.forecastDomain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
@@ -184,14 +184,14 @@ struct SeasonalForecastController {
                         if let paramsSixHourly {
                             for varible in paramsSixHourly {
                                 for member in members {
-                                    try reader.prefetchData(variable: varible, member: member, time: sixHourlyTime)
+                                    try reader.prefetchData(variable: varible, member: member, time: time.dailyRead)
                                 }
                             }
                         }
                         if let paramsDaily {
                             for varible in paramsDaily {
                                 for member in members {
-                                    try reader.prefetchData(variable: varible, member: member, time: dailyTime)
+                                    try reader.prefetchData(variable: varible, member: member, time: timeSixHourlyRead)
                                 }
                             }
                         }
@@ -200,12 +200,12 @@ struct SeasonalForecastController {
                     hourly: nil,
                     daily: paramsDaily.map { variables in
                         return {
-                            return ApiSection<DailyCfsVariable>(name: "daily", time: dailyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
+                            return ApiSection<DailyCfsVariable>(name: "daily", time: time.dailyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try (0..<domain.forecastDomain.nMembers).compactMap { member in
-                                    let d = try reader.getDaily(variable: variable, member: member, params: params, time: dailyTime)
+                                    let d = try reader.getDaily(variable: variable, member: member, params: params, time: time.dailyRead)
                                     unit = d.unit
-                                    assert(dailyTime.count == d.data.count)
+                                    assert(time.dailyRead.count == d.data.count)
                                     return ApiArray.float(d.data)
                                 }
                                 guard allMembers.count > 0 else {
@@ -217,12 +217,12 @@ struct SeasonalForecastController {
                     },
                     sixHourly: paramsSixHourly.map { variables in
                         return {
-                            return .init(name: "six_hourly", time: sixHourlyTime.add(utcOffsetShift), columns: try variables.compactMap { variable in
+                            return .init(name: "six_hourly", time: timeSixHourlyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try (0..<domain.forecastDomain.nMembers).compactMap { member in
-                                    let d = try reader.get(variable: variable, member: member, time: sixHourlyTime).convertAndRound(params: params)
+                                    let d = try reader.get(variable: variable, member: member, time: timeSixHourlyRead).convertAndRound(params: params)
                                     unit = d.unit
-                                    assert(sixHourlyTime.count == d.data.count)
+                                    assert(timeSixHourlyRead.count == d.data.count)
                                     return ApiArray.float(d.data)
                                 }
                                 guard allMembers.count > 0 else {
@@ -238,7 +238,7 @@ struct SeasonalForecastController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<SeasonalForecastDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))

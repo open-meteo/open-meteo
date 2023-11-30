@@ -211,13 +211,6 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     
     func getTimerange2(timezone: TimezoneWithOffset, current: Timestamp, forecastDaysDefault: Int, forecastDaysMax: Int, startEndDate: ApiQueryStartEndRanges?, allowedRange: Range<Timestamp>, pastDaysMax: Int) throws -> ForecastApiTimeRange {
         
-        let forecastDays = self.forecast_days ?? forecastDaysDefault
-        let forecastMinutely15 = self.forecast_minutely_15 ?? 3*24*4
-        
-        let pastDays = self.past_days ?? 0
-        let pastHours = self.past_hours ?? pastDays * 24
-        let pastMinutely15 = self.past_minutely_15 ?? pastDays * 24 * 4
-        
         let actualUtcOffset = timezone.utcOffsetSeconds
         /// Align data to nearest hour -> E.g. timezones in india may have 15 minutes offsets
         let utcOffset = (actualUtcOffset / 3600) * 3600
@@ -272,30 +265,6 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             hourlyRead: hourly.add(-1 * utcOffset),
             minutely15: minutely_15.add(-1 * actualUtcOffset)
         )
-    }
-    
-    func getTimerange(timezone: TimezoneWithOffset, current: Timestamp, forecastDays: Int, forecastDaysMax: Int, startEndDate: ApiQueryStartEndRanges?, allowedRange: Range<Timestamp>, pastDays: Int?, pastDaysMax: Int) throws -> TimerangeLocal {
-        let actualUtcOffset = timezone.utcOffsetSeconds
-        let utcOffset = (actualUtcOffset / 3600) * 3600
-        if let startEndDate, let dayRange = startEndDate.daily {
-            let start = dayRange.lowerBound
-            let includedEnd = dayRange.upperBound
-            guard allowedRange.contains(start) else {
-                throw ForecastapiError.dateOutOfRange(parameter: "start_date", allowed: allowedRange)
-            }
-            guard allowedRange.contains(includedEnd) else {
-                throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
-            }
-            return TimerangeLocal(range: start.add(-1 * utcOffset) ..< includedEnd.add(86400 - utcOffset), utcOffsetSeconds: utcOffset)
-        }
-        if forecastDays < 0 || forecastDays > forecastDaysMax {
-            throw ForecastapiError.forecastDaysInvalid(given: forecastDays, allowed: 0...forecastDaysMax)
-        }
-        if let pastDays, pastDays < 0 || pastDays > pastDaysMax {
-            throw ForecastapiError.pastDaysInvalid(given: pastDays, allowed: 0...pastDaysMax)
-        }
-        let time = Self.forecastTimeRange(currentTime: current, utcOffsetSeconds: utcOffset, pastDays: pastDays, forecastDays: forecastDays)
-        return time
     }
     
     /// Return an aligned timerange for a local-time 7 day forecast. Timestamps are in UTC time.

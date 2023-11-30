@@ -20,8 +20,8 @@ struct CmipController {
         let locations: [ForecastapiResult<Cmip6Domain>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange(timezone: timezone, current: currentTime, forecastDays: params.forecast_days ?? 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-            let dailyTime = time.range.range(dtSeconds: 3600*24)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             
             let readers: [ForecastapiResult<Cmip6Domain>.PerModel] = try domains.compactMap { domain in
                 let reader: any Cmip6Readerable = try {
@@ -45,16 +45,16 @@ struct CmipController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let dailyVariables = paramsDaily {
-                            try reader.prefetchData(variables: dailyVariables, time: dailyTime)
+                            try reader.prefetchData(variables: dailyVariables, time: time.dailyRead)
                         }
                     },
                     current: nil,
                     hourly: nil,
                     daily: paramsDaily.map { paramsDaily in
                         return {
-                            return ApiSection(name: "daily", time: dailyTime, columns: try paramsDaily.map { variable in
-                                let d = try reader.get(variable: variable, time: dailyTime).convertAndRound(params: params)
-                                assert(dailyTime.count == d.data.count)
+                            return ApiSection(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable in
+                                let d = try reader.get(variable: variable, time: time.dailyRead).convertAndRound(params: params)
+                                assert(time.dailyRead.count == d.data.count)
                                 return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
@@ -66,7 +66,7 @@ struct CmipController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: time, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<Cmip6Domain>(timeformat: params.timeformatOrDefault, results: locations)
         req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
