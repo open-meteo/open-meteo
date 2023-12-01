@@ -32,6 +32,9 @@ struct GfsDownload: AsyncCommandFix {
         
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
         var maxForecastHour: Int?
+        
+        @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        var timeinterval: String?
     }
 
     var help: String {
@@ -44,12 +47,27 @@ struct GfsDownload: AsyncCommandFix {
         let domain = try GfsDomain.load(rawValue: signature.domain)
         disableIdleSleep()
         
-        if signature.onlyVariables != nil && signature.upperLevel {
-            fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
+        if let timeinterval = signature.timeinterval {
+            for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
+                try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+            }
+            return
         }
         
         /// 18z run is available the day after starting 05:26
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
+        try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+    }
+    
+    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsDomain) async throws {
+        
+        let start = DispatchTime.now()
+        let logger = context.application.logger
+        disableIdleSleep()
+        
+        if signature.onlyVariables != nil && signature.upperLevel {
+            fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
+        }
         
         switch domain {
         case .gfs025_ensemble:

@@ -215,6 +215,18 @@ extension Timestamp: Strideable {
     }
 }
 
+extension Timestamp {
+    /// Parse range in format `yyymmdd-yymmdd`
+    static func parseRange(yyyymmdd str: String) throws -> ClosedRange<Timestamp> {
+        guard str.count == 17, str.contains("-") else {
+            throw TimeError.InvalidDateFromat
+        }
+        let start = Timestamp(Int(str[0..<4])!, Int(str[4..<6])!, Int(str[6..<8])!)
+        let end = Timestamp(Int(str[9..<13])!, Int(str[13..<15])!, Int(str[15..<17])!).add(days: 1)
+        return start...end
+    }
+}
+
 extension Range where Bound == Timestamp {
     @inlinable public var durationSeconds: Int {
         upperBound.timeIntervalSince1970 - lowerBound.timeIntervalSince1970
