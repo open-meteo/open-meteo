@@ -89,7 +89,12 @@ final class Curl {
             url = _url
             auth = nil
         }
-        logger.info("Downloading\(range != nil ? " [ranged]" : "") file \(url)")
+        if let range {
+            logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
+        } else {
+            logger.info("Downloading file \(url)")
+        }
+        
         
         let request = {
             var request = HTTPClientRequest(url: url)
@@ -212,6 +217,17 @@ final class Curl {
     /// Download all grib files and return an array of grib messages
     func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil) async throws -> [GribMessage] {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
+        
+        // AWS does not allow multi http download ranges. Split download into multiple downloads
+        let supportMultiRange = !url.contains("amazonaws.com")
+        if !supportMultiRange, let parts = range?.split(separator: ","), parts.count > 1 {
+            var messages = [GribMessage]()
+            for part in parts {
+                messages.append(contentsOf: try await downloadGrib(url: url, bzip2Decode: bzip2Decode, range: String(part)))
+            }
+            return messages
+        }
+        
         while true {
             // Start the download and wait for the header
             let response = try await initiateDownload(url: url, range: range, minSize: minSize)
