@@ -38,6 +38,9 @@ struct GfsDownload: AsyncCommandFix {
         
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
+        
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
     }
 
     var help: String {
@@ -45,8 +48,6 @@ struct GfsDownload: AsyncCommandFix {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        let start = DispatchTime.now()
-        let logger = context.application.logger
         let domain = try GfsDomain.load(rawValue: signature.domain)
         disableIdleSleep()
         
@@ -108,7 +109,11 @@ struct GfsDownload: AsyncCommandFix {
             let variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
             
             try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
-            try convertGfs(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+            
+            let nConcurrent = signature.concurrent ?? 1
+            try await variables.evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
+                try convertGfs(logger: logger, domain: domain, variables: Array($0), run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+            })
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
