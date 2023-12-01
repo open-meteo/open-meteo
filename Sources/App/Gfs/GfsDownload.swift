@@ -30,6 +30,9 @@ struct GfsDownload: AsyncCommandFix {
         @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
         var upperLevel: Bool
         
+        @Flag(name: "surface-level", help: "Download surface-level variables")
+        var surfaceLevel: Bool
+        
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
         var maxForecastHour: Int?
         
@@ -102,7 +105,7 @@ struct GfsDownload: AsyncCommandFix {
             }
             let surfaceVariables = GfsSurfaceVariable.allCases
             
-            let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
+            let variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
             
             try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
             try convertGfs(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
