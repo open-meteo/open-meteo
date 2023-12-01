@@ -471,6 +471,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case latent_heatflux
     case latent_heat_flux
     case lifted_index
+    case convective_inhibition
     case leaf_wetness_probability
     case lightning_potential
     case precipitation

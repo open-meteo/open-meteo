@@ -52,6 +52,9 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     /// CFRZR Categorical Freezing Rain (0 or 1)
     case categorical_freezing_rain
     
+    /// :CIN:surface: convective inhibition
+    case convective_inhibition
+    
     //case rain
     //case snowfall_convective_water_equivalent
     //case snowfall_water_equivalent
@@ -132,6 +135,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index_clear_sky: return 20
         case .precipitation_probability: return 1
         case .categorical_freezing_rain: return 1
+        case .convective_inhibition: return 1
         }
     }
     
@@ -219,6 +223,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .linear
         case .precipitation_probability:
             return .linear
+        case .convective_inhibition:
+            return .hermite(bounds: nil)
         }
     }
     
@@ -265,6 +271,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index_clear_sky: return .dimensionless
         case .precipitation_probability: return .percentage
         case .categorical_freezing_rain: return .dimensionless
+        case .convective_inhibition: return .joulePerKilogram
         }
     }
     
