@@ -436,7 +436,7 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         return "\(OpenMeteo.dataDictionary)omfile-glofas-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)download-glofas-\(rawValue)/"
+        return "\(OpenMeteo.tempDictionary)download-glofas-\(rawValue)/"
     }
     var omfileArchive: String? {
         return "\(OpenMeteo.dataDictionary)archive-glofas-\(rawValue)/"

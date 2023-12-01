@@ -9,6 +9,17 @@ struct OpenMeteo {
         }
         return  "./data/"
     }()
+    
+    /// Temporary directory with trailing slash
+    static var tempDictionary = {
+        if let dir = Environment.get("TEMP_DIRECTORY") {
+            return dir
+        }
+        if let dir = Environment.get("DATA_DIRECTORY") {
+            return dir
+        }
+        return  "./data/"
+    }()
 }
 
 extension Application {

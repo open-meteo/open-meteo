@@ -230,7 +230,7 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
     }
     
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
     }
     
     var omfileDirectory: String {
