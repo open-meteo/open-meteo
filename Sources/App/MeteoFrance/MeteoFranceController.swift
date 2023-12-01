@@ -71,6 +71,7 @@ enum MeteoFranceVariableDerivedSurface: String, CaseIterable, GenericVariableMix
     case weather_code
     case is_day
     case showers
+    case rain
     case wet_bulb_temperature_2m
     case cloud_cover
     case cloud_cover_low
@@ -291,6 +292,9 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .windgusts_10m, time: time)
             case .sunshine_duration:
                 try prefetchData(derived: .surface(.direct_radiation), time: time)
+            case .rain:
+                try prefetchData(variable: .precipitation, time: time)
+                try prefetchData(variable: .snowfall_water_equivalent, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -519,6 +523,10 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 let directRadiation = try get(derived: .surface(.direct_radiation), time: time)
                 let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 return DataAndUnit(duration, .seconds)
+            case .rain:
+                let precipitation = try get(raw: .precipitation, time: time)
+                let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
+                return DataAndUnit(zip(precipitation.data, snoweq.data).map(-), precipitation.unit)
             }
         case .pressure(let v):
             switch v.variable {
