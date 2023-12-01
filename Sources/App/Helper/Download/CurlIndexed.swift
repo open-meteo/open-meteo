@@ -151,28 +151,6 @@ extension Curl {
             }
         }
     }
-    
-    /// download using index ranges, BUT only single ranges and not multiple ranges.... AWS S3 does not support multi ranges
-    func downloadIndexedGribSequential<Variable: CurlIndexedVariable>(url: String, variables: [Variable], extension: String = ".idx") async throws -> [(variable: Variable, message: GribMessage)] {
-        
-        guard let inventory = try await downloadIndexAndDecode(url: ["\(url)\(`extension`)"], variables: variables).first else {
-            return []
-        }
-        
-        let ranges = inventory.range.split(separator: ",")
-        var messages = [GribMessage]()
-        messages.reserveCapacity(inventory.matches.count)
-        for range in ranges {
-            let m = try await downloadGrib(url: url, bzip2Decode: false, range: String(range))
-            m.forEach({messages.append($0)})
-        }
-        if messages.count != inventory.matches.count {
-            logger.error("Grib reader did not get all matched variables. Matches count \(inventory.matches.count). Grib count \(messages.count)")
-            throw CurlError.didNotGetAllGribMessages(got: messages.count, expected: inventory.matches.count)
-        }
-        
-        return zip(inventory.matches, messages).map({($0,$1)})
-    }
 }
 
 extension ByteBuffer {

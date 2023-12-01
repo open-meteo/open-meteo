@@ -102,6 +102,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":CAPE:surface:"
             case .lifted_index:
                 return ":LFTX:surface:"
+            case .convective_inhibition:
+                return ":CIN:surface:"
             case .visibility:
                 return ":VIS:surface:"
             default:
@@ -149,6 +151,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":SHTFL:surface:"
             case .latent_heatflux:
                 return ":LHTFL:surface:"
+            case .convective_inhibition:
+                return ":CIN:surface:"
             case .frozen_precipitation_percent:
                 return ":CPOFP:surface"
             case .categorical_freezing_rain:
@@ -246,6 +250,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":LHTFL:surface:"
             case .sensible_heatflux:
                 return ":SHTFL:surface:"
+            case .convective_inhibition:
+                return ":CIN:surface:"
             case .cape:
                 return ":CAPE:surface:"
             case .cloudcover:
@@ -304,6 +310,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":DSWRF:surface:"
             case .lifted_index:
                 return ":LFTX:surface:"
+            case .convective_inhibition:
+                return ":CIN:surface:"
             case .freezinglevel_height:
                 return ":HGT:0C isotherm:"
             case .surface_temperature:

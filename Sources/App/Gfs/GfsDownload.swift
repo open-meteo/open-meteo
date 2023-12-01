@@ -29,6 +29,18 @@ struct GfsDownload: AsyncCommandFix {
         
         @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
         var upperLevel: Bool
+        
+        @Flag(name: "surface-level", help: "Download surface-level variables")
+        var surfaceLevel: Bool
+        
+        @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
+        var maxForecastHour: Int?
+        
+        @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        var timeinterval: String?
+        
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
     }
 
     var help: String {
@@ -36,22 +48,35 @@ struct GfsDownload: AsyncCommandFix {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
+        let domain = try GfsDomain.load(rawValue: signature.domain)
+        disableIdleSleep()
+        
+        if let timeinterval = signature.timeinterval {
+            for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
+                try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+            }
+            return
+        }
+        
+        /// 18z run is available the day after starting 05:26
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
+        try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+    }
+    
+    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsDomain) async throws {
+        
         let start = DispatchTime.now()
         let logger = context.application.logger
-        let domain = try GfsDomain.load(rawValue: signature.domain)
         disableIdleSleep()
         
         if signature.onlyVariables != nil && signature.upperLevel {
             fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
         }
         
-        /// 18z run is available the day after starting 05:26
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        
         switch domain {
         case .gfs025_ensemble:
             try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush)
+            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -81,10 +106,14 @@ struct GfsDownload: AsyncCommandFix {
             }
             let surfaceVariables = GfsSurfaceVariable.allCases
             
-            let variables = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
+            let variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
             
-            try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush)
-            try convertGfs(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush)
+            try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+            
+            let nConcurrent = signature.concurrent ?? 1
+            try await variables.evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
+                try convertGfs(logger: logger, domain: domain, variables: Array($0), run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+            })
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -145,7 +174,7 @@ struct GfsDownload: AsyncCommandFix {
     }
     
     /// download GFS025 and NAM CONUS
-    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool, secondFlush: Bool) async throws {
+    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool, secondFlush: Bool, maxForecastHour: Int?) async throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let logger = application.logger
@@ -176,7 +205,10 @@ struct GfsDownload: AsyncCommandFix {
         }
         let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
-        let forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
+        var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
+        if let maxForecastHour {
+            forecastHours = forecastHours.filter({$0 <= maxForecastHour})
+        }
         
         let nMembers = domain.ensembleMembers
         let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
@@ -346,11 +378,14 @@ struct GfsDownload: AsyncCommandFix {
     }
     
     /// Process each variable and update time-series optimised files
-    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool, secondFlush: Bool) throws {
+    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool, secondFlush: Bool, maxForecastHour: Int?) throws {
         let nMembers = domain.ensembleMembers
         let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count * nMembers, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
-        let forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
+        var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
+        if let maxForecastHour {
+            forecastHours = forecastHours.filter({$0 <= maxForecastHour})
+        }
         let nTime = forecastHours.max()! / max(domain.dtHours, 1) + 1
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         

@@ -177,7 +177,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
     }
     var omfileArchive: String? {
         return "\(OpenMeteo.dataDictionary)archive-\(rawValue)/"

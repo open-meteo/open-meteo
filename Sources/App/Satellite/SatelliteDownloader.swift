@@ -30,15 +30,10 @@ struct SatelliteDownloadCommand: AsyncCommandFix {
         var createFixedFile: Bool
         
         /// Get the specified timerange in the command, or use the last 7 days as range
-        func getTimeinterval() -> TimerangeDt {
+        func getTimeinterval() throws -> TimerangeDt {
             let dt = 3600*24
             if let timeinterval = timeinterval {
-                guard timeinterval.count == 17, timeinterval.contains("-") else {
-                    fatalError("format looks wrong")
-                }
-                let start = Timestamp(Int(timeinterval[0..<4])!, Int(timeinterval[4..<6])!, Int(timeinterval[6..<8])!)
-                let end = Timestamp(Int(timeinterval[9..<13])!, Int(timeinterval[13..<15])!, Int(timeinterval[15..<17])!).add(days: 1)
-                return TimerangeDt(start: start, to: end, dtSeconds: dt)
+                return try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: dt)
             }
             // Era5 has a typical delay of 5 days
             // Per default, check last 14 days for new data. If data is already downloaded, downloading is skipped
@@ -235,7 +230,7 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
     }
     
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
     }
     
     var omfileDirectory: String {

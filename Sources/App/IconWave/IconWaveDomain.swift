@@ -21,7 +21,7 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
         return nil
     }
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
     }
     
     /// Filename of the surface elevation file

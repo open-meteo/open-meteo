@@ -252,6 +252,8 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .windSpeed, altitude: 80)
         case .sunshine_duration:
             return .init(variable: .sunshineDuration)
+        case .convective_inhibition:
+            return .init(variable: .convectiveInhibition)
         }
     }
 }

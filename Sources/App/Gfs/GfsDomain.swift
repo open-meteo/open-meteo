@@ -34,13 +34,32 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)download-\(rawValue)/"
+        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
     }
     var omfileArchive: String? {
         return nil
     }
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil
+    }
+    
+    var runsPerDay: Int {
+        switch self {
+        case .gfs013:
+            return 4
+        case .gfs025:
+            return 4
+        case .hrrr_conus:
+            return 24
+        case .hrrr_conus_15min:
+            return 24
+        case .gfs025_ensemble:
+            return 4
+        case .gfs025_ens:
+            return 4
+        case .gfs05_ens:
+            return 4
+        }
     }
     
     var dtSeconds: Int {
@@ -201,13 +220,13 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             // pgrb2
             // let all = [0.01, 0.02, 0.04, 0.07, 0.1, 0.2, 0.4, 0.7, 1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 975, 1000]
             // pgrb2b
-            //let allB = [/*1, 2, 3, 5, 7, 70,*/ 125, 175, 225, 275, 325, 375, 425, 525, 575, 625, 675, 725, 775, 825, 875, ]
-            return [10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]
+            return [10, 15, 20, 30, 40, 50, 70, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
         //case .nam_conus:
             // nam uses level 75 instead of 70. Level 15 and 40 missing. Only use the same levels as HRRR.
             //return [                            100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000] // disabled: 50, 75,
         case .hrrr_conus:
-            return [                            100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000]  // disabled: 50, 75,
+            // Note: HRRR uses level 70 instead of 75
+            return [                           50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
             // all available
             //return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
         case .hrrr_conus_15min:
@@ -289,7 +308,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfs013:
             return ["\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.sfluxgrbf\(fHHH).grib2"]
         case .gfs025:
-            return ["\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.pgrb2.0p25.f\(fHHH)"]
+            let base = "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos"
+            return ["\(base)/gfs.t\(hh)z.pgrb2.0p25.f\(fHHH)", "\(base)/gfs.t\(hh)z.pgrb2b.0p25.f\(fHHH)"]
         //case .nam_conus:
         //    return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
         case .hrrr_conus:

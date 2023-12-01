@@ -33,14 +33,9 @@ struct GloFasDownloader: AsyncCommandFix {
         var date: String?
         
         /// Get the specified timerange in the command, or use the last 7 days as range
-        func getTimeinterval() -> TimerangeDt {
+        func getTimeinterval() throws -> TimerangeDt {
             if let timeinterval = timeinterval {
-                guard timeinterval.count == 17, timeinterval.contains("-") else {
-                    fatalError("format looks wrong")
-                }
-                let start = Timestamp(Int(timeinterval[0..<4])!, Int(timeinterval[4..<6])!, Int(timeinterval[6..<8])!)
-                let end = Timestamp(Int(timeinterval[9..<13])!, Int(timeinterval[13..<15])!, Int(timeinterval[15..<17])!).add(86400)
-                return TimerangeDt(start: start, to: end, dtSeconds: 24*3600)
+                return try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 24*3600)
             }
             // Era5 has a typical delay of 5 days
             // Per default, check last 14 days for new data. If data is already downloaded, downloading is skipped
@@ -87,7 +82,7 @@ struct GloFasDownloader: AsyncCommandFix {
                 return
             }
             
-            let timeInterval = signature.getTimeinterval()
+            let timeInterval = try signature.getTimeinterval()
             try downloadTimeIntervalConsolidated(logger: logger, timeinterval: timeInterval, cdskey: cdskey, domain: domain)
         case .seasonalv3:
             fallthrough
@@ -441,7 +436,7 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         return "\(OpenMeteo.dataDictionary)omfile-glofas-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "\(OpenMeteo.dataDictionary)download-glofas-\(rawValue)/"
+        return "\(OpenMeteo.tempDictionary)download-glofas-\(rawValue)/"
     }
     var omfileArchive: String? {
         return "\(OpenMeteo.dataDictionary)archive-glofas-\(rawValue)/"
