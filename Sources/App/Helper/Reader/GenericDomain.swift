@@ -17,8 +17,8 @@ protocol GenericDomain {
     /// Where chunked time series files are stroed
     var omfileDirectory: String { get }
     
-    /// If present, the directory to a long term archive
-    var omfileArchive: String? { get }
+    /// If true, domain has yearly files
+    var hasYearlyFiles: Bool { get }
     
     /// The time length of each compressed time series file
     var omFileLength: Int { get }
@@ -28,16 +28,27 @@ protocol GenericDomain {
     
     /// The the file containing static information for elevation of soil types
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>?
+    
+    
 }
 
 extension GenericDomain {
     var dtHours: Int { dtSeconds / 3600 }
     
     /// Directory to store time chunks
-    var omfileDirectory: String { return "\(OpenMeteo.dataDirectory)omfile-\(domainName)/" }
+    var omfileDirectory: String {
+        return "\(OpenMeteo.dataDirectory)omfile-\(domainName)/"
+    }
     
     /// Temporary directory to download data
-    var downloadDirectory: String { return "\(OpenMeteo.tempDirectory)download-\(domainName)/" }
+    var downloadDirectory: String {
+        return "\(OpenMeteo.tempDirectory)download-\(domainName)/"
+    }
+    
+    /// Directory for yearly files
+    var omfileArchive: String {
+        return "\(OpenMeteo.dataDirectory)archive-\(domainName)/"
+    }
 }
 
 /**

@@ -57,8 +57,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         return rawValue
     }
 
-    var omfileArchive: String? {
-        return nil
+    var hasYearlyFiles: Bool {
+        return false
     }
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil

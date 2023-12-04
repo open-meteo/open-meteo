@@ -233,8 +233,8 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         return rawValue
     }
     
-    var omfileArchive: String? {
-        return "\(OpenMeteo.dataDirectory)yearly-\(rawValue)//"
+    var hasYearlyFiles: Bool {
+        return true
     }
     
     var omFileMaster: (path: String, time: TimerangeDt)? {

@@ -177,9 +177,10 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         return rawValue
     }
     
-    var omfileArchive: String? {
-        return "\(OpenMeteo.dataDirectory)archive-\(rawValue)/"
+    var hasYearlyFiles: Bool {
+        return false
     }
+
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
         "\(omfileDirectory)HSURF.om"
@@ -918,9 +919,7 @@ struct DownloadCmipCommand: AsyncCommand {
                        "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"
         ]
         
-        guard let yearlyPath = domain.omfileArchive else {
-            fatalError("yearly archive path not defined")
-        }
+        let yearlyPath = domain.omfileArchive
         guard let master = domain.omFileMaster else {
             fatalError("no master defined")
         }

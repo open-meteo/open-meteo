@@ -30,8 +30,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     case arome_france
     case arome_france_hd
     
-    var omfileArchive: String? {
-        return nil
+    var hasYearlyFiles: Bool {
+        return false
     }
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil

@@ -11,8 +11,8 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
     static var gwamElevation = try? OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
     static var ewamElevation = try? OmFileReader(file: IconWaveDomain.ewam.surfaceElevationFileOm)
     
-    var omfileArchive: String? {
-        return nil
+    var hasYearlyFiles: Bool {
+        return false
     }
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil

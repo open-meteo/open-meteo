@@ -36,9 +36,10 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         return nil
     }
     
-    var omfileArchive: String? {
-        return nil
+    var hasYearlyFiles: Bool {
+        return false
     }
+    
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil
     }
