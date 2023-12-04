@@ -11,7 +11,7 @@ protocol GenericDomain {
     /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
     var dtSeconds: Int { get }
     
-    /// Where compressed time series files are stroed
+    /// Where chunked time series files are stroed
     var omfileDirectory: String { get }
     
     /// If present, the directory to a long term archive
