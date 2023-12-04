@@ -222,7 +222,7 @@ extension Timestamp {
             throw TimeError.InvalidDateFromat
         }
         let start = Timestamp(Int(str[0..<4])!, Int(str[4..<6])!, Int(str[6..<8])!)
-        let end = Timestamp(Int(str[9..<13])!, Int(str[13..<15])!, Int(str[15..<17])!).add(days: 1)
+        let end = Timestamp(Int(str[9..<13])!, Int(str[13..<15])!, Int(str[15..<17])!)
         return start...end
     }
 }
