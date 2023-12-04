@@ -6,7 +6,7 @@ import SwiftPFor2D
 /**
 Meteofrance Arome, Arpge downloader
  */
-struct MeteoFranceDownload: AsyncCommandFix {
+struct MeteoFranceDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String

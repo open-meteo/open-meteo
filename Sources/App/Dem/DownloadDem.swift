@@ -71,7 +71,7 @@ struct Dem90 {
 /**
  Download digital elevation model from Sinergise https://copernicus-dem-30m.s3.amazonaws.com/readme.html
  */
-struct DownloadDemCommand: AsyncCommandFix {
+struct DownloadDemCommand: AsyncCommand {
     var help: String {
         return "Convert digital elevation model"
     }

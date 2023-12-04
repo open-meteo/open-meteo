@@ -104,7 +104,7 @@ final class BufferedParquetFileWriter {
  To remove compression and chunks `ncpdq -O --cnk_plc=unchunk -L 0 -a time,LAT,LON wind_gust_normals.nc wind_gust_normals_transposed.nc`
  
  */
-struct ExportCommand: AsyncCommandFix {
+struct ExportCommand: AsyncCommand {
     var help: String {
         return "Export to dataset to NetCDF"
     }

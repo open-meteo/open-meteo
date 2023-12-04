@@ -3,7 +3,7 @@ import Vapor
 import SwiftPFor2D
 import SwiftEccodes
 
-struct GloFasDownloader: AsyncCommandFix {
+struct GloFasDownloader: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String

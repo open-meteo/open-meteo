@@ -12,7 +12,7 @@ Gem regional and global Downloader
  - Global https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_global/15km/grib2/lat_lon/00/
  - Regional https://hpfx.collab.science.gc.ca/20221121/WXO-DD/model_gem_regional/10km/grib2/00/
  */
-struct GemDownload: AsyncCommandFix {
+struct GemDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String

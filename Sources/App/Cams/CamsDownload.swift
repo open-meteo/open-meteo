@@ -4,7 +4,7 @@ import SwiftNetCDF
 import SwiftPFor2D
 
 /// Download CAMS Europe and Global air quality forecasts
-struct DownloadCamsCommand: AsyncCommandFix {
+struct DownloadCamsCommand: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String

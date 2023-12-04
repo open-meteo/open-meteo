@@ -8,7 +8,7 @@ import CHelper
  TODO:
  - Elevation files should not mask out sea level locations -> this breaks surface pressure correction as a lake can be above sea level
  */
-struct DownloadIconCommand: AsyncCommandFix {
+struct DownloadIconCommand: AsyncCommand {
     enum VariableGroup: String, RawRepresentable, CaseIterable {
         case all
         case surface
@@ -466,35 +466,5 @@ extension IconDomains {
         default:
             return 1
         }
-    }
-}
-
-
-/// Workaround to use async in commans
-/// Wait for https://github.com/vapor/vapor/pull/2870
-protocol AsyncCommandFix: Command {
-    func run(using context: CommandContext, signature: Signature) async throws
-}
-
-extension AsyncCommandFix {
-    func run(using context: CommandContext, signature: Signature) throws {
-        // use same thread as downloader, do not use main loop
-        /*let eventloop = context.application.dedicatedHttpClient.eventLoopGroup.next()
-        let result = eventloop.flatSubmit {
-            let promise = eventloop.makePromise(of: Void.self)
-            promise.completeWithTask {
-                try await run(using: context, signature: signature)
-            }
-            return promise.futureResult
-        }
-        try result.wait()*/
-        
-        // mainloop or dedicated loop make no difference apparently
-        let eventloop = context.application.eventLoopGroup.next()
-        let promise = eventloop.makePromise(of: Void.self)
-        promise.completeWithTask {
-            try await run(using: context, signature: signature)
-        }
-        try promise.futureResult.wait()
     }
 }

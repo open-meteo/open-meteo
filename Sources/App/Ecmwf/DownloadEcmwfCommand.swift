@@ -10,7 +10,7 @@ import Vapor
  
  model info (not everything is open data) https://www.ecmwf.int/en/forecasts/datasets/set-i
  */
-struct DownloadEcmwfCommand: AsyncCommandFix {
+struct DownloadEcmwfCommand: AsyncCommand {
     struct Signature: CommandSignature {
         @Option(name: "run")
         var run: String?

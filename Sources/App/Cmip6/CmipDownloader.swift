@@ -869,7 +869,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     }
 }
 
-struct DownloadCmipCommand: AsyncCommandFix {
+struct DownloadCmipCommand: AsyncCommand {
     /// 6k locations require around 200 MB memory for a yearly time-series
     static var nLocationsPerChunk = 6_000
     

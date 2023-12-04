@@ -7,7 +7,7 @@ import SwiftNetCDF
 /**
 NCEP GFS downloader
  */
-struct GfsDownload: AsyncCommandFix {
+struct GfsDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String

@@ -10,7 +10,7 @@ import SwiftPFor2D
  
  All equations: https://library.wmo.int/doc_num.php?explnum_id=10979
  */
-struct DownloadIconWaveCommand: AsyncCommandFix {
+struct DownloadIconWaveCommand: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String

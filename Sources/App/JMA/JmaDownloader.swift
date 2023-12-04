@@ -10,7 +10,7 @@ Jma Downloader
  - elevation download
  - 3h MSM pressue level data
  */
-struct JmaDownload: AsyncCommandFix {
+struct JmaDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String

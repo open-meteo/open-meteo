@@ -123,7 +123,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     }
 }
 
-struct DownloadEra5Command: AsyncCommandFix {
+struct DownloadEra5Command: AsyncCommand {
     /// 6k locations require around 200 MB memory for a yearly time-series
     static var nLocationsPerChunk = 6_000
     

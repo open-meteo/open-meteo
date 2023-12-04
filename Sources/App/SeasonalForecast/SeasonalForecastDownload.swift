@@ -14,7 +14,7 @@ import SwiftEccodes
  set DENABLE_JPG_LIBJASPER to ON
  brew reinstall eccodes --build-from-source
  */
-struct SeasonalForecastDownload: AsyncCommandFix {
+struct SeasonalForecastDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String

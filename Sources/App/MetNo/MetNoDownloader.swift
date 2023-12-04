@@ -7,7 +7,7 @@ import SwiftNetCDF
 /// Download MetNo domains from OpenDAP server
 /// https://github.com/metno/NWPdocs/wiki
 /// Nordic dataset (same as yr.no API) https://github.com/metno/NWPdocs/wiki/MET-Nordic-dataset
-struct MetNoDownloader: AsyncCommandFix {
+struct MetNoDownloader: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
