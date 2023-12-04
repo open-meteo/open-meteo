@@ -74,11 +74,11 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         }
         
         // Waves are only available for ERA5 ocean at 0.5° resolution
-        if domain == .era5_ocean {
-            switch self {
-            case .wave_height, .wave_period, .wave_direction:
-                return true
-            default:
+        switch self {
+        case .wave_height, .wave_period, .wave_direction:
+            return domain == .era5_ocean
+        default:
+            if domain == .era5_ocean {
                 return false
             }
         }
