@@ -11,13 +11,10 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     case jma
     case eccc
     
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
-    }
     var omfileArchive: String? {
         return nil
     }

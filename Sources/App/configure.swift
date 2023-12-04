@@ -3,7 +3,7 @@ import Vapor
 
 struct OpenMeteo {
     /// Data directory with trailing slash
-    static var dataDictionary = {
+    static var dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
             return dir
         }
@@ -11,7 +11,7 @@ struct OpenMeteo {
     }()
     
     /// Temporary directory with trailing slash
-    static var tempDictionary = {
+    static var tempDirectory = {
         if let dir = Environment.get("TEMP_DIRECTORY") {
             return dir
         }

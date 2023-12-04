@@ -23,12 +23,8 @@ enum EcmwfDomain: String, GenericDomain {
         return "\(omfileDirectory)init.txt"
     }
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
-    }
-    
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
     
     private static var ifs04ElevationFile = try? OmFileReader(file: Self.ifs04.surfaceElevationFileOm)

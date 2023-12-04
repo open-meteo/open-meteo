@@ -173,14 +173,12 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         }
     }
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
+    
     var omfileArchive: String? {
-        return "\(OpenMeteo.dataDictionary)archive-\(rawValue)/"
+        return "\(OpenMeteo.dataDirectory)archive-\(rawValue)/"
     }
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
@@ -189,7 +187,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     
     /// Single file to contain the entire timerange of data -> faster for sequentual disk access
     var omFileMaster: (path: String, time: TimerangeDt)? {
-        let path = "\(OpenMeteo.dataDictionary)master-\(rawValue)/"
+        let path = "\(OpenMeteo.dataDirectory)master-\(rawValue)/"
         if self == .EC_Earth3P_HR {
             return (path, TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2050,1,1), dtSeconds: dtSeconds))
         }
@@ -297,7 +295,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
 extension GenericDomain {
     /// Get the file path to a linear bias seasonal file for a given variable
     func getBiasCorrectionFile(for variable: String) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: self.rawValue, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
+        return OmFilePathWithSuffix(domain: self.domainName, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
     }
     
     func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {

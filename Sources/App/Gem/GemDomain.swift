@@ -12,11 +12,16 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_global_ensemble
     
     var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+        return "\(OpenMeteo.dataDirectory)omfile-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+        return "\(OpenMeteo.tempDirectory)download-\(rawValue)/"
     }
+    
+    var domainName: String {
+        return rawValue
+    }
+    
     var omfileArchive: String? {
         return nil
     }

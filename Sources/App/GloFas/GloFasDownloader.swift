@@ -432,14 +432,12 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     case seasonalv3
     case intermediatev3
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-glofas-\(rawValue)/"
+    var domainName: String {
+        return "glofas-\(rawValue)/"
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-glofas-\(rawValue)/"
-    }
+    
     var omfileArchive: String? {
-        return "\(OpenMeteo.dataDictionary)archive-glofas-\(rawValue)/"
+        return "\(OpenMeteo.dataDirectory)archive-glofas-\(rawValue)/"
     }
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil

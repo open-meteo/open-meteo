@@ -89,8 +89,8 @@ final class BenchmarkCommand: Command {
             try OmFileReader(fn: compressedData).readAll()
         }
         
-        let file = "\(OpenMeteo.dataDictionary)test.om"
-        try FileManager.default.createDirectory(atPath: OpenMeteo.dataDictionary, withIntermediateDirectories: true)
+        let file = "\(OpenMeteo.dataDirectory)test.om"
+        try FileManager.default.createDirectory(atPath: OpenMeteo.dataDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItemIfExists(at: file)}
         try measure("Compress to file, small chunks", 202) {
             try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 8, chunk1: 128).write(file: file, compressionType: .p4nzdec256, scalefactor: 20, all: data, overwrite: true)

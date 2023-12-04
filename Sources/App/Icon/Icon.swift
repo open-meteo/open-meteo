@@ -52,13 +52,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             }
         }
     }
+    
+    var domainName: String {
+        return rawValue
+    }
 
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
-    }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
     var omfileArchive: String? {
         return nil
     }

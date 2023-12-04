@@ -83,16 +83,12 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         "\(omfileDirectory)soil_type.om"
     }
     
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
-    
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
     
     var omfileArchive: String? {
-        return "\(OpenMeteo.dataDictionary)yearly-\(rawValue)/"
+        return "\(OpenMeteo.dataDirectory)yearly-\(rawValue)/"
     }
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil

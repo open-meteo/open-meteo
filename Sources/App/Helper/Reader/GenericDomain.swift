@@ -8,6 +8,9 @@ protocol GenericDomain {
     /// The grid definition. Could later be replaced with a more generic implementation
     var grid: Gridable { get }
     
+    /// Domain name used as data directory
+    var domainName: String { get }
+    
     /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
     var dtSeconds: Int { get }
     
@@ -23,15 +26,18 @@ protocol GenericDomain {
     /// Single master file for a large time series
     var omFileMaster: (path: String, time: TimerangeDt)? { get }
     
-    /// Domain name used in data directories
-    var rawValue: String { get }
-    
     /// The the file containing static information for elevation of soil types
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>?
 }
 
 extension GenericDomain {
     var dtHours: Int { dtSeconds / 3600 }
+    
+    /// Directory to store time chunks
+    var omfileDirectory: String { return "\(OpenMeteo.dataDirectory)omfile-\(domainName)/" }
+    
+    /// Temporary directory to download data
+    var downloadDirectory: String { return "\(OpenMeteo.tempDirectory)download-\(domainName)/" }
 }
 
 /**

@@ -229,22 +229,18 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
-    
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)//"
+    var domainName: String {
+        return rawValue
     }
     
     var omfileArchive: String? {
-        return "\(OpenMeteo.dataDictionary)yearly-\(rawValue)//"
+        return "\(OpenMeteo.dataDirectory)yearly-\(rawValue)//"
     }
     
     var omFileMaster: (path: String, time: TimerangeDt)? {
         switch self {
         case .imerg_daily:
-                let path = "\(OpenMeteo.dataDictionary)master-\(rawValue)/"
+                let path = "\(OpenMeteo.dataDirectory)master-\(rawValue)/"
                 return (path, TimerangeDt(start: Timestamp(2000,06,01), to: Timestamp(2023, 1, 1), dtSeconds: dtSeconds))
         }
     }

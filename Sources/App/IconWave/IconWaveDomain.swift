@@ -11,17 +11,15 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
     static var gwamElevation = try? OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
     static var ewamElevation = try? OmFileReader(file: IconWaveDomain.ewam.surfaceElevationFileOm)
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
-    }
     var omfileArchive: String? {
         return nil
     }
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    
+    var domainName: String {
+        return rawValue
     }
     
     /// Filename of the surface elevation file

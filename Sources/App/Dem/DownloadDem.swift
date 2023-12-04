@@ -13,8 +13,8 @@ import SwiftPFor2D
  Total size after conversion `10.48 GB`
  */
 struct Dem90 {
-    static let downloadDirectory = "\(OpenMeteo.dataDictionary)download-dem90/"
-    static let omDirectory = "\(OpenMeteo.dataDictionary)omfile-dem90/"
+    static let downloadDirectory = "\(OpenMeteo.tempDirectory)download-dem90/"
+    static let omDirectory = "\(OpenMeteo.dataDirectory)omfile-dem90/"
 
     /// Get elevation for coordinate. Access to om files is cached.
     static func read(lat: Float, lon: Float) throws -> Float {

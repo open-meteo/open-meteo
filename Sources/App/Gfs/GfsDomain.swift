@@ -30,12 +30,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// 0.5° ensemble version for up to 25 days of forecast... Low forecast skill obviously.
     case gfs05_ens
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
+    
     var omfileArchive: String? {
         return nil
     }

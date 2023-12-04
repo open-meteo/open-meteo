@@ -30,17 +30,15 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     case arome_france
     case arome_france_hd
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
-    }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
     var omfileArchive: String? {
         return nil
     }
     var omFileMaster: (path: String, time: TimerangeDt)? {
         return nil
+    }
+    
+    var domainName: String {
+        return rawValue
     }
     
     var dtSeconds: Int {

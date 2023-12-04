@@ -4,12 +4,10 @@ import SwiftPFor2D
 enum MetNoDomain: String, GenericDomain, CaseIterable {
     case nordic_pp
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
+    
     var omfileArchive: String? {
         return nil
     }
