@@ -9,6 +9,10 @@ final class MigrationTests: XCTestCase {
         XCTAssertEqual(new?.directory, "temperature_2m")
         XCTAssertEqual(new?.file, "chunk_89.om")
         
+        new = m.transform(file: "lat_-81.om", type: "chunk")
+        XCTAssertEqual(new?.directory, "static")
+        XCTAssertEqual(new?.file, "lat_-81.om")
+        
         new = m.transform(file: "river_discharge_member02_89.om", type: "chunk")
         XCTAssertEqual(new?.directory, "river_discharge_member02")
         XCTAssertEqual(new?.file, "chunk_89.om")

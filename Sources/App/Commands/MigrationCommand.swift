@@ -34,7 +34,13 @@ struct MigrationCommand: Command {
             
             if name.starts(with: "omfile-") || name.starts(with: "archive-") || name.starts(with: "master-") {
                 //print("found \(name)")
-                let domain = domainRename(String(name.split(separator: "-", maxSplits: 1)[1]))
+                let domainRaw = domainRename(String(name.split(separator: "-", maxSplits: 1)[1]))
+                if domainRaw == "FGOALS_f3_H_highresSST" || domainRaw == "HadGEM3_GC31_HM" {
+                    continue
+                }
+                guard let domain = DomainRegistry(rawValue: domainRaw) else {
+                    fatalError("Could not match domain \(domainRaw)")
+                }
                 let domainFrom = "\(OpenMeteo.dataDirectory)\(name)"
                 let domainDirectory = "\(OpenMeteo.dataDirectory)\(domain)"
                 print("Create domain directory \(domainDirectory)")
@@ -145,7 +151,7 @@ struct MigrationCommand: Command {
         let suffixWithOm = file.split(separator: "_").last!
         let suffix = suffixWithOm.split(separator: ".").first!
         
-        if file.starts(with: "HSURF.om") || file.starts(with: "soil_type.om") {
+        if file.starts(with: "HSURF.om") || file.starts(with: "soil_type.om") || file.starts(with: "lat_") {
             return ("static", file)
         }
         
