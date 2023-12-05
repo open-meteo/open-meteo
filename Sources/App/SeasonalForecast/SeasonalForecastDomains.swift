@@ -11,23 +11,16 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     case jma
     case eccc
     
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
-    }
-    var omfileArchive: String? {
-        return nil
+    var hasYearlyFiles: Bool {
+        return false
     }
     
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    var masterTimeRange: Range<Timestamp>? {
         return nil
-    }
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
     }
     
     static var ncepElevation = try? OmFileReader(file: Self.ncep.surfaceElevationFileOm)

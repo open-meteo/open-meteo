@@ -28,20 +28,19 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var domainName: String {
+        return rawValue
+    }
+    
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
         return nil
     }
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var hasYearlyFiles: Bool {
+        return false
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
-    var omfileArchive: String? {
-        return nil
-    }
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     

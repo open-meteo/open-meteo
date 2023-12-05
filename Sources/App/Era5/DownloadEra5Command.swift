@@ -75,26 +75,15 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    var soilTypeFileOm: String {
-        "\(omfileDirectory)soil_type.om"
+    var domainName: String {
+        return rawValue
     }
     
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    var hasYearlyFiles: Bool {
+        return true
     }
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
-    }
-    
-    var omfileArchive: String? {
-        return "\(OpenMeteo.dataDictionary)yearly-\(rawValue)/"
-    }
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     
@@ -490,14 +479,14 @@ struct DownloadEra5Command: AsyncCommand {
     
     func runStripSea(logger: Logger, year: Int, domain: CdsDomain, variables: [GenericVariable]) throws {
         let domain = CdsDomain.era5
-        try FileManager.default.createDirectory(atPath: "\(domain.omfileArchive!)-no-sea", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: "\(domain.omfileArchive)-no-sea", withIntermediateDirectories: true)
         logger.info("Read elevation")
         let elevation = try OmFileReader(file: domain.surfaceElevationFileOm).readAll()
         
         for variable in variables {
             logger.info("Converting variable \(variable)")
-            let fullFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
-            let strippedFile = "\(domain.omfileArchive!)-no-sea/\(variable)_\(year).om"
+            let fullFile = "\(domain.omfileArchive)\(variable)_\(year).om"
+            let strippedFile = "\(domain.omfileArchive)-no-sea/\(variable)_\(year).om"
             try stripSea(logger: logger, readFilePath: fullFile, writeFilePath: strippedFile, elevation: elevation)
         }
     }
@@ -936,12 +925,12 @@ struct DownloadEra5Command: AsyncCommand {
         let ny = domain.grid.ny // 1440
         let nt = timeintervalHourly.count // 8784
         
-        try FileManager.default.createDirectory(atPath: domain.omfileArchive!, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileArchive, withIntermediateDirectories: true)
         
         // convert to yearly file
         for variable in variables {
             let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Convert \(variable) year \(year)")
-            let writeFile = "\(domain.omfileArchive!)\(variable)_\(year).om"
+            let writeFile = "\(domain.omfileArchive)\(variable)_\(year).om"
             if !forceUpdate && FileManager.default.fileExists(atPath: writeFile) {
                 continue
             }

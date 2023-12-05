@@ -12,15 +12,21 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_global_ensemble
     
     var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+        return "\(OpenMeteo.dataDirectory)omfile-\(rawValue)/"
     }
     var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+        return "\(OpenMeteo.tempDirectory)download-\(rawValue)/"
     }
-    var omfileArchive: String? {
-        return nil
+    
+    var domainName: String {
+        return rawValue
     }
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    
+    var hasYearlyFiles: Bool {
+        return false
+    }
+    
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     
@@ -91,11 +97,6 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_global_ensemble:
             return t.add(-3*3600).floor(toNearest: 12*3600)
         }
-    }
-    
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
     }
     
     func getForecastHours(run: Timestamp) -> [Int] {

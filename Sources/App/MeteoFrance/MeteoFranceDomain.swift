@@ -30,17 +30,16 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     case arome_france
     case arome_france_hd
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var hasYearlyFiles: Bool {
+        return false
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
-    }
-    var omfileArchive: String? {
+    
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    var omFileMaster: (path: String, time: TimerangeDt)? {
-        return nil
+    
+    var domainName: String {
+        return rawValue
     }
     
     var dtSeconds: Int {
@@ -81,11 +80,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         let t = Timestamp.now()
         // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00 (arpege) or 2:00 (arome)
         return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
-    }
-    
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
     }
     
     func forecastHours(run: Int, hourlyForArpegeEurope: Bool) -> [Int] {

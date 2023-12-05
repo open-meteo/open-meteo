@@ -505,16 +505,15 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     case gsm
     case msm
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    
+    var hasYearlyFiles: Bool {
+        return false
     }
-    var omfileArchive: String? {
-        return nil
-    }
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     
@@ -558,11 +557,6 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
             // every 3 hours
             return t.add(-2*3600).floor(toNearest: 3*3600)
         }
-    }
-    
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
     }
     
     func forecastHours(run: Int) -> [Int] {

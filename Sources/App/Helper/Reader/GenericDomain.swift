@@ -8,14 +8,20 @@ protocol GenericDomain {
     /// The grid definition. Could later be replaced with a more generic implementation
     var grid: Gridable { get }
     
+    /// Domain name used as data directory
+    var domainName: String { get }
+    
     /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
     var dtSeconds: Int { get }
     
-    /// Where compressed time series files are stroed
+    /// Where chunked time series files are stroed
     var omfileDirectory: String { get }
     
-    /// If present, the directory to a long term archive
-    var omfileArchive: String? { get }
+    /// If true, domain has yearly files
+    var hasYearlyFiles: Bool { get }
+    
+    /// If present, the timerange that is available in a master file
+    var masterTimeRange: Range<Timestamp>? { get }
     
     /// The time length of each compressed time series file
     var omFileLength: Int { get }
@@ -23,15 +29,51 @@ protocol GenericDomain {
     /// Single master file for a large time series
     var omFileMaster: (path: String, time: TimerangeDt)? { get }
     
-    /// Domain name used in data directories
-    var rawValue: String { get }
-    
     /// The the file containing static information for elevation of soil types
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>?
+    
+    
 }
 
 extension GenericDomain {
     var dtHours: Int { dtSeconds / 3600 }
+    
+    /// Directory to store time chunks
+    var omfileDirectory: String {
+        return "\(OpenMeteo.dataDirectory)omfile-\(domainName)/"
+    }
+    
+    /// Temporary directory to download data
+    var downloadDirectory: String {
+        return "\(OpenMeteo.tempDirectory)download-\(domainName)/"
+    }
+    
+    /// Directory for yearly files
+    var omfileArchive: String {
+        return "\(OpenMeteo.dataDirectory)archive-\(domainName)/"
+    }
+    
+    /// Master file to store "all" timesteps in one file. Used only in CMIP for store 100 years a once
+    var omMasterDirectory: String {
+        "\(OpenMeteo.dataDirectory)master-\(domainName)/"
+    }
+    
+    /// Single master file for a large time series
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        guard let time = masterTimeRange else {
+            return nil
+        }
+        return (omMasterDirectory, TimerangeDt(range: time, dtSeconds: dtSeconds))
+    }
+    
+    /// Filename of the surface elevation file
+    var surfaceElevationFileOm: String {
+        "\(omfileDirectory)HSURF.om"
+    }
+    
+    var soilTypeFileOm: String {
+        "\(omfileDirectory)soil_type.om"
+    }
 }
 
 /**

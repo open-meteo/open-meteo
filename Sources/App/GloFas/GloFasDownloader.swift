@@ -350,7 +350,7 @@ struct GloFasDownloader: AsyncCommand {
     func downloadYear(logger: Logger, year: Int, cdskey: String, domain: GloFasDomain) throws {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileArchive!, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domain.omfileArchive, withIntermediateDirectories: true)
         let gribFile = "\(downloadDir)glofasv4_\(year).grib"
         
         if !FileManager.default.fileExists(atPath: gribFile) {
@@ -378,7 +378,7 @@ struct GloFasDownloader: AsyncCommand {
         logger.info("Converting daily files time series")
         let time = TimerangeDt(range: Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1), dtSeconds: 3600*24)
         let nt = time.count
-        let yearlyFile = "\(domain.omfileArchive!)river_discharge_\(year).om"
+        let yearlyFile = "\(domain.omfileArchive)river_discharge_\(year).om"
         
         let omFiles = try time.map { time -> OmFileReader in
             let omFile = "\(downloadDir)glofas_\(time.format_YYYYMMdd).om"
@@ -432,16 +432,20 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     case seasonalv3
     case intermediatev3
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-glofas-\(rawValue)/"
+    var domainName: String {
+        return "glofas-\(rawValue)/"
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-glofas-\(rawValue)/"
+    
+    var hasYearlyFiles: Bool {
+        switch self {
+        case .consolidated, .consolidatedv3:
+            return true
+        default:
+            return false
+        }
     }
-    var omfileArchive: String? {
-        return "\(OpenMeteo.dataDictionary)archive-glofas-\(rawValue)/"
-    }
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     

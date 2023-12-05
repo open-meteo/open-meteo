@@ -30,10 +30,10 @@ struct OmFilePathWithSuffix: OmFileManagerReadable {
     let suffix: String
     
     func getFilePath() -> String {
-        return "\(OpenMeteo.dataDictionary)\(directory)-\(domain)/\(variable)_\(suffix).om"
+        return "\(OpenMeteo.dataDirectory)\(directory)-\(domain)/\(variable)_\(suffix).om"
     }
     func createDirectory() throws {
-        try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDictionary)\(directory)-\(domain)", withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)\(directory)-\(domain)", withIntermediateDirectories: true)
     }
 }
 

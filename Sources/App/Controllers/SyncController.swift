@@ -55,7 +55,7 @@ struct SyncController: RouteCollection {
         if !Self.syncApiKeys.contains(where: {$0 == params.apikey}) {
             throw SyncError.invalidApiKey
         }
-        return SyncFileAttributes.list(path: OpenMeteo.dataDictionary, directories: params.directories, matchFilename: params.filenames, newerThan: params.newerThan)
+        return SyncFileAttributes.list(path: OpenMeteo.dataDirectory, directories: params.directories, matchFilename: params.filenames, newerThan: params.newerThan)
     }
     
     /// Serve files via nginx X-Accel using sendfile zero copy
@@ -98,7 +98,7 @@ struct SyncFileAttributes: Content {
     let time: Int
     
     /// Iterate through data directory and find all matching files
-    static func list(path: String, directories: [String], matchFilename: [String]?, newerThan: Int?, alwaysInclude: [String] = ["HSURF.om", "soil_type.om", "init.txt"]) -> [SyncFileAttributes] {
+    static func list(path: String, directories: [String], matchFilename: [String]?, newerThan: Int?, alwaysInclude: [String] = ["HSURF.om", "soil_type.om"]) -> [SyncFileAttributes] {
         let pathUrl = URL(fileURLWithPath: path, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
         
@@ -229,7 +229,7 @@ struct SyncCommand: AsyncCommand {
                 let domains = domainSet[i]
                 let variables = variableSet.map { $0[i] }
                 
-                let locals = SyncFileAttributes.list(path: OpenMeteo.dataDictionary, directories: domains, matchFilename: variables, newerThan: newerThan[i])
+                let locals = SyncFileAttributes.list(path: OpenMeteo.dataDirectory, directories: domains, matchFilename: variables, newerThan: newerThan[i])
                 logger.info("Found \(locals.count) local files (\(locals.fileSize))")
                 
                 guard let apikey = signature.apikey else {
@@ -258,7 +258,7 @@ struct SyncCommand: AsyncCommand {
                     let startBytes = curl.totalBytesTransfered
                     var client = ClientRequest(url: URI("\(server)sync/download"))
                     try client.query.encode(SyncController.DownloadParams(file: download.file, apikey: apikey, rate: signature.rate))
-                    let localFile = "\(OpenMeteo.dataDictionary)/\(download.file)"
+                    let localFile = "\(OpenMeteo.dataDirectory)/\(download.file)"
                     let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                     try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                     // TODO sha256 hash integration check

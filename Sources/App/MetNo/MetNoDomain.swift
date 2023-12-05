@@ -4,16 +4,14 @@ import SwiftPFor2D
 enum MetNoDomain: String, GenericDomain, CaseIterable {
     case nordic_pp
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    
+    var hasYearlyFiles: Bool {
+        return false
     }
-    var omfileArchive: String? {
-        return nil
-    }
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     
@@ -45,10 +43,7 @@ enum MetNoDomain: String, GenericDomain, CaseIterable {
         return t.with(hour: t.hour)
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
+
     
     var omFileLength: Int {
         return 64 + 2*24

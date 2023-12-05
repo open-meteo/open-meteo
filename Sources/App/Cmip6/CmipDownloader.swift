@@ -173,23 +173,26 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         }
     }
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
+    var domainName: String {
+        return rawValue
     }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    
+    var hasYearlyFiles: Bool {
+        return false
     }
-    var omfileArchive: String? {
-        return "\(OpenMeteo.dataDictionary)archive-\(rawValue)/"
-    }
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
+    
+    var masterTimeRange: Range<Timestamp>? {
+        switch self {
+        case .EC_Earth3P_HR:
+            return Timestamp(1950,1,1) ..< Timestamp(2050,1,1)
+        default:
+            return Timestamp(1950,1,1) ..< Timestamp(2051,1,1)
+        }
     }
     
     /// Single file to contain the entire timerange of data -> faster for sequentual disk access
     var omFileMaster: (path: String, time: TimerangeDt)? {
-        let path = "\(OpenMeteo.dataDictionary)master-\(rawValue)/"
+        let path = "\(OpenMeteo.dataDirectory)master-\(rawValue)/"
         if self == .EC_Earth3P_HR {
             return (path, TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2050,1,1), dtSeconds: dtSeconds))
         }
@@ -297,7 +300,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
 extension GenericDomain {
     /// Get the file path to a linear bias seasonal file for a given variable
     func getBiasCorrectionFile(for variable: String) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: self.rawValue, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
+        return OmFilePathWithSuffix(domain: self.domainName, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
     }
     
     func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {
@@ -920,9 +923,7 @@ struct DownloadCmipCommand: AsyncCommand {
                        "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"
         ]
         
-        guard let yearlyPath = domain.omfileArchive else {
-            fatalError("yearly archive path not defined")
-        }
+        let yearlyPath = domain.omfileArchive
         guard let master = domain.omFileMaster else {
             fatalError("no master defined")
         }

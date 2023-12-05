@@ -11,22 +11,16 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
     static var gwamElevation = try? OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
     static var ewamElevation = try? OmFileReader(file: IconWaveDomain.ewam.surfaceElevationFileOm)
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDictionary)omfile-\(rawValue)/"
-    }
-    var omfileArchive: String? {
-        return nil
-    }
-    var omFileMaster: (path: String, time: TimerangeDt)? {
-        return nil
-    }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDictionary)download-\(rawValue)/"
+    var hasYearlyFiles: Bool {
+        return false
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
+    var masterTimeRange: Range<Timestamp>? {
+        return nil
+    }
+    
+    var domainName: String {
+        return rawValue
     }
     
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {

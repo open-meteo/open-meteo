@@ -47,7 +47,7 @@ struct OmFileSplitter {
             basePath: domain.omfileDirectory,
             nLocations: domain.grid.count,
             nTimePerFile: domain.omFileLength,
-            yearlyArchivePath: domain.omfileArchive,
+            yearlyArchivePath: domain.hasYearlyFiles ? domain.omfileArchive : nil,
             omFileMaster: domain.omFileMaster
         )
     }
