@@ -38,13 +38,8 @@ struct MigrationCommand: Command {
                 if domainRaw == "FGOALS_f3_H_highresSST" || domainRaw == "HadGEM3_GC31_HM" {
                     continue
                 }
-                let domain = domainRename(domainRaw)
+                var domain = domainRename(domainRaw)
                 let domainFrom = "\(OpenMeteo.dataDirectory)\(name)"
-                let domainDirectory = "\(OpenMeteo.dataDirectory)\(domain.rawValue)"
-                print("Create domain directory \(domainDirectory)")
-                if execute {
-                    try FileManager.default.createDirectory(atPath: domainDirectory, withIntermediateDirectories: true)
-                }
                 let subPath = "\(OpenMeteo.dataDirectory)\(name)"
                 
                 guard let directoryEnumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: subPath, isDirectory: true), includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
@@ -75,6 +70,15 @@ struct MigrationCommand: Command {
                     guard let new = transform(file: file, type: type) else {
                         continue
                     }
+                    if new.file.contains("bias_linear") {
+                        if domain == .copernicus_era5 {
+                            domain = .copernicus_era5_daily
+                        }
+                        if domain == .copernicus_era5_land {
+                            domain = .copernicus_era5_land_daily
+                        }
+                    }
+                    let domainDirectory = "\(OpenMeteo.dataDirectory)\(domain.rawValue)"
                     let from = "\(domainFrom)/\(file)"
                     let to = "\(domainDirectory)/\(new.directory)/\(new.file)"
                     print("Move \(from) to \(to)")
@@ -219,7 +223,7 @@ struct MigrationCommand: Command {
         
         if file.hasSuffix("linear_bias_seasonal.om") {
             let variable = file.replacingOccurrences(of: "_linear_bias_seasonal.om", with: "")
-            return ("linear_bias_seasonal", "\(variable).om")
+            return (variable, "linear_bias_seasonal.om")
         }
         
         /*if file.contains("member") {

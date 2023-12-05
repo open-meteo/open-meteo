@@ -15,7 +15,9 @@ enum DomainRegistry: String, CaseIterable {
     case copernicus_dem90
     case copernicus_cerra
     case copernicus_era5
+    case copernicus_era5_daily
     case copernicus_era5_land
+    case copernicus_era5_land_daily
     case copernicus_era5_ocean
     
     case cmc_gem_gdps
@@ -180,6 +182,10 @@ enum DomainRegistry: String, CaseIterable {
             return Cmip6Domain.MRI_AGCM3_2_S
         case .cmip_NICAM16_8S:
             return Cmip6Domain.NICAM16_8S
+        case .copernicus_era5_daily:
+            fatalError()
+        case .copernicus_era5_land_daily:
+            fatalError()
         }
     }
 }

@@ -7,13 +7,20 @@ import SwiftPFor2D
 ///  ERA5: https://rmets.onlinelibrary.wiley.com/doi/10.1002/qj.3803
 enum CdsDomain: String, GenericDomain, CaseIterable {
     case era5
+    case era5_daily
     case era5_ocean
     case era5_land
+    case era5_land_daily
     case cerra
     case ecmwf_ifs
     
     var dtSeconds: Int {
-        return 3600
+        switch self {
+        case .era5_daily, .era5_land_daily:
+            return 24*3600
+        default:
+            return 3600
+        }
     }
     
     var isGlobal: Bool {
@@ -30,6 +37,8 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return "reanalysis-cerra-single-levels"
         case .ecmwf_ifs:
             return ""
+        case .era5_land_daily, .era5_daily:
+            fatalError()
         }
     }
     
@@ -50,9 +59,9 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             switch self {
             case .era5_ocean:
                 return nil
-            case .era5:
+            case .era5, .era5_daily:
                 return Self.era5SoilTypeFile
-            case .era5_land:
+            case .era5_land, .era5_land_daily:
                 return Self.era5LandSoilTypeFile
             case .cerra:
                 return Self.cerraSoilTypeFile
@@ -63,9 +72,9 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             switch self {
             case .era5_ocean:
                 return Self.era5OceanElevationFile
-            case .era5:
+            case .era5, .era5_daily:
                 return Self.era5ElevationFile
-            case .era5_land:
+            case .era5_land, .era5_land_daily:
                 return Self.era5LandElevationFile
             case .cerra:
                 return Self.cerraElevationFile
@@ -98,11 +107,11 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     
     var grid: Gridable {
         switch self {
-        case .era5:
+        case .era5, .era5_daily:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .era5_ocean:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
-        case .era5_land:
+        case .era5_land, .era5_land_daily:
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
             return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
@@ -336,6 +345,8 @@ struct DownloadEra5Command: AsyncCommand {
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
             switch domain {
+            case .era5_daily, .era5_land_daily:
+                fatalError()
             case .era5_ocean:
                 // Just use wave data and mark all NaN areas as land
                 struct Query: Encodable {
@@ -508,6 +519,8 @@ struct DownloadEra5Command: AsyncCommand {
                 fatalError("email required")
             }
             return try downloadDailyEcmwfIfsFiles(logger: logger, key: cdskey, email: email, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
+        case .era5_daily, .era5_land_daily:
+            fatalError()
         }
     }
     
