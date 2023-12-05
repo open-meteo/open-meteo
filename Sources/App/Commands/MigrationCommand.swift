@@ -219,7 +219,7 @@ struct MigrationCommand: Command {
         
         if file.hasSuffix("linear_bias_seasonal.om") {
             let variable = file.replacingOccurrences(of: "_linear_bias_seasonal.om", with: "")
-            return (variable, "linear_bias_seasonal.om")
+            return ("linear_bias_seasonal", "\(variable).om")
         }
         
         /*if file.contains("member") {
