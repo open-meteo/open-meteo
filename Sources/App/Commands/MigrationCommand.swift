@@ -3,7 +3,8 @@ import Vapor
 
 struct MigrationCommand: Command {
     struct Signature: CommandSignature {
-        
+        @Flag(name: "execute", help: "Perform file moves")
+        var execute: Bool
     }
     
     var help: String {
@@ -12,6 +13,7 @@ struct MigrationCommand: Command {
     
     func run(using context: CommandContext, signature: Signature) throws {
         // loop over data directory
+        let execute = signature.execute
         
         let pathUrl = URL(fileURLWithPath: OpenMeteo.dataDirectory, isDirectory: true)
         let resourceKeys = Set<URLResourceKey>([.nameKey, .isDirectoryKey, .contentModificationDateKey, .fileSizeKey])
@@ -33,8 +35,12 @@ struct MigrationCommand: Command {
             if name.starts(with: "omfile-") || name.starts(with: "archive-") || name.starts(with: "master-") {
                 //print("found \(name)")
                 let domain = name.split(separator: "-", maxSplits: 1)[1]
+                let domainFrom = "\(OpenMeteo.dataDirectory)\(name)"
                 let domainDirectory = "\(OpenMeteo.dataDirectory)\(domain)"
                 print("Create domain directory \(domainDirectory)")
+                if execute {
+                    try FileManager.default.createDirectory(atPath: domainDirectory, withIntermediateDirectories: true)
+                }
                 let subPath = "\(OpenMeteo.dataDirectory)\(name)"
                 
                 guard let directoryEnumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: subPath, isDirectory: true), includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
@@ -65,7 +71,13 @@ struct MigrationCommand: Command {
                     guard let new = transform(file: file, type: type) else {
                         continue
                     }
-                    print("Move \(file) to \(new.directory)/\(new.file)")
+                    let from = "\(domainFrom)/\(file)"
+                    let to = "\(domainDirectory)/\(new.directory)/\(new.file)"
+                    print("Move \(from) to \(to)")
+                    if execute {
+                        try FileManager.default.createDirectory(atPath: "\(domainDirectory)/\(new.directory)/", withIntermediateDirectories: true)
+                        try FileManager.default.moveFileOverwrite(from: from, to: to)
+                    }
                     
                 }
                 
