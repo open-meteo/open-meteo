@@ -14,10 +14,6 @@ enum EcmwfDomain: String, GenericDomain {
         }
     }
     
-    var initFileName: String {
-        return "\(omfileDirectory)init.txt"
-    }
-    
     var domainName: String {
         return rawValue
     }

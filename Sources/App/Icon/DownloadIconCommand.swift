@@ -348,8 +348,7 @@ struct DownloadIconCommand: AsyncCommand {
             }
             progress.finish()
         }
-        logger.info("write init.txt")
-        try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)
+        //try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {

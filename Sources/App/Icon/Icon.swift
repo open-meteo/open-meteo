@@ -194,10 +194,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
     
-    var initFileNameOm: String {
-        return "\(omfileDirectory)init.txt"
-    }
-    
     /// model level standard heights, full levels
     /// icon wind level 1-90 88=98m, 87-174m
     /// icon-eu 1-60 58,57
