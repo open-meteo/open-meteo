@@ -4,33 +4,33 @@ import Foundation
  List of all integrated domains
  */
 enum DomainRegistry: String, CaseIterable {
-    case arome_france
-    case arome_france_hd
-    case arpege_europe
-    case arpege_world
+    case meteofrance_arome_france
+    case meteofrance_arome_france_hd
+    case meteofrance_arpege_europe
+    case meteofrance_arpege_world
     
     case cams_europe
     case cams_global
     
-    case dem90
-    case cerra
-    case era5
-    case era5_land
-    case era5_ocean
+    case copernicus_dem90
+    case copernicus_cerra
+    case copernicus_era5
+    case copernicus_era5_land
+    case copernicus_era5_ocean
     
-    case gem_global
-    case gem_global_ensemble
-    case gem_hrdps_continental
-    case gem_regional
+    case cmc_gem_gdps
+    case cmc_gem_geps
+    case cmc_gem_hrdps
+    case cmc_gem_rdps
     
-    case gfs013
-    case gfs025
-    case gfs025_ens
-    case gfs025_ensemble
-    case gfs05_ens
-    case hrrr_conus
-    case hrrr_conus_15min
-    case cfsv2
+    case ncep_gfs013
+    case ncep_gfs025
+    case ncep_gefs025
+    //case ncep_gefs025_precipitation_probability
+    case ncep_gefs05
+    case ncep_hrrr_conus
+    case ncep_hrrr_conus_15min
+    case ncep_cfsv2
     
     case glofas_consolidated_v4
     case glofas_consolidated_v3
@@ -41,15 +41,15 @@ enum DomainRegistry: String, CaseIterable {
     case glofas_seasonal_v3
     case glofas_seasonal_v4
     
-    case icon
-    case icon_eu
-    case icon_d2
-    case icon_d2_15min
-    case icon_eps
-    case icon_eu_eps
-    case icon_d2_eps
-    case icon_ewam
-    case icon_gwam
+    case dwd_icon
+    case dwd_icon_eu
+    case dwd_icon_d2
+    case dwd_icon_d2_15min
+    case dwd_icon_eps
+    case dwd_icon_eu_eps
+    case dwd_icon_d2_eps
+    case dwd_ewam
+    case dwd_gwam
     
     case ecmwf_ifs
     case ecmwf_ifs04
@@ -58,9 +58,9 @@ enum DomainRegistry: String, CaseIterable {
     case jma_msm
     case jma_gsm
 
-    case nordic_pp
+    case metno_nordic_pp
     
-    case imerg_daily
+    case nasa_imerg_daily
     
     case cmip_CMCC_CM2_VHR4
     case cmip_EC_Earth3P_HR
@@ -72,49 +72,49 @@ enum DomainRegistry: String, CaseIterable {
     
     func getDomain() -> GenericDomain {
         switch self {
-        case .arome_france:
+        case .meteofrance_arome_france:
             return MeteoFranceDomain.arome_france
-        case .arome_france_hd:
+        case .meteofrance_arome_france_hd:
             return MeteoFranceDomain.arome_france_hd
-        case .arpege_europe:
+        case .meteofrance_arpege_europe:
             return MeteoFranceDomain.arpege_europe
-        case .arpege_world:
+        case .meteofrance_arpege_world:
             return MeteoFranceDomain.arpege_world
         case .cams_europe:
             return CamsDomain.cams_europe
         case .cams_global:
             return CamsDomain.cams_global
-        case .cerra:
+        case .copernicus_cerra:
             return CdsDomain.cerra
-        case .dem90:
+        case .copernicus_dem90:
             fatalError()
         case .ecmwf_ifs:
             return CdsDomain.ecmwf_ifs
-        case .era5:
+        case .copernicus_era5:
             return CdsDomain.era5
-        case .era5_land:
+        case .copernicus_era5_land:
             return CdsDomain.era5_land
-        case .era5_ocean:
+        case .copernicus_era5_ocean:
             return CdsDomain.era5_ocean
-        case .icon_ewam:
+        case .dwd_ewam:
             return IconWaveDomain.ewam
-        case .gem_global:
+        case .cmc_gem_gdps:
             return GemDomain.gem_global
-        case .gem_global_ensemble:
+        case .cmc_gem_geps:
             return GemDomain.gem_global_ensemble
-        case .gem_hrdps_continental:
+        case .cmc_gem_hrdps:
             return GemDomain.gem_hrdps_continental
-        case .gem_regional:
+        case .cmc_gem_rdps:
             return GemDomain.gem_regional
-        case .gfs013:
+        case .ncep_gfs013:
             return GfsDomain.gfs013
-        case .gfs025:
+        case .ncep_gfs025:
             return GfsDomain.gfs025
-        case .gfs025_ens:
+        case .ncep_gefs025:
             return GfsDomain.gfs025_ens
-        case .gfs025_ensemble:
-            return GfsDomain.gfs025_ensemble
-        case .gfs05_ens:
+        //case .gfs025_ensemble:
+        //    return GfsDomain.gfs025_ensemble
+        case .ncep_gefs05:
             return GfsDomain.gfs05_ens
         case .glofas_consolidated_v4:
             return GloFasDomain.consolidated
@@ -134,25 +134,25 @@ enum DomainRegistry: String, CaseIterable {
             return GloFasDomain.seasonalv3
         case .jma_gsm:
             return JmaDomain.gsm
-        case .icon_gwam:
+        case .dwd_gwam:
             return IconWaveDomain.gwam
-        case .hrrr_conus:
+        case .ncep_hrrr_conus:
             return GfsDomain.hrrr_conus
-        case .hrrr_conus_15min:
+        case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
-        case .icon:
+        case .dwd_icon:
             return IconDomains.icon
-        case .icon_d2:
+        case .dwd_icon_d2:
             return IconDomains.iconD2
-        case .icon_d2_15min:
+        case .dwd_icon_d2_15min:
             return IconDomains.iconD2_15min
-        case .icon_d2_eps:
+        case .dwd_icon_d2_eps:
             return IconDomains.iconD2Eps
-        case .icon_eps:
+        case .dwd_icon_eps:
             return IconDomains.iconEps
-        case .icon_eu:
+        case .dwd_icon_eu:
             return IconDomains.iconEu
-        case .icon_eu_eps:
+        case .dwd_icon_eu_eps:
             return IconDomains.iconEuEps
         case .ecmwf_ifs04:
             return EcmwfDomain.ifs04
@@ -160,11 +160,11 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfDomain.ifs04_ensemble
         case .jma_msm:
             return JmaDomain.msm
-        case .cfsv2:
+        case .ncep_cfsv2:
             return SeasonalForecastDomain.ncep
-        case .nordic_pp:
+        case .metno_nordic_pp:
             return MetNoDomain.nordic_pp
-        case .imerg_daily:
+        case .nasa_imerg_daily:
             return SatelliteDomain.imerg_daily
         case .cmip_CMCC_CM2_VHR4:
             return Cmip6Domain.CMCC_CM2_VHR4
