@@ -62,7 +62,7 @@ struct MigrationCommand: Command {
                     
                     //print("found file \(file)")
                     let type: String
-                    if file.starts(with: "omfile-") {
+                    if name.starts(with: "omfile-") {
                         type = "chunk"
                     } else if name.starts(with: "archive-") {
                         type = "year"
