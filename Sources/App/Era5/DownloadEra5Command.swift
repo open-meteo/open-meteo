@@ -91,7 +91,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         return true
     }
     
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     

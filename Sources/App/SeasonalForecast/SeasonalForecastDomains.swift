@@ -19,9 +19,10 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
         return false
     }
     
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
+    
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
         "\(omfileDirectory)HSURF.om"

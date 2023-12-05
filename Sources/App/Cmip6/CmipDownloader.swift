@@ -186,6 +186,15 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         "\(omfileDirectory)HSURF.om"
     }
     
+    var masterTimeRange: Range<Timestamp>? {
+        switch self {
+        case .EC_Earth3P_HR:
+            return Timestamp(1950,1,1) ..< Timestamp(2050,1,1)
+        default:
+            return Timestamp(1950,1,1) ..< Timestamp(2051,1,1)
+        }
+    }
+    
     /// Single file to contain the entire timerange of data -> faster for sequentual disk access
     var omFileMaster: (path: String, time: TimerangeDt)? {
         let path = "\(OpenMeteo.dataDirectory)master-\(rawValue)/"

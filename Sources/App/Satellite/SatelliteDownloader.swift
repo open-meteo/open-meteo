@@ -237,12 +237,8 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         return true
     }
     
-    var omFileMaster: (path: String, time: TimerangeDt)? {
-        switch self {
-        case .imerg_daily:
-                let path = "\(OpenMeteo.dataDirectory)master-\(rawValue)/"
-                return (path, TimerangeDt(start: Timestamp(2000,06,01), to: Timestamp(2023, 1, 1), dtSeconds: dtSeconds))
-        }
+    var masterTimeRange: Range<Timestamp>? {
+        return Timestamp(2000,06,01) ..< Timestamp(2023, 1, 1)
     }
     
     /// Use store 14 days per om file

@@ -20,6 +20,9 @@ protocol GenericDomain {
     /// If true, domain has yearly files
     var hasYearlyFiles: Bool { get }
     
+    /// If present, the timerange that is available in a master file
+    var masterTimeRange: Range<Timestamp>? { get }
+    
     /// The time length of each compressed time series file
     var omFileLength: Int { get }
     
@@ -49,6 +52,20 @@ extension GenericDomain {
     var omfileArchive: String {
         return "\(OpenMeteo.dataDirectory)archive-\(domainName)/"
     }
+    
+    /// Master file to store "all" timesteps in one file. Used only in CMIP for store 100 years a once
+    var omMasterDirectory: String {
+        "\(OpenMeteo.dataDirectory)master-\(domainName)/"
+    }
+    
+    /// Single master file for a large time series
+    var omFileMaster: (path: String, time: TimerangeDt)? {
+        guard let time = masterTimeRange else {
+            return nil
+        }
+        return (omMasterDirectory, TimerangeDt(range: time, dtSeconds: dtSeconds))
+    }
+    
 }
 
 /**

@@ -445,7 +445,7 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     

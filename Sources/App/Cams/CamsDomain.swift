@@ -40,7 +40,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         return false
     }
     
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    var masterTimeRange: Range<Timestamp>? {
         return nil
     }
     
