@@ -70,6 +70,10 @@ extension GenericDomain {
     var surfaceElevationFileOm: String {
         "\(omfileDirectory)HSURF.om"
     }
+    
+    var soilTypeFileOm: String {
+        "\(omfileDirectory)soil_type.om"
+    }
 }
 
 /**

@@ -75,10 +75,6 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    var soilTypeFileOm: String {
-        "\(omfileDirectory)soil_type.om"
-    }
-    
     var domainName: String {
         return rawValue
     }
