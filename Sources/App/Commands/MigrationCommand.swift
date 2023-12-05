@@ -32,7 +32,7 @@ struct MigrationCommand: Command {
                 continue
             }
             
-            if name.starts(with: "omfile-") || name.starts(with: "archive-") || name.starts(with: "master-") {
+            if name.starts(with: "omfile-") || name.starts(with: "archive-") || name.starts(with: "master-")  || name.starts(with: "yearly-") {
                 //print("found \(name)")
                 let domainRaw = String(name.split(separator: "-", maxSplits: 1)[1])
                 if domainRaw == "FGOALS_f3_H_highresSST" || domainRaw == "HadGEM3_GC31_HM" {
@@ -64,7 +64,7 @@ struct MigrationCommand: Command {
                     let type: String
                     if name.starts(with: "omfile-") {
                         type = "chunk"
-                    } else if name.starts(with: "archive-") {
+                    } else if name.starts(with: "archive-") || name.starts(with: "yearly-") {
                         type = "year"
                     } else if name.starts(with: "master-") {
                         type = "master"
