@@ -67,10 +67,16 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     
     /// How many hourly timesteps to keep in each compressed chunk
     var omFileLength: Int {
-        // icon-d2 120
-        // eu 192
-        // global 253
-        nForecastHours(run: 0) + 3*24
+        switch self {
+        case .icon, .iconEps:
+            return 180+1 + 3*24
+        case .iconEu, .iconEuEps:
+            return 120+1 + 3*24
+        case .iconD2, .iconD2Eps:
+            return 48+1 + 3*24
+        case .iconD2_15min:
+            return 48*4 + 3*24
+        }
     }
     
     /// All available pressure levels for the current domain
@@ -90,36 +96,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return [] // 300, 500, 850 only temperature and wind
         case .iconD2Eps:
             return [] // 500, 700, 850, 950, 975, 1000
-        }
-    }
-
-    /// Number  of forecast hours per run
-    func nForecastHours(run: Int) -> Int {
-        switch self {
-        case .iconEps:
-            return 180+1
-        case .icon:
-            if  run == 6 || run == 18 {
-                return 120+1
-            } else {
-                return 180+1
-            }
-        case .iconEuEps:
-            return 120+1
-        case .iconEu:
-            if run % 6 == 0 {
-                // full runs
-                return 120+1
-            } else {
-                // ICON-EU sideruns at 3,9,15,21 have 31x 1-hourly values and 3x 6-hourly steps (6 hourly steps are ignored)
-                return 30+1
-            }
-        case .iconD2_15min:
-            return 48*4
-        case .iconD2Eps:
-            fallthrough
-        case .iconD2:
-            return 48+1
         }
     }
     
