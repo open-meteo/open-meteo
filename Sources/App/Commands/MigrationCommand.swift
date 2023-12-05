@@ -34,7 +34,7 @@ struct MigrationCommand: Command {
             
             if name.starts(with: "omfile-") || name.starts(with: "archive-") || name.starts(with: "master-") {
                 //print("found \(name)")
-                let domain = name.split(separator: "-", maxSplits: 1)[1]
+                let domain = domainRename(String(name.split(separator: "-", maxSplits: 1)[1]))
                 let domainFrom = "\(OpenMeteo.dataDirectory)\(name)"
                 let domainDirectory = "\(OpenMeteo.dataDirectory)\(domain)"
                 print("Create domain directory \(domainDirectory)")
@@ -88,6 +88,57 @@ struct MigrationCommand: Command {
             }
         }
         
+    }
+    
+    func domainRename(_ domain: String) -> String {
+        switch domain {
+        case "msm":
+            return "jma_msm"
+        case "gsm":
+            return "jma_gsm"
+        case "gwam":
+            return "icon_gwam"
+        case "ewam":
+            return "icon_ewam"
+        case "ncep":
+            return "cfsv2"
+        case "CMCC_CM2_VHR4":
+            fallthrough
+        case "EC_Earth3P_HR":
+            fallthrough
+        case "FGOALS_f3_H":
+            fallthrough
+        case "HiRAM_SIT_HR":
+            fallthrough
+        case "MPI_ESM1_2_XR":
+            fallthrough
+        case "MRI_AGCM3_2_S":
+            fallthrough
+        case "NICAM16_8S":
+            return "cmip_\(domain)"
+        case "ifs04":
+            return "ecmwf_ifs04"
+        case "ifs04_ensemble":
+            return "ecmwf_ifs04_ensemble"
+        case "glofas-consolidated":
+            return "glofas_consolidated_v4"
+        case "glofas-consolidatedv3":
+            return "glofas_consolidated_v3"
+        case "glofas-forecast":
+            return "glofas_forecast_v4"
+        case "glofas-forecastv3":
+            return "glofas_forecast_v3"
+        case "glofas-intermediate":
+            return "glofas_intermediate_v4"
+        case "glofas-intermediatev3":
+            return "glofas_intermediate_v3"
+        case "glofas-seasonalv3":
+            return "glofas_seasonal_v3"
+        case "glofas-seasonal":
+            return "glofas_seasonal_v4"
+        default:
+            return domain.replacingOccurrences(of: "-", with: "_")
+        }
     }
     
     func transform(file: String, type: String) -> (directory: String, file: String)? {
