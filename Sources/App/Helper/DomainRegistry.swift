@@ -26,25 +26,25 @@ enum DomainRegistry: String, CaseIterable {
     case gfs025_ens
     case gfs025_ensemble
     case gfs05_ens
-    case glofas_consolidated // note dash in directory name...
-    case glofas_consolidatedv3
-    case glofas_forecast
-    case glofas_forecastv3
-    case glofas_intermediate
-    case glofas_intermediatev3
-    case glofas_seasonalv3
-    case glofas_seasonal
+    case glofas_consolidated = "glofas-consolidated"
+    case glofas_consolidatedv3 = "glofas-glofas_consolidatedv3"
+    case glofas_forecast = "glofas-forecast"
+    case glofas_forecastv3 = "glofas-forecastv3"
+    case glofas_intermediate = "glofas-intermediate"
+    case glofas_intermediatev3 = "glofas-intermediatev3"
+    case glofas_seasonalv3 = "glofas-seasonalv3"
+    case glofas_seasonal = "glofas-seasonal"
     case gsm
     case gwam
     case hrrr_conus
     case hrrr_conus_15min
     case icon
-    case icon_d2 // note dash in directory name...
-    case icon_d2_15min
-    case ison_d2_eps
-    case icon_eps
-    case icon_eu
-    case icon_eu_eps
+    case icon_eu = "icon-eu"
+    case icon_d2 = "icon-d2"
+    case icon_d2_15min = "icon-d2-15min"
+    case icon_eps = "icon-eps"
+    case icon_eu_eps = "icon-eu-eps"
+    case icon_d2_eps = "icon-d2-eps"
     case ifs04
     case ifs04_ensemble
     case msm
@@ -135,7 +135,7 @@ enum DomainRegistry: String, CaseIterable {
             return IconDomains.iconD2
         case .icon_d2_15min:
             return IconDomains.iconD2_15min
-        case .ison_d2_eps:
+        case .icon_d2_eps:
             return IconDomains.iconD2Eps
         case .icon_eps:
             return IconDomains.iconEps
