@@ -180,11 +180,6 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     var hasYearlyFiles: Bool {
         return false
     }
-
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
     
     var masterTimeRange: Range<Timestamp>? {
         switch self {

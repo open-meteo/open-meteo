@@ -75,10 +75,6 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
     var soilTypeFileOm: String {
         "\(omfileDirectory)soil_type.om"
     }

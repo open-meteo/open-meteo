@@ -43,10 +43,7 @@ enum MetNoDomain: String, GenericDomain, CaseIterable {
         return t.with(hour: t.hour)
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
+
     
     var omFileLength: Int {
         return 64 + 2*24

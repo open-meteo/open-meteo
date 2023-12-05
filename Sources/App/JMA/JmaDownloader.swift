@@ -559,11 +559,6 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     func forecastHours(run: Int) -> [Int] {
         switch self {
         case .gsm:

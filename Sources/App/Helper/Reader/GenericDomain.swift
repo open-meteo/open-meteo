@@ -66,6 +66,10 @@ extension GenericDomain {
         return (omMasterDirectory, TimerangeDt(range: time, dtSeconds: dtSeconds))
     }
     
+    /// Filename of the surface elevation file
+    var surfaceElevationFileOm: String {
+        "\(omfileDirectory)HSURF.om"
+    }
 }
 
 /**

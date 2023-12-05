@@ -224,11 +224,6 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         return nil
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     var domainName: String {
         return rawValue
     }

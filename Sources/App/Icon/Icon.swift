@@ -65,11 +65,6 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         return nil
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     /// How many hourly timesteps to keep in each compressed chunk
     var omFileLength: Int {
         // icon-d2 120

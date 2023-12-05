@@ -99,11 +99,6 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     func getForecastHours(run: Timestamp) -> [Int] {
         switch self {
         case .gem_global:

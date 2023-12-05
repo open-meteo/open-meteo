@@ -82,11 +82,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     func forecastHours(run: Int, hourlyForArpegeEurope: Bool) -> [Int] {
         switch self {
         case .arpege_europe:

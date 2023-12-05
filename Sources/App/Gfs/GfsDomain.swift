@@ -159,11 +159,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     private static var gfs025ensElevationFile = try? OmFileReader(file: Self.gfs025_ens.surfaceElevationFileOm)
     private static var gfs05ensElevationFile = try? OmFileReader(file: Self.gfs05_ens.surfaceElevationFileOm)
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     var ensembleMembers: Int {
         switch self {
         case .gfs05_ens:

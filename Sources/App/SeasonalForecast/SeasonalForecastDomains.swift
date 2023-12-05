@@ -23,11 +23,6 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
         return nil
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     static var ncepElevation = try? OmFileReader(file: Self.ncep.surfaceElevationFileOm)
     
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {

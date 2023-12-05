@@ -23,11 +23,6 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
         return rawValue
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
         switch type {
         case .soilType:

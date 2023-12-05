@@ -14,11 +14,6 @@ enum EcmwfDomain: String, GenericDomain {
         }
     }
     
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
-    }
-    
     var initFileName: String {
         return "\(omfileDirectory)init.txt"
     }
