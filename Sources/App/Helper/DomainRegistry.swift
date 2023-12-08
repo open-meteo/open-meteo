@@ -183,9 +183,9 @@ enum DomainRegistry: String, CaseIterable {
         case .cmip_NICAM16_8S:
             return Cmip6Domain.NICAM16_8S
         case .copernicus_era5_daily:
-            fatalError()
+            return CdsDomain.era5_daily
         case .copernicus_era5_land_daily:
-            fatalError()
+            return CdsDomain.era5_land_daily
         }
     }
 }
