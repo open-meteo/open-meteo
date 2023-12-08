@@ -16,38 +16,38 @@ public struct ForecastapiController: RouteCollection {
             hasCurrentWeather: false,
             defaultModel: .archive_best_match,
             subdomain: "archive-api")
-        categoriesRoute.get("era5", use: era5.query)
-        categoriesRoute.get("archive", use: era5.query)
+        categoriesRoute.getAndPost("era5", use: era5.query)
+        categoriesRoute.getAndPost("archive", use: era5.query)
         
-        categoriesRoute.get("forecast", use: WeatherApiController(
+        categoriesRoute.getAndPost("forecast", use: WeatherApiController(
             defaultModel: .best_match, alias: "forecast-archive-api").query
         )
-        categoriesRoute.get("dwd-icon", use: WeatherApiController(
+        categoriesRoute.getAndPost("dwd-icon", use: WeatherApiController(
             defaultModel: .icon_seamless).query
         )
-        categoriesRoute.get("gfs", use: WeatherApiController(
+        categoriesRoute.getAndPost("gfs", use: WeatherApiController(
             has15minutely: true,
             defaultModel: .gfs_seamless).query
         )
-        categoriesRoute.get("meteofrance", use: WeatherApiController(
+        categoriesRoute.getAndPost("meteofrance", use: WeatherApiController(
             forecastDay: 4,
             has15minutely: false,
             defaultModel: .meteofrance_seamless).query
         )
-        categoriesRoute.get("jma", use: WeatherApiController(
+        categoriesRoute.getAndPost("jma", use: WeatherApiController(
             has15minutely: false,
             defaultModel: .jma_seamless).query
         )
-        categoriesRoute.get("metno", use: WeatherApiController(
+        categoriesRoute.getAndPost("metno", use: WeatherApiController(
             forecastDay: 3,
             has15minutely: false,
             defaultModel: .metno_nordic).query
         )
-        categoriesRoute.get("gem", use: WeatherApiController(
+        categoriesRoute.getAndPost("gem", use: WeatherApiController(
             has15minutely: false,
             defaultModel: .gem_seamless).query
         )
-        categoriesRoute.get("ecmwf", use: WeatherApiController(
+        categoriesRoute.getAndPost("ecmwf", use: WeatherApiController(
             forecastDay: 10,
             has15minutely: false,
             hasCurrentWeather: false,
@@ -55,13 +55,13 @@ public struct ForecastapiController: RouteCollection {
             put3HourlyDataIntoHourly: true).query
         )
         
-        categoriesRoute.get("elevation", use: DemController().query)
-        categoriesRoute.get("air-quality", use: CamsController().query)
-        categoriesRoute.get("seasonal", use: SeasonalForecastController().query)
-        categoriesRoute.get("flood", use: GloFasController().query)
-        categoriesRoute.get("climate", use: CmipController().query)
-        categoriesRoute.get("marine", use: IconWaveController().query)
-        categoriesRoute.get("ensemble", use: EnsembleApiController().query)
+        categoriesRoute.getAndPost("elevation", use: DemController().query)
+        categoriesRoute.getAndPost("air-quality", use: CamsController().query)
+        categoriesRoute.getAndPost("seasonal", use: SeasonalForecastController().query)
+        categoriesRoute.getAndPost("flood", use: GloFasController().query)
+        categoriesRoute.getAndPost("climate", use: CmipController().query)
+        categoriesRoute.getAndPost("marine", use: IconWaveController().query)
+        categoriesRoute.getAndPost("ensemble", use: EnsembleApiController().query)
     }
 }
 
@@ -91,7 +91,9 @@ struct WeatherApiController {
     
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain(subdomain, alias: alias)
-        let params = try req.query.decode(ApiQueryParameter.self)
+        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
+        try req.ensureApiKey(subdomain, alias: alias, apikey: params.apikey)
+        
         let currentTime = Timestamp.now()
         let allowedRange = historyStartDate ..< currentTime.add(days: forecastDaysMax)
         

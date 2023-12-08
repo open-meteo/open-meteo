@@ -149,7 +149,8 @@ extension SeasonalForecastReader {
 struct SeasonalForecastController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("seasonal-api")
-        let params = try req.query.decode(ApiQueryParameter.self)
+        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
+        try req.ensureApiKey("seasonal-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
         

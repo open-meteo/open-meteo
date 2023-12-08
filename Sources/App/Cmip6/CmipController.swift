@@ -6,7 +6,9 @@ import Vapor
 struct CmipController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("climate-api")
-        let params = try req.query.decode(ApiQueryParameter.self)
+        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
+        try req.ensureApiKey("climate-api", apikey: params.apikey)
+        
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)
         
