@@ -28,7 +28,7 @@ let package = Package(
         .macOS(.v12)
     ],
     dependencies: [
-        .package(url: "https://github.com/vapor/vapor.git", from: "4.88.0"),
+        .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
         .package(url: "https://github.com/google/flatbuffers.git", from: "23.3.3"),
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.7.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.0.0"),
