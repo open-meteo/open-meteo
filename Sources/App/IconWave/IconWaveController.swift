@@ -30,7 +30,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
 struct IconWaveController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("marine-api")
-        let params = try req.query.decode(ApiQueryParameter.self)
+        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
+        try req.ensureApiKey("marine-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 11)
         

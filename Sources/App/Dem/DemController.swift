@@ -6,6 +6,7 @@ struct DemController {
     struct Query: Content {
         let latitude: [Float]
         let longitude: [Float]
+        let apikey: String?
         
         func validate() throws {
             guard latitude.count == longitude.count else {
@@ -30,7 +31,9 @@ struct DemController {
 
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("api")
-        let params = try req.query.decode(Query.self)
+        let params = req.method == .POST ? try req.content.decode(Query.self) : try req.query.decode(Query.self)
+        try req.ensureApiKey("api", apikey: params.apikey)
+        
         try params.validate()
         req.incrementRateLimiter(weight: 1)
         // Run query on separat thread pool to not block the main pool

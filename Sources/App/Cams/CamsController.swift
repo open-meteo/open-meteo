@@ -7,7 +7,9 @@ import Vapor
 struct CamsController {
     func query(_ req: Request) throws -> EventLoopFuture<Response> {
         try req.ensureSubdomain("air-quality-api")
-        let params = try req.query.decode(ApiQueryParameter.self)
+        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
+        try req.ensureApiKey("air-quality-api", apikey: params.apikey)
+        
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 6)
         

@@ -48,6 +48,8 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let models: [String]?
     let cell_selection: GridSelectionMode?
     
+    let apikey: String?
+    
     /// Used in climate API
     let disable_bias_correction: Bool? // CMIP
     
