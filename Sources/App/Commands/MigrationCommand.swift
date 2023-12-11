@@ -213,6 +213,31 @@ struct MigrationCommand: Command {
         }
     }
     
+    func rename(variable: String) -> String {
+        return variable
+            .replacingOccurrences(of: "windspeed", with: "wind_speed")
+            .replacingOccurrences(of: "winddirection", with: "wind_direction")
+            .replacingOccurrences(of: "cloudcover", with: "cloud_cover")
+            .replacingOccurrences(of: "weathercode", with: "weather_code")
+            .replacingOccurrences(of: "sensible_heatflux", with: "sensible_heat_flux")
+            .replacingOccurrences(of: "latent_heatflux", with: "latent_heat_flux")
+            .replacingOccurrences(of: "freezinglevel_height", with: "freezing_level_height")
+            .replacingOccurrences(of: "soil_moisture_0_1cm", with: "soil_moisture_0_to_1cm")
+            .replacingOccurrences(of: "soil_moisture_1_3cm", with: "soil_moisture_1_to_3cm")
+            .replacingOccurrences(of: "soil_moisture_3_9cm", with: "soil_moisture_3_to_9cm")
+            .replacingOccurrences(of: "soil_moisture_9_27cm", with: "soil_moisture_9_to_27cm")
+            .replacingOccurrences(of: "soil_moisture_27_81cm", with: "soil_moisture_27_to_81cm")
+            .replacingOccurrences(of: "dewpoint", with: "dew_point")
+            .replacingOccurrences(of: "windgusts", with: "wind_gusts")
+            .replacingOccurrences(of: "vapor_pressure_deficit", with: "vapour_pressure_deficit")
+            .replacingOccurrences(of: "skin_temperature", with: "surface_temperature")
+            .replacingOccurrences(of: "surface_air_pressure", with: "surface_pressure")
+            .replacingOccurrences(of: "relativehumidity", with: "relative_humidity")
+            .replacingOccurrences(of: "eastward_wind", with: "wind_u_component")
+            .replacingOccurrences(of: "northward_wind", with: "wind_v_component")
+            .replacingOccurrences(of: "relative_vorticity_1000hPa", with: "relative_vorticity")
+    }
+    
     func transform(file: String, type: String) -> (directory: String, file: String)? {
         let suffixWithOm = file.split(separator: "_").last!
         let suffix = suffixWithOm.split(separator: ".").first!
@@ -223,7 +248,7 @@ struct MigrationCommand: Command {
         
         if file.hasSuffix("linear_bias_seasonal.om") {
             let variable = file.replacingOccurrences(of: "_linear_bias_seasonal.om", with: "")
-            return (variable, "linear_bias_seasonal.om")
+            return (rename(variable: variable), "linear_bias_seasonal.om")
         }
         
         /*if file.contains("member") {
@@ -247,9 +272,9 @@ struct MigrationCommand: Command {
             if let last = variable.split(separator: "_").last, let member = Int(last) {
                 // member file from CFS like "soil_moisture_100_to_200cm_3_97.om"
                 let variable = file.replacingOccurrences(of: "_\(last)_\(suffixWithOm)", with: "")
-                return ("\(variable)_member\(member.zeroPadded(len: 2))", "\(type)_\(suffix).om")
+                return ("\(rename(variable: variable))_member\(member.zeroPadded(len: 2))", "\(type)_\(suffix).om")
             }
-            return (variable, "\(type)_\(suffix).om")
+            return (rename(variable: variable), "\(type)_\(suffix).om")
         }
         
         if file == "init.txt" || file == "HSURF.nc" {
