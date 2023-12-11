@@ -23,7 +23,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
     
     func get(raw: VariableAndMemberAndControl<EcmwfVariable>, time: TimerangeDt) throws -> DataAndUnit {
         /// Adjust surface pressure to target elevation. Surface pressure is stored for `modelElevation`, but we want to get the pressure on `targetElevation`
-        if raw.variable == .surface_air_pressure {
+        if raw.variable == .surface_pressure {
             let pressure = try reader.get(variable: raw, time: time)
             let factor = Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.modelElevation.numeric) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation)
             return DataAndUnit(pressure.data.map({$0*factor}), pressure.unit)
@@ -37,141 +37,141 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .wind_speed_10m:
             fallthrough
         case .windspeed_10m:
-            let v = try get(raw: .init(.northward_wind_10m, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_10m, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_10m, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_10m, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_direction_10m:
             fallthrough
         case .winddirection_10m:
-            let v = try get(raw: .init(.northward_wind_10m, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_10m, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_10m, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_10m, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_speed_1000hPa:
             fallthrough
         case .windspeed_1000hPa:
-            let v = try get(raw: .init(.northward_wind_1000hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_1000hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_1000hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_1000hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_925hPa:
             fallthrough
         case .windspeed_925hPa:
-            let v = try get(raw: .init(.northward_wind_925hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_925hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_925hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_925hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_850hPa:
             fallthrough
         case .windspeed_850hPa:
-            let v = try get(raw: .init(.northward_wind_850hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_850hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_850hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_850hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_700hPa:
             fallthrough
         case .windspeed_700hPa:
-            let v = try get(raw: .init(.northward_wind_700hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_700hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_700hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_700hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_500hPa:
             fallthrough
         case .windspeed_500hPa:
-            let v = try get(raw: .init(.northward_wind_500hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_500hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_500hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_500hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_300hPa:
             fallthrough
         case .windspeed_300hPa:
-            let v = try get(raw: .init(.northward_wind_300hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_300hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_300hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_300hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_250hPa:
             fallthrough
         case .windspeed_250hPa:
-            let v = try get(raw: .init(.northward_wind_250hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_250hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_250hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_250hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_200hPa:
             fallthrough
         case .windspeed_200hPa:
-            let v = try get(raw: .init(.northward_wind_200hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_200hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_200hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_200hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_50hPa:
             fallthrough
         case .windspeed_50hPa:
-            let v = try get(raw: .init(.northward_wind_50hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_50hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_50hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_50hPa, member), time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_direction_1000hPa:
             fallthrough
         case .winddirection_1000hPa:
-            let v = try get(raw: .init(.northward_wind_1000hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_1000hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_1000hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_1000hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_925hPa:
             fallthrough
         case .winddirection_925hPa:
-            let v = try get(raw: .init(.northward_wind_925hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_925hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_925hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_925hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_850hPa:
             fallthrough
         case .winddirection_850hPa:
-            let v = try get(raw: .init(.northward_wind_850hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_850hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_850hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_850hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_700hPa:
             fallthrough
         case .winddirection_700hPa:
-            let v = try get(raw: .init(.northward_wind_700hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_700hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_700hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_700hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_500hPa:
             fallthrough
         case .winddirection_500hPa:
-            let v = try get(raw: .init(.northward_wind_500hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_500hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_500hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_500hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_300hPa:
             fallthrough
         case .winddirection_300hPa:
-            let v = try get(raw: .init(.northward_wind_300hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_300hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_300hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_300hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_250hPa:
             fallthrough
         case .winddirection_250hPa:
-            let v = try get(raw: .init(.northward_wind_250hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_250hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_250hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_250hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_200hPa:
             fallthrough
         case .winddirection_200hPa:
-            let v = try get(raw: .init(.northward_wind_200hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_200hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_200hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_200hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_50hPa:
             fallthrough
         case .winddirection_50hPa:
-            let v = try get(raw: .init(.northward_wind_50hPa, member), time: time)
-            let u = try get(raw: .init(.eastward_wind_50hPa, member), time: time)
+            let v = try get(raw: .init(.wind_v_component_50hPa, member), time: time)
+            let u = try get(raw: .init(.wind_u_component_50hPa, member), time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .soil_temperature_0_to_10cm:
@@ -183,7 +183,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .weather_code:
             fallthrough
         case .weathercode:
-            let cloudcover = try get(raw: .init(.cloudcover, member), time: time).data
+            let cloudcover = try get(raw: .init(.cloud_cover, member), time: time).data
             let precipitation = try get(raw: .init(.precipitation, member), time: time).data
             let snowfall = try get(derived: .init(.snowfall, member), time: time).data
             return DataAndUnit(WeatherCode.calculate(
@@ -327,10 +327,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .soil_temperature_0cm:
             fallthrough
-        case .surface_temperature:
-            return try get(raw: .init(.skin_temperature, member), time: time)
-        case .surface_pressure:
-            return try get(raw: .init(.surface_air_pressure, member), time: time)
+        case .skin_temperature:
+            return try get(raw: .init(.surface_temperature, member), time: time)
+        case .surface_air_pressure:
+            return try get(raw: .init(.surface_pressure, member), time: time)
         case .relative_humidity_2m:
             fallthrough
         case .relativehumidity_2m:
@@ -357,14 +357,14 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let temperature = try get(raw: .init(.temperature_2m, member), time: time)
             let rh = try get(derived: .init(.relativehumidity_2m, member), time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
-        case .cloud_cover:
-            return try get(raw: .init(.cloudcover, member), time: time)
-        case .cloud_cover_low:
-            return try get(raw: .init(.cloudcover_low, member), time: time)
-        case .cloud_cover_mid:
-            return try get(raw: .init(.cloudcover_mid, member), time: time)
-        case .cloud_cover_high:
-            return try get(raw: .init(.cloudcover_high, member), time: time)
+        case .cloudcover:
+            return try get(raw: .init(.cloud_cover, member), time: time)
+        case .cloudcover_low:
+            return try get(raw: .init(.cloud_cover_low, member), time: time)
+        case .cloudcover_mid:
+            return try get(raw: .init(.cloud_cover_mid, member), time: time)
+        case .cloudcover_high:
+            return try get(raw: .init(.cloud_cover_high, member), time: time)
         }
     }
     
@@ -374,103 +374,103 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .wind_speed_10m:
             fallthrough
         case .windspeed_10m:
-            try prefetchData(raw: .init(.northward_wind_10m, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_10m, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_10m, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_10m, member), time: time)
         case .wind_speed_1000hPa:
             fallthrough
         case .windspeed_1000hPa:
-            try prefetchData(raw: .init(.northward_wind_1000hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_1000hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_1000hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_1000hPa, member), time: time)
         case .wind_speed_925hPa:
             fallthrough
         case .windspeed_925hPa:
-            try prefetchData(raw: .init(.northward_wind_925hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_925hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_925hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_925hPa, member), time: time)
         case .wind_speed_850hPa:
             fallthrough
         case .windspeed_850hPa:
-            try prefetchData(raw: .init(.northward_wind_850hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_850hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_850hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_850hPa, member), time: time)
         case .wind_speed_700hPa:
             fallthrough
         case .windspeed_700hPa:
-            try prefetchData(raw: .init(.northward_wind_700hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_700hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_700hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_700hPa, member), time: time)
         case .wind_speed_500hPa:
             fallthrough
         case .windspeed_500hPa:
-            try prefetchData(raw: .init(.northward_wind_500hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_500hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_500hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_500hPa, member), time: time)
         case .wind_speed_300hPa:
             fallthrough
         case .windspeed_300hPa:
-            try prefetchData(raw: .init(.northward_wind_300hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_300hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_300hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_300hPa, member), time: time)
         case .wind_speed_250hPa:
             fallthrough
         case .windspeed_250hPa:
-            try prefetchData(raw: .init(.northward_wind_250hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_250hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_250hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_250hPa, member), time: time)
         case .wind_speed_200hPa:
             fallthrough
         case .windspeed_200hPa:
-            try prefetchData(raw: .init(.northward_wind_200hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_200hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_200hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_200hPa, member), time: time)
         case .wind_speed_50hPa:
             fallthrough
         case .windspeed_50hPa:
-            try prefetchData(raw: .init(.northward_wind_50hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_50hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_50hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_50hPa, member), time: time)
         case .wind_direction_10m:
             fallthrough
         case .winddirection_10m:
-            try prefetchData(raw: .init(.northward_wind_10m, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_10m, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_10m, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_10m, member), time: time)
         case .wind_direction_1000hPa:
             fallthrough
         case .winddirection_1000hPa:
-            try prefetchData(raw: .init(.northward_wind_1000hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_1000hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_1000hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_1000hPa, member), time: time)
         case .wind_direction_925hPa:
             fallthrough
         case .winddirection_925hPa:
-            try prefetchData(raw: .init(.northward_wind_925hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_925hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_925hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_925hPa, member), time: time)
         case .wind_direction_850hPa:
             fallthrough
         case .winddirection_850hPa:
-            try prefetchData(raw: .init(.northward_wind_850hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_850hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_850hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_850hPa, member), time: time)
         case .wind_direction_700hPa:
             fallthrough
         case .winddirection_700hPa:
-            try prefetchData(raw: .init(.northward_wind_700hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_700hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_700hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_700hPa, member), time: time)
         case .wind_direction_500hPa:
             fallthrough
         case .winddirection_500hPa:
-            try prefetchData(raw: .init(.northward_wind_500hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_500hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_500hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_500hPa, member), time: time)
         case .wind_direction_300hPa:
             fallthrough
         case .winddirection_300hPa:
-            try prefetchData(raw: .init(.northward_wind_300hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_300hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_300hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_300hPa, member), time: time)
         case .wind_direction_250hPa:
             fallthrough
         case .winddirection_250hPa:
-            try prefetchData(raw: .init(.northward_wind_250hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_250hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_250hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_250hPa, member), time: time)
         case .wind_direction_200hPa:
             fallthrough
         case .winddirection_200hPa:
-            try prefetchData(raw: .init(.northward_wind_200hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_200hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_200hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_200hPa, member), time: time)
         case .wind_direction_50hPa:
             fallthrough
         case .winddirection_50hPa:
-            try prefetchData(raw: .init(.northward_wind_50hPa, member), time: time)
-            try prefetchData(raw: .init(.eastward_wind_50hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_v_component_50hPa, member), time: time)
+            try prefetchData(raw: .init(.wind_u_component_50hPa, member), time: time)
         case .soil_temperature_0_to_10cm:
             fallthrough
         case .soil_temperature_0_10cm:
@@ -516,7 +516,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .weather_code:
             fallthrough
         case .weathercode:
-            try prefetchData(raw: .init(.cloudcover, member), time: time)
+            try prefetchData(raw: .init(.cloud_cover, member), time: time)
             try prefetchData(derived: .init(.snowfall, member), time: time)
             try prefetchData(raw: .init(.precipitation, member), time: time)
         case .rain:
@@ -589,12 +589,12 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .dewpoint_50hPa:
             try prefetchData(raw: .init(.temperature_50hPa, member), time: time)
             try prefetchData(raw: .init(.relative_humidity_50hPa, member), time: time)
-        case .surface_temperature:
+        case .skin_temperature:
             fallthrough
         case .soil_temperature_0cm:
-            try prefetchData(raw: .init(.skin_temperature, member), time: time)
-        case .surface_pressure:
-            try prefetchData(raw: .init(.surface_air_pressure, member), time: time)
+            try prefetchData(raw: .init(.surface_temperature, member), time: time)
+        case .surface_air_pressure:
+            try prefetchData(raw: .init(.surface_pressure, member), time: time)
         case .relative_humidity_2m:
             fallthrough
         case .relativehumidity_2m:
@@ -616,14 +616,14 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .wet_bulb_temperature_2m:
             try prefetchData(raw: .init(.relative_humidity_1000hPa, member), time: time)
             try prefetchData(raw: .init(.temperature_2m, member), time: time)
-        case .cloud_cover:
-            try prefetchData(raw: .init(.cloudcover, member), time: time)
-        case .cloud_cover_low:
-            try prefetchData(raw: .init(.cloudcover_low, member), time: time)
-        case .cloud_cover_mid:
-            try prefetchData(raw: .init(.cloudcover_mid, member), time: time)
-        case .cloud_cover_high:
-            try prefetchData(raw: .init(.cloudcover_high, member), time: time)
+        case .cloudcover:
+            try prefetchData(raw: .init(.cloud_cover, member), time: time)
+        case .cloudcover_low:
+            try prefetchData(raw: .init(.cloud_cover_low, member), time: time)
+        case .cloudcover_mid:
+            try prefetchData(raw: .init(.cloud_cover_mid, member), time: time)
+        case .cloudcover_high:
+            try prefetchData(raw: .init(.cloud_cover_high, member), time: time)
         }
     }
 }
