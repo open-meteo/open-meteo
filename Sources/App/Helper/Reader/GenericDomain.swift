@@ -26,13 +26,8 @@ protocol GenericDomain {
     /// The time length of each compressed time series file
     var omFileLength: Int { get }
     
-    /// Single master file for a large time series
-    var omFileMaster: (path: String, time: TimerangeDt)? { get }
-    
     /// The the file containing static information for elevation of soil types
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>?
-    
-    
 }
 
 extension GenericDomain {

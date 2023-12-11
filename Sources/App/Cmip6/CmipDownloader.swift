@@ -190,15 +190,6 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         }
     }
     
-    /// Single file to contain the entire timerange of data -> faster for sequentual disk access
-    var omFileMaster: (path: String, time: TimerangeDt)? {
-        let path = "\(OpenMeteo.dataDirectory)master-\(rawValue)/"
-        if self == .EC_Earth3P_HR {
-            return (path, TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2050,1,1), dtSeconds: dtSeconds))
-        }
-        return (path, TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2051,1,1), dtSeconds: dtSeconds))
-    }
-    
     var dtSeconds: Int {
         return 24*3600
     }
