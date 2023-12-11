@@ -114,7 +114,7 @@ extension GenericReaderMixerRaw {
             }
             // undo delta operation
             data?.deltaDecode()
-
+            data?.greater(than: 0)
         } else {
             // default case, just place new data in 1:1
             for r in reader.reversed() {
