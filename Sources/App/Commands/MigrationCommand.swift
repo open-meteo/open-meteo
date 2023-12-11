@@ -235,7 +235,7 @@ struct MigrationCommand: Command {
             .replacingOccurrences(of: "relativehumidity", with: "relative_humidity")
             .replacingOccurrences(of: "eastward_wind", with: "wind_u_component")
             .replacingOccurrences(of: "northward_wind", with: "wind_v_component")
-            .replacingOccurrences(of: "relative_vorticity_1000hPa", with: "relative_vorticity")
+            .replacingOccurrences(of: "atmospheric_relative_vorticity", with: "relative_vorticity")
     }
     
     func transform(file: String, type: String) -> (directory: String, file: String)? {
