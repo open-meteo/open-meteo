@@ -8,11 +8,11 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     case wind_v_component_100m
     case wind_u_component_10m
     case wind_v_component_10m
-    case windgusts_10m
-    case dewpoint_2m
-    case cloudcover_low
-    case cloudcover_mid
-    case cloudcover_high
+    case wind_gusts_10m
+    case dew_point_2m
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
     case pressure_msl
     case snowfall_water_equivalent
     /// Only ERA5-Land and CERRA have snow depth in ACTUAL height. ERA5 and ECMWF IFS use water equivalent and density
@@ -34,7 +34,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     case wave_period
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .dewpoint_2m ||
+        return self == .temperature_2m || self == .dew_point_2m ||
             self == .soil_temperature_0_to_7cm || self == .soil_temperature_7_to_28cm ||
             self == .soil_temperature_28_to_100cm || self == .soil_temperature_100_to_255cm
     }
@@ -88,7 +88,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
             switch self {
             case .temperature_2m:
                 fallthrough
-            case .dewpoint_2m:
+            case .dew_point_2m:
                 fallthrough
             case .soil_temperature_0_to_7cm:
                 fallthrough
@@ -119,12 +119,12 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .wind_v_component_100m: return "100m_v_component_of_wind"
         case .wind_u_component_10m: return "10m_u_component_of_wind"
         case .wind_v_component_10m: return "10m_v_component_of_wind"
-        case .windgusts_10m: return "instantaneous_10m_wind_gust"
-        case .dewpoint_2m: return "2m_dewpoint_temperature"
+        case .wind_gusts_10m: return "instantaneous_10m_wind_gust"
+        case .dew_point_2m: return "2m_dewpoint_temperature"
         case .temperature_2m: return "2m_temperature"
-        case .cloudcover_low: return "low_cloud_cover"
-        case .cloudcover_mid: return "medium_cloud_cover"
-        case .cloudcover_high: return "high_cloud_cover"
+        case .cloud_cover_low: return "low_cloud_cover"
+        case .cloud_cover_mid: return "medium_cloud_cover"
+        case .cloud_cover_high: return "high_cloud_cover"
         case .pressure_msl: return "mean_sea_level_pressure"
         case .snowfall_water_equivalent: return "snowfall"
         case .soil_temperature_0_to_7cm: return "soil_temperature_level_1"
@@ -158,15 +158,15 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
             return "165.128"
         case .wind_v_component_10m:
             return "166.128"
-        case .windgusts_10m:
+        case .wind_gusts_10m:
             return "49.128"
-        case .dewpoint_2m:
+        case .dew_point_2m:
             return "168.128"
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return "186.128"
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return "187.128"
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return "188.128"
         case .pressure_msl:
             return "151.128"
@@ -209,10 +209,10 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     var netCdfScaling: (offest: Double, scalefactor: Double)? {
         switch self {
         case .temperature_2m: return (-273.15, 1) // kelvin to celsius
-        case .dewpoint_2m: return (-273.15, 1)
-        case .cloudcover_low: return (0, 100) // fraction to percent
-        case .cloudcover_mid: return (0, 100)
-        case .cloudcover_high: return (0, 100)
+        case .dew_point_2m: return (-273.15, 1)
+        case .cloud_cover_low: return (0, 100) // fraction to percent
+        case .cloud_cover_mid: return (0, 100)
+        case .cloud_cover_high: return (0, 100)
         case .pressure_msl: return (0, 1) // keep in Pa (not hPa)
         case .snowfall_water_equivalent: return (0, 1000) // meter to millimeter
         case .soil_temperature_0_to_7cm: return (-273.15, 1) // kelvin to celsius
@@ -229,11 +229,11 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     /// shortName attribute in GRIB
     var gribShortName: [String] {
         switch self {
-        case .windgusts_10m: return ["10fg", "gust", "i10fg"] // or "gust" on ubuntu 22.04
+        case .wind_gusts_10m: return ["10fg", "gust", "i10fg"] // or "gust" on ubuntu 22.04
         case .temperature_2m: return ["2t"]
-        case .cloudcover_low: return ["lcc"]
-        case .cloudcover_mid: return ["mcc"]
-        case .cloudcover_high: return ["hcc"]
+        case .cloud_cover_low: return ["lcc"]
+        case .cloud_cover_mid: return ["mcc"]
+        case .cloud_cover_high: return ["hcc"]
         case .pressure_msl: return ["msl"]
         case .snowfall_water_equivalent: return ["sf"]
         case .shortwave_radiation: return ["ssrd"]
@@ -243,7 +243,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .wind_v_component_100m: return ["100v"]
         case .wind_u_component_10m: return ["10u"]
         case .wind_v_component_10m: return ["10v"]
-        case .dewpoint_2m: return ["2d"]
+        case .dew_point_2m: return ["2d"]
         case .soil_temperature_0_to_7cm: return ["stl1"]
         case .soil_temperature_7_to_28cm: return ["stl2"]
         case .soil_temperature_28_to_100cm: return ["stl3"]
@@ -269,11 +269,11 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .wind_v_component_100m: return 10
         case .wind_u_component_10m: return 10
         case .wind_v_component_10m: return 10
-        case .cloudcover_low: return 1
-        case .cloudcover_mid: return 1
-        case .cloudcover_high: return 1
-        case .windgusts_10m: return 10
-        case .dewpoint_2m: return 20
+        case .cloud_cover_low: return 1
+        case .cloud_cover_mid: return 1
+        case .cloud_cover_high: return 1
+        case .wind_gusts_10m: return 10
+        case .dew_point_2m: return 20
         case .temperature_2m: return 20
         case .pressure_msl: return 0.1
         case .snowfall_water_equivalent: return 10
@@ -304,12 +304,12 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .wind_v_component_100m: fallthrough
         case .wind_u_component_10m: fallthrough
         case .wind_v_component_10m: fallthrough
-        case .windgusts_10m: return .metrePerSecond
-        case .dewpoint_2m: return .celsius
+        case .wind_gusts_10m: return .metrePerSecond
+        case .dew_point_2m: return .celsius
         case .temperature_2m: return .celsius
-        case .cloudcover_low: return .percentage
-        case .cloudcover_mid: return .percentage
-        case .cloudcover_high: return .percentage
+        case .cloud_cover_low: return .percentage
+        case .cloud_cover_mid: return .percentage
+        case .cloud_cover_high: return .percentage
         case .pressure_msl: return .pascal
         case .snowfall_water_equivalent: return .millimetre
         case .soil_temperature_0_to_7cm: return .celsius
@@ -410,14 +410,14 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .wind_u_component_10m, time: time)
             try prefetchData(raw: .wind_v_component_10m, time: time)
-            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .dew_point_2m, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
             try prefetchData(raw: .shortwave_radiation, time: time)
         case .relative_humidity_2m:
             fallthrough
         case .relativehumidity_2m:
             try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .dew_point_2m, time: time)
         case .wind_direction_10m:
             fallthrough
         case .winddirection_10m:
@@ -437,14 +437,14 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             fallthrough
         case .vapor_pressure_deficit:
             try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .dew_point_2m, time: time)
         case .diffuse_radiation:
             try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
         case .et0_fao_evapotranspiration:
             try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .dew_point_2m, time: time)
             try prefetchData(raw: .wind_u_component_10m, time: time)
             try prefetchData(raw: .wind_v_component_10m, time: time)
         case .surface_pressure:
@@ -454,9 +454,9 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .cloud_cover:
             fallthrough
         case .cloudcover:
-            try prefetchData(raw: .cloudcover_low, time: time)
-            try prefetchData(raw: .cloudcover_mid, time: time)
-            try prefetchData(raw: .cloudcover_high, time: time)
+            try prefetchData(raw: .cloud_cover_low, time: time)
+            try prefetchData(raw: .cloud_cover_mid, time: time)
+            try prefetchData(raw: .cloud_cover_high, time: time)
         case .direct_normal_irradiance:
             try prefetchData(raw: .direct_radiation, time: time)
         case .rain:
@@ -480,7 +480,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .temperature_2m, time: time)
         case .leaf_wetness_probability:
             try prefetchData(raw: .precipitation, time: time)
-            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .dew_point_2m, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
         case .soil_moisture_index_0_to_7cm:
             try prefetchData(raw: .soil_moisture_0_to_7cm, time: time)
@@ -507,18 +507,18 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .direct_normal_irradiance_instant:
             try prefetchData(raw: .direct_radiation, time: time)
         case .wet_bulb_temperature_2m:
-            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .dew_point_2m, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
-        case .cloud_cover_low:
-            try prefetchData(raw: .cloudcover_low, time: time)
-        case .cloud_cover_mid:
-            try prefetchData(raw: .cloudcover_mid, time: time)
-        case .cloud_cover_high:
-            try prefetchData(raw: .cloudcover_high, time: time)
+        case .cloudcover_low:
+            try prefetchData(raw: .cloud_cover_low, time: time)
+        case .cloudcover_mid:
+            try prefetchData(raw: .cloud_cover_mid, time: time)
+        case .cloudcover_high:
+            try prefetchData(raw: .cloud_cover_high, time: time)
         case .wind_gusts_10m:
-            try prefetchData(raw: .windgusts_10m, time: time)
-        case .dew_point_2m:
-            try prefetchData(raw: .dewpoint_2m, time: time)
+            try prefetchData(raw: .wind_gusts_10m, time: time)
+        case .dewpoint_2m:
+            try prefetchData(raw: .dew_point_2m, time: time)
         case .sunshine_duration:
             try prefetchData(raw: .direct_radiation, time: time)
         }
@@ -552,7 +552,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             fallthrough
         case .relativehumidity_2m:
             let temperature = try get(raw: .temperature_2m, time: time).data
-            let dew = try get(raw: .dewpoint_2m, time: time).data
+            let dew = try get(raw: .dew_point_2m, time: time).data
             let relativeHumidity = zip(temperature, dew).map(Meteorology.relativeHumidity)
             return DataAndUnit(relativeHumidity, .percentage)
         case .wind_direction_10m:
@@ -580,14 +580,14 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             fallthrough
         case .vapor_pressure_deficit:
             let temperature = try get(raw: .temperature_2m, time: time).data
-            let dewpoint = try get(raw: .dewpoint_2m, time: time).data
+            let dewpoint = try get(raw: .dew_point_2m, time: time).data
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .et0_fao_evapotranspiration:
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time)
             let swrad = try get(raw: .shortwave_radiation, time: time).data
             let temperature = try get(raw: .temperature_2m, time: time).data
             let windspeed = try get(derived: .windspeed_10m, time: time).data
-            let dewpoint = try get(raw: .dewpoint_2m, time: time).data
+            let dewpoint = try get(raw: .dew_point_2m, time: time).data
             
             let et0 = swrad.indices.map { i in
                 return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: self.modelElevation.numeric, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
@@ -605,9 +605,9 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .cloud_cover:
             fallthrough
         case .cloudcover:
-            let low = try get(raw: .cloudcover_low, time: time).data
-            let mid = try get(raw: .cloudcover_mid, time: time).data
-            let high = try get(raw: .cloudcover_high, time: time).data
+            let low = try get(raw: .cloud_cover_low, time: time).data
+            let mid = try get(raw: .cloud_cover_mid, time: time).data
+            let high = try get(raw: .cloud_cover_high, time: time).data
             return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percentage)
         case .snowfall:
             let snowwater = try get(raw: .snowfall_water_equivalent, time: time).data
@@ -667,7 +667,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             }), .gddCelsius)
         case .leaf_wetness_probability:
             let temperature = try get(raw: .temperature_2m, time: time).data
-            let dewpoint = try get(raw: .dewpoint_2m, time: time).data
+            let dewpoint = try get(raw: .dew_point_2m, time: time).data
             let precipitation = try get(raw: .precipitation, time: time).data
             return DataAndUnit(zip(zip(temperature, dewpoint), precipitation).map( {
                 let ((temperature, dewpoint), precipitation) = $0
@@ -744,19 +744,19 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
         case .wet_bulb_temperature_2m:
             let temperature = try get(raw: .temperature_2m, time: time)
-            let dew = try get(raw: .dewpoint_2m, time: time).data
+            let dew = try get(raw: .dew_point_2m, time: time).data
             let rh = zip(temperature.data, dew).map(Meteorology.relativeHumidity)
             return DataAndUnit(zip(temperature.data, rh).map(Meteorology.wetBulbTemperature), temperature.unit)
-        case .cloud_cover_low:
-            return try get(raw: .cloudcover_low, time: time)
-        case .cloud_cover_mid:
-            return try get(raw: .cloudcover_mid, time: time)
-        case .cloud_cover_high:
-            return try get(raw: .cloudcover_high, time: time)
+        case .cloudcover_low:
+            return try get(raw: .cloud_cover_low, time: time)
+        case .cloudcover_mid:
+            return try get(raw: .cloud_cover_mid, time: time)
+        case .cloudcover_high:
+            return try get(raw: .cloud_cover_high, time: time)
         case .wind_gusts_10m:
-            return try get(raw: .windgusts_10m, time: time)
-        case .dew_point_2m:
-            return try get(raw: .dewpoint_2m, time: time)
+            return try get(raw: .wind_gusts_10m, time: time)
+        case .dewpoint_2m:
+            return try get(raw: .dew_point_2m, time: time)
         case .sunshine_duration:
             let directRadiation = try get(raw: .direct_radiation, time: time)
             let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)

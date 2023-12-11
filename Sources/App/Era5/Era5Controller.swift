@@ -27,9 +27,9 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case et0_fao_evapotranspiration
     case cloudcover
     case cloud_cover
-    case cloud_cover_low
-    case cloud_cover_mid
-    case cloud_cover_high
+    case cloudcover_low
+    case cloudcover_mid
+    case cloudcover_high
     case direct_normal_irradiance
     case weathercode
     case weather_code
@@ -51,7 +51,7 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case direct_normal_irradiance_instant
     case wet_bulb_temperature_2m
     case wind_gusts_10m
-    case dew_point_2m
+    case dewpoint_2m
     case sunshine_duration
     
     var requiresOffsetCorrectionForMixing: Bool {

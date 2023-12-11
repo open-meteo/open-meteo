@@ -663,7 +663,7 @@ struct DownloadEra5Command: AsyncCommand {
                 let endStep = Int(message.get(attribute: "endStep")!)!
                 logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
                 
-                if variable == .windgusts_10m && endStep == 0 {
+                if variable == .wind_gusts_10m && endStep == 0 {
                     return
                 }
                 
