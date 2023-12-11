@@ -50,46 +50,6 @@ enum OmFileManagerReadable: Hashable {
     }
 }
 
-
-/// Simple base path, variable name and timechunk
-/*struct OmFileDomainWithTime: OmFileManagerReadable {
-    let domain: DomainRegistry
-    let variable: String
-    let timeChunk: Int
-    let type: OmFileType
-    
-    func getFilePath() -> String {
-        return "\(domain.directory)\(variable)/\(type)_\(timeChunk).om"
-    }
-}
-
-/// Simple base path, variable name and timechunk
-struct OmFilePathWithTime: OmFileManagerReadable {
-    let basePath: String
-    let variable: String
-    let timeChunk: Int
-    
-    func getFilePath() -> String {
-        return basePath + variable + "_\(timeChunk).om"
-    }
-}
-
-/// Assemble a file path if required. Includes data directory as a prefix.
-/// All input paths can be passed by reference and do not require to allocate new strings unless required
-struct OmFilePathWithSuffix: OmFileManagerReadable {
-    let domain: String
-    let directory: String
-    let variable: String
-    let suffix: String
-    
-    func getFilePath() -> String {
-        return "\(OpenMeteo.dataDirectory)\(directory)-\(domain)/\(variable)_\(suffix).om"
-    }
-    func createDirectory() throws {
-        try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)\(directory)-\(domain)", withIntermediateDirectories: true)
-    }
-}*/
-
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
 final class OmFileManager: LifecycleHandler {

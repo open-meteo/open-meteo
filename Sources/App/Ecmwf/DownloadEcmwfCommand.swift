@@ -313,12 +313,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
             progress.finish()
         }
         
-        var indexTimeEnd = run.timeIntervalSince1970 + 241 * 3600
+        /*var indexTimeEnd = run.timeIntervalSince1970 + 241 * 3600
         if run.hour == 6 || run.hour == 18 {
             // run 6 and 18 only have 90 instead 240
             indexTimeEnd += (240 - 90) * 3600
         }
-        let indexTimeStart = indexTimeEnd - domain.omFileLength * domain.dtSeconds + 12 * 3600
+        let indexTimeStart = indexTimeEnd - domain.omFileLength * domain.dtSeconds + 12 * 3600*/
         //try "\(run.timeIntervalSince1970),\(domain.omFileLength),\(indexTimeStart),\(indexTimeEnd)".write(toFile: "\(domain.omfileDirectory)init.txt", atomically: true, encoding: .utf8)
     }
 }
