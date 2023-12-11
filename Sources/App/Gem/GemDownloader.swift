@@ -234,7 +234,7 @@ struct GemDownload: AsyncCommand {
                     // GEM ensemble does not have wind speed and direction directly, calculate from u/v components
                     if domain == .gem_global_ensemble, let variable = variable as? GemSurfaceVariable {
                         // keep wind speed in memory, which actually contains wind U-component
-                        if [.windspeed_10m, .windspeed_40m, .windspeed_80m, .windspeed_120m].contains(variable) {
+                        if [.wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m].contains(variable) {
                             inMemory[.init(variable, member)] = grib2d.array.data
                             continue
                         }

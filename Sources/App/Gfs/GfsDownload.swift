@@ -320,7 +320,7 @@ struct GfsDownload: AsyncCommand {
                     
                     // Convert specific humidity to relative humidity
                     if let variable = variable.variable as? GfsSurfaceVariable,
-                       variable == .relativehumidity_2m,
+                       variable == .relative_humidity_2m,
                        shortName == "2sh"
                     {
                         guard let temperature = inMemorySurface[.temperature_2m] else {
