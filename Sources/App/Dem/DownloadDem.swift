@@ -14,7 +14,6 @@ import SwiftPFor2D
  */
 struct Dem90 {
     static let downloadDirectory = "\(OpenMeteo.tempDirectory)download-dem90/"
-    static let omDirectory = "\(OpenMeteo.dataDirectory)omfile-dem90/"
 
     /// Get elevation for coordinate. Access to om files is cached.
     static func read(lat: Float, lon: Float) throws -> Float {
@@ -22,7 +21,7 @@ struct Dem90 {
             return .nan
         }
         let lati = lat < 0 ? Int(lat) - 1 : Int(lat)
-        guard let om = try OmFileManager.get(OmFilePathWithTime(basePath: Dem90.omDirectory, variable: "lat", timeChunk: lati)) else {
+        guard let om = try OmFileManager.get(.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)) else {
             // file not available
             return .nan
         }
@@ -89,7 +88,6 @@ struct DownloadDemCommand: AsyncCommand {
 
     func run(using context: CommandContext, signature: Signature) async throws {
         try FileManager.default.createDirectory(atPath: Dem90.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: Dem90.omDirectory, withIntermediateDirectories: true)
         let logger = context.application.logger
         //let curl = Curl(logger: logger)
 
@@ -158,9 +156,11 @@ struct DownloadDemCommand: AsyncCommand {
             var scheduledCompressions = 0
 
             for lat in -90..<90 {
-                if FileManager.default.fileExists(atPath: "\(Dem90.omDirectory)lat_\(lat).om") {
+                let file = OmFileManagerReadable.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lat)
+                if FileManager.default.fileExists(atPath: file.getFilePath()) {
                     continue
                 }
+                try file.createDirectory()
 
                 if scheduledCompressions >= signature.concurrentCompressions ?? 4 {
                     try await group.next()
@@ -189,7 +189,7 @@ struct DownloadDemCommand: AsyncCommand {
 
                     //let a2 = Array2DFastSpace(data: line, nLocations: 1200*360*px, nTime: 1)
                     //try a2.writeNetcdf(filename: "\(Dem90.downloadDirectory)lat_\(lat).nc", nx: 360*px, ny: 1200)
-                    try OmFileWriter(dim0: 1200, dim1: px*360, chunk0: 60, chunk1: 60).write(file: "\(Dem90.omDirectory)lat_\(lat).om", compressionType: .p4nzdec256, scalefactor: 1, all: line)
+                    try OmFileWriter(dim0: 1200, dim1: px*360, chunk0: 60, chunk1: 60).write(file: file.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: line)
                 }
             }
 

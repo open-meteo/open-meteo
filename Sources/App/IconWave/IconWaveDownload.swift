@@ -57,10 +57,9 @@ struct DownloadIconWaveCommand: AsyncCommand {
         let baseUrl = "http://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
@@ -111,9 +110,8 @@ struct DownloadIconWaveCommand: AsyncCommand {
     
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable]) throws {        
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let nLocations = domain.grid.count
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let nTime = domain.countForecastHours
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)

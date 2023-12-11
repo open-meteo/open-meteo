@@ -72,6 +72,10 @@ enum DomainRegistry: String, CaseIterable {
     case cmip_MRI_AGCM3_2_S
     case cmip_NICAM16_8S
     
+    var directory: String {
+        return "\(OpenMeteo.dataDirectory)\(rawValue)/"
+    }
+    
     func getDomain() -> GenericDomain {
         switch self {
         case .meteofrance_arome_france:

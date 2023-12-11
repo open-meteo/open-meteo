@@ -56,7 +56,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
         try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convertEcmwf(logger: logger, domain: domain, run: run, variables: variables)
@@ -69,7 +68,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         
         var generateElevationFileData: (lsm: [Float]?, surfacePressure: [Float]?, sealevelPressure: [Float]?, temperature_2m: [Float]?) = (nil, nil, nil, nil)
@@ -129,7 +127,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         for hour in forecastSteps {
@@ -260,7 +258,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         let nLocations = domain.grid.nx * domain.grid.ny
         
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations * nMembers, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil)
+        let om = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         
         var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)

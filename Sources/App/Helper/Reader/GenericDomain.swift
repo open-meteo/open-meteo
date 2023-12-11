@@ -15,7 +15,7 @@ protocol GenericDomain {
     var dtSeconds: Int { get }
     
     /// Where chunked time series files are stroed
-    var omfileDirectory: String { get }
+    //var omfileDirectory: String { get }
     
     /// If true, domain has yearly files
     var hasYearlyFiles: Bool { get }
@@ -34,9 +34,9 @@ extension GenericDomain {
     var dtHours: Int { dtSeconds / 3600 }
     
     /// Directory to store time chunks
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDirectory)omfile-\(domainRegistry.rawValue)/"
-    }
+    //var omfileDirectory: String {
+    //    return "\(OpenMeteo.dataDirectory)omfile-\(domainRegistry.rawValue)/"
+    //}
     
     /// Temporary directory to download data
     var downloadDirectory: String {
@@ -44,30 +44,30 @@ extension GenericDomain {
     }
     
     /// Directory for yearly files
-    var omfileArchive: String {
-        return "\(OpenMeteo.dataDirectory)archive-\(domainRegistry.rawValue)/"
-    }
+    //var omfileArchive: String {
+    //    return "\(OpenMeteo.dataDirectory)archive-\(domainRegistry.rawValue)/"
+    //}
     
     /// Master file to store "all" timesteps in one file. Used only in CMIP for store 100 years a once
-    var omMasterDirectory: String {
-        "\(OpenMeteo.dataDirectory)master-\(domainRegistry.rawValue)/"
-    }
+    //var omMasterDirectory: String {
+    //    "\(OpenMeteo.dataDirectory)master-\(domainRegistry.rawValue)/"
+    //}
     
     /// Single master file for a large time series
-    var omFileMaster: (path: String, time: TimerangeDt)? {
+    /*var omFileMaster: (path: String, time: TimerangeDt)? {
         guard let time = masterTimeRange else {
             return nil
         }
         return (omMasterDirectory, TimerangeDt(range: time, dtSeconds: dtSeconds))
-    }
+    }*/
     
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: String {
-        "\(omfileDirectory)HSURF.om"
+        "\(domainRegistry.directory)static/HSURF.om"
     }
     
     var soilTypeFileOm: String {
-        "\(omfileDirectory)soil_type.om"
+        "\(domainRegistry.directory)static/soil_type.om"
     }
 }
 

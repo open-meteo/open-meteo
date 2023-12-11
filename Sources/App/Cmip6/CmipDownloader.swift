@@ -307,8 +307,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
 
 extension GenericDomain {
     /// Get the file path to a linear bias seasonal file for a given variable
-    func getBiasCorrectionFile(for variable: String) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: self.domainRegistry.rawValue, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
+    func getBiasCorrectionFile(for variable: String) -> OmFileManagerReadable {
+        return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil)
     }
     
     func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {
@@ -931,13 +931,9 @@ struct DownloadCmipCommand: AsyncCommand {
                        "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"
         ]
         
-        let yearlyPath = domain.omfileArchive
-        guard let master = domain.omFileMaster else {
-            fatalError("no master defined")
-        }
+        let domainDirectory = domain.domainRegistry.directory
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: yearlyPath, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domainDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, deadLineHours: 24*14, readTimeout: 3600*3, retryError4xx: false)
         let source = domain.soureName
@@ -975,7 +971,8 @@ struct DownloadCmipCommand: AsyncCommand {
         
         for year in years {
             for variable in variables {
-                if FileManager.default.fileExists(atPath: "\(master.path)\(variable.rawValue)_0.om") {
+                try FileManager.default.createDirectory(atPath: "\(domainDirectory)\(variable.rawValue)", withIntermediateDirectories: true)
+                if FileManager.default.fileExists(atPath: "\(domainDirectory)\(variable.rawValue)/master_0.om") {
                     continue
                 }
                 let isFuture = year >= 2015
@@ -986,7 +983,7 @@ struct DownloadCmipCommand: AsyncCommand {
                 let version = variable.version(for: domain, isFuture: isFuture)
                 let experimentId = domain == .FGOALS_f3_H ? (isFuture ? "highres-future" : "hist-1950") : (isFuture ? "highresSST-future" : "highresSST-present")
                 
-                let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
+                let omFile = "\(domainDirectory)\(variable.rawValue)/year_\(year).om"
                 if FileManager.default.fileExists(atPath: omFile) {
                     continue
                 }
@@ -1178,9 +1175,11 @@ struct DownloadCmipCommand: AsyncCommand {
                     }
                     // NOTE: maybe note required if 3h data is used
                     if calculateRhFromSpecificHumidity {
-                        let pressure = try OmFileReader(file: "\(yearlyPath)pressure_msl_\(year).om").readAll2D()
+                        
+                        
+                        let pressure = try OmFileReader(file: "\(domainDirectory)pressure_msl/year_\(year).om").readAll2D()
                         let elevation = try domain.getStaticFile(type: .elevation)!.readAll()
-                        let temp = try OmFileReader(file: "\(yearlyPath)temperature_2m_mean_\(year).om").readAll2D()
+                        let temp = try OmFileReader(file: "\(domainDirectory)temperature_2m_mean/year_\(year).om").readAll2D()
                         array.data.multiplyAdd(multiply: 1000, add: 0)
                         array.data = Meteorology.specificToRelativeHumidity(specificHumidity: array, temperature: temp, sealLevelPressure: pressure, elevation: elevation)
                         //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)rh.nc", nx: domain.grid.nx, ny: domain.grid.ny)
@@ -1217,20 +1216,20 @@ struct DownloadCmipCommand: AsyncCommand {
         // Generate a single master file instead of yearly files
         // ~80 MB memory for 600 location chunks
         logger.info("Generating master files")
-        try FileManager.default.createDirectory(atPath: master.path, withIntermediateDirectories: true)
         for variable in variables {
-            let masterFile = "\(master.path)\(variable.rawValue)_0.om"
+            try FileManager.default.createDirectory(atPath: "\(domainDirectory)\(variable.rawValue)", withIntermediateDirectories: true)
+            let masterFile = "\(domainDirectory)\(variable.rawValue)/master_0.om"
             if FileManager.default.fileExists(atPath: masterFile) {
                 continue
             }
             let yearlyReader = years.compactMap { year in
-                let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
+                let omFile = "\(domainDirectory)\(variable.rawValue)/year_\(year).om"
                 return try? OmFileReader(file: omFile)
             }
             if yearlyReader.isEmpty {
                 continue
             }
-            try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512)
+            try OmFileWriter(dim0: domain.grid.count, dim1: TimerangeDt(range: domain.masterTimeRange!, dtSeconds: domain.dtSeconds).count, chunk0: 8, chunk1: 512)
                 .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: 600, chunkedFiles: yearlyReader, dataCallback: nil)
         }
         

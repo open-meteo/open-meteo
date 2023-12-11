@@ -69,9 +69,7 @@ struct SeasonalForecastDownload: AsyncCommand {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
             return
         }
-        
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        
+                
         let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
         try await GfsDownload().downloadNcepElevation(application: application, url: [url], surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
     }
@@ -103,8 +101,7 @@ struct SeasonalForecastDownload: AsyncCommand {
     
     /// Process each variable and update time-series optimised files
     func convertCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         
         for member in 1..<domain.nMembers+1 {
             try GribFile.readAndConvert(logger: logger, gribName: "tmin", member: member, domain: domain, add: -273.15).first!.value
