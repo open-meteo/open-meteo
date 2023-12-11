@@ -325,7 +325,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     case temperature_2m_max
     case temperature_2m_mean
     case pressure_msl_mean
-    case cloudcover_mean
+    case cloud_cover_mean
     case precipitation_sum
     // Note: runoff includes soil drainage -> not surface runoff
     //case runoff_sum
@@ -333,8 +333,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     case relative_humidity_2m_min
     case relative_humidity_2m_max
     case relative_humidity_2m_mean
-    case windspeed_10m_mean
-    case windspeed_10m_max
+    case wind_speed_10m_mean
+    case wind_speed_10m_max
     
     //case surface_temperature
     
@@ -374,7 +374,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .hermite(bounds: nil)
         case .temperature_2m_mean:
             return .hermite(bounds: nil)
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return .linear
         case .precipitation_sum:
             return .backwards_sum
@@ -388,9 +388,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .hermite(bounds: 0...100)
         case .relative_humidity_2m_mean:
             return .hermite(bounds: 0...100)
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return .hermite(bounds: nil)
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return .hermite(bounds: nil)
         case .soil_moisture_0_to_10cm_mean:
             return .hermite(bounds: nil)
@@ -409,7 +409,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .celsius
         case .temperature_2m_mean:
             return .celsius
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return .percentage
         case .precipitation_sum:
             return .millimetre
@@ -423,9 +423,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .percentage
         case .relative_humidity_2m_mean:
             return .percentage
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return .metrePerSecond
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return .metrePerSecond
         case .soil_moisture_0_to_10cm_mean:
             return .cubicMetrePerCubicMetre
@@ -449,7 +449,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .absoluteChage(bounds: nil)
         case .pressure_msl_mean:
             return .absoluteChage(bounds: nil)
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return .absoluteChage(bounds: 0...100)
         case .precipitation_sum:
             return .relativeChange(maximum: nil)
@@ -461,9 +461,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .absoluteChage(bounds: 0...100)
         case .relative_humidity_2m_mean:
             return .absoluteChage(bounds: 0...100)
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return .relativeChange(maximum: nil)
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return .relativeChange(maximum: nil)
         case .soil_moisture_0_to_10cm_mean:
             return .absoluteChage(bounds: 0...10e9)
@@ -486,9 +486,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return "20211028"
             }
             switch self {
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 fallthrough
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 fallthrough
             case .pressure_msl_mean:
                 fallthrough
@@ -549,7 +549,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return 20
         case .temperature_2m_mean:
             return 20
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return 1
         case .precipitation_sum:
             return 10
@@ -563,9 +563,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return 1
         case .relative_humidity_2m_mean:
             return 1
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return 10
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return 10
         //case .surface_temperature:
         //    return 20
@@ -590,7 +590,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .temperature_2m_mean:
                 return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -610,9 +610,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
-            case.windspeed_10m_max:
+            case.wind_speed_10m_max:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
             }
         /*case .HadGEM3_GC31_HM:
@@ -647,9 +647,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             case .precipitation_sum:
                 // only precip is in yearly files...
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .monthly
-            case .windspeed_10m_max:
+            case .wind_speed_10m_max:
                 return .monthly
             default:
                 return nil
@@ -688,7 +688,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             switch self {
             //case .relative_humidity_2m_mean:
                 //return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             //case .temperature_2m_mean:
                 //return .yearly
@@ -698,7 +698,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -732,7 +732,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .temperature_2m_min:
                 return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -742,7 +742,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
             default:
                 return nil
@@ -757,7 +757,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .pressure_msl_mean:
                 return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -765,9 +765,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .relative_humidity_2m_mean:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
-            case .windspeed_10m_max:
+            case .wind_speed_10m_max:
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
@@ -784,7 +784,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .pressure_msl_mean:
                 return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -796,9 +796,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .relative_humidity_2m_mean:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
-            case .windspeed_10m_max:
+            case .wind_speed_10m_max:
                 return .yearly
             case .soil_moisture_0_to_10cm_mean:
                 return nil
@@ -819,7 +819,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return "tasmax"
         case .temperature_2m_mean:
             return "tas"
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return "clt"
         case .precipitation_sum:
             return "pr"
@@ -839,9 +839,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return "rsds"
         //case .surface_temperature:
         //    return "tslsi"
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return "sfcWind"
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return "sfcWindmax"
         }
     }
@@ -851,7 +851,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return (100, 0)
         }
         
-        if (domain == .NICAM16_8S || domain == .FGOALS_f3_H) && self == .cloudcover_mean {
+        if (domain == .NICAM16_8S || domain == .FGOALS_f3_H) && self == .cloud_cover_mean {
             return (100, 0)
         }
         

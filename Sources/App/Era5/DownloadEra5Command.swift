@@ -257,7 +257,7 @@ struct DownloadEra5Command: AsyncCommand {
             .soil_temperature_0_to_7cm_mean,
             .soil_temperature_7_to_28cm_mean,
             .soil_temperature_28_to_100cm_mean,
-            .vapor_pressure_deficit_max
+            .vapour_pressure_deficit_max
         ].map{.derived($0)}
         
         for variable in variables {
