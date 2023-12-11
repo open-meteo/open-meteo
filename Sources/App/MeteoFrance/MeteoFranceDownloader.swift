@@ -53,7 +53,7 @@ struct MeteoFranceDownload: AsyncCommand {
         
         let pressureVariables = domain.levels.reversed().flatMap { level in
             MeteoFrancePressureVariableType.allCases.compactMap { variable -> MeteoFrancePressureVariable? in
-                if variable == .cloudcover && level < 100 {
+                if variable == .cloud_cover && level < 100 {
                     return nil
                 }
                 return MeteoFrancePressureVariable(variable: variable, level: level)

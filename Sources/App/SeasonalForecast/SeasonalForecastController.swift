@@ -21,8 +21,8 @@ enum CfsVariableDerived: String, RawRepresentableString {
     case winddirection_10m
     case wind_speed_10m
     case wind_direction_10m
-    case cloud_cover
-    case relative_humidity_2m
+    case cloudcover
+    case relativehumidity_2m
 }
 
 enum DailyCfsVariable: String, RawRepresentableString {
@@ -51,10 +51,10 @@ extension SeasonalForecastReader {
             case .winddirection_10m, .wind_direction_10m:
                 try prefetchData(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
                 try prefetchData(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
-            case .cloud_cover:
-                try prefetchData(variable: VariableAndMember(.cloudcover, member), time: time)
-            case .relative_humidity_2m:
-                try prefetchData(variable: VariableAndMember(.relativehumidity_2m, member), time: time)
+            case .cloudcover:
+                try prefetchData(variable: VariableAndMember(.cloud_cover, member), time: time)
+            case .relativehumidity_2m:
+                try prefetchData(variable: VariableAndMember(.relative_humidity_2m, member), time: time)
             }
         }
     }
@@ -75,10 +75,10 @@ extension SeasonalForecastReader {
                 let v = try get(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
                 let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
                 return DataAndUnit(direction, .degreeDirection)
-            case .cloud_cover:
-                return try get(variable: VariableAndMember(.cloudcover, member), time: time)
-            case .relative_humidity_2m:
-                return try get(variable: VariableAndMember(.relativehumidity_2m, member), time: time)
+            case .cloudcover:
+                return try get(variable: VariableAndMember(.cloud_cover, member), time: time)
+            case .relativehumidity_2m:
+                return try get(variable: VariableAndMember(.relative_humidity_2m, member), time: time)
             }
         }
     }

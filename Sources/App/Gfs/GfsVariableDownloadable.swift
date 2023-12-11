@@ -436,7 +436,7 @@ extension GfsPressureVariable: GfsVariableDownloadable {
             return ":VGRD:\(level) mb:"
         case .geopotential_height:
             return ":HGT:\(level) mb:"
-        case .cloudcover:
+        case .cloud_cover:
             if domain != .gfs025 {
                 // no cloud cover in HRRR and NAM
                 return nil
@@ -445,7 +445,7 @@ extension GfsPressureVariable: GfsVariableDownloadable {
                 return nil
             }
             return ":TCDC:\(level) mb:"
-        case .relativehumidity:
+        case .relative_humidity:
             return ":RH:\(level) mb:"
         case .vertical_velocity:
             switch domain {

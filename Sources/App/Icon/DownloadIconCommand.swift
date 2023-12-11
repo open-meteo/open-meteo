@@ -204,7 +204,7 @@ struct DownloadIconCommand: AsyncCommand {
                                 grib2d.array.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: grib2d.array.data, elevation: domainElevation)
                             }
                         }
-                        if domain == .iconEps && variable == .relativehumidity_2m {
+                        if domain == .iconEps && variable == .relative_humidity_2m {
                             // ICON EPS is using dewpoint, convert to relative humidity
                             guard let t2m = temperature2m[member] else {
                                 fatalError("Relative humidity calculation requires temperature_2m")
@@ -214,7 +214,7 @@ struct DownloadIconCommand: AsyncCommand {
                         }
                         // DWD ICON weather codes show rain although precipitation is 0
                         // Similar for snow at +2°C or more
-                        if variable == .weathercode {
+                        if variable == .weather_code {
                             guard let t2m = temperature2m[member] else {
                                 fatalError("Weather code correction requires temperature_2m")
                             }
@@ -235,7 +235,7 @@ struct DownloadIconCommand: AsyncCommand {
                         /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
                         /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
                         /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
-                        if variable == .freezinglevel_height {
+                        if variable == .freezing_level_height {
                             guard let t2m = temperature2m[member] else {
                                 fatalError("Freezing level height correction requires temperature_2m")
                             }

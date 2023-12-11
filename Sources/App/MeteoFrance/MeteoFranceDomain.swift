@@ -205,12 +205,12 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
  */
 enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
-    case cloudcover
-    case cloudcover_low
-    case cloudcover_mid
-    case cloudcover_high
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
     case pressure_msl
-    case relativehumidity_2m
+    case relative_humidity_2m
     
     case wind_v_component_10m
     case wind_u_component_10m
@@ -243,7 +243,7 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
    
     case snowfall_water_equivalent
     
-    case windgusts_10m
+    case wind_gusts_10m
 
     case shortwave_radiation
    
@@ -261,19 +261,19 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         switch self {
         case .temperature_2m:
             return 20
-        case .cloudcover:
+        case .cloud_cover:
             return 1
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return 1
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return 1
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return 1
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return 1
         case .precipitation:
             return 10
-        case .windgusts_10m:
+        case .wind_gusts_10m:
             return 10
         case .pressure_msl:
             return 10
@@ -324,17 +324,17 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         switch self {
         case .temperature_2m:
             return .hermite(bounds: nil)
-        case .cloudcover:
+        case .cloud_cover:
             return .hermite(bounds: 0...100)
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return .hermite(bounds: 0...100)
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return .hermite(bounds: 0...100)
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return .hermite(bounds: 0...10)
         case .pressure_msl:
             return .hermite(bounds: nil)
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
         case .wind_v_component_10m:
             return .hermite(bounds: nil)
@@ -344,7 +344,7 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
             return .backwards_sum
         case .snowfall_water_equivalent:
             return .backwards_sum
-        case .windgusts_10m:
+        case .wind_gusts_10m:
             return .hermite(bounds: nil)
         case .shortwave_radiation:
             return .solar_backwards_averaged
@@ -387,19 +387,19 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         switch self {
         case .temperature_2m:
             return .celsius
-        case .cloudcover:
+        case .cloud_cover:
             return .percentage
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return .percentage
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return .percentage
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return .percentage
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return .percentage
         case .precipitation:
             return .millimetre
-        case .windgusts_10m:
+        case .wind_gusts_10m:
             return .metrePerSecond
         case .pressure_msl:
             return .hectopascal
@@ -474,8 +474,8 @@ enum MeteoFrancePressureVariableType: String, CaseIterable {
     case wind_u_component
     case wind_v_component
     case geopotential_height
-    case cloudcover
-    case relativehumidity
+    case cloud_cover
+    case relative_humidity
 }
 
 
@@ -507,9 +507,9 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
-        case .cloudcover:
+        case .cloud_cover:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
-        case .relativehumidity:
+        case .relative_humidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
     }
@@ -524,9 +524,9 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return .hermite(bounds: nil)
         case .geopotential_height:
             return .hermite(bounds: nil)
-        case .cloudcover:
+        case .cloud_cover:
             return .hermite(bounds: 0...100)
-        case .relativehumidity:
+        case .relative_humidity:
             return .hermite(bounds: 0...100)
         }
     }
@@ -541,9 +541,9 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return .metrePerSecond
         case .geopotential_height:
             return .metre
-        case .cloudcover:
+        case .cloud_cover:
             return .percentage
-        case .relativehumidity:
+        case .relative_humidity:
             return .percentage
         }
     }

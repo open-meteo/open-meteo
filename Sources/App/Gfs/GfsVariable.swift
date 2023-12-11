@@ -307,8 +307,8 @@ enum GfsPressureVariableType: String, CaseIterable, RawRepresentableString {
     case wind_u_component
     case wind_v_component
     case geopotential_height
-    case cloudcover
-    case relativehumidity
+    case cloud_cover
+    case relative_humidity
     case vertical_velocity
 }
 
@@ -341,9 +341,9 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
-        case .cloudcover:
+        case .cloud_cover:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
-        case .relativehumidity:
+        case .relative_humidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         case .vertical_velocity:
             return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
@@ -360,9 +360,9 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .hermite(bounds: nil)
         case .geopotential_height:
             return .linear
-        case .cloudcover:
+        case .cloud_cover:
             return .linear
-        case .relativehumidity:
+        case .relative_humidity:
             return .hermite(bounds: 0...100)
         case .vertical_velocity:
             return .hermite(bounds: nil)
@@ -379,9 +379,9 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .metrePerSecond
         case .geopotential_height:
             return .metre
-        case .cloudcover:
+        case .cloud_cover:
             return .percentage
-        case .relativehumidity:
+        case .relative_humidity:
             return .percentage
         case .vertical_velocity:
             return .metrePerSecondNotUnitConverted

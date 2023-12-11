@@ -121,7 +121,7 @@ struct SeasonalForecastDownload: AsyncCommand {
                     .writeCfs(om: om, logger: logger, variable: .precipitation, member: member, run: run, dtSeconds: domain.dtSeconds)
             
             try GribFile.readAndConvert(logger: logger, gribName: "tcdcclm", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .cloudcover, member: member, run: run, dtSeconds: domain.dtSeconds)
+                    .writeCfs(om: om, logger: logger, variable: .cloud_cover, member: member, run: run, dtSeconds: domain.dtSeconds)
 
             try GribFile.readAndConvert(logger: logger, gribName: "soilm1", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .soil_moisture_0_to_10cm, member: member, run: run, dtSeconds: domain.dtSeconds)
@@ -156,7 +156,7 @@ struct SeasonalForecastDownload: AsyncCommand {
                 let specificHumidity = try GribFile.readAndConvert(logger: logger, gribName: "q2m", member: member, domain: domain, multiply: 1000).first!.value
                 
                 let relativeHumidity = Array2DFastTime(data: Meteorology.specificToRelativeHumidity(specificHumidity: specificHumidity.data, temperature: tmp2m.data, pressure: surfacePressure.data), nLocations: tmp2m.nLocations, nTime: tmp2m.nTime)
-                try relativeHumidity.writeCfs(om: om, logger: logger, variable: .relativehumidity_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
+                try relativeHumidity.writeCfs(om: om, logger: logger, variable: .relative_humidity_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
             }()
             
             
