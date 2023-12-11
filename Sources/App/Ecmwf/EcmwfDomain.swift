@@ -14,8 +14,13 @@ enum EcmwfDomain: String, GenericDomain {
         }
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .ifs04:
+            return .ecmwf_ifs04
+        case .ifs04_ensemble:
+            return .ecmwf_ifs04_ensemble
+        }
     }
     
     private static var ifs04ElevationFile = try? OmFileReader(file: Self.ifs04.surfaceElevationFileOm)

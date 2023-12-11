@@ -18,8 +18,17 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         return "\(OpenMeteo.tempDirectory)download-\(rawValue)/"
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .gem_global:
+            return .cmc_gem_gdps
+        case .gem_regional:
+            return .cmc_gem_rdps
+        case .gem_hrdps_continental:
+            return .cmc_gem_hrdps
+        case .gem_global_ensemble:
+            return .cmc_gem_geps
+        }
     }
     
     var hasYearlyFiles: Bool {

@@ -432,8 +432,25 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     case seasonalv3
     case intermediatev3
     
-    var domainName: String {
-        return "glofas-\(rawValue)/"
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .forecast:
+            return .glofas_forecast_v4
+        case .consolidated:
+            return .glofas_consolidated_v4
+        case .seasonal:
+            return .glofas_seasonal_v4
+        case .intermediate:
+            return .glofas_intermediate_v4
+        case .forecastv3:
+            return .glofas_forecast_v3
+        case .consolidatedv3:
+            return .glofas_consolidated_v3
+        case .seasonalv3:
+            return .glofas_seasonal_v3
+        case .intermediatev3:
+            return .glofas_intermediate_v3
+        }
     }
     
     var hasYearlyFiles: Bool {

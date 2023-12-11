@@ -121,8 +121,8 @@ extension Cmip6Domain: ModelFlatbufferSerialisable {
         switch self {
         case .CMCC_CM2_VHR4:
             return .cmccCm2Vhr4
-        case .FGOALS_f3_H_highresSST:
-            return .fgoalsF3HHighressst
+        //case .FGOALS_f3_H_highresSST:
+        //    return .fgoalsF3HHighressst
         case .FGOALS_f3_H:
             return .fgoalsF3H
         case .HiRAM_SIT_HR:

@@ -53,8 +53,23 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .icon:
+            return .dwd_icon
+        case .iconEu:
+            return .dwd_icon_eu
+        case .iconD2:
+            return .dwd_icon_d2
+        case .iconD2_15min:
+            return .dwd_icon_d2_15min
+        case .iconEps:
+            return .dwd_icon_eps
+        case .iconEuEps:
+            return .dwd_icon_eu_eps
+        case .iconD2Eps:
+            return .dwd_icon_d2_eps
+        }
     }
 
     var hasYearlyFiles: Bool {

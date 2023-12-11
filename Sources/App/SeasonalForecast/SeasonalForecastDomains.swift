@@ -11,8 +11,25 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     case jma
     case eccc
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .ecmwf:
+            fatalError()
+        case .ukMetOffice:
+            fatalError()
+        case .meteoFrance:
+            fatalError()
+        case .dwd:
+            fatalError()
+        case .cmcc:
+            fatalError()
+        case .ncep:
+            return .ncep_cfsv2
+        case .jma:
+            fatalError()
+        case .eccc:
+            fatalError()
+        }
     }
     
     var hasYearlyFiles: Bool {

@@ -19,8 +19,13 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
         return nil
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .gwam:
+            return .dwd_gwam
+        case .ewam:
+            return .dwd_ewam
+        }
     }
     
     func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {

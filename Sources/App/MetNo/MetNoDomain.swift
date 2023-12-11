@@ -4,8 +4,11 @@ import SwiftPFor2D
 enum MetNoDomain: String, GenericDomain, CaseIterable {
     case nordic_pp
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .nordic_pp:
+            return .metno_nordic_pp
+        }
     }
     
     var hasYearlyFiles: Bool {

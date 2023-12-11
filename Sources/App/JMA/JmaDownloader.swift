@@ -505,8 +505,13 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     case gsm
     case msm
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .gsm:
+            return .jma_gsm
+        case .msm:
+            return .jma_msm
+        }
     }
     
     var hasYearlyFiles: Bool {

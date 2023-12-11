@@ -9,7 +9,7 @@ protocol GenericDomain {
     var grid: Gridable { get }
     
     /// Domain name used as data directory
-    var domainName: String { get }
+    var domainRegistry: DomainRegistry { get }
     
     /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
     var dtSeconds: Int { get }
@@ -35,22 +35,22 @@ extension GenericDomain {
     
     /// Directory to store time chunks
     var omfileDirectory: String {
-        return "\(OpenMeteo.dataDirectory)omfile-\(domainName)/"
+        return "\(OpenMeteo.dataDirectory)omfile-\(domainRegistry.rawValue)/"
     }
     
     /// Temporary directory to download data
     var downloadDirectory: String {
-        return "\(OpenMeteo.tempDirectory)download-\(domainName)/"
+        return "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
     }
     
     /// Directory for yearly files
     var omfileArchive: String {
-        return "\(OpenMeteo.dataDirectory)archive-\(domainName)/"
+        return "\(OpenMeteo.dataDirectory)archive-\(domainRegistry.rawValue)/"
     }
     
     /// Master file to store "all" timesteps in one file. Used only in CMIP for store 100 years a once
     var omMasterDirectory: String {
-        "\(OpenMeteo.dataDirectory)master-\(domainName)/"
+        "\(OpenMeteo.dataDirectory)master-\(domainRegistry.rawValue)/"
     }
     
     /// Single master file for a large time series

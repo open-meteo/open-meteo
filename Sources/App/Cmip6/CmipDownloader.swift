@@ -90,7 +90,7 @@ import SwiftNetCDF
  */
 enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     case CMCC_CM2_VHR4
-    case FGOALS_f3_H_highresSST
+    //case FGOALS_f3_H_highresSST
     case FGOALS_f3_H
     case HiRAM_SIT_HR
     case MRI_AGCM3_2_S
@@ -108,8 +108,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return "CMCC-CM2-VHR4"
         case .FGOALS_f3_H:
             fallthrough
-        case .FGOALS_f3_H_highresSST:
-            return "FGOALS-f3-H"
+        //case .FGOALS_f3_H_highresSST:
+        //    return "FGOALS-f3-H"
         case .HiRAM_SIT_HR:
             return "HiRAM-SIT-HR"
         case .MRI_AGCM3_2_S:
@@ -133,8 +133,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return "gn"
         case .FGOALS_f3_H:
             fallthrough
-        case .FGOALS_f3_H_highresSST:
-            return "gr"
+        //case .FGOALS_f3_H_highresSST:
+        //    return "gr"
         case .HiRAM_SIT_HR:
             return "gn"
         case .MRI_AGCM3_2_S:
@@ -156,8 +156,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return "CMCC"
         case .FGOALS_f3_H:
             fallthrough
-        case .FGOALS_f3_H_highresSST:
-            return "CAS"
+        //case .FGOALS_f3_H_highresSST:
+        //    return "CAS"
         case .HiRAM_SIT_HR:
             return "AS-RCEC"
         case .MRI_AGCM3_2_S:
@@ -173,8 +173,25 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         }
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .CMCC_CM2_VHR4:
+            return .cmip_CMCC_CM2_VHR4
+        //case .FGOALS_f3_H_highresSST:
+        //    return .cmip_FGOALS_f3_H
+        case .FGOALS_f3_H:
+            return .cmip_FGOALS_f3_H
+        case .HiRAM_SIT_HR:
+            return .cmip_HiRAM_SIT_HR
+        case .MRI_AGCM3_2_S:
+            return .cmip_MRI_AGCM3_2_S
+        case .EC_Earth3P_HR:
+            return .cmip_EC_Earth3P_HR
+        case .MPI_ESM1_2_XR:
+            return .cmip_MPI_ESM1_2_XR
+        case .NICAM16_8S:
+            return .cmip_NICAM16_8S
+        }
     }
     
     var hasYearlyFiles: Bool {
@@ -195,7 +212,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     }
     
     private static var elevationCMCC_CM2_VHR4 = try? OmFileReader(file: Self.CMCC_CM2_VHR4.surfaceElevationFileOm)
-    private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H_highresSST.surfaceElevationFileOm)
+    //private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H_highresSST.surfaceElevationFileOm)
     private static var elevationHiRAM_SIT_HR = try? OmFileReader(file: Self.HiRAM_SIT_HR.surfaceElevationFileOm)
     private static var elevationMRI_AGCM3_2_S = try? OmFileReader(file: Self.MRI_AGCM3_2_S.surfaceElevationFileOm)
     private static var elevationEC_Earth3P_HR = try? OmFileReader(file: Self.EC_Earth3P_HR.surfaceElevationFileOm)
@@ -213,8 +230,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
                 return Self.elevationCMCC_CM2_VHR4
             case .FGOALS_f3_H:
                 fallthrough
-            case .FGOALS_f3_H_highresSST:
-                return Self.elevationFGOALS_f3_H
+            //case .FGOALS_f3_H_highresSST:
+               // return Self.elevationFGOALS_f3_H
             case .HiRAM_SIT_HR:
                 return Self.elevationHiRAM_SIT_HR
             case .MRI_AGCM3_2_S:
@@ -238,7 +255,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     
     /// true if feb 29 is missing
     var needsLeapYearFix: Bool {
-        return self == .CMCC_CM2_VHR4 || self == .FGOALS_f3_H || self == .FGOALS_f3_H_highresSST
+        return self == .CMCC_CM2_VHR4 || self == .FGOALS_f3_H /*|| self == .FGOALS_f3_H_highresSST*/
     }
     
     var grid: Gridable {
@@ -246,8 +263,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         case .CMCC_CM2_VHR4:
             return RegularGrid(nx: 1152, ny: 768, latMin: -90, lonMin: -180, dx: 0.3125, dy: 180/768)
         case .FGOALS_f3_H:
-            fallthrough
-        case .FGOALS_f3_H_highresSST:
+           // fallthrough
+        //case .FGOALS_f3_H_highresSST:
             return RegularGrid(nx: 1440, ny: 720, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .HiRAM_SIT_HR:
             return RegularGrid(nx: 1536, ny: 768, latMin: -90, lonMin: -180, dx: 360/1536, dy: 180/768)
@@ -270,8 +287,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return ("20210330", "20210330")
         case .FGOALS_f3_H:
             return nil
-        case .FGOALS_f3_H_highresSST:
-            return ("20201204", "20210121")
+        //case .FGOALS_f3_H_highresSST:
+        //    return ("20201204", "20210121")
         case .HiRAM_SIT_HR:
             return nil
         case .MRI_AGCM3_2_S:
@@ -291,7 +308,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
 extension GenericDomain {
     /// Get the file path to a linear bias seasonal file for a given variable
     func getBiasCorrectionFile(for variable: String) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: self.domainName, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
+        return OmFilePathWithSuffix(domain: self.domainRegistry.rawValue, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
     }
     
     func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {
@@ -462,8 +479,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return "20210308"
             }
             return isFuture ? "20190725" : "20170927"
-        case .FGOALS_f3_H_highresSST:
-            return isFuture ? "20200417" : "20190817"
+        //case .FGOALS_f3_H_highresSST:
+        //    return isFuture ? "20200417" : "20190817"
         case .FGOALS_f3_H:
             if self == .precipitation_sum && !isFuture {
                 return "20211028"
@@ -637,7 +654,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             default:
                 return nil
             }
-        case .FGOALS_f3_H_highresSST:
+        /*case .FGOALS_f3_H_highresSST:
             // no near surface RH, only specific humidity
             // temp min/max and rh/min max can only be calculated form 3h values
             // 3h values are only available for the non-SST version
@@ -665,7 +682,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             default:
                 return nil
-            }
+            }*/
         case .FGOALS_f3_H:
             /// windspeed max possible via 3h vas/uas, but requires code support
             switch self {
@@ -1143,7 +1160,7 @@ struct DownloadCmipCommand: AsyncCommand {
                     }*/
                 case .yearly:
                     /// `FGOALS_f3_H` has no near surface relative humidity, calculate from specific humidity
-                    let calculateRhFromSpecificHumidity = (domain == .FGOALS_f3_H_highresSST || domain == .FGOALS_f3_H) && variable == .relative_humidity_2m_mean
+                    let calculateRhFromSpecificHumidity = (/*domain == .FGOALS_f3_H_highresSST || */domain == .FGOALS_f3_H) && variable == .relative_humidity_2m_mean
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {

@@ -38,8 +38,17 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         return nil
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .arpege_europe:
+            return .meteofrance_arpege_europe
+        case .arpege_world:
+            return .meteofrance_arpege_world
+        case .arome_france:
+            return .meteofrance_arome_france
+        case .arome_france_hd:
+            return .meteofrance_arome_france_hd
+        }
     }
     
     var dtSeconds: Int {

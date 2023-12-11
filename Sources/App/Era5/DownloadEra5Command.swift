@@ -84,8 +84,23 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .era5:
+            return .copernicus_era5
+        case .era5_daily:
+            return .copernicus_era5_daily
+        case .era5_ocean:
+            return .copernicus_era5_ocean
+        case .era5_land:
+            return .copernicus_era5_land
+        case .era5_land_daily:
+            return .copernicus_era5_land_daily
+        case .cerra:
+            return .copernicus_cerra
+        case .ecmwf_ifs:
+            return .ecmwf_ifs
+        }
     }
     
     var hasYearlyFiles: Bool {

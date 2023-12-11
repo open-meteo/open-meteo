@@ -224,8 +224,11 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         return nil
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .imerg_daily:
+            return .nasa_imerg_daily
+        }
     }
     
     var hasYearlyFiles: Bool {

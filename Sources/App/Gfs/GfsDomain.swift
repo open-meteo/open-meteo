@@ -30,8 +30,23 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// 0.5° ensemble version for up to 25 days of forecast... Low forecast skill obviously.
     case gfs05_ens
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .gfs013:
+            return .ncep_gfs013
+        case .gfs025:
+            return .ncep_gfs025
+        case .hrrr_conus:
+            return .ncep_hrrr_conus
+        case .hrrr_conus_15min:
+            return .ncep_hrrr_conus_15min
+        case .gfs025_ensemble:
+            return .ncep_gefs025_probability
+        case .gfs025_ens:
+            return .ncep_gefs025
+        case .gfs05_ens:
+            return .ncep_gefs05
+        }
     }
     
     var hasYearlyFiles: Bool {
