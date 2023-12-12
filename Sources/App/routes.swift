@@ -6,6 +6,8 @@ func routes(_ app: Application) throws {
     try app.register(collection: ForecastapiController())
     
     try app.register(collection: SyncController())
+    
+    try app.register(collection: S3DataController())
 }
 
 extension RoutesBuilder {
