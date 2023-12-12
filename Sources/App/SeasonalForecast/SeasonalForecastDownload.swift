@@ -84,7 +84,7 @@ struct SeasonalForecastDownload: AsyncCommand {
         let gribVariables = ["tmp2m", "tmin", "soilt1", "dswsfc", "cprat", "q2m", "wnd10m", "tcdcclm", "prate", "soilm3", "pressfc", "soilm2", "soilm1", "soilm4", "tmax"]
         
         for gribVariable in gribVariables {
-            logger.info("Downloading varibale \(gribVariable)")
+            logger.info("Downloading variable \(gribVariable)")
             for member in 1..<domain.nMembers+1 {
                 // https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/18/time_grib_01/tmin.01.2022080818.daily.grb2.idx
                 let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/time_grib_\(member.zeroPadded(len: 2))/\(gribVariable).\(member.zeroPadded(len: 2)).\(run.format_YYYYMMddHH).daily.grb2"

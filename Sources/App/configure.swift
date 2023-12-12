@@ -36,10 +36,12 @@ extension Application {
             return existing
         }
         // try again with very high timeouts, so only the curl internal timers are used
-        let configuration = HTTPClient.Configuration(
+        var configuration = HTTPClient.Configuration(
             redirectConfiguration: .follow(max: 5, allowCycles: false),
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
             connectionPool: .init(idleTimeout: .minutes(10)))
+        // NCEP server still struggle with H2
+        configuration.httpVersion = .http1Only
         
         let new = HTTPClient(
             eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 1)),
