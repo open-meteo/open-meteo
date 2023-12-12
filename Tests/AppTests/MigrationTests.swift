@@ -23,8 +23,8 @@ final class MigrationTests: XCTestCase {
         XCTAssertEqual(new?.file, "chunk_96.om")
         
         new = m.transform(file: "soil_temperature_28_to_100cm_mean_linear_bias_seasonal.om", type: "chunk")
-        XCTAssertEqual(new?.directory, "linear_bias_seasonal")
-        XCTAssertEqual(new?.file, "soil_temperature_28_to_100cm_mean.om")
+        XCTAssertEqual(new?.directory, "soil_temperature_28_to_100cm_mean")
+        XCTAssertEqual(new?.file, "linear_bias_seasonal.om")
         
         new = m.transform(file: "HSURF.om", type: "chunk")
         XCTAssertEqual(new?.directory, "static")
