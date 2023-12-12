@@ -33,7 +33,7 @@ struct S3DataController: RouteCollection {
     }
     
     /// https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjectsV2.html
-    struct S3ListV2: Decodable {
+    struct S3ListV2: Codable {
         let list_type: Int
         let delimiter: String
         let prefix: String
@@ -45,6 +45,18 @@ struct S3DataController: RouteCollection {
             case prefix
             case apikey
         }
+    }
+    
+    struct S3ListV2File {
+        let name: String
+        let modificationTime: Date
+        let fileSize: Int
+    }
+    
+    struct DownloadParams: Codable {
+        let apikey: String?
+        /// in megabytes per second
+        let rate: Int?
     }
     
     /// List all files in a specified directory
@@ -68,7 +80,7 @@ struct S3DataController: RouteCollection {
             throw Abort(.forbidden)
         }
         
-        var files = [(name: String, modificationTime: Date, fileSize: Int)]()
+        var files = [S3ListV2File]()
         var directories = [String]()
         for case let fileURL as URL in directoryEnumerator {
             guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
@@ -86,7 +98,7 @@ struct S3DataController: RouteCollection {
                 else {
                     continue
                 }
-                files.append((name, modificationTime, fileSize))
+                files.append(S3ListV2File(name: name, modificationTime: modificationTime, fileSize: fileSize))
             }
             
         }
@@ -129,13 +141,8 @@ struct S3DataController: RouteCollection {
     
     /// Serve file through nginx send file
     func get(_ req: Request) async throws -> Response {
-        struct Params: Decodable {
-            let apikey: String
-            /// in megabytes per second
-            let rate: Int?
-        }
-        let params = try req.query.decode(Params.self)
-        if !Self.syncApiKeys.contains(where: {$0 == params.apikey}) {
+        let params = try req.query.decode(DownloadParams.self)
+        guard let apikey = params.apikey, Self.syncApiKeys.contains(where: {$0 == apikey}) else {
             throw SyncError.invalidApiKey
         }
         
@@ -158,7 +165,7 @@ fileprivate extension String {
     }
 }
 
-fileprivate extension DateFormatter {
+extension DateFormatter {
     /// Format dates like `2023-11-14T04:32:17.000Z`
     static var awsS3DateTime = {
         let dateFormat = DateFormatter()

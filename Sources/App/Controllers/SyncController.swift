@@ -167,7 +167,7 @@ struct SyncFileAttributes: Content {
 /**
  Command to download weather database fom another node
  */
-struct SyncCommand: AsyncCommand {
+struct SyncOldCommand: AsyncCommand {
     var help: String {
         return "Synchronise weather database from a remote server"
     }
