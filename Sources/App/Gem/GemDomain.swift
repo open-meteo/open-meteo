@@ -31,6 +31,10 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
+    }
+    
     var hasYearlyFiles: Bool {
         return false
     }
@@ -64,29 +68,6 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    private static var gemGlobalElevationFile = try? OmFileReader(file: Self.gem_global.surfaceElevationFileOm)
-    private static var gemRegionalElevationFile = try? OmFileReader(file: Self.gem_regional.surfaceElevationFileOm)
-    private static var gemHrdpsContinentalElevationFile = try? OmFileReader(file: Self.gem_hrdps_continental.surfaceElevationFileOm)
-    private static var gemGlobalEnsembleElevationFile = try? OmFileReader(file: Self.gem_global_ensemble.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .gem_global:
-                return Self.gemGlobalElevationFile
-            case .gem_regional:
-                return Self.gemRegionalElevationFile
-            case .gem_hrdps_continental:
-                return Self.gemHrdpsContinentalElevationFile
-            case .gem_global_ensemble:
-                return Self.gemGlobalEnsembleElevationFile
-            }
-        }
-    }
-    
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()

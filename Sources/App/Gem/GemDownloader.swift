@@ -93,7 +93,7 @@ struct GemDownload: AsyncCommand {
     // download seamask and height
     func downloadElevation(application: Application, domain: GemDomain, run: Timestamp, server: String?) async throws {
         let logger = application.logger
-        let surfaceElevationFileOm = domain.surfaceElevationFileOm
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }

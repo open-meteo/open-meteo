@@ -15,42 +15,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     case iconEuEps = "icon-eu-eps"
     case iconD2Eps = "icon-d2-eps"
     
-    private static var iconElevataion = try? OmFileReader(file: Self.icon.surfaceElevationFileOm)
-    private static var iconD2Elevataion = try? OmFileReader(file: Self.iconD2.surfaceElevationFileOm)
-    private static var iconEuElevataion = try? OmFileReader(file: Self.iconEu.surfaceElevationFileOm)
-    private static var iconEpsElevataion = try? OmFileReader(file: Self.iconEps.surfaceElevationFileOm)
-    private static var iconD2EpsElevataion = try? OmFileReader(file: Self.iconD2Eps.surfaceElevationFileOm)
-    private static var iconEuEpsElevataion = try? OmFileReader(file: Self.iconEuEps.surfaceElevationFileOm)
-    
     var dtSeconds: Int {
         if self == .iconD2_15min {
             return 3600/4
         }
         return 3600
-    }
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .icon:
-                return Self.iconElevataion
-            case .iconEu:
-                return Self.iconEuElevataion
-            case .iconD2_15min:
-                fallthrough
-            case .iconD2:
-                return Self.iconD2Elevataion
-            case .iconEps:
-                return Self.iconEpsElevataion
-            case .iconEuEps:
-                return Self.iconEuEpsElevataion
-            case .iconD2Eps:
-                return Self.iconD2EpsElevataion
-            }
-        }
     }
     
     var domainRegistry: DomainRegistry {
@@ -69,6 +38,15 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return .dwd_icon_eu_eps
         case .iconD2Eps:
             return .dwd_icon_d2_eps
+        }
+    }
+    
+    var domainRegistryStatic: DomainRegistry? {
+        switch self {
+        case .iconD2_15min:
+            return .dwd_icon_d2
+        default:
+            return domainRegistry
         }
     }
 

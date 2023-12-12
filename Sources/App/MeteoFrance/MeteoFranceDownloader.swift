@@ -78,7 +78,7 @@ struct MeteoFranceDownload: AsyncCommand {
     // download seamask and height
     func downloadElevation(application: Application, domain: MeteoFranceDomain) async throws {
         let logger = application.logger
-        let surfaceElevationFileOm = domain.surfaceElevationFileOm
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }

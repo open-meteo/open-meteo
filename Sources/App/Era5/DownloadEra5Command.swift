@@ -42,45 +42,14 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    private static var era5ElevationFile = try? OmFileReader(file: Self.era5.surfaceElevationFileOm)
-    private static var era5OceanElevationFile = try? OmFileReader(file: Self.era5_ocean.surfaceElevationFileOm)
-    private static var era5LandElevationFile = try? OmFileReader(file: Self.era5_land.surfaceElevationFileOm)
-    private static var cerraElevationFile = try? OmFileReader(file: Self.cerra.surfaceElevationFileOm)
-    private static var ifsElevationFile = try? OmFileReader(file: Self.ecmwf_ifs.surfaceElevationFileOm)
-    
-    private static var era5SoilTypeFile = try? OmFileReader(file: Self.era5.soilTypeFileOm)
-    private static var era5LandSoilTypeFile = try? OmFileReader(file: Self.era5_land.soilTypeFileOm)
-    private static var cerraSoilTypeFile = try? OmFileReader(file: Self.cerra.soilTypeFileOm)
-    private static var ifsSoilTypeFile = try? OmFileReader(file: Self.ecmwf_ifs.soilTypeFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            switch self {
-            case .era5_ocean:
-                return nil
-            case .era5, .era5_daily:
-                return Self.era5SoilTypeFile
-            case .era5_land, .era5_land_daily:
-                return Self.era5LandSoilTypeFile
-            case .cerra:
-                return Self.cerraSoilTypeFile
-            case .ecmwf_ifs:
-                return Self.ifsSoilTypeFile
-            }
-        case .elevation:
-            switch self {
-            case .era5_ocean:
-                return Self.era5OceanElevationFile
-            case .era5, .era5_daily:
-                return Self.era5ElevationFile
-            case .era5_land, .era5_land_daily:
-                return Self.era5LandElevationFile
-            case .cerra:
-                return Self.cerraElevationFile
-            case .ecmwf_ifs:
-                return Self.ifsElevationFile
-            }
+    var domainRegistryStatic: DomainRegistry? {
+        switch self {
+        case .era5_daily:
+            return .copernicus_era5
+        case .era5_land_daily:
+            return .copernicus_era5_land
+        default:
+            return domainRegistry
         }
     }
     
@@ -304,7 +273,7 @@ struct DownloadEra5Command: AsyncCommand {
      */
     func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain) async throws {
         let logger = application.logger
-        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
         }
         
@@ -433,7 +402,7 @@ struct DownloadEra5Command: AsyncCommand {
         let writer = OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunk0, chunk1: 400/chunk0)
         
         if let soilType {
-            try writer.write(file: domain.soilTypeFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: soilType)
+            try writer.write(file: domain.soilTypeFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: soilType)
         }
         
         /*let a1 = Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1)
@@ -449,7 +418,7 @@ struct DownloadEra5Command: AsyncCommand {
             }
         }
 
-        try writer.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        try writer.write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
         
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         if let tempDownloadGribFile2 {

@@ -11,11 +11,11 @@ protocol GenericDomain {
     /// Domain name used as data directory
     var domainRegistry: DomainRegistry { get }
     
+    /// Domain which is used for static files. E.g. 15minutes domains refer to the 1-hourly domain
+    var domainRegistryStatic: DomainRegistry? { get }
+    
     /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
     var dtSeconds: Int { get }
-    
-    /// Where chunked time series files are stroed
-    //var omfileDirectory: String { get }
     
     /// If true, domain has yearly files
     var hasYearlyFiles: Bool { get }
@@ -25,49 +25,40 @@ protocol GenericDomain {
     
     /// The time length of each compressed time series file
     var omFileLength: Int { get }
-    
-    /// The the file containing static information for elevation of soil types
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>?
 }
 
 extension GenericDomain {
     var dtHours: Int { dtSeconds / 3600 }
-    
-    /// Directory to store time chunks
-    //var omfileDirectory: String {
-    //    return "\(OpenMeteo.dataDirectory)omfile-\(domainRegistry.rawValue)/"
-    //}
     
     /// Temporary directory to download data
     var downloadDirectory: String {
         return "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
     }
     
-    /// Directory for yearly files
-    //var omfileArchive: String {
-    //    return "\(OpenMeteo.dataDirectory)archive-\(domainRegistry.rawValue)/"
-    //}
-    
-    /// Master file to store "all" timesteps in one file. Used only in CMIP for store 100 years a once
-    //var omMasterDirectory: String {
-    //    "\(OpenMeteo.dataDirectory)master-\(domainRegistry.rawValue)/"
-    //}
-    
-    /// Single master file for a large time series
-    /*var omFileMaster: (path: String, time: TimerangeDt)? {
-        guard let time = masterTimeRange else {
+    /// The the file containing static information for elevation of soil types
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
+        guard let domainRegistryStatic else {
             return nil
         }
-        return (omMasterDirectory, TimerangeDt(range: time, dtSeconds: dtSeconds))
-    }*/
-    
-    /// Filename of the surface elevation file
-    var surfaceElevationFileOm: String {
-        "\(domainRegistry.directory)static/HSURF.om"
+        switch type {
+        case .soilType:
+            return try? OmFileManager.get(
+                .staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil)
+            )
+        case .elevation:
+            return try? OmFileManager.get(
+                .staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil)
+            )
+        }
     }
     
-    var soilTypeFileOm: String {
-        "\(domainRegistry.directory)static/soil_type.om"
+    /// Filename of the surface elevation file
+    var surfaceElevationFileOm: OmFileManagerReadable {
+        .staticFile(domain: domainRegistry, variable: "HSURF", chunk: nil)
+    }
+    
+    var soilTypeFileOm: OmFileManagerReadable {
+        .staticFile(domain: domainRegistry, variable: "soil_type", chunk: nil)
     }
 }
 

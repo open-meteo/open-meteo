@@ -194,6 +194,10 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         }
     }
     
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
+    }
+    
     var hasYearlyFiles: Bool {
         return false
     }
@@ -209,43 +213,6 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     
     var dtSeconds: Int {
         return 24*3600
-    }
-    
-    private static var elevationCMCC_CM2_VHR4 = try? OmFileReader(file: Self.CMCC_CM2_VHR4.surfaceElevationFileOm)
-    //private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H_highresSST.surfaceElevationFileOm)
-    private static var elevationHiRAM_SIT_HR = try? OmFileReader(file: Self.HiRAM_SIT_HR.surfaceElevationFileOm)
-    private static var elevationMRI_AGCM3_2_S = try? OmFileReader(file: Self.MRI_AGCM3_2_S.surfaceElevationFileOm)
-    private static var elevationEC_Earth3P_HR = try? OmFileReader(file: Self.EC_Earth3P_HR.surfaceElevationFileOm)
-    //private static var elevationHadGEM3_GC31_HM = try? OmFileReader(file: Self.HadGEM3_GC31_HM.surfaceElevationFileOm)
-    private static var elevationMPI_ESM1_2_XR = try? OmFileReader(file: Self.MPI_ESM1_2_XR.surfaceElevationFileOm)
-    private static var elevationNICAM16_8S = try? OmFileReader(file: Self.NICAM16_8S.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .CMCC_CM2_VHR4:
-                return Self.elevationCMCC_CM2_VHR4
-            case .FGOALS_f3_H:
-                fallthrough
-            //case .FGOALS_f3_H_highresSST:
-               // return Self.elevationFGOALS_f3_H
-            case .HiRAM_SIT_HR:
-                return Self.elevationHiRAM_SIT_HR
-            case .MRI_AGCM3_2_S:
-                return Self.elevationMRI_AGCM3_2_S
-            case .EC_Earth3P_HR:
-                return Self.elevationEC_Earth3P_HR
-            //case .HadGEM3_GC31_HM:
-                //return Self.elevationHadGEM3_GC31_HM
-            case .MPI_ESM1_2_XR:
-                return Self.elevationMPI_ESM1_2_XR
-            case .NICAM16_8S:
-                return Self.elevationNICAM16_8S
-            }
-        }
     }
     
     var omFileLength: Int {
@@ -940,7 +907,7 @@ struct DownloadCmipCommand: AsyncCommand {
         let grid = domain.gridName
         
         /// Make sure elevation information is present. Otherwise download it
-        if let version = domain.versionOrography, !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+        if let version = domain.versionOrography, !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             let ncFileAltitude = "\(domain.downloadDirectory)orog_fx.nc"
             let experimentId = "highresSST-present" //domain == .HadGEM3_GC31_HM ? "hist-1950" : "highresSST-present"
             if !FileManager.default.fileExists(atPath: ncFileAltitude) {
@@ -961,7 +928,7 @@ struct DownloadCmipCommand: AsyncCommand {
                 }
             }
             //try altitude.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: altitude.data)
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: altitude.data)
             
             if deleteNetCDF {
                 try FileManager.default.removeItem(atPath: ncFileAltitude)

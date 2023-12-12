@@ -51,6 +51,10 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
+    }
+    
     var dtSeconds: Int {
         if self == .arpege_world {
             return 3*3600
@@ -59,29 +63,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     }
     var isGlobal: Bool {
         return self == .arpege_world
-    }
-
-    private static var arpegeEuropeElevationFile = try? OmFileReader(file: Self.arpege_europe.surfaceElevationFileOm)
-    private static var arpegeWorldElevationFile = try? OmFileReader(file: Self.arpege_world.surfaceElevationFileOm)
-    private static var aromeFranceElevationFile = try? OmFileReader(file: Self.arome_france.surfaceElevationFileOm)
-    private static var aromeFranceHdElevationFile = try? OmFileReader(file: Self.arome_france_hd.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .arpege_europe:
-                return Self.arpegeEuropeElevationFile
-            case .arpege_world:
-                return Self.arpegeWorldElevationFile
-            case .arome_france:
-                return Self.aromeFranceElevationFile
-            case .arome_france_hd:
-                return Self.aromeFranceHdElevationFile
-            }
-        }
     }
     
     /// Based on the current time , guess the current run that should be available soon on the open-data server

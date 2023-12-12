@@ -71,7 +71,8 @@ struct MetNoDownloader: AsyncCommand {
         }
         
         /// Create elevation file if requried
-        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
+        if !FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             logger.info("Creating elevation file")
             // unit meters
             guard var altitude = try ncFile.getVariable(name: "altitude")?.asType(Float.self)?.read() else {
@@ -87,7 +88,7 @@ struct MetNoDownloader: AsyncCommand {
                 }
             }
             logger.info("Writing elevation file")
-            try OmFileWriter(dim0: ny, dim1: nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: altitude)
+            try OmFileWriter(dim0: ny, dim1: nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: altitude)
         }
         
         /// Verify projection and grid coordinates

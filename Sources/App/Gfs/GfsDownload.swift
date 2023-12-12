@@ -182,7 +182,7 @@ struct GfsDownload: AsyncCommand {
         let elevationUrl = (domain == .gfs025_ens ? GfsDomain.gfs025 : domain).getGribUrl(run: run, forecastHour: 0, member: 0)
         if domain != .hrrr_conus_15min {
             // 15min hrrr data uses hrrr domain elevation files
-            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
+            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, isGlobal: domain.isGlobal)
         }
         
         let deadLineHours: Double

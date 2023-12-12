@@ -32,40 +32,16 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
+    }
+    
     var hasYearlyFiles: Bool {
         return false
     }
     
     var masterTimeRange: Range<Timestamp>? {
         return nil
-    }
-    
-    static var ncepElevation = try? OmFileReader(file: Self.ncep.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .ecmwf:
-                fatalError()
-            case .ukMetOffice:
-                fatalError()
-            case .meteoFrance:
-                fatalError()
-            case .dwd:
-                fatalError()
-            case .cmcc:
-                fatalError()
-            case .ncep:
-                return Self.ncepElevation
-            case .jma:
-                fatalError()
-            case .eccc:
-                fatalError()
-            }
-        }
     }
     
     var lastRun: Timestamp {

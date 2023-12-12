@@ -450,6 +450,10 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var domainRegistryStatic: DomainRegistry? {
+        return nil
+    }
+    
     var hasYearlyFiles: Bool {
         switch self {
         case .consolidated, .consolidatedv3:
@@ -496,10 +500,6 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     
     var dtSeconds: Int {
         return 3600*24
-    }
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        return nil
     }
     
     /// `version_3_1` or  `version_4_0`

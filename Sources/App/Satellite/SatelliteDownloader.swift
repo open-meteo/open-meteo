@@ -196,15 +196,15 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         }
     }
     
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        return nil
-    }
-    
     var domainRegistry: DomainRegistry {
         switch self {
         case .imerg_daily:
             return .nasa_imerg_daily
         }
+    }
+    
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
     }
     
     var hasYearlyFiles: Bool {

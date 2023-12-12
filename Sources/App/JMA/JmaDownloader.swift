@@ -513,6 +513,10 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
+    }
+    
     var hasYearlyFiles: Bool {
         return false
     }
@@ -529,23 +533,6 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     }
     var isGlobal: Bool {
         return self == .gsm
-    }
-
-    private static var gsmElevationFile = try? OmFileReader(file: Self.gsm.surfaceElevationFileOm)
-    private static var msmElevationFile = try? OmFileReader(file: Self.msm.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .gsm:
-                return Self.gsmElevationFile
-            case .msm:
-                return Self.msmElevationFile
-            }
-        }
     }
     
     /// Based on the current time , guess the current run that should be available soon on the open-data server

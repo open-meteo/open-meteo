@@ -89,7 +89,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                 }
                 
                 /// Create elevation file for sea mask
-                if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+                if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                     var elevation = grib2d.array.data
                     for i in elevation.indices {
                         /// `NaN` out of domain, `-999` sea grid point
@@ -97,7 +97,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                     }
                     //let data2d = Array2DFastSpace(data: elevation, nLocations: elevation.count, nTime: 1)
                     //try data2d.writeNetcdf(filename: "\(downloadDirectory)elevation.nc", nx: nx, ny: ny)
-                    try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+                    try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
                 }
                 
                 // Save temporarily as compressed om files

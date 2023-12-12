@@ -8,9 +8,6 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
     case gwam
     case ewam
     
-    static var gwamElevation = try? OmFileReader(file: IconWaveDomain.gwam.surfaceElevationFileOm)
-    static var ewamElevation = try? OmFileReader(file: IconWaveDomain.ewam.surfaceElevationFileOm)
-    
     var hasYearlyFiles: Bool {
         return false
     }
@@ -28,18 +25,8 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
         }
     }
     
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .gwam:
-                return Self.gwamElevation
-            case .ewam:
-                return Self.ewamElevation
-            }
-        }
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
     }
     
     /// Number of time steps in each time series optimised file. 5 days more than each run.

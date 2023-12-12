@@ -71,7 +71,7 @@ extension DailyCfsVariable: FlatBuffersVariable {
             return .init(variable: .showers, aggregation: .sum)
         case .shortwave_radiation_sum:
             return .init(variable: .shortwaveRadiation, aggregation: .sum)
-        case .wind_speed_10m_max, .wind_speed_10m_max:
+        case .wind_speed_10m_max, .windspeed_10m_max:
             return .init(variable: .windSpeed, aggregation: .maximum, altitude: 10)
         case .winddirection_10m_dominant, .wind_direction_10m_dominant:
             return .init(variable: .windDirection, aggregation: .dominant, altitude: 2)

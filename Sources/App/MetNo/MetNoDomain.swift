@@ -11,6 +11,10 @@ enum MetNoDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
+    }
+    
     var hasYearlyFiles: Bool {
         return false
     }
@@ -23,20 +27,6 @@ enum MetNoDomain: String, GenericDomain, CaseIterable {
     }
     var isGlobal: Bool {
         return false
-    }
-
-    private static var nordicPpElevationFile = try? OmFileReader(file: Self.nordic_pp.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .nordic_pp:
-                return Self.nordicPpElevationFile
-            }
-        }
     }
     
     /// Based on the current time , guess the current run that should be available soon on the open-data server
