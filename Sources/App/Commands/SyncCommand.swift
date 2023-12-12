@@ -13,7 +13,7 @@ struct SyncCommand: AsyncCommand {
         @Argument(name: "variables", help: "Weather variables, separated by comma")
         var variables: String
         
-        @Option(name: "apikey", help: "Sync API key for accessing direct Open-Meteo servers")
+        @Option(name: "apikey", help: "Sync API key for accessing Open-Meteo servers directly. Not required for AWS open-data.")
         var apikey: String?
         
         @Option(name: "server", help: "Server base URL. Default 'https://openmeteo.s3.amazonaws.com/'")
@@ -37,8 +37,10 @@ struct SyncCommand: AsyncCommand {
         disableIdleSleep()
         
         let server = signature.server ?? "https://openmeteo.s3.amazonaws.com/"
+        guard server.starts(with: "http"), server.last == "/" else {
+            fatalError("Server name must include http and end with a trailing slash")
+        }
         let pastDays = signature.pastDays ?? 7
-        let rate = signature.rate
         let models = try DomainRegistry.load(commaSeparated: signature.models)
         let variables = signature.variables.split(separator: ",")
         
@@ -49,16 +51,17 @@ struct SyncCommand: AsyncCommand {
             let newerThan = Timestamp.now().add(-24 * 3600 * pastDays)
             
             /// E.g. `data/ncep_gfs025/temperature_2m/chunk_1234.om`
-            var toDownload = [(file: String, fileSize: Int)]()
+            var toDownload = [S3DataController.S3ListV2File]()
             
             for model in models {
                 // always add static
-                // always download linear bias files if available
+                toDownload.append(contentsOf: try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/static/", apikey: signature.apikey).files.includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory))
+                
+                // Check specified variables
                 for variable in variables {
                     let remote = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/\(variable)/", apikey: signature.apikey)
-                    
-                    // calculate timerange for each file
-                    // download if in timerange and newer
+                    let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+                    toDownload.append(contentsOf: filtered)
                 }
             }
             
@@ -68,19 +71,21 @@ struct SyncCommand: AsyncCommand {
             for download in toDownload {
                 curl.setDeadlineIn(minutes: 30)
                 let startBytes = curl.totalBytesTransfered
-                var client = ClientRequest(url: URI("\(server)\(download.file)"))
+                var client = ClientRequest(url: URI("\(server)\(download.name)"))
                 try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
-                let pathNoData = download.file[download.file.index(download.file.startIndex, offsetBy: 5)..<download.file.endIndex]
+                let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
                 let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                 try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false)
                 progress.add(curl.totalBytesTransfered - startBytes)
             }
+            progress.finish()
             
             guard let repeatInterval = signature.repeatInterval else {
                 break
             }
+            logger.info("Repeat in \(repeatInterval) seconds")
             try await Task.sleep(nanoseconds: UInt64(repeatInterval * 1_000_000_000))
         }
         curl.printStatistics()
@@ -91,20 +96,40 @@ fileprivate extension Array where Element == S3DataController.S3ListV2File {
     /// Only include files with data newer than a given timestamp. This is based on evaluating the time-chunk in the filename and is not based on the modification time
     func includeFiles(newerThan: Timestamp, domain: DomainRegistry) -> [Element] {
         let omFileLength = domain.getDomain().omFileLength
+        let dtSeconds = domain.getDomain().dtSeconds
         return self.filter({ file in
-            let name = file.name
+            if file.name.contains("/static/") {
+                return true
+            }
+            let last = file.name.lastIndex(of: "/") ?? file.name.startIndex
+            let name = file.name[file.name.index(after: last)..<file.name.endIndex]
             if name.starts(with: "master_") || name.starts(with: "linear_bias_seasonal") {
                 return true
             }
-            if name.starts(with: "year_"), let year = Int(name[name.index(name.startIndex, offsetBy: 5)..<name.endIndex]) {
+            if name.starts(with: "year_"), let year = Int(name[name.index(name.startIndex, offsetBy: 5)..<(name.lastIndex(of: ".") ?? name.endIndex)]) {
                 let end = Timestamp(year+1, 1, 1)
                 return end > newerThan
             }
-            if name.starts(with: "chunk_"), let chunk = Int(name[name.index(name.startIndex, offsetBy: 6)..<name.endIndex]) {
-                let end = Timestamp((chunk + 1) * omFileLength)
+            if name.starts(with: "chunk_"), let chunk = Int(name[name.index(name.startIndex, offsetBy: 6)..<(name.lastIndex(of: ".") ?? name.endIndex)]) {
+                let end = Timestamp((chunk + 1) * omFileLength * dtSeconds)
                 return end > newerThan
             }
             return false
+        })
+    }
+    
+    /// Compare remote files to local files. Only keep files that are not available locally or older.
+    func includeFiles(compareLocalDirectory: String) -> [Element] {
+        let resourceKeys = Set<URLResourceKey>([.contentModificationDateKey, .fileSizeKey])
+        return self.filter({ file in
+            let pathNoData = file.name[file.name.index(file.name.startIndex, offsetBy: 5)..<file.name.endIndex]
+            let fileURL = URL(fileURLWithPath: "\(compareLocalDirectory)\(pathNoData)")
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
+                  let size = resourceValues.fileSize,
+                  let modificationTime = resourceValues.contentModificationDate else {
+                return true
+            }
+            return file.fileSize != size || modificationTime > file.modificationTime
         })
     }
 }

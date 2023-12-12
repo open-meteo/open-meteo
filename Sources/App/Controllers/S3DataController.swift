@@ -23,6 +23,7 @@ import Vapor
  */
 struct S3DataController: RouteCollection {
     static var syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
+    static var nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
     
     func boot(routes: RoutesBuilder) throws {
         if Self.syncApiKeys.isEmpty {
@@ -147,11 +148,20 @@ struct S3DataController: RouteCollection {
         }
         
         let path = req.url.path.sanitisedPath
-        let response = Response()
-        //let response = req.fileio.streamFile(at: abspath)
-        response.headers.add(name: "X-Accel-Redirect", value: "/data-internal\(path)")
-        // Bytes per second download speed limit. Set to 50 MB/s.
-        response.headers.add(name: "X-Accel-Limit-Rate", value: "\((params.rate ?? 50)*1024*1024)")
+        guard path.last != "/", path.starts(with: "/data/") else {
+            throw Abort(.forbidden)
+        }
+        let pathNoData = path[path.index(path.startIndex, offsetBy: 6)..<path.endIndex]
+        
+        if let nginxSendfilePrefix = Self.nginxSendfilePrefix {
+            let response = Response()
+            //let response = req.fileio.streamFile(at: abspath)
+            response.headers.add(name: "X-Accel-Redirect", value: "/\(nginxSendfilePrefix)\(pathNoData)")
+            // Bytes per second download speed limit. Set to 50 MB/s.
+            response.headers.add(name: "X-Accel-Limit-Rate", value: "\((params.rate ?? 50)*1024*1024)")
+            return response
+        }
+        let response = req.fileio.streamFile(at: "\(OpenMeteo.dataDirectory)\(pathNoData)")
         return response
     }
 }
