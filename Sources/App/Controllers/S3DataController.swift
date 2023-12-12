@@ -165,7 +165,19 @@ struct S3DataController: RouteCollection {
         return response
     }
 }
+
+
+enum SyncError: AbortError {
+    case invalidApiKey
     
+    var status: NIOHTTP1.HTTPResponseStatus {
+        switch self {
+        case .invalidApiKey:
+            return .unauthorized
+        }
+    }
+}
+
 fileprivate extension String {
     static var sanitisedPathCharacterSet = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_/").inverted
     

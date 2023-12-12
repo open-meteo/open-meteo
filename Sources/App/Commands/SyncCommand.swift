@@ -3,14 +3,14 @@ import Vapor
 
 struct SyncCommand: AsyncCommand {
     var help: String {
-        return "Synchronise weather database from a remote server"
+        return "Download the open-meteo weather database from a remote S3 server."
     }
     
     struct Signature: CommandSignature {
-        @Argument(name: "models", help: "Weather model domains separated by comma. Supports multiple servers separated by semicolon;")
+        @Argument(name: "models", help: "Weather model domains separated by comma. E.g. 'cmc_gem_gdps,dwd_icon'")
         var models: String
         
-        @Argument(name: "variables", help: "Weather variables, separated by comma")
+        @Argument(name: "variables", help: "Weather variables, separated by comma. E.g. 'temperature_2m,relative_humidity_2m'")
         var variables: String
         
         @Option(name: "apikey", help: "Sync API key for accessing Open-Meteo servers directly. Not required for AWS open-data.")
@@ -19,7 +19,7 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "server", help: "Server base URL. Default 'https://openmeteo.s3.amazonaws.com/'")
         var server: String?
         
-        @Option(name: "rate", help: "Transferrate in megabytes per second")
+        @Option(name: "rate", help: "Transferrate in megabytes per second. Not applicable for AWS open-data.")
         var rate: Int?
         
         @Option(name: "past-days", help: "Maximum age of synchronised files. Default 7 days.")
@@ -27,8 +27,6 @@ struct SyncCommand: AsyncCommand {
         
         @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of seconds.")
         var repeatInterval: Int?
-        
-        // delete old files (case pressure levels)
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -43,6 +41,8 @@ struct SyncCommand: AsyncCommand {
         let pastDays = signature.pastDays ?? 7
         let models = try DomainRegistry.load(commaSeparated: signature.models)
         let variables = signature.variables.split(separator: ",")
+        /// Undocumented switch to download all weather variables. This can generate immense traffic!
+        let downloadAllVariables = signature.variables == "really_download_all_variables"
         
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, retryError4xx: false)
         
@@ -54,14 +54,29 @@ struct SyncCommand: AsyncCommand {
             var toDownload = [S3DataController.S3ListV2File]()
             
             for model in models {
-                // always add static
-                toDownload.append(contentsOf: try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/static/", apikey: signature.apikey).files.includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory))
+                let modelPrefix = "data/\(model.rawValue)/"
+                let remoteDirectories = try await curl.s3list(server: server, prefix: modelPrefix, apikey: signature.apikey).directories
                 
-                // Check specified variables
-                for variable in variables {
-                    let remote = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/\(variable)/", apikey: signature.apikey)
-                    let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                    toDownload.append(contentsOf: filtered)
+                if downloadAllVariables {
+                    for variablePrefix in remoteDirectories {
+                        let remote = try await curl.s3list(server: server, prefix: variablePrefix, apikey: signature.apikey)
+                        let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+                        toDownload.append(contentsOf: filtered)
+                    }
+                } else {
+                    if remoteDirectories.contains("\(modelPrefix)static/") {
+                        toDownload.append(contentsOf: try await curl.s3list(server: server, prefix: "\(modelPrefix)static/", apikey: signature.apikey).files.includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory))
+                    }
+                    // Check specified variables
+                    for variable in variables {
+                        let variablePrefix = "\(modelPrefix)\(variable)/"
+                        guard remoteDirectories.contains(variablePrefix) else {
+                            continue
+                        }
+                        let remote = try await curl.s3list(server: server, prefix: variablePrefix, apikey: signature.apikey)
+                        let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+                        toDownload.append(contentsOf: filtered)
+                    }
                 }
             }
             
