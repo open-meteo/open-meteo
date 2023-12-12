@@ -226,19 +226,19 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             guard allowedRange.contains(daily.range.lowerBound) else {
                 throw ForecastapiError.dateOutOfRange(parameter: "start_date", allowed: allowedRange)
             }
-            guard allowedRange.contains(daily.range.upperBound) else {
+            guard allowedRange.contains(daily.range.upperBound.add(-1 * daily.dtSeconds)) else {
                 throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
             }
             guard allowedRange.contains(hourly.range.lowerBound) else {
                 throw ForecastapiError.dateOutOfRange(parameter: "start_hourly", allowed: allowedRange)
             }
-            guard allowedRange.contains(hourly.range.upperBound) else {
+            guard allowedRange.contains(hourly.range.upperBound.add(-1 * hourly.dtSeconds)) else {
                 throw ForecastapiError.dateOutOfRange(parameter: "end_hourly", allowed: allowedRange)
             }
             guard allowedRange.contains(minutely_15.range.lowerBound) else {
                 throw ForecastapiError.dateOutOfRange(parameter: "start_minutely_15", allowed: allowedRange)
             }
-            guard allowedRange.contains(minutely_15.range.upperBound) else {
+            guard allowedRange.contains(minutely_15.range.upperBound.add(-1 * minutely_15.dtSeconds)) else {
                 throw ForecastapiError.dateOutOfRange(parameter: "end_minutely_15", allowed: allowedRange)
             }
             
