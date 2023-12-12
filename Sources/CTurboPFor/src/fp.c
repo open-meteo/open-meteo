@@ -159,7 +159,7 @@ size_t TEMPLATE2(fpxenc,USIZE)(uint_t *in, size_t n, unsigned char *out, uint_t 
               sv = TEMPLATE2(mm_xore_epi, USIZE)(v0,sv);    bv = _mm_or_si128(bv, sv);        _mm_storeu_si128((__m128i *) p,               sv); sv = v0;
               sv = TEMPLATE2(mm_xore_epi, USIZE)(v1,sv);    bv = _mm_or_si128(bv, sv);        _mm_storeu_si128((__m128i *)(p+16/(USIZE/8)), sv); sv = v1;
     }
-    start = (uint_t)TEMPLATE2(_mm_cvtsi128_si,USIZE)(_mm_srli_si128(sv,16-USIZE/8));
+    start = (uint_t)TEMPLATE2(mm_cvtsi128_si,USIZE)(_mm_srli_si128(sv,16-USIZE/8));
     b     = TEMPLATE2(mm_hor_epi, USIZE)(bv);
       #else
     for(p = _p; p != &_p[VSIZE]; p+=4,ip+=4) { FE(0,USIZE); FE(1,USIZE); FE(2,USIZE); FE(3,USIZE); }
@@ -244,7 +244,7 @@ size_t TEMPLATE2(fpxdec,USIZE)(unsigned char *in, size_t n, uint_t *out, uint_t 
       _mm_storeu_si128((__m128i *) op,               v0);
       _mm_storeu_si128((__m128i *)(op+16/(USIZE/8)), sv);
     }
-    start = (uint_t)TEMPLATE2(_mm_cvtsi128_si,USIZE)(_mm_srli_si128(sv,16-USIZE/8));
+    start = (uint_t)TEMPLATE2(mm_cvtsi128_si,USIZE)(_mm_srli_si128(sv,16-USIZE/8));
       #else
     for(p = _p; p != &_p[VSIZE]; p+=4,op+=4) { FD(0,USIZE); FD(1,USIZE); FD(2,USIZE); FD(3,USIZE); }
       #endif
@@ -564,7 +564,7 @@ size_t TEMPLATE2(bvzzdec,USIZE)(unsigned char *in, size_t n, uint_t *out, uint_t
           sv = _mm_add_epi32(sv,cv); _mm_storeu_si128(op, sv); sv = mm_shuffle_nnnn_epi32(sv, 3); op += 4; //_mm_shuffle_epi32(sv, _MM_SHUFFLE(3, 3, 3, 3))->mm_shuffle_nnnn_epi32(sv, 3)
           sv = _mm_add_epi32(sv,cv); _mm_storeu_si128(op, sv); sv = mm_shuffle_nnnn_epi32(sv, 3); op += 4;
         }
-        start = (unsigned)_mm_cvtsi128_si32(_mm_srli_si128(sv,12));
+        start = (unsigned)mm_cvtsi128_si32(_mm_srli_si128(sv,12));
           #else
         for(r+=NL, _op = op; op != _op+(r&~7); op += 8)
           op[0]=(start+=pd),
