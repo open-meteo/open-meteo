@@ -22,6 +22,8 @@ jobs:
       run: echo "version=$(swift -version | head -n 1 | sed s/,// )" >> $GITHUB_OUTPUT
       shell: bash
     - uses: actions/checkout@v4
+    - name: restore timestamps
+      uses: chetan/git-restore-mtime-action@v2
     #- name: Get runtime library
     #  uses: wei/curl@v1
     #  with:
