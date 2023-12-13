@@ -38,10 +38,10 @@ struct OmFileSplitter {
         max(6, 3072 / nTimePerFile)
     }
     
-    init<Domain: GenericDomain>(_ domain: Domain, chunknLocations: Int? = nil) {
+    init<Domain: GenericDomain>(_ domain: Domain, nMembers: Int? = nil, chunknLocations: Int? = nil) {
         self.init(
             domain: domain.domainRegistry,
-            nLocations: domain.grid.count,
+            nLocations: domain.grid.count * max(nMembers ?? 1, 1),
             nTimePerFile: domain.omFileLength,
             hasYearlyFiles: domain.hasYearlyFiles,
             masterTimeRange: domain.masterTimeRange,

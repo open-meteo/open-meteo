@@ -110,7 +110,7 @@ struct DownloadIconCommand: AsyncCommand {
         let dateStr = run.format_YYYYMMddHH
 
         let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
@@ -276,7 +276,7 @@ struct DownloadIconCommand: AsyncCommand {
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         let nLocations = grid.count
         
-        let om = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil)
+        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         //print("nLocationsPerChunk \(nLocationsPerChunk)... \(nLocations/nLocationsPerChunk) iterations")
 

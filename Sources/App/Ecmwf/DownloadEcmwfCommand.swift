@@ -116,6 +116,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
         }
         //try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(domain.downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
+        try domain.surfaceElevationFileOm.createDirectory()
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
     }
     
@@ -127,7 +128,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         for hour in forecastSteps {
@@ -237,11 +238,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                                    Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 50)))
                 }
                 let memberStr = member > 0 ? "_\(member)" : ""
-                try writer.write(file: "\(downloadDirectory)cloudcover_low_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverLow, overwrite: true)
-                try writer.write(file: "\(downloadDirectory)cloudcover_mid_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverMid, overwrite: true)
-                try writer.write(file: "\(downloadDirectory)cloudcover_high_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverHigh, overwrite: true)
+                try writer.write(file: "\(downloadDirectory)cloud_cover_low_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverLow, overwrite: true)
+                try writer.write(file: "\(downloadDirectory)cloud_cover_mid_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverMid, overwrite: true)
+                try writer.write(file: "\(downloadDirectory)cloud_cover_high_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverHigh, overwrite: true)
                 let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
-                try writer.write(file: "\(downloadDirectory)cloudcover_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover, overwrite: true)
+                try writer.write(file: "\(downloadDirectory)cloud_cover_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover, overwrite: true)
             }
         }
         curl.printStatistics()
@@ -258,7 +259,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         let nLocations = domain.grid.nx * domain.grid.ny
         
-        let om = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil)
+        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         
         var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)

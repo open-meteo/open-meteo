@@ -210,7 +210,7 @@ struct GfsDownload: AsyncCommand {
         }
         
         let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -379,7 +379,7 @@ struct GfsDownload: AsyncCommand {
     /// Process each variable and update time-series optimised files
     func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool, secondFlush: Bool, maxForecastHour: Int?) throws {
         let nMembers = domain.ensembleMembers
-        let om = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil)
+        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         if let maxForecastHour {

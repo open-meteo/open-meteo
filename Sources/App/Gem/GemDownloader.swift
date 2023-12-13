@@ -163,7 +163,7 @@ struct GemDownload: AsyncCommand {
         let downloadDirectory = domain.downloadDirectory
         let nMembers = domain.ensembleMembers
         
-        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -267,7 +267,7 @@ struct GemDownload: AsyncCommand {
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         let nLocations = grid.nx * grid.ny
         
-        let om = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil)
+        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         
         var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
