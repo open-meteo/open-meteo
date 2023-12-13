@@ -22,8 +22,6 @@ jobs:
       run: echo "version=$(swift -version | head -n 1 | sed s/,// )" >> $GITHUB_OUTPUT
       shell: bash
     - uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
     #- name: Get runtime library
     #  uses: wei/curl@v1
     #  with:
@@ -38,9 +36,6 @@ jobs:
         key: ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
         restore-keys: |
           ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
-    - run: git config --system --add safe.directory /__w/open-meteo/open-meteo
-    - name: restore timestamps
-      uses: chetan/git-restore-mtime-action@v2
     - name: Resolve dependencies
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
