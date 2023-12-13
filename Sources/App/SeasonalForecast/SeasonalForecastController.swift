@@ -203,7 +203,7 @@ struct SeasonalForecastController {
                         return {
                             return ApiSection<DailyCfsVariable>(name: "daily", time: time.dailyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
-                                let allMembers: [ApiArray] = try (0..<domain.forecastDomain.nMembers).compactMap { member in
+                                let allMembers: [ApiArray] = try members.compactMap { member in
                                     let d = try reader.getDaily(variable: variable, member: member, params: params, time: time.dailyRead)
                                     unit = d.unit
                                     assert(time.dailyRead.count == d.data.count)
@@ -220,7 +220,7 @@ struct SeasonalForecastController {
                         return {
                             return .init(name: "six_hourly", time: timeSixHourlyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
-                                let allMembers: [ApiArray] = try (0..<domain.forecastDomain.nMembers).compactMap { member in
+                                let allMembers: [ApiArray] = try members.compactMap { member in
                                     let d = try reader.get(variable: variable, member: member, time: timeSixHourlyRead).convertAndRound(params: params)
                                     unit = d.unit
                                     assert(timeSixHourlyRead.count == d.data.count)
