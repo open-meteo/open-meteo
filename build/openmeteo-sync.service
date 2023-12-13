@@ -8,7 +8,7 @@ Type=simple
 User=openmeteo-api
 Group=openmeteo-api
 WorkingDirectory=/var/lib/openmeteo-api/
-ExecStart=/usr/local/bin/openmeteo-api sync $SYNC_DOMAINS --apikey $SYNC_APIKEY --max-age-days $SYNC_MAX_AGE_DAYS --server $SYNC_SERVER --repeat-interval $SYNC_REPEAT_INTERVAL
+ExecStart=/usr/local/bin/openmeteo-api sync $SYNC_DOMAINS $SYNC_VARIABLES --apikey $SYNC_APIKEY --past-days $SYNC_PAST_DAYS --server $SYNC_SERVER --repeat-interval $SYNC_REPEAT_INTERVAL
 ExecStopPost=/bin/bash -c 'if [ "$$EXIT_STATUS" != 0 ]; then /usr/local/bin/openmeteo-notify.sh $NOTIFICATION_EMAIL %N; fi'
 Restart=on-failure
 RestartSec=1

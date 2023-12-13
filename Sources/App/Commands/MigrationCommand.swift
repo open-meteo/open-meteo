@@ -1,6 +1,13 @@
 import Foundation
 import Vapor
 
+/**
+ Migrate the local open-meteo database to a new structure.
+ See: https://github.com/open-meteo/open-meteo/pull/543
+ 
+ Old `omfile-icon_d2/temperature_2m_12345.om`
+ New `dwd_icon_d2/temperature_2m/chunk_12345.om`
+ */
 struct MigrationCommand: Command {
     struct Signature: CommandSignature {
         @Flag(name: "execute", help: "Perform file moves")
@@ -98,6 +105,7 @@ struct MigrationCommand: Command {
         
     }
     
+    /// Rename old domain names to new names
     func domainRename(_ domain: String) -> DomainRegistry {
         switch domain {
         case "msm":

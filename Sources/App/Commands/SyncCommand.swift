@@ -1,16 +1,34 @@
 import Foundation
 import Vapor
 
+/**
+Download the open-meteo weather database from a S3 server.
+
+Arguments:
+           models Weather model domains separated by comma. E.g. 'cmc_gem_gdps,dwd_icon'
+        variables Weather variables separated by comma. E.g. 'temperature_2m,relative_humidity_2m'
+
+Options:
+           apikey Sync API key for accessing Open-Meteo servers directly. Not required for AWS open-data.
+           server Server base URL. Default 'https://openmeteo.s3.amazonaws.com/'
+             rate Transfer rate in megabytes per second. Not applicable for AWS open-data.
+        past-days Maximum age of synchronised files. Default 7 days.
+  repeat-interval If set, check for new files every specified amount of minutes.
+
+Example to download from a local endpoint
+DATA_DIRECTORY=/Volumes/2TB_1GBs/data/ API_SYNC_APIKEYS=123 openmeteo-api
+DATA_DIRECTORY=/Volumes/2TB_1GBs/data2/ openmeteo-api sync cmc_gem_gdps,dwd_icon_d2,dwd_icon temperature_2m --server http://127.0.0.1:8080/ --apikey 123 --past-days 30 --repeat-interval 5
+*/
 struct SyncCommand: AsyncCommand {
     var help: String {
-        return "Download the open-meteo weather database from a remote S3 server."
+        return "Download the open-meteo weather database from a S3 server."
     }
     
     struct Signature: CommandSignature {
         @Argument(name: "models", help: "Weather model domains separated by comma. E.g. 'cmc_gem_gdps,dwd_icon'")
         var models: String
         
-        @Argument(name: "variables", help: "Weather variables, separated by comma. E.g. 'temperature_2m,relative_humidity_2m'")
+        @Argument(name: "variables", help: "Weather variables separated by comma. E.g. 'temperature_2m,relative_humidity_2m'")
         var variables: String
         
         @Option(name: "apikey", help: "Sync API key for accessing Open-Meteo servers directly. Not required for AWS open-data.")
@@ -19,13 +37,13 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "server", help: "Server base URL. Default 'https://openmeteo.s3.amazonaws.com/'")
         var server: String?
         
-        @Option(name: "rate", help: "Transferrate in megabytes per second. Not applicable for AWS open-data.")
+        @Option(name: "rate", help: "Transfer rate in megabytes per second. Not applicable for AWS open-data.")
         var rate: Int?
         
         @Option(name: "past-days", help: "Maximum age of synchronised files. Default 7 days.")
         var pastDays: Int?
         
-        @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of seconds.")
+        @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of minutes.")
         var repeatInterval: Int?
     }
     
@@ -100,8 +118,8 @@ struct SyncCommand: AsyncCommand {
             guard let repeatInterval = signature.repeatInterval else {
                 break
             }
-            logger.info("Repeat in \(repeatInterval) seconds")
-            try await Task.sleep(nanoseconds: UInt64(repeatInterval * 1_000_000_000))
+            logger.info("Repeat in \(repeatInterval) minutes")
+            try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
         }
         curl.printStatistics()
     }
@@ -150,7 +168,7 @@ fileprivate extension Array where Element == S3DataController.S3ListV2File {
 }
 
 extension StringProtocol {
-    /// Interprete the given string as XML and iteraterate over a list of keys
+    /// Interpret the given string as XML and iterate over a list of keys
     func xmlSection(_ section: String) -> AnySequence<SubSequence> {
         return AnySequence<SubSequence> { () -> AnyIterator<SubSequence> in
             var pos = startIndex
@@ -168,7 +186,7 @@ extension StringProtocol {
         }
     }
     
-    /// Interprete the given string as XML and get the first key
+    /// Interpret the given string as XML and get the first key
     func xmlFirst(_ section: String) -> SubSequence? {
         guard let start = range(of: "<\(section)>", range: startIndex..<endIndex) else {
             return nil
