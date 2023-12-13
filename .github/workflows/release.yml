@@ -36,11 +36,11 @@ jobs:
         key: ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
         restore-keys: |
           ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
+    - name: restore timestamps
+      uses: chetan/git-restore-mtime-action@v2
     - name: Resolve dependencies
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
-    - name: Get eccodes
-      run: curl -L https://github.com/patrick-zippenfenig/ecCodes-ubuntu/releases/download/2.33.0/libeccodes0_2.33.0_jammy_amd64.deb -o libeccodes0_2.33.0_jammy_amd64.deb
     - name: Build
       run: |
         ${{ env.swift_build }}
@@ -71,6 +71,8 @@ jobs:
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}
         key_passphrase: ${{ secrets.GPG_SECRET }}
+    - name: Get eccodes
+      run: curl -L https://github.com/patrick-zippenfenig/ecCodes-ubuntu/releases/download/2.33.0/libeccodes0_2.33.0_jammy_amd64.deb -o libeccodes0_2.33.0_jammy_amd64.deb
     - name: Create APT repository
       uses: patrick-zippenfenig/apt-repo-action@master
       with:
