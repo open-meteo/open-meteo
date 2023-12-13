@@ -25,6 +25,9 @@ jobs:
       run: echo "version=$(swift -version | head -n 1 | sed s/,// )" >> $GITHUB_OUTPUT
       shell: bash
     - uses: actions/checkout@v4
+      with:
+        ref: dist
+        fetch-depth: 0
     - name: restore timestamps
       uses: chetan/git-restore-mtime-action@v2
     - name: Cache resolved dependencies
