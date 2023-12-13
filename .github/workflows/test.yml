@@ -27,8 +27,6 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    - name: restore timestamps
-      uses: chetan/git-restore-mtime-action@v2
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
       uses: actions/cache@v3
@@ -39,6 +37,9 @@ jobs:
         key: ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-${{ hashFiles('Package.swift', 'Package.resolved') }}
         restore-keys: |
           ${{ runner.os }}-${{ steps.get-swift-version.outputs.version }}-${{ env.cache_version }}-spm-deps-
+    - run: git config --system --add safe.directory /__w/open-meteo/open-meteo
+    - name: restore timestamps
+      uses: chetan/git-restore-mtime-action@v2
     - name: Resolve dependencies
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
