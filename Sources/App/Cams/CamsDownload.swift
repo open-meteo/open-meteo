@@ -129,8 +129,7 @@ struct DownloadCamsCommand: AsyncCommand {
     
     /// Assemble a time-series and update operational files
     func convertCamsGlobal(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         
         for variable in variables {
             guard let meta = variable.getCamsGlobalMeta()else {
@@ -214,8 +213,7 @@ struct DownloadCamsCommand: AsyncCommand {
     
     /// Process each variable and update time-series optimised files
     func convertCamsEurope(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         
         guard let ncFile = try NetCDF.open(path: "\(domain.downloadDirectory)download.nc", allowUpdate: false) else {
             fatalError("Could not open '\(domain.downloadDirectory)download.nc'")

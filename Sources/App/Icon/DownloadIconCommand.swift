@@ -44,13 +44,13 @@ struct DownloadIconCommand: AsyncCommand {
      */
     func convertSurfaceElevation(application: Application, domain: IconDomains, run: Timestamp) async throws {
         let logger = application.logger
-        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
         
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
@@ -87,7 +87,7 @@ struct DownloadIconCommand: AsyncCommand {
             }
         }
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: hsurf)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: hsurf)
     }
     
     
@@ -110,7 +110,7 @@ struct DownloadIconCommand: AsyncCommand {
         let dateStr = run.format_YYYYMMddHH
 
         let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
@@ -205,7 +205,7 @@ struct DownloadIconCommand: AsyncCommand {
                                 grib2d.array.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: grib2d.array.data, elevation: domainElevation)
                             }
                         }
-                        if domain == .iconEps && variable == .relativehumidity_2m {
+                        if domain == .iconEps && variable == .relative_humidity_2m {
                             // ICON EPS is using dewpoint, convert to relative humidity
                             guard let t2m = temperature2m[member] else {
                                 fatalError("Relative humidity calculation requires temperature_2m")
@@ -215,7 +215,7 @@ struct DownloadIconCommand: AsyncCommand {
                         }
                         // DWD ICON weather codes show rain although precipitation is 0
                         // Similar for snow at +2°C or more
-                        if variable == .weathercode {
+                        if variable == .weather_code {
                             guard let t2m = temperature2m[member] else {
                                 fatalError("Weather code correction requires temperature_2m")
                             }
@@ -236,7 +236,7 @@ struct DownloadIconCommand: AsyncCommand {
                         /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
                         /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
                         /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
-                        if variable == .freezinglevel_height {
+                        if variable == .freezing_level_height {
                             guard let t2m = temperature2m[member] else {
                                 fatalError("Freezing level height correction requires temperature_2m")
                             }
@@ -276,8 +276,7 @@ struct DownloadIconCommand: AsyncCommand {
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
         let nLocations = grid.count
         
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations * nMembers, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil)
+        let om = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         //print("nLocationsPerChunk \(nLocationsPerChunk)... \(nLocations/nLocationsPerChunk) iterations")
 

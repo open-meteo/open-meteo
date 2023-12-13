@@ -30,8 +30,34 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// 0.5° ensemble version for up to 25 days of forecast... Low forecast skill obviously.
     case gfs05_ens
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .gfs013:
+            return .ncep_gfs013
+        case .gfs025:
+            return .ncep_gfs025
+        case .hrrr_conus:
+            return .ncep_hrrr_conus
+        case .hrrr_conus_15min:
+            return .ncep_hrrr_conus_15min
+        case .gfs025_ensemble:
+            return .ncep_gefs025_probability
+        case .gfs025_ens:
+            return .ncep_gefs025
+        case .gfs05_ens:
+            return .ncep_gefs05
+        }
+    }
+    
+    var domainRegistryStatic: DomainRegistry? {
+        switch self {
+        case .hrrr_conus_15min:
+            return .ncep_hrrr_conus
+        case .gfs025_ensemble:
+            return .ncep_gefs025
+        default:
+            return domainRegistry
+        }
     }
     
     var hasYearlyFiles: Bool {
@@ -99,32 +125,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .gfs05_ens:
-                return Self.gfs05ensElevationFile
-            case .gfs013:
-                return Self.gfs013ElevationFile
-            case .gfs025_ens:
-                return Self.gfs025ensElevationFile
-            case .gfs025_ensemble:
-                fallthrough
-            case .gfs025:
-                return Self.gfs025ElevationFile
-                //case .nam_conus:
-                //return Self.namConusElevationFile
-            case .hrrr_conus:
-                return Self.hrrrConusElevationFile
-            case .hrrr_conus_15min:
-                return Self.hrrrConusElevationFile
-            }
-        }
-    }
-    
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
@@ -151,13 +151,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
 
         }
     }
-    
-    private static var gfs013ElevationFile = try? OmFileReader(file: Self.gfs013.surfaceElevationFileOm)
-    private static var gfs025ElevationFile = try? OmFileReader(file: Self.gfs025.surfaceElevationFileOm)
-    //private static var namConusElevationFile = try? OmFileReader(file: Self.nam_conus.surfaceElevationFileOm)
-    private static var hrrrConusElevationFile = try? OmFileReader(file: Self.hrrr_conus.surfaceElevationFileOm)
-    private static var gfs025ensElevationFile = try? OmFileReader(file: Self.gfs025_ens.surfaceElevationFileOm)
-    private static var gfs05ensElevationFile = try? OmFileReader(file: Self.gfs05_ens.surfaceElevationFileOm)
     
     var ensembleMembers: Int {
         switch self {

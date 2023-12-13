@@ -7,13 +7,20 @@ import SwiftPFor2D
 ///  ERA5: https://rmets.onlinelibrary.wiley.com/doi/10.1002/qj.3803
 enum CdsDomain: String, GenericDomain, CaseIterable {
     case era5
+    case era5_daily
     case era5_ocean
     case era5_land
+    case era5_land_daily
     case cerra
     case ecmwf_ifs
     
     var dtSeconds: Int {
-        return 3600
+        switch self {
+        case .era5_daily, .era5_land_daily:
+            return 24*3600
+        default:
+            return 3600
+        }
     }
     
     var isGlobal: Bool {
@@ -30,53 +37,39 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return "reanalysis-cerra-single-levels"
         case .ecmwf_ifs:
             return ""
+        case .era5_land_daily, .era5_daily:
+            fatalError()
         }
     }
     
-    private static var era5ElevationFile = try? OmFileReader(file: Self.era5.surfaceElevationFileOm)
-    private static var era5OceanElevationFile = try? OmFileReader(file: Self.era5_ocean.surfaceElevationFileOm)
-    private static var era5LandElevationFile = try? OmFileReader(file: Self.era5_land.surfaceElevationFileOm)
-    private static var cerraElevationFile = try? OmFileReader(file: Self.cerra.surfaceElevationFileOm)
-    private static var ifsElevationFile = try? OmFileReader(file: Self.ecmwf_ifs.surfaceElevationFileOm)
-    
-    private static var era5SoilTypeFile = try? OmFileReader(file: Self.era5.soilTypeFileOm)
-    private static var era5LandSoilTypeFile = try? OmFileReader(file: Self.era5_land.soilTypeFileOm)
-    private static var cerraSoilTypeFile = try? OmFileReader(file: Self.cerra.soilTypeFileOm)
-    private static var ifsSoilTypeFile = try? OmFileReader(file: Self.ecmwf_ifs.soilTypeFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            switch self {
-            case .era5_ocean:
-                return nil
-            case .era5:
-                return Self.era5SoilTypeFile
-            case .era5_land:
-                return Self.era5LandSoilTypeFile
-            case .cerra:
-                return Self.cerraSoilTypeFile
-            case .ecmwf_ifs:
-                return Self.ifsSoilTypeFile
-            }
-        case .elevation:
-            switch self {
-            case .era5_ocean:
-                return Self.era5OceanElevationFile
-            case .era5:
-                return Self.era5ElevationFile
-            case .era5_land:
-                return Self.era5LandElevationFile
-            case .cerra:
-                return Self.cerraElevationFile
-            case .ecmwf_ifs:
-                return Self.ifsElevationFile
-            }
+    var domainRegistryStatic: DomainRegistry? {
+        switch self {
+        case .era5_daily:
+            return .copernicus_era5
+        case .era5_land_daily:
+            return .copernicus_era5_land
+        default:
+            return domainRegistry
         }
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .era5:
+            return .copernicus_era5
+        case .era5_daily:
+            return .copernicus_era5_daily
+        case .era5_ocean:
+            return .copernicus_era5_ocean
+        case .era5_land:
+            return .copernicus_era5_land
+        case .era5_land_daily:
+            return .copernicus_era5_land_daily
+        case .cerra:
+            return .copernicus_cerra
+        case .ecmwf_ifs:
+            return .ecmwf_ifs
+        }
     }
     
     var hasYearlyFiles: Bool {
@@ -98,11 +91,11 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     
     var grid: Gridable {
         switch self {
-        case .era5:
+        case .era5, .era5_daily:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .era5_ocean:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
-        case .era5_land:
+        case .era5_land, .era5_land_daily:
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
             return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
@@ -125,9 +118,6 @@ struct DownloadEra5Command: AsyncCommand {
         
         @Option(name: "year", short: "y", help: "Download one year")
         var year: String?
-        
-        @Option(name: "stripseaYear", short: "s", help: "strip sea of converted files")
-        var stripseaYear: String?
         
         @Option(name: "prefetch-factor", short: "p", help: "Prefetch factor for bias calculation. Default 2")
         var prefetchFactor: Int?
@@ -176,10 +166,6 @@ struct DownloadEra5Command: AsyncCommand {
             (try CerraVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? CerraVariable.allCases) :
         (try Era5Variable.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5Variable.allCases).filter({ $0.availableForDomain(domain: domain) })
         
-        if let stripseaYear = signature.stripseaYear {
-            try runStripSea(logger: logger, year: Int(stripseaYear)!, domain: domain, variables: variables)
-            return
-        }
         if signature.calculateBiasField {
             try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
             return
@@ -240,7 +226,7 @@ struct DownloadEra5Command: AsyncCommand {
             .soil_temperature_0_to_7cm_mean,
             .soil_temperature_7_to_28cm_mean,
             .soil_temperature_28_to_100cm_mean,
-            .vapor_pressure_deficit_max
+            .vapour_pressure_deficit_max
         ].map{.derived($0)}
         
         for variable in variables {
@@ -282,53 +268,17 @@ struct DownloadEra5Command: AsyncCommand {
         }
     }
     
-    func stripSea(logger: Logger, readFilePath: String, writeFilePath: String, elevation: [Float]) throws {
-        let domain = CdsDomain.era5
-        if FileManager.default.fileExists(atPath: writeFilePath) {
-            return
-        }
-        let read = try OmFileReader(file: readFilePath)
-        
-        var percent = 0
-        try OmFileWriter(dim0: read.dim0, dim1: read.dim1, chunk0: read.chunk0, chunk1: read.chunk1).write(file: writeFilePath, compressionType: .p4nzdec256, scalefactor: read.scalefactor, overwrite: false) { dim0 in
-            let ratio = Int(Float(dim0) / (Float(read.dim0)) * 100)
-            if percent != ratio {
-                logger.info("\(ratio) %")
-                percent = ratio
-            }
-            
-            let nLocations = 1000 * read.chunk0
-            let locationRange = dim0..<min(dim0+nLocations, read.dim0)
-            
-            try read.willNeed(dim0Slow: locationRange, dim1: 0..<read.dim1)
-            var data = try read.read(dim0Slow: locationRange, dim1: nil)
-            for loc in locationRange {
-                let (lat,lon) = domain.grid.getCoordinates(gridpoint: loc)
-                let isNorthRussia = lon >= 43 && lat > 63
-                let isNorthCanadaGreenlandAlaska = lat > 66 && lon < -26
-                let isAntarctica = lat < -56
-                
-                if elevation[loc] <= -999 || lat > 72 || isNorthRussia || isNorthCanadaGreenlandAlaska || isAntarctica {
-                    for t in 0..<read.dim1 {
-                        data[(loc-dim0) * read.dim1 + t] = .nan
-                    }
-                }
-            }
-            return ArraySlice(data)
-        }
-    }
     /**
      Soil type information: https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle
      */
     func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain) async throws {
         let logger = application.logger
-        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
         }
         
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let tempDownloadGribFile = "\(downloadDir)elevation.grib"
         let tempDownloadGribFile2 = domain == .era5_land ? "\(downloadDir)lsm.grib" : nil
         let tempDownloadGribFile3 = domain == .era5_land ? "\(downloadDir)soil_type.grib" : nil
@@ -336,6 +286,8 @@ struct DownloadEra5Command: AsyncCommand {
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
             switch domain {
+            case .era5_daily, .era5_land_daily:
+                fatalError()
             case .era5_ocean:
                 // Just use wave data and mark all NaN areas as land
                 struct Query: Encodable {
@@ -450,7 +402,7 @@ struct DownloadEra5Command: AsyncCommand {
         let writer = OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunk0, chunk1: 400/chunk0)
         
         if let soilType {
-            try writer.write(file: domain.soilTypeFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: soilType)
+            try writer.write(file: domain.soilTypeFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: soilType)
         }
         
         /*let a1 = Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1)
@@ -466,7 +418,7 @@ struct DownloadEra5Command: AsyncCommand {
             }
         }
 
-        try writer.write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        try writer.write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
         
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         if let tempDownloadGribFile2 {
@@ -474,20 +426,6 @@ struct DownloadEra5Command: AsyncCommand {
         }
         if let tempDownloadGribFile3 {
             try FileManager.default.removeItemIfExists(at: tempDownloadGribFile3)
-        }
-    }
-    
-    func runStripSea(logger: Logger, year: Int, domain: CdsDomain, variables: [GenericVariable]) throws {
-        let domain = CdsDomain.era5
-        try FileManager.default.createDirectory(atPath: "\(domain.omfileArchive)-no-sea", withIntermediateDirectories: true)
-        logger.info("Read elevation")
-        let elevation = try OmFileReader(file: domain.surfaceElevationFileOm).readAll()
-        
-        for variable in variables {
-            logger.info("Converting variable \(variable)")
-            let fullFile = "\(domain.omfileArchive)\(variable)_\(year).om"
-            let strippedFile = "\(domain.omfileArchive)-no-sea/\(variable)_\(year).om"
-            try stripSea(logger: logger, readFilePath: fullFile, writeFilePath: strippedFile, elevation: elevation)
         }
     }
     
@@ -508,6 +446,8 @@ struct DownloadEra5Command: AsyncCommand {
                 fatalError("email required")
             }
             return try downloadDailyEcmwfIfsFiles(logger: logger, key: cdskey, email: email, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
+        case .era5_daily, .era5_land_daily:
+            fatalError()
         }
     }
     
@@ -692,7 +632,7 @@ struct DownloadEra5Command: AsyncCommand {
                 let endStep = Int(message.get(attribute: "endStep")!)!
                 logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
                 
-                if variable == .windgusts_10m && endStep == 0 {
+                if variable == .wind_gusts_10m && endStep == 0 {
                     return
                 }
                 
@@ -873,8 +813,7 @@ struct DownloadEra5Command: AsyncCommand {
         
         logger.info("Converting timerange \(timeinterval.prettyString())")
        
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
                 
         let indexTime = timeintervalHourly.toIndexTime()
         let nt = timeintervalHourly.count
@@ -924,17 +863,15 @@ struct DownloadEra5Command: AsyncCommand {
         let nx = domain.grid.nx // 721
         let ny = domain.grid.ny // 1440
         let nt = timeintervalHourly.count // 8784
-        
-        try FileManager.default.createDirectory(atPath: domain.omfileArchive, withIntermediateDirectories: true)
-        
+                
         // convert to yearly file
         for variable in variables {
             let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Convert \(variable) year \(year)")
-            let writeFile = "\(domain.omfileArchive)\(variable)_\(year).om"
-            if !forceUpdate && FileManager.default.fileExists(atPath: writeFile) {
+            let writeFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "\(variable)", type: .year, chunk: year)
+            if !forceUpdate && FileManager.default.fileExists(atPath: writeFile.getFilePath()) {
                 continue
             }
-            let existingFile = forceUpdate ? try? OmFileReader(file: writeFile) : nil
+            let existingFile = forceUpdate ? try writeFile.openRead() : nil
             let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
@@ -945,10 +882,10 @@ struct DownloadEra5Command: AsyncCommand {
             }
             // For updates, delete file before creating a new one.
             // Because the file is open, data access is still possible
-            try FileManager.default.removeItemIfExists(at: writeFile)
+            try FileManager.default.removeItemIfExists(at: writeFile.getFilePath())
             
             // chunk 6 locations and 21 days of data
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
+            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile.getFilePath(), compressionType: .p4nzdec256, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, nx*ny)
                 
                 var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)

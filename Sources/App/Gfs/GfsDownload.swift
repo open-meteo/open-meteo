@@ -176,14 +176,13 @@ struct GfsDownload: AsyncCommand {
     /// download GFS025 and NAM CONUS
     func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool, secondFlush: Bool, maxForecastHour: Int?) async throws {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let logger = application.logger
         
         // GFS025 ensemble does not have elevation information, use non-ensemble version
         let elevationUrl = (domain == .gfs025_ens ? GfsDomain.gfs025 : domain).getGribUrl(run: run, forecastHour: 0, member: 0)
         if domain != .hrrr_conus_15min {
             // 15min hrrr data uses hrrr domain elevation files
-            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
+            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, isGlobal: domain.isGlobal)
         }
         
         let deadLineHours: Double
@@ -211,7 +210,7 @@ struct GfsDownload: AsyncCommand {
         }
         
         let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -321,7 +320,7 @@ struct GfsDownload: AsyncCommand {
                     
                     // Convert specific humidity to relative humidity
                     if let variable = variable.variable as? GfsSurfaceVariable,
-                       variable == .relativehumidity_2m,
+                       variable == .relative_humidity_2m,
                        shortName == "2sh"
                     {
                         guard let temperature = inMemorySurface[.temperature_2m] else {
@@ -380,7 +379,7 @@ struct GfsDownload: AsyncCommand {
     /// Process each variable and update time-series optimised files
     func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool, secondFlush: Bool, maxForecastHour: Int?) throws {
         let nMembers = domain.ensembleMembers
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count * nMembers, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil)
+        let om = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         if let maxForecastHour {
@@ -485,14 +484,13 @@ struct GfsDownload: AsyncCommand {
     func downloadPrecipitationProbability(application: Application, run: Timestamp, skipFilesIfExisting: Bool) async throws {
         let domain = GfsDomain.gfs025_ensemble
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let grid = domain.grid
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4, waitAfterLastModified: 90)
         
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         enum EnsembleVariable: CurlIndexedVariable, CaseIterable {

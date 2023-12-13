@@ -104,11 +104,11 @@ enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, Cas
     case windspeed_2m_mean
     case wind_speed_2m_max
     case wind_speed_2m_mean
-    case wind_speed_10m_max
-    case wind_speed_10m_mean
-    case wind_gusts_10m_mean
-    case wind_gusts_10m_max
-    case vapour_pressure_deficit_max
+    case windspeed_10m_max
+    case windspeed_10m_mean
+    case windgusts_10m_mean
+    case windgusts_10m_max
+    case vapor_pressure_deficit_max
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -126,9 +126,9 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
     case soil_temperature_0_to_7cm_mean
     case soil_temperature_7_to_28cm_mean
     case soil_temperature_28_to_100cm_mean
-    case vapor_pressure_deficit_max
-    case windgusts_10m_mean
-    case windgusts_10m_max
+    case vapour_pressure_deficit_max
+    case wind_gusts_10m_mean
+    case wind_gusts_10m_max
 
     
     var requiresOffsetCorrectionForMixing: Bool {
@@ -139,7 +139,7 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
         switch self {
         case .et0_fao_evapotranspiration_sum:
             return .relativeChange(maximum: nil)
-        case .vapor_pressure_deficit_max:
+        case .vapour_pressure_deficit_max:
             return .relativeChange(maximum: nil)
         case .leaf_wetness_probability_mean:
             return .absoluteChage(bounds: 0...100)
@@ -159,9 +159,9 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
             return .absoluteChage(bounds: nil)
         case .soil_temperature_28_to_100cm_mean:
             return .absoluteChage(bounds: nil)
-        case .windgusts_10m_mean:
+        case .wind_gusts_10m_mean:
             return .relativeChange(maximum: nil)
-        case .windgusts_10m_max:
+        case .wind_gusts_10m_max:
             return .relativeChange(maximum: nil)
         }
     }
@@ -304,10 +304,10 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        guard let readerEra5Land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+        guard let readerEra5Land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        guard let readerEra5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+        guard let readerEra5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
@@ -596,23 +596,23 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             // note: time should align to UTC 0 midnight
             return DataAndUnit(Zensun.calculateDaylightDuration(utcMidnight: time.range, lat: modelLat, lon: modelLon), .seconds)
         case .windspeed_2m_max, .wind_speed_2m_max:
-            let wind = try get(raw: .raw(.windspeed_10m_max), time: time)
+            let wind = try get(raw: .raw(.wind_speed_10m_max), time: time)
             let scale = Meteorology.scaleWindFactor(from: 10, to: 2)
             return DataAndUnit(wind.data.map{$0*scale}, wind.unit)
         case .windspeed_2m_mean, .wind_speed_2m_mean:
-            let wind = try get(raw: .raw(.windspeed_10m_mean), time: time)
+            let wind = try get(raw: .raw(.wind_speed_10m_mean), time: time)
             let scale = Meteorology.scaleWindFactor(from: 10, to: 2)
             return DataAndUnit(wind.data.map{$0*scale}, wind.unit)
-        case .wind_gusts_10m_mean:
-            return try get(raw: .derived(.windgusts_10m_mean), time: time)
-        case .wind_gusts_10m_max:
-            return try get(raw: .derived(.windgusts_10m_max), time: time)
-        case .vapour_pressure_deficit_max:
-            return try get(raw: .derived(.vapor_pressure_deficit_max), time: time)
-        case .wind_speed_10m_max:
-            return try get(raw: .raw(.windspeed_10m_max), time: time)
-        case .wind_speed_10m_mean:
-            return try get(raw: .raw(.windspeed_10m_mean), time: time)
+        case .windgusts_10m_mean:
+            return try get(raw: .derived(.wind_gusts_10m_mean), time: time)
+        case .windgusts_10m_max:
+            return try get(raw: .derived(.wind_gusts_10m_max), time: time)
+        case .vapor_pressure_deficit_max:
+            return try get(raw: .derived(.vapour_pressure_deficit_max), time: time)
+        case .windspeed_10m_max:
+            return try get(raw: .raw(.wind_speed_10m_max), time: time)
+        case .windspeed_10m_mean:
+            return try get(raw: .raw(.wind_speed_10m_mean), time: time)
         }
     }
     
@@ -642,19 +642,19 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
         case .daylight_duration:
             break
         case .windspeed_2m_max, .wind_speed_2m_max:
-            try prefetchData(raw: .raw(.windspeed_10m_max), time: time)
+            try prefetchData(raw: .raw(.wind_speed_10m_max), time: time)
         case .windspeed_2m_mean, .wind_speed_2m_mean:
-            try prefetchData(raw: .raw(.windspeed_10m_mean), time: time)
-        case .wind_gusts_10m_mean:
-            try prefetchData(raw: .derived(.windgusts_10m_mean), time: time)
-        case .wind_gusts_10m_max:
-            try prefetchData(raw: .derived(.windgusts_10m_max), time: time)
-        case .vapour_pressure_deficit_max:
-            try prefetchData(raw: .derived(.vapor_pressure_deficit_max), time: time)
-        case .wind_speed_10m_max:
-            try prefetchData(raw: .raw(.windspeed_10m_max), time: time)
-        case .wind_speed_10m_mean:
-            try prefetchData(raw: .raw(.windspeed_10m_mean), time: time)
+            try prefetchData(raw: .raw(.wind_speed_10m_mean), time: time)
+        case .windgusts_10m_mean:
+            try prefetchData(raw: .derived(.wind_gusts_10m_mean), time: time)
+        case .windgusts_10m_max:
+            try prefetchData(raw: .derived(.wind_gusts_10m_max), time: time)
+        case .vapor_pressure_deficit_max:
+            try prefetchData(raw: .derived(.vapour_pressure_deficit_max), time: time)
+        case .windspeed_10m_max:
+            try prefetchData(raw: .raw(.wind_speed_10m_max), time: time)
+        case .windspeed_10m_mean:
+            try prefetchData(raw: .raw(.wind_speed_10m_mean), time: time)
         }
     }
 }
@@ -679,7 +679,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
             let tempmean = try get(raw: .temperature_2m_mean, time: time).data
-            let wind = try get(raw: .windspeed_10m_mean, time: time).data
+            let wind = try get(raw: .wind_speed_10m_mean, time: time).data
             let radiation = try get(raw: .shortwave_radiation_sum, time: time).data
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.with(dtSeconds: 3600)).sum(by: 24)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
@@ -707,7 +707,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                     relativeHumidity: rh))
             }
             return DataAndUnit(et0, .millimetre)
-        case .vapor_pressure_deficit_max:
+        case .vapour_pressure_deficit_max:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
             let tempmin = try get(raw: .temperature_2m_min, time: time).data
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
@@ -793,10 +793,10 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             let st7_28 = st0_7.indices.map { return st0_7[max(0, $0-5) ..< $0+1].mean() }
             let st28_100 = st7_28.indices.map { return st7_28[max(0, $0-51) ..< $0+1].mean() }
             return DataAndUnit(st28_100, t2m.unit)
-        case .windgusts_10m_mean:
-            return try get(raw: .windspeed_10m_mean, time: time)
-        case .windgusts_10m_max:
-            return try get(raw: .windspeed_10m_max, time: time)
+        case .wind_gusts_10m_mean:
+            return try get(raw: .wind_speed_10m_mean, time: time)
+        case .wind_gusts_10m_max:
+            return try get(raw: .wind_speed_10m_max, time: time)
         }
     }
     
@@ -806,7 +806,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
             try prefetchData(raw: .temperature_2m_mean, time: time)
-            try prefetchData(raw: .windspeed_10m_mean, time: time)
+            try prefetchData(raw: .wind_speed_10m_mean, time: time)
             try prefetchData(raw: .shortwave_radiation_sum, time: time)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             if hasRhMinMax {
@@ -815,7 +815,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             } else {
                 try prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
-        case .vapor_pressure_deficit_max:
+        case .vapour_pressure_deficit_max:
             try prefetchData(raw: .temperature_2m_max, time: time)
             try prefetchData(raw: .temperature_2m_min, time: time)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
@@ -852,10 +852,10 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             try prefetchData(raw: .temperature_2m_max, time: time)
         case .soil_temperature_28_to_100cm_mean:
             try prefetchData(raw: .temperature_2m_max, time: time)
-        case .windgusts_10m_mean:
-            try prefetchData(raw: .windspeed_10m_mean, time: time)
-        case .windgusts_10m_max:
-            try prefetchData(raw: .windspeed_10m_max, time: time)
+        case .wind_gusts_10m_mean:
+            try prefetchData(raw: .wind_speed_10m_mean, time: time)
+        case .wind_gusts_10m_max:
+            try prefetchData(raw: .wind_speed_10m_max, time: time)
         }
     }
 }

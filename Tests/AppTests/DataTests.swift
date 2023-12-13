@@ -12,7 +12,7 @@ final class DataTests: XCTestCase {
     }
     
     func testDem90() throws {
-        try XCTSkipUnless(FileManager.default.fileExists(atPath: Dem90.omDirectory), "Elevation information unavailable")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory), "Elevation information unavailable")
         
         XCTAssertEqual(try Dem90.read(lat: -32.878000, lon: 28.101000), 25) // beach, SE south africa
         XCTAssertEqual(try Dem90.read(lat: -32.878000, lon: 28.120000), 0) // water, SE south africa
@@ -45,7 +45,7 @@ final class DataTests: XCTestCase {
     }
     
     func testElevationMatching() throws {
-        try XCTSkipUnless(FileManager.default.fileExists(atPath: Dem90.omDirectory), "Elevation information unavailable")
+        try XCTSkipUnless(FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory), "Elevation information unavailable")
         
         let optimised = try IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
         XCTAssertEqual(optimised.gridpoint, 225405)

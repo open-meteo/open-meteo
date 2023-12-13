@@ -51,7 +51,7 @@ struct JmaDownload: AsyncCommand {
         case .gsm:
             variables = JmaSurfaceVariable.allCases.filter({$0 != .shortwave_radiation}) + domain.levels.flatMap {
                 level in JmaPressureVariableType.allCases.compactMap { variable in
-                    if variable == .relativehumidity && level <= 250 {
+                    if variable == .relative_humidity && level <= 250 {
                         return nil
                     }
                     return JmaPressureVariable(variable: variable, level: level)
@@ -64,7 +64,6 @@ struct JmaDownload: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         //try await downloadElevation(application: context.application, domain: domain)
         let handles = try await download(application: context.application, domain: domain, run: run, server: server)
@@ -80,7 +79,7 @@ struct JmaDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         defer { curl.printStatistics() }
         
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -142,7 +141,7 @@ struct JmaDownload: AsyncCommand {
     
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: JmaDomain, variables: [JmaVariableDownloadable], run: Timestamp, createNetcdf: Bool, handles: [(variable: JmaVariableDownloadable, hour: Int, fn: FileHandle)]) throws {
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour)
         let nTime = forecastHours.max()! / domain.dtHours + 1
@@ -217,14 +216,14 @@ extension GribMessage {
         case "10u": return JmaSurfaceVariable.wind_u_component_10m
         case "10v": return JmaSurfaceVariable.wind_v_component_10m
         case "2t": return JmaSurfaceVariable.temperature_2m
-        case "2r": return JmaSurfaceVariable.relativehumidity_2m
-        case "lcc": return JmaSurfaceVariable.cloudcover_low
-        case "mcc": return JmaSurfaceVariable.cloudcover_mid
-        case "hcc": return JmaSurfaceVariable.cloudcover_high
+        case "2r": return JmaSurfaceVariable.relative_humidity_2m
+        case "lcc": return JmaSurfaceVariable.cloud_cover_low
+        case "mcc": return JmaSurfaceVariable.cloud_cover_mid
+        case "hcc": return JmaSurfaceVariable.cloud_cover_high
         case "dswrf": return JmaSurfaceVariable.shortwave_radiation
         case "unknown":
             if parameterCategory == 6 && parameterNumber == 1 {
-                return JmaSurfaceVariable.cloudcover
+                return JmaSurfaceVariable.cloud_cover
             }
             if parameterCategory == 1 && parameterNumber == 8 {
                 return JmaSurfaceVariable.precipitation
@@ -241,9 +240,9 @@ extension GribMessage {
         case "w": return JmaPressureVariable(variable: .vertical_velocity, level: level)
         case "r":
             if level == 2 { // MSM case
-                return JmaSurfaceVariable.relativehumidity_2m
+                return JmaSurfaceVariable.relative_humidity_2m
             }
-            return JmaPressureVariable(variable: .relativehumidity, level: level)
+            return JmaPressureVariable(variable: .relative_humidity, level: level)
         default: return nil
         }
     }
@@ -251,12 +250,12 @@ extension GribMessage {
 
 enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericVariableMixable {
     case temperature_2m
-    case cloudcover
-    case cloudcover_low
-    case cloudcover_mid
-    case cloudcover_high
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
     case pressure_msl
-    case relativehumidity_2m
+    case relative_humidity_2m
     
     /// not in global model
     case shortwave_radiation
@@ -284,15 +283,15 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         switch self {
         case .temperature_2m:
             return 20
-        case .cloudcover:
+        case .cloud_cover:
             return 1
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return 1
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return 1
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return 1
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return 1
         case .precipitation:
             return 10
@@ -322,17 +321,17 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         switch self {
         case .temperature_2m:
             return .hermite(bounds: nil)
-        case .cloudcover:
+        case .cloud_cover:
             return .hermite(bounds: 0...100)
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return .hermite(bounds: 0...100)
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return .hermite(bounds: 0...100)
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return .hermite(bounds: 0...100)
         case .pressure_msl:
             return .hermite(bounds: nil)
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
         case .wind_v_component_10m:
             return .hermite(bounds: nil)
@@ -349,15 +348,15 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         switch self {
         case .temperature_2m:
             return .celsius
-        case .cloudcover:
+        case .cloud_cover:
             return .percentage
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return .percentage
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return .percentage
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return .percentage
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return .percentage
         case .precipitation:
             return .millimetre
@@ -398,7 +397,7 @@ enum JmaPressureVariableType: String, CaseIterable {
     case wind_v_component
     case geopotential_height
     case vertical_velocity
-    case relativehumidity
+    case relative_humidity
 }
 
 
@@ -436,7 +435,7 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         case .vertical_velocity:
             return (10..<15).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
-        case .relativehumidity:
+        case .relative_humidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
     }
@@ -453,7 +452,7 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
             return .hermite(bounds: nil)
         case .vertical_velocity:
             return .hermite(bounds: nil)
-        case .relativehumidity:
+        case .relative_humidity:
             return .hermite(bounds: 0...100)
         }
     }
@@ -482,7 +481,7 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
             return .metre
         case .vertical_velocity:
             return .metrePerSecond
-        case .relativehumidity:
+        case .relative_humidity:
             return .percentage
         }
     }
@@ -505,8 +504,17 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     case gsm
     case msm
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .gsm:
+            return .jma_gsm
+        case .msm:
+            return .jma_msm
+        }
+    }
+    
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
     }
     
     var hasYearlyFiles: Bool {
@@ -525,23 +533,6 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     }
     var isGlobal: Bool {
         return self == .gsm
-    }
-
-    private static var gsmElevationFile = try? OmFileReader(file: Self.gsm.surfaceElevationFileOm)
-    private static var msmElevationFile = try? OmFileReader(file: Self.msm.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .gsm:
-                return Self.gsmElevationFile
-            case .msm:
-                return Self.msmElevationFile
-            }
-        }
     }
     
     /// Based on the current time , guess the current run that should be available soon on the open-data server

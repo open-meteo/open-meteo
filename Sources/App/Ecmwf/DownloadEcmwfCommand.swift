@@ -56,7 +56,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
         try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convertEcmwf(logger: logger, domain: domain, run: run, variables: variables)
@@ -66,10 +65,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
     func downloadEcmwfElevation(application: Application, domain: EcmwfDomain, base: String, run: Timestamp) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
-        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
             return
         }
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         
         var generateElevationFileData: (lsm: [Float]?, surfacePressure: [Float]?, sealevelPressure: [Float]?, temperature_2m: [Float]?) = (nil, nil, nil, nil)
@@ -118,7 +116,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
         }
         //try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(domain.downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
     }
     
     /// Download ECMWF ifs open data
@@ -129,7 +127,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         for hour in forecastSteps {
@@ -260,7 +258,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         let nLocations = domain.grid.nx * domain.grid.ny
         
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: nLocations * nMembers, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil, chunknLocations: nMembers > 1 ? nMembers : nil)
+        let om = OmFileSplitter(domain, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         
         var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
@@ -315,12 +313,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
             progress.finish()
         }
         
-        var indexTimeEnd = run.timeIntervalSince1970 + 241 * 3600
+        /*var indexTimeEnd = run.timeIntervalSince1970 + 241 * 3600
         if run.hour == 6 || run.hour == 18 {
             // run 6 and 18 only have 90 instead 240
             indexTimeEnd += (240 - 90) * 3600
         }
-        let indexTimeStart = indexTimeEnd - domain.omFileLength * domain.dtSeconds + 12 * 3600
+        let indexTimeStart = indexTimeEnd - domain.omFileLength * domain.dtSeconds + 12 * 3600*/
         //try "\(run.timeIntervalSince1970),\(domain.omFileLength),\(indexTimeStart),\(indexTimeEnd)".write(toFile: "\(domain.omfileDirectory)init.txt", atomically: true, encoding: .utf8)
     }
 }

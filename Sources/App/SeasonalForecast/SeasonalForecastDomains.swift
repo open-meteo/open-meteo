@@ -11,8 +11,29 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     case jma
     case eccc
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .ecmwf:
+            fatalError()
+        case .ukMetOffice:
+            fatalError()
+        case .meteoFrance:
+            fatalError()
+        case .dwd:
+            fatalError()
+        case .cmcc:
+            fatalError()
+        case .ncep:
+            return .ncep_cfsv2
+        case .jma:
+            fatalError()
+        case .eccc:
+            fatalError()
+        }
+    }
+    
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
     }
     
     var hasYearlyFiles: Bool {
@@ -21,34 +42,6 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     
     var masterTimeRange: Range<Timestamp>? {
         return nil
-    }
-    
-    static var ncepElevation = try? OmFileReader(file: Self.ncep.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .ecmwf:
-                fatalError()
-            case .ukMetOffice:
-                fatalError()
-            case .meteoFrance:
-                fatalError()
-            case .dwd:
-                fatalError()
-            case .cmcc:
-                fatalError()
-            case .ncep:
-                return Self.ncepElevation
-            case .jma:
-                fatalError()
-            case .eccc:
-                fatalError()
-            }
-        }
     }
     
     var lastRun: Timestamp {
@@ -191,12 +184,12 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
     case soil_moisture_100_to_200cm
     case soil_temperature_0_to_10cm
     case shortwave_radiation
-    case cloudcover
+    case cloud_cover
     case wind_u_component_10m
     case wind_v_component_10m
     case precipitation
     case showers
-    case relativehumidity_2m
+    case relative_humidity_2m
     case pressure_msl
     
     var omFileName: (file: String, level: Int) {
@@ -246,7 +239,7 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
             return 20
         case .shortwave_radiation:
             return 1
-        case .cloudcover:
+        case .cloud_cover:
             return 1
         case .wind_u_component_10m:
             return 10
@@ -256,7 +249,7 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
             return 10
         case .showers:
             return 10
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return 1
         case .pressure_msl:
             return 10
@@ -283,7 +276,7 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
             return .celsius
         case .shortwave_radiation:
             return .wattPerSquareMetre
-        case .cloudcover:
+        case .cloud_cover:
             return .percentage
         case .wind_u_component_10m:
             return .metrePerSecond
@@ -293,7 +286,7 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
             return .millimetre
         case .showers:
             return .millimetre
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return .percentage
         case .pressure_msl:
             return .hectopascal

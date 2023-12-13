@@ -4,15 +4,11 @@ import SwiftPFor2D
 
 /// Read any time from multiple files
 struct OmFileSplitter {
+    let domain: DomainRegistry
     
-    /// like `/data/domain/` will be expanded to `/data/domain/variable_123235234.om`
-    let basePath: String
+    let masterTimeRange: Range<Timestamp>?
     
-    /// like `/data/domain-yearly/` and will be expanded to `/data/domain-yearly/2012_variable.om`
-    let yearlyArchivePath: String?
-    
-    /// Like `/data/domain-master/`
-    let omFileMaster: (path: String, time: TimerangeDt)?
+    let hasYearlyFiles: Bool
     
     /// actually also in file
     let nLocations: Int
@@ -42,22 +38,23 @@ struct OmFileSplitter {
         max(6, 3072 / nTimePerFile)
     }
     
-    init<Domain: GenericDomain>(_ domain: Domain) {
+    init<Domain: GenericDomain>(_ domain: Domain, chunknLocations: Int? = nil) {
         self.init(
-            basePath: domain.omfileDirectory,
+            domain: domain.domainRegistry,
             nLocations: domain.grid.count,
             nTimePerFile: domain.omFileLength,
-            yearlyArchivePath: domain.hasYearlyFiles ? domain.omfileArchive : nil,
-            omFileMaster: domain.omFileMaster
+            hasYearlyFiles: domain.hasYearlyFiles,
+            masterTimeRange: domain.masterTimeRange,
+            chunknLocations: chunknLocations
         )
     }
     
-    init(basePath: String, nLocations: Int, nTimePerFile: Int, yearlyArchivePath: String?, omFileMaster: (path: String, time: TimerangeDt)? = nil, chunknLocations: Int? = nil) {
-        self.basePath = basePath
+    init(domain: DomainRegistry, nLocations: Int, nTimePerFile: Int, hasYearlyFiles: Bool, masterTimeRange: Range<Timestamp>?, chunknLocations: Int? = nil) {
+        self.domain = domain
         self.nLocations = nLocations
         self.nTimePerFile = nTimePerFile
-        self.yearlyArchivePath = yearlyArchivePath
-        self.omFileMaster = omFileMaster
+        self.hasYearlyFiles = hasYearlyFiles
+        self.masterTimeRange = masterTimeRange
         self.chunknLocations = chunknLocations ?? Self.calcChunknLocations(nTimePerFile: nTimePerFile)
     }
     
@@ -73,10 +70,10 @@ struct OmFileSplitter {
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var start = indexTime.lowerBound
         
-        if let omFileMaster {
-            let fileTime = omFileMaster.time.toIndexTime()
+        if let masterTimeRange {
+            let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             if let offsets = indexTime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: omFileMaster.path, variable: variable, timeChunk: 0)),
+               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0)),
                 omFile.dim0 % nLocations == 0 {
                 let nLevels = omFile.dim0 / nLocations
                 if nLevels > 1 && location.count > 1 {
@@ -93,7 +90,7 @@ struct OmFileSplitter {
             return
         }
         
-        if let yearlyArchivePath {
+        if hasYearlyFiles {
             let startYear = time.range.lowerBound.toComponents().year
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year
@@ -104,7 +101,7 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                guard let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: yearlyArchivePath, variable: variable, timeChunk: year)) else {
+                guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year)) else {
                     continue
                 }
                 guard omFile.dim0 % nLocations == 0 else {
@@ -131,7 +128,7 @@ struct OmFileSplitter {
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 continue
             }
-            guard let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: basePath, variable: variable, timeChunk: timeChunk)) else {
+            guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)) else {
                 continue
             }
             guard omFile.dim0 % nLocations == 0 else {
@@ -164,10 +161,10 @@ struct OmFileSplitter {
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var out = [Float](repeating: .nan, count: indexTime.count * location.count)
         
-        if let omFileMaster {
-            let fileTime = omFileMaster.time.toIndexTime()
+        if let masterTimeRange {
+            let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             if let offsets = indexTime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: omFileMaster.path, variable: variable, timeChunk: 0)),
+               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0)),
                 omFile.dim0 % nLocations == 0 {
                 let nLevels = omFile.dim0 / nLocations
                 if nLevels > 1 && location.count > 1 {
@@ -181,7 +178,7 @@ struct OmFileSplitter {
             }
         }
         
-        if let yearlyArchivePath {
+        if hasYearlyFiles {
             let startYear = time.range.lowerBound.toComponents().year
             /// end year is included in itteration range
             let endYear = time.range.upperBound.add(-1 * time.dtSeconds).toComponents().year
@@ -192,7 +189,7 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                guard let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: yearlyArchivePath, variable: variable, timeChunk: year)) else {
+                guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year)) else {
                     continue
                 }
                 guard omFile.dim0 % nLocations == 0 else {
@@ -222,7 +219,7 @@ struct OmFileSplitter {
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
-            guard let omFile = try OmFileManager.get(OmFilePathWithTime(basePath: basePath, variable: variable, timeChunk: timeChunk)) else {
+            guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)) else {
                 continue
             }
             guard omFile.dim0 % nLocations == 0 else {
@@ -278,11 +275,12 @@ struct OmFileSplitter {
                 return nil
             }
             
-            let readFile = basePath + variable + "_\(timeChunk).om"
-            let tempFile = readFile + "~"
-            let omRead = FileManager.default.fileExists(atPath: readFile) ? try OmFileReader(file: readFile) : nil
+            let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)
+            try readFile.createDirectory()
+            let omRead = try readFile.openRead()
             try omRead?.willNeed()
             
+            let tempFile = readFile.getFilePath() + "~"
             try FileManager.default.removeItemIfExists(at: tempFile)
             
             let bufferSize = P4NENC256_BOUND(n: chunknLocations * nTimePerFile, bytesPerElement: compression.bytesPerElement)
@@ -296,7 +294,7 @@ struct OmFileSplitter {
             
             try omWrite.writeHeader()
             
-            return (omRead, omWrite, offsets, readFile)
+            return (omRead, omWrite, offsets, readFile.getFilePath())
         }
         
         let nIndexTime = indexTime.count

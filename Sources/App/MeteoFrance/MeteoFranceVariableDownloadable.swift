@@ -33,7 +33,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         switch self {
         case .temperature_2m:
             fallthrough
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             fallthrough
         case .wind_u_component_10m:
             fallthrough
@@ -51,7 +51,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             fallthrough
         case .wind_v_component_100m:
             return true
-        case .windgusts_10m:
+        case .wind_gusts_10m:
             return true
         case .cape:
             return true
@@ -62,11 +62,11 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     
     var isAlwaysHourlyInArgegeEurope: Bool {
         switch self {
-        case .cloudcover_low:
+        case .cloud_cover_low:
             fallthrough
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             fallthrough
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return true
         default:
             return inPackage == .SP1
@@ -77,17 +77,17 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         switch self {
         case .temperature_2m:
             return .SP1
-        case .cloudcover:
+        case .cloud_cover:
             return .SP1
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return .SP2
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return .SP2
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return .SP2
         case .pressure_msl:
             return .SP1
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return .SP1
         case .precipitation:
             return .SP1
@@ -97,7 +97,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             return .SP1
         case .wind_u_component_10m:
             return .SP1
-        case .windgusts_10m:
+        case .wind_gusts_10m:
             return .SP1
         case .cape:
             return .SP2
@@ -142,17 +142,17 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         switch self {
         case .temperature_2m:
             return ":TMP:2 m above ground:\(hourStr):"
-        case .cloudcover:
+        case .cloud_cover:
             return ":TCDC:surface:\(hourStr):"
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return ":LCDC:surface:\(hourStr):"
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return ":MCDC:surface:\(hourStr):"
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return ":HCDC:surface:\(hourStr):"
         case .pressure_msl:
             return ":PRMSL:mean sea level:\(hourStr):"
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return ":RH:2 m above ground:\(hourStr):"
         case .precipitation:
             return ":TPRATE:surface:0-\(hourOrDay) acc fcst:"
@@ -162,7 +162,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             return "VGRD:10 m above ground:\(hourStr):"
         case .wind_u_component_10m:
             return "UGRD:10 m above ground:\(hourStr):"
-        case .windgusts_10m:
+        case .wind_gusts_10m:
             return ":GUST:10 m above ground:\(hour-1)-\(hour) hour max fcst:"
         case .shortwave_radiation:
             return ":DSWRF:surface:0-\(hourOrDay) acc fcst:"
@@ -203,13 +203,13 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     
     func skipHour0(domain: MeteoFranceDomain) -> Bool {
         switch self {
-        case .cloudcover: return domain == .arome_france
-        case .cloudcover_low: return domain == .arome_france
-        case .cloudcover_mid: return domain == .arome_france
-        case .cloudcover_high: return domain == .arome_france
+        case .cloud_cover: return domain == .arome_france
+        case .cloud_cover_low: return domain == .arome_france
+        case .cloud_cover_mid: return domain == .arome_france
+        case .cloud_cover_high: return domain == .arome_france
         case .precipitation: return true
         case .shortwave_radiation: return true
-        case .windgusts_10m: return true
+        case .wind_gusts_10m: return true
         case .snowfall_water_equivalent: return true
         default: return false
         }
@@ -254,7 +254,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
 
 extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
     func availableFor(domain: MeteoFranceDomain) -> Bool {
-        if variable == .cloudcover && domain == .arome_france {
+        if variable == .cloud_cover && domain == .arome_france {
             return false
         }
         return true
@@ -275,9 +275,9 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
             return ":VGRD:\(level) mb:\(hourStr):"
         case .geopotential_height:
             return ":GP:\(level) mb:\(hourStr):"
-        case .cloudcover:
+        case .cloud_cover:
             return ":FRACCC:\(level) mb:\(hourStr):"
-        case .relativehumidity:
+        case .relative_humidity:
             return ":RH:\(level) mb:\(hourStr):"
         }
     }
@@ -292,9 +292,9 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
             return .IP1
         case .geopotential_height:
             return .IP1
-        case .cloudcover:
+        case .cloud_cover:
             return .IP3
-        case .relativehumidity:
+        case .relative_humidity:
             return .IP1
         }
     }
@@ -307,7 +307,7 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
         switch variable {
         case .temperature:
             return (1, -273.15)
-        case .cloudcover:
+        case .cloud_cover:
             return (100, 0)
         case .geopotential_height:
             // convert geopotential to height (WMO defined gravity constant)

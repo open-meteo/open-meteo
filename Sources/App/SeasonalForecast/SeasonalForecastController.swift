@@ -3,7 +3,7 @@ import Vapor
 
 typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableDerived>
 
-typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, VariableAndMember<CfsVariable>>
+typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, VariableAndMemberAndControlSplitFiles<CfsVariable>>
 
 enum SeasonalForecastDomainApi: String, RawRepresentableString, CaseIterable {
     case cfsv2
@@ -21,8 +21,8 @@ enum CfsVariableDerived: String, RawRepresentableString {
     case winddirection_10m
     case wind_speed_10m
     case wind_direction_10m
-    case cloud_cover
-    case relative_humidity_2m
+    case cloudcover
+    case relativehumidity_2m
 }
 
 enum DailyCfsVariable: String, RawRepresentableString {
@@ -43,18 +43,18 @@ extension SeasonalForecastReader {
     func prefetchData(variable: SeasonalForecastVariable, member: Int, time: TimerangeDt) throws {
         switch variable {
         case .raw(let variable):
-            try prefetchData(variable: VariableAndMember(variable, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(variable, member), time: time)
         case .derived(let variable):
             switch variable {
             case .windspeed_10m, .wind_speed_10m:
                 fallthrough
             case .winddirection_10m, .wind_direction_10m:
-                try prefetchData(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
-                try prefetchData(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
-            case .cloud_cover:
-                try prefetchData(variable: VariableAndMember(.cloudcover, member), time: time)
-            case .relative_humidity_2m:
-                try prefetchData(variable: VariableAndMember(.relativehumidity_2m, member), time: time)
+                try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.wind_u_component_10m, member), time: time)
+                try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.wind_v_component_10m, member), time: time)
+            case .cloudcover:
+                try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.cloud_cover, member), time: time)
+            case .relativehumidity_2m:
+                try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.relative_humidity_2m, member), time: time)
             }
         }
     }
@@ -62,23 +62,23 @@ extension SeasonalForecastReader {
     func get(variable: SeasonalForecastVariable, member: Int, time: TimerangeDt) throws -> DataAndUnit {
         switch variable {
         case .raw(let variable):
-            return try get(variable: VariableAndMember(variable, member), time: time)
+            return try get(variable: VariableAndMemberAndControlSplitFiles(variable, member), time: time)
         case .derived(let variable):
             switch variable {
             case .windspeed_10m, .wind_speed_10m:
-                let u = try get(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
-                let v = try get(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
+                let u = try get(variable: VariableAndMemberAndControlSplitFiles(.wind_u_component_10m, member), time: time)
+                let v = try get(variable: VariableAndMemberAndControlSplitFiles(.wind_v_component_10m, member), time: time)
                 let speed = zip(u.data,v.data).map(Meteorology.windspeed)
                 return DataAndUnit(speed, u.unit)
             case .winddirection_10m, .wind_direction_10m:
-                let u = try get(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
-                let v = try get(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
+                let u = try get(variable: VariableAndMemberAndControlSplitFiles(.wind_u_component_10m, member), time: time)
+                let v = try get(variable: VariableAndMemberAndControlSplitFiles(.wind_v_component_10m, member), time: time)
                 let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
                 return DataAndUnit(direction, .degreeDirection)
-            case .cloud_cover:
-                return try get(variable: VariableAndMember(.cloudcover, member), time: time)
-            case .relative_humidity_2m:
-                return try get(variable: VariableAndMember(.relativehumidity_2m, member), time: time)
+            case .cloudcover:
+                return try get(variable: VariableAndMemberAndControlSplitFiles(.cloud_cover, member), time: time)
+            case .relativehumidity_2m:
+                return try get(variable: VariableAndMemberAndControlSplitFiles(.relative_humidity_2m, member), time: time)
             }
         }
     }
@@ -87,22 +87,22 @@ extension SeasonalForecastReader {
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:
-            try prefetchData(variable: VariableAndMember(.temperature_2m_max, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.temperature_2m_max, member), time: time)
         case .temperature_2m_min:
-            try prefetchData(variable: VariableAndMember(.temperature_2m_min, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.temperature_2m_min, member), time: time)
         case .precipitation_sum:
-            try prefetchData(variable: VariableAndMember(.precipitation, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.precipitation, member), time: time)
         case .showers_sum:
-            try prefetchData(variable: VariableAndMember(.showers, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.showers, member), time: time)
         case .shortwave_radiation_sum:
-            try prefetchData(variable: VariableAndMember(.shortwave_radiation, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.shortwave_radiation, member), time: time)
         case .windspeed_10m_max, .wind_speed_10m_max:
             fallthrough
         case .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            try prefetchData(variable: VariableAndMember(.wind_u_component_10m, member), time: time)
-            try prefetchData(variable: VariableAndMember(.wind_v_component_10m, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.wind_u_component_10m, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.wind_v_component_10m, member), time: time)
         case .precipitation_hours:
-            try prefetchData(variable: VariableAndMember(.precipitation, member), time: time)
+            try prefetchData(variable: VariableAndMemberAndControlSplitFiles(.precipitation, member), time: time)
         }
     }
     
@@ -110,31 +110,31 @@ extension SeasonalForecastReader {
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:
-            let data = try get(variable: VariableAndMember(.temperature_2m_max, member), time: time).convertAndRound(params: params)
+            let data = try get(variable: VariableAndMemberAndControlSplitFiles(.temperature_2m_max, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 4), data.unit)
         case .temperature_2m_min:
-            let data = try get(variable: VariableAndMember(.temperature_2m_min, member), time: time).convertAndRound(params: params)
+            let data = try get(variable: VariableAndMemberAndControlSplitFiles(.temperature_2m_min, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 4), data.unit)
         case .precipitation_sum:
-            let data = try get(variable: VariableAndMember(.precipitation, member), time: time).convertAndRound(params: params)
+            let data = try get(variable: VariableAndMemberAndControlSplitFiles(.precipitation, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 4), data.unit)
         case .showers_sum:
-            let data = try get(variable: VariableAndMember(.showers, member), time: time).convertAndRound(params: params)
+            let data = try get(variable: VariableAndMemberAndControlSplitFiles(.showers, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.sum(by: 4), data.unit)
         case .shortwave_radiation_sum:
-            let data = try get(variable: VariableAndMember(.shortwave_radiation, member), time: time).convertAndRound(params: params)
+            let data = try get(variable: VariableAndMemberAndControlSplitFiles(.shortwave_radiation, member), time: time).convertAndRound(params: params)
             // for 6h data
             return DataAndUnit(data.data.sum(by: 4).map({$0*0.0036 * 6}).round(digits: 2), .megajoulePerSquareMetre)
         case .windspeed_10m_max, .wind_speed_10m_max:
             let data = try get(variable: .derived(.windspeed_10m), member: member, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 4), data.unit)
         case .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            let u = try get(variable: VariableAndMember(.wind_u_component_10m, member), time: time).data.sum(by: 4)
-            let v = try get(variable: VariableAndMember(.wind_v_component_10m, member), time: time).data.sum(by: 4)
+            let u = try get(variable: VariableAndMemberAndControlSplitFiles(.wind_u_component_10m, member), time: time).data.sum(by: 4)
+            let v = try get(variable: VariableAndMemberAndControlSplitFiles(.wind_v_component_10m, member), time: time).data.sum(by: 4)
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .precipitation_hours:
-            let data = try get(variable: VariableAndMember(.precipitation, member), time: time).convertAndRound(params: params)
+            let data = try get(variable: VariableAndMemberAndControlSplitFiles(.precipitation, member), time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 4), .hours)
         }
     }

@@ -14,26 +14,17 @@ enum EcmwfDomain: String, GenericDomain {
         }
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .ifs04:
+            return .ecmwf_ifs04
+        case .ifs04_ensemble:
+            return .ecmwf_ifs04_ensemble
+        }
     }
     
-    private static var ifs04ElevationFile = try? OmFileReader(file: Self.ifs04.surfaceElevationFileOm)
-    private static var ifs04ensembleElevationFile = try? OmFileReader(file: Self.ifs04_ensemble.surfaceElevationFileOm)
-    
-    /// There is no elevation file for ECMWF
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .ifs04:
-                return Self.ifs04ElevationFile
-            case .ifs04_ensemble:
-                return Self.ifs04ensembleElevationFile
-            }
-        }
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
     }
     
     var hasYearlyFiles: Bool {

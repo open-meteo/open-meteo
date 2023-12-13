@@ -24,7 +24,7 @@ extension CfsVariable: FlatBuffersVariable {
             return .init(variable: .soilTemperature, depth: 0, depthTo: 10)
         case .shortwave_radiation:
             return .init(variable: .shortwaveRadiation)
-        case .cloudcover:
+        case .cloud_cover:
             return .init(variable: .cloudCover)
         case .wind_u_component_10m:
             return .init(variable: .undefined)
@@ -34,7 +34,7 @@ extension CfsVariable: FlatBuffersVariable {
             return .init(variable: .precipitation)
         case .showers:
             return .init(variable: .showers)
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return .init(variable: .relativeHumidity, altitude: 2)
         case .pressure_msl:
             return .init(variable: .pressureMsl)
@@ -50,9 +50,9 @@ extension CfsVariableDerived: FlatBuffersVariable {
             return .init(variable: .windSpeed, altitude: 10)
         case .winddirection_10m, .wind_direction_10m:
             return .init(variable: .windDirection, altitude: 10)
-        case .cloud_cover:
+        case .cloudcover:
             return .init(variable: .cloudCover)
-        case .relative_humidity_2m:
+        case .relativehumidity_2m:
             return .init(variable: .relativeHumidity, altitude: 2)
         }
     }
@@ -71,7 +71,7 @@ extension DailyCfsVariable: FlatBuffersVariable {
             return .init(variable: .showers, aggregation: .sum)
         case .shortwave_radiation_sum:
             return .init(variable: .shortwaveRadiation, aggregation: .sum)
-        case .windspeed_10m_max, .wind_speed_10m_max:
+        case .wind_speed_10m_max, .windspeed_10m_max:
             return .init(variable: .windSpeed, aggregation: .maximum, altitude: 10)
         case .winddirection_10m_dominant, .wind_direction_10m_dominant:
             return .init(variable: .windDirection, aggregation: .dominant, altitude: 2)

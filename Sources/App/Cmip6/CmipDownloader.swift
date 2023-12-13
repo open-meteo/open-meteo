@@ -90,7 +90,7 @@ import SwiftNetCDF
  */
 enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     case CMCC_CM2_VHR4
-    case FGOALS_f3_H_highresSST
+    //case FGOALS_f3_H_highresSST
     case FGOALS_f3_H
     case HiRAM_SIT_HR
     case MRI_AGCM3_2_S
@@ -108,8 +108,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return "CMCC-CM2-VHR4"
         case .FGOALS_f3_H:
             fallthrough
-        case .FGOALS_f3_H_highresSST:
-            return "FGOALS-f3-H"
+        //case .FGOALS_f3_H_highresSST:
+        //    return "FGOALS-f3-H"
         case .HiRAM_SIT_HR:
             return "HiRAM-SIT-HR"
         case .MRI_AGCM3_2_S:
@@ -133,8 +133,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return "gn"
         case .FGOALS_f3_H:
             fallthrough
-        case .FGOALS_f3_H_highresSST:
-            return "gr"
+        //case .FGOALS_f3_H_highresSST:
+        //    return "gr"
         case .HiRAM_SIT_HR:
             return "gn"
         case .MRI_AGCM3_2_S:
@@ -156,8 +156,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return "CMCC"
         case .FGOALS_f3_H:
             fallthrough
-        case .FGOALS_f3_H_highresSST:
-            return "CAS"
+        //case .FGOALS_f3_H_highresSST:
+        //    return "CAS"
         case .HiRAM_SIT_HR:
             return "AS-RCEC"
         case .MRI_AGCM3_2_S:
@@ -173,8 +173,29 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         }
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .CMCC_CM2_VHR4:
+            return .cmip_CMCC_CM2_VHR4
+        //case .FGOALS_f3_H_highresSST:
+        //    return .cmip_FGOALS_f3_H
+        case .FGOALS_f3_H:
+            return .cmip_FGOALS_f3_H
+        case .HiRAM_SIT_HR:
+            return .cmip_HiRAM_SIT_HR
+        case .MRI_AGCM3_2_S:
+            return .cmip_MRI_AGCM3_2_S
+        case .EC_Earth3P_HR:
+            return .cmip_EC_Earth3P_HR
+        case .MPI_ESM1_2_XR:
+            return .cmip_MPI_ESM1_2_XR
+        case .NICAM16_8S:
+            return .cmip_NICAM16_8S
+        }
+    }
+    
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
     }
     
     var hasYearlyFiles: Bool {
@@ -190,54 +211,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         }
     }
     
-    /// Single file to contain the entire timerange of data -> faster for sequentual disk access
-    var omFileMaster: (path: String, time: TimerangeDt)? {
-        let path = "\(OpenMeteo.dataDirectory)master-\(rawValue)/"
-        if self == .EC_Earth3P_HR {
-            return (path, TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2050,1,1), dtSeconds: dtSeconds))
-        }
-        return (path, TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2051,1,1), dtSeconds: dtSeconds))
-    }
-    
     var dtSeconds: Int {
         return 24*3600
-    }
-    
-    private static var elevationCMCC_CM2_VHR4 = try? OmFileReader(file: Self.CMCC_CM2_VHR4.surfaceElevationFileOm)
-    private static var elevationFGOALS_f3_H = try? OmFileReader(file: Self.FGOALS_f3_H_highresSST.surfaceElevationFileOm)
-    private static var elevationHiRAM_SIT_HR = try? OmFileReader(file: Self.HiRAM_SIT_HR.surfaceElevationFileOm)
-    private static var elevationMRI_AGCM3_2_S = try? OmFileReader(file: Self.MRI_AGCM3_2_S.surfaceElevationFileOm)
-    private static var elevationEC_Earth3P_HR = try? OmFileReader(file: Self.EC_Earth3P_HR.surfaceElevationFileOm)
-    //private static var elevationHadGEM3_GC31_HM = try? OmFileReader(file: Self.HadGEM3_GC31_HM.surfaceElevationFileOm)
-    private static var elevationMPI_ESM1_2_XR = try? OmFileReader(file: Self.MPI_ESM1_2_XR.surfaceElevationFileOm)
-    private static var elevationNICAM16_8S = try? OmFileReader(file: Self.NICAM16_8S.surfaceElevationFileOm)
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        switch type {
-        case .soilType:
-            return nil
-        case .elevation:
-            switch self {
-            case .CMCC_CM2_VHR4:
-                return Self.elevationCMCC_CM2_VHR4
-            case .FGOALS_f3_H:
-                fallthrough
-            case .FGOALS_f3_H_highresSST:
-                return Self.elevationFGOALS_f3_H
-            case .HiRAM_SIT_HR:
-                return Self.elevationHiRAM_SIT_HR
-            case .MRI_AGCM3_2_S:
-                return Self.elevationMRI_AGCM3_2_S
-            case .EC_Earth3P_HR:
-                return Self.elevationEC_Earth3P_HR
-            //case .HadGEM3_GC31_HM:
-                //return Self.elevationHadGEM3_GC31_HM
-            case .MPI_ESM1_2_XR:
-                return Self.elevationMPI_ESM1_2_XR
-            case .NICAM16_8S:
-                return Self.elevationNICAM16_8S
-            }
-        }
     }
     
     var omFileLength: Int {
@@ -247,7 +222,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     
     /// true if feb 29 is missing
     var needsLeapYearFix: Bool {
-        return self == .CMCC_CM2_VHR4 || self == .FGOALS_f3_H || self == .FGOALS_f3_H_highresSST
+        return self == .CMCC_CM2_VHR4 || self == .FGOALS_f3_H /*|| self == .FGOALS_f3_H_highresSST*/
     }
     
     var grid: Gridable {
@@ -255,8 +230,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         case .CMCC_CM2_VHR4:
             return RegularGrid(nx: 1152, ny: 768, latMin: -90, lonMin: -180, dx: 0.3125, dy: 180/768)
         case .FGOALS_f3_H:
-            fallthrough
-        case .FGOALS_f3_H_highresSST:
+           // fallthrough
+        //case .FGOALS_f3_H_highresSST:
             return RegularGrid(nx: 1440, ny: 720, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .HiRAM_SIT_HR:
             return RegularGrid(nx: 1536, ny: 768, latMin: -90, lonMin: -180, dx: 360/1536, dy: 180/768)
@@ -279,8 +254,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return ("20210330", "20210330")
         case .FGOALS_f3_H:
             return nil
-        case .FGOALS_f3_H_highresSST:
-            return ("20201204", "20210121")
+        //case .FGOALS_f3_H_highresSST:
+        //    return ("20201204", "20210121")
         case .HiRAM_SIT_HR:
             return nil
         case .MRI_AGCM3_2_S:
@@ -299,8 +274,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
 
 extension GenericDomain {
     /// Get the file path to a linear bias seasonal file for a given variable
-    func getBiasCorrectionFile(for variable: String) -> OmFilePathWithSuffix {
-        return OmFilePathWithSuffix(domain: self.domainName, directory: "master", variable: variable, suffix: "linear_bias_seasonal")
+    func getBiasCorrectionFile(for variable: String) -> OmFileManagerReadable {
+        return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil)
     }
     
     func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {
@@ -317,7 +292,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     case temperature_2m_max
     case temperature_2m_mean
     case pressure_msl_mean
-    case cloudcover_mean
+    case cloud_cover_mean
     case precipitation_sum
     // Note: runoff includes soil drainage -> not surface runoff
     //case runoff_sum
@@ -325,8 +300,8 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     case relative_humidity_2m_min
     case relative_humidity_2m_max
     case relative_humidity_2m_mean
-    case windspeed_10m_mean
-    case windspeed_10m_max
+    case wind_speed_10m_mean
+    case wind_speed_10m_max
     
     //case surface_temperature
     
@@ -366,7 +341,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .hermite(bounds: nil)
         case .temperature_2m_mean:
             return .hermite(bounds: nil)
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return .linear
         case .precipitation_sum:
             return .backwards_sum
@@ -380,9 +355,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .hermite(bounds: 0...100)
         case .relative_humidity_2m_mean:
             return .hermite(bounds: 0...100)
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return .hermite(bounds: nil)
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return .hermite(bounds: nil)
         case .soil_moisture_0_to_10cm_mean:
             return .hermite(bounds: nil)
@@ -401,7 +376,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .celsius
         case .temperature_2m_mean:
             return .celsius
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return .percentage
         case .precipitation_sum:
             return .millimetre
@@ -415,9 +390,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .percentage
         case .relative_humidity_2m_mean:
             return .percentage
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return .metrePerSecond
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return .metrePerSecond
         case .soil_moisture_0_to_10cm_mean:
             return .cubicMetrePerCubicMetre
@@ -441,7 +416,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .absoluteChage(bounds: nil)
         case .pressure_msl_mean:
             return .absoluteChage(bounds: nil)
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return .absoluteChage(bounds: 0...100)
         case .precipitation_sum:
             return .relativeChange(maximum: nil)
@@ -453,9 +428,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return .absoluteChage(bounds: 0...100)
         case .relative_humidity_2m_mean:
             return .absoluteChage(bounds: 0...100)
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return .relativeChange(maximum: nil)
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return .relativeChange(maximum: nil)
         case .soil_moisture_0_to_10cm_mean:
             return .absoluteChage(bounds: 0...10e9)
@@ -471,16 +446,16 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return "20210308"
             }
             return isFuture ? "20190725" : "20170927"
-        case .FGOALS_f3_H_highresSST:
-            return isFuture ? "20200417" : "20190817"
+        //case .FGOALS_f3_H_highresSST:
+        //    return isFuture ? "20200417" : "20190817"
         case .FGOALS_f3_H:
             if self == .precipitation_sum && !isFuture {
                 return "20211028"
             }
             switch self {
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 fallthrough
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 fallthrough
             case .pressure_msl_mean:
                 fallthrough
@@ -541,7 +516,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return 20
         case .temperature_2m_mean:
             return 20
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return 1
         case .precipitation_sum:
             return 10
@@ -555,9 +530,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return 1
         case .relative_humidity_2m_mean:
             return 1
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return 10
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return 10
         //case .surface_temperature:
         //    return 20
@@ -582,7 +557,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .temperature_2m_mean:
                 return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -602,9 +577,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
-            case.windspeed_10m_max:
+            case.wind_speed_10m_max:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
             }
         /*case .HadGEM3_GC31_HM:
@@ -639,14 +614,14 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             case .precipitation_sum:
                 // only precip is in yearly files...
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .monthly
-            case .windspeed_10m_max:
+            case .wind_speed_10m_max:
                 return .monthly
             default:
                 return nil
             }
-        case .FGOALS_f3_H_highresSST:
+        /*case .FGOALS_f3_H_highresSST:
             // no near surface RH, only specific humidity
             // temp min/max and rh/min max can only be calculated form 3h values
             // 3h values are only available for the non-SST version
@@ -674,13 +649,13 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             default:
                 return nil
-            }
+            }*/
         case .FGOALS_f3_H:
             /// windspeed max possible via 3h vas/uas, but requires code support
             switch self {
             //case .relative_humidity_2m_mean:
                 //return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             //case .temperature_2m_mean:
                 //return .yearly
@@ -690,7 +665,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -724,7 +699,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .temperature_2m_min:
                 return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -734,7 +709,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
             default:
                 return nil
@@ -749,7 +724,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .pressure_msl_mean:
                 return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -757,9 +732,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .relative_humidity_2m_mean:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
-            case .windspeed_10m_max:
+            case .wind_speed_10m_max:
                 return .yearly
             case .shortwave_radiation_sum:
                 return .yearly
@@ -776,7 +751,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .pressure_msl_mean:
                 return .yearly
-            case .cloudcover_mean:
+            case .cloud_cover_mean:
                 return .yearly
             case .precipitation_sum:
                 return .yearly
@@ -788,9 +763,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return .yearly
             case .relative_humidity_2m_mean:
                 return .yearly
-            case .windspeed_10m_mean:
+            case .wind_speed_10m_mean:
                 return .yearly
-            case .windspeed_10m_max:
+            case .wind_speed_10m_max:
                 return .yearly
             case .soil_moisture_0_to_10cm_mean:
                 return nil
@@ -811,7 +786,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return "tasmax"
         case .temperature_2m_mean:
             return "tas"
-        case .cloudcover_mean:
+        case .cloud_cover_mean:
             return "clt"
         case .precipitation_sum:
             return "pr"
@@ -831,9 +806,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return "rsds"
         //case .surface_temperature:
         //    return "tslsi"
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return "sfcWind"
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return "sfcWindmax"
         }
     }
@@ -843,7 +818,7 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
             return (100, 0)
         }
         
-        if (domain == .NICAM16_8S || domain == .FGOALS_f3_H) && self == .cloudcover_mean {
+        if (domain == .NICAM16_8S || domain == .FGOALS_f3_H) && self == .cloud_cover_mean {
             return (100, 0)
         }
         
@@ -923,20 +898,16 @@ struct DownloadCmipCommand: AsyncCommand {
                        "https://esg.lasg.ac.cn/thredds/fileServer/esg_dataroot/CMIP6/"
         ]
         
-        let yearlyPath = domain.omfileArchive
-        guard let master = domain.omFileMaster else {
-            fatalError("no master defined")
-        }
+        let domainDirectory = domain.domainRegistry.directory
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: yearlyPath, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: domainDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, deadLineHours: 24*14, readTimeout: 3600*3, retryError4xx: false)
         let source = domain.soureName
         let grid = domain.gridName
         
         /// Make sure elevation information is present. Otherwise download it
-        if let version = domain.versionOrography, !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+        if let version = domain.versionOrography, !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             let ncFileAltitude = "\(domain.downloadDirectory)orog_fx.nc"
             let experimentId = "highresSST-present" //domain == .HadGEM3_GC31_HM ? "hist-1950" : "highresSST-present"
             if !FileManager.default.fileExists(atPath: ncFileAltitude) {
@@ -957,7 +928,7 @@ struct DownloadCmipCommand: AsyncCommand {
                 }
             }
             //try altitude.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: altitude.data)
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: altitude.data)
             
             if deleteNetCDF {
                 try FileManager.default.removeItem(atPath: ncFileAltitude)
@@ -967,7 +938,8 @@ struct DownloadCmipCommand: AsyncCommand {
         
         for year in years {
             for variable in variables {
-                if FileManager.default.fileExists(atPath: "\(master.path)\(variable.rawValue)_0.om") {
+                try FileManager.default.createDirectory(atPath: "\(domainDirectory)\(variable.rawValue)", withIntermediateDirectories: true)
+                if FileManager.default.fileExists(atPath: "\(domainDirectory)\(variable.rawValue)/master_0.om") {
                     continue
                 }
                 let isFuture = year >= 2015
@@ -978,7 +950,7 @@ struct DownloadCmipCommand: AsyncCommand {
                 let version = variable.version(for: domain, isFuture: isFuture)
                 let experimentId = domain == .FGOALS_f3_H ? (isFuture ? "highres-future" : "hist-1950") : (isFuture ? "highresSST-future" : "highresSST-present")
                 
-                let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
+                let omFile = "\(domainDirectory)\(variable.rawValue)/year_\(year).om"
                 if FileManager.default.fileExists(atPath: omFile) {
                     continue
                 }
@@ -1152,7 +1124,7 @@ struct DownloadCmipCommand: AsyncCommand {
                     }*/
                 case .yearly:
                     /// `FGOALS_f3_H` has no near surface relative humidity, calculate from specific humidity
-                    let calculateRhFromSpecificHumidity = (domain == .FGOALS_f3_H_highresSST || domain == .FGOALS_f3_H) && variable == .relative_humidity_2m_mean
+                    let calculateRhFromSpecificHumidity = (/*domain == .FGOALS_f3_H_highresSST || */domain == .FGOALS_f3_H) && variable == .relative_humidity_2m_mean
                     let short = calculateRhFromSpecificHumidity ? "huss" : variable.shortname
                     let ncFile = "\(domain.downloadDirectory)\(short)_\(year).nc"
                     if !FileManager.default.fileExists(atPath: ncFile) {
@@ -1170,9 +1142,11 @@ struct DownloadCmipCommand: AsyncCommand {
                     }
                     // NOTE: maybe note required if 3h data is used
                     if calculateRhFromSpecificHumidity {
-                        let pressure = try OmFileReader(file: "\(yearlyPath)pressure_msl_\(year).om").readAll2D()
+                        
+                        
+                        let pressure = try OmFileReader(file: "\(domainDirectory)pressure_msl/year_\(year).om").readAll2D()
                         let elevation = try domain.getStaticFile(type: .elevation)!.readAll()
-                        let temp = try OmFileReader(file: "\(yearlyPath)temperature_2m_mean_\(year).om").readAll2D()
+                        let temp = try OmFileReader(file: "\(domainDirectory)temperature_2m_mean/year_\(year).om").readAll2D()
                         array.data.multiplyAdd(multiply: 1000, add: 0)
                         array.data = Meteorology.specificToRelativeHumidity(specificHumidity: array, temperature: temp, sealLevelPressure: pressure, elevation: elevation)
                         //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)rh.nc", nx: domain.grid.nx, ny: domain.grid.ny)
@@ -1209,20 +1183,20 @@ struct DownloadCmipCommand: AsyncCommand {
         // Generate a single master file instead of yearly files
         // ~80 MB memory for 600 location chunks
         logger.info("Generating master files")
-        try FileManager.default.createDirectory(atPath: master.path, withIntermediateDirectories: true)
         for variable in variables {
-            let masterFile = "\(master.path)\(variable.rawValue)_0.om"
+            try FileManager.default.createDirectory(atPath: "\(domainDirectory)\(variable.rawValue)", withIntermediateDirectories: true)
+            let masterFile = "\(domainDirectory)\(variable.rawValue)/master_0.om"
             if FileManager.default.fileExists(atPath: masterFile) {
                 continue
             }
             let yearlyReader = years.compactMap { year in
-                let omFile = "\(yearlyPath)\(variable.rawValue)_\(year).om"
+                let omFile = "\(domainDirectory)\(variable.rawValue)/year_\(year).om"
                 return try? OmFileReader(file: omFile)
             }
             if yearlyReader.isEmpty {
                 continue
             }
-            try OmFileWriter(dim0: domain.grid.count, dim1: master.time.count, chunk0: 8, chunk1: 512)
+            try OmFileWriter(dim0: domain.grid.count, dim1: TimerangeDt(range: domain.masterTimeRange!, dtSeconds: domain.dtSeconds).count, chunk0: 8, chunk1: 512)
                 .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: 600, chunkedFiles: yearlyReader, dataCallback: nil)
         }
         

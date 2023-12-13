@@ -66,14 +66,13 @@ struct SeasonalForecastDownload: AsyncCommand {
     /// download cfs domain
     func downloadCfsElevation(application: Application, domain: SeasonalForecastDomain, run: Timestamp) async throws {
         /// download seamask and height
-        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
-        
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        
+                
         let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/6hrly_grib_01/flxf\(run.format_YYYYMMddHH).01.\(run.format_YYYYMMddHH).grb2"
-        try await GfsDownload().downloadNcepElevation(application: application, url: [url], surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
+        try await GfsDownload().downloadNcepElevation(application: application, url: [url], surfaceElevationFileOm: surfaceElevationFileOm, grid: domain.grid, isGlobal: true)
     }
     
     func downloadCfs(application: Application, domain: SeasonalForecastDomain, run: Timestamp, skipFilesIfExisting: Bool) async throws {
@@ -85,7 +84,7 @@ struct SeasonalForecastDownload: AsyncCommand {
         let gribVariables = ["tmp2m", "tmin", "soilt1", "dswsfc", "cprat", "q2m", "wnd10m", "tcdcclm", "prate", "soilm3", "pressfc", "soilm2", "soilm1", "soilm4", "tmax"]
         
         for gribVariable in gribVariables {
-            logger.info("Downloading varibale \(gribVariable)")
+            logger.info("Downloading variable \(gribVariable)")
             for member in 1..<domain.nMembers+1 {
                 // https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/18/time_grib_01/tmin.01.2022080818.daily.grb2.idx
                 let url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.\(run.format_YYYYMMdd)/\(run.hour.zeroPadded(len: 2))/time_grib_\(member.zeroPadded(len: 2))/\(gribVariable).\(member.zeroPadded(len: 2)).\(run.format_YYYYMMddHH).daily.grb2"
@@ -103,8 +102,7 @@ struct SeasonalForecastDownload: AsyncCommand {
     
     /// Process each variable and update time-series optimised files
     func convertCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         
         for member in 1..<domain.nMembers+1 {
             try GribFile.readAndConvert(logger: logger, gribName: "tmin", member: member, domain: domain, add: -273.15).first!.value
@@ -124,7 +122,7 @@ struct SeasonalForecastDownload: AsyncCommand {
                     .writeCfs(om: om, logger: logger, variable: .precipitation, member: member, run: run, dtSeconds: domain.dtSeconds)
             
             try GribFile.readAndConvert(logger: logger, gribName: "tcdcclm", member: member, domain: domain).first!.value
-                    .writeCfs(om: om, logger: logger, variable: .cloudcover, member: member, run: run, dtSeconds: domain.dtSeconds)
+                    .writeCfs(om: om, logger: logger, variable: .cloud_cover, member: member, run: run, dtSeconds: domain.dtSeconds)
 
             try GribFile.readAndConvert(logger: logger, gribName: "soilm1", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .soil_moisture_0_to_10cm, member: member, run: run, dtSeconds: domain.dtSeconds)
@@ -159,7 +157,7 @@ struct SeasonalForecastDownload: AsyncCommand {
                 let specificHumidity = try GribFile.readAndConvert(logger: logger, gribName: "q2m", member: member, domain: domain, multiply: 1000).first!.value
                 
                 let relativeHumidity = Array2DFastTime(data: Meteorology.specificToRelativeHumidity(specificHumidity: specificHumidity.data, temperature: tmp2m.data, pressure: surfacePressure.data), nLocations: tmp2m.nLocations, nTime: tmp2m.nTime)
-                try relativeHumidity.writeCfs(om: om, logger: logger, variable: .relativehumidity_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
+                try relativeHumidity.writeCfs(om: om, logger: logger, variable: .relative_humidity_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
             }()
             
             
@@ -187,7 +185,7 @@ fileprivate extension Array2DFastTime {
         let timeIndexStart = run.timeIntervalSince1970 / dtSeconds
         let timeIndices = timeIndexStart ..< timeIndexStart + nTime
         
-        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_\(member)", array2d: self, indexTime: timeIndices, skipFirst: 1, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_member\(member)", array2d: self, indexTime: timeIndices, skipFirst: 1, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
         logger.info("Update om \(variable) finished in \(startOm.timeElapsedPretty())")
     }
 }

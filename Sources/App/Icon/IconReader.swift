@@ -66,13 +66,13 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             }
             
             // EPS models do not have weather codes
-            if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weathercode {
-                let cloudcover = try get(raw: .cloudcover, member: member, time: time).data
+            if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weather_code {
+                let cloudcover = try get(raw: .cloud_cover, member: member, time: time).data
                 let precipitation = try get(raw: .precipitation, member: member, time: time).data
                 let snowfall = try get(variable: .derived(.surface(.snowfall)), member: member, time: time).data
                 let showers = reader.domain != .iconD2Eps ? nil : try get(raw: .init(.surface(.showers), member), time: time).data
                 let cape = reader.domain == .iconEps ? nil : try get(raw: .init(.surface(.cape), member), time: time).data
-                let gusts = reader.domain == .iconEps ? nil : try get(raw: .init(.surface(.windgusts_10m), member), time: time).data
+                let gusts = reader.domain == .iconEps ? nil : try get(raw: .init(.surface(.wind_gusts_10m), member), time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
@@ -140,13 +140,13 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             }
             
             // EPS models do not have weather codes
-            if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weathercode {
+            if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weather_code {
                 try reader.prefetchData(variable: .init(.surface(.precipitation), member), time: time)
-                try reader.prefetchData(variable: .init(.surface(.cloudcover), member), time: time)
+                try reader.prefetchData(variable: .init(.surface(.cloud_cover), member), time: time)
                 if reader.domain != .iconEuEps {
                     try reader.prefetchData(variable: .init(.surface(.snowfall_water_equivalent), member), time: time)
                     try reader.prefetchData(variable: .init(.surface(.snowfall_convective_water_equivalent), member), time: time)
-                    try reader.prefetchData(variable: .init(.surface(.windgusts_10m), member), time: time)
+                    try reader.prefetchData(variable: .init(.surface(.wind_gusts_10m), member), time: time)
                     try reader.prefetchData(variable: .init(.surface(.cape), member), time: time)
                 }
                 if reader.domain == .iconEps {
@@ -196,7 +196,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let adjPressure = lP + Float(level - lowerLevel) * (hP - lP) / Float(upperLevel - lowerLevel)
                 return Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: adjPressure)
             }, lower.unit)
-        case .relativehumidity:
+        case .relative_humidity:
             return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
                 return (l + h) / 2
             }, lower.unit)
@@ -228,15 +228,15 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
                 try prefetchData(raw: .wind_u_component_10m, member: member, time: time)
                 try prefetchData(raw: .wind_v_component_10m, member: member, time: time)
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+                try prefetchData(raw: .relative_humidity_2m, member: member, time: time)
                 try prefetchData(raw: .direct_radiation, member: member, time: time)
                 try prefetchData(raw: .diffuse_radiation, member: member, time: time)
-            case .relative_humidity_2m:
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+            case .relativehumidity_2m:
+                try prefetchData(raw: .relative_humidity_2m, member: member, time: time)
             case .dew_point_2m:
                 fallthrough
             case .dewpoint_2m:
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+                try prefetchData(raw: .relative_humidity_2m, member: member, time: time)
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
             case .wind_speed_10m:
                 fallthrough
@@ -282,17 +282,17 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .direct_normal_irradiance:
                 try prefetchData(raw: .direct_radiation, member: member, time: time)
             case .evapotranspiration:
-                try prefetchData(raw: .latent_heatflux, member: member, time: time)
+                try prefetchData(raw: .latent_heat_flux, member: member, time: time)
             case .vapour_pressure_deficit:
                 fallthrough
             case .vapor_pressure_deficit:
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+                try prefetchData(raw: .relative_humidity_2m, member: member, time: time)
             case .et0_fao_evapotranspiration:
                 try prefetchData(raw: .direct_radiation, member: member, time: time)
                 try prefetchData(raw: .diffuse_radiation, member: member, time: time)
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
+                try prefetchData(raw: .relative_humidity_2m, member: member, time: time)
                 try prefetchData(raw: .wind_u_component_10m, member: member, time: time)
                 try prefetchData(raw: .wind_v_component_10m, member: member, time: time)
             case .snowfall:
@@ -321,37 +321,37 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .direct_radiation, member: member, time: time)
             case .is_day:
                 break
-            case .soil_moisture_0_to_1cm:
-                try prefetchData(raw: .soil_moisture_0_1cm, member: member, time: time)
-            case .soil_moisture_1_to_3cm:
-                try prefetchData(raw: .soil_moisture_1_3cm, member: member, time: time)
-            case .soil_moisture_3_to_9cm:
-                try prefetchData(raw: .soil_moisture_3_9cm, member: member, time: time)
-            case .soil_moisture_9_to_27cm:
-                try prefetchData(raw: .soil_moisture_9_27cm, member: member, time: time)
-            case .soil_moisture_27_to_81cm:
-                try prefetchData(raw: .soil_moisture_27_81cm, member: member, time: time)
+            case .soil_moisture_0_1cm:
+                try prefetchData(raw: .soil_moisture_0_to_1cm, member: member, time: time)
+            case .soil_moisture_1_3cm:
+                try prefetchData(raw: .soil_moisture_1_to_3cm, member: member, time: time)
+            case .soil_moisture_3_9cm:
+                try prefetchData(raw: .soil_moisture_3_to_9cm, member: member, time: time)
+            case .soil_moisture_9_27cm:
+                try prefetchData(raw: .soil_moisture_9_to_27cm, member: member, time: time)
+            case .soil_moisture_27_81cm:
+                try prefetchData(raw: .soil_moisture_27_to_81cm, member: member, time: time)
             case .wet_bulb_temperature_2m:
                 try prefetchData(raw: .temperature_2m, member: member, time: time)
-                try prefetchData(raw: .relativehumidity_2m, member: member, time: time)
-            case .cloud_cover:
-                try prefetchData(raw: .cloudcover, member: member, time: time)
-            case .cloud_cover_low:
-                try prefetchData(raw: .cloudcover_low, member: member, time: time)
-            case .cloud_cover_mid:
-                try prefetchData(raw: .cloudcover_mid, member: member, time: time)
-            case .cloud_cover_high:
-                try prefetchData(raw: .cloudcover_high, member: member, time: time)
-            case .weather_code:
-                try prefetchData(raw: .weathercode, member: member, time: time)
-            case .sensible_heat_flux:
-                try prefetchData(raw: .sensible_heatflux, member: member, time: time)
-            case .latent_heat_flux:
-                try prefetchData(raw: .latent_heatflux, member: member, time: time)
-            case .wind_gusts_10m:
-                try prefetchData(raw: .windgusts_10m, member: member, time: time)
-            case .freezing_level_height:
-                try prefetchData(raw: .freezinglevel_height, member: member, time: time)
+                try prefetchData(raw: .relative_humidity_2m, member: member, time: time)
+            case .cloudcover:
+                try prefetchData(raw: .cloud_cover, member: member, time: time)
+            case .cloudcover_low:
+                try prefetchData(raw: .cloud_cover_low, member: member, time: time)
+            case .cloudcover_mid:
+                try prefetchData(raw: .cloud_cover_mid, member: member, time: time)
+            case .cloudcover_high:
+                try prefetchData(raw: .cloud_cover_high, member: member, time: time)
+            case .weathercode:
+                try prefetchData(raw: .weather_code, member: member, time: time)
+            case .sensible_heatflux:
+                try prefetchData(raw: .sensible_heat_flux, member: member, time: time)
+            case .latent_heatflux:
+                try prefetchData(raw: .latent_heat_flux, member: member, time: time)
+            case .windgusts_10m:
+                try prefetchData(raw: .wind_gusts_10m, member: member, time: time)
+            case .freezinglevel_height:
+                try prefetchData(raw: .freezing_level_height, member: member, time: time)
             case .sunshine_duration:
                 try prefetchData(raw: .direct_radiation, member: member, time: time)            }
         case .pressure(let variable):
@@ -370,13 +370,13 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 fallthrough
             case .dewpoint:
                 try prefetchData(raw: IconPressureVariable(variable: .temperature, level: level), member: member, time: time)
-                try prefetchData(raw: IconPressureVariable(variable: .relativehumidity, level: level), member: member, time: time)
+                try prefetchData(raw: IconPressureVariable(variable: .relative_humidity, level: level), member: member, time: time)
             case .cloud_cover:
                 fallthrough
             case .cloudcover:
-                try prefetchData(raw: IconPressureVariable(variable: .relativehumidity, level: level), member: member, time: time)
-            case .relative_humidity:
-                try prefetchData(raw: IconPressureVariable(variable: .relativehumidity, level: level), member: member, time: time)
+                try prefetchData(raw: IconPressureVariable(variable: .relative_humidity, level: level), member: member, time: time)
+            case .relativehumidity:
+                try prefetchData(raw: IconPressureVariable(variable: .relative_humidity, level: level), member: member, time: time)
             }
         }
     }
@@ -448,7 +448,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .apparent_temperature:
                 let windspeed = try get(derived: .init(.surface(.windspeed_10m), member), time: time).data
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
-                let relhum = try get(derived: .init(.surface(.relative_humidity_2m), member), time: time).data
+                let relhum = try get(derived: .init(.surface(.relativehumidity_2m), member), time: time).data
                 let radiation = try get(derived: .init(.surface(.shortwave_radiation), member), time: time).data
                 return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
             case .shortwave_radiation:
@@ -457,14 +457,14 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let total = zip(direct, diffuse).map(+)
                 return DataAndUnit(total, .wattPerSquareMetre)
             case .evapotranspiration:
-                let latent = try get(raw: .latent_heatflux, member: member, time: time).data
+                let latent = try get(raw: .latent_heat_flux, member: member, time: time).data
                 let evapotranspiration = latent.map(Meteorology.evapotranspiration)
                 return DataAndUnit(evapotranspiration, .millimetre)
             case .vapour_pressure_deficit:
                 fallthrough
             case .vapor_pressure_deficit:
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
-                let rh = try get(raw: .relativehumidity_2m, member: member, time: time).data
+                let rh = try get(raw: .relative_humidity_2m, member: member, time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .direct_normal_irradiance:
@@ -476,7 +476,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let swrad = try get(derived: .init(.surface(.shortwave_radiation),  member), time: time).data
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
                 let windspeed = try get(derived: .init(.surface(.windspeed_10m), member), time: time).data
-                let rh = try get(raw: .relativehumidity_2m, member: member, time: time).data
+                let rh = try get(raw: .relative_humidity_2m, member: member, time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 
                 let et0 = swrad.indices.map { i in
@@ -499,13 +499,13 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     ($0 + $1) * 0.7
                 })
                 return DataAndUnit(snowfall, SiUnit.centimetre)
-            case .relative_humidity_2m:
-                return try get(raw: .relativehumidity_2m, member: member, time: time)
+            case .relativehumidity_2m:
+                return try get(raw: .relative_humidity_2m, member: member, time: time)
             case .dew_point_2m:
                 fallthrough
             case .dewpoint_2m:
                 let temperature = try get(raw: .temperature_2m, member: member, time: time)
-                let rh = try get(raw: .relativehumidity_2m, member: member, time: time)
+                let rh = try get(raw: .relative_humidity_2m, member: member, time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .surface_pressure:
                 let temperature = try get(raw: .temperature_2m, member: member, time: time).data
@@ -537,38 +537,38 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(dni, direct.unit)
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
-            case .soil_moisture_0_to_1cm:
-                return try get(raw: .soil_moisture_0_1cm, member: member, time: time)
-            case .soil_moisture_1_to_3cm:
-                return try get(raw: .soil_moisture_1_3cm, member: member, time: time)
-            case .soil_moisture_3_to_9cm:
-                return try get(raw: .soil_moisture_3_9cm, member: member, time: time)
-            case .soil_moisture_9_to_27cm:
-                return try get(raw: .soil_moisture_9_27cm, member: member, time: time)
-            case .soil_moisture_27_to_81cm:
-                return try get(raw: .soil_moisture_27_81cm, member: member, time: time)
+            case .soil_moisture_0_1cm:
+                return try get(raw: .soil_moisture_0_to_1cm, member: member, time: time)
+            case .soil_moisture_1_3cm:
+                return try get(raw: .soil_moisture_1_to_3cm, member: member, time: time)
+            case .soil_moisture_3_9cm:
+                return try get(raw: .soil_moisture_3_to_9cm, member: member, time: time)
+            case .soil_moisture_9_27cm:
+                return try get(raw: .soil_moisture_9_to_27cm, member: member, time: time)
+            case .soil_moisture_27_81cm:
+                return try get(raw: .soil_moisture_27_to_81cm, member: member, time: time)
             case .wet_bulb_temperature_2m:
                 let temperature = try get(raw: .temperature_2m, member: member, time: time)
-                let rh = try get(raw: .relativehumidity_2m, member: member, time: time).data
+                let rh = try get(raw: .relative_humidity_2m, member: member, time: time).data
                 return DataAndUnit(zip(temperature.data, rh).map(Meteorology.wetBulbTemperature), temperature.unit)
-            case .cloud_cover:
-                return try get(raw: .cloudcover, member: member, time: time)
-            case .cloud_cover_low:
-                return try get(raw: .cloudcover_low, member: member, time: time)
-            case .cloud_cover_mid:
-                return try get(raw: .cloudcover_mid, member: member, time: time)
-            case .cloud_cover_high:
-                return try get(raw: .cloudcover_high, member: member, time: time)
-            case .weather_code:
-                return try get(raw: .weathercode, member: member, time: time)
-            case .sensible_heat_flux:
-                return try get(raw: .sensible_heatflux, member: member, time: time)
-            case .latent_heat_flux:
-                return try get(raw: .latent_heatflux, member: member, time: time)
-            case .wind_gusts_10m:
-                return try get(raw: .windgusts_10m, member: member, time: time)
-            case .freezing_level_height:
-                return try get(raw: .freezinglevel_height, member: member, time: time)
+            case .cloudcover:
+                return try get(raw: .cloud_cover, member: member, time: time)
+            case .cloudcover_low:
+                return try get(raw: .cloud_cover_low, member: member, time: time)
+            case .cloudcover_mid:
+                return try get(raw: .cloud_cover_mid, member: member, time: time)
+            case .cloudcover_high:
+                return try get(raw: .cloud_cover_high, member: member, time: time)
+            case .weathercode:
+                return try get(raw: .weather_code, member: member, time: time)
+            case .sensible_heatflux:
+                return try get(raw: .sensible_heat_flux, member: member, time: time)
+            case .latent_heatflux:
+                return try get(raw: .latent_heat_flux, member: member, time: time)
+            case .windgusts_10m:
+                return try get(raw: .wind_gusts_10m, member: member, time: time)
+            case .freezinglevel_height:
+                return try get(raw: .freezing_level_height, member: member, time: time)
             case .sunshine_duration:
                 let directRadiation = try get(raw: .direct_radiation, member: member, time: time)
                 let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
@@ -595,15 +595,15 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 fallthrough
             case .dewpoint:
                 let temperature = try get(raw: IconPressureVariable(variable: .temperature, level: level), member: member, time: time)
-                let rh = try get(raw: IconPressureVariable(variable: .relativehumidity, level: level), member: member, time: time)
+                let rh = try get(raw: IconPressureVariable(variable: .relative_humidity, level: level), member: member, time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloud_cover:
                 fallthrough
             case .cloudcover:
-                let rh = try get(raw: IconPressureVariable(variable: .relativehumidity, level: level), member: member, time: time)
+                let rh = try get(raw: IconPressureVariable(variable: .relative_humidity, level: level), member: member, time: time)
                 return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level))}), .percentage)
-            case .relative_humidity:
-                return try get(raw: IconPressureVariable(variable: .relativehumidity, level: level), member: member, time: time)
+            case .relativehumidity:
+                return try get(raw: IconPressureVariable(variable: .relative_humidity, level: level), member: member, time: time)
             }
         }
     }

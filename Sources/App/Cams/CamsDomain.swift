@@ -28,12 +28,17 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    var domainName: String {
-        return rawValue
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .cams_global:
+            return .cams_global
+        case .cams_europe:
+            return .cams_europe
+        }
     }
     
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        return nil
+    var domainRegistryStatic: DomainRegistry? {
+        return domainRegistry
     }
     
     var hasYearlyFiles: Bool {

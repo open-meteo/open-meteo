@@ -1,49 +1,5 @@
 import Foundation
 
-/// Combine weather variable and member to be used in `GenericReader`
-struct VariableAndMember<Variable: GenericVariable>: GenericVariable {
-    let variable: Variable
-    let member: Int
-    
-    public init(_ variable: Variable, _ member: Int) {
-        self.variable = variable
-        self.member = member
-    }
-    
-    var omFileName: (file: String, level: Int) {
-        return ("\(variable.omFileName.file)_\(member)", variable.omFileName.level)
-    }
-    
-    var scalefactor: Float {
-        variable.scalefactor
-    }
-    
-    var interpolation: ReaderInterpolation {
-        variable.interpolation
-    }
-    
-    var unit: SiUnit {
-        variable.unit
-    }
-    
-    var isElevationCorrectable: Bool {
-        variable.isElevationCorrectable
-    }
-    
-    init?(rawValue: String) {
-        fatalError()
-    }
-    
-    var rawValue: String {
-        "\(variable.omFileName.file)_\(member)"
-    }
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-        return variable.requiresOffsetCorrectionForMixing
-    }
-}
-
-
 /// Represent a variable combined with a pressure level and helps decoding it
 struct VariableAndMemberAndControl<Variable: RawRepresentableString>: RawRepresentableString {
     var variable: Variable

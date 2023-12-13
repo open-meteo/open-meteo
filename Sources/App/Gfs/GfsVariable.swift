@@ -9,13 +9,13 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case temperature_80m
     case temperature_100m
     
-    case cloudcover
-    case cloudcover_low
-    case cloudcover_mid
-    case cloudcover_high
+    case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
     case pressure_msl
     
-    case relativehumidity_2m
+    case relative_humidity_2m
     
     /// accumulated since forecast start
     case precipitation
@@ -41,8 +41,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case snow_depth
     
     /// averaged since model start
-    case sensible_heatflux
-    case latent_heatflux
+    case sensible_heat_flux
+    case latent_heat_flux
     
     case showers
     
@@ -59,8 +59,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     //case snowfall_convective_water_equivalent
     //case snowfall_water_equivalent
     
-    case windgusts_10m
-    case freezinglevel_height
+    case wind_gusts_10m
+    case freezing_level_height
     case shortwave_radiation
     /// Only for HRRR domain. Otherwise diff could be estimated with https://arxiv.org/pdf/2007.01639.pdf 3) method
     case diffuse_radiation
@@ -97,11 +97,11 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .temperature_2m: return 20
         case .temperature_80m: return 20
         case .temperature_100m: return 20
-        case .cloudcover: return 1
-        case .cloudcover_low: return 1
-        case .cloudcover_mid: return 1
-        case .cloudcover_high: return 1
-        case .relativehumidity_2m: return 1
+        case .cloud_cover: return 1
+        case .cloud_cover_low: return 1
+        case .cloud_cover_mid: return 1
+        case .cloud_cover_high: return 1
+        case .relative_humidity_2m: return 1
         case .precipitation: return 10
         case .wind_v_component_10m: return 10
         case .wind_u_component_10m: return 10
@@ -119,10 +119,10 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .soil_moisture_40_to_100cm: return 1000
         case .soil_moisture_100_to_200cm: return 1000
         case .snow_depth: return 100 // 1cm res
-        case .sensible_heatflux: return 0.144
-        case .latent_heatflux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
-        case .windgusts_10m: return 10
-        case .freezinglevel_height:  return 0.1 // zero height 10 meter resolution
+        case .sensible_heat_flux: return 0.144
+        case .latent_heat_flux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
+        case .wind_gusts_10m: return 10
+        case .freezing_level_height:  return 0.1 // zero height 10 meter resolution
         case .showers: return 10
         case .pressure_msl: return 10
         case .shortwave_radiation: return 1
@@ -147,17 +147,17 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .temperature_100m:
             return .hermite(bounds: nil)
-        case .cloudcover:
+        case .cloud_cover:
             return .linear
-        case .cloudcover_low:
+        case .cloud_cover_low:
             return .linear
-        case .cloudcover_mid:
+        case .cloud_cover_mid:
             return .linear
-        case .cloudcover_high:
+        case .cloud_cover_high:
             return .linear
         case .pressure_msl:
             return .hermite(bounds: nil)
-        case .relativehumidity_2m:
+        case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
         case .precipitation:
             return .backwards_sum
@@ -193,9 +193,9 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .snow_depth:
             return .linear
-        case .sensible_heatflux:
+        case .sensible_heat_flux:
             return .hermite(bounds: nil)
-        case .latent_heatflux:
+        case .latent_heat_flux:
             return .hermite(bounds: nil)
         case .showers:
             return .backwards_sum
@@ -203,9 +203,9 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .backwards
         case .categorical_freezing_rain:
             return .backwards
-        case .windgusts_10m:
+        case .wind_gusts_10m:
             return .hermite(bounds: nil)
-        case .freezinglevel_height:
+        case .freezing_level_height:
             return .linear
         case .shortwave_radiation:
             return .solar_backwards_averaged
@@ -233,11 +233,11 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .temperature_2m: return .celsius
         case .temperature_80m: return .celsius
         case .temperature_100m: return .celsius
-        case .cloudcover: return .percentage
-        case .cloudcover_low: return .percentage
-        case .cloudcover_mid: return .percentage
-        case .cloudcover_high: return .percentage
-        case .relativehumidity_2m: return .percentage
+        case .cloud_cover: return .percentage
+        case .cloud_cover_low: return .percentage
+        case .cloud_cover_mid: return .percentage
+        case .cloud_cover_high: return .percentage
+        case .relative_humidity_2m: return .percentage
         case .precipitation: return .millimetre
         case .wind_v_component_10m: return .metrePerSecond
         case .wind_u_component_10m: return .metrePerSecond
@@ -255,11 +255,11 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .soil_moisture_40_to_100cm: return .cubicMetrePerCubicMetre
         case .soil_moisture_100_to_200cm: return .cubicMetrePerCubicMetre
         case .snow_depth: return .metre
-        case .sensible_heatflux: return .wattPerSquareMetre
-        case .latent_heatflux: return .wattPerSquareMetre
+        case .sensible_heat_flux: return .wattPerSquareMetre
+        case .latent_heat_flux: return .wattPerSquareMetre
         case .showers: return .millimetre
-        case .windgusts_10m: return .metrePerSecond
-        case .freezinglevel_height: return .metre
+        case .wind_gusts_10m: return .metrePerSecond
+        case .freezing_level_height: return .metre
         case .pressure_msl: return .hectopascal
         case .shortwave_radiation: return .wattPerSquareMetre
         case .frozen_precipitation_percent: return .percentage
@@ -307,8 +307,8 @@ enum GfsPressureVariableType: String, CaseIterable, RawRepresentableString {
     case wind_u_component
     case wind_v_component
     case geopotential_height
-    case cloudcover
-    case relativehumidity
+    case cloud_cover
+    case relative_humidity
     case vertical_velocity
 }
 
@@ -341,9 +341,9 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
-        case .cloudcover:
+        case .cloud_cover:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
-        case .relativehumidity:
+        case .relative_humidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         case .vertical_velocity:
             return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
@@ -360,9 +360,9 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .hermite(bounds: nil)
         case .geopotential_height:
             return .linear
-        case .cloudcover:
+        case .cloud_cover:
             return .linear
-        case .relativehumidity:
+        case .relative_humidity:
             return .hermite(bounds: 0...100)
         case .vertical_velocity:
             return .hermite(bounds: nil)
@@ -379,9 +379,9 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .metrePerSecond
         case .geopotential_height:
             return .metre
-        case .cloudcover:
+        case .cloud_cover:
             return .percentage
-        case .relativehumidity:
+        case .relative_humidity:
             return .percentage
         case .vertical_velocity:
             return .metrePerSecondNotUnitConverted

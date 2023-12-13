@@ -4,36 +4,49 @@ import NIOConcurrencyHelpers
 import Vapor
 import NIO
 
-/// Represents an om file that can be cached for file accesses.
-protocol OmFileManagerReadable: Hashable {
-    /// Will only be called if the file path needs to be assembled
-    func getFilePath() -> String
+enum OmFileManagerType: String {
+    case chunk
+    case year
+    case master
+    case linear_bias_seasonal
 }
 
-/// Simple base path, variable name and timechunk
-struct OmFilePathWithTime: OmFileManagerReadable {
-    let basePath: String
-    let variable: String
-    let timeChunk: Int
+enum OmFileManagerReadable: Hashable {
+    case domainChunk(domain: DomainRegistry, variable: String, type: OmFileManagerType, chunk: Int?)
+    case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
     
+    /// Assemble the full file system path
     func getFilePath() -> String {
-        return basePath + variable + "_\(timeChunk).om"
+        switch self {
+        case .domainChunk(let domain, let variable, let type, let chunk):
+            if let chunk {
+                return "\(domain.directory)\(variable)/\(type)_\(chunk).om"
+            }
+            return "\(domain.directory)\(variable)/\(type).om"
+        case .staticFile(let domain, let variable, let chunk):
+            if let chunk {
+                // E.g. DEM model '/copernicus_dem90/static/lat_-1.om'
+                return "\(domain.directory)static/\(variable)_\(chunk).om"
+            }
+            return "\(domain.directory)static/\(variable).om"
+        }
     }
-}
-
-/// Assemble a file path if required. Includes data directory as a prefix.
-/// All input paths can be passed by reference and do not require to allocate new strings unless required
-struct OmFilePathWithSuffix: OmFileManagerReadable {
-    let domain: String
-    let directory: String
-    let variable: String
-    let suffix: String
     
-    func getFilePath() -> String {
-        return "\(OpenMeteo.dataDirectory)\(directory)-\(domain)/\(variable)_\(suffix).om"
-    }
     func createDirectory() throws {
-        try FileManager.default.createDirectory(atPath: "\(OpenMeteo.dataDirectory)\(directory)-\(domain)", withIntermediateDirectories: true)
+        let file = getFilePath()
+        guard let last = file.lastIndex(of: "/") else {
+            return
+        }
+        let path = String(file[file.startIndex..<last])
+        try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
+    }
+    
+    func openRead() throws -> OmFileReader<MmapFile>? {
+        let file = getFilePath()
+        guard FileManager.default.fileExists(atPath: file) else {
+            return nil
+        }
+        return try OmFileReader(file: file)
     }
 }
 
@@ -104,12 +117,12 @@ final class OmFileManager: LifecycleHandler {
     }
     
     /// Get cached file or return nil, if the files does not exist
-    public static func get<File: OmFileManagerReadable>(_ file: File) throws -> OmFileReader<MmapFile>? {
+    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
         try instance.get(file)
     }
 
     /// Get cached file or return nil, if the files does not exist
-    public func get<File: OmFileManagerReadable>(_ file: File) throws -> OmFileReader<MmapFile>? {
+    public func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
         let key = file.hashValue
         
         return try lock.withLock {
@@ -121,14 +134,10 @@ final class OmFileManager: LifecycleHandler {
                     return nil
                 }
             }
-            // The actual path name string is interpolated as last as possible. So a cached request, does not have to assemble a path string
-            // This might be a bit over-optimised to just safe string allocations...
-            let path = file.getFilePath()
-            guard FileManager.default.fileExists(atPath: path) else {
-                cached[key] = .missing(path: path)
+            guard let file = try file.openRead() else {
+                cached[key] = .missing(path: file.getFilePath())
                 return nil
             }
-            let file = try OmFileReader(file: path)
             cached[key] = .exists(file: file)
             return file
         }

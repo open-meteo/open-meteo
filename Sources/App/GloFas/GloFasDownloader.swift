@@ -110,12 +110,11 @@ struct GloFasDownloader: AsyncCommand {
         let logger = application.logger
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
         let downloadTimeHours: Double = domain.isForecast ? 5 : 14
@@ -246,7 +245,6 @@ struct GloFasDownloader: AsyncCommand {
     func downloadTimeIntervalConsolidated(logger: Logger, timeinterval: TimerangeDt, cdskey: String, domain: GloFasDomain) throws {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let gribFile = "\(downloadDir)glofasv4_temp.grib"
         
         let ny = domain.grid.ny
@@ -306,7 +304,7 @@ struct GloFasDownloader: AsyncCommand {
         
         
         logger.info("Reading to timeseries")
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         var data2d = Array2DFastTime(nLocations: nx*ny, nTime: timeinterval.count)
         for (i, date) in timeinterval.enumerated() {
             logger.info("Reading \(date.format_YYYYMMdd)")
@@ -350,7 +348,6 @@ struct GloFasDownloader: AsyncCommand {
     func downloadYear(logger: Logger, year: Int, cdskey: String, domain: GloFasDomain) throws {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileArchive, withIntermediateDirectories: true)
         let gribFile = "\(downloadDir)glofasv4_\(year).grib"
         
         if !FileManager.default.fileExists(atPath: gribFile) {
@@ -378,7 +375,7 @@ struct GloFasDownloader: AsyncCommand {
         logger.info("Converting daily files time series")
         let time = TimerangeDt(range: Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1), dtSeconds: 3600*24)
         let nt = time.count
-        let yearlyFile = "\(domain.omfileArchive)river_discharge_\(year).om"
+        let yearlyFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "river_discharge", type: .year, chunk: year)
         
         let omFiles = try time.map { time -> OmFileReader in
             let omFile = "\(downloadDir)glofas_\(time.format_YYYYMMdd).om"
@@ -393,7 +390,7 @@ struct GloFasDownloader: AsyncCommand {
         var looptime = DispatchTime.now()
         // Scale logarithmic. Max discharge around 400_000 m3/s
         // Note: delta 2d coding (chunk0=6) save around 15% space
-        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
+        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile.getFilePath(), compressionType: .p4nzdec256logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
             
             let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
             if percent != ratio {
@@ -432,8 +429,29 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     case seasonalv3
     case intermediatev3
     
-    var domainName: String {
-        return "glofas-\(rawValue)/"
+    var domainRegistry: DomainRegistry {
+        switch self {
+        case .forecast:
+            return .glofas_forecast_v4
+        case .consolidated:
+            return .glofas_consolidated_v4
+        case .seasonal:
+            return .glofas_seasonal_v4
+        case .intermediate:
+            return .glofas_intermediate_v4
+        case .forecastv3:
+            return .glofas_forecast_v3
+        case .consolidatedv3:
+            return .glofas_consolidated_v3
+        case .seasonalv3:
+            return .glofas_seasonal_v3
+        case .intermediatev3:
+            return .glofas_intermediate_v3
+        }
+    }
+    
+    var domainRegistryStatic: DomainRegistry? {
+        return nil
     }
     
     var hasYearlyFiles: Bool {
@@ -482,10 +500,6 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     
     var dtSeconds: Int {
         return 3600*24
-    }
-    
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
-        return nil
     }
     
     /// `version_3_1` or  `version_4_0`

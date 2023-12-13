@@ -36,10 +36,12 @@ extension Application {
             return existing
         }
         // try again with very high timeouts, so only the curl internal timers are used
-        let configuration = HTTPClient.Configuration(
+        var configuration = HTTPClient.Configuration(
             redirectConfiguration: .follow(max: 5, allowCycles: false),
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
             connectionPool: .init(idleTimeout: .minutes(10)))
+        // NCEP server still struggle with H2
+        configuration.httpVersion = .http1Only
         
         let new = HTTPClient(
             eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 1)),
@@ -66,6 +68,7 @@ public func configure(_ app: Application) throws {
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
+    app.commands.use(MigrationCommand(), as: "migration")
     app.asyncCommands.use(DownloadIconCommand(), as: "download")
     app.asyncCommands.use(DownloadIconWaveCommand(), as: "download-iconwave")
     app.asyncCommands.use(DownloadEcmwfCommand(), as: "download-ecmwf")

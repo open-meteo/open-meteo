@@ -57,10 +57,9 @@ struct DownloadIconWaveCommand: AsyncCommand {
         let baseUrl = "http://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
-        let nLocationsPerChunk = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil).nLocationsPerChunk
+        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
@@ -90,7 +89,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                 }
                 
                 /// Create elevation file for sea mask
-                if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm) {
+                if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                     var elevation = grib2d.array.data
                     for i in elevation.indices {
                         /// `NaN` out of domain, `-999` sea grid point
@@ -98,7 +97,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                     }
                     //let data2d = Array2DFastSpace(data: elevation, nLocations: elevation.count, nTime: 1)
                     //try data2d.writeNetcdf(filename: "\(downloadDirectory)elevation.nc", nx: nx, ny: ny)
-                    try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+                    try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
                 }
                 
                 // Save temporarily as compressed om files
@@ -111,9 +110,8 @@ struct DownloadIconWaveCommand: AsyncCommand {
     
     /// Process each variable and update time-series optimised files
     func convert(logger: Logger, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable]) throws {        
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         let nLocations = domain.grid.count
-        let om = OmFileSplitter(basePath: domain.omfileDirectory, nLocations: domain.grid.count, nTimePerFile: domain.omFileLength, yearlyArchivePath: nil)
+        let om = OmFileSplitter(domain)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let nTime = domain.countForecastHours
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
