@@ -12,7 +12,7 @@ env:
 jobs:
   linux:
     runs-on: ubuntu-22.04
-    container: swift:5.9.2-jammy
+    container: ghcr.io/open-meteo/docker-container-build:latest
     name: Linux
     steps:
     - name: Get Swift Version
@@ -34,12 +34,6 @@ jobs:
     - name: Resolve dependencies
       if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
       run: ${{ env.swift_package_resolve }}
-    - name: Install NetCDF
-      run: apt-get update && apt-get -qq -y install libnetcdf-dev libbz2-dev build-essential curl
-    - name: Get eccodes
-      run: |
-        curl -L https://github.com/patrick-zippenfenig/ecCodes-ubuntu/releases/download/2.33.0/libeccodes0_2.33.0_jammy_amd64.deb -o libeccodes0_2.33.0_jammy_amd64.deb
-        apt install -y ./libeccodes0_2.33.0_jammy_amd64.deb
     - name: Build
       run: |
         ${{ env.swift_build }}
