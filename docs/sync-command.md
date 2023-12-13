@@ -64,3 +64,15 @@ openmeteo-api sync cmc_gem_gdps,dwd_icon temperature_2m,shortwave_radiation --ap
 With Docker, you can just spawn this command and leave it running in the background.
 
 The Ubuntu packages contain a systemd servive `openmeteo-sync` to start this command. It can be enabled in `/etc/default/openmeteo-api.env` by setting `SYNC_ENABLED=true`, `SYNC_APIKEY=mykey123`, `SYNC_DOMAINS=cmc_gem_gdps,dwd_icon`, `SYNC_VARIABLES=temperature_2m,shortwave_radiation` and `SYNC_REPEAT_INTERVAL=5` followed by a restart with `systemctl restart openmeteo-sync`.
+
+
+## Cleanup old data
+To automatically cleanup old data, the following cronjobs can be used.
+
+```
+# Remove pressure level data after 10 days
+0 * * * * find /var/lib/openmeteo-api/data/ -type f -name "chunk_*" -wholename "*hPa*" -mtime +10 -delete
+
+# Remove surface level data after 90 days
+5 * * * * find /var/lib/openmeteo-api/data/ -type f -name "chunk_*" -mtime +90 -delete
+```
