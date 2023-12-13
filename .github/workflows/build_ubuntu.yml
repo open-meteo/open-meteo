@@ -1,7 +1,7 @@
 on:
   workflow_dispatch:
 
-name: Build ubuntu package and save as artifact
+name: Build ubuntu package as artifact
 
 env:
   swift_package_resolve: swift package resolve
@@ -15,6 +15,11 @@ jobs:
     container: swift:5.9.2-jammy
     name: Linux
     steps:
+    - name: Get Swift Version
+      id: get-swift-version
+      run: |
+        echo "::set-output name=version::$(swift -version | head -n 1 | sed s/,// )"
+      shell: bash
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
       uses: actions/cache@v3
