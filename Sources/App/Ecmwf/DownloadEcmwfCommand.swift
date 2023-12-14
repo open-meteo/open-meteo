@@ -125,6 +125,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
+        defer { Process.alarm(seconds: 0) }
         
         let downloadDirectory = domain.downloadDirectory
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)

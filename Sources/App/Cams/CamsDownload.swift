@@ -76,6 +76,7 @@ struct DownloadCamsCommand: AsyncCommand {
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
+        defer { Process.alarm(seconds: 0) }
         
         let dateRun = run.format_YYYYMMddHH
         let remoteDir = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CAMS_GLOBAL/\(dateRun)/"
