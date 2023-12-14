@@ -75,6 +75,9 @@ struct DownloadCamsCommand: AsyncCommand {
         let writer = OmFileWriter(dim0: nx, dim1: ny, chunk0: nx, chunk1: ny)
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        Process.alarm(seconds: 6 * 3600)
+        defer { Process.alarm(seconds: 0) }
+        
         let dateRun = run.format_YYYYMMddHH
         let remoteDir = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CAMS_GLOBAL/\(dateRun)/"
         /// The surface level of multi-level files is available in the `CAMS_GLOBAL_ADDITIONAL` directory

@@ -80,6 +80,8 @@ struct SeasonalForecastDownload: AsyncCommand {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 18, readTimeout: 20*60)
+        Process.alarm(seconds: Int(18 + 1) * 3600)
+        defer { Process.alarm(seconds: 0) }
         
         let gribVariables = ["tmp2m", "tmin", "soilt1", "dswsfc", "cprat", "q2m", "wnd10m", "tcdcclm", "prate", "soilm3", "pressfc", "soilm2", "soilm1", "soilm4", "tmax"]
         

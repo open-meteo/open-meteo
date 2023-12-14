@@ -124,6 +124,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
     func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, skipFilesIfExisting: Bool, variables: [EcmwfVariable]) async throws {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        Process.alarm(seconds: 6 * 3600)
+        defer { Process.alarm(seconds: 0) }
+        
         let downloadDirectory = domain.downloadDirectory
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)

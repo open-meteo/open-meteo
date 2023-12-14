@@ -3,7 +3,6 @@ import Vapor
 import SwiftPFor2D
 import SwiftNetCDF
 
-
 /**
 NCEP GFS downloader
  */
@@ -42,6 +41,15 @@ struct GfsDownload: AsyncCommand {
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
     }
+    
+    /// Downloaders return FileHandles to keep files open while downloading
+    /// If another download starts and would overlap, this still keeps the old file open
+    struct GfsHandle {
+        let variable: GfsVariableDownloadable
+        let time: Timestamp
+        let member: Int
+        let fn: FileHandle
+    }
 
     var help: String {
         "Download GFS from NOAA NCEP"
@@ -75,8 +83,8 @@ struct GfsDownload: AsyncCommand {
         
         switch domain {
         case .gfs025_ensemble:
-            try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+            let handles = try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
+            try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, handles: handles)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -108,11 +116,11 @@ struct GfsDownload: AsyncCommand {
             
             let variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
             
-            try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
             
             let nConcurrent = signature.concurrent ?? 1
-            try await variables.evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
-                try convertGfs(logger: logger, domain: domain, variables: Array($0), run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+            try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
+                try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, handles: $0.flatMap{$0.values})
             })
         }
         
@@ -174,7 +182,7 @@ struct GfsDownload: AsyncCommand {
     }
     
     /// download GFS025 and NAM CONUS
-    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool, secondFlush: Bool, maxForecastHour: Int?) async throws {
+    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [GfsVariableDownloadable], skipFilesIfExisting: Bool, secondFlush: Bool, maxForecastHour: Int?) async throws -> [GfsHandle] {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let logger = application.logger
         
@@ -188,7 +196,7 @@ struct GfsDownload: AsyncCommand {
         let deadLineHours: Double
         switch domain {
         case .gfs013:
-            deadLineHours = 5 // 6 hours interval so we let 1 hour for data conversion
+            deadLineHours = 6
         case .gfs025:
             deadLineHours = 5
         case .hrrr_conus_15min:
@@ -196,14 +204,17 @@ struct GfsDownload: AsyncCommand {
         case .hrrr_conus:
             deadLineHours = 2
         case .gfs025_ensemble:
-            deadLineHours = 5
+            deadLineHours = 8
         case .gfs025_ens:
-            deadLineHours = 5
+            deadLineHours = 8
         case .gfs05_ens:
-            deadLineHours = secondFlush ? 10 : 5
+            deadLineHours = secondFlush ? 16 : 8
         }
         let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
+        Process.alarm(seconds: Int(deadLineHours+2) * 3600)
+        defer { Process.alarm(seconds: 0) }
+        
         var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         if let maxForecastHour {
             forecastHours = forecastHours.filter({$0 <= maxForecastHour})
@@ -214,14 +225,14 @@ struct GfsDownload: AsyncCommand {
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        var handles = [GfsHandle]()
         
         // Download HRRR 15 minutes data
         if domain == .hrrr_conus_15min {
-            for forecastHour in 0...18 {
+            for forecastHour in 0...(maxForecastHour ?? 18) {
                 logger.info("Downloading forecastHour \(forecastHour)")
-                let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
                 
-                let variables: [GfsVariableAndDomain] = (variables.flatMap({ v in
+                let variables: [GfsVariableAndDomain] = try (variables.flatMap({ v in
                     return forecastHour == 0 ? [GfsVariableAndDomain(variable: v, domain: domain, timestep: 0)] : (0..<4).map {
                         GfsVariableAndDomain(variable: v, domain: domain, timestep: (forecastHour-1) * 60 + ($0+1) * 15)
                     }
@@ -229,26 +240,54 @@ struct GfsDownload: AsyncCommand {
                     guard let timestep = variable.timestep else {
                         return false
                     }
-                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(timestep/15)\(prefix).fpg"
-                    return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
+                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(timestep/15).fpg"
+                    if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
+                        handles.append(GfsHandle(
+                            variable: variable.variable,
+                            time: run.add(timestep * 60),
+                            member: 0,
+                            fn: try FileHandle.openFileReading(file: fileDest)
+                        ))
+                        return false
+                    }
+                    return true
                 }
                 
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0)
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables) {
                     try grib2d.load(message: message)
                     guard let timestep = variable.timestep else {
-                        return
+                        continue
                     }
+                    let timestamp = run.add(timestep * 60)
                     if let fma = variable.variable.multiplyAdd(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
-                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(timestep/15)\(prefix).fpg"
+                    
+                    // HRRR_15min data has backwards averaged radiation, but diffuse radiation is still instantanous
+                    if let variable = variable.variable as? GfsSurfaceVariable, variable == .diffuse_radiation {
+                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
+                        for i in grib2d.array.data.indices {
+                            if factor.data[i] < 0.05 {
+                                continue
+                            }
+                            grib2d.array.data[i] /= factor.data[i]
+                        }
+                    }
+                    
+                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(timestep/15).fpg"
                     try FileManager.default.removeItemIfExists(at: file)
-                    try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    handles.append(GfsHandle(
+                        variable: variable.variable,
+                        time: timestamp,
+                        member: 0,
+                        fn: fn
+                    ))
                 }
             }
             curl.printStatistics()
-            return
+            return handles
         }
         
         let variables: [GfsVariableAndDomain] = variables.map {
@@ -269,14 +308,22 @@ struct GfsDownload: AsyncCommand {
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
-            /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
-            let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
+            let timestamp = run.add(hours: forecastHour)
             
             for member in 0..<nMembers {
                 let memberStr = member > 0 ? "_\(member)" : ""
-                let variables = (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
-                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr)\(prefix).fpg"
-                    return !skipFilesIfExisting || !FileManager.default.fileExists(atPath: fileDest)
+                let variables = try (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
+                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr).fpg"
+                    if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
+                        handles.append(GfsHandle.init(
+                            variable: variable.variable,
+                            time: timestamp,
+                            member: member,
+                            fn: try FileHandle.openFileReading(file: fileDest)
+                        ))
+                        return false
+                    }
+                    return true
                 }
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
                                
@@ -345,8 +392,21 @@ struct GfsDownload: AsyncCommand {
                         grib2d.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: grib2d.array.data, temperature: temperature, pressureLevel: Float(variable.level))
                     }
                     
+                    // HRRR contains instantanous values for solar flux. Convert it to backwards averaged.
+                    if let variable = variable.variable as? GfsSurfaceVariable {
+                        if  (domain == .hrrr_conus && [.shortwave_radiation, .diffuse_radiation].contains(variable)) {
+                            let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
+                            for i in grib2d.array.data.indices {
+                                if factor.data[i] < 0.05 {
+                                    continue
+                                }
+                                grib2d.array.data[i] /= factor.data[i]
+                            }
+                        }
+                    }
+                    
                     //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
-                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr)\(prefix).fpg"
+                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr).fpg"
                     try FileManager.default.removeItemIfExists(at: file)
                     
                     // Scaling before compression with scalefactor
@@ -369,70 +429,60 @@ struct GfsDownload: AsyncCommand {
                         continue
                     }
                     
-                    try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    handles.append(GfsHandle.init(
+                        variable: variable.variable,
+                        time: timestamp,
+                        member: member, fn: fn
+                    ))
                 }
             }
         }
         curl.printStatistics()
+        return handles
     }
     
     /// Process each variable and update time-series optimised files
-    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool, secondFlush: Bool, maxForecastHour: Int?) throws {
+    /// Note: This conversion step is getting more and more generic. With more refactoring, a fully generic conversion step will be possible
+    func convertGfs(logger: Logger, domain: GfsDomain, createNetcdf: Bool, handles: [GfsDownload.GfsHandle]) throws {
         let nMembers = domain.ensembleMembers
         let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
-        var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
-        if let maxForecastHour {
-            forecastHours = forecastHours.filter({$0 <= maxForecastHour})
-        }
-        let nTime = forecastHours.max()! / max(domain.dtHours, 1) + 1
-        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
+        let timeMinMax = handles.minAndMax(by: {$0.time < $1.time})!
+        let time = TimerangeDt(range: timeMinMax.min.time...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
+        logger.info("Convert timerange \(time.prettyString())")
         
         let grid = domain.grid
         let nLocations = grid.count
                 
-        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
+        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: time.count)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
-        for variable in variables {            
-            if GfsVariableAndDomain(variable: variable, domain: domain, timestep: 0).gribIndexName == nil {
-                continue
-            }
-            if domain == .gfs013 && variable as? GfsSurfaceVariable == .pressure_msl {
-                // do not write pressure to disk
-                continue
-            }
+        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
+            let variable = handles[0].variable
             
             let skip = variable.skipHour0(for: domain) ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
-            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try forecastHours.compactMap({ hour in
-                if hour == 0 && variable.skipHour0(for: domain) {
-                    return nil
-                }
-                /// HRRR has overlapping downloads of multiple runs. Make sure not to overwrite files.
-                let prefix = run.hour % 3 == 0 ? "" : "_run\(run.hour % 3)"
-                let readers = try (0..<nMembers).map { member in
-                    let memberStr = member > 0 ? "_\(member)" : ""
-                    let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr)\(prefix).fpg"
-                    return try OmFileReader(file: file)
-                }
-                //try reader.willNeed()
-                return (hour, readers)
-            })
+            let readers: [(time: Timestamp, reader: [OmFileReader<MmapFile>])] = try handles.grouped(by: {$0.time}).map { (time, h) in
+                return (time, try h.map{try OmFileReader(fn: $0.fn)})
+            }
             
             // Create netcdf file for debugging
             if createNetcdf {
                 let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", overwriteExisting: true)
                 try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
                 var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                    try ncFile.createDimension(name: "time", length: nTime),
+                    try ncFile.createDimension(name: "time", length: time.count),
+                    try ncFile.createDimension(name: "member", length: nMembers),
                     try ncFile.createDimension(name: "LAT", length: grid.ny),
                     try ncFile.createDimension(name: "LON", length: grid.nx)
                 ])
                 for reader in readers {
-                    let data = try reader.reader[0].readAll()
-                    try ncVariable.write(data, offset: [reader.hour/max(domain.dtHours,1), 0, 0], count: [1, grid.ny, grid.nx])
+                    for (member,r) in reader.reader.enumerated() {
+                        let data = try r.readAll()
+                        try ncVariable.write(data, offset: [time.index(of: reader.time)!, member, 0, 0], count: [1, 1, grid.ny, grid.nx])
+                    }
                 }
             }
             
@@ -442,25 +492,10 @@ struct GfsDownload: AsyncCommand {
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 data3d.data.fillWithNaNs()
                 for reader in readers {
+                    precondition(reader.reader.count == nMembers, "nMember count wrong")
                     for (i, memberReader) in reader.reader.enumerated() {
                         try memberReader.read(into: &readTemp, arrayDim1Range: (0..<locationRange.count), arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data3d[0..<locationRange.count, i, reader.hour / max(domain.dtHours,1)] = readTemp
-                    }
-                }
-                
-                // HRRR contains instantanous values for solar flux. Convert it to backwards averaged.
-                // HRRR_15min data has backwards averaged radiation, but diffuse radiation is still instantanous
-                if let variable = variable as? GfsSurfaceVariable {
-                    if  (domain == .hrrr_conus && [.shortwave_radiation, .diffuse_radiation].contains(variable) ||
-                        (domain == .hrrr_conus_15min && variable == .diffuse_radiation)
-                    ) {
-                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: locationRange, timerange: time)
-                        for i in data3d.data.indices {
-                            if factor.data[i] < 0.05 {
-                                continue
-                            }
-                            data3d.data[i] /= factor.data[i]
-                        }
+                        data3d[0..<locationRange.count, i, time.index(of: reader.time)!] = readTemp
                     }
                 }
                 
@@ -474,14 +509,14 @@ struct GfsDownload: AsyncCommand {
                 )
                 
                 progress.add(locationRange.count * nMembers)
-                return data3d.data[0..<locationRange.count * nMembers * nTime]
+                return data3d.data[0..<locationRange.count * nMembers * time.count]
             }
             progress.finish()
         }
     }
     
     /// Download precipitation members from GFS ensemble and calculate probability
-    func downloadPrecipitationProbability(application: Application, run: Timestamp, skipFilesIfExisting: Bool) async throws {
+    func downloadPrecipitationProbability(application: Application, run: Timestamp, skipFilesIfExisting: Bool) async throws -> [GfsHandle] {
         let domain = GfsDomain.gfs025_ensemble
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
@@ -504,6 +539,7 @@ struct GfsDownload: AsyncCommand {
         var previous = [Int: [Float]]()
         previous.reserveCapacity(members.count)
         let threshold = Float(0.3)
+        var handles = [GfsHandle]()
         
         for forecastHour in forecastHours {
             if forecastHour == 0 {
@@ -511,6 +547,12 @@ struct GfsDownload: AsyncCommand {
             }
             let file = "\(domain.downloadDirectory)precipitation_probability_\(forecastHour).fpg"
             if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
+                handles.append(GfsHandle(
+                    variable: GfsSurfaceVariable.precipitation_probability,
+                    time: run.add(hours: forecastHour),
+                    member: 0,
+                    fn: try FileHandle.openFileReading(file: file)
+                ))
                 continue
             }
             /// Probability 0-100
@@ -541,9 +583,16 @@ struct GfsDownload: AsyncCommand {
             }
             //try Array2D(data: greater01, nx: grid.nx, ny: grid.ny).writeNetcdf(filename: "\(domain.downloadDirectory)precipitation_probability_\(forecastHour).nc")
             try FileManager.default.removeItemIfExists(at: file)
-            try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, all: greater01)
+            let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, all: greater01)
+            handles.append(GfsHandle(
+                variable: GfsSurfaceVariable.precipitation_probability,
+                time: run.add(hours: forecastHour),
+                member: 0,
+                fn: fn
+            ))
         }
         curl.printStatistics()
+        return handles
     }
 }
 
