@@ -212,6 +212,7 @@ struct GfsDownload: AsyncCommand {
         }
         let waitAfterLastModified: TimeInterval = domain == .gfs025 ? 180 : 120
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
+        Process.alarm(seconds: Int(deadLineHours+2) * 3600)
         var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
         if let maxForecastHour {
             forecastHours = forecastHours.filter({$0 <= maxForecastHour})

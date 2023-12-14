@@ -17,6 +17,15 @@ extension Process {
             print("[WARNING] Could not set number of open file limit to 65536). \(String(cString: strerror(errno)))")
         }
     }
+    
+    /// Set alarm to terminate the process in case it gets stuck
+    public static func alarm(seconds: Int) {
+        #if os(Linux)
+        Glibc.alarm(UInt32(seconds))
+        #else
+        Darwin.alarm(UInt32(seconds))
+        #endif
+    }
 }
 
 

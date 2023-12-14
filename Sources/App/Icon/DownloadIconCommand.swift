@@ -99,6 +99,7 @@ struct DownloadIconCommand: AsyncCommand {
         
         let deadLineHours: Double = (domain == .iconD2 || domain == .iconD2Eps) ? 2 : 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: 120)
+        Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
@@ -262,6 +263,7 @@ struct DownloadIconCommand: AsyncCommand {
             }
         }
         curl.printStatistics()
+        Process.alarm(seconds: 0)
     }
 
     /// unompress and remap

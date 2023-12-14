@@ -77,7 +77,12 @@ struct JmaDownload: AsyncCommand {
         let logger = application.logger
         let deadLineHours: Double = domain == .gsm ? 3 : 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
-        defer { curl.printStatistics() }
+        Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
+        defer {
+            curl.printStatistics()
+            Process.alarm(seconds: 0)
+        }
+        
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
