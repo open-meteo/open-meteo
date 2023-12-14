@@ -256,9 +256,22 @@ struct GfsDownload: AsyncCommand {
                     guard let timestep = variable.timestep else {
                         continue
                     }
+                    let timestamp = run.add(timestep * 60)
                     if let fma = variable.variable.multiplyAdd(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
+                    
+                    // HRRR_15min data has backwards averaged radiation, but diffuse radiation is still instantanous
+                    if let variable = variable.variable as? GfsSurfaceVariable, variable == .diffuse_radiation {
+                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
+                        for i in grib2d.array.data.indices {
+                            if factor.data[i] < 0.05 {
+                                continue
+                            }
+                            grib2d.array.data[i] /= factor.data[i]
+                        }
+                    }
+                    
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(timestep/15).fpg"
                     try FileManager.default.removeItemIfExists(at: file)
                     let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
@@ -292,6 +305,8 @@ struct GfsDownload: AsyncCommand {
         
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
+            let timestamp = run.add(hours: forecastHour)
+            
             for member in 0..<nMembers {
                 let memberStr = member > 0 ? "_\(member)" : ""
                 let variables = try (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
@@ -374,6 +389,19 @@ struct GfsDownload: AsyncCommand {
                         grib2d.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: grib2d.array.data, temperature: temperature, pressureLevel: Float(variable.level))
                     }
                     
+                    // HRRR contains instantanous values for solar flux. Convert it to backwards averaged.
+                    if let variable = variable.variable as? GfsSurfaceVariable {
+                        if  (domain == .hrrr_conus && [.shortwave_radiation, .diffuse_radiation].contains(variable)) {
+                            let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
+                            for i in grib2d.array.data.indices {
+                                if factor.data[i] < 0.05 {
+                                    continue
+                                }
+                                grib2d.array.data[i] /= factor.data[i]
+                            }
+                        }
+                    }
+                    
                     //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
                     let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr).fpg"
                     try FileManager.default.removeItemIfExists(at: file)
@@ -432,14 +460,6 @@ struct GfsDownload: AsyncCommand {
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
             let variable = handles[0].variable
             
-            if GfsVariableAndDomain(variable: variable, domain: domain, timestep: 0).gribIndexName == nil {
-                continue
-            }
-            if domain == .gfs013 && variable as? GfsSurfaceVariable == .pressure_msl {
-                // do not write pressure to disk
-                continue
-            }
-            
             let skip = variable.skipHour0(for: domain) ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
@@ -473,23 +493,7 @@ struct GfsDownload: AsyncCommand {
                         data3d[0..<locationRange.count, i, reader.hour / max(domain.dtHours,1)] = readTemp
                     }
                 }
-                
-                // HRRR contains instantanous values for solar flux. Convert it to backwards averaged.
-                // HRRR_15min data has backwards averaged radiation, but diffuse radiation is still instantanous
-                if let variable = variable as? GfsSurfaceVariable {
-                    if  (domain == .hrrr_conus && [.shortwave_radiation, .diffuse_radiation].contains(variable) ||
-                        (domain == .hrrr_conus_15min && variable == .diffuse_radiation)
-                    ) {
-                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: locationRange, timerange: time)
-                        for i in data3d.data.indices {
-                            if factor.data[i] < 0.05 {
-                                continue
-                            }
-                            data3d.data[i] /= factor.data[i]
-                        }
-                    }
-                }
-                
+                                
                 // Interpolate all missing values
                 data3d.interpolateInplace(
                     type: variable.interpolation,
