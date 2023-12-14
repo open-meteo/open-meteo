@@ -279,19 +279,29 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         let useArchive = (Timestamp.now().timeIntervalSince1970 - run.timeIntervalSince1970) > 36*3600
         /// 4 week archive
         let gfsAws = "https://noaa-gfs-bdp-pds.s3.amazonaws.com/"
+        
         let gfsNomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/"
         let yyyymmdd = run.format_YYYYMMdd
         let hh = run.hh
+        
+        let gefsAws = "https://noaa-gefs-pds.s3.amazonaws.com/"
+        let gefsNomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/"
+        let gefsServer = useArchive ? gefsAws : gefsNomads
+        
+        let hrrrNomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"
+        let hrrrAws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
+        let hrrrServer = useArchive ? hrrrAws : hrrrNomads
+        
         switch self {
         case .gfs05_ens:
             let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
-            return ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2ap5/\(memberString).t\(hh)z.pgrb2a.0p50.f\(fHHH)",
-                    "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2bp5/\(memberString).t\(hh)z.pgrb2b.0p50.f\(fHHH)"]
+            return ["\(gefsServer)gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2ap5/\(memberString).t\(hh)z.pgrb2a.0p50.f\(fHHH)",
+                    "\(gefsServer)gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2bp5/\(memberString).t\(hh)z.pgrb2b.0p50.f\(fHHH)"]
         case .gfs025_ensemble:
             fallthrough
         case .gfs025_ens:
             let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
-            return ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2sp25/\(memberString).t\(hh)z.pgrb2s.0p25.f\(fHHH)"]
+            return ["\(gefsServer)gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2sp25/\(memberString).t\(hh)z.pgrb2s.0p25.f\(fHHH)"]
         case .gfs013:
             return ["\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos/gfs.t\(hh)z.sfluxgrbf\(fHHH).grib2"]
         case .gfs025:
@@ -300,14 +310,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         //case .nam_conus:
         //    return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
         case .hrrr_conus:
-            let nomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"
             //let google = "https://storage.googleapis.com/high-resolution-rapid-refresh/"
-            let aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
-            return ["\(useArchive ? aws : nomads)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfprsf\(fHH).grib2"]
+            return ["\(hrrrServer)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfprsf\(fHH).grib2"]
         case .hrrr_conus_15min:
-            let nomads = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/"
-            let aws = "https://noaa-hrrr-bdp-pds.s3.amazonaws.com/"
-            return ["\(useArchive ? aws : nomads)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfsubhf\(fHH).grib2"]
+            return ["\(hrrrServer)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfsubhf\(fHH).grib2"]
         }
     }
 }
