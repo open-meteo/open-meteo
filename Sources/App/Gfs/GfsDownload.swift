@@ -46,7 +46,7 @@ struct GfsDownload: AsyncCommand {
     /// If another download starts and would overlap, this still keeps the old file open
     struct GfsHandle {
         let variable: GfsVariableDownloadable
-        let hour: Int
+        let time: Timestamp
         let member: Int
         let fn: FileHandle
     }
@@ -84,7 +84,7 @@ struct GfsDownload: AsyncCommand {
         switch domain {
         case .gfs025_ensemble:
             let handles = try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, handles: handles)
+            try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, handles: handles)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -120,7 +120,7 @@ struct GfsDownload: AsyncCommand {
             
             let nConcurrent = signature.concurrent ?? 1
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
-                try convertGfs(logger: logger, domain: domain, run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, handles: $0.flatMap{$0.values})
+                try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, handles: $0.flatMap{$0.values})
             })
         }
         
@@ -226,7 +226,7 @@ struct GfsDownload: AsyncCommand {
         
         // Download HRRR 15 minutes data
         if domain == .hrrr_conus_15min {
-            for forecastHour in 0...18 {
+            for forecastHour in 0...(maxForecastHour ?? 18) {
                 logger.info("Downloading forecastHour \(forecastHour)")
                 
                 let variables: [GfsVariableAndDomain] = try (variables.flatMap({ v in
@@ -241,7 +241,7 @@ struct GfsDownload: AsyncCommand {
                     if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
                         handles.append(GfsHandle(
                             variable: variable.variable,
-                            hour: timestep/15,
+                            time: run.add(timestep * 60),
                             member: 0,
                             fn: try FileHandle.openFileReading(file: fileDest)
                         ))
@@ -277,7 +277,7 @@ struct GfsDownload: AsyncCommand {
                     let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                     handles.append(GfsHandle(
                         variable: variable.variable,
-                        hour: timestep/15,
+                        time: timestamp,
                         member: 0,
                         fn: fn
                     ))
@@ -314,7 +314,7 @@ struct GfsDownload: AsyncCommand {
                     if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
                         handles.append(GfsHandle.init(
                             variable: variable.variable,
-                            hour: forecastHour,
+                            time: timestamp,
                             member: member,
                             fn: try FileHandle.openFileReading(file: fileDest)
                         ))
@@ -429,7 +429,7 @@ struct GfsDownload: AsyncCommand {
                     let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                     handles.append(GfsHandle.init(
                         variable: variable.variable,
-                        hour: forecastHour,
+                        time: timestamp,
                         member: member, fn: fn
                     ))
                 }
@@ -440,21 +440,19 @@ struct GfsDownload: AsyncCommand {
     }
     
     /// Process each variable and update time-series optimised files
-    func convertGfs(logger: Logger, domain: GfsDomain, run: Timestamp, createNetcdf: Bool, secondFlush: Bool, maxForecastHour: Int?, handles: [GfsDownload.GfsHandle]) throws {
+    /// Note: This conversion step is getting more and more generic. With more refactoring, a fully generic conversion step will be possible
+    func convertGfs(logger: Logger, domain: GfsDomain, createNetcdf: Bool, handles: [GfsDownload.GfsHandle]) throws {
         let nMembers = domain.ensembleMembers
         let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
-        var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
-        if let maxForecastHour {
-            forecastHours = forecastHours.filter({$0 <= maxForecastHour})
-        }
-        let nTime = forecastHours.max()! / max(domain.dtHours, 1) + 1
-        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
+        let timeMinMax = handles.minAndMax(by: {$0.time < $1.time})!
+        let time = TimerangeDt(range: timeMinMax.min.time...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
+        logger.info("Convert timerange \(time.prettyString())")
         
         let grid = domain.grid
         let nLocations = grid.count
                 
-        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
+        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: time.count)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
@@ -463,8 +461,8 @@ struct GfsDownload: AsyncCommand {
             let skip = variable.skipHour0(for: domain) ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
-            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try handles.grouped(by: {$0.hour}).map { (hour, h) in
-                return (hour, try h.map{try OmFileReader(fn: $0.fn)})
+            let readers: [(time: Timestamp, reader: [OmFileReader<MmapFile>])] = try handles.grouped(by: {$0.time}).map { (time, h) in
+                return (time, try h.map{try OmFileReader(fn: $0.fn)})
             }
             
             // Create netcdf file for debugging
@@ -472,13 +470,16 @@ struct GfsDownload: AsyncCommand {
                 let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", overwriteExisting: true)
                 try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
                 var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                    try ncFile.createDimension(name: "time", length: nTime),
+                    try ncFile.createDimension(name: "time", length: time.count),
+                    try ncFile.createDimension(name: "member", length: nMembers),
                     try ncFile.createDimension(name: "LAT", length: grid.ny),
                     try ncFile.createDimension(name: "LON", length: grid.nx)
                 ])
                 for reader in readers {
-                    let data = try reader.reader[0].readAll()
-                    try ncVariable.write(data, offset: [reader.hour/max(domain.dtHours,1), 0, 0], count: [1, grid.ny, grid.nx])
+                    for (member,r) in reader.reader.enumerated() {
+                        let data = try r.readAll()
+                        try ncVariable.write(data, offset: [time.index(of: reader.time)!, member, 0, 0], count: [1, 1, grid.ny, grid.nx])
+                    }
                 }
             }
             
@@ -488,12 +489,13 @@ struct GfsDownload: AsyncCommand {
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 data3d.data.fillWithNaNs()
                 for reader in readers {
+                    precondition(reader.reader.count == nMembers, "nMember count wrong")
                     for (i, memberReader) in reader.reader.enumerated() {
                         try memberReader.read(into: &readTemp, arrayDim1Range: (0..<locationRange.count), arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data3d[0..<locationRange.count, i, reader.hour / max(domain.dtHours,1)] = readTemp
+                        data3d[0..<locationRange.count, i, time.index(of: reader.time)!] = readTemp
                     }
                 }
-                                
+                
                 // Interpolate all missing values
                 data3d.interpolateInplace(
                     type: variable.interpolation,
@@ -504,7 +506,7 @@ struct GfsDownload: AsyncCommand {
                 )
                 
                 progress.add(locationRange.count * nMembers)
-                return data3d.data[0..<locationRange.count * nMembers * nTime]
+                return data3d.data[0..<locationRange.count * nMembers * time.count]
             }
             progress.finish()
         }
@@ -544,7 +546,7 @@ struct GfsDownload: AsyncCommand {
             if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
                 handles.append(GfsHandle(
                     variable: GfsSurfaceVariable.precipitation_probability,
-                    hour: forecastHour,
+                    time: run.add(hours: forecastHour),
                     member: 0,
                     fn: try FileHandle.openFileReading(file: file)
                 ))
@@ -581,7 +583,7 @@ struct GfsDownload: AsyncCommand {
             let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, all: greater01)
             handles.append(GfsHandle(
                 variable: GfsSurfaceVariable.precipitation_probability,
-                hour: forecastHour,
+                time: run.add(hours: forecastHour),
                 member: 0,
                 fn: fn
             ))
