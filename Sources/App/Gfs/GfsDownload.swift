@@ -84,7 +84,7 @@ struct GfsDownload: AsyncCommand {
         switch domain {
         case .gfs025_ensemble:
             let handles = try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, variables: [GfsSurfaceVariable.precipitation_probability], run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, handles: handles)
+            try convertGfs(logger: logger, domain: domain, run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, handles: handles)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -119,8 +119,8 @@ struct GfsDownload: AsyncCommand {
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
             
             let nConcurrent = signature.concurrent ?? 1
-            try await variables.evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
-                try convertGfs(logger: logger, domain: domain, variables: Array($0), run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, handles: handles)
+            try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
+                try convertGfs(logger: logger, domain: domain, run: run, createNetcdf: signature.createNetcdf, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, handles: $0.flatMap{$0.values})
             })
         }
         
@@ -412,7 +412,7 @@ struct GfsDownload: AsyncCommand {
     }
     
     /// Process each variable and update time-series optimised files
-    func convertGfs(logger: Logger, domain: GfsDomain, variables: [GfsVariableDownloadable], run: Timestamp, createNetcdf: Bool, secondFlush: Bool, maxForecastHour: Int?, handles: [GfsHandle]) throws {
+    func convertGfs(logger: Logger, domain: GfsDomain, run: Timestamp, createNetcdf: Bool, secondFlush: Bool, maxForecastHour: Int?, handles: [GfsDownload.GfsHandle]) throws {
         let nMembers = domain.ensembleMembers
         let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
@@ -429,7 +429,9 @@ struct GfsDownload: AsyncCommand {
         var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
         var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
-        for variable in variables {
+        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
+            let variable = handles[0].variable
+            
             if GfsVariableAndDomain(variable: variable, domain: domain, timestep: 0).gribIndexName == nil {
                 continue
             }
@@ -441,7 +443,7 @@ struct GfsDownload: AsyncCommand {
             let skip = variable.skipHour0(for: domain) ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
-            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try handles.filter({$0.variable.omFileName == variable.omFileName}).grouped(by: {$0.hour}).map { (hour, h) in
+            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try handles.grouped(by: {$0.hour}).map { (hour, h) in
                 return (hour, try h.map{try OmFileReader(fn: $0.fn)})
             }
             
