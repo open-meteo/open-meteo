@@ -84,7 +84,7 @@ struct GfsDownload: AsyncCommand {
         switch domain {
         case .gfs025_ensemble:
             let handles = try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
-            try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, handles: handles)
+            try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -120,7 +120,7 @@ struct GfsDownload: AsyncCommand {
             
             let nConcurrent = signature.concurrent ?? 1
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
-                try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, handles: $0.flatMap{$0.values})
+                try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: $0.flatMap{$0.values})
             })
         }
         
@@ -444,12 +444,13 @@ struct GfsDownload: AsyncCommand {
     
     /// Process each variable and update time-series optimised files
     /// Note: This conversion step is getting more and more generic. With more refactoring, a fully generic conversion step will be possible
-    func convertGfs(logger: Logger, domain: GfsDomain, createNetcdf: Bool, handles: [GfsDownload.GfsHandle]) throws {
+    func convertGfs(logger: Logger, domain: GfsDomain, createNetcdf: Bool, run: Timestamp, handles: [GfsDownload.GfsHandle]) throws {
         let nMembers = domain.ensembleMembers
         let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let timeMinMax = handles.minAndMax(by: {$0.time < $1.time})!
-        let time = TimerangeDt(range: timeMinMax.min.time...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
+        // `timeMinMax.min.time` has issues with `skip`
+        let time = TimerangeDt(range: run...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
         logger.info("Convert timerange \(time.prettyString())")
         
         let grid = domain.grid
