@@ -12,14 +12,12 @@ import Foundation
 extension Process {
     /// Set open files limit to 64k
     public static func setOpenFileLimitto64k() {
-        var filelimit = rlimit(rlim_cur: 65536, rlim_max: 65536)
-        if setrlimit(OS_RLIMIT, &filelimit) == -1 {
-            print("[ WARNING ] Could not set number of open file limit to 65536. \(String(cString: strerror(errno)))")
-            return
-        }
-        filelimit = rlimit(rlim_cur: 524288, rlim_max: 524288)
-        if setrlimit(OS_RLIMIT, &filelimit) == -1 {
-            print("[ WARNING ] Could not set number of open file limit to 524288. \(String(cString: strerror(errno)))")
+        for limit in [1024*1024, 524288, 65536] {
+            var filelimit = rlimit(rlim_cur: rlim_t(limit), rlim_max: rlim_t(limit))
+            guard setrlimit(OS_RLIMIT, &filelimit) != -1 else {
+                print("[ WARNING ] Could not set number of open file limit to \(limit). \(String(cString: strerror(errno)))")
+                continue
+            }
             return
         }
     }
