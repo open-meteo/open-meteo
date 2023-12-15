@@ -29,6 +29,9 @@ struct JmaDownload: AsyncCommand {
         
         @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
         var upperLevel: Bool
+
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
     }
     
     var help: String {
@@ -69,6 +72,10 @@ struct JmaDownload: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, run: run, server: server)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf, handles: handles)
         logger.info("Finished in \(start.timeElapsedPretty())")
+
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+        }
     }
     
     /// MSM or GSM domain
