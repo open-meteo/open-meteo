@@ -14,7 +14,13 @@ extension Process {
     public static func setOpenFileLimitto64k() {
         var filelimit = rlimit(rlim_cur: 65536, rlim_max: 65536)
         if setrlimit(OS_RLIMIT, &filelimit) == -1 {
-            print("[WARNING] Could not set number of open file limit to 65536). \(String(cString: strerror(errno)))")
+            print("[ WARNING ] Could not set number of open file limit to 65536. \(String(cString: strerror(errno)))")
+            return
+        }
+        filelimit = rlimit(rlim_cur: 1024*1024, rlim_max:  1024*1024)
+        if setrlimit(OS_RLIMIT, &filelimit) == -1 {
+            print("[ WARNING ] Could not set number of open file limit to 1048576. \(String(cString: strerror(errno)))")
+            return
         }
     }
     
