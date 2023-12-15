@@ -191,7 +191,7 @@ struct MigrationCommand: Command {
         case "gfs025_ens":
             return .ncep_gefs025
         case "gfs025_ensemble":
-            return .ncep_gefs025
+            return .ncep_gefs025_probability
         case "gfs05_ens":
             return .ncep_gefs05
         case "hrrr_conus":
