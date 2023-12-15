@@ -180,7 +180,7 @@ extension DomainRegistry {
         let dir = rawValue
         try Process.spawn(
             cmd: "aws",
-            args: ["s3", "sync", "--exclude", "*~", "--quiet", "\(OpenMeteo.dataDirectory)\(dir)", "s3://\(bucket)/data/\(dir)"]
+            args: ["s3", "sync", "--exclude", "*~", "--no-progress", "\(OpenMeteo.dataDirectory)\(dir)", "s3://\(bucket)/data/\(dir)"]
         )
     }
 }
