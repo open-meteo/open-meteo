@@ -130,7 +130,7 @@ struct S3DataController: RouteCollection {
         <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
             <Name>openmeteo</Name>
             <Prefix>\(path)</Prefix>
-            <KeyCount>\(files.count + directoriesXml.count)</KeyCount>
+            <KeyCount>\(files.count + directories.count)</KeyCount>
             <MaxKeys>1000</MaxKeys>
             <Delimiter>/</Delimiter>
             <IsTruncated>false</IsTruncated>
