@@ -32,6 +32,9 @@ struct GloFasDownloader: AsyncCommand {
         @Option(name: "date", short: "d", help: "Which run date to download like 2022-12-01")
         var date: String?
         
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() throws -> TimerangeDt {
             if let timeinterval = timeinterval {
@@ -102,6 +105,10 @@ struct GloFasDownloader: AsyncCommand {
             }
             
             try await downloadEnsembleForecast(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, createNetcdf: signature.createNetcdf, user: ftpuser, password: ftppassword)
+        }
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
         }
     }
     

@@ -137,6 +137,9 @@ struct DownloadEra5Command: AsyncCommand {
         @Option(name: "only-variables")
         var onlyVariables: String?
         
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval(domain: CdsDomain) throws -> TimerangeDt {
             let dt = 3600*24
@@ -199,6 +202,10 @@ struct DownloadEra5Command: AsyncCommand {
         let timeinterval = try signature.getTimeinterval(domain: domain)
         let timeintervalReturned = try downloadDailyFiles(logger: logger, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables)
         try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain, variables: variables)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+        }
     }
     
     /// Generate seasonal averages for bias corrections for CMIP climate data

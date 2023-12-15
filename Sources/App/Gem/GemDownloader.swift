@@ -37,6 +37,9 @@ struct GemDownload: AsyncCommand {
         
         @Option(name: "server", help: "Server base URL. Default 'https://hpfx.collab.science.gc.ca/YYYYMMDD/WXO-DD/'. Alternative 'https://dd.weather.gc.ca/'")
         var server: String?
+        
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
     }
     
     var help: String {
@@ -88,6 +91,10 @@ struct GemDownload: AsyncCommand {
         try await download(application: context.application, domain: domain, variables: variables, run: run, skipFilesIfExisting: signature.skipExisting, server: signature.server)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+        }
     }
     
     // download seamask and height

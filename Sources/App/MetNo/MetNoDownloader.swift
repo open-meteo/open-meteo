@@ -23,6 +23,9 @@ struct MetNoDownloader: AsyncCommand {
         
         @Option(name: "only-variables")
         var onlyVariables: String?
+        
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
     }
 
     var help: String {
@@ -45,6 +48,10 @@ struct MetNoDownloader: AsyncCommand {
         //try await download(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+        }
     }
     
     /// Process each variable and update time-series optimised files
@@ -167,6 +174,16 @@ struct MetNoDownloader: AsyncCommand {
     }
 }
 
+extension DomainRegistry {
+    /// Upload all data to a specified S3 bucket
+    func syncToS3(bucket: String) throws {
+        let dir = rawValue
+        try Process.spawn(
+            cmd: "aws",
+            args: ["s3", "sync", "--exclude", "*~", "--quiet", "\(OpenMeteo.dataDirectory)\(dir)", "s3://\(bucket)/data/\(dir)"]
+        )
+    }
+}
 
 extension NetCDF {
     /// Try to open a file. If it does not excist, wait 10 seconds and try again until deadline is reached

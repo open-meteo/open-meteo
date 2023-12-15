@@ -27,6 +27,9 @@ struct SeasonalForecastDownload: AsyncCommand {
         
         @Option(name: "only-variables")
         var onlyVariables: String?
+        
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
     }
 
     var help: String {
@@ -60,6 +63,10 @@ struct SeasonalForecastDownload: AsyncCommand {
             fatalError()
         case .eccc:
             fatalError()
+        }
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
         }
     }
     

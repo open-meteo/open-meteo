@@ -26,6 +26,9 @@ struct DownloadCamsCommand: AsyncCommand {
         
         @Option(name: "ftppassword", short: "p", help: "Password for the ECMWF CAMS FTP server")
         var ftppassword: String?
+        
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
     }
 
     var help: String {
@@ -59,6 +62,10 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             try downloadCamsEurope(logger: logger, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
             try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
+        }
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
         }
     }
     

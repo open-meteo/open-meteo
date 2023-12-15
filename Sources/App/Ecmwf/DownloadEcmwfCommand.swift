@@ -26,6 +26,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         @Option(name: "only-variables")
         var onlyVariables: String?
+        
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
     }
 
     var help: String {
@@ -59,6 +62,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
         try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
         try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convertEcmwf(logger: logger, domain: domain, run: run, variables: variables)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+        }
     }
     
     /// Download elevation file

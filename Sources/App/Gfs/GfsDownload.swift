@@ -40,6 +40,9 @@ struct GfsDownload: AsyncCommand {
         
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
+        
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
     }
     
     /// Downloaders return FileHandles to keep files open while downloading
@@ -69,6 +72,10 @@ struct GfsDownload: AsyncCommand {
         /// 18z run is available the day after starting 05:26
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+        }
     }
     
     func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsDomain) async throws {

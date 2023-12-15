@@ -23,6 +23,9 @@ struct DownloadIconWaveCommand: AsyncCommand {
         
         @Option(name: "only-variables")
         var onlyVariables: String?
+        
+        @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
+        var uploadS3Bucket: String?
     }
 
     var help: String {
@@ -48,6 +51,10 @@ struct DownloadIconWaveCommand: AsyncCommand {
         let variables = onlyVariables ?? IconWaveVariable.allCases
         try await download(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting, variables: variables)
         try convert(logger: logger, domain: domain, run: date, variables: variables)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+        }
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
