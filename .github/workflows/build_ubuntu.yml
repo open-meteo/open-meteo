@@ -48,7 +48,7 @@ jobs:
     - name: Rename deb file
       run: mv openmeteo-api_0.0.0_amd64.deb openmeteo-api_0.0.0_jammy_amd64.deb
     - name: 'Upload Artifact'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: openmeteo-api_0.0.0_jammy_amd64.deb
         path: openmeteo-api_0.0.0_jammy_amd64.deb
