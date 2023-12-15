@@ -74,7 +74,6 @@ struct SyncCommand: AsyncCommand {
             for model in models {
                 let modelPrefix = "data/\(model.rawValue)/"
                 let remoteDirectories = try await curl.s3list(server: server, prefix: modelPrefix, apikey: signature.apikey).directories
-                print(remoteDirectories)
                 
                 if downloadAllVariables {
                     for variablePrefix in remoteDirectories {
