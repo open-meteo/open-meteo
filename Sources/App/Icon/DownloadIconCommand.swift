@@ -432,9 +432,9 @@ struct DownloadIconCommand: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
             if domain == .iconD2 {
-                try DomainRegistry.dwd_icon_d2_15min.syncToS3(bucket: uploadS3Bucket)
+                try DomainRegistry.dwd_icon_d2_15min.syncToS3(bucket: uploadS3Bucket, variables: variables)
             }
         }
     }

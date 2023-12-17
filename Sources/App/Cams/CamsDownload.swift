@@ -65,7 +65,7 @@ struct DownloadCamsCommand: AsyncCommand {
         }
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
     }
     

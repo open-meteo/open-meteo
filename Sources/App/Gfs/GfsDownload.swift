@@ -72,10 +72,6 @@ struct GfsDownload: AsyncCommand {
         /// 18z run is available the day after starting 05:26
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         try await downloadRun(using: context, signature: signature, run: run, domain: domain)
-        
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
-        }
     }
     
     func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsDomain) async throws {
@@ -88,8 +84,11 @@ struct GfsDownload: AsyncCommand {
             fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
         }
         
+        let variables: [GfsVariableDownloadable]
+        
         switch domain {
         case .gfs025_ensemble:
+            variables = [GfsSurfaceVariable.precipitation_probability]
             let handles = try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
             try convertGfs(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles)
         case .gfs05_ens:
@@ -121,7 +120,7 @@ struct GfsDownload: AsyncCommand {
             }
             let surfaceVariables = GfsSurfaceVariable.allCases
             
-            let variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
+            variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
             
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
             
@@ -132,6 +131,9 @@ struct GfsDownload: AsyncCommand {
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+        }
     }
     
     func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) async throws {

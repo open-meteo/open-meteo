@@ -53,7 +53,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
         try convert(logger: logger, domain: domain, run: date, variables: variables)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
     }
     

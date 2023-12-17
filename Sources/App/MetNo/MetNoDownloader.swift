@@ -50,7 +50,7 @@ struct MetNoDownloader: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket)
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
     }
     
@@ -176,12 +176,21 @@ struct MetNoDownloader: AsyncCommand {
 
 extension DomainRegistry {
     /// Upload all data to a specified S3 bucket
-    func syncToS3(bucket: String) throws {
+    func syncToS3(bucket: String, variables: [GenericVariable]?) throws {
         let dir = rawValue
-        try Process.spawn(
-            cmd: "aws",
-            args: ["s3", "sync", "--exclude", "*~", "--no-progress", "\(OpenMeteo.dataDirectory)\(dir)", "s3://\(bucket)/data/\(dir)"]
-        )
+        if let variables {
+            for variable in variables {
+                try Process.spawn(
+                    cmd: "aws",
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", "\(OpenMeteo.dataDirectory)\(dir)/\(variable.omFileName.file)", "s3://\(bucket)/data/\(dir)/\(variable.omFileName.file)"]
+                )
+            }
+        } else {
+            try Process.spawn(
+                cmd: "aws",
+                args: ["s3", "sync", "--exclude", "*~", "--no-progress", "\(OpenMeteo.dataDirectory)\(dir)", "s3://\(bucket)/data/\(dir)"]
+            )
+        }
     }
 }
 
