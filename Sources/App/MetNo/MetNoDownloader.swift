@@ -180,15 +180,22 @@ extension DomainRegistry {
         let dir = rawValue
         if let variables {
             for variable in variables {
+                let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable.omFileName.file)"
+                let dest = "s3://\(bucket)/data/\(dir)/\(variable.omFileName.file)"
+                if !FileManager.default.fileExists(atPath: src) {
+                    continue
+                }
                 try Process.spawn(
                     cmd: "aws",
-                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", "\(OpenMeteo.dataDirectory)\(dir)/\(variable.omFileName.file)", "s3://\(bucket)/data/\(dir)/\(variable.omFileName.file)"]
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
                 )
             }
         } else {
+            let src = "\(OpenMeteo.dataDirectory)\(dir)"
+            let dest = "s3://\(bucket)/data/\(dir)"
             try Process.spawn(
                 cmd: "aws",
-                args: ["s3", "sync", "--exclude", "*~", "--no-progress", "\(OpenMeteo.dataDirectory)\(dir)", "s3://\(bucket)/data/\(dir)"]
+                args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
             )
         }
     }
