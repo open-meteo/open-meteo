@@ -134,6 +134,23 @@ struct MeteoFranceDownload: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
     }
     
+    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws {
+        
+        // loop timestemps
+        // loop variables
+        // arpege europe subset=lat(20,72)&subset=long(-32,42)
+        // world subset=lat(-90,90)&subset=long(-180,180)
+        // arome 0.01 subset=lat(37.5,55.4)&subset=long(-12,16)
+        // arome 0.025 same now as arome 0.01
+        /*
+         curl -X 'GET' \
+           'https://public-api.meteofrance.fr/public/arpege/1.0/wcs/MF-NWP-GLOBAL-ARPEGE-025-GLOBE-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=aaaaaa&subset=bbbbbb&format=application%2Fwmo-grib' \
+           -H 'accept: application/wmo-grib' \
+           -H 'apikey: eyJ4NXQi.....AGkA=='
+         */
+        
+    }
+    
     /// download MeteoFrance
     func download(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws {
         let logger = application.logger

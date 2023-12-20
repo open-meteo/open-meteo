@@ -72,6 +72,28 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
     }
     
+    var mfApiName: String {
+        switch self {
+        case .arpege_europe:
+            return "MF-NWP-GLOBAL-ARPEGE-01-EUROPE"
+        case .arpege_world:
+            return "MF-NWP-GLOBAL-ARPEGE-025-GLOBE"
+        case .arome_france:
+            return "MF-NWP-HIGHRES-AROME-0025-FRANCE"
+        case .arome_france_hd:
+            return "MF-NWP-HIGHRES-AROME-001-FRANCE"
+        }
+    }
+    
+    var mfApiFamily: String {
+        switch self {
+        case .arpege_world, .arpege_europe:
+            return "arpege"
+        case .arome_france, .arome_france_hd:
+            return "arome"
+        }
+    }
+    
     func forecastHours(run: Int, hourlyForArpegeEurope: Bool) -> [Int] {
         switch self {
         case .arpege_europe:
@@ -172,8 +194,10 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arpege_europe:
             return RegularGrid(nx: 741, ny: 521, latMin: 20, lonMin: -32, dx: 0.1, dy: 0.1)
         case .arpege_world:
+            // TODO api update 0.25°
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .arome_france:
+            // TODO api update 1121x717
             return RegularGrid(nx: 801, ny: 601, latMin: 38.0, lonMin: -8.0, dx: 0.025, dy: 0.025)
         case .arome_france_hd:
             return RegularGrid(nx: 2801, ny: 1791, latMin: 37.5, lonMin: -12.0, dx: 0.01, dy: 0.01)
