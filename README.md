@@ -34,6 +34,7 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 - The free non-commerical API is hosted at [https://api.open-meteo.com](https://api.open-meteo.com/v1/forecast?latitude=52.52&longitude=13.41&hourly=temperature_2m) using to GeoDNS to servers in Europe and North America (HTTPS is optional). The API source code is in this current repository.
 - The geocoding API source code is available in a separate repository https://github.com/open-meteo/geocoding-api
 - Larger changes are announced in the [Open-Meteo Blog](https://openmeteo.substack.com)
+- The [Open-Meteo weather database](https://github.com/open-meteo/open-data) is redistributed as part of an AWS Open-Data Sponsorship
 
 ## Who is using Open-Meteo?
 Apps:
