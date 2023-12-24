@@ -45,9 +45,9 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arpege_world:
             return .meteofrance_arpege_world025
         case .arome_france:
-            return .meteofrance_arome_france
+            return .meteofrance_arome_france0025
         case .arome_france_hd:
-            return .meteofrance_arome_france_hd001
+            return .meteofrance_arome_france_hd
         }
     }
     

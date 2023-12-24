@@ -155,9 +155,9 @@ struct MigrationCommand: Command {
         case "glofas-seasonal":
             return .glofas_seasonal_v4
         case "arome_france":
-            return .meteofrance_arome_france
+            return .meteofrance_arome_france0025
         case "arome_france_hd":
-            return .meteofrance_arome_france_hd001
+            return .meteofrance_arome_france_hd
         case "arpege_europe":
             return .meteofrance_arpege_europe
         case "arpege_world":

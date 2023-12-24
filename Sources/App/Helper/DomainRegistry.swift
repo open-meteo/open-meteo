@@ -4,8 +4,8 @@ import Foundation
  List of all integrated domains
  */
 enum DomainRegistry: String, CaseIterable {
-    case meteofrance_arome_france
-    case meteofrance_arome_france_hd001
+    case meteofrance_arome_france0025
+    case meteofrance_arome_france_hd
     case meteofrance_arpege_europe
     case meteofrance_arpege_world025
     
@@ -78,9 +78,9 @@ enum DomainRegistry: String, CaseIterable {
     
     func getDomain() -> GenericDomain {
         switch self {
-        case .meteofrance_arome_france:
+        case .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
-        case .meteofrance_arome_france_hd001:
+        case .meteofrance_arome_france_hd:
             return MeteoFranceDomain.arome_france_hd
         case .meteofrance_arpege_europe:
             return MeteoFranceDomain.arpege_europe
