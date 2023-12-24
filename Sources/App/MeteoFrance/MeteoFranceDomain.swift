@@ -110,7 +110,12 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
 
     func forecastHours(run: Int, hourlyForArpegeEurope: Bool) -> [Int] {
         switch self {
-        case .arpege_europe, .arpege_world:
+        case .arpege_world:
+            if run == 12 {
+                return Array(stride(from: 0, through: 48, by: 1)) + Array(stride(from: 51, through: 114, by: 3))
+            }
+            return Array(stride(from: 0, through: 48, by: 1)) + Array(stride(from: 51, through: 102, by: 3))
+        case .arpege_europe:
             if run == 12 {
                 return Array(stride(from: 0, through: 114, by: 1))
             }
