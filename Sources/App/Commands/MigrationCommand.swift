@@ -157,11 +157,11 @@ struct MigrationCommand: Command {
         case "arome_france":
             return .meteofrance_arome_france
         case "arome_france_hd":
-            return .meteofrance_arome_france_hd
+            return .meteofrance_arome_france_hd001
         case "arpege_europe":
             return .meteofrance_arpege_europe
         case "arpege_world":
-            return .meteofrance_arpege_world
+            return .meteofrance_arpege_world025
         case "cams_europe":
             return .cams_europe
         case "cams_global":

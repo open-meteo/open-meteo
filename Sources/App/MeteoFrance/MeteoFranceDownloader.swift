@@ -88,6 +88,7 @@ struct MeteoFranceDownload: AsyncCommand {
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
+        try domain.surfaceElevationFileOm.createDirectory()
         guard let apikey = Environment.get("METEOFRANCE_API_KEY") else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -198,8 +199,9 @@ struct MeteoFranceDownload: AsyncCommand {
                 let subsetHeight = coverage.height.map { "&subset=height(\($0))" } ?? ""
                 let subsetTime = "&subset=time(\(hour * 3600))"
                 let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
+                let period = coverage.isPeriod ? "_PT1H" : ""
                 
-                let url = "https://public-api.meteofrance.fr/public/arpege/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(subsetGrid)\(subsetHeight)\(subsetTime)&format=application%2Fwmo-grib"
+                let url = "https://public-api.meteofrance.fr/public/arpege/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetTime)&format=application%2Fwmo-grib"
                 let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
                 
                 //try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)
