@@ -72,14 +72,18 @@ struct MeteoFranceDownload: AsyncCommand {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
-        try await downloadElevation(application: context.application, domain: domain)
-        try await download(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
+        try await downloadElevation2(application: context.application, domain: domain)
+        try await download2(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
+    }
+    
+    func downloadElevation2(application: Application, domain: MeteoFranceDomain) async throws {
+        
     }
     
     // download seamask and height
@@ -135,6 +139,69 @@ struct MeteoFranceDownload: AsyncCommand {
     }
     
     func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws {
+        
+        guard let apikey = Environment.get("METEOFRANCE_API_KEY") else {
+            fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
+        }
+        let logger = application.logger
+        let deadLineHours: Double = domain == .arpege_europe && run.hour == 12 ? 5.9 : 5
+        Process.alarm(seconds: Int(deadLineHours+2) * 3600)
+        defer { Process.alarm(seconds: 0) }
+        
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, headers: [("apikey", apikey)])
+        let grid = domain.grid
+        var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+        let subsetGrid = domain.mfSubsetGrid
+        
+        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        
+        for hour in domain.forecastHours(run: run.hour, hourlyForArpegeEurope: true) {
+            for variable in variables {
+                guard let coverage = variable.getCoverageId(domain: domain) else {
+                    continue
+                }
+                if hour == 0 && variable.skipHour0(domain: domain) {
+                    continue
+                }
+                let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om"
+                
+                if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
+                    continue
+                }
+                
+                let subsetHeight = coverage.height.map { "&subset=height(\($0))" } ?? ""
+                let subsetTime = "&subset=time(\(hour * 3600))"
+                let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
+                
+                let message = try await curl.downloadGrib(url: "https://public-api.meteofrance.fr/public/arpege/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(subsetGrid)\(subsetHeight)\(subsetTime)&format=application%2Fwmo-grib", bzip2Decode: false)[0]
+                
+                //try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)
+                //message.dumpAttributes()
+                
+                try grib2d.load(message: message)
+                if domain.isGlobal {
+                    grib2d.array.shift180LongitudeAndFlipLatitude()
+                } else {
+                    grib2d.array.flipLatitude()
+                }
+                if let fma = variable.multiplyAdd {
+                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                
+                try FileManager.default.removeItemIfExists(at: file)
+                let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                /*handles.append(GfsHandle(
+                    variable: variable.variable,
+                    time: timestamp,
+                    member: 0,
+                    fn: fn
+                ))*/
+
+            }
+        }
+        curl.printStatistics()
         
         // loop timestemps
         // loop variables

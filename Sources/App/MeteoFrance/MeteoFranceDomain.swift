@@ -56,9 +56,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        if self == .arpege_world {
-            return 3*3600
-        }
         return 3600
     }
     var isGlobal: Bool {
@@ -94,6 +91,17 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var mfSubsetGrid: String {
+        switch self {
+        case .arpege_europe:
+            return "&subset=lat(20,72)&subset=long(-32,42)"
+        case .arpege_world:
+            return "&subset=long(-180,180)&subset=lat(-90,90)"
+        case .arome_france, .arome_france_hd:
+            return "&subset=lat(37.5,55.4)&subset=long(-12,16)"
+        }
+    }
+
     func forecastHours(run: Int, hourlyForArpegeEurope: Bool) -> [Int] {
         switch self {
         case .arpege_europe:
@@ -115,7 +123,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             if run == 6 || run == 18 {
                 // no 6h
                 let through = run == 6 ? 72 : 60
-                return Array(stride(from: 0, through: through, by: 3))
+                return Array(stride(from: 0, through: through, by: 1))
             }
             let through = 102
             return Array(stride(from: 0, to: 96, by: 3)) + Array(stride(from: 96, through: through, by: 6))
@@ -194,11 +202,9 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arpege_europe:
             return RegularGrid(nx: 741, ny: 521, latMin: 20, lonMin: -32, dx: 0.1, dy: 0.1)
         case .arpege_world:
-            // TODO api update 0.25°
-            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
+            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .arome_france:
-            // TODO api update 1121x717
-            return RegularGrid(nx: 801, ny: 601, latMin: 38.0, lonMin: -8.0, dx: 0.025, dy: 0.025)
+            return RegularGrid(nx: 1121, ny: 717, latMin: 37.5, lonMin: -12.0, dx: 0.025, dy: 0.025)
         case .arome_france_hd:
             return RegularGrid(nx: 2801, ny: 1791, latMin: 37.5, lonMin: -12.0, dx: 0.01, dy: 0.01)
         }

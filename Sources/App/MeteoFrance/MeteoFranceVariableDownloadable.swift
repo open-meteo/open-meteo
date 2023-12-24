@@ -14,6 +14,8 @@ protocol MeteoFranceVariableDownloadable: GenericVariable {
     /// Others start hourly and then switch to 3/6 hourly resolution
     /// Obviously, if hourly data is available, it will be used
     var isAlwaysHourlyInArgegeEurope: Bool { get }
+    
+    func getCoverageId(domain: MeteoFranceDomain) -> (variable: String, height: Int?)?
 }
 
 enum MfVariablePackages: String, CaseIterable {
@@ -26,8 +28,8 @@ enum MfVariablePackages: String, CaseIterable {
 }
 
 extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
-    func getCoverageId(domain: MeteoFranceDomain) -> (variable: String, height: Int?)?  {
-        // add Surface temperature TEMPERATURE__GROUND_OR_WATER_SURFAC?
+    func getCoverageId(domain: MeteoFranceDomain) -> (variable: String, height: Int?)? {
+        // add Surface temperature TEMPERATURE__GROUND_OR_WATER_SURFACE
         // GEOMETRIC_HEIGHT__GROUND_OR_WATER_SURFACE___2023-12-20T12.00.00Z
         if domain == .arome_france_hd {
             switch self {
