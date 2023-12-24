@@ -73,8 +73,9 @@ struct MeteoFranceDownload: AsyncCommand {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         try await downloadElevation2(application: context.application, domain: domain, run: run)
-        try await download2(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
-        try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        let handles = try await download2(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
+        try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles)
+        //try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -164,7 +165,7 @@ struct MeteoFranceDownload: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
     }
     
-    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws {
+    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
         
         guard let apikey = Environment.get("METEOFRANCE_API_KEY") else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
@@ -181,8 +182,10 @@ struct MeteoFranceDownload: AsyncCommand {
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        var handles = [GenericVariableHandle]()
         
         for hour in domain.forecastHours(run: run.hour, hourlyForArpegeEurope: true) {
+            let timestamp = run.add(hours: hour)
             for variable in variables {
                 guard let coverage = variable.getCoverageId(domain: domain) else {
                     continue
@@ -193,6 +196,13 @@ struct MeteoFranceDownload: AsyncCommand {
                 let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om"
                 
                 if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
+                    handles.append(GenericVariableHandle(
+                        variable: variable,
+                        time: timestamp,
+                        member: 0,
+                        fn: try FileHandle.openFileReading(file: file),
+                        skipHour0: variable.skipHour0(domain: domain)
+                    ))
                     continue
                 }
                 
@@ -221,16 +231,17 @@ struct MeteoFranceDownload: AsyncCommand {
                 
                 try FileManager.default.removeItemIfExists(at: file)
                 let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                /*handles.append(GfsHandle(
-                    variable: variable.variable,
+                handles.append(GenericVariableHandle(
+                    variable: variable,
                     time: timestamp,
                     member: 0,
-                    fn: fn
-                ))*/
-
+                    fn: fn,
+                    skipHour0: variable.skipHour0(domain: domain)
+                ))
             }
         }
         curl.printStatistics()
+        return handles
         
         // loop timestemps
         // loop variables
@@ -342,7 +353,7 @@ struct MeteoFranceDownload: AsyncCommand {
     }
     
     /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: MeteoFranceDomain, variables: [MeteoFranceVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
+    /*func convert(logger: Logger, domain: MeteoFranceDomain, variables: [MeteoFranceVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
         let om = OmFileSplitter(domain)
         let nLocationsPerChunk = om.nLocationsPerChunk
         let forecastHours = domain.forecastHours(run: run.hour, hourlyForArpegeEurope: false)
@@ -407,7 +418,7 @@ struct MeteoFranceDownload: AsyncCommand {
             }
             progress.finish()
         }
-    }
+    }*/
 }
 
 fileprivate struct MfGribVariable: CurlIndexedVariable {
