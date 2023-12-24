@@ -72,7 +72,7 @@ struct MeteoFranceDownload: AsyncCommand {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
-        try await downloadElevation2(application: context.application, domain: domain)
+        try await downloadElevation2(application: context.application, domain: domain, run: run)
         try await download2(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -82,8 +82,33 @@ struct MeteoFranceDownload: AsyncCommand {
         }
     }
     
-    func downloadElevation2(application: Application, domain: MeteoFranceDomain) async throws {
+    func downloadElevation2(application: Application, domain: MeteoFranceDomain, run: Timestamp) async throws {
+        let logger = application.logger
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
+            return
+        }
+        guard let apikey = Environment.get("METEOFRANCE_API_KEY") else {
+            fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
+        }
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, headers: [("apikey", apikey)])
+        let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
+        let subsetGrid = domain.mfSubsetGrid
+        let url = "https://public-api.meteofrance.fr/public/arpege/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=GEOMETRIC_HEIGHT__GROUND_OR_WATER_SURFACE___\(runTime)\(subsetGrid)&subset=time(0)&format=application%2Fwmo-grib"
         
+        let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        try grib2d.load(message: message)
+        if domain.isGlobal {
+            grib2d.array.shift180LongitudeAndFlipLatitude()
+        } else {
+            grib2d.array.flipLatitude()
+        }
+        try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc")
+        //try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
+        //message.dumpAttributes()
+        
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
     }
     
     // download seamask and height
@@ -174,7 +199,8 @@ struct MeteoFranceDownload: AsyncCommand {
                 let subsetTime = "&subset=time(\(hour * 3600))"
                 let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
                 
-                let message = try await curl.downloadGrib(url: "https://public-api.meteofrance.fr/public/arpege/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(subsetGrid)\(subsetHeight)\(subsetTime)&format=application%2Fwmo-grib", bzip2Decode: false)[0]
+                let url = "https://public-api.meteofrance.fr/public/arpege/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(subsetGrid)\(subsetHeight)\(subsetTime)&format=application%2Fwmo-grib"
+                let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
                 
                 //try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)
                 //message.dumpAttributes()
