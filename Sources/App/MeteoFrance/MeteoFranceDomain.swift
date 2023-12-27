@@ -88,12 +88,17 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    var mfApiFamily: String {
+    enum Family: String {
+        case arpege
+        case arome
+    }
+    
+    var family: Family {
         switch self {
         case .arpege_world, .arpege_europe:
-            return "arpege"
+            return .arpege
         case .arome_france, .arome_france_hd:
-            return "arome"
+            return .arome
         }
     }
     
@@ -122,41 +127,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return Array(stride(from: 0, through: 102, by: 1))
         case .arome_france, .arome_france_hd:
             return Array(stride(from: 0, through: 51, by: 1))
-        }
-    }
-    
-    /// arpege europe 00H12H, 13H24H ... 97H102H
-    /// arpege world 00H24H, 27H48H, .. 75H102H (run 6/18 ends 51H72H)
-    /// arome france 00H06H, 07H12H, 13H18H
-    /// arome hh 00H.grib2
-    func getForecastHoursPerFile(run: Int, hourlyForArpegeEurope: Bool) -> [(file: String, steps: ArraySlice<Int>)] {
-        
-        let breakpoints: [Int]
-        switch self {
-        case .arpege_europe:
-            breakpoints = [12,24,36,48,60,72,84,96,102]
-        case .arpege_world:
-            breakpoints = [24,48,72,102]
-        case .arome_france:
-            breakpoints = [6,12,18,24,30,36,42]
-        case .arome_france_hd:
-            breakpoints = []
-        }
-        
-        let timesteps = forecastHours(run: run, hourlyForArpegeEurope: hourlyForArpegeEurope)
-        let steps = timesteps.chunked(by: { t, i in
-            return !breakpoints.isEmpty && !breakpoints.contains(t)
-        })
-        
-        return steps.enumerated().map { (i, s) in
-            if breakpoints.count == 0 {
-                return ("\(i.zeroPadded(len: 2))H", s)
-            }
-            let start = i == 0 ? 0 : breakpoints[i-1] + dtHours
-            let end = breakpoints[i]
-            let file = "\(start.zeroPadded(len: 2))H\(end.zeroPadded(len: 2))H"
-            
-            return (file, s)
         }
     }
     

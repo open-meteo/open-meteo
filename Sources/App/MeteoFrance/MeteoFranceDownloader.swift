@@ -96,7 +96,7 @@ struct MeteoFranceDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, headers: [("apikey", apikey)])
         let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
         let subsetGrid = domain.mfSubsetGrid
-        let url = "https://public-api.meteofrance.fr/public/\(domain.mfApiFamily)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=GEOMETRIC_HEIGHT__GROUND_OR_WATER_SURFACE___\(runTime)\(subsetGrid)&subset=time(0)&format=application%2Fwmo-grib"
+        let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=GEOMETRIC_HEIGHT__GROUND_OR_WATER_SURFACE___\(runTime)\(subsetGrid)&subset=time(0)&format=application%2Fwmo-grib"
         
         let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -161,7 +161,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 let is3H = domain == .arpege_world && hour >= 51
                 let period = coverage.isPeriod ? is3H ? "_PT3H" : "_PT1H" : ""
                 
-                let url = "https://public-api.meteofrance.fr/public/\(domain.mfApiFamily)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetTime)&format=application%2Fwmo-grib"
+                let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetTime)&format=application%2Fwmo-grib"
                 let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
                 
                 //try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)

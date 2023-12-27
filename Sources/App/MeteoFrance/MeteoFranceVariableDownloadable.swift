@@ -89,20 +89,36 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     func availableFor(domain: MeteoFranceDomain) -> Bool {
         if domain == .arome_france_hd {
             switch self {
-            case .cloud_cover: return false
-            case .wind_u_component_150m, .wind_u_component_200m:
-                return false
-            case .wind_v_component_150m, .wind_v_component_200m:
-                return false
-            case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
-                return false
-            case .shortwave_radiation:
-                return false
-            case .pressure_msl:
-                // only surface
-                return false
+            case .temperature_2m:
+                return true
+            case .relative_humidity_2m:
+                return true
+            case .wind_v_component_10m:
+                return true
+            case .wind_u_component_10m:
+                return true
+            case .wind_v_component_20m:
+                return true
+            case .wind_u_component_20m:
+                return true
+            case .wind_v_component_50m:
+                return true
+            case .wind_u_component_50m:
+                return true
+            case .wind_v_component_100m:
+                return true
+            case .wind_u_component_100m:
+                return true
+            case .precipitation:
+                return true
+            case .snowfall_water_equivalent:
+                return true
+            case .wind_gusts_10m:
+                return true
+            case .cape:
+                return true
             default:
-                break
+                return false
             }
         }
         return true
@@ -110,10 +126,10 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     
     func skipHour0(domain: MeteoFranceDomain) -> Bool {
         switch self {
-        case .cloud_cover: return domain == .arome_france
-        case .cloud_cover_low: return domain == .arome_france
-        case .cloud_cover_mid: return domain == .arome_france
-        case .cloud_cover_high: return domain == .arome_france
+        case .cloud_cover: return domain.family == .arome
+        case .cloud_cover_low: return domain.family == .arome
+        case .cloud_cover_mid: return domain.family == .arome
+        case .cloud_cover_high: return domain.family == .arome
         case .precipitation: return true
         case .shortwave_radiation: return true
         case .wind_gusts_10m: return true
