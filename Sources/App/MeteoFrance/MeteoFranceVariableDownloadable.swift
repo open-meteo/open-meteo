@@ -181,6 +181,10 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
             // level 10-70 only have 3-hourly data
             return false
         }
+        if domain == .arpege_europe && forecastHour % 3 != 0 && forecastHour > 48 {
+            /// after hour 48 only 3 hourly data
+            return false
+        }
         return true
     }
     
