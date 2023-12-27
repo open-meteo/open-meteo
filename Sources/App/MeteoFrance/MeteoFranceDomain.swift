@@ -134,9 +134,9 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     var levels: [Int] {
         switch self {
         case .arpege_europe:
-            return [                    100,      150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
+            return [                    100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arpege_world:
-            return [10, 20, 30, 50, 70, 100,      150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
+            return [10, 20, 30, 50, 70, 100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arome_france:
             return [                    100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arome_france_hd:
@@ -443,7 +443,6 @@ enum MeteoFrancePressureVariableType: String, CaseIterable {
     case wind_u_component
     case wind_v_component
     case geopotential_height
-    case cloud_cover
     case relative_humidity
 }
 
@@ -476,8 +475,6 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
-        case .cloud_cover:
-            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         case .relative_humidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
@@ -493,8 +490,6 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return .hermite(bounds: nil)
         case .geopotential_height:
             return .hermite(bounds: nil)
-        case .cloud_cover:
-            return .hermite(bounds: 0...100)
         case .relative_humidity:
             return .hermite(bounds: 0...100)
         }
@@ -510,8 +505,6 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return .metrePerSecond
         case .geopotential_height:
             return .metre
-        case .cloud_cover:
-            return .percentage
         case .relative_humidity:
             return .percentage
         }

@@ -6,7 +6,7 @@ protocol MeteoFranceVariableDownloadable: GenericVariable {
     var isAccumulatedSinceModelStart: Bool { get }
     
     /// AROME france HD has very few variables
-    func availableFor(domain: MeteoFranceDomain) -> Bool
+    func availableFor(domain: MeteoFranceDomain, forecastHour: Int) -> Bool
     
     /// Return the `coverage` id for the given variable or nil if it is not available for this domain
     func getCoverageId() -> (variable: String, height: Int?, pressure: Int?, isPeriod: Bool)
@@ -86,7 +86,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     }
     
     
-    func availableFor(domain: MeteoFranceDomain) -> Bool {
+    func availableFor(domain: MeteoFranceDomain, forecastHour: Int) -> Bool {
         if domain == .arome_france_hd {
             switch self {
             case .temperature_2m:
@@ -176,8 +176,9 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
 }
 
 extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
-    func availableFor(domain: MeteoFranceDomain) -> Bool {
-        if variable == .cloud_cover && domain == .arome_france {
+    func availableFor(domain: MeteoFranceDomain, forecastHour: Int) -> Bool {
+        if level <= 70 && forecastHour % 3 != 0 {
+            // level 10-70 only have 3-hourly data
             return false
         }
         return true
@@ -194,10 +195,7 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
             return ("V_COMPONENT_OF_WIND__ISOBARIC_SURFACE", nil, level, false)
         case .geopotential_height:
             return ("GEOPOTENTIAL__ISOBARIC_SURFACE", nil, level, false)
-        case .cloud_cover:
-            return ("SPECIFIC_CLOUD_ICE_WATER_CONTENT__ISOBARIC_SURFACE", nil, level, false)
         case .relative_humidity:
-            // 100 125 150 175 200 225 250 275 300 350 400 450 500 550 600 650 700 750 800 850 900 925 950 1000
             return ("RELATIVE_HUMIDITY__ISOBARIC_SURFACE", nil, level, false)
         }
     }
@@ -210,8 +208,6 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
         switch variable {
         case .temperature:
             return (1, -273.15)
-        case .cloud_cover:
-            return (100, 0)
         case .geopotential_height:
             // convert geopotential to height (WMO defined gravity constant)
             return (1/9.80665, 0)

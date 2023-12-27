@@ -55,10 +55,7 @@ struct MeteoFranceDownload: AsyncCommand {
         }
         
         let pressureVariables = domain.levels.reversed().flatMap { level in
-            MeteoFrancePressureVariableType.allCases.compactMap { variable -> MeteoFrancePressureVariable? in
-                if variable == .cloud_cover && level < 100 {
-                    return nil
-                }
+            MeteoFrancePressureVariableType.allCases.map { variable -> MeteoFrancePressureVariable in
                 return MeteoFrancePressureVariable(variable: variable, level: level)
             }
         }
@@ -66,7 +63,7 @@ struct MeteoFranceDownload: AsyncCommand {
         
         let variablesAll = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
         
-        let variables = variablesAll.filter({ $0.availableFor(domain: domain) })
+        let variables = variablesAll.filter({ $0.availableFor(domain: domain, forecastHour: 0) })
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
@@ -135,7 +132,7 @@ struct MeteoFranceDownload: AsyncCommand {
         for hour in domain.forecastHours(run: run.hour, hourlyForArpegeEurope: true) {
             let timestamp = run.add(hours: hour)
             for variable in variables {
-                guard variable.availableFor(domain: domain) else {
+                guard variable.availableFor(domain: domain, forecastHour: hour) else {
                     continue
                 }
                 if hour == 0 && variable.skipHour0(domain: domain) {
