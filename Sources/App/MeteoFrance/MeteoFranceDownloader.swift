@@ -156,12 +156,13 @@ struct MeteoFranceDownload: AsyncCommand {
                 
                 let coverage = variable.getCoverageId()
                 let subsetHeight = coverage.height.map { "&subset=height(\($0))" } ?? ""
+                let subsetPressure = coverage.pressure.map { "&subset=pressure(\($0))" } ?? ""
                 let subsetTime = "&subset=time(\(hour * 3600))"
                 let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
                 let is3H = domain == .arpege_world && hour >= 51
                 let period = coverage.isPeriod ? is3H ? "_PT3H" : "_PT1H" : ""
                 
-                let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetTime)&format=application%2Fwmo-grib"
+                let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetPressure)\(subsetTime)&format=application%2Fwmo-grib"
                 let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
                 
                 //try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)

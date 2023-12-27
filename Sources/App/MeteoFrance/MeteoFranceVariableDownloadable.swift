@@ -9,79 +9,79 @@ protocol MeteoFranceVariableDownloadable: GenericVariable {
     func availableFor(domain: MeteoFranceDomain) -> Bool
     
     /// Return the `coverage` id for the given variable or nil if it is not available for this domain
-    func getCoverageId() -> (variable: String, height: Int?, isPeriod: Bool)
+    func getCoverageId() -> (variable: String, height: Int?, pressure: Int?, isPeriod: Bool)
 }
 
 extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
-    func getCoverageId() -> (variable: String, height: Int?, isPeriod: Bool) {
+    func getCoverageId() -> (variable: String, height: Int?, pressure: Int?, isPeriod: Bool) {
         // add Surface temperature TEMPERATURE__GROUND_OR_WATER_SURFACE
         switch self {
         case .temperature_2m:
             // only 2 arome 0.01
-            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 2, false)
+            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 2, nil, false)
         case .cloud_cover:
             // not for arome 0.01
-            return ("TOTAL_CLOUD_COVER__GROUND_OR_WATER_SURFACE", nil, false)
+            return ("TOTAL_CLOUD_COVER__GROUND_OR_WATER_SURFACE", nil, nil, false)
         case .cloud_cover_low:
-            return ("LOW_CLOUD_COVER__GROUND_OR_WATER_SURFACE", nil, false)
+            return ("LOW_CLOUD_COVER__GROUND_OR_WATER_SURFACE", nil, nil, false)
         case .cloud_cover_mid:
-            return ("HIGH_CLOUD_COVER__GROUND_OR_WATER_SURFACE", nil, false)
+            return ("HIGH_CLOUD_COVER__GROUND_OR_WATER_SURFACE", nil, nil, false)
         case .cloud_cover_high:
-            return ("MEDIUM_CLOUD_COVER__GROUND_OR_WATER_SURFACE", nil, false)
+            return ("MEDIUM_CLOUD_COVER__GROUND_OR_WATER_SURFACE", nil, nil, false)
         case .pressure_msl:
-            return ("PRESSURE__MEAN_SEA_LEVEL", nil, false)
+            return ("PRESSURE__MEAN_SEA_LEVEL", nil, nil, false)
             // TODO arome 0.01 has surface pressure
             //return ("PRESSURE__GROUND_OR_WATER_SURFACE", nil)
         case .relative_humidity_2m:
             // 2 10 20 50 100
             // arome 0.25: 2 10 20 35 50 75 100 150 200 250 375 500 625 750 875 1000 1125 1250 1375 1500 1750 2000 2250 2500 2750 3000
-            return ("RELATIVE_HUMIDITY__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 2, false)
+            return ("RELATIVE_HUMIDITY__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 2, nil, false)
         case .wind_v_component_10m:
             // arome 0.01 10 20 50 100
-            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 10, false)
+            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 10, nil, false)
         case .wind_u_component_10m:
-            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 10, false)
+            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 10, nil, false)
         case .wind_v_component_20m:
-            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 20, false)
+            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 20, nil, false)
         case .wind_u_component_20m:
-            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 20, false)
+            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 20, nil, false)
         case .wind_v_component_50m:
-            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 50, false)
+            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 50, nil, false)
         case .wind_u_component_50m:
-            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 50, false)
+            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 50, nil, false)
         case .wind_v_component_100m:
-            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 100, false)
+            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 100, nil, false)
         case .wind_u_component_100m:
-            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 100, false)
+            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 100, nil, false)
         case .wind_v_component_150m:
-            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 150, false)
+            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 150, nil, false)
         case .wind_u_component_150m:
-            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 150, false)
+            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 150, nil, false)
         case .wind_v_component_200m:
-            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 200, false)
+            return ("V_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 200, nil, false)
         case .wind_u_component_200m:
-            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 200, false)
+            return ("U_COMPONENT_OF_WIND__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 200, nil, false)
         case .temperature_20m:
-            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 20, false)
+            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 20, nil, false)
         case .temperature_50m:
-            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 50, false)
+            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 50, nil, false)
         case .temperature_100m:
-            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 100, false)
+            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 100, nil, false)
         case .temperature_150m:
-            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 150, false)
+            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 150, nil, false)
         case .temperature_200m:
-            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 200, false)
+            return ("TEMPERATURE__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 200, nil, false)
         case .precipitation:
-            return ("TOTAL_PRECIPITATION__GROUND_OR_WATER_SURFACE", nil, true)
+            return ("TOTAL_PRECIPITATION__GROUND_OR_WATER_SURFACE", nil, nil, true)
         case .snowfall_water_equivalent:
-            return ("TOTAL_SNOW_PRECIPITATION__GROUND_OR_WATER_SURFACE", nil, true)
+            return ("TOTAL_SNOW_PRECIPITATION__GROUND_OR_WATER_SURFACE", nil, nil, true)
         case .wind_gusts_10m:
-            return ("WIND_SPEED_GUST__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 10, false)
+            return ("WIND_SPEED_GUST__SPECIFIC_HEIGHT_LEVEL_ABOVE_GROUND", 10, nil, false)
         case .shortwave_radiation:
             // Note: There is also "regular" short wave radiation which subtracted upwelling raditiation
-            return ("DOWNWARD_SHORT_WAVE_RADIATION_FLUX__GROUND_OR_WATER_SURFACE", nil, true)
+            return ("DOWNWARD_SHORT_WAVE_RADIATION_FLUX__GROUND_OR_WATER_SURFACE", nil, nil, true)
         case .cape:
-            return ("CONVECTIVE_AVAILABLE_POTENTIAL_ENERGY__GROUND_OR_WATER_SURFACE", nil, false)
+            return ("CONVECTIVE_AVAILABLE_POTENTIAL_ENERGY__GROUND_OR_WATER_SURFACE", nil, nil, false)
         }
     }
     
@@ -183,22 +183,22 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
         return true
     }
     
-    func getCoverageId() -> (variable: String, height: Int?, isPeriod: Bool)  {
+    func getCoverageId() -> (variable: String, height: Int?, pressure: Int?, isPeriod: Bool)  {
         // consider vertical velocity
         switch variable {
         case .temperature:
-            return ("TEMPERATURE__ISOBARIC_SURFACE", level, false)
+            return ("TEMPERATURE__ISOBARIC_SURFACE", nil, level, false)
         case .wind_u_component:
-            return ("U_COMPONENT_OF_WIND__ISOBARIC_SURFACE", level, false)
+            return ("U_COMPONENT_OF_WIND__ISOBARIC_SURFACE", nil, level, false)
         case .wind_v_component:
-            return ("V_COMPONENT_OF_WIND__ISOBARIC_SURFACE", level, false)
+            return ("V_COMPONENT_OF_WIND__ISOBARIC_SURFACE", nil, level, false)
         case .geopotential_height:
-            return ("GEOPOTENTIAL__ISOBARIC_SURFACE", level, false)
+            return ("GEOPOTENTIAL__ISOBARIC_SURFACE", nil, level, false)
         case .cloud_cover:
-            return ("SPECIFIC_CLOUD_ICE_WATER_CONTENT__ISOBARIC_SURFACE", level, false)
+            return ("SPECIFIC_CLOUD_ICE_WATER_CONTENT__ISOBARIC_SURFACE", nil, level, false)
         case .relative_humidity:
             // 100 125 150 175 200 225 250 275 300 350 400 450 500 550 600 650 700 750 800 850 900 925 950 1000
-            return ("RELATIVE_HUMIDITY__ISOBARIC_SURFACE", level, false)
+            return ("RELATIVE_HUMIDITY__ISOBARIC_SURFACE", nil, level, false)
         }
     }
     
