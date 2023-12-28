@@ -95,6 +95,8 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             case .wind_v_component_20m, .wind_v_component_50m, .wind_v_component_100m, .wind_v_component_150m, .wind_v_component_200m:
                 fallthrough
             case .wind_u_component_20m, .wind_u_component_50m, .wind_u_component_100m, .wind_u_component_150m, .wind_u_component_200m:
+                fallthrough
+            case .cape:
                 if (forecastHour % 3 != 0 && forecastHour > 48) {
                     return false
                 }
