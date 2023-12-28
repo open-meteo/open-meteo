@@ -87,6 +87,23 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     
     
     func availableFor(domain: MeteoFranceDomain, forecastHour: Int) -> Bool {
+        if domain == .arpege_europe && forecastHour % 3 != 0 && forecastHour > 48 {
+            switch self {
+                /// upper level variables after hour 48 only 3 hourly data
+            case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
+                fallthrough
+            case .wind_v_component_20m, .wind_v_component_50m, .wind_v_component_100m, .wind_v_component_200m:
+                fallthrough
+            case .wind_u_component_20m, .wind_u_component_50m, .wind_u_component_100m, .wind_u_component_200m:
+                if (forecastHour % 3 != 0 && forecastHour > 48) {
+                    return false
+                }
+                return true
+            default:
+                return true
+            }
+        }
+        
         if domain == .arome_france_hd {
             switch self {
             case .temperature_2m:
