@@ -200,8 +200,8 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormat, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil) -> EventLoopFuture<Response> {
-        return ForecastapiController.runLoop.next().submit {
+    func response(format: ForecastResultFormat, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil) async throws -> Response {
+        return try await ForecastapiController.runLoop.next().submit {
             for location in results {
                 for model in location.results {
                     try model.prefetch()
@@ -217,7 +217,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
             case .flatbuffers:
                 return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime)
             }
-        }
+        }.get()
     }
     
     /// Calculate excess weight of an API query. The following factors are considered:
