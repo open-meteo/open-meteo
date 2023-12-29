@@ -179,9 +179,10 @@ extension DomainRegistry {
     func syncToS3(bucket: String, variables: [GenericVariable]?) throws {
         let dir = rawValue
         if let variables {
-            for variable in variables {
-                let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable.omFileName.file)"
-                let dest = "s3://\(bucket)/data/\(dir)/\(variable.omFileName.file)"
+            let vDirectories = variables.map { $0.omFileName.file } + ["static"]
+            for variable in vDirectories {
+                let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
+                let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }

@@ -97,6 +97,7 @@ enum MeteoFrancePressureVariableDerivedType: String, CaseIterable {
     case dew_point
     case cloudcover
     case relativehumidity
+    case cloud_cover
 }
 
 /**
@@ -134,40 +135,16 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
     }
     
     func get(raw: MeteoFranceVariable, time: TimerangeDt) throws -> DataAndUnit {
-        // arpege_europe and arpege_world have no level 125
-        if reader.domain == .arpege_europe || reader.domain == .arpege_world, case let .pressure(pressure) = raw, pressure.level == 125  {
-            return try self.interpolatePressureLevel(variable: pressure.variable, level: 125, lowerLevel: 100, upperLevel: 150, time: time)
-        }
-        
-        /// AROME France domain has no cloud cover for pressure levels, calculate from RH
-        if reader.domain == .arome_france, case let .pressure(pressure) = raw, pressure.variable == .cloud_cover {
-            let rh = try get(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: pressure.level)), time: time)
-            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(pressure.level))}), .percentage)
-        }
-        
         return try reader.get(variable: raw, time: time)
     }
     
     func prefetchData(raw: MeteoFranceVariable, time: TimerangeDt) throws {
-        // arpege_europe and arpege_world have no level 125
-        if reader.domain == .arpege_europe || reader.domain == .arpege_world, case let .pressure(pressure) = raw, pressure.level == 125  {
-            try self.prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: pressure.variable, level: 100)), time: time)
-            try self.prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: pressure.variable, level: 150)), time: time)
-            return
-        }
-        
-        /// AROME France domain has no cloud cover for pressure levels, calculate from RH
-        if reader.domain == .arome_france, case let .pressure(pressure) = raw, pressure.variable == .cloud_cover {
-            try self.prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: pressure.level)), time: time)
-            return
-        }
-        
         try reader.prefetchData(variable: raw, time: time)
     }
     
     
     /// TODO partly duplicate code with ICON
-    private func interpolatePressureLevel(variable: MeteoFrancePressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDt) throws -> DataAndUnit {
+    /*private func interpolatePressureLevel(variable: MeteoFrancePressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDt) throws -> DataAndUnit {
         let lower = try get(raw: .pressure(MeteoFrancePressureVariable(variable: variable, level: lowerLevel)), time: time)
         let upper = try get(raw: .pressure(MeteoFrancePressureVariable(variable: variable, level: upperLevel)), time: time)
         
@@ -200,7 +177,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
             }, lower.unit)
         }
-    }
+    }*/
     
     func prefetchData(variable: MeteoFranceSurfaceVariable, time: TimerangeDt) throws {
         try prefetchData(variable: .raw(.surface(variable)), time: time)
@@ -306,8 +283,8 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
             case .dewpoint, .dew_point, .relativehumidity:
                 try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .temperature, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
-            case .cloudcover:
-                try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .cloud_cover, level: v.level)), time: time)
+            case .cloudcover, .cloud_cover:
+                try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }
         }
     }
@@ -544,8 +521,9 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .pressure(MeteoFrancePressureVariable(variable: .temperature, level: v.level)), time: time)
                 let rh = try get(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-            case .cloudcover:
-                return try get(raw: .pressure(MeteoFrancePressureVariable(variable: .cloud_cover, level: v.level)), time: time)
+            case .cloudcover, .cloud_cover:
+                let rh = try get(raw: .pressure(.init(variable: .relative_humidity, level: v.level)), time: time)
+                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percentage)
             case .relativehumidity:
                 return try get(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }

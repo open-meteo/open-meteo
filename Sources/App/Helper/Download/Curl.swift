@@ -41,18 +41,22 @@ final class Curl {
     
     let client: HTTPClient
     
+    /// Add headers to every request
+    let headers: [(String, String)]
+    
     /// If the environment varibale `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
     static var cacheDirectory: String? {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, headers: [(String, String)] = .init()) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
         self.readTimeout = readTimeout
         self.waitAfterLastModified = waitAfterLastModified
         self.client = client
+        self.headers = headers
     }
     
     deinit {
@@ -104,6 +108,7 @@ final class Curl {
             if let auth = auth {
                 request.headers.add(name: "Authorization", value: "Basic \(auth)")
             }
+            request.headers.add(contentsOf: headers)
             return request
         }()
         
@@ -120,7 +125,7 @@ final class Curl {
                 }
                 return response
             } catch {
-                if !self.retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code) {
+                if !self.retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code), status.code != 401 {
                     logger.error("Download failed with 4xx error, \(error)")
                     throw error
                 }
