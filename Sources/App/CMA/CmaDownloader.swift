@@ -48,7 +48,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
     }
     
-    func getCmaVariable(message: GribMessage) -> CmaVariableDownloadable? {
+    func getCmaVariable(logger: Logger, message: GribMessage) -> CmaVariableDownloadable? {
         guard let shortName = message.get(attribute: "shortName"),
               let stepRange = message.get(attribute: "stepRange"),
               let stepType = message.get(attribute: "stepType"),
@@ -163,7 +163,7 @@ struct DownloadCmaCommand: AsyncCommand {
         default: break
         }
         
-        print(shortName, stepRange, stepType, typeOfLevel, level, parameterName, parameterUnits, cfName, scaledValueOfFirstFixedSurface, scaledValueOfSecondFixedSurface, paramId)
+        logger.debug("Unmapped GRIB message \(shortName) \(stepRange) \(stepType) \(typeOfLevel) \(level) \(parameterName) \(parameterUnits) \(cfName) \(scaledValueOfFirstFixedSurface) \(scaledValueOfSecondFixedSurface) \(paramId)")
         return nil
     }
     
@@ -194,28 +194,12 @@ struct DownloadCmaCommand: AsyncCommand {
             
             let grib = try await curl.downloadGrib(url: url, bzip2Decode: false)
             for message in grib {
-                guard let shortName = message.get(attribute: "shortName"),
-                      let stepRange = message.get(attribute: "stepRange"),
-                      let stepType = message.get(attribute: "stepType"),
-                      let typeOfLevel = message.get(attribute: "typeOfLevel"),
-                      let scaledValueOfFirstFixedSurface = message.get(attribute: "scaledValueOfFirstFixedSurface"),
-                      let scaledValueOfSecondFixedSurface = message.get(attribute: "scaledValueOfSecondFixedSurface"),
-                      let levelStr = message.get(attribute: "level"),
-                      let level = Int(levelStr),
-                      let parameterName = message.get(attribute: "parameterName"),
-                      let parameterUnits = message.get(attribute: "parameterUnits"),
-                      let cfName = message.get(attribute: "cfName"),
-                      let paramId = message.get(attribute: "paramId")
+                guard let stepRange = message.get(attribute: "stepRange"),
+                      let stepType = message.get(attribute: "stepType")
                 else {
                     fatalError("could not get step range or type")
                 }
-                
-                guard let variable = getCmaVariable(message: message) else {
-                    /*if typeOfLevel != "isobaricInhPa" {
-                        try grib2d.load(message: message)
-                        try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(shortName) \(stepRange) \(stepType) \(typeOfLevel) \(level) \(parameterName) \(parameterUnits) \(cfName) \(scaledValueOfFirstFixedSurface) \(scaledValueOfSecondFixedSurface) \(paramId).nc")
-                    }*/
-
+                guard let variable = getCmaVariable(logger: logger, message: message) else {
                     continue
                 }
                 
