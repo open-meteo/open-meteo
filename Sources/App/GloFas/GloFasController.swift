@@ -86,8 +86,8 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 }
 
 struct GloFasController {
-    func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain("flood-api")
+    func query(_ req: Request) async throws -> Response {
+        try await req.ensureSubdomain("flood-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("flood-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
@@ -158,8 +158,8 @@ struct GloFasController {
             return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<GlofasDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
-        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
+        return try await result.response(format: params.format ?? .json)
     }
 }
 

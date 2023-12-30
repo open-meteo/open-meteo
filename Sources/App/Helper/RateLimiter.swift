@@ -8,18 +8,44 @@ import NIOConcurrencyHelpers
  Limit API request rate limit for the free API.
  Count how many calls have been made by a given IP address.
  */
-final class RateLimiter: LifecycleHandler {
+final class RateLimiterLifecycle: LifecycleHandler {
+    private let backgroundWatcher = NIOLockedValueBox<RepeatedTask?>(nil)
+    
+    public static var instance = RateLimiterLifecycle()
+        
+    private init() {}
+    
+    /// Setup timer to empty statics every minute, hour or day
+    func didBoot(_ application: Application) throws {
+        backgroundWatcher.withLockedValue({
+            let eventloop = application.eventLoopGroup.next()
+            $0 = eventloop.scheduleRepeatedAsyncTask(
+                initialDelay: .seconds(Int64(60 - Timestamp.now().second)),
+                delay: .seconds(60),
+                { task in
+                    eventloop.makeFutureWithTask({
+                        await RateLimiter.instance.minutelyCallback()
+                    })
+                }
+            )
+        })
+    }
+    
+    func shutdown(_ application: Application) {
+        backgroundWatcher.withLockedValue {
+            $0?.cancel()
+        }
+    }
+}
+
+/// Thread safe access to rate limiter
+final actor RateLimiter {
     private static let limitDaily = Float(Environment.get("CALL_LIMIT_DAILY").flatMap(Int.init) ?? 10_000)
     
     private static let limitHourly = Float(Environment.get("CALL_LIMIT_HOURLY").flatMap(Int.init) ?? 5_000)
     
     private static let limitMinutely = Float(Environment.get("CALL_LIMIT_MINUTELY").flatMap(Int.init) ?? 600)
     
-    /// Ensure thread safety
-    private let lock = NIOLock()
-    
-    private var backgroundWatcher: RepeatedTask?
-        
     private var dailyPerIPv4 = [UInt32: Float]()
     
     private var dailyPerIPv6 = [Int: Float]()
@@ -36,121 +62,91 @@ final class RateLimiter: LifecycleHandler {
         
     private init() {}
     
-    /// Setup timer to empty statics every minute, hour or day
-    func didBoot(_ application: Application) throws {
-        backgroundWatcher = application.eventLoopGroup.next().scheduleRepeatedTask(
-            initialDelay: .seconds(Int64(60 - Timestamp.now().second)),
-            delay: .seconds(60),
-            { task in
-            let now = Timestamp.now().timeIntervalSince1970
-            self.lock.withLockVoid {
-                self.minutelyPerIPv4.removeAll(keepingCapacity: true)
-                self.minutelyPerIPv6.removeAll(keepingCapacity: true)
-                if (now % 3600) < 60 {
-                    self.hourlyPerIPv4.removeAll(keepingCapacity: true)
-                    self.hourlyPerIPv6.removeAll(keepingCapacity: true)
-                }
-                if (now % (24*3600)) < 60 {
-                    self.dailyPerIPv4.removeAll(keepingCapacity: true)
-                    self.dailyPerIPv6.removeAll(keepingCapacity: true)
-                }
-            }
-        })
+    func minutelyCallback() {
+        let now = Timestamp.now().timeIntervalSince1970
+        minutelyPerIPv4.removeAll(keepingCapacity: true)
+        minutelyPerIPv6.removeAll(keepingCapacity: true)
+        if (now % 3600) < 60 {
+            hourlyPerIPv4.removeAll(keepingCapacity: true)
+            hourlyPerIPv6.removeAll(keepingCapacity: true)
+        }
+        if (now % (24*3600)) < 60 {
+            dailyPerIPv4.removeAll(keepingCapacity: true)
+            dailyPerIPv6.removeAll(keepingCapacity: true)
+        }
     }
     
     /// Check if the current IP address is over quota and throw an error. If not return.
-    func check(request: Request) throws {
+    func check(address: SocketAddress) throws {
         guard Self.limitDaily > 0 || Self.limitHourly > 0 || Self.limitMinutely > 0 else {
-            return
-        }
-        guard let address = request.peerAddress ?? request.remoteAddress else {
             return
         }
         switch address {
         case .v4(let socket):
             let ip: UInt32 = socket.address.sin_addr.s_addr
-            return try lock.withLock({
-                if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
-                    throw RateLimitError.minutelyExceeded
-                }
-                
-                if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
-                    throw RateLimitError.hourlyExceeded
-                }
-                
-                if Self.limitDaily > 0, let usageDaily = dailyPerIPv4[ip], usageDaily >= Self.limitDaily {
-                    throw RateLimitError.dailyExceeded
-                }
-                return
-            })
+            if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
+                throw RateLimitError.minutelyExceeded
+            }
+            
+            if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
+                throw RateLimitError.hourlyExceeded
+            }
+            
+            if Self.limitDaily > 0, let usageDaily = dailyPerIPv4[ip], usageDaily >= Self.limitDaily {
+                throw RateLimitError.dailyExceeded
+            }
         case .v6(_):
             var hasher = Hasher()
             address.hash(into: &hasher)
             let ip = hasher.finalize()
-            return try lock.withLock({
-                if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
-                    throw RateLimitError.minutelyExceeded
-                }
-                if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
-                    throw RateLimitError.hourlyExceeded
-                }
-                if Self.limitDaily > 0, let usageDaily = dailyPerIPv6[ip], usageDaily >= Self.limitDaily {
-                    throw RateLimitError.dailyExceeded
-                }
-                return
-            })
+            if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
+                throw RateLimitError.minutelyExceeded
+            }
+            if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
+                throw RateLimitError.hourlyExceeded
+            }
+            if Self.limitDaily > 0, let usageDaily = dailyPerIPv6[ip], usageDaily >= Self.limitDaily {
+                throw RateLimitError.dailyExceeded
+            }
         case .unixDomainSocket(_):
-            return
+            break
         }
     }
     
     /// Increment the current IP address by the specified counter
     /// `count` can be later used to increase the weight for "heavy" API calls. E.g. calls with many weather variables my account for more than just 1.
-    func increment(request: Request, count: Float) {
+    func increment(address: SocketAddress, count: Float) {
         guard Self.limitDaily > 0 || Self.limitHourly > 0 || Self.limitMinutely > 0 else {
-            return
-        }
-        guard let address = request.peerAddress ?? request.remoteAddress else {
             return
         }
         switch address {
         case .v4(let socket):
             let ip: UInt32 = socket.address.sin_addr.s_addr
-            return lock.withLock({
-                if Self.limitMinutely > 0 {
-                    minutelyPerIPv4[ip] = count + (minutelyPerIPv4[ip] ?? 0)
-                }
-                if Self.limitHourly > 0 {
-                    hourlyPerIPv4[ip] = count + (hourlyPerIPv4[ip] ?? 0)
-                }
-                if Self.limitDaily > 0 {
-                    dailyPerIPv4[ip] = count + (dailyPerIPv4[ip] ?? 0)
-                }
-                return
-            })
+            if Self.limitMinutely > 0 {
+                minutelyPerIPv4[ip] = count + (minutelyPerIPv4[ip] ?? 0)
+            }
+            if Self.limitHourly > 0 {
+                hourlyPerIPv4[ip] = count + (hourlyPerIPv4[ip] ?? 0)
+            }
+            if Self.limitDaily > 0 {
+                dailyPerIPv4[ip] = count + (dailyPerIPv4[ip] ?? 0)
+            }
         case .v6(_):
             var hasher = Hasher()
             address.hash(into: &hasher)
             let ip = hasher.finalize()
-            return lock.withLock({
-                if Self.limitMinutely > 0 {
-                    minutelyPerIPv6[ip] = count + (minutelyPerIPv6[ip] ?? 0)
-                }
-                if Self.limitHourly > 0 {
-                    hourlyPerIPv6[ip] = count + (hourlyPerIPv6[ip] ?? 0)
-                }
-                if Self.limitDaily > 0 {
-                    dailyPerIPv6[ip] = count + (dailyPerIPv6[ip] ?? 0)
-                }
-                return
-            })
+            if Self.limitMinutely > 0 {
+                minutelyPerIPv6[ip] = count + (minutelyPerIPv6[ip] ?? 0)
+            }
+            if Self.limitHourly > 0 {
+                hourlyPerIPv6[ip] = count + (hourlyPerIPv6[ip] ?? 0)
+            }
+            if Self.limitDaily > 0 {
+                dailyPerIPv6[ip] = count + (dailyPerIPv6[ip] ?? 0)
+            }
         case .unixDomainSocket(_):
-            return
+            break
         }
-    }
-    
-    func shutdown(_ application: Application) {
-        backgroundWatcher?.cancel()
     }
 }
 
@@ -177,7 +173,7 @@ enum RateLimitError: Error, AbortError {
 
 extension Request {
     /// On open-meteo servers, make sure, the right domain is active
-    func ensureSubdomain(_ subdomain: String, alias: String? = nil) throws {
+    func ensureSubdomain(_ subdomain: String, alias: String? = nil) async throws {
         guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
             return
         }
@@ -189,7 +185,10 @@ extension Request {
         }
         
         if isFreeApi {
-            try RateLimiter.instance.check(request: self)
+            guard let address = peerAddress ?? remoteAddress else {
+                return
+            }
+            try await RateLimiter.instance.check(address: address)
         }
     }
     
@@ -211,10 +210,13 @@ extension Request {
         }
     }
     
-    func incrementRateLimiter(weight: Float) {
+    func incrementRateLimiter(weight: Float) async {
+        guard let address = peerAddress ?? remoteAddress else {
+            return
+        }
         /// Free API
         if headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "customer-") }) {
-            RateLimiter.instance.increment(request: self, count: weight)
+            await RateLimiter.instance.increment(address: address, count: weight)
         }
     }
 }

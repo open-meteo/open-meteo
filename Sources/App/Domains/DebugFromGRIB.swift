@@ -7,6 +7,12 @@ extension GribMessage {
         let i: Int, x: Int, y: Int, latitude: Float, longitude: Float
     }
     
+    func dumpAttributes() {
+        for attribute in self.iterate(namespace: .all) {
+            print(attribute)
+        }
+    }
+    
     /// Print debug grid information
     func debugGrid(grid: Gridable, flipLatidude: Bool, shift180Longitude: Bool) throws {
         guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {

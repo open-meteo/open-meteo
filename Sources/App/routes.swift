@@ -12,9 +12,9 @@ extension RoutesBuilder {
     @preconcurrency
     public func getAndPost<Response>(
         _ path: PathComponent...,
-        use closure: @Sendable @escaping (Request) throws -> Response
+        use closure: @Sendable @escaping (Request) async throws -> Response
     )
-    where Response: ResponseEncodable
+    where Response: AsyncResponseEncodable
     {
         self.on(.GET, path, use: closure)
         self.on(.POST, path, use: closure)

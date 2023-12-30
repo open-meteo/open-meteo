@@ -60,11 +60,9 @@ final class OmFileManager: LifecycleHandler {
     }
     
     /// Non existing files are set to nil
-    private var cached = [Int: OmFileState]()
+    private let cached = NIOLockedValueBox<[Int: OmFileState]>(.init())
     
-    private let lock = NIOLock()
-    
-    private var backgroundWatcher: RepeatedTask?
+    private let backgroundWatcher = NIOLockedValueBox<RepeatedTask?>(nil)
     
     public static var instance = OmFileManager()
     
@@ -73,47 +71,58 @@ final class OmFileManager: LifecycleHandler {
     func didBoot(_ application: Application) throws {
         //let logger = application.logger
         //logger.debug("Starting OmFileManager")
-        backgroundWatcher = application.eventLoopGroup.next().scheduleRepeatedTask(initialDelay: .seconds(2), delay: .seconds(2), {
-            task in
-            
-            // Could be later used to expose some metrics
-            var countExisting = 0
-            var countMissing = 0
-            var countEjected = 0
-            
-            let copy = self.lock.withLock {
-                return self.cached
-            }
-            
-            for e in copy {
-                switch e.value {
-                case .exists(file: let file):
-                    // Remove file from cache, if it was deleted
-                    if file.wasDeleted() {
-                        self.lock.withLock {
-                            let _ = self.cached.removeValue(forKey: e.key)
-                            countEjected += 1
-                        }
-                    }
-                    countExisting += 1
-                case .missing(path: let path):
-                    // Remove file from cache, if it is now available, so the next open, will make it available
-                    if FileManager.default.fileExists(atPath: path) {
-                        self.lock.withLock {
-                            let _ = self.cached.removeValue(forKey: e.key)
-                            countEjected += 1
-                        }
-                    }
-                    countMissing += 1
-                }
-            }
-            
-            //logger.info("OmFileManager tracking \(countExisting) open files, \(countMissing) missing files. \(countEjected) were ejected in this update.")
+        backgroundWatcher.withLockedValue({
+            $0 = application.eventLoopGroup.next().scheduleRepeatedTask(initialDelay: .seconds(2), delay: .seconds(2), {
+                task in
+                
+                self.secondlyCallback()
+                
+
+            })
         })
     }
     
+    /// Called every couple of seconds to check for any file modifications
+    func secondlyCallback() {
+        // Could be later used to expose some metrics
+        var countExisting = 0
+        var countMissing = 0
+        var countEjected = 0
+        
+        let copy = cached.withLockedValue {
+            return $0
+        }
+        
+        for e in copy {
+            switch e.value {
+            case .exists(file: let file):
+                // Remove file from cache, if it was deleted
+                if file.wasDeleted() {
+                    cached.withLockedValue({
+                        $0.removeValue(forKey: e.key)
+                        countEjected += 1
+                    })
+                }
+                countExisting += 1
+            case .missing(path: let path):
+                // Remove file from cache, if it is now available, so the next open, will make it available
+                if FileManager.default.fileExists(atPath: path) {
+                    cached.withLockedValue({
+                        let _ = $0.removeValue(forKey: e.key)
+                        countEjected += 1
+                    })
+                }
+                countMissing += 1
+            }
+        }
+        
+        //logger.info("OmFileManager tracking \(countExisting) open files, \(countMissing) missing files. \(countEjected) were ejected in this update.")
+    }
+    
     func shutdown(_ application: Application) {
-        backgroundWatcher?.cancel()
+        backgroundWatcher.withLockedValue {
+            $0?.cancel()
+        }
     }
     
     /// Get cached file or return nil, if the files does not exist
@@ -125,7 +134,7 @@ final class OmFileManager: LifecycleHandler {
     public func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
         let key = file.hashValue
         
-        return try lock.withLock {
+        return try cached.withLockedValue { cached in
             if let file = cached[key] {
                 switch file {
                 case .exists(file: let file):

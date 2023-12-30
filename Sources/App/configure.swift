@@ -104,7 +104,7 @@ public func configure(_ app: Application) throws {
     //app.views.use(.leaf)
     
     app.lifecycle.use(OmFileManager.instance)
-    app.lifecycle.use(RateLimiter.instance)
+    app.lifecycle.use(RateLimiterLifecycle.instance)
 
     // register routes
     try routes(app)

@@ -7,8 +7,8 @@ import Vapor
  Endpoint https://ensemble-api.open-meteo.com/v1/ensemble?latitude=52.52&longitude=13.41&models=icon_seamless&hourly=temperature_2m
  */
 public struct EnsembleApiController {
-    func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain("ensemble-api")
+    func query(_ req: Request) async throws -> Response {
+        try await req.ensureSubdomain("ensemble-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("ensemble-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
@@ -75,8 +75,8 @@ public struct EnsembleApiController {
             return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
-        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
+        return try await result.response(format: params.format ?? .json)
     }
 }
 
