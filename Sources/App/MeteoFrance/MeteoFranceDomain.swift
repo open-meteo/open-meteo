@@ -43,9 +43,9 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arpege_europe:
             return .meteofrance_arpege_europe
         case .arpege_world:
-            return .meteofrance_arpege_world
+            return .meteofrance_arpege_world025
         case .arome_france:
-            return .meteofrance_arome_france
+            return .meteofrance_arome_france0025
         case .arome_france_hd:
             return .meteofrance_arome_france_hd
         }
@@ -56,9 +56,6 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        if self == .arpege_world {
-            return 3*3600
-        }
         return 3600
     }
     var isGlobal: Bool {
@@ -68,75 +65,68 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00 (arpege) or 2:00 (arome)
-        return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
+        switch self {
+        case .arpege_europe, .arpege_world:
+            // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00
+            return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
+        case .arome_france, .arome_france_hd:
+            // Delay of 3:40 hours after initialisation. Cronjobs starts at or 2:00
+            return t.with(hour: ((t.hour - 2 + 24) % 24) / 3 * 3)
+        }
     }
     
+    var mfApiName: String {
+        switch self {
+        case .arpege_europe:
+            return "MF-NWP-GLOBAL-ARPEGE-01-EUROPE"
+        case .arpege_world:
+            return "MF-NWP-GLOBAL-ARPEGE-025-GLOBE"
+        case .arome_france:
+            return "MF-NWP-HIGHRES-AROME-0025-FRANCE"
+        case .arome_france_hd:
+            return "MF-NWP-HIGHRES-AROME-001-FRANCE"
+        }
+    }
+    
+    enum Family: String {
+        case arpege
+        case arome
+    }
+    
+    var family: Family {
+        switch self {
+        case .arpege_world, .arpege_europe:
+            return .arpege
+        case .arome_france, .arome_france_hd:
+            return .arome
+        }
+    }
+    
+    var mfSubsetGrid: String {
+        switch self {
+        case .arpege_europe:
+            return "&subset=lat(20,72)&subset=long(-32,42)"
+        case .arpege_world:
+            return "&subset=long(-180,180)&subset=lat(-90,90)"
+        case .arome_france, .arome_france_hd:
+            return "&subset=lat(37.5,55.4)&subset=long(-12,16)"
+        }
+    }
+
     func forecastHours(run: Int, hourlyForArpegeEurope: Bool) -> [Int] {
         switch self {
-        case .arpege_europe:
-            // Note: apparently surface variables are hourly, while pressure/model levels are 1/3/6h
-            if hourlyForArpegeEurope {
-                let through = (run == 0 || run == 12) ? 102 : run == 18 ? 60 : 72
-                return Array(stride(from: 0, through: through, by: 1))
-            }
-            // In SP2 some are hourly and some are switching 1/3/6h
-            if run == 18 {
-                // up to 60h, no 6h afterwards
-                return Array(stride(from: 0, through: 12, by: 1)) + Array(stride(from: 15, through: 60, by: 3))
-            }
-            let through = (run == 0 || run == 12) ? 102 : 72
-            return Array(stride(from: 0, through: 12, by: 1)) + Array(stride(from: 15, through: 72, by: 3)) + Array(stride(from: 78, through: through, by: 6))
-            
-            //return Array(stride(from: 0, through: through, by: 1))
         case .arpege_world:
-            if run == 6 || run == 18 {
-                // no 6h
-                let through = run == 6 ? 72 : 60
-                return Array(stride(from: 0, through: through, by: 3))
+            if run == 12 {
+                return Array(stride(from: 0, through: 48, by: 1)) + Array(stride(from: 51, through: 114, by: 3))
             }
-            let through = 102
-            return Array(stride(from: 0, to: 96, by: 3)) + Array(stride(from: 96, through: through, by: 6))
-        case .arome_france:
-            fallthrough
-        case .arome_france_hd:
-            let through = run == 00 || run == 12 ? 42 : 36
-            return Array(stride(from: 0, through: through, by: 1))
-        }
-    }
-    
-    /// arpege europe 00H12H, 13H24H ... 97H102H
-    /// arpege world 00H24H, 27H48H, .. 75H102H (run 6/18 ends 51H72H)
-    /// arome france 00H06H, 07H12H, 13H18H
-    /// arome hh 00H.grib2
-    func getForecastHoursPerFile(run: Int, hourlyForArpegeEurope: Bool) -> [(file: String, steps: ArraySlice<Int>)] {
-        
-        let breakpoints: [Int]
-        switch self {
+            return Array(stride(from: 0, through: 48, by: 1)) + Array(stride(from: 51, through: 102, by: 3))
         case .arpege_europe:
-            breakpoints = [12,24,36,48,60,72,84,96,102]
-        case .arpege_world:
-            breakpoints = [24,48,72,102]
-        case .arome_france:
-            breakpoints = [6,12,18,24,30,36,42]
-        case .arome_france_hd:
-            breakpoints = []
-        }
-        
-        let timesteps = forecastHours(run: run, hourlyForArpegeEurope: hourlyForArpegeEurope)
-        let steps = timesteps.chunked(by: { t, i in
-            return !breakpoints.isEmpty && !breakpoints.contains(t)
-        })
-        
-        return steps.enumerated().map { (i, s) in
-            if breakpoints.count == 0 {
-                return ("\(i.zeroPadded(len: 2))H", s)
+            if run == 12 {
+                return Array(stride(from: 0, through: 114, by: 1))
             }
-            let start = i == 0 ? 0 : breakpoints[i-1] + dtHours
-            let end = breakpoints[i]
-            let file = "\(start.zeroPadded(len: 2))H\(end.zeroPadded(len: 2))H"
-            
-            return (file, s)
+            return Array(stride(from: 0, through: 102, by: 1))
+        case .arome_france, .arome_france_hd:
+            return Array(stride(from: 0, through: 51, by: 1))
         }
     }
     
@@ -144,9 +134,9 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     var levels: [Int] {
         switch self {
         case .arpege_europe:
-            return [                    100,      150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
+            return [                    100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arpege_world:
-            return [10, 20, 30, 50, 70, 100,      150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
+            return [10, 20, 30, 50, 70, 100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arome_france:
             return [                    100, 125, 150, 175, 200, 225, 250, 275, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 1000]
         case .arome_france_hd:
@@ -159,10 +149,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arpege_europe:
             return 114 + 3*24
         case .arpege_world:
-            return (114 + 4*24) / 3
-        case .arome_france:
-            fallthrough
-        case .arome_france_hd:
+            return 114 + 4*24
+        case .arome_france, .arome_france_hd:
             return 36 + 3*24
         }
     }
@@ -172,9 +160,9 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arpege_europe:
             return RegularGrid(nx: 741, ny: 521, latMin: 20, lonMin: -32, dx: 0.1, dy: 0.1)
         case .arpege_world:
-            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
+            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .arome_france:
-            return RegularGrid(nx: 801, ny: 601, latMin: 38.0, lonMin: -8.0, dx: 0.025, dy: 0.025)
+            return RegularGrid(nx: 1121, ny: 717, latMin: 37.5, lonMin: -12.0, dx: 0.025, dy: 0.025)
         case .arome_france_hd:
             return RegularGrid(nx: 2801, ny: 1791, latMin: 37.5, lonMin: -12.0, dx: 0.01, dy: 0.01)
         }
@@ -455,7 +443,6 @@ enum MeteoFrancePressureVariableType: String, CaseIterable {
     case wind_u_component
     case wind_v_component
     case geopotential_height
-    case cloud_cover
     case relative_humidity
 }
 
@@ -488,8 +475,6 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
-        case .cloud_cover:
-            return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         case .relative_humidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
@@ -505,8 +490,6 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return .hermite(bounds: nil)
         case .geopotential_height:
             return .hermite(bounds: nil)
-        case .cloud_cover:
-            return .hermite(bounds: 0...100)
         case .relative_humidity:
             return .hermite(bounds: 0...100)
         }
@@ -522,8 +505,6 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return .metrePerSecond
         case .geopotential_height:
             return .metre
-        case .cloud_cover:
-            return .percentage
         case .relative_humidity:
             return .percentage
         }
