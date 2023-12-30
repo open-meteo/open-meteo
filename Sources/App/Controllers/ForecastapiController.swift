@@ -89,8 +89,8 @@ struct WeatherApiController {
         self.put3HourlyDataIntoHourly = put3HourlyDataIntoHourly
     }
     
-    func query(_ req: Request) throws -> EventLoopFuture<Response> {
-        try req.ensureSubdomain(subdomain, alias: alias)
+    func query(_ req: Request) async throws -> Response {
+        try await req.ensureSubdomain(subdomain, alias: alias)
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey(subdomain, alias: alias, apikey: params.apikey)
         
@@ -209,8 +209,8 @@ struct WeatherApiController {
             return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
         }
         let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
-        req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return result.response(format: params.format ?? .json)
+        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
+        return try await result.response(format: params.format ?? .json)
     }
 }
 
