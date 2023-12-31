@@ -19,6 +19,9 @@ struct DownloadCmaCommand: AsyncCommand {
         
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
+        
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
     }
 
     var help: String {
@@ -39,7 +42,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: signature.concurrent ?? 1)
         try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -170,7 +173,7 @@ struct DownloadCmaCommand: AsyncCommand {
         return nil
     }
     
-    func download(application: Application, domain: CmaDomain, run: Timestamp, server: String) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 10
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
@@ -182,79 +185,85 @@ struct DownloadCmaCommand: AsyncCommand {
         let forecastHours = stride(from: 0, through: domain.forecastHours(run: run.hour), by: 3)
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-        
         var handles = [GenericVariableHandle]()
         
-        var previousData = [String: (step: Int, data: [Float])]()
+        /// Keep values from previous timestep. Actori isolated, because of concurrent execution
+        actor PreviousData {
+            var data = [String: (step: Int, data: [Float])]()
+            
+            func set(variable: CmaVariableDownloadable, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
+                let previous = data[variable.rawValue]
+                data[variable.rawValue] = (step, d)
+                return previous
+            }
+        }
+        let previous = PreviousData()
         
         for forecastHour in forecastHours {
             let url = "\(server)t\(run.hh)00/f0_f240_6h/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
             
             let grib = try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: 6)
-            for message in grib {
-                guard let stepRange = message.get(attribute: "stepRange"),
-                      let stepType = message.get(attribute: "stepType")
-                else {
-                    fatalError("could not get step range or type")
-                }
-                if stepType == "accum" && forecastHour == 0 {
-                    continue
-                }
-                guard let variable = getCmaVariable(logger: logger, message: message) else {
-                    continue
-                }
-                if let variable = variable as? CmaSurfaceVariable {
-                    if (variable == .snow_depth || variable == .wind_gusts_10m) && forecastHour == 0 {
-                        continue
+            // Process grib message concurrently
+            let res: [[GenericVariableHandle]] = try await grib.evenlyChunked(in: concurrent).mapConcurrent(nConcurrent: concurrent) { messages in
+                // Allocate one writer per thread
+                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                
+                return try await messages.asyncCompactMap { message -> GenericVariableHandle? in
+                    guard let stepRange = message.get(attribute: "stepRange"),
+                          let stepType = message.get(attribute: "stepType")
+                    else {
+                        fatalError("could not get step range or type")
                     }
-                }
-                
-                //message.dumpAttributes()
-                try grib2d.load(message: message)
-                grib2d.array.shift180LongitudeAndFlipLatitude()
-                
-                // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd {
-                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-                
-                /*if (variable as? CmaSurfaceVariable) == .snow_depth {
-                    try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)test.nc")
-                    fatalError()
-                } else {
-                    continue
-                }*/
-                
-                if stepType == "accum" {
-                    let splited = stepRange.split(separator: "-")
-                    guard splited.count == 2 else {
-                        continue
+                    if stepType == "accum" && forecastHour == 0 {
+                        return nil
                     }
-                    let startStep = Int(splited[0])!
-                    let currentStep = Int(splited[1])!
-                    let previous = previousData[variable.rawValue]
-                    // Store data for averaging in next run
-                    previousData[variable.rawValue] = (currentStep, grib2d.array.data)
-                    // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-                    if let previous, previous.step != startStep {
-                        for l in previous.data.indices {
-                            grib2d.array.data[l] -= previous.data[l]
+                    guard let variable = getCmaVariable(logger: logger, message: message) else {
+                        return nil
+                    }
+                    if let variable = variable as? CmaSurfaceVariable {
+                        if (variable == .snow_depth || variable == .wind_gusts_10m) && forecastHour == 0 {
+                            return nil
                         }
                     }
+                    
+                    //message.dumpAttributes()
+                    try grib2d.load(message: message)
+                    grib2d.array.shift180LongitudeAndFlipLatitude()
+                    
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.multiplyAdd {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    if stepType == "accum" {
+                        let splited = stepRange.split(separator: "-")
+                        guard splited.count == 2 else {
+                            return nil
+                        }
+                        let startStep = Int(splited[0])!
+                        let currentStep = Int(splited[1])!
+                        // Store data for averaging in next run
+                        let previous = await previous.set(variable: variable, step: currentStep, data: grib2d.array.data)
+                        // For the overall first timestep or the first step of each repeating section, deaveraging is not required
+                        if let previous, previous.step != startStep {
+                            for l in previous.data.indices {
+                                grib2d.array.data[l] -= previous.data[l]
+                            }
+                        }
+                    }
+                    
+                    let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(forecastHour).om"
+                    try FileManager.default.removeItemIfExists(at: file)
+                    
+                    logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
+                    let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    
+                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
                 }
-                
-                let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(forecastHour).om"
-                try FileManager.default.removeItemIfExists(at: file)
-                
-                logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                
-                handles.append(.init(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum"))
             }
+            handles.append(contentsOf: res.flatMap({$0}))
         }
         return handles
     }
