@@ -83,7 +83,7 @@ final class Curl {
         }
         
         // Check in cache
-        if let cacheDirectory {
+        if let cacheDirectory, method == .GET {
             return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory)
         }
         
@@ -143,7 +143,7 @@ final class Curl {
     /// Spit download into parts and perform HTTP range downloads concurrently
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
-        let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .OPTIONS, nConcurrent: 1)
+        let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, nConcurrent: 1)
         guard let length = try options.contentLength(), length >= nConcurrent else {
             throw CurlError.couldNotGetContentLengthForConcurrentDownload
         }
@@ -151,6 +151,7 @@ final class Curl {
         let chunks = (0..<nConcurrent).map {
             return $0 * chunkLength ..< min(($0 + 1) * chunkLength, length)
         }
+        logger.info("Start concurrent download nConcurrent=\(nConcurrent) length=\(length.bytesHumanReadable) chunkLength=\(chunkLength.bytesHumanReadable)")
         let responses = try await chunks.mapConcurrent(nConcurrent: nConcurrent) {
             let range = "\($0.lowerBound)-\($0.upperBound-1)"
             return try await self.downloadInMemoryAsync(url: url, range: range, minSize: $0.count, nConcurrent: 1)
