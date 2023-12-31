@@ -183,7 +183,8 @@ struct DownloadCmaCommand: AsyncCommand {
             curl.printStatistics()
             Process.alarm(seconds: 0)
         }
-        let forecastHours = stride(from: 0, through: domain.forecastHours(run: run.hour), by: 3)
+        let nForecastHours = domain.forecastHours(run: run.hour)
+        let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         var handles = [GenericVariableHandle]()
@@ -201,7 +202,7 @@ struct DownloadCmaCommand: AsyncCommand {
         let previous = PreviousData()
         
         for forecastHour in forecastHours {
-            let url = "\(server)t\(run.hh)00/f0_f240_6h/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
+            let url = "\(server)t\(run.hh)00/f0_f\(nForecastHours)_6h/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
             
             let grib = try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: 6)
