@@ -67,6 +67,9 @@ struct DownloadCmaCommand: AsyncCommand {
         
         switch typeOfLevel {
         case "isobaricInhPa":
+            if level < 10 {
+                return nil
+            }
             switch parameterName {
             case "Temperature":
                 return CmaPressureVariable(variable: .temperature, level: level)
@@ -199,8 +202,16 @@ struct DownloadCmaCommand: AsyncCommand {
                 else {
                     fatalError("could not get step range or type")
                 }
+                if stepType == "accum" && forecastHour == 0 {
+                    continue
+                }
                 guard let variable = getCmaVariable(logger: logger, message: message) else {
                     continue
+                }
+                if let variable = variable as? CmaSurfaceVariable {
+                    if (variable == .snow_depth || variable == .wind_gusts_10m) && forecastHour == 0 {
+                        continue
+                    }
                 }
                 
                 //message.dumpAttributes()
@@ -211,6 +222,13 @@ struct DownloadCmaCommand: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
+                
+                /*if (variable as? CmaSurfaceVariable) == .snow_depth {
+                    try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)test.nc")
+                    fatalError()
+                } else {
+                    continue
+                }*/
                 
                 if stepType == "accum" {
                     let splited = stepRange.split(separator: "-")

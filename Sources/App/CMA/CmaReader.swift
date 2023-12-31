@@ -418,7 +418,7 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_80m, .wind_speed_80m, .windspeed_70m, .wind_speed_70m:
                 let u = try get(raw: .wind_u_component_70m, time: time).data
                 let v = try get(raw: .wind_v_component_70m, time: time).data
-                var speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u,v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
 
             case .winddirection_70m, .wind_direction_70m, .winddirection_80m, .wind_direction_80m:
@@ -435,7 +435,7 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_100m, .wind_speed_100m:
                 let u = try get(raw: .wind_u_component_100m, time: time).data
                 let v = try get(raw: .wind_v_component_100m, time: time).data
-                var speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u,v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
                 
             case .winddirection_120m, .wind_direction_120m:
@@ -446,7 +446,7 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_120m, .wind_speed_120m:
                 let u = try get(raw: .wind_u_component_120m, time: time).data
                 let v = try get(raw: .wind_v_component_120m, time: time).data
-                var speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u,v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
                 
             case .winddirection_140m, .wind_direction_140m:
@@ -457,7 +457,7 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_140m, .wind_speed_140m:
                 let u = try get(raw: .wind_u_component_140m, time: time).data
                 let v = try get(raw: .wind_v_component_140m, time: time).data
-                var speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u,v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
                 
             case .winddirection_160m, .wind_direction_160m:
@@ -468,7 +468,7 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_160m, .wind_speed_160m:
                 let u = try get(raw: .wind_u_component_160m, time: time).data
                 let v = try get(raw: .wind_v_component_160m, time: time).data
-                var speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u,v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
                 
             case .winddirection_180m, .wind_direction_180m:
@@ -479,7 +479,7 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_180m, .wind_speed_180m:
                 let u = try get(raw: .wind_u_component_180m, time: time).data
                 let v = try get(raw: .wind_v_component_180m, time: time).data
-                var speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u,v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
                 
             case .windspeed_200m, .wind_speed_200m:

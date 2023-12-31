@@ -6,18 +6,18 @@ protocol CmaVariableDownloadable: GenericVariable {
 }
 
 enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariableDownloadable {
-    case temperature_2m
-    case cloud_cover
-    case cloud_cover_low
-    case cloud_cover_mid
-    case cloud_cover_high
-    case pressure_msl
-    case relative_humidity_2m
+    case temperature_2m // ok
+    case cloud_cover // ok
+    case cloud_cover_low// ok
+    case cloud_cover_mid// ok
+    case cloud_cover_high// ok
+    case pressure_msl // ok
+    case relative_humidity_2m // ok
     
-    case shortwave_radiation
+    case shortwave_radiation // broken
     case shortwave_radiation_clear_sky
     
-    case wind_v_component_10m
+    case wind_v_component_10m // ok
     case wind_u_component_10m
     case wind_v_component_30m
     case wind_u_component_30m
@@ -37,25 +37,25 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
     case wind_u_component_180m
     case wind_v_component_200m
     case wind_u_component_200m
-    case wind_gusts_10m
+    case wind_gusts_10m // 0 at init time
     
-    case precipitation
+    case precipitation // ok
     case precipitation_type
-    case showers
-    case snowfall
+    case showers // maybe ok
+    case snowfall // maybe ok
     case surface_temperature
-    case snow_depth
-    case cape
+    case snow_depth // 0 at init time
+    case cape // ok
     case convective_inhibition
     case lifted_index
-    case visibility
+    case visibility // ok
     
-    case soil_temperature_0_to_10cm
+    case soil_temperature_0_to_10cm // all ok
     case soil_temperature_10_to_40cm
     case soil_temperature_40_to_100cm
     case soil_temperature_100_to_200cm
     
-    case soil_moisture_0_to_10cm
+    case soil_moisture_0_to_10cm // all ok
     case soil_moisture_10_to_40cm
     case soil_moisture_40_to_100cm
     case soil_moisture_100_to_200cm
@@ -77,6 +77,10 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
             return (1, -273.15)
         case .snowfall:
             return (100, 0)
+        case .shortwave_radiation, .shortwave_radiation_clear_sky:
+            return (1/1000, 0)
+        case .pressure_msl:
+            return (1/100, 0)
         default:
             return nil
         }
@@ -323,13 +327,13 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
  Types of pressure level variables
  */
 enum CmaPressureVariableType: String, CaseIterable {
-    case temperature
-    case wind_u_component
-    case wind_v_component
-    case geopotential_height
+    case temperature // ok
+    case wind_u_component // ok
+    case wind_v_component // ok
+    case geopotential_height // ok
     case vertical_velocity
-    case relative_humidity
-    case cloud_cover
+    case relative_humidity // ok
+    case cloud_cover // ok
 }
 
 
