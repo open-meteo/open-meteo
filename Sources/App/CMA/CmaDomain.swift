@@ -37,11 +37,11 @@ enum CmaDomain: String, GenericDomain, CaseIterable {
         return 120
     }
     
-    /// count of forecast hours
-    var forecastHours: Int {
+    /// Last forecast hour per run
+    func forecastHours(run: Int) -> Int {
         switch self {
         case .grapes_global:
-            return 121
+            return (run % 12 == 6) ? 120 : 240
         }
     }
     

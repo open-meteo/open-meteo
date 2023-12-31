@@ -14,7 +14,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
     case pressure_msl // ok
     case relative_humidity_2m // ok
     
-    case shortwave_radiation // broken
+    case shortwave_radiation // ok
     case shortwave_radiation_clear_sky
     
     case wind_v_component_10m // ok
@@ -37,14 +37,14 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
     case wind_u_component_180m
     case wind_v_component_200m
     case wind_u_component_200m
-    case wind_gusts_10m // 0 at init time
+    case wind_gusts_10m // ok
     
     case precipitation // ok
     case precipitation_type
     case showers // maybe ok
     case snowfall // maybe ok
     case surface_temperature
-    case snow_depth // 0 at init time
+    case snow_depth // ok
     case cape // ok
     case convective_inhibition
     case lifted_index

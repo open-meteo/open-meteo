@@ -179,8 +179,7 @@ struct DownloadCmaCommand: AsyncCommand {
             curl.printStatistics()
             Process.alarm(seconds: 0)
         }
-        let forecastHours = stride(from: 0, through: 240, by: 3)
-        
+        let forecastHours = stride(from: 0, through: domain.forecastHours(run: run.hour), by: 3)
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
