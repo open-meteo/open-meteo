@@ -41,9 +41,10 @@ struct DownloadCmaCommand: AsyncCommand {
             fatalError("Parameter 'server' is required")
         }
 
+        let nConcurrent = signature.concurrent ?? 1
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: signature.concurrent ?? 1)
-        try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })

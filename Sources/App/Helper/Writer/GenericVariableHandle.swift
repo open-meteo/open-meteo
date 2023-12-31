@@ -12,6 +12,13 @@ struct GenericVariableHandle {
     let fn: FileHandle
     let skipHour0: Bool
     
+    /// Process concurrently
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self], concurrent: Int) async throws {
+        try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
+            try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, nMembers: 1, handles: $0.flatMap{$0.values})
+        })
+    }
+    
     /// Process each variable and update time-series optimised files
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self]) throws {
         let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
