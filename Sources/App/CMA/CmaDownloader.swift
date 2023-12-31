@@ -202,7 +202,8 @@ struct DownloadCmaCommand: AsyncCommand {
         let previous = PreviousData()
         
         for forecastHour in forecastHours {
-            let url = "\(server)t\(run.hh)00/f0_f\(nForecastHours)_6h/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
+            let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
+            let url = "\(server)t\(run.hh)00/\(timeint)/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
             
             let grib = try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: 6)
