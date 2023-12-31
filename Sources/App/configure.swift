@@ -44,7 +44,7 @@ extension Application {
         configuration.httpVersion = .http1Only
         
         let new = HTTPClient(
-            eventLoopGroupProvider: .shared(MultiThreadedEventLoopGroup(numberOfThreads: 1)),
+            eventLoopGroupProvider: .shared(eventLoopGroup),
             configuration: configuration,
             backgroundActivityLogger: logger)
         self.storage.set(HttpClientKey.self, to: new) {

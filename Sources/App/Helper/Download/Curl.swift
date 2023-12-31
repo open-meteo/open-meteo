@@ -15,6 +15,7 @@ enum CurlError: Error {
     case timeoutReached
     case futimes(error: String)
     case contentLengthHeaderTooLarge(got: Int)
+    case couldNotGetContentLengthForConcurrentDownload
 }
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
@@ -75,7 +76,11 @@ final class Curl {
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, cacheDirectory: String? = Curl.cacheDirectory) async throws -> HTTPClientResponse {
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, nConcurrent: Int) async throws -> HTTPClientResponse {
+        
+        if nConcurrent > 1 && range == nil {
+            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, nConcurrent: nConcurrent)
+        }
         
         // Check in cache
         if let cacheDirectory {
@@ -102,6 +107,7 @@ final class Curl {
         
         let request = {
             var request = HTTPClientRequest(url: url)
+            request.method = method
             if let range = range {
                 request.headers.add(name: "range", value: "bytes=\(range)")
             }
@@ -134,6 +140,29 @@ final class Curl {
         }
     }
     
+    /// Spit download into parts and perform HTTP range downloads concurrently
+    private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, nConcurrent: Int) async throws -> HTTPClientResponse {
+        
+        let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .OPTIONS, nConcurrent: 1)
+        guard let length = try options.contentLength(), length >= nConcurrent else {
+            throw CurlError.couldNotGetContentLengthForConcurrentDownload
+        }
+        let chunkLength = length.divideRoundedUp(divisor: nConcurrent)
+        let chunks = (0..<nConcurrent).map {
+            return $0 * chunkLength ..< min(($0 + 1) * chunkLength, length)
+        }
+        let responses = try await chunks.mapConcurrent(nConcurrent: nConcurrent) {
+            let range = "\($0.lowerBound)-\($0.upperBound-1)"
+            return try await self.downloadInMemoryAsync(url: url, range: range, minSize: $0.count, nConcurrent: 1)
+        }
+        
+        var result = ByteBuffer()
+        for response in responses {
+            result.writeImmutableBuffer(response)
+        }
+        return HTTPClientResponse(status: .ok, headers: options.headers, body: .bytes(result))
+    }
+    
     /// Cache all HTTP download in temporary files. Only used for debugging.
     private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String) async throws -> HTTPClientResponse {
         try FileManager.default.createDirectory(atPath: cacheDirectory, withIntermediateDirectories: true)
@@ -152,12 +181,12 @@ final class Curl {
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     /// Data is first downloaded to a tempoary tilde file and then moved to its final location atomically
-    func download(url: String, toFile: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, cacheDirectory: String? = Curl.cacheDirectory) async throws {
+    func download(url: String, toFile: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, cacheDirectory: String? = Curl.cacheDirectory, nConcurrent: Int = 1) async throws {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         let fileTemp = "\(toFile)~"
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent)
             
             // Retry failed file transfers after this point
             do {
@@ -182,11 +211,11 @@ final class Curl {
     
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
-    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bool = false) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bool = false, nConcurrent: Int = 1) async throws -> ByteBuffer {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, nConcurrent: nConcurrent)
             
             // Retry failed file transfers after this point
             do {
@@ -220,7 +249,7 @@ final class Curl {
     }
     
     /// Download all grib files and return an array of grib messages
-    func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil) async throws -> [GribMessage] {
+    func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1) async throws -> [GribMessage] {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         
         // AWS does not allow multi http download ranges. Split download into multiple downloads
@@ -235,7 +264,7 @@ final class Curl {
         
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, nConcurrent: nConcurrent)
             
             // Retry failed file transfers after this point
             do {

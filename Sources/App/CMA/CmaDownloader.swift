@@ -169,7 +169,7 @@ struct DownloadCmaCommand: AsyncCommand {
     
     func download(application: Application, domain: CmaDomain, run: Timestamp, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours: Double = 6
+        let deadLineHours: Double = 10
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer {
@@ -192,7 +192,7 @@ struct DownloadCmaCommand: AsyncCommand {
             let url = "\(server)t\(run.hh)00/f0_f240_6h/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
             
-            let grib = try await curl.downloadGrib(url: url, bzip2Decode: false)
+            let grib = try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: 6)
             for message in grib {
                 guard let stepRange = message.get(attribute: "stepRange"),
                       let stepType = message.get(attribute: "stepType")

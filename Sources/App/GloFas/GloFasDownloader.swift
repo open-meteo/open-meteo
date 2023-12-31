@@ -155,7 +155,7 @@ struct GloFasDownloader: AsyncCommand {
         }
         
         while true {
-            let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil)
+            let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil, nConcurrent: 1)
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     let counter = Counter()
