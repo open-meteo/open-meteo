@@ -175,6 +175,38 @@ struct DownloadCmaCommand: AsyncCommand {
         return nil
     }
     
+    /// Create elevation and sea mask
+    func writeElevation(grib: [GribMessage], domain: CmaDomain) async throws {
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
+        try domain.surfaceElevationFileOm.createDirectory()
+        guard let orogGrib = grib.first(where: { message in
+            message.get(attribute: "shortName") == "orog"
+        }) else {
+            fatalError("Could not get orography")
+        }
+        guard let soilMoistureGrib = grib.first(where: { message in
+            message.get(attribute: "shortName") == "q" && message.get(attribute: "typeOfLevel") == "depthBelowLandLayer"
+        }) else {
+            fatalError("Could not get soil moisture")
+        }
+        var orog = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        var soilMoisture = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        try orog.load(message: orogGrib)
+        try soilMoisture.load(message: soilMoistureGrib)
+        orog.array.shift180LongitudeAndFlipLatitude()
+        soilMoisture.array.shift180LongitudeAndFlipLatitude()
+        
+        for i in orog.array.data.indices {
+            if soilMoisture.array.data[i].isNaN || soilMoisture.array.data[i] > 1000 {
+                // Mark as sea level
+                orog.array.data[i] = -999
+            }
+        }
+        //try orog.array.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
+        
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: orog.array.data)
+    }
+    
     func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 10
@@ -210,6 +242,9 @@ struct DownloadCmaCommand: AsyncCommand {
             let timestamp = run.add(hours: forecastHour)
             
             let grib = try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: 6)
+            if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+                try await writeElevation(grib: grib, domain: domain)
+            }
             // Process grib message concurrently
             let res: [[GenericVariableHandle]] = try await grib.evenlyChunked(in: concurrent).mapConcurrent(nConcurrent: concurrent) { messages in
                 // Allocate one writer per thread
@@ -217,21 +252,10 @@ struct DownloadCmaCommand: AsyncCommand {
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 
                 return try await messages.asyncCompactMap { message -> GenericVariableHandle? in
-                    guard let shortName = lock.withLock({ message.get(attribute: "shortName") }),
-                          let stepRange = lock.withLock({ message.get(attribute: "stepRange") }),
+                    guard let stepRange = lock.withLock({ message.get(attribute: "stepRange") }),
                           let stepType = lock.withLock({ message.get(attribute: "stepType") })
                     else {
                         fatalError("could not get step range or type")
-                    }
-                    if shortName == "orog" && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
-                        // Generate elevation file
-                        try lock.withLock {
-                            try grib2d.load(message: message)
-                        }
-                        grib2d.array.shift180LongitudeAndFlipLatitude()
-                        try domain.surfaceElevationFileOm.createDirectory()
-                        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
-                        return nil
                     }
                     if stepType == "accum" && forecastHour == 0 {
                         return nil
