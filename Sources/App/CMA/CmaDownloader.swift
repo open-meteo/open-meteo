@@ -2,6 +2,7 @@ import Foundation
 import SwiftPFor2D
 import Vapor
 import SwiftEccodes
+import NIOConcurrencyHelpers
 
 struct DownloadCmaCommand: AsyncCommand {
     struct Signature: CommandSignature {
@@ -200,6 +201,8 @@ struct DownloadCmaCommand: AsyncCommand {
             }
         }
         let previous = PreviousData()
+        /// Underlaying eccodes library is not thread safe. Serialise all eccodes calls
+        let lock = NIOLock()
         
         for forecastHour in forecastHours {
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
@@ -214,15 +217,15 @@ struct DownloadCmaCommand: AsyncCommand {
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 
                 return try await messages.asyncCompactMap { message -> GenericVariableHandle? in
-                    guard let stepRange = message.get(attribute: "stepRange"),
-                          let stepType = message.get(attribute: "stepType")
+                    guard let stepRange = lock.withLock({ message.get(attribute: "stepRange") }),
+                    let stepType = lock.withLock({ message.get(attribute: "stepType") })
                     else {
                         fatalError("could not get step range or type")
                     }
                     if stepType == "accum" && forecastHour == 0 {
                         return nil
                     }
-                    guard let variable = getCmaVariable(logger: logger, message: message) else {
+                    guard let variable = lock.withLock({ getCmaVariable(logger: logger, message: message)}) else {
                         return nil
                     }
                     if let variable = variable as? CmaSurfaceVariable {
@@ -232,7 +235,9 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
                     
                     //message.dumpAttributes()
-                    try grib2d.load(message: message)
+                    try lock.withLock {
+                        try grib2d.load(message: message)
+                    }
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                     
                     // Scaling before compression with scalefactor
