@@ -217,10 +217,21 @@ struct DownloadCmaCommand: AsyncCommand {
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 
                 return try await messages.asyncCompactMap { message -> GenericVariableHandle? in
-                    guard let stepRange = lock.withLock({ message.get(attribute: "stepRange") }),
-                    let stepType = lock.withLock({ message.get(attribute: "stepType") })
+                    guard let shortName = lock.withLock({ message.get(attribute: "shortName") }),
+                          let stepRange = lock.withLock({ message.get(attribute: "stepRange") }),
+                          let stepType = lock.withLock({ message.get(attribute: "stepType") })
                     else {
                         fatalError("could not get step range or type")
+                    }
+                    if shortName == "orog" && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+                        // Generate elevation file
+                        try lock.withLock {
+                            try grib2d.load(message: message)
+                        }
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                        try domain.surfaceElevationFileOm.createDirectory()
+                        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
+                        return nil
                     }
                     if stepType == "accum" && forecastHour == 0 {
                         return nil
