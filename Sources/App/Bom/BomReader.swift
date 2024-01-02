@@ -29,6 +29,7 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case weathercode
     case is_day
     case rain
+    case snowfall
     case wet_bulb_temperature_2m
     case cloudcover
     case cloudcover_low
@@ -143,6 +144,8 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
         case .direct_radiation_instant:
             try prefetchData(raw: .direct_radiation, time: time)
+        case .snowfall:
+            try prefetchData(raw: .snowfall_water_equivalent, time: time)
         }
     }
     
@@ -255,6 +258,9 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             let showers = try get(raw: .showers, time: time)
             let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
             return DataAndUnit(zip(precipitation.data, zip(snoweq.data, showers.data)).map({max($0 - $1.0 - $1.1, 0)}), precipitation.unit)
+        case .snowfall:
+            let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
+            return DataAndUnit(snoweq.data.map{$0*0.7}, .centimetre)
         }
     }
 }
