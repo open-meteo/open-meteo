@@ -560,9 +560,10 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .archive_best_match:
             return .bestMatch
         case .cma_grapes_global:
-            return .cmaGrapesGlobal
+            // TODO register GRAPES model in Flatbuffers SDK
+            return .bestMatch
         case .bom_access_global:
-            return .bomAccessGlobal
+            return .bestMatch
         }
     }
 }

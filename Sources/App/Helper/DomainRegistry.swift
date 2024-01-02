@@ -67,7 +67,6 @@ enum DomainRegistry: String, CaseIterable {
     case cma_grapes_global
     
     case bom_access_global
-    case bom_access_global_ensemble
     
     case cmip_CMCC_CM2_VHR4
     case cmip_EC_Earth3P_HR
@@ -199,8 +198,6 @@ enum DomainRegistry: String, CaseIterable {
             return CmaDomain.grapes_global
         case .bom_access_global:
             return BomDomain.access_global
-        case .bom_access_global_ensemble:
-            return BomDomain.access_global_ensemble
         }
     }
 }
