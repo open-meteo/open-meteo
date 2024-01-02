@@ -5,12 +5,12 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case relativehumidity_2m
     case dewpoint_2m
     case dew_point_2m
-    case windspeed_10m
-    case wind_speed_10m
+    //case windspeed_10m
+    //case wind_speed_10m
 
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
-    case direct_radiation
+    //case direct_radiation
     case direct_radiation_instant
     case diffuse_radiation_instant
     case diffuse_radiation
@@ -22,7 +22,7 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case weathercode
-    case weather_code
+    //case weather_code
     case is_day
     case rain
     case wet_bulb_temperature_2m

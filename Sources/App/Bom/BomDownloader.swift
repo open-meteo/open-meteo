@@ -46,6 +46,7 @@ struct DownloadBomCommand: AsyncCommand {
 
         let nConcurrent = signature.concurrent ?? 1
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        try await downloadElevation(application: context.application, domain: domain, server: server, run: run)
         let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles, concurrent: nConcurrent)
         
@@ -55,7 +56,54 @@ struct DownloadBomCommand: AsyncCommand {
         }
     }
     
-    /// Dwonload
+    func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp) async throws {
+        let logger = application.logger
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
+            return
+        }
+        try domain.surfaceElevationFileOm.createDirectory()
+        
+        logger.info("Downloading height and elevation data")
+        
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
+        let base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/"
+        
+        let topogFile = "\(domain.downloadDirectory)topog.nc"
+        let lndMaskFile = "\(domain.downloadDirectory)lnd_mask.nc"
+        if !FileManager.default.fileExists(atPath: topogFile) {
+            try await curl.download(
+                url: "\(base)an/sfc/topog.nc",
+                toFile: topogFile,
+                bzip2Decode: false
+            )
+        }
+        if !FileManager.default.fileExists(atPath: lndMaskFile) {
+            try await curl.download(
+                url: "\(base)an/sfc/lnd_mask.nc",
+                toFile: lndMaskFile,
+                bzip2Decode: false
+            )
+        }
+        
+        guard var elevation = try NetCDF.open(path: topogFile, allowUpdate: false)?.getVariable(name: "topog")?.asType(Float.self)?.read() else {
+            fatalError("Could not read topog file")
+        }
+        guard let landMask = try NetCDF.open(path: lndMaskFile, allowUpdate: false)?.getVariable(name: "lnd_mask")?.asType(Float.self)?.read() else {
+            fatalError("Could not read topog file")
+        }
+        for i in elevation.indices {
+            if landMask[i] <= 0 {
+                // mask sea
+                elevation[i] = -999
+            }
+        }
+        
+        elevation.shift180LongitudeAndFlipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+    }
+    
+    /// Download variables, convert to temporary om files and return all handles
     func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int) async throws -> [GenericVariableHandle] {
         
         let logger = application.logger
@@ -71,7 +119,7 @@ struct DownloadBomCommand: AsyncCommand {
         // list of variables to download
         // http://www.bom.gov.au/nwp/doc/access/docs/ACCESS-G.all-flds.slv.surface.shtml
         let variables: [(name: String, om: BomVariable?)] = [
-           ("temp_scrn", .temperature_2m),
+            ("temp_scrn", .temperature_2m),
             ("accum_conv_rain", .showers),
             ("accum_prcp", .precipitation),
             ("mslp", .pressure_msl),
