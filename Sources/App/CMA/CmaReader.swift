@@ -58,18 +58,15 @@ enum CmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case diffuse_radiation_instant
     case diffuse_radiation
     case shortwave_radiation_instant
-    //case evapotranspiration
     case et0_fao_evapotranspiration
     case vapour_pressure_deficit
     case vapor_pressure_deficit
-    //case snowfall
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case weathercode
     case weather_code
     case is_day
-    case showers
     case rain
     case wet_bulb_temperature_2m
     case cloudcover
@@ -94,9 +91,8 @@ enum CmaPressureVariableDerivedType: String, CaseIterable {
     case wind_speed
     case wind_direction
     case dew_point
-    case cloudcover
     case relativehumidity
-    case cloud_cover
+    case cloudcover
 }
 
 /**
@@ -140,43 +136,6 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
     func prefetchData(raw: CmaVariable, time: TimerangeDt) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
-    
-    
-    /// TODO partly duplicate code with ICON
-    /*private func interpolatePressureLevel(variable: CmaPressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDt) throws -> DataAndUnit {
-        let lower = try get(raw: .pressure(CmaPressureVariable(variable: variable, level: lowerLevel)), time: time)
-        let upper = try get(raw: .pressure(CmaPressureVariable(variable: variable, level: upperLevel)), time: time)
-        
-        switch variable {
-        case .temperature:
-            // temperature/pressure is linear, therefore
-            // perform linear interpolation between 2 points
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
-            }, lower.unit)
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
-            }, lower.unit)
-        case .geopotential_height:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                let lP = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: l)
-                let hP = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: h)
-                let adjPressure = lP + Float(level - lowerLevel) * (hP - lP) / Float(upperLevel - lowerLevel)
-                return Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: adjPressure)
-            }, lower.unit)
-        case .relative_humidity:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return (l + h) / 2
-            }, lower.unit)
-        case .cloud_cover:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
-                return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
-            }, lower.unit)
-        }
-    }*/
     
     func prefetchData(variable: CmaSurfaceVariable, time: TimerangeDt) throws {
         try prefetchData(variable: .raw(.surface(variable)), time: time)
@@ -255,8 +214,6 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_200m, .wind_speed_200m, .winddirection_200m, .wind_direction_200m:
                 try prefetchData(variable: .wind_u_component_200m, time: time)
                 try prefetchData(variable: .wind_v_component_200m, time: time)
-            case .showers:
-                try prefetchData(variable: .precipitation, time: time)
             case .wet_bulb_temperature_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
@@ -286,8 +243,8 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .dewpoint, .dew_point, .relativehumidity:
                 try prefetchData(raw: .pressure(CmaPressureVariable(variable: .temperature, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(CmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
-            case .cloudcover, .cloud_cover:
-                try prefetchData(raw: .pressure(CmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
+            case .cloudcover:
+                try prefetchData(raw: .pressure(CmaPressureVariable(variable: .cloud_cover, level: v.level)), time: time)
             }
         }
     }
@@ -493,9 +450,6 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
                 
-            case .showers:
-                let precipitation = try get(raw: .precipitation, time: time)
-                return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
             case .wet_bulb_temperature_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let rh = try get(raw: .relative_humidity_2m, time: time)
@@ -535,9 +489,8 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .pressure(CmaPressureVariable(variable: .temperature, level: v.level)), time: time)
                 let rh = try get(raw: .pressure(CmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-            case .cloudcover, .cloud_cover:
-                let rh = try get(raw: .pressure(.init(variable: .relative_humidity, level: v.level)), time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percentage)
+            case .cloudcover:
+                return try get(raw: .pressure(.init(variable: .cloud_cover, level: v.level)), time: time)
             case .relativehumidity:
                 return try get(raw: .pressure(CmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }

@@ -4,6 +4,9 @@ import Vapor
 import SwiftEccodes
 import NIOConcurrencyHelpers
 
+/**
+ Downloader for CMA domains
+ */
 struct DownloadCmaCommand: AsyncCommand {
     struct Signature: CommandSignature {
         @Option(name: "run")

@@ -1,5 +1,11 @@
 import Foundation
 
+/**
+ Weather forecast domains from the China Meteorological Administration (CMA)
+ https://www.cma.gov.cn/en/forecast/highlight/202311/t20231117_5892086.html
+ 
+ No mesoscale model yet, only global
+ */
 enum CmaDomain: String, GenericDomain, CaseIterable {
     case grapes_global
     
@@ -54,5 +60,4 @@ enum CmaDomain: String, GenericDomain, CaseIterable {
             return t.with(hour: ((t.hour - 4 + 24) % 24) / 6 * 6)
         }
     }
-    
 }
