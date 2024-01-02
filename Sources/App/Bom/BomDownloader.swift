@@ -111,7 +111,7 @@ struct DownloadBomCommand: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
     }
     
-    /// Download model level wind on 40, 80 and 120 m
+    /// Download model level wind on 40, 80 and 120 m. Model level have 1h delay
     func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 5

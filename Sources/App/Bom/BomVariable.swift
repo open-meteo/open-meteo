@@ -1,10 +1,6 @@
 import Foundation
 
 enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable {
-    // ml has 1h delay! ml analysis has a lot of levels!
-    // ml temp: 20 53.3 100 160
-    // ml wind: 10 36.6 76.6 130
-    
     case showers
     case precipitation
     case pressure_msl
@@ -40,10 +36,7 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
     case soil_moisture_100_to_300cm
     
     case weather_code
-    
     case visibility
-    //case thunderstorm_probability // bright et all 0-1000K
-    
     case wind_gusts_10m
     
     var requiresOffsetCorrectionForMixing: Bool {
