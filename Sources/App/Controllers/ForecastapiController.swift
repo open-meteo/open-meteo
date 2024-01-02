@@ -54,6 +54,10 @@ public struct ForecastapiController: RouteCollection {
             defaultModel: .ecmwf_ifs04,
             put3HourlyDataIntoHourly: true).query
         )
+        categoriesRoute.getAndPost("cma", use: WeatherApiController(
+            has15minutely: false,
+            defaultModel: .cma_grapes_global).query
+        )
         
         categoriesRoute.getAndPost("elevation", use: DemController().query)
         categoriesRoute.getAndPost("air-quality", use: CamsController().query)
