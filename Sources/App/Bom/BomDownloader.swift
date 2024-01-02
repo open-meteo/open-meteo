@@ -84,14 +84,14 @@ struct DownloadBomCommand: AsyncCommand {
             ("low_cld", .cloud_cover_low),
             ("sfc_temp", .surface_temperature),
             ("snow_amt_lnd", .snow_depth),
-            ("soil_temp", .soil_temperature_10cm),
-            ("soil_temp2", .soil_temperature_35cm),
-            ("soil_temp3", .soil_temperature_100cm),
-            ("soil_temp4", .soil_temperature_300cm),
-            ("soil_mois", .soil_moisture_10cm),
-            ("soil_mois2", .soil_moisture_35cm),
-            ("soil_mois3", .soil_moisture_100cm),
-            ("soil_mois4", .soil_moisture_300cm),
+            ("soil_temp", .soil_temperature_0_to_10cm),
+            ("soil_temp2", .soil_temperature_10_to_35cm),
+            ("soil_temp3", .soil_temperature_35_to_100cm),
+            ("soil_temp4", .soil_temperature_100_to_300cm),
+            ("soil_mois", .soil_moisture_0_to_10cm),
+            ("soil_mois2", .soil_moisture_10_to_35cm),
+            ("soil_mois3", .soil_moisture_35_to_100cm),
+            ("soil_mois4", .soil_moisture_100_to_300cm),
             ("visibility", .visibility),
             ("wndgust10m", .wind_gusts_10m),
             ("uwnd10m", nil),
@@ -143,7 +143,7 @@ struct DownloadBomCommand: AsyncCommand {
             ),
             zip(
                 try combineAnalysisForecast(domain: domain, variable: "ttl_cld", run: run),
-                try combineAnalysisForecast(domain: domain, variable: "precipitation", run: run)
+                try combineAnalysisForecast(domain: domain, variable: "accum_prcp", run: run)
             )),
             zip(zip(
                 try combineAnalysisForecast(domain: domain, variable: "accum_conv_rain", run: run),

@@ -29,15 +29,15 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
     case wind_speed_120m
     case wind_direction_120m
     
-    case soil_temperature_10cm
-    case soil_temperature_35cm
-    case soil_temperature_100cm
-    case soil_temperature_300cm
+    case soil_temperature_0_to_10cm
+    case soil_temperature_10_to_35cm
+    case soil_temperature_35_to_100cm
+    case soil_temperature_100_to_300cm
     
-    case soil_moisture_10cm
-    case soil_moisture_35cm
-    case soil_moisture_100cm
-    case soil_moisture_300cm
+    case soil_moisture_0_to_10cm
+    case soil_moisture_10_to_35cm
+    case soil_moisture_35_to_100cm
+    case soil_moisture_100_to_300cm
     
     case weather_code
     
@@ -48,10 +48,10 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
     
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
-        case .soil_moisture_10cm: return true
-        case .soil_moisture_35cm: return true
-        case .soil_moisture_100cm: return true
-        case .soil_moisture_300cm: return true
+        case .soil_moisture_0_to_10cm: return true
+        case .soil_moisture_10_to_35cm: return true
+        case .soil_moisture_35_to_100cm: return true
+        case .soil_moisture_100_to_300cm: return true
         case .snow_depth: return true
         default: return false
         }
@@ -59,7 +59,7 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m, .surface_temperature, .soil_temperature_10cm, .soil_temperature_35cm, .soil_temperature_100cm, .soil_temperature_300cm:
+        case .temperature_2m, .surface_temperature, .soil_temperature_0_to_10cm, .soil_temperature_10_to_35cm, .soil_temperature_35_to_100cm, .soil_temperature_100_to_300cm:
             return (1, -273.15)
         case .snow_depth:
             return (0.7/100, 0)
@@ -102,14 +102,14 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         case .wind_direction_120m:
             return 1
         case .surface_temperature: return 20
-        case .soil_temperature_10cm: return 20
-        case .soil_temperature_35cm: return 20
-        case .soil_temperature_100cm: return 20
-        case .soil_temperature_300cm: return 20
-        case .soil_moisture_10cm: return 1000
-        case .soil_moisture_35cm: return 1000
-        case .soil_moisture_100cm: return 1000
-        case .soil_moisture_300cm: return 1000
+        case .soil_temperature_0_to_10cm: return 20
+        case .soil_temperature_10_to_35cm: return 20
+        case .soil_temperature_35_to_100cm: return 20
+        case .soil_temperature_100_to_300cm: return 20
+        case .soil_moisture_0_to_10cm: return 1000
+        case .soil_moisture_10_to_35cm: return 1000
+        case .soil_moisture_35_to_100cm: return 1000
+        case .soil_moisture_100_to_300cm: return 1000
         case .snow_depth: return 100 // 1cm res
         case .wind_gusts_10m: return 10
         case .showers: return 10
@@ -162,21 +162,21 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
             return .backwards
         case .surface_temperature:
             return .hermite(bounds: nil)
-        case .soil_temperature_10cm:
+        case .soil_temperature_0_to_10cm:
             return .hermite(bounds: nil)
-        case .soil_temperature_35cm:
+        case .soil_temperature_10_to_35cm:
             return .hermite(bounds: nil)
-        case .soil_temperature_100cm:
+        case .soil_temperature_35_to_100cm:
             return .hermite(bounds: nil)
-        case .soil_temperature_300cm:
+        case .soil_temperature_100_to_300cm:
             return .hermite(bounds: nil)
-        case .soil_moisture_10cm:
+        case .soil_moisture_0_to_10cm:
             return .hermite(bounds: nil)
-        case .soil_moisture_35cm:
+        case .soil_moisture_10_to_35cm:
             return .hermite(bounds: nil)
-        case .soil_moisture_100cm:
+        case .soil_moisture_35_to_100cm:
             return .hermite(bounds: nil)
-        case .soil_moisture_300cm:
+        case .soil_moisture_100_to_300cm:
             return .hermite(bounds: nil)
         case .snow_depth:
             return .linear
@@ -221,14 +221,14 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         case .wind_direction_120m:
             return .degreeDirection
         case .surface_temperature: return .celsius
-        case .soil_temperature_10cm: return .celsius
-        case .soil_temperature_35cm: return .celsius
-        case .soil_temperature_100cm: return .celsius
-        case .soil_temperature_300cm: return .celsius
-        case .soil_moisture_10cm: return .cubicMetrePerCubicMetre
-        case .soil_moisture_35cm: return .cubicMetrePerCubicMetre
-        case .soil_moisture_100cm: return .cubicMetrePerCubicMetre
-        case .soil_moisture_300cm: return .cubicMetrePerCubicMetre
+        case .soil_temperature_0_to_10cm: return .celsius
+        case .soil_temperature_10_to_35cm: return .celsius
+        case .soil_temperature_35_to_100cm: return .celsius
+        case .soil_temperature_100_to_300cm: return .celsius
+        case .soil_moisture_0_to_10cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_10_to_35cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_35_to_100cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_100_to_300cm: return .cubicMetrePerCubicMetre
         case .snow_depth: return .metre
         case .showers: return .millimetre
         case .wind_gusts_10m: return .metrePerSecond
@@ -246,13 +246,13 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         switch self {
         case .surface_temperature:
             fallthrough
-        case .soil_temperature_10cm:
+        case .soil_temperature_0_to_10cm:
             fallthrough
-        case .soil_temperature_35cm:
+        case .soil_temperature_10_to_35cm:
             fallthrough
-        case .soil_temperature_100cm:
+        case .soil_temperature_35_to_100cm:
             fallthrough
-        case .soil_temperature_300cm:
+        case .soil_temperature_100_to_300cm:
             fallthrough
         case .temperature_2m:
             return true
