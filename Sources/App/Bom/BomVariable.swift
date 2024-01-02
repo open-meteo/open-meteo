@@ -43,6 +43,8 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
     
     case weather_code
     
+    case weather_code
+    
     case visibility
     case wind_gusts_10m
     

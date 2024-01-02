@@ -225,7 +225,7 @@ struct GloFasDownloader: AsyncCommand {
                             await counter.dec()
                         }
                     }
-                    curl.totalBytesTransfered.withLockedValue({ $0 += tracker.transfered })
+                    curl.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
                 }
                 break
             } catch {
