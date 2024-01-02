@@ -42,7 +42,7 @@ extension Sequence {
     /// `nConcurrent` limits the number of concurrent tasks
     func foreachConcurrent(
         nConcurrent: Int,
-        body: @escaping (Element) async throws -> Void
+        body: @escaping @Sendable (Element) async throws -> Void
     ) async rethrows {
         assert(nConcurrent > 0)
         try await withThrowingTaskGroup(of: Void.self) { group in
@@ -61,7 +61,7 @@ extension Sequence {
     /// Note: Results are ordered which may have a performance penalty
     func mapConcurrent<T>(
         nConcurrent: Int,
-        body: @escaping (Element) async throws -> T
+        body: @escaping @Sendable (Element) async throws -> T
     ) async rethrows -> [T] {
         assert(nConcurrent > 0)
         return try await withThrowingTaskGroup(of: (Int, T).self) { group in

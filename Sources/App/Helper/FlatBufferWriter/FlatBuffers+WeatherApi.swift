@@ -529,6 +529,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .meteofranceAromeFranceHd
         case .archive_best_match:
             return .bestMatch
+        case .cma_grapes_global:
+            // TODO register GRAPES model in Flatbuffers SDK
+            return .bestMatch
         }
     }
 }

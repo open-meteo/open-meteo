@@ -54,6 +54,10 @@ public struct ForecastapiController: RouteCollection {
             defaultModel: .ecmwf_ifs04,
             put3HourlyDataIntoHourly: true).query
         )
+        categoriesRoute.getAndPost("cma", use: WeatherApiController(
+            has15minutely: false,
+            defaultModel: .cma_grapes_global).query
+        )
         
         categoriesRoute.getAndPost("elevation", use: DemController().query)
         categoriesRoute.getAndPost("air-quality", use: CamsController().query)
@@ -280,6 +284,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     case metno_nordic
     
+    case cma_grapes_global
+    
     case archive_best_match
     case era5_seamless
     case era5
@@ -419,6 +425,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .ecmwf_ifs:
             return [try Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode)]
+        case .cma_grapes_global:
+            return try CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
     
