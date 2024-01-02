@@ -227,7 +227,7 @@ struct GloFasDownloader: AsyncCommand {
                             }
                         }
                     }
-                    curl.totalBytesTransfered += tracker.transfered
+                    curl.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
                 }
                 break
             } catch {

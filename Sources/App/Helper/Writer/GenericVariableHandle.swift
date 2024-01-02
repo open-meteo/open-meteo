@@ -23,7 +23,10 @@ struct GenericVariableHandle {
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self]) throws {
         let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
-        let timeMinMax = handles.minAndMax(by: {$0.time < $1.time})!
+        guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
+            logger.warning("No data to convert")
+            return
+        }
         // `timeMinMax.min.time` has issues with `skip`
         let time = TimerangeDt(range: run...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
         logger.info("Convert timerange \(time.prettyString())")

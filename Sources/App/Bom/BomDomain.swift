@@ -19,7 +19,7 @@ enum BomDomain: String, GenericDomain, CaseIterable {
     var domainRegistry: DomainRegistry {
         switch self {
         case .access_global:
-            return .cma_grapes_global
+            return .bom_access_global
         }
     }
     
@@ -44,12 +44,12 @@ enum BomDomain: String, GenericDomain, CaseIterable {
     }
     
     /// Last forecast hour per run
-    func forecastHours(run: Int) -> Int {
+    /*func forecastHours(run: Int) -> Int {
         switch self {
         case .access_global:
             return (run % 12 == 6) ? 84 : 240
         }
-    }
+    }*/
     
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {

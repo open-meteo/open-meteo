@@ -3,6 +3,7 @@ import Vapor
 import SwiftEccodes
 import AsyncHTTPClient
 import CHelper
+import NIOConcurrencyHelpers
 
 
 enum CurlError: Error {
@@ -35,7 +36,7 @@ final class Curl {
     let retryError4xx: Bool
     
     /// Number of bytes of how much data was transfered
-    var totalBytesTransfered: Int = 0
+    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
     
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
@@ -72,6 +73,7 @@ final class Curl {
     }
     
     public func printStatistics() {
+        let totalBytesTransfered = totalBytesTransfered.withLockedValue({$0})
         logger.info("Finished downloading \(totalBytesTransfered.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
     }
     
@@ -201,7 +203,7 @@ final class Curl {
                     try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
                 try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
-                self.totalBytesTransfered += tracker.transfered
+                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
                 try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return
             } catch {
@@ -237,7 +239,7 @@ final class Curl {
                         buffer.writeImmutableBuffer(fragement)
                     }
                 }
-                self.totalBytesTransfered += tracker.transfered
+                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
@@ -286,7 +288,7 @@ final class Curl {
                             chelper_malloc_trim()
                         }
                     }
-                    self.totalBytesTransfered += tracker.transfered
+                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
                     if let minSize = minSize, tracker.transfered < minSize {
                         throw CurlError.sizeTooSmall
                     }

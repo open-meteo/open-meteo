@@ -103,7 +103,7 @@ struct SyncCommand: AsyncCommand {
             let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes)
             for download in toDownload {
                 curl.setDeadlineIn(minutes: 30)
-                let startBytes = curl.totalBytesTransfered
+                let startBytes = curl.totalBytesTransfered.withLockedValue({$0})
                 var client = ClientRequest(url: URI("\(server)\(download.name)"))
                 try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
                 let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
@@ -111,7 +111,8 @@ struct SyncCommand: AsyncCommand {
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                 try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false)
-                progress.add(curl.totalBytesTransfered - startBytes)
+                let totalBytesTransfered = curl.totalBytesTransfered.withLockedValue({$0})
+                progress.add(totalBytesTransfered - startBytes)
             }
             progress.finish()
             

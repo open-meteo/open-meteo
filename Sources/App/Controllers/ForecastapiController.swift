@@ -286,6 +286,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     case cma_grapes_global
     
+    case bom_access_global
+    
     case archive_best_match
     case era5_seamless
     case era5
@@ -427,6 +429,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [try Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode)]
         case .cma_grapes_global:
             return try CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .bom_access_global:
+            return try BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
     

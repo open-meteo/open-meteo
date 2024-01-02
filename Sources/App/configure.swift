@@ -71,6 +71,7 @@ public func configure(_ app: Application) throws {
     app.commands.use(MigrationCommand(), as: "migration")
     app.asyncCommands.use(DownloadIconCommand(), as: "download")
     app.asyncCommands.use(DownloadCmaCommand(), as: "download-cma")
+    app.asyncCommands.use(DownloadBomCommand(), as: "download-bom")
     app.asyncCommands.use(DownloadIconWaveCommand(), as: "download-iconwave")
     app.asyncCommands.use(DownloadEcmwfCommand(), as: "download-ecmwf")
     app.asyncCommands.use(DownloadEra5Command(), as: "download-era5")
