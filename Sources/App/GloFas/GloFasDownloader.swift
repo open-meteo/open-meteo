@@ -226,10 +226,14 @@ struct GloFasDownloader: AsyncCommand {
                         }
                     }
 <<<<<<< HEAD
+<<<<<<< HEAD
                     curl.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 =======
                     curl.totalBytesTransfered.withLockedValue({ $0 += tracker.transfered })
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
+=======
+                    curl.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
+>>>>>>> be4d2507 (wip downloader)
                 }
                 break
             } catch {
