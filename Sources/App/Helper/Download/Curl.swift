@@ -53,6 +53,7 @@ final class Curl {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     var totalBytesTransfered = NIOLockedValueBox<Int>(0)
 =======
     var totalBytesTransfered = NIOLockedValueBox(Int(0))
@@ -73,6 +74,8 @@ final class Curl {
 >>>>>>> 702b3a7c (wip downloader)
 =======
 >>>>>>> 917621f9 (support concurrent downloads in sync command)
+=======
+>>>>>>> 145ffb4f (wip downloader)
     var totalBytesTransfered = NIOLockedValueBox(Int(0))
 =======
     var totalBytesTransfered = NIOLockedValueBox<Int>(0)
@@ -93,12 +96,23 @@ final class Curl {
 >>>>>>> 702b3a7c (wip downloader)
 =======
 =======
+=======
+>>>>>>> 77387133 (wip downloader)
     var totalBytesTransfered = NIOLockedValueBox<Int>(0)
 =======
     var totalBytesTransfered = NIOLockedValueBox(Int(0))
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
+<<<<<<< HEAD
 >>>>>>> e2d41225 (support concurrent downloads in sync command)
+<<<<<<< HEAD
 >>>>>>> 917621f9 (support concurrent downloads in sync command)
+=======
+=======
+=======
+    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
+>>>>>>> be4d2507 (wip downloader)
+>>>>>>> 77387133 (wip downloader)
+>>>>>>> 145ffb4f (wip downloader)
     
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
@@ -378,6 +392,7 @@ final class Curl {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
@@ -398,6 +413,8 @@ final class Curl {
 >>>>>>> 702b3a7c (wip downloader)
 =======
 >>>>>>> 917621f9 (support concurrent downloads in sync command)
+=======
+>>>>>>> 145ffb4f (wip downloader)
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
@@ -418,12 +435,23 @@ final class Curl {
 >>>>>>> 702b3a7c (wip downloader)
 =======
 =======
+=======
+>>>>>>> 77387133 (wip downloader)
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
+<<<<<<< HEAD
 >>>>>>> e2d41225 (support concurrent downloads in sync command)
+<<<<<<< HEAD
 >>>>>>> 917621f9 (support concurrent downloads in sync command)
+=======
+=======
+=======
+                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
+>>>>>>> be4d2507 (wip downloader)
+>>>>>>> 77387133 (wip downloader)
+>>>>>>> 145ffb4f (wip downloader)
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
@@ -481,6 +509,7 @@ final class Curl {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                     self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
@@ -501,6 +530,8 @@ final class Curl {
 >>>>>>> 702b3a7c (wip downloader)
 =======
 >>>>>>> 917621f9 (support concurrent downloads in sync command)
+=======
+>>>>>>> 145ffb4f (wip downloader)
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 =======
                     self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
@@ -521,12 +552,23 @@ final class Curl {
 >>>>>>> 702b3a7c (wip downloader)
 =======
 =======
+=======
+>>>>>>> 77387133 (wip downloader)
                     self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
+<<<<<<< HEAD
 >>>>>>> e2d41225 (support concurrent downloads in sync command)
+<<<<<<< HEAD
 >>>>>>> 917621f9 (support concurrent downloads in sync command)
+=======
+=======
+=======
+                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
+>>>>>>> be4d2507 (wip downloader)
+>>>>>>> 77387133 (wip downloader)
+>>>>>>> 145ffb4f (wip downloader)
                     if let minSize = minSize, tracker.transfered < minSize {
                         throw CurlError.sizeTooSmall
                     }
