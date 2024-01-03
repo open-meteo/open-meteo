@@ -8,11 +8,14 @@ import Foundation
  */
 enum BomDomain: String, GenericDomain, CaseIterable {
     case access_global
+    case access_global_ensemble
     
     var grid: Gridable {
         switch self {
         case .access_global:
             return RegularGrid(nx: 2048, ny: 1536, latMin: -89.941406, lonMin: -179.912109, dx: 360/2048, dy: 180/1536)
+        case .access_global_ensemble:
+            return RegularGrid(nx: 800, ny: 600, latMin: -89.85, lonMin: -179.775, dx: 360/800, dy: 180/600)
         }
     }
     
@@ -20,6 +23,17 @@ enum BomDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .access_global:
             return .bom_access_global
+        case .access_global_ensemble:
+            return .bom_access_global_ensemble
+        }
+    }
+    
+    var ensembleMembers: Int {
+        switch self {
+        case .access_global_ensemble:
+            return 17+1
+        default:
+            return 1
         }
     }
     
@@ -28,7 +42,10 @@ enum BomDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        return 3600
+        switch self {
+        case .access_global: 3600
+        case .access_global_ensemble: 3*3600
+        }
     }
     
     var hasYearlyFiles: Bool {
@@ -40,7 +57,10 @@ enum BomDomain: String, GenericDomain, CaseIterable {
     }
     
     var omFileLength: Int {
-        return 240+48
+        switch self {
+        case .access_global: 240+48
+        case .access_global_ensemble: (240+48) / 3
+        }
     }
     
     /// Last forecast hour per run
@@ -58,6 +78,9 @@ enum BomDomain: String, GenericDomain, CaseIterable {
         case .access_global:
             // Delay of 8:50 hours (0/12z) or 7:15 (6/18z) after initialisation with 4 runs a day
             return t.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
+        case .access_global_ensemble:
+            // Delay of 14:15 hours, 4 runs
+            return t.with(hour: ((t.hour - 14 + 24) % 24) / 6 * 6)
         }
     }
 }

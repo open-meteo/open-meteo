@@ -38,6 +38,14 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case windgusts_10m
     case sunshine_duration
     
+    case soil_temperature_10_to_45cm
+    case soil_temperature_40_to_100cm
+    case soil_temperature_100_to_200cm
+    
+    case soil_moisture_10_to_40cm
+    case soil_moisture_40_to_100cm
+    case soil_moisture_100_to_200cm
+    
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -146,6 +154,18 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .direct_radiation, time: time)
         case .snowfall:
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
+        case .soil_temperature_10_to_45cm:
+            try prefetchData(raw: .soil_temperature_10_to_35cm, time: time)
+        case .soil_temperature_40_to_100cm:
+            try prefetchData(raw: .soil_temperature_35_to_100cm, time: time)
+        case .soil_temperature_100_to_200cm:
+            try prefetchData(raw: .soil_temperature_100_to_300cm, time: time)
+        case .soil_moisture_10_to_40cm:
+            try prefetchData(raw: .soil_moisture_10_to_35cm, time: time)
+        case .soil_moisture_40_to_100cm:
+            try prefetchData(raw: .soil_moisture_35_to_100cm, time: time)
+        case .soil_moisture_100_to_200cm:
+            try prefetchData(raw: .soil_moisture_100_to_300cm, time: time)
         }
     }
     
@@ -261,6 +281,18 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
         case .snowfall:
             let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
             return DataAndUnit(snoweq.data.map{$0*0.7}, .centimetre)
+        case .soil_temperature_10_to_45cm:
+            return try get(raw: .soil_temperature_10_to_35cm, time: time)
+        case .soil_temperature_40_to_100cm:
+            return try get(raw: .soil_temperature_35_to_100cm, time: time)
+        case .soil_temperature_100_to_200cm:
+            return try get(raw: .soil_temperature_100_to_300cm, time: time)
+        case .soil_moisture_10_to_40cm:
+            return try get(raw: .soil_moisture_10_to_35cm, time: time)
+        case .soil_moisture_40_to_100cm:
+            return try get(raw: .soil_moisture_35_to_100cm, time: time)
+        case .soil_moisture_100_to_200cm:
+            return try get(raw: .soil_moisture_100_to_300cm, time: time)
         }
     }
 }

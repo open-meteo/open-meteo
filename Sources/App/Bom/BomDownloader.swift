@@ -46,17 +46,18 @@ struct DownloadBomCommand: AsyncCommand {
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        guard let server = signature.server else {
+        guard var server = signature.server else {
             fatalError("Parameter 'server' is required")
         }
 
         let nConcurrent = signature.concurrent ?? 1
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try await downloadElevation(application: context.application, domain: domain, server: server, run: run)
-        let handles = signature.upperLevel ?
-        try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting) :
-        try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles, concurrent: nConcurrent)
+        let handles = domain == .access_global_ensemble ? 
+            try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting) : signature.upperLevel ?
+            try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting) :
+            try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
@@ -75,20 +76,23 @@ struct DownloadBomCommand: AsyncCommand {
         logger.info("Downloading height and elevation data")
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
-        let base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/"
+        var base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/an/"
+        if domain == .access_global_ensemble {
+            base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/cf/"
+        }
         
         let topogFile = "\(domain.downloadDirectory)topog.nc"
         let lndMaskFile = "\(domain.downloadDirectory)lnd_mask.nc"
         if !FileManager.default.fileExists(atPath: topogFile) {
             try await curl.download(
-                url: "\(base)an/sfc/topog.nc",
+                url: "\(base)sfc/topog.nc",
                 toFile: topogFile,
                 bzip2Decode: false
             )
         }
         if !FileManager.default.fileExists(atPath: lndMaskFile) {
             try await curl.download(
-                url: "\(base)an/sfc/lnd_mask.nc",
+                url: "\(base)sfc/lnd_mask.nc",
                 toFile: lndMaskFile,
                 bzip2Decode: false
             )
@@ -169,6 +173,130 @@ struct DownloadBomCommand: AsyncCommand {
                     ]
             }
         }.flatMap({$0})
+    }
+    
+    /// Download variables, convert to temporary om files and return all handles
+    /// Ensemble do no have `rh_scrn` and `cld_phys_thunder_p`
+    func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
+        let logger = application.logger
+        let deadLineHours: Double = 5
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
+        defer {
+            curl.printStatistics()
+            Process.alarm(seconds: 0)
+        }
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: domain.ensembleMembers).nLocationsPerChunk
+        
+        
+        // list of variables to download
+        // http://www.bom.gov.au/nwp/doc/access/docs/ACCESS-G.all-flds.slv.surface.shtml
+        let variables: [(name: String, om: BomVariable?)] = [
+            ("temp_scrn", .temperature_2m),
+            ("accum_conv_rain", .showers),
+            ("accum_prcp", .precipitation),
+            ("mslp", .pressure_msl),
+            ("av_sfc_sw_dir", .direct_radiation),
+            ("av_swsfcdown", .shortwave_radiation),
+            //("rh_scrn", .relative_humidity_2m),
+            ("ttl_cld", .cloud_cover),
+            /*("hi_cld", .cloud_cover_high),
+            ("mid_cld", .cloud_cover_mid),
+            ("low_cld", .cloud_cover_low),*/
+            ("sfc_temp", .surface_temperature),
+            ("snow_amt_lnd", .snow_depth),
+            ("soil_temp", .soil_temperature_0_to_10cm),
+            ("soil_temp2", .soil_temperature_10_to_35cm),
+            ("soil_temp3", .soil_temperature_35_to_100cm),
+            ("soil_temp4", .soil_temperature_100_to_300cm),
+            ("soil_mois", .soil_moisture_0_to_10cm),
+            ("soil_mois2", .soil_moisture_10_to_35cm),
+            ("soil_mois3", .soil_moisture_35_to_100cm),
+            ("soil_mois4", .soil_moisture_100_to_300cm),
+            ("visibility", .visibility),
+            ("wndgust10m", .wind_gusts_10m),
+            ("uwnd10m", nil),
+            ("vwnd10m", nil),
+            ("accum_conv_snow", nil),
+            ("accum_ls_snow", nil),
+            ("dewpt_scrn", nil),
+            //("cld_phys_thunder_p", nil)
+        ]
+        
+        let handles = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> [GenericVariableHandle] in
+            return try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
+                let base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/"
+                let forecastFile = "\(domain.downloadDirectory)\(variable.name)_fc_\(member).nc"
+                let memberStr = ((run.hour % 12 == 6) ? (member+18) : member).zeroPadded(len: 3)
+                if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: forecastFile) {
+                    let url = member == 0 ? "\(base)cf/sfc/\(variable.name).nc" : "\(base)pf/\(memberStr)/sfc/\(variable.name).nc"
+                    try await curl.download(
+                        url: url,
+                        toFile: forecastFile,
+                        bzip2Decode: false
+                    )
+                }
+                guard let omVariable = variable.om else {
+                    return []
+                }
+                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                logger.info("Compressing and writing data to \(omVariable.omFileName.file).om")
+                return try self.iterateForecast(domain: domain, member: member, variable: variable.name, run: run).map { (timestamp, data) in
+                    let fn = try writer.write(domain: domain, variable: omVariable, data: data, time: timestamp)
+                    return GenericVariableHandle(variable: omVariable, time: timestamp, member: member, fn: fn, skipHour0: false)
+                }
+            }
+        }
+        
+        logger.info("Calculate snow sum")
+        let handlesSnow = try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
+            return try await zip(
+                try iterateForecast(domain: domain, member: member, variable: "accum_conv_snow", run: run),
+                try iterateForecast(domain: domain, member: member, variable: "accum_ls_snow", run: run)
+            ).mapConcurrent(nConcurrent: concurrent) { arg -> GenericVariableHandle in
+                let (conv_snow, ls_snow) = arg
+                let timestamp = conv_snow.0
+                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                let snow = zip(conv_snow.1, ls_snow.1).map(+)
+                let fnSnow = try writer.write(domain: domain, variable: .snowfall_water_equivalent, data: snow, time: timestamp)
+                return GenericVariableHandle(variable: BomVariable.snowfall_water_equivalent, time: timestamp, member: member, fn: fnSnow, skipHour0: false)
+            }
+        }
+        
+        logger.info("Calculate relative humidity")
+        let handlesRh = try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
+            return try await zip(
+                try iterateForecast(domain: domain, member: member, variable: "sfc_temp", run: run),
+                try iterateForecast(domain: domain, member: member, variable: "dewpt_scrn", run: run)
+            ).mapConcurrent(nConcurrent: concurrent) { arg -> GenericVariableHandle in
+                let (sfc_temp, dewpt_scrn) = arg
+                let timestamp = sfc_temp.0
+                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                let rh = zip(sfc_temp.1, dewpt_scrn.1).map(Meteorology.relativeHumidity)
+                let fnRh = try writer.write(domain: domain, variable: .relative_humidity_2m, data: rh, time: timestamp)
+                return GenericVariableHandle(variable: BomVariable.relative_humidity_2m, time: timestamp, member: member, fn: fnRh, skipHour0: false)
+            }
+        }
+        
+        logger.info("Calculate wind")
+        let handlesWind = try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
+            return try await zip(
+                try iterateForecast(domain: domain, member: member, variable: "uwnd10m", run: run),
+                try iterateForecast(domain: domain, member: member, variable: "vwnd10m", run: run)
+            ).mapConcurrent(nConcurrent: concurrent) { (u, v) -> [GenericVariableHandle] in
+                let timestamp = u.0
+                let speed = zip(u.1, v.1).map(Meteorology.windspeed)
+                let direction = Meteorology.windirectionFast(u: u.1, v: v.1)
+                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                let fnSpeed = try writer.write(domain: domain, variable: .wind_speed_10m, data: speed, time: timestamp)
+                let fnDirection = try writer.write(domain: domain, variable: .wind_direction_10m, data: direction, time: timestamp)
+                return [
+                    GenericVariableHandle(variable: BomVariable.wind_speed_10m, time: timestamp, member: member, fn: fnSpeed, skipHour0: false),
+                    GenericVariableHandle(variable: BomVariable.wind_direction_10m, time: timestamp, member: member, fn: fnDirection, skipHour0: false)
+                ]
+            }.flatMap({$0})
+        }
+        return handles.flatMap({$0}) + handlesSnow + handlesWind + handlesRh
     }
     
     /// Download variables, convert to temporary om files and return all handles
@@ -291,6 +419,70 @@ struct DownloadBomCommand: AsyncCommand {
                 ]
         }
         return handles.flatMap({$0}) + handlesSnow.flatMap({$0}) + handlesWind.flatMap({$0})
+    }
+    
+    /// Process timsteps only on forecast
+    /// Performs deaccumulation if required
+    func iterateForecast(domain: BomDomain, member: Int, variable: String, run: Timestamp, level: Float? = nil) throws -> AnySequence<(Timestamp, [Float])> {
+        let forecastFile = "\(domain.downloadDirectory)\(variable)_fc_\(member).nc"
+        
+        guard let ncForecast = try NetCDF.open(path: forecastFile, allowUpdate: false) else {
+            fatalError("Could not open \(forecastFile)")
+        }
+        guard let timeForecast = try ncForecast.getVariable(name: "time")?.asType(Int32.self)?.read() else {
+            fatalError("Could not read time")
+        }
+        guard let varForecast = ncForecast.getVariable(name: variable) else {
+            fatalError("Could not open nc variable \(variable)")
+        }
+        let nDims = varForecast.dimensionsFlat.count
+        let dimensions = ncForecast.getDimensions()
+        guard let nx = dimensions.first(where: {$0.name == "lon"})?.length else {
+            fatalError("Could not get nx")
+        }
+        guard let ny = dimensions.first(where: {$0.name == "lat"})?.length else {
+            fatalError("Could not get ny")
+        }
+        let isAccumulated = variable.starts(with: "accum_")
+        // process indiviual timesteps
+        return AnySequence<(Timestamp, [Float])> { () -> AnyIterator<(Timestamp, [Float])> in
+            var pos = 0
+            var previousStepData: [Float]? = nil
+            return AnyIterator<(Timestamp, [Float])> { () -> (Timestamp, [Float])? in
+                if pos >= timeForecast.count {
+                    return nil
+                }
+                defer {pos += 1}
+                // search level if requried
+                let levelIndex = level.map { level in
+                    guard let index = try? ncForecast
+                        .getVariable(name: "rho_lvl")?
+                        .asType(Float.self)?
+                        .read()
+                        .firstIndex(where: {abs($0 - level) < 0.1}) else {
+                        fatalError("Could not get level index")
+                    }
+                    return index
+                } ?? 0
+                guard var data = try? varForecast.asType(Float.self)?.read(
+                    offset: nDims == 3 ? [pos, 0, 0] : [pos, levelIndex, 0, 0],
+                    count: nDims == 3 ? [1, ny, nx] : [1, 1, ny, nx]
+                ) else {
+                    fatalError("Could not read timestep")
+                }
+                if isAccumulated {
+                    if let previous = previousStepData {
+                        previousStepData = data
+                        for i in data.indices {
+                            data[i] -= previous[i]
+                        }
+                    } else {
+                        previousStepData = data
+                    }
+                }
+                return (run.add(Int(timeForecast[pos])), data)
+            }
+        }
     }
     
     /// Process timsteps from 2 netcdf files: analysis and forecast
