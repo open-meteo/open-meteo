@@ -268,6 +268,22 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .soilMoisture, depth: 100, depthTo: 300)
         case .shortwave_radiation_clear_sky:
             return .init(variable: .shortwaveRadiationClearSky)
+        case .wind_direction_140m:
+            return .init(variable: .windDirection, altitude: 140)
+        case .wind_direction_160m:
+            return .init(variable: .windDirection, altitude: 160)
+        case .wind_direction_30m:
+            return .init(variable: .windDirection, altitude: 30)
+        case .wind_direction_70m:
+            return .init(variable: .windDirection, altitude: 70)
+        case .wind_speed_140m:
+            return .init(variable: .windSpeed, altitude: 140)
+        case .wind_speed_160m:
+            return .init(variable: .windSpeed, altitude: 160)
+        case .wind_speed_30m:
+            return .init(variable: .windSpeed, altitude: 30)
+        case .wind_speed_70m:
+            return .init(variable: .windSpeed, altitude: 70)
         }
     }
 }
