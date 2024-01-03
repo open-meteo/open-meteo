@@ -255,13 +255,13 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
         case .convective_inhibition:
             return .init(variable: .convectiveInhibition)
         case .soil_temperature_10_to_35cm:
-            return .init(variable: .soilTemperature, depth: 0, depthTo: 35)
+            return .init(variable: .soilTemperature, depth: 10, depthTo: 35)
         case .soil_temperature_35_to_100cm:
             return .init(variable: .soilTemperature, depth: 35, depthTo: 100)
         case .soil_temperature_100_to_300cm:
             return .init(variable: .soilTemperature, depth: 100, depthTo: 300)
         case .soil_moisture_10_to_35cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 35)
+            return .init(variable: .soilMoisture, depth: 10, depthTo: 35)
         case .soil_moisture_35_to_100cm:
             return .init(variable: .soilMoisture, depth: 35, depthTo: 100)
         case .soil_moisture_100_to_300cm:
