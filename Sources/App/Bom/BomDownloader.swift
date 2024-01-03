@@ -227,7 +227,7 @@ struct DownloadBomCommand: AsyncCommand {
             return try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
                 let base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/"
                 let forecastFile = "\(domain.downloadDirectory)\(variable.name)_fc_\(member).nc"
-                let memberStr = ((run.hour % 12 == 6) ? (member+18) : member).zeroPadded(len: 3)
+                let memberStr = ((run.hour % 12 == 6) ? (member+17) : member).zeroPadded(len: 3)
                 if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: forecastFile) {
                     let url = member == 0 ? "\(base)cf/sfc/\(variable.name).nc" : "\(base)pf/\(memberStr)/sfc/\(variable.name).nc"
                     try await curl.download(
