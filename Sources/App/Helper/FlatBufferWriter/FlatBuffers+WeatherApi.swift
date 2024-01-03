@@ -254,6 +254,20 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .sunshineDuration)
         case .convective_inhibition:
             return .init(variable: .convectiveInhibition)
+        case .soil_temperature_10_to_35cm:
+            return .init(variable: .soilTemperature, depth: 0, depthTo: 35)
+        case .soil_temperature_35_to_100cm:
+            return .init(variable: .soilTemperature, depth: 35, depthTo: 100)
+        case .soil_temperature_100_to_300cm:
+            return .init(variable: .soilTemperature, depth: 100, depthTo: 300)
+        case .soil_moisture_10_to_35cm:
+            return .init(variable: .soilMoisture, depth: 0, depthTo: 35)
+        case .soil_moisture_35_to_100cm:
+            return .init(variable: .soilMoisture, depth: 35, depthTo: 100)
+        case .soil_moisture_100_to_300cm:
+            return .init(variable: .soilMoisture, depth: 100, depthTo: 300)
+        case .shortwave_radiation_clear_sky:
+            return .init(variable: .shortwaveRadiationClearSky)
         }
     }
 }
@@ -530,10 +544,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .archive_best_match:
             return .bestMatch
         case .cma_grapes_global:
-            // TODO register GRAPES model in Flatbuffers SDK
-            return .bestMatch
+            return .cmaGrapesGlobal
         case .bom_access_global:
-            return .bestMatch
+            return .bomAccessGlobal
         }
     }
 }

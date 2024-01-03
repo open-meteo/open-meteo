@@ -614,6 +614,13 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case wind_speed_40m
     case wind_speed_50m
     case wind_speed_80m
+    case soil_temperature_10_to_35cm
+    case soil_temperature_35_to_100cm
+    case soil_temperature_100_to_300cm
+    case soil_moisture_10_to_35cm
+    case soil_moisture_35_to_100cm
+    case soil_moisture_100_to_300cm
+    case shortwave_radiation_clear_sky
     
     /// Some variables are kept for backwards compatibility
     var remapped: Self {

@@ -155,8 +155,7 @@ extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
         case .gfs05:
             return .gfs025
         case .bom_access_global_ensemble:
-            // TODO register domain in SDK
-            return .bestMatch
+            return .bomAccessGlobalEnsemble
         }
     }
 }
