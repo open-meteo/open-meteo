@@ -287,7 +287,7 @@ struct DownloadBomCommand: AsyncCommand {
                 let (sfc_temp, dewpt_scrn) = arg
                 let timestamp = sfc_temp.0
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                let rh = zip(sfc_temp.1, dewpt_scrn.1).map(Meteorology.relativeHumidity)
+                let rh = zip(sfc_temp.1, dewpt_scrn.1).map({Meteorology.relativeHumidity(temperature: $0.0-273.15, dewpoint: $0.1-273.15)})
                 let fnRh = try writer.write(domain: domain, variable: .relative_humidity_2m, data: rh, time: timestamp, member: member)
                 return GenericVariableHandle(variable: BomVariable.relative_humidity_2m, time: timestamp, member: member, fn: fnRh, skipHour0: false)
             }
