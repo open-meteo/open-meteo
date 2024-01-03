@@ -54,6 +54,14 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         switch self {
         case .temperature_2m, .surface_temperature, .soil_temperature_0_to_10cm, .soil_temperature_10_to_35cm, .soil_temperature_35_to_100cm, .soil_temperature_100_to_300cm:
             return (1, -273.15)
+        case .soil_moisture_0_to_10cm:
+            return (0.001 / 0.1, 0) // 10cm depth
+        case .soil_moisture_10_to_35cm:
+            return (0.001 / 0.25, 0) // 25cm depth
+        case .soil_moisture_35_to_100cm:
+            return (0.001 / 0.65, 0) // 65cm depth
+        case .soil_moisture_100_to_300cm:
+            return (0.001 / 2.00, 0) // 200cm depth
         case .snow_depth:
             return (0.7/100, 0)
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
