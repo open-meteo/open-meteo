@@ -58,6 +58,10 @@ public struct ForecastapiController: RouteCollection {
             has15minutely: false,
             defaultModel: .cma_grapes_global).query
         )
+        categoriesRoute.getAndPost("bom", use: WeatherApiController(
+            has15minutely: false,
+            defaultModel: .bom_access_global).query
+        )
         
         categoriesRoute.getAndPost("elevation", use: DemController().query)
         categoriesRoute.getAndPost("air-quality", use: CamsController().query)
