@@ -223,7 +223,6 @@ struct DownloadCmaCommand: AsyncCommand {
         let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        var handles = [GenericVariableHandle]()
         
         /// Keep values from previous timestep. Actori isolated, because of concurrent execution
         actor PreviousData {
@@ -236,34 +235,41 @@ struct DownloadCmaCommand: AsyncCommand {
             }
         }
         let previous = PreviousData()
-        /// Underlaying eccodes library is not thread safe. Serialise all eccodes calls
-        let lock = NIOLock()
+        /// Only one download and conversion step at a time. TODO: build some kind of concurrent async sequence
+        let lockDownload = NIOLock()
+        let lockConversion = NIOLock()
         
-        for forecastHour in forecastHours {
+        return try await forecastHours.mapConcurrent(nConcurrent: 2) { forecastHour -> [GenericVariableHandle] in
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
             let url = "\(server)t\(run.hh)00/\(timeint)/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
             
-            let grib = try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: 6)
+            lockDownload.lock()
+            let grib = try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: concurrent)
+            lockDownload.unlock()
+            
+            lockConversion.lock()
+            defer { lockConversion.unlock() }
+            
             if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                 try await writeElevation(grib: grib, domain: domain)
             }
             // Process grib message concurrently
-            let res: [[GenericVariableHandle]] = try await grib.evenlyChunked(in: concurrent).mapConcurrent(nConcurrent: concurrent) { messages in
+            return try await grib.evenlyChunked(in: concurrent).mapConcurrent(nConcurrent: concurrent) { messages in
                 // Allocate one writer per thread
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 
                 return try await messages.asyncCompactMap { message -> GenericVariableHandle? in
-                    guard let stepRange = lock.withLock({ message.get(attribute: "stepRange") }),
-                          let stepType = lock.withLock({ message.get(attribute: "stepType") })
+                    guard let stepRange = message.get(attribute: "stepRange"),
+                          let stepType = message.get(attribute: "stepType")
                     else {
                         fatalError("could not get step range or type")
                     }
                     if stepType == "accum" && forecastHour == 0 {
                         return nil
                     }
-                    guard let variable = lock.withLock({ getCmaVariable(logger: logger, message: message)}) else {
+                    guard let variable = getCmaVariable(logger: logger, message: message) else {
                         return nil
                     }
                     if let variable = variable as? CmaSurfaceVariable {
@@ -273,9 +279,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
                     
                     //message.dumpAttributes()
-                    try lock.withLock {
-                        try grib2d.load(message: message)
-                    }
+                    try grib2d.load(message: message)
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                     
                     // Scaling before compression with scalefactor
@@ -308,9 +312,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
                 }
-            }
-            handles.append(contentsOf: res.flatMap({$0}))
-        }
-        return handles
+            }.flatMap({$0})
+        }.flatMap({$0})
     }
 }
