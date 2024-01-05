@@ -47,7 +47,7 @@ extension Sequence {
         assert(nConcurrent > 0)
         try await withThrowingTaskGroup(of: Void.self) { group in
             for (index, element) in self.enumerated() {
-                if index > nConcurrent {
+                if index >= nConcurrent {
                     let _ = try await group.next()
                 }
                 group.addTask { try await body(element) }
@@ -68,7 +68,7 @@ extension Sequence {
             var results = [(Int, T)]()
             results.reserveCapacity(self.underestimatedCount)
             for (index, element) in self.enumerated() {
-                if index > nConcurrent, let result = try await group.next() {
+                if index >= nConcurrent, let result = try await group.next() {
                     results.append(result)
                 }
                 group.addTask { return (index, try await body(element)) }
