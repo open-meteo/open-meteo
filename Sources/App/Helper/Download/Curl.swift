@@ -427,7 +427,8 @@ extension HTTPClientResponse {
         guard let length = headers["Content-Length"].first.flatMap(Int.init), length >= 0 else {
             return nil
         }
-        if length > 128*(1<<30) {
+        // Yes, we are downloading 250GB GRIB files....
+        if length > 512*(1<<30) {
             throw CurlError.contentLengthHeaderTooLarge(got: length)
         }
         return length
