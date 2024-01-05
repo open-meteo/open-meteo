@@ -45,12 +45,15 @@ final class Curl {
     /// Add headers to every request
     let headers: [(String, String)]
     
+    /// Chunk size for concurrent downloads
+    let chunkSize: Int
+    
     /// If the environment varibale `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
     static var cacheDirectory: String? {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, headers: [(String, String)] = .init()) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
@@ -58,6 +61,7 @@ final class Curl {
         self.waitAfterLastModified = waitAfterLastModified
         self.client = client
         self.headers = headers
+        self.chunkSize = chunkSizeMB * (2<<19)
     }
     
     deinit {
@@ -72,17 +76,17 @@ final class Curl {
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
         
-        if nConcurrent > 1 && range == nil {
-            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
-        }
-        
         // Check in cache
         if let cacheDirectory, method == .GET {
-            return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory)
+            return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent)
+        }
+        
+        if nConcurrent > 1 && range == nil {
+            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
         }
         
         // URL might contain password, strip them from logging
@@ -96,10 +100,12 @@ final class Curl {
             url = _url
             auth = nil
         }
-        if let range {
-            logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
-        } else {
-            logger.info("Downloading file \(url)")
+        if !quiet {
+            if let range {
+                logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
+            } else {
+                logger.info("Downloading file \(url)")
+            }
         }
         
         
@@ -138,37 +144,60 @@ final class Curl {
         }
     }
     
-    /// Spit download into parts and perform HTTP range downloads concurrently
+    /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
+        let deadline = deadline ?? self.deadline
         let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1)
         guard let length = try options.contentLength(), length >= nConcurrent else {
             throw CurlError.couldNotGetContentLengthForConcurrentDownload
         }
-        let chunkLength = length.divideRoundedUp(divisor: nConcurrent)
-        let chunks = (0..<nConcurrent).map {
-            return $0 * chunkLength ..< min(($0 + 1) * chunkLength, length)
-        }
-        logger.info("Start concurrent download nConcurrent=\(nConcurrent) length=\(length.bytesHumanReadable) chunkLength=\(chunkLength.bytesHumanReadable)")
-        let responses = try await chunks.mapConcurrent(nConcurrent: nConcurrent) {
-            let range = "\($0.lowerBound)-\($0.upperBound-1)"
-            return try await self.downloadInMemoryAsync(url: url, range: range, minSize: $0.count, nConcurrent: 1)
+        let chunks = (0..<length.divideRoundedUp(divisor: chunkSize)).map {
+            return $0 * chunkSize ..< min(($0 + 1) * chunkSize, length)
         }
         
-        var result = ByteBuffer()
-        for response in responses {
-            result.writeImmutableBuffer(response)
+        logger.info("Initiate concurrent download nConcurrent=\(nConcurrent) nChunks=\(chunks.count) length=\(length.bytesHumanReadable) chunkLength=\(chunkSize.bytesHumanReadable)")
+
+        let stream = chunks.mapStream(nConcurrent: nConcurrent) { chunk in
+            let range = "\(chunk.lowerBound)-\(chunk.upperBound-1)"
+            let timeout = TimeoutTracker(logger: self.logger, deadline: deadline)
+            while true {
+                // Start the download and wait for the header
+                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: 1, quiet: true)
+                
+                // Retry failed file transfers after this point
+                do {
+                    var buffer = ByteBuffer()
+                    let contentLength = try response.contentLength()
+                    if let contentLength {
+                        buffer.reserveCapacity(contentLength)
+                    }
+                    for try await fragement in response.body {
+                        try Task.checkCancellation()
+                        buffer.writeImmutableBuffer(fragement)
+                    }
+                    self.totalBytesTransfered.withLockedValue({$0 += buffer.readableBytes })
+                    if let minSize = minSize, buffer.readableBytes < minSize {
+                        throw CurlError.sizeTooSmall
+                    }
+                    
+                    return buffer
+                } catch {
+                    try await timeout.check(error: error)
+                }
+            }
         }
-        return HTTPClientResponse(status: .ok, headers: options.headers, body: .bytes(result))
+        
+        return HTTPClientResponse(status: .ok, headers: options.headers, body: .stream(stream))
     }
     
     /// Cache all HTTP download in temporary files. Only used for debugging.
-    private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String) async throws -> HTTPClientResponse {
+    private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String, nConcurrent: Int) async throws -> HTTPClientResponse {
         try FileManager.default.createDirectory(atPath: cacheDirectory, withIntermediateDirectories: true)
         //try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
         let cacheFile = cacheDirectory + "/" + SHA256.hash(data: (url + (range ?? "")).data(using: .utf8) ?? Data()).hex
         if !FileManager.default.fileExists(atPath: cacheFile) {
-            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil)
+            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: nConcurrent)
         }
         guard let data = try FileHandle(forReadingAtPath: cacheFile)?.readToEnd() else {
             fatalError("Could not read cached file")

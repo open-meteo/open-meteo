@@ -6,6 +6,15 @@ import NIO
 
 
 final class HelperTests: XCTestCase {
+    func testMapStream() async {
+        let a = (0..<100).map{$0}
+        let res = try! await a.mapStream(nConcurrent: 4){
+            try await Task.sleep(nanoseconds: UInt64.random(in: 1000..<10000))
+            return $0
+        }.collect()
+        XCTAssertEqual(res, a)
+    }
+    
     func testIndexedCurl() {
         let index = """
             1:0:d=2022080800:UFLX:surface:anl:
