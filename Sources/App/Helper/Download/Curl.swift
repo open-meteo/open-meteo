@@ -35,7 +35,7 @@ final class Curl {
     let retryError4xx: Bool
     
     /// Number of bytes of how much data was transfered
-    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
+    var totalBytesTransfered = NIOLockedValueBox(Int(0))
     
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
@@ -76,9 +76,13 @@ final class Curl {
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false) async throws -> HTTPClientResponse {
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
+        
+        if nConcurrent > 1 && range == nil {
+            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
+        }
         
         // Check in cache
         if let cacheDirectory, method == .GET {
@@ -144,10 +148,9 @@ final class Curl {
         }
     }
     
-    /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
+    /// Spit download into parts and perform HTTP range downloads concurrently
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
-        let deadline = deadline ?? self.deadline
         let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1)
         guard let length = try options.contentLength(), length >= nConcurrent else {
             throw CurlError.couldNotGetContentLengthForConcurrentDownload
@@ -266,7 +269,7 @@ final class Curl {
                         buffer.writeImmutableBuffer(fragement)
                     }
                 }
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
+                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
@@ -316,7 +319,7 @@ final class Curl {
                             chelper_malloc_trim()
                         }
                     }
-                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
+                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
                     if let minSize = minSize, tracker.transfered < minSize {
                         throw CurlError.sizeTooSmall
                     }
