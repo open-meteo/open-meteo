@@ -45,6 +45,9 @@ struct SyncCommand: AsyncCommand {
         
         @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of minutes.")
         var repeatInterval: Int?
+        
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent file download")
+        var concurrent: Int?
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -101,17 +104,17 @@ struct SyncCommand: AsyncCommand {
             let totalBytes = toDownload.reduce(0, {$0 + $1.fileSize})
             logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
             let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes)
-            for download in toDownload {
-                curl.setDeadlineIn(minutes: 30)
-                let startBytes = curl.totalBytesTransfered
+            try await toDownload.foreachConcurrent(nConcurrent: signature.concurrent ?? 1) { download in
+                let startBytes = curl.totalBytesTransfered.withLockedValue({$0})
                 var client = ClientRequest(url: URI("\(server)\(download.name)"))
                 try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
                 let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
                 let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
-                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false)
-                progress.add(curl.totalBytesTransfered - startBytes)
+                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                let totalBytesTransfered: Int = curl.totalBytesTransfered.withLockedValue({$0})
+                progress.add(totalBytesTransfered - startBytes)
             }
             progress.finish()
             

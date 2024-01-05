@@ -1,5 +1,5 @@
 import Vapor
-
+import NIOConcurrencyHelpers
 
 extension AsyncSequence where Element == ByteBuffer {
     /// Get tracker to print and track transfer rates
@@ -9,6 +9,7 @@ extension AsyncSequence where Element == ByteBuffer {
 }
 
 final class TransferAmountTracker {
+    let lock = NIOLock()
     var transfered = 0
     var transferedLastPrint = 0
     let printDelta: Double = 20
@@ -26,6 +27,8 @@ final class TransferAmountTracker {
     
     /// Print status from time to time
     func add(_ bytes: Int) {
+        lock.lock()
+        defer { lock.unlock() }
         transfered += bytes
         let deltaT = Date().timeIntervalSince(lastPrint)
         if deltaT > printDelta {
@@ -46,6 +49,8 @@ final class TransferAmountTracker {
     
     /// Print end statistics
     func finish() {
+        lock.lock()
+        defer { lock.unlock() }
         guard transfered > 0 else {
             return
         }

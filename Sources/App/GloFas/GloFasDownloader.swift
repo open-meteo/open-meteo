@@ -155,7 +155,7 @@ struct GloFasDownloader: AsyncCommand {
         }
         
         while true {
-            let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil, nConcurrent: 1)
+            let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil, deadline: Date().addingTimeInterval(TimeInterval(downloadTimeHours * 3600)), nConcurrent: 1)
             do {
                 try await withThrowingTaskGroup(of: Void.self) { group in
                     let counter = Counter()
@@ -227,7 +227,7 @@ struct GloFasDownloader: AsyncCommand {
                             }
                         }
                     }
-                    curl.totalBytesTransfered += tracker.transfered
+                    curl.totalBytesTransfered.withLockedValue({ $0 += tracker.transfered })
                 }
                 break
             } catch {
