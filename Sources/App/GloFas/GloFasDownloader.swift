@@ -232,6 +232,7 @@ struct GloFasDownloader: AsyncCommand {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                     curl.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 =======
                     curl.totalBytesTransfered.withLockedValue({ $0 += tracker.transfered })
@@ -250,6 +251,8 @@ struct GloFasDownloader: AsyncCommand {
 >>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
 =======
 >>>>>>> 702b3a7c (wip downloader)
+=======
+>>>>>>> 917621f9 (support concurrent downloads in sync command)
                     curl.totalBytesTransfered.withLockedValue({ $0 += tracker.transfered })
 =======
                     curl.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
@@ -266,7 +269,16 @@ struct GloFasDownloader: AsyncCommand {
 =======
                     curl.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 >>>>>>> b20096f5 (wip downloader)
+<<<<<<< HEAD
 >>>>>>> 702b3a7c (wip downloader)
+=======
+=======
+                    curl.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
+=======
+                    curl.totalBytesTransfered.withLockedValue({ $0 += tracker.transfered })
+>>>>>>> 2fd9f557 (support concurrent downloads in sync command)
+>>>>>>> e2d41225 (support concurrent downloads in sync command)
+>>>>>>> 917621f9 (support concurrent downloads in sync command)
                 }
                 break
             } catch {
