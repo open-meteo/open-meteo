@@ -4,7 +4,17 @@ import SwiftEccodes
 import AsyncHTTPClient
 import CHelper
 import NIOConcurrencyHelpers
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+=======
 
+<<<<<<< HEAD
+>>>>>>> 06b9088a (wip downloader)
+>>>>>>> 89925f5d (support concurrent downloads in sync command)
+
+=======
+>>>>>>> cc3c27e9 (support concurrent downloads in sync command)
 enum CurlError: Error {
     //case noGribMessagesMatch
     case didNotFindAllVariablesInGribIndex
@@ -111,7 +121,11 @@ final class Curl {
         if nConcurrent > 1 && range == nil {
             return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
         }
+<<<<<<< HEAD
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
+=======
+>>>>>>> cc3c27e9 (support concurrent downloads in sync command)
+>>>>>>> 89925f5d (support concurrent downloads in sync command)
         
         // Check in cache
         if let cacheDirectory, method == .GET {
@@ -186,7 +200,11 @@ final class Curl {
     /// Spit download into parts and perform HTTP range downloads concurrently
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
+<<<<<<< HEAD
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
+=======
+>>>>>>> cc3c27e9 (support concurrent downloads in sync command)
+>>>>>>> 89925f5d (support concurrent downloads in sync command)
         let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1)
         guard let length = try options.contentLength(), length >= nConcurrent else {
             throw CurlError.couldNotGetContentLengthForConcurrentDownload
