@@ -45,6 +45,9 @@ struct SyncCommand: AsyncCommand {
         
         @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of minutes.")
         var repeatInterval: Int?
+        
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent file download")
+        var concurrent: Int?
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
