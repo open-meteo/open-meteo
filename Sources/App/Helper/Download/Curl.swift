@@ -38,6 +38,7 @@ final class Curl {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     var totalBytesTransfered = NIOLockedValueBox<Int>(0)
 =======
     var totalBytesTransfered = NIOLockedValueBox(Int(0))
@@ -45,6 +46,9 @@ final class Curl {
 =======
     var totalBytesTransfered = NIOLockedValueBox<Int>(0)
 >>>>>>> be4d2507 (wip downloader)
+=======
+    var totalBytesTransfered = NIOLockedValueBox(Int(0))
+>>>>>>> 2fd9f557 (support concurrent downloads in sync command)
 =======
     var totalBytesTransfered = NIOLockedValueBox(Int(0))
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
@@ -88,9 +92,19 @@ final class Curl {
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
+<<<<<<< HEAD
     func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
+=======
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
+        
+        let deadline = deadline ?? self.deadline
+        
+        if nConcurrent > 1 && range == nil {
+            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
+        }
+>>>>>>> 2fd9f557 (support concurrent downloads in sync command)
         
         // Check in cache
         if let cacheDirectory, method == .GET {
@@ -156,10 +170,16 @@ final class Curl {
         }
     }
     
+<<<<<<< HEAD
     /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
+=======
+    /// Spit download into parts and perform HTTP range downloads concurrently
+    private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
+        
+>>>>>>> 2fd9f557 (support concurrent downloads in sync command)
         let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1)
         guard let length = try options.contentLength(), length >= nConcurrent else {
             throw CurlError.couldNotGetContentLengthForConcurrentDownload
@@ -281,6 +301,7 @@ final class Curl {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
@@ -288,6 +309,9 @@ final class Curl {
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
 >>>>>>> be4d2507 (wip downloader)
+=======
+                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
+>>>>>>> 2fd9f557 (support concurrent downloads in sync command)
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
@@ -343,6 +367,7 @@ final class Curl {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
                     self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
@@ -350,6 +375,9 @@ final class Curl {
 =======
                     self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
 >>>>>>> be4d2507 (wip downloader)
+=======
+                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
+>>>>>>> 2fd9f557 (support concurrent downloads in sync command)
 =======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
 >>>>>>> 2fd9f557 (support concurrent downloads in sync command)
