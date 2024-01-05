@@ -306,13 +306,13 @@ final class Curl {
                     if bzip2Decode {
                         for try await m in response.body.tracker(tracker).decompressBzip2().decodeGrib() {
                             try Task.checkCancellation()
-                            m.forEach({messages.append($0)})
+                            messages.append(m)
                             chelper_malloc_trim()
                         }
                     } else {
                         for try await m in response.body.tracker(tracker).decodeGrib() {
                             try Task.checkCancellation()
-                            m.forEach({messages.append($0)})
+                            messages.append(m)
                             chelper_malloc_trim()
                         }
                     }
@@ -328,6 +328,51 @@ final class Curl {
             }
         }
     }
+    
+    /// Stream GRIB messages. The grib stream might be restarted on error.
+    func withGribStream<T>(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
+        let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
+        let timeout = TimeoutTracker(logger: logger, deadline: deadline)
+        
+        // TODO fix AWS code path
+        // TODO use grib stream for GLOFAS downloader
+        
+        // AWS does not allow multi http download ranges. Split download into multiple downloads
+        /*let supportMultiRange = !url.contains("amazonaws.com")
+        if !supportMultiRange, let parts = range?.split(separator: ","), parts.count > 1 {
+            var messages = [GribMessage]()
+            for part in parts {
+                messages.append(contentsOf: try await downloadGrib(url: url, bzip2Decode: bzip2Decode, range: String(part)))
+            }
+            return messages
+        }*/
+        
+        while true {
+            // Start the download and wait for the header
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent)
+            
+            // Retry failed file transfers after this point
+            do {
+                let contentLength = try response.contentLength()
+                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                let result: T
+                if bzip2Decode {
+                    result = try await body(response.body.tracker(tracker).decompressBzip2().decodeGrib().eraseToAnyAsyncSequence())
+                } else {
+                    result = try await body(response.body.tracker(tracker).decodeGrib().eraseToAnyAsyncSequence())
+                }
+                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
+                if let minSize = minSize, tracker.transfered < minSize {
+                    throw CurlError.sizeTooSmall
+                }
+                try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
+                return result
+            } catch {
+                try await timeout.check(error: error)
+            }
+        }
+    }
+    
 }
 
 extension GribMessage {
