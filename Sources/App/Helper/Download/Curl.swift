@@ -169,6 +169,7 @@ final class Curl {
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false) async throws -> HTTPClientResponse {
 =======
     func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
@@ -193,6 +194,12 @@ final class Curl {
             return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
         }
         
+=======
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false) async throws -> HTTPClientResponse {
+        
+        let deadline = deadline ?? self.deadline
+        
+>>>>>>> 3c7cb90f (proper concurrent download implementation)
         // Check in cache
         if let cacheDirectory, method == .GET {
             return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent)
@@ -259,6 +266,7 @@ final class Curl {
     
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
@@ -279,7 +287,16 @@ final class Curl {
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
 >>>>>>> 92cec0c6 (support concurrent downloads in sync command)
+<<<<<<< HEAD
 >>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
+=======
+=======
+    /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
+    private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
+        
+        let deadline = deadline ?? self.deadline
+>>>>>>> 3c7cb90f (proper concurrent download implementation)
+>>>>>>> fd549088 (proper concurrent download implementation)
         let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1)
         guard let length = try options.contentLength(), length >= nConcurrent else {
             throw CurlError.couldNotGetContentLengthForConcurrentDownload
