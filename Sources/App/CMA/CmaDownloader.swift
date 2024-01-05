@@ -235,46 +235,35 @@ struct DownloadCmaCommand: AsyncCommand {
             }
         }
         let previous = PreviousData()
-        /// Only one download and conversion step at a time. TODO: build some kind of concurrent async sequence
-        let lockDownload = NIOLock()
-        let lockConversion = NIOLock()
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        return try await forecastHours.mapConcurrent(nConcurrent: 2) { forecastHour -> [GenericVariableHandle] in
+        return try await forecastHours.asyncFlatMap { forecastHour in
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
             let url = "\(server)t\(run.hh)00/\(timeint)/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
-            
-            lockDownload.lock()
-            let grib = try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: concurrent)
-            lockDownload.unlock()
-            
-            lockConversion.lock()
-            defer { lockConversion.unlock() }
-            
-            if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
-                try await writeElevation(grib: grib, domain: domain)
-            }
-            // Process grib message concurrently
-            return try await grib.evenlyChunked(in: concurrent).mapConcurrent(nConcurrent: concurrent) { messages in
-                // Allocate one writer per thread
-                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                
-                return try await messages.asyncCompactMap { message -> GenericVariableHandle? in
+            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+                var handles = [GenericVariableHandle]()
+                for try await message in stream {
+                    /*
+                     if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+                         try await writeElevation(grib: grib, domain: domain)
+                     }
+                     */
                     guard let stepRange = message.get(attribute: "stepRange"),
                           let stepType = message.get(attribute: "stepType")
                     else {
                         fatalError("could not get step range or type")
                     }
                     if stepType == "accum" && forecastHour == 0 {
-                        return nil
+                        continue
                     }
                     guard let variable = getCmaVariable(logger: logger, message: message) else {
-                        return nil
+                        continue
                     }
                     if let variable = variable as? CmaSurfaceVariable {
                         if (variable == .snow_depth || variable == .wind_gusts_10m) && forecastHour == 0 {
-                            return nil
+                            continue
                         }
                     }
                     
@@ -290,7 +279,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     if stepType == "accum" {
                         let splited = stepRange.split(separator: "-")
                         guard splited.count == 2 else {
-                            return nil
+                            continue
                         }
                         let startStep = Int(splited[0])!
                         let currentStep = Int(splited[1])!
@@ -310,9 +299,10 @@ struct DownloadCmaCommand: AsyncCommand {
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
                     let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
+                    handles.append(GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum"))
                 }
-            }.flatMap({$0})
-        }.flatMap({$0})
+                return handles
+            }
+        }
     }
 }
