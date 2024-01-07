@@ -115,6 +115,7 @@ struct SyncCommand: AsyncCommand {
             let totalBytes = toDownload.reduce(0, {$0 + $1.file.fileSize})
             logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
             let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes)
+            let curlStartBytes = await curl.totalBytesTransfered.bytes
             try await toDownload.foreachConcurrent(nConcurrent: signature.concurrent ?? 1) { download in
                 var client = ClientRequest(url: URI("\(download.server)\(download.file.name)"))
                 try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
@@ -123,7 +124,7 @@ struct SyncCommand: AsyncCommand {
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                 try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
-                await progress.set(curl.totalBytesTransfered.bytes)
+                await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
             }
             await progress.finish()
             
