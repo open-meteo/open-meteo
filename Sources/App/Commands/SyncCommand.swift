@@ -104,8 +104,7 @@ struct SyncCommand: AsyncCommand {
             let totalBytes = toDownload.reduce(0, {$0 + $1.fileSize})
             logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
             let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes)
-            for download in toDownload {
-                curl.setDeadlineIn(minutes: 30)
+            try await toDownload.foreachConcurrent(nConcurrent: signature.concurrent ?? 1) { download in
                 let startBytes = curl.totalBytesTransfered.withLockedValue({$0})
                 var client = ClientRequest(url: URI("\(server)\(download.name)"))
                 try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
@@ -113,8 +112,8 @@ struct SyncCommand: AsyncCommand {
                 let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
-                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false)
-                let totalBytesTransfered = curl.totalBytesTransfered.withLockedValue({$0})
+                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                let totalBytesTransfered: Int = curl.totalBytesTransfered.withLockedValue({$0})
                 progress.add(totalBytesTransfered - startBytes)
             }
             progress.finish()

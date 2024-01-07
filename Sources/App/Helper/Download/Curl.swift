@@ -4,17 +4,7 @@ import SwiftEccodes
 import AsyncHTTPClient
 import CHelper
 import NIOConcurrencyHelpers
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-=======
 
-<<<<<<< HEAD
->>>>>>> 06b9088a (wip downloader)
->>>>>>> 89925f5d (support concurrent downloads in sync command)
-
-=======
->>>>>>> cc3c27e9 (support concurrent downloads in sync command)
 enum CurlError: Error {
     //case noGribMessagesMatch
     case didNotFindAllVariablesInGribIndex
@@ -45,88 +35,7 @@ final class Curl {
     let retryError4xx: Bool
     
     /// Number of bytes of how much data was transfered
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
-=======
     var totalBytesTransfered = NIOLockedValueBox(Int(0))
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
->>>>>>> be4d2507 (wip downloader)
-=======
-    var totalBytesTransfered = NIOLockedValueBox(Int(0))
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-    var totalBytesTransfered = NIOLockedValueBox(Int(0))
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-=======
->>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
-=======
->>>>>>> 702b3a7c (wip downloader)
-=======
->>>>>>> 917621f9 (support concurrent downloads in sync command)
-=======
->>>>>>> 145ffb4f (wip downloader)
-=======
->>>>>>> 90d7bf78 (support concurrent downloads in sync command)
-    var totalBytesTransfered = NIOLockedValueBox(Int(0))
-=======
-    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
->>>>>>> 06b9088a (wip downloader)
-<<<<<<< HEAD
->>>>>>> 2fa10353 (wip downloader)
-=======
-=======
-    var totalBytesTransfered = NIOLockedValueBox(Int(0))
->>>>>>> 92cec0c6 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
-=======
-=======
-    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
->>>>>>> b20096f5 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 702b3a7c (wip downloader)
-=======
-=======
-=======
->>>>>>> 77387133 (wip downloader)
-=======
->>>>>>> 16c26dcc (support concurrent downloads in sync command)
-    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
-=======
-    var totalBytesTransfered = NIOLockedValueBox(Int(0))
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> e2d41225 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> 917621f9 (support concurrent downloads in sync command)
-=======
-=======
-=======
-    var totalBytesTransfered = NIOLockedValueBox<Int>(0)
->>>>>>> be4d2507 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 77387133 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 145ffb4f (wip downloader)
-=======
-=======
-=======
-    var totalBytesTransfered = NIOLockedValueBox(Int(0))
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
->>>>>>> 16c26dcc (support concurrent downloads in sync command)
->>>>>>> 90d7bf78 (support concurrent downloads in sync command)
     
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
@@ -167,39 +76,10 @@ final class Curl {
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false) async throws -> HTTPClientResponse {
-=======
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
->>>>>>> 92cec0c6 (support concurrent downloads in sync command)
-        
-        let deadline = deadline ?? self.deadline
-=======
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
-        
-        let deadline = deadline ?? self.deadline
-        
-        if nConcurrent > 1 && range == nil {
-            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
-        }
-<<<<<<< HEAD
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
->>>>>>> cc3c27e9 (support concurrent downloads in sync command)
->>>>>>> 89925f5d (support concurrent downloads in sync command)
-        
-        if nConcurrent > 1 && range == nil {
-            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
-        }
-        
-=======
     func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
         
->>>>>>> 3c7cb90f (proper concurrent download implementation)
         // Check in cache
         if let cacheDirectory, method == .GET {
             return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent)
@@ -264,39 +144,10 @@ final class Curl {
         }
     }
     
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
     /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
-=======
-    /// Spit download into parts and perform HTTP range downloads concurrently
-    private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
-        
-<<<<<<< HEAD
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
->>>>>>> cc3c27e9 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> 89925f5d (support concurrent downloads in sync command)
-=======
-=======
-    /// Spit download into parts and perform HTTP range downloads concurrently
-    private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
-        
->>>>>>> 92cec0c6 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
-=======
-=======
-    /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
-    private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
-        
-        let deadline = deadline ?? self.deadline
->>>>>>> 3c7cb90f (proper concurrent download implementation)
->>>>>>> fd549088 (proper concurrent download implementation)
         let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1)
         guard let length = try options.contentLength(), length >= nConcurrent else {
             throw CurlError.couldNotGetContentLengthForConcurrentDownload
@@ -415,88 +266,7 @@ final class Curl {
                         buffer.writeImmutableBuffer(fragement)
                     }
                 }
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
-=======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
->>>>>>> be4d2507 (wip downloader)
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-=======
->>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
-=======
->>>>>>> 702b3a7c (wip downloader)
-=======
->>>>>>> 917621f9 (support concurrent downloads in sync command)
-=======
->>>>>>> 145ffb4f (wip downloader)
-=======
->>>>>>> 90d7bf78 (support concurrent downloads in sync command)
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
->>>>>>> 06b9088a (wip downloader)
-<<<<<<< HEAD
->>>>>>> 2fa10353 (wip downloader)
-=======
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 92cec0c6 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
-=======
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
->>>>>>> b20096f5 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 702b3a7c (wip downloader)
-=======
-=======
-=======
->>>>>>> 77387133 (wip downloader)
-=======
->>>>>>> 16c26dcc (support concurrent downloads in sync command)
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> e2d41225 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> 917621f9 (support concurrent downloads in sync command)
-=======
-=======
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
->>>>>>> be4d2507 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 77387133 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 145ffb4f (wip downloader)
-=======
-=======
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
->>>>>>> 16c26dcc (support concurrent downloads in sync command)
->>>>>>> 90d7bf78 (support concurrent downloads in sync command)
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
@@ -546,88 +316,7 @@ final class Curl {
                             chelper_malloc_trim()
                         }
                     }
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
-=======
                 self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
->>>>>>> be4d2507 (wip downloader)
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-=======
-=======
->>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
-=======
->>>>>>> 702b3a7c (wip downloader)
-=======
->>>>>>> 917621f9 (support concurrent downloads in sync command)
-=======
->>>>>>> 145ffb4f (wip downloader)
-=======
->>>>>>> 90d7bf78 (support concurrent downloads in sync command)
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
-=======
-                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
->>>>>>> 06b9088a (wip downloader)
-<<<<<<< HEAD
->>>>>>> 2fa10353 (wip downloader)
-=======
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 92cec0c6 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> b0e5d0e8 (support concurrent downloads in sync command)
-=======
-=======
-                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
->>>>>>> b20096f5 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 702b3a7c (wip downloader)
-=======
-=======
-=======
->>>>>>> 77387133 (wip downloader)
-=======
->>>>>>> 16c26dcc (support concurrent downloads in sync command)
-                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> e2d41225 (support concurrent downloads in sync command)
-<<<<<<< HEAD
->>>>>>> 917621f9 (support concurrent downloads in sync command)
-=======
-=======
-=======
-                    self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
->>>>>>> be4d2507 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 77387133 (wip downloader)
-<<<<<<< HEAD
->>>>>>> 145ffb4f (wip downloader)
-=======
-=======
-=======
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
->>>>>>> 2fd9f557 (support concurrent downloads in sync command)
->>>>>>> 16c26dcc (support concurrent downloads in sync command)
->>>>>>> 90d7bf78 (support concurrent downloads in sync command)
                     if let minSize = minSize, tracker.transfered < minSize {
                         throw CurlError.sizeTooSmall
                     }
