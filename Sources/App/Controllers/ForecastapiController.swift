@@ -58,6 +58,10 @@ public struct ForecastapiController: RouteCollection {
             has15minutely: false,
             defaultModel: .cma_grapes_global).query
         )
+        categoriesRoute.getAndPost("bom", use: WeatherApiController(
+            has15minutely: false,
+            defaultModel: .bom_access_global).query
+        )
         
         categoriesRoute.getAndPost("elevation", use: DemController().query)
         categoriesRoute.getAndPost("air-quality", use: CamsController().query)
@@ -286,6 +290,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     case cma_grapes_global
     
+    case bom_access_global
+    
     case archive_best_match
     case era5_seamless
     case era5
@@ -427,6 +433,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [try Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode)]
         case .cma_grapes_global:
             return try CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .bom_access_global:
+            return try BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
     
@@ -588,24 +596,39 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case wind_direction_100m
     case wind_direction_10m
     case wind_direction_120m
+    case wind_direction_140m
     case wind_direction_150m
+    case wind_direction_160m
     case wind_direction_180m
     case wind_direction_200m
     case wind_direction_20m
     case wind_direction_40m
+    case wind_direction_30m
     case wind_direction_50m
     case wind_direction_80m
+    case wind_direction_70m
     case wind_gusts_10m
     case wind_speed_100m
     case wind_speed_10m
     case wind_speed_120m
+    case wind_speed_140m
     case wind_speed_150m
+    case wind_speed_160m
     case wind_speed_180m
     case wind_speed_200m
     case wind_speed_20m
     case wind_speed_40m
+    case wind_speed_30m
     case wind_speed_50m
+    case wind_speed_70m
     case wind_speed_80m
+    case soil_temperature_10_to_35cm
+    case soil_temperature_35_to_100cm
+    case soil_temperature_100_to_300cm
+    case soil_moisture_10_to_35cm
+    case soil_moisture_35_to_100cm
+    case soil_moisture_100_to_300cm
+    case shortwave_radiation_clear_sky
     
     /// Some variables are kept for backwards compatibility
     var remapped: Self {

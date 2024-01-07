@@ -15,7 +15,7 @@ struct GenericVariableHandle {
     /// Process concurrently
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self], concurrent: Int) async throws {
         try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
-            try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, nMembers: 1, handles: $0.flatMap{$0.values})
+            try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, nMembers: nMembers, handles: $0.flatMap{$0.values})
         })
     }
     
@@ -23,7 +23,10 @@ struct GenericVariableHandle {
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self]) throws {
         let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
-        let timeMinMax = handles.minAndMax(by: {$0.time < $1.time})!
+        guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
+            logger.warning("No data to convert")
+            return
+        }
         // `timeMinMax.min.time` has issues with `skip`
         let time = TimerangeDt(range: run...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
         logger.info("Convert timerange \(time.prettyString())")
@@ -40,8 +43,8 @@ struct GenericVariableHandle {
             let skip = handles[0].skipHour0 ? 1 : 0
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
-            let readers: [(time: Timestamp, reader: [OmFileReader<MmapFile>])] = try handles.grouped(by: {$0.time}).map { (time, h) in
-                return (time, try h.map{try OmFileReader(fn: $0.fn)})
+            let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
+                return (time, try h.map{(try OmFileReader(fn: $0.fn), $0.member)})
             }
             
             // Create netcdf file for debugging
@@ -55,9 +58,9 @@ struct GenericVariableHandle {
                     try ncFile.createDimension(name: "LON", length: grid.nx)
                 ])
                 for reader in readers {
-                    for (member,r) in reader.reader.enumerated() {
-                        let data = try r.readAll()
-                        try ncVariable.write(data, offset: [time.index(of: reader.time)!, member, 0, 0], count: [1, 1, grid.ny, grid.nx])
+                    for r in reader.reader {
+                        let data = try r.fn.readAll()
+                        try ncVariable.write(data, offset: [time.index(of: reader.time)!, r.member, 0, 0], count: [1, 1, grid.ny, grid.nx])
                     }
                 }
             }
@@ -69,9 +72,9 @@ struct GenericVariableHandle {
                 data3d.data.fillWithNaNs()
                 for reader in readers {
                     precondition(reader.reader.count == nMembers, "nMember count wrong")
-                    for (i, memberReader) in reader.reader.enumerated() {
-                        try memberReader.read(into: &readTemp, arrayDim1Range: (0..<locationRange.count), arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data3d[0..<locationRange.count, i, time.index(of: reader.time)!] = readTemp
+                    for r in reader.reader {
+                        try r.fn.read(into: &readTemp, arrayDim1Range: (0..<locationRange.count), arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                        data3d[0..<locationRange.count, r.member, time.index(of: reader.time)!] = readTemp
                     }
                 }
                 

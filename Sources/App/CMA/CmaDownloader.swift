@@ -87,7 +87,7 @@ struct DownloadCmaCommand: AsyncCommand {
                 return CmaPressureVariable(variable: .wind_v_component, level: level)
             case "Geopotential height":
                 return CmaPressureVariable(variable: .geopotential_height, level: level)
-            case "Vertical velocity":
+            case "Vertical velocity (geometric)":
                 return CmaPressureVariable(variable: .vertical_velocity, level: level)
             case "Relative humidity":
                 return CmaPressureVariable(variable: .relative_humidity, level: level)

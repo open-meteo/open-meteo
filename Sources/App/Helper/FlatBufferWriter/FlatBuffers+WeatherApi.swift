@@ -254,6 +254,36 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .sunshineDuration)
         case .convective_inhibition:
             return .init(variable: .convectiveInhibition)
+        case .soil_temperature_10_to_35cm:
+            return .init(variable: .soilTemperature, depth: 10, depthTo: 35)
+        case .soil_temperature_35_to_100cm:
+            return .init(variable: .soilTemperature, depth: 35, depthTo: 100)
+        case .soil_temperature_100_to_300cm:
+            return .init(variable: .soilTemperature, depth: 100, depthTo: 300)
+        case .soil_moisture_10_to_35cm:
+            return .init(variable: .soilMoisture, depth: 10, depthTo: 35)
+        case .soil_moisture_35_to_100cm:
+            return .init(variable: .soilMoisture, depth: 35, depthTo: 100)
+        case .soil_moisture_100_to_300cm:
+            return .init(variable: .soilMoisture, depth: 100, depthTo: 300)
+        case .shortwave_radiation_clear_sky:
+            return .init(variable: .shortwaveRadiationClearSky)
+        case .wind_direction_140m:
+            return .init(variable: .windDirection, altitude: 140)
+        case .wind_direction_160m:
+            return .init(variable: .windDirection, altitude: 160)
+        case .wind_direction_30m:
+            return .init(variable: .windDirection, altitude: 30)
+        case .wind_direction_70m:
+            return .init(variable: .windDirection, altitude: 70)
+        case .wind_speed_140m:
+            return .init(variable: .windSpeed, altitude: 140)
+        case .wind_speed_160m:
+            return .init(variable: .windSpeed, altitude: 160)
+        case .wind_speed_30m:
+            return .init(variable: .windSpeed, altitude: 30)
+        case .wind_speed_70m:
+            return .init(variable: .windSpeed, altitude: 70)
         }
     }
 }
@@ -531,6 +561,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .bestMatch
         case .cma_grapes_global:
             // TODO register GRAPES model in Flatbuffers SDK
+            return .bestMatch
+        case .bom_access_global:
             return .bestMatch
         }
     }

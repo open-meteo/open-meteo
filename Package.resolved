@@ -59,8 +59,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "34e9a2d5cabe53aebcccbe8a6935aff07d8f2ee2",
-        "version" : "1.7.0"
+        "revision" : "e06c88bb9145eccea81646f053ea4fd23a169d1f",
+        "version" : "1.7.1"
       }
     },
     {
@@ -203,8 +203,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git",
       "state" : {
-        "revision" : "55f3d6e384252d9c587f8736982c2af50d3828d3",
-        "version" : "1.0.4"
+        "revision" : "277983b6e053c102f99e89f9f6393697a5a2f9c4",
+        "version" : "1.0.5"
       }
     },
     {
@@ -212,8 +212,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "67fe736c37b0ad958b9d248f010cff6c1baa5c3a",
-        "version" : "4.89.3"
+        "revision" : "6db3d917b5ce5024a84eb265ef65691383305d70",
+        "version" : "4.90.0"
       }
     },
     {
