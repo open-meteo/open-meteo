@@ -225,14 +225,14 @@ struct GloFasDownloader: AsyncCommand {
                             await counter.dec()
                         }
                     }
-                    curl.totalBytesTransfered.withLockedValue({ $0 += tracker.transfered })
+                    await curl.totalBytesTransfered.add(tracker.transfered)
                 }
                 break
             } catch {
                 try await timeout.check(error: error)
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
     }
     
     struct GlofasQuery: Encodable {

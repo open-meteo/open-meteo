@@ -105,7 +105,6 @@ struct SyncCommand: AsyncCommand {
             logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
             let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes)
             try await toDownload.foreachConcurrent(nConcurrent: signature.concurrent ?? 1) { download in
-                let startBytes = curl.totalBytesTransfered.withLockedValue({$0})
                 var client = ClientRequest(url: URI("\(server)\(download.name)"))
                 try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
                 let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
@@ -113,10 +112,9 @@ struct SyncCommand: AsyncCommand {
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                 try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
-                let totalBytesTransfered: Int = curl.totalBytesTransfered.withLockedValue({$0})
-                progress.add(totalBytesTransfered - startBytes)
+                await progress.set(curl.totalBytesTransfered.bytes)
             }
-            progress.finish()
+            await progress.finish()
             
             guard let repeatInterval = signature.repeatInterval else {
                 break
@@ -124,7 +122,7 @@ struct SyncCommand: AsyncCommand {
             logger.info("Repeat in \(repeatInterval) minutes")
             try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
         }
-        curl.printStatistics()
+        await curl.printStatistics()
     }
 }
 

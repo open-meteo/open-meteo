@@ -3,7 +3,6 @@ import Vapor
 import SwiftEccodes
 import AsyncHTTPClient
 import CHelper
-import NIOConcurrencyHelpers
 
 enum CurlError: Error {
     //case noGribMessagesMatch
@@ -25,9 +24,6 @@ final class Curl {
     /// Give up downloading after the time, default 3 hours
     let deadline: Date
     
-    /// start time of downloading
-    let startTime = DispatchTime.now()
-    
     /// Time to transfer a file. Default 5 minutes
     let readTimeout: Int
     
@@ -35,7 +31,7 @@ final class Curl {
     let retryError4xx: Bool
     
     /// Number of bytes of how much data was transfered
-    var totalBytesTransfered = NIOLockedValueBox(Int(0))
+    var totalBytesTransfered = TotalBytesTransfered()
     
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
@@ -73,10 +69,9 @@ final class Curl {
         // trim it, before starting to convert data
         chelper_malloc_trim()
     }
-    
-    public func printStatistics() {
-        let totalBytesTransfered = totalBytesTransfered.withLockedValue({$0})
-        logger.info("Finished downloading \(totalBytesTransfered.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
+
+    public func printStatistics() async {
+        await totalBytesTransfered.printStatistics(logger: logger)
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
@@ -186,7 +181,7 @@ final class Curl {
                         try Task.checkCancellation()
                         buffer.writeImmutableBuffer(fragement)
                     }
-                    self.totalBytesTransfered.withLockedValue({$0 += buffer.readableBytes })
+                    await self.totalBytesTransfered.add(buffer.readableBytes)
                     if let minSize = minSize, buffer.readableBytes < minSize {
                         throw CurlError.sizeTooSmall
                     }
@@ -239,7 +234,7 @@ final class Curl {
                     try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
                 try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered})
+                await totalBytesTransfered.add(tracker.transfered)
                 try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return
             } catch {
@@ -276,7 +271,7 @@ final class Curl {
                         buffer.writeImmutableBuffer(fragement)
                     }
                 }
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
+                await totalBytesTransfered.add(tracker.transfered)
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
@@ -309,30 +304,29 @@ final class Curl {
             
             // Retry failed file transfers after this point
             do {
-                //return try await withThrowingTaskGroup(of: Void.self) { group in
-                    var messages = [GribMessage]()
-                    let contentLength = try response.contentLength()
-                    let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
-                    if bzip2Decode {
-                        for try await m in response.body.tracker(tracker).decompressBzip2().decodeGrib() {
-                            try Task.checkCancellation()
-                            messages.append(m)
-                            chelper_malloc_trim()
-                        }
-                    } else {
-                        for try await m in response.body.tracker(tracker).decodeGrib() {
-                            try Task.checkCancellation()
-                            messages.append(m)
-                            chelper_malloc_trim()
-                        }
+                var messages = [GribMessage]()
+                let contentLength = try response.contentLength()
+                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                if bzip2Decode {
+                    for try await m in response.body.tracker(tracker).decompressBzip2().decodeGrib() {
+                        try Task.checkCancellation()
+                        messages.append(m)
+                        chelper_malloc_trim()
                     }
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
-                    if let minSize = minSize, tracker.transfered < minSize {
-                        throw CurlError.sizeTooSmall
+                } else {
+                    for try await m in response.body.tracker(tracker).decodeGrib() {
+                        try Task.checkCancellation()
+                        messages.append(m)
+                        chelper_malloc_trim()
                     }
-                    try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
-                    return messages
-                //}
+                }
+                let trackerTransfered = await tracker.transfered
+                await totalBytesTransfered.add(trackerTransfered)
+                if let minSize = minSize, trackerTransfered < minSize {
+                    throw CurlError.sizeTooSmall
+                }
+                try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
+                return messages
             } catch {
                 try await timeout.check(error: error)
             }
@@ -371,8 +365,9 @@ final class Curl {
                 } else {
                     result = try await body(response.body.tracker(tracker).decodeGrib().eraseToAnyAsyncSequence())
                 }
-                self.totalBytesTransfered.withLockedValue({$0 += tracker.transfered })
-                if let minSize = minSize, tracker.transfered < minSize {
+                let trackerTransfered = await tracker.transfered
+                await totalBytesTransfered.add(trackerTransfered)
+                if let minSize = minSize, trackerTransfered < minSize {
                     throw CurlError.sizeTooSmall
                 }
                 try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
@@ -532,5 +527,21 @@ extension HTTPClientResponse {
             }
             try await Task.sleep(nanoseconds:  UInt64(delta * 1_000_000_000))
         }
+    }
+}
+
+/// Track total bytes transfered
+final actor TotalBytesTransfered {
+    var bytes: Int = 0
+    
+    /// start time of downloading
+    let startTime = DispatchTime.now()
+    
+    public func add(_ n: Int) {
+        self.bytes += n
+    }
+    
+    public func printStatistics(logger: Logger) {
+        logger.info("Finished downloading \(bytes.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
     }
 }

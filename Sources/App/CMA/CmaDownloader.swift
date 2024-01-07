@@ -219,10 +219,6 @@ struct DownloadCmaCommand: AsyncCommand {
         let deadLineHours: Double = 10
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
-        defer {
-            curl.printStatistics()
-            Process.alarm(seconds: 0)
-        }
         let nForecastHours = domain.forecastHours(run: run.hour)
         let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
         
@@ -240,7 +236,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
         let previous = PreviousData()
         
-        return try await forecastHours.asyncFlatMap { forecastHour in
+        let handles = try await forecastHours.asyncFlatMap { forecastHour in
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
             let url = "\(server)t\(run.hh)00/\(timeint)/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
@@ -308,5 +304,8 @@ struct DownloadCmaCommand: AsyncCommand {
                 }.collect().compactMap({$0})
             }
         }
+        await curl.printStatistics()
+        Process.alarm(seconds: 0)
+        return handles
     }
 }

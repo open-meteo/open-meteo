@@ -134,7 +134,7 @@ struct DownloadCamsCommand: AsyncCommand {
                 try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
     }
     
     /// Assemble a time-series and update operational files

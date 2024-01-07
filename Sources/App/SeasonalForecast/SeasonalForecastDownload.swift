@@ -106,7 +106,7 @@ struct SeasonalForecastDownload: AsyncCommand {
                 try await curl.download(url: url, toFile: fileDest, bzip2Decode: false)
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
     }
     
     /// Process each variable and update time-series optimised files

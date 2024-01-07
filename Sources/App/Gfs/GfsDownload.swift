@@ -285,7 +285,7 @@ struct GfsDownload: AsyncCommand {
                     ))
                 }
             }
-            curl.printStatistics()
+            await curl.printStatistics()
             return handles
         }
         
@@ -439,7 +439,7 @@ struct GfsDownload: AsyncCommand {
                 }
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
         return handles
     }
     
@@ -519,7 +519,7 @@ struct GfsDownload: AsyncCommand {
                 fn: fn, skipHour0: false
             ))
         }
-        curl.printStatistics()
+        await curl.printStatistics()
         return handles
     }
 }

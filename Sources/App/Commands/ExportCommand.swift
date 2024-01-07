@@ -206,7 +206,7 @@ struct ExportCommand: AsyncCommand {
         
         switch format {
         case .netcdf:
-            try generateNetCdf(
+            try await generateNetCdf(
                 logger: logger,
                 file: "\(filePath)~",
                 domain: domain,
@@ -391,7 +391,7 @@ struct ExportCommand: AsyncCommand {
         #endif
     }
     
-    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) throws {
+    func generateNetCdf(logger: Logger, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) async throws {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
         
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
@@ -449,9 +449,9 @@ struct ExportCommand: AsyncCommand {
                     }
                     let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                     try ncVariable.write(normals, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
-                    progress.add(time.count * 4)
+                    await progress.add(time.count * 4)
                 }
-                progress.finish()
+                await progress.finish()
                 return
             }
             // Loop over locations, read and write
@@ -463,9 +463,9 @@ struct ExportCommand: AsyncCommand {
                 }
                 let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                 try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
-                progress.add(time.count * 4)
+                await progress.add(time.count * 4)
             }
-            progress.finish()
+            await progress.finish()
             return
         }
         
@@ -497,9 +497,9 @@ struct ExportCommand: AsyncCommand {
                     fatalError("Invalid variable \(variable)")
                 }
                 try ncVariable.write(data.data, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, time.count])
-                progress.add(time.count * 4)
+                await progress.add(time.count * 4)
             }
-            progress.finish()
+            await progress.finish()
             return
         }
         
@@ -511,10 +511,10 @@ struct ExportCommand: AsyncCommand {
                 fatalError("Invalid variable \(variable)")
             }
             try ncVariable.write(data.data, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
-            progress.add(time.count * 4)
+            await progress.add(time.count * 4)
         }
         
-        progress.finish()
+        await progress.finish()
     }
 }
 

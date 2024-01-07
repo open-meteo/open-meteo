@@ -260,7 +260,7 @@ struct GemDownload: AsyncCommand {
                 }
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
     }
     
     /// Process each variable and update time-series optimised files

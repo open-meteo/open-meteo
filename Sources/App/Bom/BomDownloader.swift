@@ -121,10 +121,6 @@ struct DownloadBomCommand: AsyncCommand {
         let deadLineHours: Double = 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
-        defer {
-            curl.printStatistics()
-            Process.alarm(seconds: 0)
-        }
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let variables = ["wnd_ucmp", "wnd_vcmp"]
     
@@ -155,7 +151,7 @@ struct DownloadBomCommand: AsyncCommand {
             (76.664, .wind_speed_80m, .wind_direction_80m),
             (130, .wind_speed_120m, .wind_direction_120m),
         ]
-        return try await map.mapConcurrent(nConcurrent: concurrent) { map -> [GenericVariableHandle] in
+        let handles = try await map.mapConcurrent(nConcurrent: concurrent) { map -> [GenericVariableHandle] in
             logger.info("Calculate wind level \(map.level)")
             let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
             return try zip(
@@ -173,6 +169,9 @@ struct DownloadBomCommand: AsyncCommand {
                     ]
             }
         }.flatMap({$0})
+        await curl.printStatistics()
+        Process.alarm(seconds: 0)
+        return handles
     }
     
     /// Download variables, convert to temporary om files and return all handles
@@ -182,10 +181,6 @@ struct DownloadBomCommand: AsyncCommand {
         let deadLineHours: Double = 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
-        defer {
-            curl.printStatistics()
-            Process.alarm(seconds: 0)
-        }
         let nMembers = domain.ensembleMembers
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         
@@ -311,6 +306,8 @@ struct DownloadBomCommand: AsyncCommand {
                 ]
             }.flatMap({$0})
         }
+        await curl.printStatistics()
+        Process.alarm(seconds: 0)
         return handles.flatMap({$0}) + handlesSnow + handlesWind + handlesRh
     }
     
@@ -320,10 +317,6 @@ struct DownloadBomCommand: AsyncCommand {
         let deadLineHours: Double = 5
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
-        defer {
-            curl.printStatistics()
-            Process.alarm(seconds: 0)
-        }
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         
         // list of variables to download
@@ -433,6 +426,8 @@ struct DownloadBomCommand: AsyncCommand {
                 GenericVariableHandle(variable: BomVariable.wind_direction_10m, time: timestamp, member: 0, fn: fnDirection, skipHour0: false)
                 ]
         }
+        await curl.printStatistics()
+        Process.alarm(seconds: 0)
         return handles.flatMap({$0}) + handlesSnow.flatMap({$0}) + handlesWind.flatMap({$0})
     }
     

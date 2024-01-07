@@ -187,7 +187,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 ))
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
         return handles
     }
 }
