@@ -75,7 +75,7 @@ struct DownloadBomCommand: AsyncCommand {
         
         logger.info("Downloading height and elevation data")
         
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
         var base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/an/"
         if domain == .access_global_ensemble {
             base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/cf/"
@@ -119,7 +119,7 @@ struct DownloadBomCommand: AsyncCommand {
     func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer {
             curl.printStatistics()
@@ -180,7 +180,7 @@ struct DownloadBomCommand: AsyncCommand {
     func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer {
             curl.printStatistics()
@@ -318,7 +318,7 @@ struct DownloadBomCommand: AsyncCommand {
     func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         defer {
             curl.printStatistics()

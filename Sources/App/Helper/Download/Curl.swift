@@ -40,6 +40,9 @@ final class Curl {
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
     
+    /// If set, check HEAD before ownloading, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
+    let waitAfterLastModifiedBeforeDownload: TimeInterval?
+    
     let client: HTTPClient
     
     /// Add headers to every request
@@ -53,12 +56,13 @@ final class Curl {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
         self.readTimeout = readTimeout
         self.waitAfterLastModified = waitAfterLastModified
+        self.waitAfterLastModifiedBeforeDownload = waitAfterLastModifiedBeforeDownload
         self.client = client
         self.headers = headers
         self.chunkSize = chunkSizeMB * (2<<19)
@@ -76,13 +80,19 @@ final class Curl {
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false) async throws -> HTTPClientResponse {
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false, waitAfterLastModifiedBeforeDownload: TimeInterval?) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
         
         // Check in cache
         if let cacheDirectory, method == .GET {
             return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent)
+        }
+        
+        // Ensure sufficient wait time using head requests
+        if let waitAfterLastModifiedBeforeDownload {
+            let head = try await initiateDownload(url: _url, range: range, minSize: minSize, method: .HEAD, deadline: deadline, nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil)
+            try await head.waitAfterLastModified(logger: logger, wait: waitAfterLastModifiedBeforeDownload)
         }
         
         if nConcurrent > 1 && range == nil {
@@ -100,7 +110,7 @@ final class Curl {
             url = _url
             auth = nil
         }
-        if !quiet {
+        if !quiet && waitAfterLastModifiedBeforeDownload == nil {
             if let range {
                 logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
             } else {
@@ -148,8 +158,8 @@ final class Curl {
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
-        let options = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1)
-        guard let length = try options.contentLength(), length >= nConcurrent else {
+        let head = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil)
+        guard let length = try head.contentLength(), length >= nConcurrent else {
             throw CurlError.couldNotGetContentLengthForConcurrentDownload
         }
         let chunks = (0..<length.divideRoundedUp(divisor: chunkSize)).map {
@@ -163,7 +173,7 @@ final class Curl {
             let timeout = TimeoutTracker(logger: self.logger, deadline: deadline)
             while true {
                 // Start the download and wait for the header
-                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: 1, quiet: true)
+                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
                 
                 // Retry failed file transfers after this point
                 do {
@@ -188,7 +198,7 @@ final class Curl {
             }
         }
         
-        return HTTPClientResponse(status: .ok, headers: options.headers, body: .stream(stream))
+        return HTTPClientResponse(status: .ok, headers: head.headers, body: .stream(stream))
     }
     
     /// Cache all HTTP download in temporary files. Only used for debugging.
@@ -215,7 +225,7 @@ final class Curl {
         let fileTemp = "\(toFile)~"
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, deadline: deadline, nConcurrent: nConcurrent)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
             
             // Retry failed file transfers after this point
             do {
@@ -245,7 +255,7 @@ final class Curl {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
             
             // Retry failed file transfers after this point
             do {
@@ -295,7 +305,7 @@ final class Curl {
         
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
             
             // Retry failed file transfers after this point
             do {
@@ -349,7 +359,7 @@ final class Curl {
         
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
             
             // Retry failed file transfers after this point
             do {
