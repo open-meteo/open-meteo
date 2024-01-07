@@ -210,6 +210,10 @@ struct DownloadCmaCommand: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: orog.array.data)
     }
     
+    /// Download CMA data.
+    /// Uses concurrent downloads and concurrent data conversion to process data as fast as possible
+    /// Each download GRIB file is split into hundrets 16 MB parts and download in parallel using HTTP RANGE.
+    /// Individual grib messages are extracted while downloading and processed concurrently
     func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 10
@@ -224,7 +228,7 @@ struct DownloadCmaCommand: AsyncCommand {
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         
-        /// Keep values from previous timestep. Actori isolated, because of concurrent execution
+        /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
         actor PreviousData {
             var data = [String: (step: Int, data: [Float])]()
             
@@ -235,16 +239,16 @@ struct DownloadCmaCommand: AsyncCommand {
             }
         }
         let previous = PreviousData()
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         return try await forecastHours.asyncFlatMap { forecastHour in
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
             let url = "\(server)t\(run.hh)00/\(timeint)/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
+            // Split download into 16 MB parts and download concurrently
+            // In case processing is too slow, incoming data will be buffered
             return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
-                var handles = [GenericVariableHandle]()
-                for try await message in stream {
+                // Process each grib message concurrently. Independent from download thread
+                return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                     /*
                      if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                          try await writeElevation(grib: grib, domain: domain)
@@ -256,17 +260,19 @@ struct DownloadCmaCommand: AsyncCommand {
                         fatalError("could not get step range or type")
                     }
                     if stepType == "accum" && forecastHour == 0 {
-                        continue
+                        return nil
                     }
                     guard let variable = getCmaVariable(logger: logger, message: message) else {
-                        continue
+                        return nil
                     }
                     if let variable = variable as? CmaSurfaceVariable {
                         if (variable == .snow_depth || variable == .wind_gusts_10m) && forecastHour == 0 {
-                            continue
+                            return nil
                         }
                     }
                     
+                    let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     //message.dumpAttributes()
                     try grib2d.load(message: message)
                     grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -279,7 +285,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     if stepType == "accum" {
                         let splited = stepRange.split(separator: "-")
                         guard splited.count == 2 else {
-                            continue
+                            return nil
                         }
                         let startStep = Int(splited[0])!
                         let currentStep = Int(splited[1])!
@@ -298,10 +304,8 @@ struct DownloadCmaCommand: AsyncCommand {
                     
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
                     let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    
-                    handles.append(GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum"))
-                }
-                return handles
+                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
+                }.collect().compactMap({$0})
             }
         }
     }
