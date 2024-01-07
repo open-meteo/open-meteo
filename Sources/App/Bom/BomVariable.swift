@@ -1,10 +1,6 @@
 import Foundation
 
 enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable {
-    // ml has 1h delay! ml analysis has a lot of levels!
-    // ml temp: 20 53.3 100 160
-    // ml wind: 10 36.6 76.6 130
-    
     case showers
     case precipitation
     case pressure_msl
@@ -40,13 +36,6 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
     case soil_moisture_100_to_300cm
     
     case weather_code
-    
-    case weather_code
-    
-    case weather_code
-    
-    case weather_code
-    
     case visibility
     case wind_gusts_10m
     
@@ -216,21 +205,9 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         case .cloud_cover_high: return .percentage
         case .relative_humidity_2m: return .percentage
         case .precipitation: return .millimetre
-        case .wind_speed_10m:
-            fallthrough
-        case .wind_speed_40m:
-            fallthrough
-        case .wind_speed_80m:
-            fallthrough
-        case .wind_speed_120m:
-            fallthrough
-        case .wind_direction_10m:
-            fallthrough
-        case .wind_direction_40m:
-            fallthrough
-        case .wind_direction_80m:
-            fallthrough
-        case .wind_direction_120m:
+        case .wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m:
+            return .metrePerSecond
+        case .wind_direction_10m, .wind_direction_40m, .wind_direction_80m, .wind_direction_120m:
             return .degreeDirection
         case .surface_temperature: return .celsius
         case .soil_temperature_0_to_10cm: return .celsius
