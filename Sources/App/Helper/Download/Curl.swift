@@ -31,7 +31,7 @@ final class Curl {
     let retryError4xx: Bool
     
     /// Number of bytes of how much data was transfered
-    var totalBytesTransfered = TotalBytesTransfered()
+    let totalBytesTransfered = TotalBytesTransfered()
     
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
