@@ -85,7 +85,7 @@ struct WeatherApiController {
     /// ecmwf v1 uses 3 hourly data in hourly field..
     let put3HourlyDataIntoHourly: Bool
     
-    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2022, 1, 1), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: String? = nil, put3HourlyDataIntoHourly: Bool = false) {
+    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2020, 1, 1), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: String? = nil, put3HourlyDataIntoHourly: Bool = false) {
         self.forecastDay = forecastDay
         self.forecastDaysMax = forecastDaysMax
         self.historyStartDate = historyStartDate
