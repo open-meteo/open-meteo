@@ -98,7 +98,7 @@ enum DomainRegistry: String, CaseIterable {
         case .copernicus_cerra:
             return CdsDomain.cerra
         case .copernicus_dem90:
-            fatalError()
+            return Dem90()
         case .ecmwf_ifs:
             return CdsDomain.ecmwf_ifs
         case .copernicus_era5:

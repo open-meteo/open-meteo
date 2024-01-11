@@ -12,8 +12,34 @@ import SwiftPFor2D
 
  Total size after conversion `10.48 GB`
  */
-struct Dem90 {
-    static let downloadDirectory = "\(OpenMeteo.tempDirectory)download-dem90/"
+struct Dem90: GenericDomain {
+    var grid: Gridable {
+        fatalError("Dem90 does not offer a grid")
+    }
+    
+    var domainRegistry: DomainRegistry {
+        return .copernicus_dem90
+    }
+    
+    var domainRegistryStatic: DomainRegistry? {
+        return .copernicus_dem90
+    }
+    
+    var dtSeconds: Int {
+        return 0
+    }
+    
+    var hasYearlyFiles: Bool {
+        return false
+    }
+    
+    var masterTimeRange: Range<Timestamp>? {
+        return nil
+    }
+    
+    var omFileLength: Int {
+        return 0
+    }
 
     /// Get elevation for coordinate. Access to om files is cached.
     static func read(lat: Float, lon: Float) throws -> Float {
@@ -87,7 +113,7 @@ struct DownloadDemCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        try FileManager.default.createDirectory(atPath: Dem90.downloadDirectory, withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(atPath: Dem90().downloadDirectory, withIntermediateDirectories: true)
         let logger = context.application.logger
         //let curl = Curl(logger: logger)
 
@@ -106,8 +132,8 @@ struct DownloadDemCommand: AsyncCommand {
 
                     group.addTask {
                         logger.info("Dem lon \(lon) lat \(lat)")
-                        let omFile = "\(Dem90.downloadDirectory)\(lat)_\(lon).om"
-                        let testFile = "\(Dem90.downloadDirectory)\(lat)_\(lon).txt"
+                        let omFile = "\(Dem90().downloadDirectory)\(lat)_\(lon).om"
+                        let testFile = "\(Dem90().downloadDirectory)\(lat)_\(lon).txt"
                         if FileManager.default.fileExists(atPath: omFile) || FileManager.default.fileExists(atPath: testFile) {
                             return
                         }
@@ -137,7 +163,7 @@ struct DownloadDemCommand: AsyncCommand {
                             continue
                         }*/
 
-                        let ncTemp = "\(Dem90.downloadDirectory)\(lat)_\(lon)_temp.nc"
+                        let ncTemp = "\(Dem90().downloadDirectory)\(lat)_\(lon)_temp.nc"
 
                         try Process.spawn(cmd: "gdal_translate", args: ["-of","NetCDF",tifLocal,ncTemp])
                         //try FileManager.default.removeItem(atPath: tifTemp)
@@ -173,7 +199,7 @@ struct DownloadDemCommand: AsyncCommand {
                     var line = [Float](repeating: 0, count: 360*1200*px)
                     for lon in -180..<180 {
                         logger.info("Dem convert lon \(lon) lat \(lat)")
-                        let omFile = "\(Dem90.downloadDirectory)\(lat)_\(lon).om"
+                        let omFile = "\(Dem90().downloadDirectory)\(lat)_\(lon).om"
                         if !FileManager.default.fileExists(atPath: omFile) {
                             continue
                         }
