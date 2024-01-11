@@ -20,7 +20,7 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.getAndPost("archive", use: era5.query)
         
         categoriesRoute.getAndPost("forecast", use: WeatherApiController(
-            defaultModel: .best_match, alias: "forecast-archive-api").query
+            defaultModel: .best_match, alias: "historical-forecast-api").query
         )
         categoriesRoute.getAndPost("dwd-icon", use: WeatherApiController(
             defaultModel: .icon_seamless).query
