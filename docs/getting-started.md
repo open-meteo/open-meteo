@@ -1,23 +1,23 @@
 # Getting started
 
-This guide explains how you can run your own weather API using Docker or prebuilt Ubuntu 22.04 Jammy packages. This guide assumes fairly good knowledge of linux server administration and understanding of weather models.
+This tutorial provides instructions on setting up your weather API using either Docker or prebuilt packages for Ubuntu 22.04 Jammy. It presupposes a solid understanding of Linux server administration and familiarity with weather models.
 
-## Architecture
-Open-Meteo has 3 components:
-1. An HTTP API server that serves the same API as offered on open-meteo.com. The API server is based on the Swift Vapor framework, compiles to a single binary and is designed to offer fast access to weather data.
-2. A File-based database to store all downloaded datasets. Literally just the `./data` directory. The Open-Meteo weather database files use a custom binary format to efficiently compress data.
-3. Download commands for various weather models and variables. You can either download weather model data from the [open-data distribution through AWS S3](https://github.com/open-meteo/open-data) or download the original weather models.
+## System Architecture
+Open-Meteo comprises three key components:
+1. An HTTP API server, which mirrors the API available on open-meteo.com. Developed using the Swift Vapor framework, this server compiles into a single binary, prioritizing fast access to weather data.
+2. A file-based database responsible for managing all downloaded datasets, stored in the `./data` directory. The weather database files use a proprietary binary format, optimizing time-series data compression for efficiency.
+3. Download commands tailored for various weather models. Users have the option to retrieve weather model data either through the [open-data distribution on AWS S3](https://github.com/open-meteo/open-data) or by directly downloading the original weather models.
 
-Hardware requirements:
-- A relatively modern CPU with SIMD (or Intel® AVX2) instructions. Both `x86-64` and `Arm®` are supported.
-- At least 8 GB of memory, 16 GB recommended.
-- For all forecast data, 150 GB of disk space is recommended (for best performance, SSDs with high IOPS). If only a small selection for weather variables is used, just a couple of GB are fine (32 - 48 GB).
+Hardware Requirements:
+- A relatively modern CPU with SIMD (or Intel® AVX2) instructions. `x86-64` and `Arm®` are supported.
+- A minimum of 8 GB of memory, with 16 GB recommended for optimal performance.
+- For comprehensive forecast data access, it is advised to have at least 150 GB of disk space, preferably on NVMe SSDs with high IOPS for enhanced performance. If only a limited selection of weather variables is employed, a few gigabytes (32 - 48 GB) will suffice.
 
 ## Running the API
-There are different option to run Open-Meteo: Docker or with prebuilt Ubuntu 22.04 (Jammy Jellyfish) packages.
+Different options exist for deploying Open-Meteo: either through Docker or by using prebuilt packages designed for Ubuntu 22.04 (Jammy Jellyfish).
 
 ### Running on Docker
-To quickly run Open-Meteo, Docker can be used. It will run an container which exposes the Open-Meteo API to http://127.0.0.1:8080. Afterwards weather datasets can be downloaded. 
+For a rapid deployment of Open-Meteo, Docker can be used. It launches a container that makes the Open-Meteo API accessible at `http://127.0.0.1:8080``. Subsequently, weather datasets can be downloaded from the AWS Open-Data distribution.
 
 ```bash
 # Get the latest image
@@ -38,7 +38,7 @@ curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf
 ```
 
 ### Using prebuilt Ubuntu Jammy Jellyfish packages
-If you are running Ubuntu 22.04 Jammy Jellyfish, you can use prebuilt binaries. They can be installed via APT:
+If you're operating on Ubuntu 22.04 Jammy Jellyfish, you have the option to utilize prebuilt binaries, which can be installed through APT with the following command:
 
 ```bash
 curl -L https://apt.open-meteo.com/public.key | sudo gpg --dearmour -o /etc/apt/trusted.gpg.d/openmeteo.gpg
@@ -55,45 +55,45 @@ openmeteo-api sync ecmwf_ifs04 temperature_2m
 curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs04&hourly=temperature_2m"
 ```
 
-This will automatically install and run an API instance at `http://127.0.0.1:8080`. It can be checked with:
+This will automatically install and initiate an API instance at `http://127.0.0.1:8080`. You can verify this by using:
 ```bash
 sudo systemctl status openmeteo-api
 sudo systemctl restart openmeteo-api
 sudo journalctl -u openmeteo-api.service
 ```
 
-Per default, port 8080 is bound to 127.0.0.1 and **not** exposed to the network. You can set `API_BIND="0.0.0.0:8080"` in `/etc/default/openmeteo-api.env` and restart the service to expose the service. However, it is recommended to use a proxy like nginx.
+By default, port 8080 is bound to 127.0.0.1 and is **not** accessible from the network. To expose the service, you can configure `API_BIND="0.0.0.0:8080"` in `/etc/default/openmeteo-api.env` and restart the service. Nevertheless, it is advisable to use a proxy, such as nginx.
 
 
-## Downloading weather models
-Open-Meteo downloads raw weather data from national weather services and converts data into a highly optimized time-series database. The Open-Meteo database is distributed as open-data through an [AWS Open-Data Sponsorship](https://github.com/open-meteo/open-data). Information on downloading raw weather forecast from national weather services, is available [here](./downloading-datasets.md).
+## Downloading Weather Models
+Open-Meteo fetches raw weather data from national weather services and transforms it into a highly optimized time-series database. The Open-Meteo database is distributed as open-data through an [AWS Open-Data Sponsorship](https://github.com/open-meteo/open-data). For details on downloading raw weather forecasts from national weather services, refer to the [downloading datasets documentation](./downloading-datasets.md).
 
-As shown above, the `sync` command downloads the Open-Meteo weather database directly from AWS S3. It accepts 2 arguments:
-1. One or more weather model. E.g. `ecmwf_ifs04` or `dwd_icon,dwd_icon_eu,dwd_icon_d2`
-2. A list of weather variables E.g. `temperature_2m,relative_humidity_2m,wind_u_component_10m,wind_v_component_10m`
+As illustrated earlier, the `sync` command enables the direct download of the Open-Meteo weather database from AWS S3. It requires two arguments:
+1. One or more weather model, such as `ecmwf_ifs04` or `dwd_icon,dwd_icon_eu,dwd_icon_d2`
+2. A list of weather variables, for example, `temperature_2m,relative_humidity_2m,wind_u_component_10m,wind_v_component_10m`
 
-The weather models and variables might be a bit unfamiliar, because the Open-Meteo weather API selects the most suitable weather model for each location automatically. A detailed list of all weather models is available on the documentation for the [open-data distribution](https://github.com/open-meteo/open-data).
+The weather models and variables may seem unfamiliar because the Open-Meteo weather API automatically selects the most suitable weather model for each location. You can find a comprehensive list of all weather models in the [open-data distribution](https://github.com/open-meteo/open-data) documentation.
 
-The `sync` command accepts 2 optional parameter:
-1. `--past-days <number>`: To specify how much past weather data should be downloaded. Per default 3 days. Please note: Because data is compressed by short time-intervals, 2-7 days of past data will always be present.
-2. `--repeat-interval <number>`: If set, the API will continue to run indefinitely and check every N minutes for new data.
+The `sync` command also accepts two optional parameters:
+1. `--past-days <number>`: Specifies the duration for downloading past weather data, with a default of 3 days. Note that due to data compression in short time intervals, 2-7 days of past data will always be available.
+2. `--repeat-interval <number>`: If set, the API will run indefinitely, checking for new data every N minutes.
 
-### Basic configuration
-To run a general purpose weather API that provides the weather variables `temperature_2m,relative_humidity_2m,precipitation_probability,rain,snowfall,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m`, the following configuration is recommended:
+### Basic Configuration
+To run a comprehensive weather API covering the variables `temperature_2m, relative_humidity_2m, precipitation_probability, rain, snowfall, weather_code, cloud_cover, wind_speed_10m, wind_direction_10m`, consider the following configuration:
 
-1. Download the digital elevation model once with `[..] sync copernicus_dem90 static`. This is required to perform down-scaling based on terrain elevation. 8 GB of storage are required.
-2. Download the forecast data with `[..] sync dwd_icon,ncep_gfs013,ncep_gfs025,ncep_gefs025_probability temperature_2m,dew_point_2m,relative_humidity_2m,precipitation_probability,precipitation,rain,cloud_cover,snowfall_water_equivalent,snowfall_convective_water_equivalent,weather_code,wind_u_component_10m,wind_v_component_10m,cape,lifted_index`
-3. Set-up a cronjob or background process to check for updates every couple of minutes
+1. One-time download of the digital elevation model using `[..] sync copernicus_dem90 static`. This step is crucial for downscaling based on terrain elevation, requiring 8 GB of storage.
+2. Fetch forecast data with `[..] sync dwd_icon,ncep_gfs013,ncep_gfs025,ncep_gefs025_probability temperature_2m,dew_point_2m,relative_humidity_2m,precipitation_probability,precipitation,rain,cloud_cover,snowfall_water_equivalent,snowfall_convective_water_equivalent,weather_code,wind_u_component_10m,wind_v_component_10m,cape,lifted_index`
+3. Set-up a cronjob or background process to check for updates at regular intervals.
 
-Notice how the list of weather variables is now significantly longer? The API requires additional data to compute certain weather variables on demand like `wind_speed_10m` from `wind_u_component_10m` and `wind_v_component_10m`. As a list of weather models, NCEP GFS and DWD ICON are used. They are global weather models and provide good forecast accuracy for most parts of the world. For GFS, the variants `gfs013` and `gfs025` are downloaded. Surface variables like temperature are available for GFS in 13 km resolution, some variables like `cape` are only available for GFS in 25 km resolution. This configuration of weather models and variables requires 12 GB storage. 
+Note the expanded list of weather variables. Additional data is required for on-demand computation of certain variables, such as deriving `wind_speed_10m` from `wind_u_component_10m` and `wind_v_component_10m`. NCEP GFS and DWD ICON are selected as the list of weather models, both being global models with strong forecast accuracy worldwide. For GFS, the variants `gfs013` and `gfs025` are downloaded, offering temperature data at resolutions of 13 km and 25 km, respectively. Some variables like `cape` are exclusively available in 25 km resolution for GFS. This configuration required 12 GB of storage.
 
-To further enhance the weather forecast, high resolution models for Europe and North America can be added. Namely the models `ncep_hrrr_conus` and `dwd_icon_eu,dwd_icon_d2` boost local accuracy and provide updates every 1 or 3 hours. Simply add them to the list of weather models `dwd_icon,ncep_gfs013,ncep_gfs025,ncep_gefs025_probability,ncep_hrrr_conus,dwd_icon_eu,dwd_icon_d2`. Adding local models, requires another 3 GB of storage.
+To further refine the forecast accuracy, consider adding high-resolution models for Europe and North America, namely `ncep_hrrr_conus`, `dwd_icon_eu`, and `dwd_icon_d2`. These models enhance local precision and provide updates every 1 or 3 hours. Simply include them in the list of weather models: `dwd_icon,ncep_gfs013,ncep_gfs025,ncep_gefs025_probability,ncep_hrrr_conus,dwd_icon_eu,dwd_icon_d2`. Integrating local models requires an additional 3 GB of storage.
 
-The list of weather models and variables must to be carefully selected. Please refer to the [open-data documentation](https://github.com/open-meteo/open-data) to get a better understanding of available weather models and variables. 
+The selection of weather models and variables should be approached thoughtfully. Refer to the [open-data documentation](https://github.com/open-meteo/open-data) for a comprehensive understanding of available weather models and variables.
 
-### Automatic data synchronization  
+### Automatic Data Synchronization  
 
-The prebuilt Ubuntu images install a sync service automatically. Edit: `/etc/default/openmeteo-api.env`:
+The prebuilt Ubuntu images automatically install a synchronization service. Modify the configuration in /etc/default/openmeteo-api.env:
 ```
 [...]
 
@@ -106,14 +106,14 @@ SYNC_VARIABLES=temperature_2m,dew_point_2m,relative_humidity_2m,...
 SYNC_REPEAT_INTERVAL=5
 ```
 
-Restart and monitor the sync service with
+Restart and monitor the sync service with:
 ```bash
 sudo systemctl status openmeteo-sync
 sudo systemctl restart openmeteo-sync
 sudo journalctl -u openmeteo-sync.service
 ```
 
-To automatically cleanup old data, the following cronjobs can be used.
+To automate the removal of older data, use the following cronjobs:
 
 ```
 # Remove pressure level data after 10 days
