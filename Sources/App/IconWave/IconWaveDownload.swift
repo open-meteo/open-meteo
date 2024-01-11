@@ -112,7 +112,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                 try writer.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
     }
     
     /// Process each variable and update time-series optimised files

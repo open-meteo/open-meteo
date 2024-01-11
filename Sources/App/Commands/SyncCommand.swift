@@ -45,6 +45,9 @@ struct SyncCommand: AsyncCommand {
         
         @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of minutes.")
         var repeatInterval: Int?
+        
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent file download")
+        var concurrent: Int?
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -52,12 +55,21 @@ struct SyncCommand: AsyncCommand {
         
         disableIdleSleep()
         
-        let server = signature.server ?? "https://openmeteo.s3.amazonaws.com/"
-        guard server.starts(with: "http"), server.last == "/" else {
-            fatalError("Server name must include http and end with a trailing slash")
+        let serverSet = (signature.server ?? "https://openmeteo.s3.amazonaws.com/").split(separator: ";").map(String.init)
+        for server in serverSet {
+            guard server.last == "/" else {
+                fatalError("Server name must include http and end with a trailing slash.")
+            }
         }
+        let modelsSet = try signature.models.split(separator: ";").map({
+            try DomainRegistry.load(commaSeparated: String($0))
+        })
+
+        guard serverSet.count == modelsSet.count else {
+           fatalError("Number of servers and models sets must be the same")
+        }
+        
         let pastDays = signature.pastDays ?? 7
-        let models = try DomainRegistry.load(commaSeparated: signature.models)
         let variables = signature.variables.split(separator: ",")
         /// Undocumented switch to download all weather variables. This can generate immense traffic!
         let downloadAllVariables = signature.variables == "really_download_all_variables"
@@ -69,51 +81,52 @@ struct SyncCommand: AsyncCommand {
             let newerThan = Timestamp.now().add(-24 * 3600 * pastDays)
             
             /// E.g. `data/ncep_gfs025/temperature_2m/chunk_1234.om`
-            var toDownload = [S3DataController.S3ListV2File]()
+            var toDownload = [(server: String, file: S3DataController.S3ListV2File)]()
             
-            for model in models {
-                let modelPrefix = "data/\(model.rawValue)/"
-                let remoteDirectories = try await curl.s3list(server: server, prefix: modelPrefix, apikey: signature.apikey).directories
-                
-                if downloadAllVariables {
-                    for variablePrefix in remoteDirectories {
-                        let remote = try await curl.s3list(server: server, prefix: variablePrefix, apikey: signature.apikey)
-                        let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                        toDownload.append(contentsOf: filtered)
-                    }
-                } else {
-                    if remoteDirectories.contains("\(modelPrefix)static/") {
-                        toDownload.append(contentsOf: try await curl.s3list(server: server, prefix: "\(modelPrefix)static/", apikey: signature.apikey).files.includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory))
-                    }
-                    // Check specified variables
-                    for variable in variables {
-                        let variablePrefix = "\(modelPrefix)\(variable)/"
-                        guard remoteDirectories.contains(variablePrefix) else {
-                            continue
+            for (models, server) in zip(modelsSet, serverSet) {
+                for model in models {
+                    let modelPrefix = "data/\(model.rawValue)/"
+                    let remoteDirectories = try await curl.s3list(server: server, prefix: modelPrefix, apikey: signature.apikey).directories
+                    
+                    if downloadAllVariables {
+                        for variablePrefix in remoteDirectories {
+                            let remote = try await curl.s3list(server: server, prefix: variablePrefix, apikey: signature.apikey)
+                            let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+                            toDownload.append(contentsOf: filtered.map({(server, $0)}))
                         }
-                        let remote = try await curl.s3list(server: server, prefix: variablePrefix, apikey: signature.apikey)
-                        let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                        toDownload.append(contentsOf: filtered)
+                    } else {
+                        if remoteDirectories.contains("\(modelPrefix)static/") {
+                            toDownload.append(contentsOf: try await curl.s3list(server: server, prefix: "\(modelPrefix)static/", apikey: signature.apikey).files.includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory).map({(server, $0)}))
+                        }
+                        // Check specified variables
+                        for variable in variables {
+                            let variablePrefix = "\(modelPrefix)\(variable)/"
+                            guard remoteDirectories.contains(variablePrefix) else {
+                                continue
+                            }
+                            let remote = try await curl.s3list(server: server, prefix: variablePrefix, apikey: signature.apikey)
+                            let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+                            toDownload.append(contentsOf: filtered.map({(server, $0)}))
+                        }
                     }
                 }
             }
             
-            let totalBytes = toDownload.reduce(0, {$0 + $1.fileSize})
+            let totalBytes = toDownload.reduce(0, {$0 + $1.file.fileSize})
             logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
             let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes)
-            for download in toDownload {
-                curl.setDeadlineIn(minutes: 30)
-                let startBytes = curl.totalBytesTransfered
-                var client = ClientRequest(url: URI("\(server)\(download.name)"))
+            let curlStartBytes = await curl.totalBytesTransfered.bytes
+            try await toDownload.foreachConcurrent(nConcurrent: signature.concurrent ?? 1) { download in
+                var client = ClientRequest(url: URI("\(download.server)\(download.file.name)"))
                 try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
-                let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
+                let pathNoData = download.file.name[download.file.name.index(download.file.name.startIndex, offsetBy: 5)..<download.file.name.endIndex]
                 let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                 try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
-                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false)
-                progress.add(curl.totalBytesTransfered - startBytes)
+                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
             }
-            progress.finish()
+            await progress.finish()
             
             guard let repeatInterval = signature.repeatInterval else {
                 break
@@ -121,7 +134,7 @@ struct SyncCommand: AsyncCommand {
             logger.info("Repeat in \(repeatInterval) minutes")
             try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
         }
-        curl.printStatistics()
+        await curl.printStatistics()
     }
 }
 

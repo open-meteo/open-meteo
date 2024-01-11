@@ -15,7 +15,7 @@ struct Meteorology {
     
     /// Calculate wind direction in degrees
     @inlinable static func windirectionFast(u: [Float], v: [Float]) -> [Float] {
-        precondition(u.count == v.count)
+        precondition(u.count == v.count, "Invalid array dimensions u\(u.count) \(v.count)")
         return [Float](unsafeUninitializedCapacity: u.count) { buffer, initializedCount in
             CHelper.windirectionFast(u.count, u, v, buffer.baseAddress)
             initializedCount += u.count

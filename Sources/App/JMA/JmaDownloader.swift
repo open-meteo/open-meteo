@@ -85,12 +85,6 @@ struct JmaDownload: AsyncCommand {
         let deadLineHours: Double = domain == .gsm ? 3 : 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
-        defer {
-            curl.printStatistics()
-            Process.alarm(seconds: 0)
-        }
-        
-        
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
@@ -116,7 +110,7 @@ struct JmaDownload: AsyncCommand {
             }
         }
         
-        return try await filesToDownload.asyncFlatMap { filename in
+        let handles = try await filesToDownload.asyncFlatMap { filename in
             let grib = try await curl.downloadGrib(url: "\(server)\(filename)", bzip2Decode: false)
             return try grib.compactMap { message -> (JmaVariableDownloadable, Int, FileHandle)? in
                 guard let variable = message.toJmaVariable(),
@@ -149,6 +143,9 @@ struct JmaDownload: AsyncCommand {
                 return (variable, hour, fn)
             }
         }
+        await curl.printStatistics()
+        Process.alarm(seconds: 0)
+        return handles
     }
     
     /// Process each variable and update time-series optimised files

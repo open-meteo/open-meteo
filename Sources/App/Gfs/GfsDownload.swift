@@ -115,9 +115,7 @@ struct GfsDownload: AsyncCommand {
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
             
             let nConcurrent = signature.concurrent ?? 1
-            try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: nConcurrent).foreachConcurrent(nConcurrent: nConcurrent, body: {
-                try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: $0.flatMap{$0.values})
-            })
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -287,7 +285,7 @@ struct GfsDownload: AsyncCommand {
                     ))
                 }
             }
-            curl.printStatistics()
+            await curl.printStatistics()
             return handles
         }
         
@@ -441,7 +439,7 @@ struct GfsDownload: AsyncCommand {
                 }
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
         return handles
     }
     
@@ -521,7 +519,7 @@ struct GfsDownload: AsyncCommand {
                 fn: fn, skipHour0: false
             ))
         }
-        curl.printStatistics()
+        await curl.printStatistics()
         return handles
     }
 }

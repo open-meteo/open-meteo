@@ -4,7 +4,6 @@ import SwiftEccodes
 import AsyncHTTPClient
 import CHelper
 
-
 enum CurlError: Error {
     //case noGribMessagesMatch
     case didNotFindAllVariablesInGribIndex
@@ -15,6 +14,7 @@ enum CurlError: Error {
     case timeoutReached
     case futimes(error: String)
     case contentLengthHeaderTooLarge(got: Int)
+    case couldNotGetContentLengthForConcurrentDownload
 }
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
@@ -22,10 +22,7 @@ final class Curl {
     let logger: Logger
     
     /// Give up downloading after the time, default 3 hours
-    var deadline: Date
-    
-    /// start time of downloading
-    let startTime = DispatchTime.now()
+    let deadline: Date
     
     /// Time to transfer a file. Default 5 minutes
     let readTimeout: Int
@@ -34,29 +31,37 @@ final class Curl {
     let retryError4xx: Bool
     
     /// Number of bytes of how much data was transfered
-    var totalBytesTransfered: Int = 0
+    let totalBytesTransfered = TotalBytesTransfered()
     
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
+    
+    /// If set, check HEAD before ownloading, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
+    let waitAfterLastModifiedBeforeDownload: TimeInterval?
     
     let client: HTTPClient
     
     /// Add headers to every request
     let headers: [(String, String)]
     
+    /// Chunk size for concurrent downloads
+    let chunkSize: Int
+    
     /// If the environment varibale `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
     static var cacheDirectory: String? {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, headers: [(String, String)] = .init()) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5*60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
         self.readTimeout = readTimeout
         self.waitAfterLastModified = waitAfterLastModified
+        self.waitAfterLastModifiedBeforeDownload = waitAfterLastModifiedBeforeDownload
         self.client = client
         self.headers = headers
+        self.chunkSize = chunkSizeMB * (2<<19)
     }
     
     deinit {
@@ -64,22 +69,29 @@ final class Curl {
         // trim it, before starting to convert data
         chelper_malloc_trim()
     }
-    
-    /// Set new deadline
-    public func setDeadlineIn(minutes: Int) {
-        self.deadline = Date().addingTimeInterval(TimeInterval(minutes * 60))
-    }
-    
-    public func printStatistics() {
-        logger.info("Finished downloading \(totalBytesTransfered.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
+
+    public func printStatistics() async {
+        await totalBytesTransfered.printStatistics(logger: logger)
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, cacheDirectory: String? = Curl.cacheDirectory) async throws -> HTTPClientResponse {
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false, waitAfterLastModifiedBeforeDownload: TimeInterval?) async throws -> HTTPClientResponse {
+        
+        let deadline = deadline ?? self.deadline
         
         // Check in cache
-        if let cacheDirectory {
-            return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory)
+        if let cacheDirectory, method == .GET {
+            return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent)
+        }
+        
+        // Ensure sufficient wait time using head requests
+        if let waitAfterLastModifiedBeforeDownload {
+            let head = try await initiateDownload(url: _url, range: range, minSize: minSize, method: .HEAD, deadline: deadline, nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil)
+            try await head.waitAfterLastModified(logger: logger, wait: waitAfterLastModifiedBeforeDownload)
+        }
+        
+        if nConcurrent > 1 && range == nil {
+            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
         }
         
         // URL might contain password, strip them from logging
@@ -93,15 +105,18 @@ final class Curl {
             url = _url
             auth = nil
         }
-        if let range {
-            logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
-        } else {
-            logger.info("Downloading file \(url)")
+        if !quiet && waitAfterLastModifiedBeforeDownload == nil {
+            if let range {
+                logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
+            } else {
+                logger.info("Downloading file \(url)")
+            }
         }
         
         
         let request = {
             var request = HTTPClientRequest(url: url)
+            request.method = method
             if let range = range {
                 request.headers.add(name: "range", value: "bytes=\(range)")
             }
@@ -134,13 +149,60 @@ final class Curl {
         }
     }
     
+    /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
+    private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
+        
+        let deadline = deadline ?? self.deadline
+        let head = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil)
+        guard let length = try head.contentLength(), length >= nConcurrent else {
+            throw CurlError.couldNotGetContentLengthForConcurrentDownload
+        }
+        let chunks = (0..<length.divideRoundedUp(divisor: chunkSize)).map {
+            return $0 * chunkSize ..< min(($0 + 1) * chunkSize, length)
+        }
+        
+        logger.info("Initiate concurrent download nConcurrent=\(nConcurrent) nChunks=\(chunks.count) length=\(length.bytesHumanReadable) chunkLength=\(chunkSize.bytesHumanReadable)")
+
+        let stream = chunks.mapStream(nConcurrent: nConcurrent) { chunk in
+            let range = "\(chunk.lowerBound)-\(chunk.upperBound-1)"
+            let timeout = TimeoutTracker(logger: self.logger, deadline: deadline)
+            while true {
+                // Start the download and wait for the header
+                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
+                
+                // Retry failed file transfers after this point
+                do {
+                    var buffer = ByteBuffer()
+                    let contentLength = try response.contentLength()
+                    if let contentLength {
+                        buffer.reserveCapacity(contentLength)
+                    }
+                    for try await fragement in response.body {
+                        try Task.checkCancellation()
+                        buffer.writeImmutableBuffer(fragement)
+                    }
+                    await self.totalBytesTransfered.add(buffer.readableBytes)
+                    if let minSize = minSize, buffer.readableBytes < minSize {
+                        throw CurlError.sizeTooSmall
+                    }
+                    
+                    return buffer
+                } catch {
+                    try await timeout.check(error: error)
+                }
+            }
+        }
+        
+        return HTTPClientResponse(status: .ok, headers: head.headers, body: .stream(stream))
+    }
+    
     /// Cache all HTTP download in temporary files. Only used for debugging.
-    private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String) async throws -> HTTPClientResponse {
+    private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String, nConcurrent: Int) async throws -> HTTPClientResponse {
         try FileManager.default.createDirectory(atPath: cacheDirectory, withIntermediateDirectories: true)
-        try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
+        //try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
         let cacheFile = cacheDirectory + "/" + SHA256.hash(data: (url + (range ?? "")).data(using: .utf8) ?? Data()).hex
         if !FileManager.default.fileExists(atPath: cacheFile) {
-            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil)
+            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: nConcurrent)
         }
         guard let data = try FileHandle(forReadingAtPath: cacheFile)?.readToEnd() else {
             fatalError("Could not read cached file")
@@ -152,12 +214,13 @@ final class Curl {
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     /// Data is first downloaded to a tempoary tilde file and then moved to its final location atomically
-    func download(url: String, toFile: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, cacheDirectory: String? = Curl.cacheDirectory) async throws {
+    func download(url: String, toFile: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, cacheDirectory: String? = Curl.cacheDirectory, nConcurrent: Int = 1, deadLineHours: Double? = nil) async throws {
+        let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         let fileTemp = "\(toFile)~"
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
             
             // Retry failed file transfers after this point
             do {
@@ -171,7 +234,7 @@ final class Curl {
                     try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
                 try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
-                self.totalBytesTransfered += tracker.transfered
+                await totalBytesTransfered.add(tracker.transfered)
                 try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return
             } catch {
@@ -182,11 +245,12 @@ final class Curl {
     
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
-    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bool = false) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bool = false, nConcurrent: Int = 1, deadLineHours: Double? = nil) async throws -> ByteBuffer {
+        let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
             
             // Retry failed file transfers after this point
             do {
@@ -207,7 +271,7 @@ final class Curl {
                         buffer.writeImmutableBuffer(fragement)
                     }
                 }
-                self.totalBytesTransfered += tracker.transfered
+                await totalBytesTransfered.add(tracker.transfered)
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
@@ -220,7 +284,8 @@ final class Curl {
     }
     
     /// Download all grib files and return an array of grib messages
-    func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil) async throws -> [GribMessage] {
+    func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil) async throws -> [GribMessage] {
+        let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         
         // AWS does not allow multi http download ranges. Split download into multiple downloads
@@ -235,39 +300,84 @@ final class Curl {
         
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
             
             // Retry failed file transfers after this point
             do {
-                //return try await withThrowingTaskGroup(of: Void.self) { group in
-                    var messages = [GribMessage]()
-                    let contentLength = try response.contentLength()
-                    let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
-                    if bzip2Decode {
-                        for try await m in response.body.tracker(tracker).decompressBzip2().decodeGrib() {
-                            try Task.checkCancellation()
-                            m.forEach({messages.append($0)})
-                            chelper_malloc_trim()
-                        }
-                    } else {
-                        for try await m in response.body.tracker(tracker).decodeGrib() {
-                            try Task.checkCancellation()
-                            m.forEach({messages.append($0)})
-                            chelper_malloc_trim()
-                        }
+                var messages = [GribMessage]()
+                let contentLength = try response.contentLength()
+                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                if bzip2Decode {
+                    for try await m in response.body.tracker(tracker).decompressBzip2().decodeGrib() {
+                        try Task.checkCancellation()
+                        messages.append(m)
+                        chelper_malloc_trim()
                     }
-                    self.totalBytesTransfered += tracker.transfered
-                    if let minSize = minSize, tracker.transfered < minSize {
-                        throw CurlError.sizeTooSmall
+                } else {
+                    for try await m in response.body.tracker(tracker).decodeGrib() {
+                        try Task.checkCancellation()
+                        messages.append(m)
+                        chelper_malloc_trim()
                     }
-                    try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
-                    return messages
-                //}
+                }
+                let trackerTransfered = await tracker.transfered
+                await totalBytesTransfered.add(trackerTransfered)
+                if let minSize = minSize, trackerTransfered < minSize {
+                    throw CurlError.sizeTooSmall
+                }
+                try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
+                return messages
             } catch {
                 try await timeout.check(error: error)
             }
         }
     }
+    
+    /// Stream GRIB messages. The grib stream might be restarted on error.
+    func withGribStream<T>(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
+        let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
+        let timeout = TimeoutTracker(logger: logger, deadline: deadline)
+        
+        // TODO fix AWS code path
+        // TODO use grib stream for GLOFAS downloader
+        
+        // AWS does not allow multi http download ranges. Split download into multiple downloads
+        /*let supportMultiRange = !url.contains("amazonaws.com")
+        if !supportMultiRange, let parts = range?.split(separator: ","), parts.count > 1 {
+            var messages = [GribMessage]()
+            for part in parts {
+                messages.append(contentsOf: try await downloadGrib(url: url, bzip2Decode: bzip2Decode, range: String(part)))
+            }
+            return messages
+        }*/
+        
+        while true {
+            // Start the download and wait for the header
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
+            
+            // Retry failed file transfers after this point
+            do {
+                let contentLength = try response.contentLength()
+                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                let result: T
+                if bzip2Decode {
+                    result = try await body(response.body.tracker(tracker).decompressBzip2().decodeGrib().eraseToAnyAsyncSequence())
+                } else {
+                    result = try await body(response.body.tracker(tracker).decodeGrib().eraseToAnyAsyncSequence())
+                }
+                let trackerTransfered = await tracker.transfered
+                await totalBytesTransfered.add(trackerTransfered)
+                if let minSize = minSize, trackerTransfered < minSize {
+                    throw CurlError.sizeTooSmall
+                }
+                try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
+                return result
+            } catch {
+                try await timeout.check(error: error)
+            }
+        }
+    }
+    
 }
 
 extension GribMessage {
@@ -397,7 +507,8 @@ extension HTTPClientResponse {
         guard let length = headers["Content-Length"].first.flatMap(Int.init), length >= 0 else {
             return nil
         }
-        if length > 128*(1<<30) {
+        // Yes, we are downloading 250GB GRIB files....
+        if length > 512*(1<<30) {
             throw CurlError.contentLengthHeaderTooLarge(got: length)
         }
         return length
@@ -416,5 +527,21 @@ extension HTTPClientResponse {
             }
             try await Task.sleep(nanoseconds:  UInt64(delta * 1_000_000_000))
         }
+    }
+}
+
+/// Track total bytes transfered
+final actor TotalBytesTransfered {
+    var bytes: Int = 0
+    
+    /// start time of downloading
+    let startTime = DispatchTime.now()
+    
+    public func add(_ n: Int) {
+        self.bytes += n
+    }
+    
+    public func printStatistics(logger: Logger) {
+        logger.info("Finished downloading \(bytes.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
     }
 }

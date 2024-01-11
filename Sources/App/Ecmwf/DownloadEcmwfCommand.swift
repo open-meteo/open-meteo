@@ -255,7 +255,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 try writer.write(file: "\(downloadDirectory)cloud_cover_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover, overwrite: true)
             }
         }
-        curl.printStatistics()
+        await curl.printStatistics()
     }
     
     func convertEcmwf(logger: Logger, domain: EcmwfDomain, run: Timestamp, variables: [EcmwfVariable]) throws {
