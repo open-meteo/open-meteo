@@ -31,7 +31,7 @@ public struct ForecastapiController: RouteCollection {
         )
         categoriesRoute.getAndPost("meteofrance", use: WeatherApiController(
             forecastDay: 4,
-            has15minutely: false,
+            has15minutely: true,
             defaultModel: .meteofrance_seamless).query
         )
         categoriesRoute.getAndPost("jma", use: WeatherApiController(
