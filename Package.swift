@@ -32,7 +32,7 @@ let package = Package(
         .package(url: "https://github.com/google/flatbuffers.git", from: "23.3.3"),
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.7.1"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.0.0"),
-        .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.4"),
+        .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.6"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "0.1.5"),
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "0.0.0")
