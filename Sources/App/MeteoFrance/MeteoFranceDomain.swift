@@ -94,7 +94,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             // Delay of 3:40 hours after initialisation. Cronjobs starts at or 2:00
             return t.with(hour: ((t.hour - 2 + 24) % 24) / 3 * 3)
         case .arome_france_15min, .arome_france_hd_15min:
-            return t.with(hour: ((t.hour - 1 + 24) % 24))
+            return t.with(hour: t.hour)
         }
     }
     

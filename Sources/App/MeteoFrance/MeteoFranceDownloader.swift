@@ -63,7 +63,7 @@ struct MeteoFranceDownload: AsyncCommand {
         
         let variablesAll = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
         
-        let variables = variablesAll.filter({ $0.availableFor(domain: domain, forecastHour: 0) })
+        let variables = variablesAll.filter({ $0.availableFor(domain: domain, forecastSecond: 0) })
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
@@ -135,7 +135,7 @@ struct MeteoFranceDownload: AsyncCommand {
         for seconds in domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: true) {
             let timestamp = run.add(seconds)
             for variable in variables {
-                guard variable.availableFor(domain: domain, forecastHour: seconds/3600) else {
+                guard variable.availableFor(domain: domain, forecastSecond: seconds) else {
                     continue
                 }
                 if seconds == 0 && variable.skipHour0(domain: domain) {
