@@ -145,6 +145,12 @@ final class Curl {
                     throw error
                 }
                 try await timeout.check(error: error)
+                
+                if let waitAfterLastModifiedBeforeDownload, case CurlError.downloadFailed(code: let status) = error, status.code == 404 {
+                    /// if there was a 404, make sure to wait at least `waitAfterLastModifiedBeforeDownload`
+                    /// Happens if the server does not return `Last-Modified` date to wait before starting downloading
+                    try await Task.sleep(nanoseconds: UInt64(waitAfterLastModifiedBeforeDownload) * 1_000_000_000)
+                }
             }
         }
     }
