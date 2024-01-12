@@ -6,6 +6,8 @@ import Foundation
 enum DomainRegistry: String, CaseIterable {
     case meteofrance_arome_france0025
     case meteofrance_arome_france_hd
+    case meteofrance_arome_france0025_15min
+    case meteofrance_arome_france_hd_15min
     case meteofrance_arpege_europe
     case meteofrance_arpege_world025
     
@@ -201,6 +203,10 @@ enum DomainRegistry: String, CaseIterable {
             return BomDomain.access_global
         case .bom_access_global_ensemble:
             return BomDomain.access_global_ensemble
+        case .meteofrance_arome_france0025_15min:
+            return MeteoFranceDomain.arome_france_15min
+        case .meteofrance_arome_france_hd_15min:
+            return MeteoFranceDomain.arome_france_hd_15min
         }
     }
 }

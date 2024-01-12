@@ -133,6 +133,7 @@ final class Curl {
             do {
                 let response = try await client.execute(request, timeout: .seconds(Int64(readTimeout)))
                 if response.status != .ok && response.status != .partialContent {
+                    //await print(try response.body.collect(upTo: 10000000).readStringImmutable())
                     throw CurlError.downloadFailed(code: response.status)
                 }
                 if let minSize = minSize, let contentLength = try response.contentLength(), contentLength < minSize {
