@@ -326,9 +326,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             }
             // For western europe, use arome models
             if let arome_france_hd = try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode) {
+                let arome_france_hd_15min = try MeteoFranceReader(domain: .arome_france_hd_15min, lat: lat, lon: lon, elevation: elevation, mode: mode)
                 let arome_france = try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode)
+                let arome_france_15min = try MeteoFranceReader(domain: .arome_france_15min, lat: lat, lon: lon, elevation: elevation, mode: mode)
                 let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode)
-                return Array([gfs013, icon, arpege_europe, arome_france, arome_france_hd].compacted())
+                return Array([gfs013, icon, arpege_europe, arome_france, arome_france_hd, arome_france_15min, arome_france_hd_15min].compacted())
             }
             // For North America, use HRRR
             if let hrrr = try GfsReader(domain: .hrrr_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) {
@@ -362,7 +364,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .meteofrance_seamless:
             fallthrough
         case .meteofrance_mix:
-            return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .meteofrance_arpege_seamless:
             fallthrough
         case .arpege_seamless:
@@ -370,7 +372,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .meteofrance_arome_seamless:
             fallthrough
         case .arome_seamless:
-            return try MeteoFranceMixer(domains: [.arome_france, .arome_france_hd], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try MeteoFranceMixer(domains: [.arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
         case .arpege_world:
             fallthrough
         case .meteofrance_arpege_world:

@@ -6,7 +6,7 @@ protocol MeteoFranceVariableDownloadable: GenericVariable {
     var isAccumulatedSinceModelStart: Bool { get }
     
     /// AROME france HD has very few variables
-    func availableFor(domain: MeteoFranceDomain, forecastHour: Int) -> Bool
+    func availableFor(domain: MeteoFranceDomain, forecastSecond: Int) -> Bool
     
     /// Return the `coverage` id for the given variable or nil if it is not available for this domain
     func getCoverageId() -> (variable: String, height: Int?, pressure: Int?, isPeriod: Bool)
@@ -86,7 +86,8 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     }
     
     
-    func availableFor(domain: MeteoFranceDomain, forecastHour: Int) -> Bool {
+    func availableFor(domain: MeteoFranceDomain, forecastSecond: Int) -> Bool {
+        let forecastHour = forecastSecond / 3600
         if domain == .arpege_europe && forecastHour % 3 != 0 && forecastHour > 48 {
             switch self {
                 /// upper level variables after hour 48 only 3 hourly data
@@ -103,6 +104,62 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
                 return true
             default:
                 return true
+            }
+        }
+        
+        if domain == .arome_france_hd_15min {
+            switch self {
+            case .cape:
+                return true
+            case .precipitation:
+                return true
+            case .snowfall_water_equivalent:
+                return true
+           //case .wind_gusts_10m:
+                //return true
+            case .relative_humidity_2m:
+                return true
+            case .temperature_2m:
+                return true
+            default:
+                return false
+            }
+        }
+        
+        if domain == .arome_france_15min {
+            switch self {
+            //case .temperature_2m:
+            //    return true
+            //case .relative_humidity_2m:
+            //    return true // 10 meter!?!?!?
+            case .wind_v_component_10m:
+                return true
+            case .wind_u_component_10m:
+                return true
+            case .wind_v_component_20m:
+                return true
+            case .wind_u_component_20m:
+                return true
+            case .wind_v_component_50m:
+                return true
+            case .wind_u_component_50m:
+                return true
+            case .wind_v_component_100m:
+                return true
+            case .wind_u_component_100m:
+                return true
+            //case .precipitation:
+            //    return true
+            //case .snowfall_water_equivalent:
+            //    return true
+            //case .wind_gusts_10m: // only hourly
+            //    return forecastSecond % 3600 == 0
+            //case .shortwave_radiation: // only hourly
+            //    return forecastSecond % 3600 == 0
+            //case .pressure_msl:
+            //    return true
+            default:
+                return false
             }
         }
         
@@ -145,10 +202,10 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     
     func skipHour0(domain: MeteoFranceDomain) -> Bool {
         switch self {
-        case .cloud_cover: return domain.family == .arome
-        case .cloud_cover_low: return domain.family == .arome
-        case .cloud_cover_mid: return domain.family == .arome
-        case .cloud_cover_high: return domain.family == .arome
+        case .cloud_cover: return domain.family == .arome || domain.family == .aromepi
+        case .cloud_cover_low: return domain.family == .arome || domain.family == .aromepi
+        case .cloud_cover_mid: return domain.family == .arome || domain.family == .aromepi
+        case .cloud_cover_high: return domain.family == .arome || domain.family == .aromepi
         case .precipitation: return true
         case .shortwave_radiation: return true
         case .wind_gusts_10m: return true
@@ -195,7 +252,8 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
 }
 
 extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
-    func availableFor(domain: MeteoFranceDomain, forecastHour: Int) -> Bool {
+    func availableFor(domain: MeteoFranceDomain, forecastSecond: Int) -> Bool {
+        let forecastHour = forecastSecond / 3600
         if level <= 70 && forecastHour % 3 != 0 {
             // level 10-70 only have 3-hourly data
             return false
