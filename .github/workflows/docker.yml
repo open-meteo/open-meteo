@@ -19,18 +19,15 @@ jobs:
     strategy:
       matrix:
         include:
-          - arch: arm64
-            variant: v8
-          - arch: amd64
+          - platform: linux/arm64
+          - platform: linux/amd64
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
-      #- name: Set up QEMU
-      #  uses: docker/setup-qemu-action@v3
-      #  with:
-      #    platforms: |
-      #      amd64
-      #      arm64
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+        with:
+          platforms: ${{ matrix.platform }}
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Docker meta
@@ -49,9 +46,6 @@ jobs:
         with:
           context: .
           platforms: ${{ matrix.platform }}
-          #platforms: |
-          #  linux/amd64
-          #  linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
