@@ -8,7 +8,7 @@ cd open-meteo
 
 # Install docker
 docker build -f Dockerfile.development -t open-meteo-development .
-docker run -it --security-opt seccomp=unconfined -p 8080:8080 -v ${PWD}/data:/app/data -t open-meteo-development /bin/bash
+docker run -it --security-opt seccomp=unconfined -p 8080:8080 -v ${PWD}:/app -t open-meteo-development /bin/bash
 # Run commands inside docker container:
 swift run
 swift run openmeteo-api download-ecmwf --run 00
