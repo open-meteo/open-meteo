@@ -16,15 +16,21 @@ jobs:
   push_to_registry:
     name: Build Docker Image
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - arch: arm64
+            variant: v8
+          - arch: amd64
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-        with:
-          platforms: |
-            amd64
-            arm64
+      #- name: Set up QEMU
+      #  uses: docker/setup-qemu-action@v3
+      #  with:
+      #    platforms: |
+      #      amd64
+      #      arm64
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
       - name: Docker meta
@@ -42,9 +48,9 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          platforms: |
-            linux/amd64
-            linux/arm64
+          #platforms: |
+          #  linux/amd64
+          #  linux/arm64
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
