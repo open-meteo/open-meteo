@@ -7,7 +7,7 @@ name: Upload Release Asset
 
 env:
   swift_package_resolve: swift package resolve
-  swift_build: swift build -c release  -Xswiftc -g -Xswiftc -static-stdlib -Xcc -march=skylake
+  swift_build: MARCH_SKYLAKE=TRUE swift build -c release -Xswiftc -g -Xswiftc -static-stdlib
   swift_test: swift test
   cache_version: 2
 

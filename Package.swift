@@ -4,7 +4,8 @@ import PackageDescription
 import Foundation
 
 #if arch(x86_64)
-let mArch = ["-march=native"]
+// Docker and Ubuntu release system uses `march=skylake`
+let mArch = ProcessInfo.processInfo.environment["MARCH_SKYLAKE"] == "TRUE" ? ["-march=skylake"] : ["-march=native"]
 #else
 let mArch: [String] = []
 #endif

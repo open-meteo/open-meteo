@@ -15,7 +15,7 @@ RUN swift package resolve
 COPY . .
 
 # Compile with optimizations
-RUN swift build -c release -Xcc -march=skylake
+RUN MARCH_SKYLAKE=TRUE swift build -c release
 
 
 # ================================
