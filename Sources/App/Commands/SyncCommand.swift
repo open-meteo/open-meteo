@@ -46,7 +46,7 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of minutes.")
         var repeatInterval: Int?
         
-        @Option(name: "concurrent", short: "c", help: "Number of concurrent file download")
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent file download. Default 4")
         var concurrent: Int?
     }
     
@@ -70,50 +70,45 @@ struct SyncCommand: AsyncCommand {
         }
         let serverAndModels = zip(modelsSet, serverSet).flatMap { (models, server) in models.map {(server, $0)} }
         let pastDays = signature.pastDays ?? 7
-        let variables = signature.variables.split(separator: ",")
-        let concurrent = signature.concurrent ?? 1
+        let variables = signature.variables.split(separator: ",").map(String.init) + ["static"]
+        let concurrent = signature.concurrent ?? 4
         /// Undocumented switch to download all weather variables. This can generate immense traffic!
         let downloadAllVariables = signature.variables == "really_download_all_variables"
         
         let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, retryError4xx: false)
         
         while true {
-            logger.info("Checking for files to download newer than \(pastDays) days")
+            logger.info("Checking for files to with more than \(pastDays) past days data")
             let newerThan = Timestamp.now().add(-24 * 3600 * pastDays)
             
-            /// E.g. `data/ncep_gfs025/temperature_2m/chunk_1234.om`
-            let toDownload: [(server: String, file: S3DataController.S3ListV2File)] = try await serverAndModels.mapConcurrent(nConcurrent: concurrent) { (server, model) in
-                let modelPrefix = "data/\(model.rawValue)/"
-                let remoteDirectories = try await curl.s3list(server: server, prefix: modelPrefix, apikey: signature.apikey).directories
-                
-                if downloadAllVariables {
-                    return try await remoteDirectories.asyncFlatMap { variablePrefix in
-                        let remote = try await curl.s3list(server: server, prefix: variablePrefix, apikey: signature.apikey)
-                        let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                        return filtered.map({(server, $0)})
-                    }
-                } else {
-                    let variables = remoteDirectories.contains("\(modelPrefix)static/") ? variables + ["static"] : variables
-                    // Check specified variables
-                    return try await variables.asyncFlatMap { variable in
-                        let variablePrefix = "\(modelPrefix)\(variable)/"
-                        guard remoteDirectories.contains(variablePrefix) else {
-                            return []
-                        }
-                        let remote = try await curl.s3list(server: server, prefix: variablePrefix, apikey: signature.apikey)
-                        let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                        return filtered.map({(server, $0)})
-                    }
+            /// Get a list of all variables from all models
+            let remotes = try await serverAndModels.mapConcurrent(nConcurrent: concurrent) { (server, model) in
+                let remoteDirectories = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/", apikey: signature.apikey).directories
+                return remoteDirectories.map {
+                    return (server, model, $0)
                 }
             }.flatMap({$0})
             
+            /// Filter variables to download
+            let toDownload = try await remotes.mapConcurrent(nConcurrent: concurrent) { (server, model, remoteDirectory) -> [(server: String, file: S3DataController.S3ListV2File)] in
+                if !downloadAllVariables && !variables.contains(where: {"data/\(model.rawValue)/\($0)/" == remoteDirectory}) {
+                    return []
+                }
+                let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey)
+                let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+                return filtered.map({(server, $0)})
+            }.flatMap({$0})
+            
+            /// Download all files
             let totalBytes = toDownload.reduce(0, {$0 + $1.file.fileSize})
             logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
             let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes)
             let curlStartBytes = await curl.totalBytesTransfered.bytes
             try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
                 var client = ClientRequest(url: URI("\(download.server)\(download.file.name)"))
-                try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
+                if signature.apikey != nil || signature.rate != nil {
+                    try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
+                }
                 let pathNoData = download.file.name[download.file.name.index(download.file.name.startIndex, offsetBy: 5)..<download.file.name.endIndex]
                 let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
                 let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
