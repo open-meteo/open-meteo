@@ -41,7 +41,7 @@ extension Application {
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
             connectionPool: .init(idleTimeout: .minutes(10)))
         // NCEP server still struggle with H2
-        configuration.httpVersion = .http1Only
+        //configuration.httpVersion = .http1Only
         
         let new = HTTPClient(
             eventLoopGroupProvider: .shared(eventLoopGroup),
