@@ -17,17 +17,18 @@ final class TimeoutTracker {
     }
     
     /// Print statistics, throw if deadline reached, sleep backoff timer
-    func check(error: Error) async throws {
+    func check(error: Error, delay: Int? = nil) async throws {
+        let delay = delay ?? retryDelaySeconds
         let timeElapsed = Date().timeIntervalSince(startTime)
         if Date().timeIntervalSince(lastPrint) > 60 {
-            logger.info("Download failed, retry every \(retryDelaySeconds) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
+            logger.info("Download failed, retry every \(delay) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
             lastPrint = Date()
         }
         if Date() > deadline {
             logger.error("Deadline reached. Last Error \(error)")
             throw CurlError.timeoutReached
         }
-        try await Task.sleep(nanoseconds: UInt64(retryDelaySeconds * 1_000_000_000))
+        try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
     }
 }
 

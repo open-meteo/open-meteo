@@ -84,16 +84,18 @@ struct DownloadBomCommand: AsyncCommand {
         let topogFile = "\(domain.downloadDirectory)topog.nc"
         let lndMaskFile = "\(domain.downloadDirectory)lnd_mask.nc"
         if !FileManager.default.fileExists(atPath: topogFile) {
-            try await curl.download(
+            let _ = try await curl.downloadNetCdf(
                 url: "\(base)sfc/topog.nc",
-                toFile: topogFile,
+                file: topogFile,
+                ncVariable: "topog",
                 bzip2Decode: false
             )
         }
         if !FileManager.default.fileExists(atPath: lndMaskFile) {
-            try await curl.download(
+            let _ = try await curl.downloadNetCdf(
                 url: "\(base)sfc/lnd_mask.nc",
-                toFile: lndMaskFile,
+                file: lndMaskFile,
+                ncVariable: "lnd_mask",
                 bzip2Decode: false
             )
         }
@@ -130,16 +132,18 @@ struct DownloadBomCommand: AsyncCommand {
             let analysisFile = "\(domain.downloadDirectory)\(variable)_an.nc"
             let forecastFile = "\(domain.downloadDirectory)\(variable)_fc.nc"
             if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: analysisFile) {
-                try await curl.download(
+                let _ = try await curl.downloadNetCdf(
                     url: "\(base)an/ml/\(variable).nc",
-                    toFile: analysisFile,
+                    file: analysisFile,
+                    ncVariable: variable,
                     bzip2Decode: false
                 )
             }
             if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: forecastFile) {
-                try await curl.download(
+                let _ = try await curl.downloadNetCdf(
                     url: "\(base)fc/ml/\(variable).nc",
-                    toFile: forecastFile,
+                    file: forecastFile,
+                    ncVariable: variable,
                     bzip2Decode: false
                 )
             }
@@ -225,9 +229,10 @@ struct DownloadBomCommand: AsyncCommand {
                 let memberStr = ((run.hour % 12 == 6) ? (member+17) : member).zeroPadded(len: 3)
                 if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: forecastFile) {
                     let url = member == 0 ? "\(base)cf/sfc/\(variable.name).nc" : "\(base)pf/\(memberStr)/sfc/\(variable.name).nc"
-                    try await curl.download(
+                    let _ = try await curl.downloadNetCdf(
                         url: url,
-                        toFile: forecastFile,
+                        file: forecastFile,
+                        ncVariable: variable.name,
                         bzip2Decode: false
                     )
                 }
@@ -357,16 +362,18 @@ struct DownloadBomCommand: AsyncCommand {
             let analysisFile = "\(domain.downloadDirectory)\(variable.name)_an.nc"
             let forecastFile = "\(domain.downloadDirectory)\(variable.name)_fc.nc"
             if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: analysisFile) {
-                try await curl.download(
+                let _ = try await curl.downloadNetCdf(
                     url: "\(base)an/sfc/\(variable.name).nc",
-                    toFile: analysisFile,
+                    file: analysisFile,
+                    ncVariable: variable.name,
                     bzip2Decode: false
                 )
             }
             if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: forecastFile) {
-                try await curl.download(
+                let _ = try await curl.downloadNetCdf(
                     url: "\(base)fc/sfc/\(variable.name).nc",
-                    toFile: forecastFile,
+                    file: forecastFile,
+                    ncVariable: variable.name,
                     bzip2Decode: false
                 )
             }
