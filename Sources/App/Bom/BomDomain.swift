@@ -43,8 +43,8 @@ enum BomDomain: String, GenericDomain, CaseIterable {
     
     var dtSeconds: Int {
         switch self {
-        case .access_global: 3600
-        case .access_global_ensemble: 3*3600
+        case .access_global: return 3600
+        case .access_global_ensemble: return 3*3600
         }
     }
     
@@ -58,8 +58,8 @@ enum BomDomain: String, GenericDomain, CaseIterable {
     
     var omFileLength: Int {
         switch self {
-        case .access_global: 240+48
-        case .access_global_ensemble: (240+48) / 3
+        case .access_global: return 240+48
+        case .access_global_ensemble: return (240+48) / 3
         }
     }
     
