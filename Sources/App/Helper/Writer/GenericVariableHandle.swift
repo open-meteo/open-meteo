@@ -14,9 +14,12 @@ struct GenericVariableHandle {
     
     /// Process concurrently
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self], concurrent: Int) async throws {
+        let startTime = Date()
         try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
             try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, nMembers: nMembers, handles: $0.flatMap{$0.values})
         })
+        let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
+        logger.info("Conversion completed in \(timeElapsed)")
     }
     
     /// Process each variable and update time-series optimised files
