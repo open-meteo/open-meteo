@@ -11,6 +11,7 @@ enum CurlError: Error {
     case didNotGetAllGribMessages(got: Int, expected: Int)
     case downloadFailed(code: HTTPStatus)
     case timeoutReached
+    case timeoutPerChunkReached
     case futimes(error: String)
     case contentLengthHeaderTooLarge(got: Int)
     case couldNotGetContentLengthForConcurrentDownload
@@ -174,17 +175,24 @@ final class Curl {
             let range = "\(chunk.lowerBound)-\(chunk.upperBound-1)"
             let timeout = TimeoutTracker(logger: self.logger, deadline: deadline)
             while true {
+                // 60 seconds timeout for each chunks
+                let deadlineShort = Date().addingTimeInterval(TimeInterval(60))
                 // Start the download and wait for the header
-                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
+                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadlineShort, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
                 
                 // Retry failed file transfers after this point
                 do {
                     var buffer = ByteBuffer()
                     let contentLength = try response.contentLength()
+                    //let tracker = TransferAmountTracker(logger: self.logger, totalSize: contentLength)
                     if let contentLength {
                         buffer.reserveCapacity(contentLength)
                     }
                     for try await fragement in response.body {
+                        //await tracker.add(fragement.readableBytes)
+                        if Date() > deadlineShort {
+                            throw CurlError.timeoutPerChunkReached
+                        }
                         try Task.checkCancellation()
                         buffer.writeImmutableBuffer(fragement)
                     }
