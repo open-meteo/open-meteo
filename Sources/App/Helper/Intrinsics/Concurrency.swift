@@ -130,7 +130,11 @@ extension Sequence {
 
 extension AsyncSequence {
     func collect() async rethrows -> [Element] {
-        try await reduce(into: [Element]()) { $0.append($1) }
+        var results = [Element]()
+        for try await element in self {
+            results.append(element)
+        }
+        return results
     }
     
     /// Execute a closure for each element concurrently and return a new value
@@ -147,26 +151,26 @@ extension AsyncSequence {
                 do {
                     try await withThrowingTaskGroup(of: (Int, T).self) { group in
                         var results = [Int: T]()
-                        var pos = 0
-                        let indexAsync = Counter()
+                        var readerIndex = 0
+                        var writerIndex = 0
                         for try await element in self {
-                            let index = await indexAsync.get()
-                            if index >= nConcurrent, let result = try await group.next() {
+                            if writerIndex >= nConcurrent, let result = try await group.next() {
                                 results[result.0] = result.1
-                                while let nextReturn = results.removeValue(forKey: pos) {
-                                    pos += 1
+                                while let nextReturn = results.removeValue(forKey: readerIndex) {
+                                    readerIndex += 1
                                     continuation.yield(nextReturn)
                                 }
                             }
+                            let indexCopy = writerIndex
                             group.addTask {
-                                await indexAsync.increment()
-                                return (index, try await body(element))
+                                return (indexCopy, try await body(element))
                             }
+                            writerIndex += 1
                         }
                         while let result = try await group.next() {
                             results[result.0] = result.1
-                            while let nextReturn = results.removeValue(forKey: pos) {
-                                pos += 1
+                            while let nextReturn = results.removeValue(forKey: readerIndex) {
+                                readerIndex += 1
                                 continuation.yield(nextReturn)
                             }
                         }
@@ -180,18 +184,5 @@ extension AsyncSequence {
                 task.cancel()
             }
         }
-    }
-}
-
-/// Thread safe counter
-fileprivate actor Counter {
-    private var value = 0
-    
-    func increment() {
-        value += 1
-    }
-    
-    func get() -> Int {
-        return value
     }
 }
