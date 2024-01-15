@@ -236,15 +236,15 @@ struct DownloadCmaCommand: AsyncCommand {
         }
         let previous = PreviousData()
         
-        let handles = try await forecastHours.asyncFlatMap { forecastHour in
+        let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
             let url = "\(server)t\(run.hh)00/\(timeint)/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             let timestamp = run.add(hours: forecastHour)
             // Split download into 16 MB parts and download concurrently
             // In case processing is too slow, incoming data will be buffered
-            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+            let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
                 // Process each grib message concurrently. Independent from download thread
-                return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                let handles = try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                     /*
                      if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                          try await writeElevation(grib: grib, domain: domain)
@@ -302,8 +302,13 @@ struct DownloadCmaCommand: AsyncCommand {
                     let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
                 }.collect().compactMap({$0})
+                logger.info("Handles in stream: \(handles.count)")
+                return handles
             }
+            logger.info("Handles in this timestep \(timestamp): \(handles.count)")
+            return handles
         }
+        logger.info("Handles total: \(handles.count)")
         await curl.printStatistics()
         Process.alarm(seconds: 0)
         return handles

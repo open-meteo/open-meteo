@@ -18,7 +18,8 @@ extension Sequence {
         var values = [T]()
         values.reserveCapacity(self.underestimatedCount)
         for element in self {
-            try await values.append(contentsOf: transform(element))
+            let transformed = try await transform(element)
+            values.append(contentsOf: transformed)
         }
         return values
     }
