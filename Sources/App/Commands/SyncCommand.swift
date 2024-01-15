@@ -83,7 +83,7 @@ struct SyncCommand: AsyncCommand {
             
             /// Get a list of all variables from all models
             let remotes = try await serverAndModels.mapConcurrent(nConcurrent: concurrent) { (server, model) in
-                let remoteDirectories = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/", apikey: signature.apikey).directories
+                let remoteDirectories = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/", apikey: signature.apikey, deadLineHours: 0.1).directories
                 return remoteDirectories.map {
                     return (server, model, $0)
                 }
@@ -94,7 +94,7 @@ struct SyncCommand: AsyncCommand {
                 if !downloadAllVariables && !variables.contains(where: {"data/\(model.rawValue)/\($0)/" == remoteDirectory}) {
                     return []
                 }
-                let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey)
+                let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey, deadLineHours: 0.1)
                 let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
                 return filtered.map({(server, $0)})
             }.flatMap({$0})
@@ -204,11 +204,11 @@ extension StringProtocol {
 
 fileprivate extension Curl {
     /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
-    func s3list(server: String, prefix: String, apikey: String?) async throws -> (files: [S3DataController.S3ListV2File], directories: [String]) {
+    func s3list(server: String, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3DataController.S3ListV2File], directories: [String]) {
         var request = ClientRequest(method: .GET, url: URI("\(server)"))
         let params = S3DataController.S3ListV2(list_type: 2, delimiter: "/", prefix: prefix, apikey: apikey)
         try request.query.encode(params)
-        var response = try await downloadInMemoryAsync(url: request.url.string, minSize: nil)
+        var response = try await downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours)
         guard let body = response.readString(length: response.readableBytes) else {
             return ([],[])
         }
