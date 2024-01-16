@@ -69,6 +69,15 @@ extension FileHandle {
         // This field contains the number of hard links to the file.
         return stats.st_nlink == 0
     }
+    
+    public func fileSize() -> Int {
+        var stats = stat()
+        guard fstat(fileDescriptor, &stats) != -1 else {
+            let error = String(cString: strerror(errno))
+            fatalError("fstat failed on open file descriptor. Error \(errno) \(error)")
+        }
+        return Int(stats.st_size)
+    }
 }
 
 extension FileManager {

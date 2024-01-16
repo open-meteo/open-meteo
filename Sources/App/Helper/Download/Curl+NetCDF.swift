@@ -24,9 +24,22 @@ extension Curl {
                 guard let nc = try NetCDF.open(path: file, allowUpdate: false) else {
                     throw CurlNetCdfError.netcdfOpenFailed
                 }
-                // Try to read meta data from variable
+                // Try to read meta data from variable.
                 guard (nc.getVariable(name: ncVariable)?.dimensions) != nil else {
-                    throw CurlNetCdfError.netcdfVarGetFailed
+                    guard let size = FileHandle(forReadingAtPath: file)?.fileSize() else {
+                        fatalError("Could not get file size")
+                    }
+                    // Check remote file size to see if more data is comming in
+                    while true {
+                        guard let newSize = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil).contentLength() else {
+                            fatalError("Could not get new size")
+                        }
+                        if newSize <= size {
+                            throw CurlNetCdfError.netcdfVarGetFailed // retry download
+                        }
+                        // wait 1min
+                        try await timeout.check(error: CurlNetCdfError.netcdfVarGetFailed, delay: 60)
+                    }
                 }
                 return nc
             } catch {
