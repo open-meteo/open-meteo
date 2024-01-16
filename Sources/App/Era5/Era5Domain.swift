@@ -515,7 +515,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .cloud_cover_mid, time: time)
         case .cloudcover_high:
             try prefetchData(raw: .cloud_cover_high, time: time)
-        case .wind_gusts_10m:
+        case .windgusts_10m:
             try prefetchData(raw: .wind_gusts_10m, time: time)
         case .dewpoint_2m:
             try prefetchData(raw: .dew_point_2m, time: time)
@@ -753,7 +753,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return try get(raw: .cloud_cover_mid, time: time)
         case .cloudcover_high:
             return try get(raw: .cloud_cover_high, time: time)
-        case .wind_gusts_10m:
+        case .windgusts_10m:
             return try get(raw: .wind_gusts_10m, time: time)
         case .dewpoint_2m:
             return try get(raw: .dew_point_2m, time: time)

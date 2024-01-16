@@ -50,7 +50,7 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case direct_radiation_instant
     case direct_normal_irradiance_instant
     case wet_bulb_temperature_2m
-    case wind_gusts_10m
+    case windgusts_10m
     case dewpoint_2m
     case sunshine_duration
     
