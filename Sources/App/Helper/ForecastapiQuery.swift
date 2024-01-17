@@ -50,6 +50,12 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     
     let apikey: String?
     
+    /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical.
+    let tilt: Float?
+    
+    /// Azimuth of a solar panel for GTI calculation. 0° south, -90° east, 90° west
+    let azimuth: Float?
+    
     /// Used in climate API
     let disable_bias_correction: Bool? // CMIP
     
@@ -76,6 +82,10 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     
     var timeformatOrDefault: Timeformat {
         return timeformat ?? .iso8601
+    }
+    
+    var readerOptions: GenericReaderOptions {
+        return GenericReaderOptions(tilt: tilt, azimuth: azimuth)
     }
     
     /// Parse `start_date` and `end_date` parameter to range of timestamps

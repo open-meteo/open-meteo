@@ -4,7 +4,7 @@ import Foundation
 protocol MultiDomainMixerDomain: RawRepresentableString {
     var countEnsembleMember: Int { get }
     
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol]
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol]
 }
 
 /// Combine multiple independent weather models, that may not have given forecast variable
@@ -34,8 +34,8 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         self.domain = domain
     }
     
-    public init?(domain: MultiDomainMixerDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        let reader = try domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+    public init?(domain: MultiDomainMixerDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
+        let reader = try domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         guard !reader.isEmpty else {
             return nil
         }

@@ -126,7 +126,7 @@ struct WeatherApiController {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
             
             let readers: [ForecastapiResult<MultiDomains>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: params.readerOptions) else {
                     return nil
                 }
                 
@@ -301,10 +301,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol] {
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol] {
         switch self {
         case .best_match:
-            guard let icon: any GenericReaderProtocol = try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            guard let icon: any GenericReaderProtocol = try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
             guard let gfs013: any GenericReaderProtocol = try GfsReader(domain: .gfs013, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
@@ -312,14 +312,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             }
             // Scandinavian region, combine with ICON
             if lat >= 54.9, let metno = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode) {
-                let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode)
+                let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return Array([gfs013, icon, iconEu, metno].compacted())
             }
             // If Icon-d2 is available, use icon domains
-            if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode),
-               let iconD2_15min = try IconReader(domain: .iconD2_15min, lat: lat, lon: lon, elevation: elevation, mode: mode) {
+            if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+               let iconD2_15min = try IconReader(domain: .iconD2_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 // TODO: check how out of projection areas are handled
-                guard let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                guard let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
                 }
                 return [gfs013, icon, iconEu, iconD2, iconD2_15min]
@@ -342,7 +342,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             }
             
             // Remaining eastern europe
-            if let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode) {
+            if let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 return [gfs013, icon, iconEu]
             }
             
@@ -356,23 +356,23 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .gfs_seamless:
             fallthrough
         case .gfs_mix:
-            return try GfsMixer(domains: [.gfs013, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GfsMixer(domains: [.gfs013, .hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .gfs_global:
-            return try GfsMixer(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GfsMixer(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .gfs_hrrr:
-            return try GfsMixer(domains: [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GfsMixer(domains: [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .meteofrance_seamless:
             fallthrough
         case .meteofrance_mix:
-            return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .meteofrance_arpege_seamless:
             fallthrough
         case .arpege_seamless:
-            return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .meteofrance_arome_seamless:
             fallthrough
         case .arome_seamless:
-            return try MeteoFranceMixer(domains: [.arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try MeteoFranceMixer(domains: [.arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .arpege_world:
             fallthrough
         case .meteofrance_arpege_world:
@@ -392,7 +392,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .jma_seamless:
             fallthrough
         case .jma_mix:
-            return try JmaMixer(domains: [.gsm, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try JmaMixer(domains: [.gsm, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .jma_msm:
             return try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .jms_gsm:
@@ -402,19 +402,19 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .icon_seamless:
             fallthrough
         case .icon_mix:
-            return try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .icon_global:
-            return try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .icon_eu:
-            return try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .icon_d2:
-            return try IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .ecmwf_ifs04:
             return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .metno_nordic:
             return try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gem_seamless:
-            return try GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .gem_global:
             return try GemReader(domain: .gem_global, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gem_regional:
@@ -631,6 +631,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case soil_moisture_35_to_100cm
     case soil_moisture_100_to_300cm
     case shortwave_radiation_clear_sky
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     
     /// Some variables are kept for backwards compatibility
     var remapped: Self {

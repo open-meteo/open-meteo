@@ -15,6 +15,36 @@ protocol GenericReaderDerived: GenericReaderProtocol {
     func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDt) throws
 }
 
+/// Parameters for tilted radiation calculation
+struct GenericReaderOptions {
+    /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical.
+    private var tilt: Float
+    
+    /// Azimuth of a solar panel for GTI calculation. 0° south, -90° east, 90° west
+    private var azimuth: Float
+    
+    public init(tilt: Float? = nil, azimuth: Float? = nil) {
+        self.tilt = tilt ?? 0
+        self.azimuth = azimuth ?? 0
+    }
+    
+    /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.
+    func getTilt() throws -> Float {
+        guard tilt >= 0 && tilt <= 90 else {
+            throw ForecastapiError.generic(message: "Parameter `&tilt=` must be within 0° and 90°")
+        }
+        return tilt
+    }
+    
+    /// Azimuth of a solar panel for GTI calculation. 0° south, -90° east, 90° west. Throws out of bounds error.
+    func getAzimuth() throws -> Float {
+        guard azimuth >= -90 && azimuth <= 90 else {
+            throw ForecastapiError.generic(message: "Parameter `&azimuth=` must be within -90° and 90°")
+        }
+        return azimuth
+    }
+}
+
 extension GenericReaderDerived {
     var modelLat: Float {
         reader.modelLat

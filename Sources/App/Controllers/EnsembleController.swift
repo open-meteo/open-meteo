@@ -26,7 +26,7 @@ public struct EnsembleApiController {
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             
             let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<EnsembleVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                guard let reader = try GenericReaderMulti<EnsembleVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: params.readerOptions) else {
                     return nil
                 }
                 return .init(
@@ -115,16 +115,16 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
 
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol] {
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol] {
         switch self {
         case .icon_seamless:
-            return try IconMixer(domains: [.iconEps, .iconEuEps, .iconD2Eps], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try IconMixer(domains: [.iconEps, .iconEuEps, .iconD2Eps], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .icon_global:
-            return try IconReader(domain: .iconEps, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try IconReader(domain: .iconEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .icon_eu:
-            return try IconReader(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try IconReader(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .icon_d2:
-            return try IconReader(domain: .iconD2Eps, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try IconReader(domain: .iconD2Eps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .ecmwf_ifs04:
             return try EcmwfReader(domain: .ifs04_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gfs025:
@@ -132,7 +132,7 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
         case .gfs05:
             return try GfsReader(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gfs_seamless:
-            return try GfsMixer(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode)?.reader ?? []
+            return try GfsMixer(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .gem_global:
             return try GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .bom_access_global_ensemble:

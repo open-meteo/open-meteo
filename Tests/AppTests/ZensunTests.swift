@@ -181,4 +181,24 @@ final class ZensunTests: XCTestCase {
         let dni2 = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time)
         XCTAssertEqualArray(dni2, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 75.31125, 525.6262, 730.035, 838.7038, 889.7469, 908.00757, 911.16675, 843.0275, 749.2078, 665.61414, 414.24997, 34.339397, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
     }
+    
+    func testGTI() {
+        let directRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 116.0, 305.0, 485.0, 615.0, 680.0, 681.0, 579.0, 428.0, 272.0, 87.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        let diffuseRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 2.0, 130.0, 118.0, 224.0, 315.0, 316.0, 318.0, 280.0, 215.0, 139.0, 40.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        let time = TimerangeDt(start: Timestamp(2022,7,31), nTime: 24, dtSeconds: 3600)
+        let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: 45, azimuth: 0, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
+        XCTAssertEqualArray(gti, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.9707108, 118.167114, 113.10868, 211.9621, 336.0515, 361.00406, 362.58548, 300.82724, 202.34702, 130.68182, 37.861877, 0.9707107, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+        
+        let gtiInstant = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: 45, azimuth: 0, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: true)
+        XCTAssertEqualArray(gtiInstant, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.3991673, 173.6138, 136.74342, 235.82225, 354.7455, 365.43063, 352.53616, 279.27585, 176.0145, 100.48777, 18.381083, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+        
+        let gtiTrackHorizontal = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: 45, azimuth: .nan, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
+        XCTAssertEqualArray(gtiTrackHorizontal, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 59.943016, 562.7015, 797.77844, 1038.7473, 1185.6353, 1205.2142, 1210.2856, 1106.8444, 939.80383, 752.5833, 385.76633, 27.280811, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+        
+        let gtiTrackVertical = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: .nan, azimuth: 0, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
+        XCTAssertEqualArray(gtiTrackHorizontal, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 59.943016, 562.7015, 797.77844, 1038.7473, 1185.6353, 1205.2142, 1210.2856, 1106.8444, 939.80383, 752.5833, 385.76633, 27.280811, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+        
+        let gtiBiAxialTracking = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: .nan, azimuth: .nan, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
+        XCTAssertEqualArray(gtiBiAxialTracking, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 77.22054, 624.142, 838.312, 1045.3708, 1184.8297, 1209.3428, 1214.2375, 1106.0839, 945.6867, 787.8196, 448.4831, 35.248135, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+    }
 }

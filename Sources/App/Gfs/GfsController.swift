@@ -609,7 +609,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
 struct GfsMixer: GenericReaderMixer {
     let reader: [GfsReader]
     
-    static func makeReader(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GfsReader? {
+    static func makeReader(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GfsReader? {
         return try GfsReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
     }
 }

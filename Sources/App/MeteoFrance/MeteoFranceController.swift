@@ -534,7 +534,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
 struct MeteoFranceMixer: GenericReaderMixer {
     let reader: [MeteoFranceReader]
     
-    static func makeReader(domain: MeteoFranceReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> MeteoFranceReader? {
+    static func makeReader(domain: MeteoFranceReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> MeteoFranceReader? {
         return try MeteoFranceReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
     }
 }

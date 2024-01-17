@@ -425,7 +425,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 struct GemMixer: GenericReaderMixer {
     let reader: [GemReader]
     
-    static func makeReader(domain: GemReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GemReader? {
+    static func makeReader(domain: GemReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GemReader? {
         return try GemReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
     }
 }

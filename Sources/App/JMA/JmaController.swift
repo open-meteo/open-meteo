@@ -375,7 +375,7 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 struct JmaMixer: GenericReaderMixer {
     let reader: [JmaReader]
     
-    static func makeReader(domain: JmaReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> JmaReader? {
+    static func makeReader(domain: JmaReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> JmaReader? {
         return try JmaReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
     }
 }
