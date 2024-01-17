@@ -100,9 +100,9 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
         case .sunshine_duration:
             return .init(variable: .sunshineDuration)
         case .global_tilted_irradiance:
-            fatalError()
+            return .init(variable: .globalTiltedIrradiance)
         case .global_tilted_irradiance_instant:
-            fatalError()
+            return .init(variable: .globalTiltedIrradianceInstant)
         }
     }
 }

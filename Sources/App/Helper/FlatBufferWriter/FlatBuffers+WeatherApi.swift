@@ -285,9 +285,9 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
         case .wind_speed_70m:
             return .init(variable: .windSpeed, altitude: 70)
         case .global_tilted_irradiance:
-            fatalError()
+            return .init(variable: .globalTiltedIrradiance)
         case .global_tilted_irradiance_instant:
-            fatalError()
+            return .init(variable: .globalTiltedIrradianceInstant)
         }
     }
 }
