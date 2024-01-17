@@ -122,7 +122,7 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     
     typealias Derived = CamsVariableDerived
     
-    var reader: GenericReaderCached<CamsDomain, CamsVariable>
+    let reader: GenericReaderCached<CamsDomain, CamsVariable>
     
     func get(derived: CamsVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
         switch derived {

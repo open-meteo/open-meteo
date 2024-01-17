@@ -53,6 +53,8 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case windgusts_10m
     case dewpoint_2m
     case sunshine_duration
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

@@ -7,9 +7,9 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Derived = VariableAndMemberAndControl<IconVariableDerived>
     typealias MixingVar = VariableOrDerived<VariableAndMemberAndControl<IconVariable>, VariableAndMemberAndControl<IconVariableDerived>>
 
-    var reader: GenericReaderCached<IconDomains, Variable>
+    let reader: GenericReaderCached<IconDomains, Variable>
     
-    var options: GenericReaderOptions
+    let options: GenericReaderOptions
     
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {

@@ -2,7 +2,7 @@ import Foundation
 
 
 struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
-    var reader: GenericReaderCached<EcmwfDomain, Variable>
+    let reader: GenericReaderCached<EcmwfDomain, Variable>
     
     typealias Domain = EcmwfDomain
     

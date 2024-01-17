@@ -236,6 +236,8 @@ struct DownloadEra5Command: AsyncCommand {
             .vapour_pressure_deficit_max
         ].map{.derived($0)}
         
+        let options = GenericReaderOptions()
+        
         for variable in variables {
             guard let era5Variable = ForecastVariableDaily(rawValue: variable.rawValue) else {
                 fatalError("Could not initialise Era5DailyWeatherVariable for \(variable)")
@@ -258,10 +260,10 @@ struct DownloadEra5Command: AsyncCommand {
                 // Read location one-by-one... Multi location support does not work with derived varibales
                 for (l, gridpoint) in locationRange.enumerated() {
                     let gridpointNext = min(gridpoint+1, writer.dim0-1)
-                    let readerNext = GenericReaderMulti<ForecastVariable>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpointNext)))])
+                    let readerNext = GenericReaderMulti<ForecastVariable>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpointNext)), options: options)])
                     try readerNext.prefetchData(variables: [era5Variable], time: time)
                     
-                    let reader = GenericReaderMulti<ForecastVariable>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpoint)))])
+                    let reader = GenericReaderMulti<ForecastVariable>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpoint)), options: options)])
                     
                     guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
                         fatalError("Could not get \(era5Variable)")

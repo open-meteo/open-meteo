@@ -22,7 +22,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
         case .gwam:
             return try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .era5_ocean:
-            return [try Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode)]
+            return [try Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         }
     }
 }

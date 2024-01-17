@@ -128,15 +128,15 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
         case .ecmwf_ifs04:
             return try EcmwfReader(domain: .ifs04_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gfs025:
-            return try GfsReader(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try GfsReader(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs05:
-            return try GfsReader(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try GfsReader(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs_seamless:
             return try GfsMixer(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .gem_global:
-            return try GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .bom_access_global_ensemble:
-            return try BomReader(domain: .access_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+            return try BomReader(domain: .access_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         }
     }
     
@@ -214,6 +214,8 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepr
     case diffuse_radiation_instant
     case direct_radiation_instant
     case direct_normal_irradiance_instant
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     case is_day
     case visibility
     case freezinglevel_height

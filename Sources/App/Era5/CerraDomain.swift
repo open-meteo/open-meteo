@@ -29,6 +29,8 @@ enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixabl
     case diffuse_radiation_instant
     case direct_radiation_instant
     case direct_normal_irradiance_instant
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     case wet_bulb_temperature_2m
     case wind_speed_10m
     case wind_direction_10m
@@ -47,7 +49,9 @@ enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixabl
 }
 
 struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
-    var reader: GenericReaderCached<CdsDomain, CerraVariable>
+    let reader: GenericReaderCached<CdsDomain, CerraVariable>
+    
+    let options: GenericReaderOptions
     
     typealias Domain = CdsDomain
     
@@ -55,11 +59,12 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     
     typealias Derived = CerraVariableDerived
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
+        self.options = options
     }
     
     func prefetchData(variables: [CerraHourlyVariable], time: TimerangeDt) throws {
@@ -91,6 +96,8 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .vapor_pressure_deficit:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .relative_humidity_2m, time: time)
+        case .global_tilted_irradiance, .global_tilted_irradiance_instant:
+            fallthrough
         case .diffuse_radiation:
             try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
@@ -301,6 +308,18 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let directRadiation = try get(raw: .direct_radiation, time: time)
             let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
             return DataAndUnit(duration, .seconds)
+        case .global_tilted_irradiance:
+            let directRadiation = try get(raw: .direct_radiation, time: time).data
+            let ghi = try get(raw: .shortwave_radiation, time: time).data
+            let diffuseRadiation = zip(ghi, directRadiation).map(-)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+            return DataAndUnit(gti, .wattPerSquareMetre)
+        case .global_tilted_irradiance_instant:
+            let directRadiation = try get(raw: .direct_radiation, time: time).data
+            let ghi = try get(raw: .shortwave_radiation, time: time).data
+            let diffuseRadiation = zip(ghi, directRadiation).map(-)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+            return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }
 }

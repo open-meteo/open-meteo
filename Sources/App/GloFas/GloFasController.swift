@@ -4,7 +4,7 @@ import Vapor
 typealias GloFasVariableMember = VariableAndMemberAndControlSplitFiles<GloFasVariable>
 
 struct GloFasMixer: GenericReaderMixer {
-    var reader: [GloFasReader]
+    let reader: [GloFasReader]
     
     static func makeReader(domain: GloFasReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GloFasReader? {
         return try GloFasReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
@@ -28,7 +28,7 @@ typealias GloFasVariableOrDerived = VariableOrDerived<GloFasVariable, GlofasDeri
 typealias GloFasVariableOrDerivedMember = VariableOrDerived<GloFasVariableMember, GloFasReader.Derived>
 
 struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
-    var reader: GenericReaderCached<GloFasDomain, GloFasVariableMember>
+    let reader: GenericReaderCached<GloFasDomain, GloFasVariableMember>
     
     typealias Domain = GloFasDomain
     
