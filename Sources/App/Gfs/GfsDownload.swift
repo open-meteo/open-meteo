@@ -124,13 +124,14 @@ struct GfsDownload: AsyncCommand {
         }
     }
     
-    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: String, grid: Gridable, isGlobal: Bool) async throws {
+    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileManagerReadable, grid: Gridable, isGlobal: Bool) async throws {
         let logger = application.logger
         
         /// download seamask and height
-        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
             return
         }
+        try surfaceElevationFileOm.createDirectory()
         
         logger.info("Downloading height and elevation data")
         
@@ -175,7 +176,7 @@ struct GfsDownload: AsyncCommand {
         
         //try height.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
         
-        try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
+        try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
     }
     
     /// download GFS025 and NAM CONUS
@@ -187,7 +188,7 @@ struct GfsDownload: AsyncCommand {
         let elevationUrl = (domain == .gfs025_ens ? GfsDomain.gfs025 : domain).getGribUrl(run: run, forecastHour: 0, member: 0)
         if domain != .hrrr_conus_15min {
             // 15min hrrr data uses hrrr domain elevation files
-            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, isGlobal: domain.isGlobal)
+            try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         }
         
         let deadLineHours: Double
