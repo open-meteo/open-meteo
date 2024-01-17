@@ -99,6 +99,10 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
         case .sunshine_duration:
             return .init(variable: .sunshineDuration)
+        case .global_tilted_irradiance:
+            return .init(variable: .globalTiltedIrradiance)
+        case .global_tilted_irradiance_instant:
+            return .init(variable: .globalTiltedIrradianceInstant)
         }
     }
 }

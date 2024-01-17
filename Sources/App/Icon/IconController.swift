@@ -114,6 +114,8 @@ enum IconSurfaceVariableDerived: String, CaseIterable, GenericVariableMixable {
     case windgusts_10m
     case freezinglevel_height
     case sunshine_duration
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     
     var requiresOffsetCorrectionForMixing: Bool {
         return self == .snow_height

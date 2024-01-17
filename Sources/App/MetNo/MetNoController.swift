@@ -4,7 +4,9 @@ import Vapor
 typealias MetNoHourlyVariable = VariableOrDerived<MetNoVariable, MetNoVariableDerived>
 
 struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
-    var reader: GenericReaderCached<MetNoDomain, MetNoVariable>
+    let reader: GenericReaderCached<MetNoDomain, MetNoVariable>
+    
+    let options: GenericReaderOptions
     
     typealias Domain = MetNoDomain
     
@@ -12,11 +14,12 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     
     typealias Derived = MetNoVariableDerived
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
+        self.options = options
     }
     
     func prefetchData(derived: MetNoVariableDerived, time: TimerangeDt) throws {
@@ -55,6 +58,8 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .direct_radiation:
             fallthrough
         case .direct_radiation_instant:
+            fallthrough
+        case .global_tilted_irradiance, .global_tilted_irradiance_instant:
             fallthrough
         case .shortwave_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
@@ -221,6 +226,16 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let directRadiation = try get(derived: .direct_radiation, time: time)
             let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
             return DataAndUnit(duration, .seconds)
+        case .global_tilted_irradiance:
+            let directRadiation = try get(derived: .direct_radiation, time: time).data
+            let diffuseRadiation = try get(derived: .diffuse_radiation, time: time).data
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+            return DataAndUnit(gti, .wattPerSquareMetre)
+        case .global_tilted_irradiance_instant:
+            let directRadiation = try get(derived: .direct_radiation, time: time).data
+            let diffuseRadiation = try get(derived: .diffuse_radiation, time: time).data
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+            return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }
 }
@@ -247,6 +262,8 @@ enum MetNoVariableDerived: String, GenericVariableMixable {
     case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     case snowfall
     case weather_code
     case weathercode

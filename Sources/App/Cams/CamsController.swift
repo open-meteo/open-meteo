@@ -29,7 +29,7 @@ struct CamsController {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
             let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try CamsMixer(domains: domain.camsDomains, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .nearest) else {
+                guard let reader = try CamsMixer(domains: domain.camsDomains, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .nearest, options: params.readerOptions) else {
                     return nil
                 }
                 
@@ -122,7 +122,7 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     
     typealias Derived = CamsVariableDerived
     
-    var reader: GenericReaderCached<CamsDomain, CamsVariable>
+    let reader: GenericReaderCached<CamsDomain, CamsVariable>
     
     func get(derived: CamsVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
         switch derived {
@@ -287,7 +287,7 @@ extension Array where Element == Float {
 struct CamsMixer: GenericReaderMixer {
     let reader: [CamsReader]
     
-    static func makeReader(domain: CamsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> CamsReader? {
+    static func makeReader(domain: CamsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> CamsReader? {
         guard let reader = try GenericReader<CamsDomain, CamsVariable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }

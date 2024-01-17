@@ -528,9 +528,9 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
 
     typealias Derived = Cmip6VariableDerivedPostBiasCorrection
     
-    var reader: ReaderNext
+    let reader: ReaderNext
     
-    var domain: Cmip6Domain
+    let domain: Cmip6Domain
     
     init(reader: ReaderNext, domain: Cmip6Domain) {
         self.reader = reader
@@ -664,9 +664,9 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
 
     typealias Derived = Cmip6VariableDerivedBiasCorrected
     
-    var reader: ReaderNext
+    let reader: ReaderNext
     
-    var domain: Cmip6Domain
+    let domain: Cmip6Domain
     
     init(reader: ReaderNext, domain: Cmip6Domain) {
         self.reader = reader

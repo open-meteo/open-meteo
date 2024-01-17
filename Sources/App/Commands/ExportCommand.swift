@@ -776,6 +776,8 @@ enum ExportDomain: String, CaseIterable {
     }
     
     func getReader(position: Int) throws -> any GenericReaderProtocol {
+        let options = GenericReaderOptions()
+        
         switch self {
         case .CMCC_CM2_VHR4:
             return Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position), domain: Cmip6Domain.CMCC_CM2_VHR4), domain: Cmip6Domain.CMCC_CM2_VHR4)
@@ -800,9 +802,9 @@ enum ExportDomain: String, CaseIterable {
         case .glofas_v3_seasonal:
             return try GenericReader<GloFasDomain, GloFasVariableMember>(domain: GloFasDomain.seasonalv3, position: position)
         case .era5_land:
-            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position)))
+            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position)), options: options)
         case .era5:
-            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position)))
+            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position)), options: options)
         }
     }
     

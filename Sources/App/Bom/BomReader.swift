@@ -19,6 +19,8 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case diffuse_radiation_instant
     case diffuse_radiation
     case shortwave_radiation_instant
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     
     case et0_fao_evapotranspiration
     case vapour_pressure_deficit
@@ -62,13 +64,16 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
     
     typealias MixingVar = BomVariableCombined
     
-    var reader: GenericReaderCached<BomDomain, VariableAndMemberAndControl<BomVariable>>
+    let reader: GenericReaderCached<BomDomain, VariableAndMemberAndControl<BomVariable>>
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    let options: GenericReaderOptions
+    
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
+        self.options = options
     }
     
     func get(raw: VariableAndMemberAndControl<BomVariable>, time: TimerangeDt) throws -> DataAndUnit {
@@ -133,6 +138,8 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .direct_radiation, member: member, time: time)
         case .shortwave_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, member: member, time: time)
+        case .global_tilted_irradiance, .global_tilted_irradiance_instant:
+            fallthrough
         case .diffuse_radiation, .diffuse_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, member: member, time: time)
             try prefetchData(raw: .direct_radiation, member: member, time: time)
@@ -303,6 +310,18 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             return try get(raw: .soil_moisture_35_to_100cm, member: member, time: time)
         case .soil_moisture_100_to_200cm:
             return try get(raw: .soil_moisture_100_to_300cm, member: member, time: time)
+        case .global_tilted_irradiance:
+            let directRadiation = try get(raw: .direct_radiation, member: member, time: time).data
+            let ghi = try get(raw: .shortwave_radiation, member: member, time: time).data
+            let diffuseRadiation = zip(ghi, directRadiation).map(-)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+            return DataAndUnit(gti, .wattPerSquareMetre)
+        case .global_tilted_irradiance_instant:
+            let directRadiation = try get(raw: .direct_radiation, member: member, time: time).data
+            let ghi = try get(raw: .shortwave_radiation, member: member, time: time).data
+            let diffuseRadiation = zip(ghi, directRadiation).map(-)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+            return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }
 }

@@ -7,13 +7,16 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Derived = VariableAndMemberAndControl<IconVariableDerived>
     typealias MixingVar = VariableOrDerived<VariableAndMemberAndControl<IconVariable>, VariableAndMemberAndControl<IconVariableDerived>>
 
-    var reader: GenericReaderCached<IconDomains, Variable>
+    let reader: GenericReaderCached<IconDomains, Variable>
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    let options: GenericReaderOptions
+    
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
+        self.options = options
     }
     
     func get(variable: VariableOrDerived<IconVariable, IconVariableDerived>, member: Int, time: TimerangeDt) throws -> DataAndUnit {
@@ -353,7 +356,11 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .freezinglevel_height:
                 try prefetchData(raw: .freezing_level_height, member: member, time: time)
             case .sunshine_duration:
-                try prefetchData(raw: .direct_radiation, member: member, time: time)            }
+                try prefetchData(raw: .direct_radiation, member: member, time: time)
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
+                try prefetchData(raw: .direct_radiation, member: member, time: time)
+                try prefetchData(raw: .diffuse_radiation, member: member, time: time)
+            }
         case .pressure(let variable):
             let level = variable.level
             switch variable.variable {
@@ -573,6 +580,17 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let directRadiation = try get(raw: .direct_radiation, member: member, time: time)
                 let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 return DataAndUnit(duration, .seconds)
+            case .global_tilted_irradiance:
+                let directRadiation = try get(raw: .direct_radiation, member: member, time: time).data
+                let diffuseRadiation = try get(raw: .diffuse_radiation, member: member, time: time).data
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+                return DataAndUnit(gti, .wattPerSquareMetre)
+            case .global_tilted_irradiance_instant:
+                let directRadiation = try get(raw: .direct_radiation, member: member, time: time).data
+                let diffuseRadiation = try get(raw: .diffuse_radiation, member: member, time: time).data
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+                return DataAndUnit(gti, .wattPerSquareMetre)
+                
             }
         case .pressure(let variable):
             let level = variable.level
@@ -612,7 +630,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
 struct IconMixer: GenericReaderMixer {
     let reader: [IconReader]
     
-    static func makeReader(domain: IconReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> IconReader? {
-        return try IconReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    static func makeReader(domain: IconReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> IconReader? {
+        return try IconReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 }

@@ -58,6 +58,8 @@ enum CmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case diffuse_radiation_instant
     case diffuse_radiation
     case shortwave_radiation_instant
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     case et0_fao_evapotranspiration
     case vapour_pressure_deficit
     case vapor_pressure_deficit
@@ -120,13 +122,16 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
     
     typealias MixingVar = CmaVariableCombined
     
-    var reader: GenericReaderCached<CmaDomain, CmaVariable>
+    let reader: GenericReaderCached<CmaDomain, CmaVariable>
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    let options: GenericReaderOptions
+    
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
+        self.options = options
     }
     
     func get(raw: CmaVariable, time: TimerangeDt) throws -> DataAndUnit {
@@ -177,6 +182,8 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
+                fallthrough
             case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .shortwave_radiation_instant:
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .weather_code, .weathercode:
@@ -472,6 +479,16 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let precipitation = try get(raw: .precipitation, time: time)
                 let snoweq = try get(raw: .snowfall, time: time)
                 return DataAndUnit(zip(precipitation.data, snoweq.data).map({max($0 - $1 / 0.7, 0)}), precipitation.unit)
+            case .global_tilted_irradiance:
+                let directRadiation = try get(derived: .surface(.direct_radiation), time: time).data
+                let diffuseRadiation = try get(derived: .surface(.diffuse_radiation), time: time).data
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+                return DataAndUnit(gti, .wattPerSquareMetre)
+            case .global_tilted_irradiance_instant:
+                let directRadiation = try get(derived: .surface(.direct_radiation), time: time).data
+                let diffuseRadiation = try get(derived: .surface(.diffuse_radiation), time: time).data
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+                return DataAndUnit(gti, .wattPerSquareMetre)
             }
         case .pressure(let v):
             switch v.variable {

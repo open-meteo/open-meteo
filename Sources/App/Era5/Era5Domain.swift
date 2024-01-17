@@ -336,19 +336,19 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
 
 struct Era5Factory {
     /// Build a single reader for a given CdsDomain
-    public static func makeReader(domain: CdsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader<GenericReaderCached<CdsDomain, Era5Variable>> {
+    public static func makeReader(domain: CdsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Era5Reader<GenericReaderCached<CdsDomain, Era5Variable>> {
         guard let reader = try GenericReader<CdsDomain, Era5Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             // should not be possible
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        return .init(reader: GenericReaderCached(reader: reader))
+        return .init(reader: GenericReaderCached(reader: reader), options: options)
     }
     
     /**
      Build a combined ERA5 and ERA5-Land reader.
      Derived variables are calculated after combinding both variables to make it possible to calculate ET0 evapotransipiration with temperature from ERA5-Land, but radiation from ERA5
      */
-    public static func makeEra5CombinedLand(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
+    public static func makeEra5CombinedLand(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
         guard /*let era5ocean = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode),*/
               let era5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode),
               let era5land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode)
@@ -356,10 +356,10 @@ struct Era5Factory {
             // should not be possible
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        return .init(reader: GenericReaderMixerSameDomain(reader: [/*GenericReaderCached(reader: era5ocean), */GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]))
+        return .init(reader: GenericReaderMixerSameDomain(reader: [/*GenericReaderCached(reader: era5ocean), */GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
     }
     
-    public static func makeArchiveBestMatch(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
+    public static func makeArchiveBestMatch(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
         guard let era5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode),
               let era5land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode),
               let ecmwfIfs = try GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode) 
@@ -371,12 +371,14 @@ struct Era5Factory {
             GenericReaderCached(reader: era5),
             GenericReaderCached(reader: era5land),
             GenericReaderCached(reader: ecmwfIfs)
-        ]))
+        ]), options: options)
     }
 }
 
 struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol where Reader.MixingVar == Era5Variable {
-    var reader: Reader
+    let reader: Reader
+    
+    let options: GenericReaderOptions
     
     typealias Domain = CdsDomain
     
@@ -384,8 +386,9 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
     
     typealias Derived = Era5VariableDerived
     
-    public init(reader: Reader) {
+    public init(reader: Reader, options: GenericReaderOptions) {
         self.reader = reader
+        self.options = options
     }
     
     func prefetchData(variables: [Era5HourlyVariable], time: TimerangeDt) throws {
@@ -438,6 +441,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .vapor_pressure_deficit:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .dew_point_2m, time: time)
+        case .global_tilted_irradiance, .global_tilted_irradiance_instant:
+            fallthrough
         case .diffuse_radiation:
             try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
@@ -761,6 +766,18 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let directRadiation = try get(raw: .direct_radiation, time: time)
             let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
             return DataAndUnit(duration, .seconds)
+        case .global_tilted_irradiance:
+            let directRadiation = try get(raw: .direct_radiation, time: time).data
+            let ghi = try get(raw: .shortwave_radiation, time: time).data
+            let diffuseRadiation = zip(ghi, directRadiation).map(-)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+            return DataAndUnit(gti, .wattPerSquareMetre)
+        case .global_tilted_irradiance_instant:
+            let directRadiation = try get(raw: .direct_radiation, time: time).data
+            let ghi = try get(raw: .shortwave_radiation, time: time).data
+            let diffuseRadiation = zip(ghi, directRadiation).map(-)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+            return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }
 }

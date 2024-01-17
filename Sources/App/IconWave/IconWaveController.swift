@@ -10,10 +10,10 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     
     var countEnsembleMember: Int { return 1 }
     
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> [any GenericReaderProtocol] {
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol] {
         switch self {
         case .best_match:
-            guard let reader: any GenericReaderProtocol = try IconWaveMixer(domains: [.gwam, .ewam], lat: lat, lon: lon, elevation: .nan, mode: mode) else {
+            guard let reader: any GenericReaderProtocol = try IconWaveMixer(domains: [.gwam, .ewam], lat: lat, lon: lon, elevation: .nan, mode: mode, options: options) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             return [reader]
@@ -22,7 +22,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
         case .gwam:
             return try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .era5_ocean:
-            return [try Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode)]
+            return [try Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         }
     }
 }
@@ -50,7 +50,7 @@ struct IconWaveController {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
             let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<IconWaveVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea) else {
+                guard let reader = try GenericReaderMulti<IconWaveVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
                     return nil
                 }
                 
@@ -122,7 +122,7 @@ typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
 struct IconWaveMixer: GenericReaderMixer {
     let reader: [IconWaveReader]
     
-    static func makeReader(domain: IconWaveDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> IconWaveReader? {
+    static func makeReader(domain: IconWaveDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> IconWaveReader? {
         return try IconWaveReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
     }
 }

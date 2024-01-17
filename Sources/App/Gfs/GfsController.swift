@@ -31,6 +31,8 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case direct_radiation_instant
     case diffuse_radiation_instant
     case shortwave_radiation_instant
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     case evapotranspiration
     case et0_fao_evapotranspiration
     case vapor_pressure_deficit
@@ -99,11 +101,13 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
     
     typealias MixingVar = GfsVariableCombined
     
-    var reader: GenericReaderMixerSameDomain<GenericReaderCached<GfsDomain, Variable>>
+    let reader: GenericReaderMixerSameDomain<GenericReaderCached<GfsDomain, Variable>>
     
-    var domain: Domain
+    let domain: Domain
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    let options: GenericReaderOptions
+    
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         switch domain {
         case .gfs013:
             // Note gfs025_ensemble only offers precipitation probability at 3h
@@ -149,6 +153,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             fatalError("hrrr_conus_15min should not been initilised in GfsMixer025_013")
         }
         self.domain = domain
+        self.options = options
     }
     
     func get(raw: Variable, time: TimerangeDt) throws -> DataAndUnit {
@@ -296,6 +301,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .direct_normal_irradiance_instant:
                 fallthrough
             case .direct_radiation:
+                fallthrough
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
                 fallthrough
             case .direct_radiation_instant:
                 try prefetchData(raw: .init(.surface(.shortwave_radiation), member), time: time)
@@ -573,6 +580,18 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let directRadiation = try get(derived: .init(.surface(.direct_radiation), member), time: time)
                 let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
                 return DataAndUnit(duration, .seconds)
+            case .global_tilted_irradiance:
+                let diffuseRadiation = try get(raw: .init(.surface(.diffuse_radiation), member), time: time).data
+                let ghi = try get(raw: .init(.surface(.shortwave_radiation), member), time: time).data
+                let directRadiation = zip(ghi, diffuseRadiation).map(-)
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+                return DataAndUnit(gti, .wattPerSquareMetre)
+            case .global_tilted_irradiance_instant:
+                let diffuseRadiation = try get(raw: .init(.surface(.diffuse_radiation), member), time: time).data
+                let ghi = try get(raw: .init(.surface(.shortwave_radiation), member), time: time).data
+                let directRadiation = zip(ghi, diffuseRadiation).map(-)
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+                return DataAndUnit(gti, .wattPerSquareMetre)
             }
         case .pressure(let v):
             switch v.variable {
@@ -609,7 +628,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
 struct GfsMixer: GenericReaderMixer {
     let reader: [GfsReader]
     
-    static func makeReader(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GfsReader? {
-        return try GfsReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    static func makeReader(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GfsReader? {
+        return try GfsReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 }

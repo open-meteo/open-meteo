@@ -16,7 +16,7 @@ protocol GenericReaderMixerRaw: GenericReaderProtocol {
 protocol GenericReaderMixer: GenericReaderMixerRaw {
     associatedtype Domain: GenericDomain
     
-    static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> Reader?
+    static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Reader?
 }
 
 struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {    
@@ -30,12 +30,12 @@ struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReade
 }
 
 extension GenericReaderMixer {    
-    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
         var elevation = elevation
         
         let reader: [Reader] = try domains.reversed().compactMap { domain -> (Reader?) in
-            guard let domain = try Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            guard let domain = try Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return nil
             }
             if elevation.isNaN {
