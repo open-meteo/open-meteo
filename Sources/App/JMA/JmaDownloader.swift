@@ -275,6 +275,18 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
     /// accumulated since forecast start
     case precipitation
     
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .precipitation: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .shortwave_radiation: return true
+        case .wind_v_component_10m, .wind_u_component_10m: return true
+        default: return false
+        }
+    }
+    
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -416,6 +428,10 @@ enum JmaPressureVariableType: String, CaseIterable {
 struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: JmaPressureVariableType
     let level: Int
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

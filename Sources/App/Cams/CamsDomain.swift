@@ -87,6 +87,10 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     case olive_pollen
     case ragweed_pollen
     
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }

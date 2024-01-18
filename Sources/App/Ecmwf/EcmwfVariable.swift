@@ -99,6 +99,19 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case downloadAndProcess
     }
     
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_1000hPa: return true
+        case .precipitation: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        //case .shortwave_radiation, .direct_radiation: return true
+        case .wind_v_component_10m, .wind_u_component_10m: return true
+        //case .weather_code: return true
+        default: return false
+        }
+    }
+    
     /// If true, download
     var includeInEnsemble: DownloadOrProcess? {
         switch self {

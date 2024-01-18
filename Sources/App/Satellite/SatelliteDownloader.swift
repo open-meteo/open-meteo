@@ -157,6 +157,9 @@ struct SatelliteDownloadCommand: AsyncCommand {
 enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVariable {
     case precipitation_sum
     
+    var storePreviousForecast: Bool {
+        return false
+    }
     
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)

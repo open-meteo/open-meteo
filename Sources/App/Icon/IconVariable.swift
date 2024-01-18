@@ -13,6 +13,10 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
     let variable: IconPressureVariableType
     let level: Int
     
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -190,6 +194,19 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     
     /// Maximum updraft within 10 km altitude `W_CTMAX`
     case updraft
+    
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .showers, .precipitation, .snowfall_water_equivalent: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .diffuse_radiation, .direct_radiation: return true
+        case .wind_gusts_10m, .wind_u_component_10m, .wind_v_component_10m: return true
+        case .weather_code: return true
+        default: return false
+        }
+    }
     
     var scalefactor: Float {
         switch self {

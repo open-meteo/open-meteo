@@ -355,6 +355,10 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
     case precipitation
     case direct_radiation
     
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
     var isElevationCorrectable: Bool {
         return self == .temperature_2m
     }

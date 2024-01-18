@@ -50,6 +50,22 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         }
     }
     
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .showers, .precipitation, .snowfall_water_equivalent: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .shortwave_radiation, .direct_radiation: return true
+        case .wind_gusts_10m, .wind_speed_10m, .wind_direction_10m: return true
+        case .weather_code: return true
+        //case .wind_speed_40m, .wind_direction_40m: return true
+        //case .wind_speed_80m, .wind_direction_80m: return true
+        //case .wind_speed_120m, .wind_direction_120m: return true
+        default: return false
+        }
+    }
+    
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m, .surface_temperature, .soil_temperature_0_to_10cm, .soil_temperature_10_to_35cm, .soil_temperature_35_to_100cm, .soil_temperature_100_to_300cm:

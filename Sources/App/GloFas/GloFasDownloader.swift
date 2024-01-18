@@ -574,6 +574,10 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
 enum GloFasVariable: String, GenericVariable {
     case river_discharge
     
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }

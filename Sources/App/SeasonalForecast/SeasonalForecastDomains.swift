@@ -192,6 +192,10 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
     case relative_humidity_2m
     case pressure_msl
     
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }

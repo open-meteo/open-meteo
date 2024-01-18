@@ -309,6 +309,10 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     case soil_moisture_0_to_10cm_mean
     case shortwave_radiation_sum
     
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
     enum TimeType {
         case restoreFrom(dt: Int, shortName: String, aggregate: TimeTypeAggregate)
         case monthly

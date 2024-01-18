@@ -33,6 +33,10 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     case wave_direction
     case wave_period
     
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
     var isElevationCorrectable: Bool {
         return self == .temperature_2m || self == .dew_point_2m ||
             self == .soil_temperature_0_to_7cm || self == .soil_temperature_7_to_28cm ||
