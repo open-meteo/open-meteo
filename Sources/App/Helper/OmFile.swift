@@ -286,7 +286,7 @@ struct OmFileSplitter {
             
             return try (0..<nPreviousDays).map { previousDay -> WriterPerStep in
                 let skip = previousDay > 0 ? previousDay * 86400 / time.dtSeconds : skipFirst
-                let variable = previousDay > 0 ? "\(variable)_day-\(previousDay)" : variable
+                let variable = previousDay > 0 ? "\(variable)_previous_day\(previousDay)" : variable
                 
                 let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)
                 try readFile.createDirectory()

@@ -181,6 +181,10 @@ extension DomainRegistry {
         if let variables {
             let vDirectories = variables.map { $0.omFileName.file } + ["static"]
             for variable in vDirectories {
+                if variable.contains("_previous_day") {
+                    // do not upload data from past days yet
+                    continue
+                }
                 let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
                 let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
                 if !FileManager.default.fileExists(atPath: src) {
