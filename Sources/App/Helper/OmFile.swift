@@ -266,8 +266,8 @@ struct OmFileSplitter {
         let indexTime = time.toIndexTime()
         let indextimeChunked  = indexTime.lowerBound / nTimePerFile ..< indexTime.upperBound.divideRoundedUp(divisor: nTimePerFile)
         
-        // Number of previous days of forecast to keep
-        let nPreviousDays = storePreviousForecast ? time.range.count / 86400 : 1
+        // Number of previous days of forecast to keep. Max 7 past days
+        let nPreviousDays = storePreviousForecast ? min(8, time.range.count / 86400) : 1
         
         struct WriterPerStep {
             let read: OmFileReader<MmapFile>?
