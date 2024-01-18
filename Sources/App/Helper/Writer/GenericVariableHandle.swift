@@ -68,7 +68,9 @@ struct GenericVariableHandle {
                 }
             }
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip,  scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { offset in
+            let storePreviousForecast = variable.storePreviousForecast && nMembers <= 1
+            
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip,  scalefactor: variable.scalefactor, storePreviousForecast: storePreviousForecast) { offset in
                 let d0offset = offset / nMembers
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
