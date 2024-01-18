@@ -206,7 +206,7 @@ struct GloFasDownloader: AsyncCommand {
                             var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
                             /// Reused read buffer
                             var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-                            try om.updateFromTimeOrientedStreaming(variable: name, time: timerange, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic) { d0offset in
+                            try om.updateFromTimeOrientedStreaming(variable: name, time: timerange, skipFirst: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic) { d0offset in
                                 
                                 try Task.checkCancellation()
                                 
@@ -320,7 +320,7 @@ struct GloFasDownloader: AsyncCommand {
             data2d[0..<nx*ny, i] = try dailyFile.readAll()
         }
         logger.info("Update om database")
-        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, skipFirst: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
     }
     
     /// Convert a single file
