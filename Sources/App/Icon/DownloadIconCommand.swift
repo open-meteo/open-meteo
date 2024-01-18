@@ -318,7 +318,7 @@ struct DownloadIconCommand: AsyncCommand {
                 return (hour, readers)
             })
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { offset in
                 let d0offset = offset / nMembers
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)

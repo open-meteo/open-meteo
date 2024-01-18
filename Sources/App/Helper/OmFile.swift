@@ -246,12 +246,12 @@ struct OmFileSplitter {
      
      TODO: smoothing is not implemented
      */
-    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, indexTime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
+    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
         
-        precondition(array2d.nTime == indexTime.count)
+        precondition(array2d.nTime == time.count)
         
         // Process at most 8 MB at once
-        try updateFromTimeOrientedStreaming(variable: variable, indexTime: indexTime, skipFirst: skipFirst, smooth: smooth, skipLast: skipLast, scalefactor: scalefactor, compression: compression) { d0offset in
+        try updateFromTimeOrientedStreaming(variable: variable, time: time, skipFirst: skipFirst, smooth: smooth, skipLast: skipLast, scalefactor: scalefactor, compression: compression) { d0offset in
             
             let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
             let dataRange = locationRange.multiply(array2d.nTime)
@@ -260,15 +260,21 @@ struct OmFileSplitter {
     }
     
     /**
-     Write new data to the archived storage and combine it with existint data.
+     Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Upates are done streamlingly to low memory usage
      
      TODO: smoothing is not implemented
      */
-    func updateFromTimeOrientedStreaming(variable: String, indexTime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+    func updateFromTimeOrientedStreaming(variable: String, time: TimerangeDt, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256, timeLaggedForecast: Bool = false, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+        
+        let indexTime = time.toIndexTime()
+        let indextimeChunked  = indexTime.lowerBound / nTimePerFile ..< indexTime.upperBound.divideRoundedUp(divisor: nTimePerFile)
+        
+        //let dtSeconds = domain.getDomain().dtSeconds
+        //let nLaggedDays = indexTime.count * dtSeconds
         
         // open all files for all timeranges and write a header
-        let writers: [(read: OmFileReader<MmapFile>?, write: OmFileWriterState<FileHandle>, offsets: (file: CountableRange<Int>, array: CountableRange<Int>), fileName: String)] = try (indexTime.lowerBound / nTimePerFile ..< indexTime.upperBound.divideRoundedUp(divisor: nTimePerFile)).compactMap { timeChunk in
+        let writers: [(read: OmFileReader<MmapFile>?, write: OmFileWriterState<FileHandle>, offsets: (file: CountableRange<Int>, array: CountableRange<Int>), fileName: String)] = try indextimeChunked.compactMap { timeChunk in
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk+1) * nTimePerFile
             
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
