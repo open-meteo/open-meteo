@@ -1,5 +1,5 @@
 ## Build From Source
-To compile and build the Open-Meteo Docker image yourself, you can download the source code and run `docker build`. This approach is required to run Open-Meteo on different CPU architectures like Apple M1 or ARM.
+To compile and build the Open-Meteo Docker image yourself, you can download the source code and run `docker build`.
 
 Build Docker image from source:
 
