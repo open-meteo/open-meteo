@@ -7,11 +7,12 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  REGISTRY_IMAGE: ${{ github.repository }}
+  REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
   
 jobs:
   build:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-22.04
