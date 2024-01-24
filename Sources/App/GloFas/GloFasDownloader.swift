@@ -133,7 +133,6 @@ struct GloFasDownloader: AsyncCommand {
         
         // forecast day 0 is valid for the next day
         let timerange = TimerangeDt(start: run.add(24*3600), nTime: nTime, dtSeconds: 24*3600)
-        let indexTime = timerange.toIndexTime()
         let nLocationsPerChunk = om.nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: nx*ny, chunk0: 1, chunk1: nLocationsPerChunk)
         
@@ -207,7 +206,7 @@ struct GloFasDownloader: AsyncCommand {
                             var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
                             /// Reused read buffer
                             var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-                            try om.updateFromTimeOrientedStreaming(variable: name, indexTime: indexTime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic) { d0offset in
+                            try om.updateFromTimeOrientedStreaming(variable: name, time: timerange, skipFirst: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic, storePreviousForecast: false) { d0offset in
                                 
                                 try Task.checkCancellation()
                                 
@@ -321,8 +320,7 @@ struct GloFasDownloader: AsyncCommand {
             data2d[0..<nx*ny, i] = try dailyFile.readAll()
         }
         logger.info("Update om database")
-        let indextime = timeinterval.toIndexTime()
-        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, indexTime: indextime, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, skipFirst: 0, scalefactor: 1000, compression: .p4nzdec256logarithmic, storePreviousForecast: false)
     }
     
     /// Convert a single file
@@ -575,6 +573,10 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
 
 enum GloFasVariable: String, GenericVariable {
     case river_discharge
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
     
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)

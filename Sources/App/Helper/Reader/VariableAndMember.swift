@@ -57,6 +57,10 @@ extension VariableAndMemberAndControl: GenericVariable where Variable: GenericVa
         return (variable.omFileName.file, member)
     }
     
+    var storePreviousForecast: Bool {
+        variable.storePreviousForecast
+    }
+    
     var scalefactor: Float {
         variable.scalefactor
     }
@@ -139,6 +143,10 @@ extension VariableAndMemberAndControlSplitFiles: GenericVariable where Variable:
             return (variable.rawValue, 0)
         }
         return ("\(variable.rawValue)_member\(member.zeroPadded(len: 2))", 0)
+    }
+    
+    var storePreviousForecast: Bool {
+        return variable.storePreviousForecast
     }
     
     var scalefactor: Float {

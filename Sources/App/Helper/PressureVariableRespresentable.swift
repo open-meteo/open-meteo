@@ -93,6 +93,10 @@ extension SurfaceAndPressureVariable: GenericVariable where Surface: GenericVari
         }
     }
     
+    var storePreviousForecast: Bool {
+        asGenericVariable.storePreviousForecast
+    }
+    
     var omFileName: (file: String, level: Int) {
         asGenericVariable.omFileName
     }

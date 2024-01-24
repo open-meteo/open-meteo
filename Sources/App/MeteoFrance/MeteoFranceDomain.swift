@@ -255,6 +255,18 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
    
     case cape
     
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .precipitation, .snowfall_water_equivalent: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .shortwave_radiation: return true
+        case .cape: return true
+        default: return false
+        }
+    }
+    
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -490,6 +502,10 @@ enum MeteoFrancePressureVariableType: String, CaseIterable {
 struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
     let variable: MeteoFrancePressureVariableType
     let level: Int
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

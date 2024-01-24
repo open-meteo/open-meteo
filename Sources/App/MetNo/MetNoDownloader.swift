@@ -144,7 +144,7 @@ struct MetNoDownloader: AsyncCommand {
             
             /// Create chunked time-series arrays instead of transposing the entire array
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, indexTime: time.toIndexTime(), skipFirst: skip, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
@@ -181,6 +181,10 @@ extension DomainRegistry {
         if let variables {
             let vDirectories = variables.map { $0.omFileName.file } + ["static"]
             for variable in vDirectories {
+                if variable.contains("_previous_day") {
+                    // do not upload data from past days yet
+                    continue
+                }
                 let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
                 let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
                 if !FileManager.default.fileExists(atPath: src) {

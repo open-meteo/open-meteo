@@ -51,6 +51,19 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     
     case cape
     
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .showers, .precipitation, .snowfall_water_equivalent: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .shortwave_radiation: return true
+        case .wind_gusts_10m, .wind_speed_10m, .wind_direction_10m: return true
+        case .cape: return true
+        default: return false
+        }
+    }
+    
     //case cin
     
     //case lifted_index
@@ -478,6 +491,10 @@ enum GemPressureVariableType: String, CaseIterable {
 struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: GemPressureVariableType
     let level: Int
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

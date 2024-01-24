@@ -80,6 +80,9 @@ protocol GenericVariable: GenericVariableMixable {
     
     /// If true, temperature will be corrected by 0.65°K per 100 m
     var isElevationCorrectable: Bool { get }
+    
+    /// If true, forecasts from the previous model runs will be preserved
+    var storePreviousForecast: Bool { get }
 }
 
 enum ReaderInterpolation {

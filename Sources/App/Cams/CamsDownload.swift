@@ -165,10 +165,9 @@ struct DownloadCamsCommand: AsyncCommand {
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
-            let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
-            let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
+            let time = TimerangeDt(start: run, nTime: data2d.nTime, dtSeconds: domain.dtSeconds)
             //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, indexTime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, time: time, skipFirst: 0, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
         
@@ -249,9 +248,8 @@ struct DownloadCamsCommand: AsyncCommand {
             
             logger.info("Create om file")
             let startOm = DispatchTime.now()
-            let timeIndexStart = run.timeIntervalSince1970 / domain.dtSeconds
-            let timeIndices = timeIndexStart ..< timeIndexStart + data2d.nTime
-            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, indexTime: timeIndices, skipFirst: 0, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+            let time = TimerangeDt(start: run, nTime: data2d.nTime, dtSeconds: domain.dtSeconds)
+            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, time: time, skipFirst: 0,  scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
     }

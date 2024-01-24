@@ -53,11 +53,11 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
     public let scalefactor: Float
     
     /// Buffer where chunks are moved to, before compression them. => input for compression call
-    public var readBuffer: UnsafeMutableRawBufferPointer
+    private var readBuffer: UnsafeMutableRawBufferPointer
     
     /// Compressed chunks are written into this buffer
     /// 1 MB write buffer or larger if chunks are very large
-    public var writeBuffer: UnsafeMutableBufferPointer<UInt8>
+    private var writeBuffer: UnsafeMutableBufferPointer<UInt8>
     
     public var bytesWrittenSinceLastFlush = 0
     
@@ -88,7 +88,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public init(fn: Backend, dim0: Int, dim1: Int, chunk0: Int, chunk1: Int, compression: CompressionType, scalefactor: Float, readBuffer: UnsafeMutableRawBufferPointer, writeBuffer: UnsafeMutableBufferPointer<UInt8>) throws {
+    public init(fn: Backend, dim0: Int, dim1: Int, chunk0: Int, chunk1: Int, compression: CompressionType, scalefactor: Float) throws {
         self.fn = fn
         self.dim0 = dim0
         self.dim1 = dim1
@@ -96,8 +96,6 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
         self.chunk1 = chunk1
         self.compression = compression
         self.scalefactor = scalefactor
-        self.readBuffer = readBuffer
-        self.writeBuffer = writeBuffer
         
         guard chunk0 > 0 && chunk1 > 0 && dim0 > 0 && dim1 > 0 else {
             throw SwiftPFor2DError.dimensionMustBeLargerThan0
@@ -106,7 +104,23 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
             throw SwiftPFor2DError.chunkDimensionIsSmallerThenOverallDim
         }
         
+        let chunkSizeByte = chunk0 * chunk1 * 4
+        if chunkSizeByte > 1024 * 1024 * 4 {
+            print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
+        }
+
+        let bufferSize = P4NENC256_BOUND(n: chunk0*chunk1, bytesPerElement: 4)
+        
+        // Read buffer needs to be a bit larger for AVX 256 bit alignment
+        self.readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
+        self.writeBuffer = .allocate(capacity: max(1024 * 1024, bufferSize))
+        
         chunkOffsetBytes.reserveCapacity(nChunks)
+    }
+    
+    deinit {
+        readBuffer.deallocate()
+        writeBuffer.deallocate()
     }
     
     public func writeHeader() throws {
@@ -303,34 +317,11 @@ public final class OmFileWriter {
     public let chunk0: Int
     public let chunk1: Int
     
-    var readBuffer: UnsafeMutableRawBufferPointer
-    
-    /// Compressed chunks are written into this buffer
-    /// 8 MB write buffer or larger if chunks are very large
-    var writeBuffer: UnsafeMutableBufferPointer<UInt8>
-    
     public init(dim0: Int, dim1: Int, chunk0: Int, chunk1: Int) {
         self.dim0 = dim0
         self.dim1 = dim1
         self.chunk0 = chunk0
         self.chunk1 = chunk1
-        
-        let chunkSizeByte = chunk0 * chunk1 * 4
-        if chunkSizeByte > 1024 * 1024 * 4 {
-            print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
-        }
-
-        let bufferSize = P4NENC256_BOUND(n: chunk0*chunk1, bytesPerElement: 4)
-        
-        // Read buffer needs to be a bit larger for AVX 256 bit alignment
-        self.readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
-        
-        self.writeBuffer = .allocate(capacity: max(1024 * 1024 * 8, bufferSize))
-    }
-    
-    deinit {
-        readBuffer.deallocate()
-        writeBuffer.deallocate()
     }
     
     /**
@@ -342,7 +333,7 @@ public final class OmFileWriter {
      */
     public func write<Backend: OmFileWriterBackend>(fn: Backend, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         
-        let state = try OmFileWriterState<Backend>(fn: fn, dim0: dim0, dim1: dim1, chunk0: chunk0, chunk1: chunk1, compression: compressionType, scalefactor: scalefactor, readBuffer: readBuffer, writeBuffer: writeBuffer)
+        let state = try OmFileWriterState<Backend>(fn: fn, dim0: dim0, dim1: dim1, chunk0: chunk0, chunk1: chunk1, compression: compressionType, scalefactor: scalefactor)
         
         try state.writeHeader()
         while state.c0 < state.nDim0Chunks {

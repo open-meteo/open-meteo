@@ -60,6 +60,19 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
     case soil_moisture_40_to_100cm
     case soil_moisture_100_to_200cm
     
+    var storePreviousForecast: Bool {
+        switch self {
+        case .temperature_2m, .relative_humidity_2m: return true
+        case .showers, .precipitation, .snowfall: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .shortwave_radiation: return true
+        case .wind_gusts_10m, .wind_u_component_10m, .wind_v_component_10m: return true
+        case .cape: return true
+        default: return false
+        }
+    }
+    
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
         case .soil_moisture_0_to_10cm: return true
@@ -342,6 +355,10 @@ enum CmaPressureVariableType: String, CaseIterable {
 struct CmaPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixable, CmaVariableDownloadable {
     let variable: CmaPressureVariableType
     let level: Int
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

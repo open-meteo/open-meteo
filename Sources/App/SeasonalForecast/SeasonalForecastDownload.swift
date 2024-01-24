@@ -191,10 +191,9 @@ struct SeasonalForecastDownload: AsyncCommand {
 fileprivate extension Array2DFastTime {
     func writeCfs(om: OmFileSplitter, logger: Logger, variable: CfsVariable, member: Int, run: Timestamp, dtSeconds: Int) throws {
         let startOm = DispatchTime.now()
-        let timeIndexStart = run.timeIntervalSince1970 / dtSeconds
-        let timeIndices = timeIndexStart ..< timeIndexStart + nTime
+        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: dtSeconds)
         
-        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_member\(member)", array2d: self, indexTime: timeIndices, skipFirst: 1, smooth: 0, skipLast: 0, scalefactor: variable.scalefactor)
+        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_member\(member)", array2d: self, time: time, skipFirst: 1, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast)
         logger.info("Update om \(variable) finished in \(startOm.timeElapsedPretty())")
     }
 }

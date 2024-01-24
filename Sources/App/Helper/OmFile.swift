@@ -242,16 +242,14 @@ struct OmFileSplitter {
     
     /**
      Write new data to the archived storage and combine it with existint data.
-     Updates are done in chunks of 8 MB to keep memory size low. Otherwise ICON update would take 4+ GB memory for just this function.
-     
-     TODO: smoothing is not implemented
+     Updates are done in chunks to keep memory size low. Otherwise ICON update would take 4+ GB memory for just this function.
      */
-    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, indexTime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
+    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, skipFirst: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256, storePreviousForecast: Bool) throws {
         
-        precondition(array2d.nTime == indexTime.count)
+        precondition(array2d.nTime == time.count)
         
         // Process at most 8 MB at once
-        try updateFromTimeOrientedStreaming(variable: variable, indexTime: indexTime, skipFirst: skipFirst, smooth: smooth, skipLast: skipLast, scalefactor: scalefactor, compression: compression) { d0offset in
+        try updateFromTimeOrientedStreaming(variable: variable, time: time, skipFirst: skipFirst, scalefactor: scalefactor, compression: compression, storePreviousForecast: storePreviousForecast) { d0offset in
             
             let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
             let dataRange = locationRange.multiply(array2d.nTime)
@@ -260,41 +258,51 @@ struct OmFileSplitter {
     }
     
     /**
-     Write new data to the archived storage and combine it with existint data.
+     Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Upates are done streamlingly to low memory usage
-     
-     TODO: smoothing is not implemented
      */
-    func updateFromTimeOrientedStreaming(variable: String, indexTime: Range<Int>, skipFirst: Int, smooth: Int, skipLast: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+    func updateFromTimeOrientedStreaming(variable: String, time: TimerangeDt, skipFirst: Int, scalefactor: Float, compression: CompressionType = .p4nzdec256, storePreviousForecast: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+        
+        let indexTime = time.toIndexTime()
+        let indextimeChunked  = indexTime.lowerBound / nTimePerFile ..< indexTime.upperBound.divideRoundedUp(divisor: nTimePerFile)
+        
+        // Number of previous days of forecast to keep. Max 7 past days
+        let nPreviousDays = storePreviousForecast ? min(8, time.range.count / 86400) : 1
+        
+        struct WriterPerStep {
+            let read: OmFileReader<MmapFile>?
+            let write: OmFileWriterState<FileHandle>
+            let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
+            let fileName: String
+            let skip: Int
+        }
         
         // open all files for all timeranges and write a header
-        let writers: [(read: OmFileReader<MmapFile>?, write: OmFileWriterState<FileHandle>, offsets: (file: CountableRange<Int>, array: CountableRange<Int>), fileName: String)] = try (indexTime.lowerBound / nTimePerFile ..< indexTime.upperBound.divideRoundedUp(divisor: nTimePerFile)).compactMap { timeChunk in
+        let writers: [WriterPerStep] = try indextimeChunked.flatMap { timeChunk -> [WriterPerStep] in
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk+1) * nTimePerFile
-            
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
-                return nil
+                return []
             }
             
-            let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)
-            try readFile.createDirectory()
-            let omRead = try readFile.openRead()
-            try omRead?.willNeed()
-            
-            let tempFile = readFile.getFilePath() + "~"
-            try FileManager.default.removeItemIfExists(at: tempFile)
-            
-            let bufferSize = P4NENC256_BOUND(n: chunknLocations * nTimePerFile, bytesPerElement: compression.bytesPerElement)
-            let readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
-            /// 1MB write cache
-            let writeBuffer = UnsafeMutableBufferPointer<UInt8>.allocate(capacity: max(1024 * 1024, bufferSize))
-            //print("readBuffer \(readBuffer.count.bytesHumanReadable) writeBuffer \(writeBuffer.count.bytesHumanReadable)")
-            let fn = try FileHandle.createNewFile(file: tempFile)
-            
-            let omWrite = try OmFileWriterState<FileHandle>(fn: fn, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, compression: compression, scalefactor: scalefactor, readBuffer: readBuffer, writeBuffer: writeBuffer)
-            
-            try omWrite.writeHeader()
-            
-            return (omRead, omWrite, offsets, readFile.getFilePath())
+            return try (0..<nPreviousDays).map { previousDay -> WriterPerStep in
+                let skip = previousDay > 0 ? previousDay * 86400 / time.dtSeconds : skipFirst
+                let variable = previousDay > 0 ? "\(variable)_previous_day\(previousDay)" : variable
+                
+                let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)
+                try readFile.createDirectory()
+                let omRead = try readFile.openRead()
+                try omRead?.willNeed()
+
+                let tempFile = readFile.getFilePath() + "~"
+                try FileManager.default.removeItemIfExists(at: tempFile)
+                let fn = try FileHandle.createNewFile(file: tempFile)
+
+                let omWrite = try OmFileWriterState<FileHandle>(fn: fn, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, compression: compression, scalefactor: scalefactor)
+
+                try omWrite.writeHeader()
+                
+                return WriterPerStep(read: omRead, write: omWrite, offsets: offsets, fileName: readFile.getFilePath(), skip: skip)
+            }
         }
         
         let nIndexTime = indexTime.count
@@ -325,12 +333,12 @@ struct OmFileSplitter {
                 // write "new" data into existing data
                 for l in 0..<locationRange.count {
                     for (tFile,tArray) in zip(writer.offsets.file, writer.offsets.array) {
-                        if tArray < skipFirst {
+                        if tArray < writer.skip {
                             continue
                         }
-                        if nIndexTime - tArray <= skipLast {
+                        /*if nIndexTime - tArray <= skipLast {
                             continue
-                        }
+                        }*/
                         if data[data.startIndex + l * nIndexTime + tArray].isNaN {
                             continue
                         }
@@ -348,9 +356,6 @@ struct OmFileSplitter {
         /// Write end of file and move it in position
         for writer in writers {
             try writer.write.writeTail()
-            writer.write.readBuffer.deallocate()
-            writer.write.writeBuffer.deallocate()
-            
             try writer.write.fn.close()
             
             // Overwrite existing file, with newly created
