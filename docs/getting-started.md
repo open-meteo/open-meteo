@@ -23,15 +23,14 @@ For a rapid deployment of Open-Meteo, Docker can be used. It launches a containe
 # Get the latest image
 docker pull ghcr.io/open-meteo/open-meteo
 
-# Create a local data directory
-mkdir data
-chmod o+w data
+# Create a Docker volume to store weather data
+docker volume create --name open-meteo-data
 
 # Start the API service on http://127.0.0.1:8080
-docker run -d --rm -v ${PWD}/data:/app/data -p 8080:8080 ghcr.io/open-meteo/open-meteo
+docker run -d --rm -v open-meteo-data:/app/data -p 8080:8080 ghcr.io/open-meteo/open-meteo
 
 # Download the latest ECMWF IFS 0.4° open-data forecast for temperature (50 MB)
-docker run -it --rm -v ${PWD}/data:/app/data ghcr.io/open-meteo/open-meteo sync ecmwf_ifs04 temperature_2m
+docker run -it --rm -v open-meteo-data:/app/data ghcr.io/open-meteo/open-meteo sync ecmwf_ifs04 temperature_2m
 
 # Get your forecast
 curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs04&hourly=temperature_2m"
@@ -72,24 +71,8 @@ As illustrated earlier, the `sync` command enables the direct download of the Op
 1. One or more weather model, such as `ecmwf_ifs04` or `dwd_icon,dwd_icon_eu,dwd_icon_d2`
 2. A list of weather variables, for example, `temperature_2m,relative_humidity_2m,wind_u_component_10m,wind_v_component_10m`
 
-The weather models and variables may seem unfamiliar because the Open-Meteo weather API automatically selects the most suitable weather model for each location. You can find a comprehensive list of all weather models in the [open-data distribution](https://github.com/open-meteo/open-data) documentation.
+Please refer to the [Weather API tutorial](https://github.com/open-meteo/open-data/tree/main/tutorial_weather_api) for more more information.
 
-The `sync` command also accepts two optional parameters:
-1. `--past-days <number>`: Specifies the duration for downloading past weather data, with a default of 3 days. Note that due to data compression in short time intervals, 2-7 days of past data will always be available.
-2. `--repeat-interval <number>`: If set, the API will run indefinitely, checking for new data every N minutes.
-
-### Basic Configuration
-To run a comprehensive weather API covering the variables `temperature_2m, relative_humidity_2m, precipitation_probability, rain, snowfall, weather_code, cloud_cover, wind_speed_10m, wind_direction_10m`, consider the following configuration:
-
-1. One-time download of the digital elevation model using `[..] sync copernicus_dem90 static`. This step is crucial for downscaling based on terrain elevation, requiring 8 GB of storage.
-2. Fetch forecast data with `[..] sync dwd_icon,ncep_gfs013,ncep_gfs025,ncep_gefs025_probability temperature_2m,dew_point_2m,relative_humidity_2m,precipitation_probability,precipitation,rain,cloud_cover,snowfall_water_equivalent,snowfall_convective_water_equivalent,weather_code,wind_u_component_10m,wind_v_component_10m,cape,lifted_index`
-3. Set-up a cronjob or background process to check for updates at regular intervals.
-
-Note the expanded list of weather variables. Additional data is required for on-demand computation of certain variables, such as deriving `wind_speed_10m` from `wind_u_component_10m` and `wind_v_component_10m`. NCEP GFS and DWD ICON are selected as the list of weather models, both being global models with strong forecast accuracy worldwide. For GFS, the variants `gfs013` and `gfs025` are downloaded, offering temperature data at resolutions of 13 km and 25 km, respectively. Some variables like `cape` are exclusively available in 25 km resolution for GFS. This configuration required 12 GB of storage.
-
-To further refine the forecast accuracy, consider adding high-resolution models for Europe and North America, namely `ncep_hrrr_conus`, `dwd_icon_eu`, and `dwd_icon_d2`. These models enhance local precision and provide updates every 1 or 3 hours. Simply include them in the list of weather models: `dwd_icon,ncep_gfs013,ncep_gfs025,ncep_gefs025_probability,ncep_hrrr_conus,dwd_icon_eu,dwd_icon_d2`. Integrating local models requires an additional 3 GB of storage.
-
-The selection of weather models and variables should be approached thoughtfully. Refer to the [open-data documentation](https://github.com/open-meteo/open-data) for a comprehensive understanding of available weather models and variables.
 
 ### Automatic Data Synchronization  
 

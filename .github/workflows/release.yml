@@ -28,7 +28,7 @@ jobs:
     #    args: -o libswiftlang_5.8-1.0.0-ubuntu-jammy_amd64.deb https://archive.swiftlang.xyz/repos/ubuntu/pool/main/libs/libswiftlang/libswiftlang_5.8-1.0.0-ubuntu-jammy_amd64.deb # https://apt.open-meteo.com/pool/main/s/swiftlang-slim/swiftlang-slim_5.7.1-01-ubuntu-jammy_amd64.deb
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: |
           .build
