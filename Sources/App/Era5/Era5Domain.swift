@@ -67,7 +67,62 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Interpolation not required for era5")
+        switch self {
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_100m:
+            return .hermite(bounds: nil)
+        case .wind_v_component_100m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_v_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_gusts_10m:
+            return .hermite(bounds: nil)
+        case .dew_point_2m:
+            return .hermite(bounds: nil)
+        case .cloud_cover_low:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_mid:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_high:
+            return .hermite(bounds: 0...100)
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .snowfall_water_equivalent:
+            return .backwards_sum
+        case .snow_depth:
+            return .linear
+        case .soil_temperature_0_to_7cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_7_to_28cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_28_to_100cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_100_to_255cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_0_to_7cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_7_to_28cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_28_to_100cm:
+            return .hermite(bounds: nil)
+        case .soil_moisture_100_to_255cm:
+            return .hermite(bounds: nil)
+        case .shortwave_radiation:
+            return .solar_backwards_averaged
+        case .precipitation:
+            return .backwards_sum
+        case .direct_radiation:
+            return .solar_backwards_averaged
+        case .wave_height:
+            return .hermite(bounds: nil)
+        case .wave_direction:
+            return .backwards
+        case .wave_period:
+            return .hermite(bounds: nil)
+        }
     }
     
     func availableForDomain(domain: CdsDomain) -> Bool {

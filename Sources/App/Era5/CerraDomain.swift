@@ -368,7 +368,38 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Interpolation not required for cerra")
+        switch self {
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .wind_speed_10m:
+            return .hermite(bounds: nil)
+        case .wind_direction_10m:
+            return .backwards
+        case .wind_speed_100m:
+            return .hermite(bounds: nil)
+        case .wind_direction_100m:
+            return .backwards
+        case .wind_gusts_10m:
+            return .hermite(bounds: nil)
+        case .relative_humidity_2m:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_low:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_mid:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_high:
+            return .hermite(bounds: 0...100)
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .snowfall_water_equivalent:
+            return .backwards_sum
+        case .shortwave_radiation:
+            return .solar_backwards_averaged
+        case .precipitation:
+            return .backwards_sum
+        case .direct_radiation:
+            return .solar_backwards_averaged
+        }
     }
     
     var requiresOffsetCorrectionForMixing: Bool {
