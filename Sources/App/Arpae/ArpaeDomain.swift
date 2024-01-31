@@ -5,13 +5,13 @@ import Foundation
  */
 enum ArpaeDomain: String, GenericDomain, CaseIterable {
     case cosmo_2i
-    case comos_2m
+    case comos_5m
     
     var grid: Gridable {
         switch self {
         case .cosmo_2i:
             return RegularGrid(nx: 2048, ny: 1536, latMin: -89.941406, lonMin: -179.912109, dx: 360/2048, dy: 180/1536)
-        case .comos_2m:
+        case .comos_5m:
             return RegularGrid(nx: 800, ny: 600, latMin: -89.85, lonMin: -179.775, dx: 360/800, dy: 180/600)
         }
     }
@@ -19,9 +19,18 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
     var domainRegistry: DomainRegistry {
         switch self {
         case .cosmo_2i:
-            return .bom_access_global
-        case .comos_2m:
-            return .bom_access_global_ensemble
+            return .arpae_cosmo_2i
+        case .comos_5m:
+            return .arpae_cosmo_5m
+        }
+    }
+    
+    var apiName: String {
+        switch self {
+        case .cosmo_2i:
+            return "COSMO-2I"
+        case .comos_5m:
+            return "COSMO-5M"
         }
     }
     
@@ -36,7 +45,7 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
     var dtSeconds: Int {
         switch self {
         case .cosmo_2i: return 3600
-        case .comos_2m: return 3*3600
+        case .comos_5m: return 3*3600
         }
     }
     
@@ -51,7 +60,7 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
     var omFileLength: Int {
         switch self {
         case .cosmo_2i: return 240+48
-        case .comos_2m: return (240+48) / 3
+        case .comos_5m: return (240+48) / 3
         }
     }
     
@@ -62,7 +71,7 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
         case .cosmo_2i:
             // Delay of 8:50 hours (0/12z) or 7:15 (6/18z) after initialisation with 4 runs a day
             return t.add(hours: -7).with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
-        case .comos_2m:
+        case .comos_5m:
             // Delay of 14:15 hours, 4 runs
             return t.add(hours: -14).with(hour: ((t.hour - 14 + 24) % 24) / 6 * 6)
         }

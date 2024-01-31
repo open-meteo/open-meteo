@@ -52,12 +52,22 @@ struct DownloadArpaeCommand: AsyncCommand {
     
     func download(application: Application, domain: ArpaeDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours: Double = 10
+        let deadLineHours: Double = 3
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
-        // download single JSON file for meta
-        // download single GRIB file
+        // download single JSON file for meta https://meteohub.mistralportal.it/api/datasets/COSMO-2I/opendata
+        
+        //{"date":"2024-01-30","run":"00:00","filename":"data-20240130T044559Z-93a22050-7b23-4f2c-bf93-9726657b0c7f.grib"}
+
+        let meta = try await waitForRun(curl: curl, domain: domain, run: run)
+        
+        for message in try await curl.downloadGrib(url: "https://meteohub.mistralportal.it/api/opendata/\(meta.filename)", bzip2Decode: false) {
+            message.dumpAttributes()
+        }
+        print(meta)
+        
+        // download single GRIB file https://meteohub.mistralportal.it/api/opendata/data-20240131T034805Z-6ae934c1-903b-4ff3-9b42-bd8636af36c7.grib
         // loop grib messages
         // return handles to chunked files
         
@@ -65,5 +75,30 @@ struct DownloadArpaeCommand: AsyncCommand {
         Process.alarm(seconds: 0)
         //return handles
         fatalError()
+    }
+    
+    /// Check the Mistral API for a new run
+    fileprivate func waitForRun(curl: Curl, domain: ArpaeDomain, run: Timestamp) async throws -> ArpaeMetaResponse {
+        let progress = TimeoutTracker(logger: curl.logger, deadline: Date().addingTimeInterval(2*3600))
+        while true {
+            guard let meta = try await curl.downloadInMemoryAsync(url: "https://meteohub.mistralportal.it/api/datasets/\(domain.apiName)/opendata", minSize: nil).readJSONDecodable([ArpaeMetaResponse].self)?.first(where: {$0.date == run.iso8601_YYYY_MM_dd && $0.run == "\(run.hh):00"}) else {
+                try await progress.check(error: CurlError.timeoutReached, delay: 5)
+                continue
+            }
+            return meta
+        }
+    }
+}
+
+fileprivate struct ArpaeMetaResponse: Decodable {
+    let date: String
+    let run: String
+    let filename: String
+}
+
+extension ByteBuffer {
+    public func readJSONDecodable<T: Decodable>(_ type: T.Type) throws -> T? {
+        var a = self
+        return try a.readJSONDecodable(type, length: a.readableBytes)
     }
 }
