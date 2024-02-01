@@ -49,39 +49,122 @@ struct DownloadArpaeCommand: AsyncCommand {
         }
     }
     
-    
+    /// Download an ARPAE model from MISTRAL meteo hub
+    /// 1. Fetch a metadata API to get the GRIB file name
+    /// 2. Download GRIB file and convert to a temporary chunked file for later timeseries update
+    /// Uses concurrent mutipart downlad and concurrent processing (Slightly overkill for this small domain)
     func download(application: Application, domain: ArpaeDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 3
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
-        // download single JSON file for meta https://meteohub.mistralportal.it/api/datasets/COSMO-2I/opendata
+        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
-        //{"date":"2024-01-30","run":"00:00","filename":"data-20240130T044559Z-93a22050-7b23-4f2c-bf93-9726657b0c7f.grib"}
-
-        let meta = try await waitForRun(curl: curl, domain: domain, run: run)
-        
-        for message in try await curl.downloadGrib(url: "https://meteohub.mistralportal.it/api/opendata/\(meta.filename)", bzip2Decode: false) {
-            message.dumpAttributes()
+        /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
+        actor PreviousData {
+            var data = [String: (step: Int, data: [Float])]()
+            
+            func set(variable: ArpaeSurfaceVariable, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
+                let previous = data[variable.rawValue]
+                data[variable.rawValue] = (step, d)
+                return previous
+            }
         }
-        print(meta)
+        let previous = PreviousData()
         
-        // download single GRIB file https://meteohub.mistralportal.it/api/opendata/data-20240131T034805Z-6ae934c1-903b-4ff3-9b42-bd8636af36c7.grib
-        // loop grib messages
-        // return handles to chunked files
-        
+        let meta = try await waitForRun(curl: curl, domain: domain, run: run)
+        let handles = try await curl.withGribStream(url: meta.url, bzip2Decode: false, nConcurrent: concurrent) { messages in
+            return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                guard let shortName = message.get(attribute: "shortName"),
+                      let stepRange = message.get(attribute: "stepRange"),
+                      let stepType = message.get(attribute: "stepType"),
+                      let levelStr = message.get(attribute: "level"),
+                      let parameterName = message.get(attribute: "parameterName"),
+                      let parameterUnits = message.get(attribute: "parameterUnits"),
+                      let validityTime = message.get(attribute: "validityTime"),
+                      let validityDate = message.get(attribute: "validityDate")
+                else {
+                    fatalError("could not get attributes")
+                }
+                let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+                guard let variable = getVariable(shortName: shortName, levelStr: levelStr) else {
+                    logger.debug("Unmapped GRIB message \(shortName) \(stepRange) \(stepType) \(parameterName) \(parameterUnits)")
+                    return nil
+                }
+                //print(shortName, stepRange, stepType, levelStr, parameterName, parameterUnits, validityDate, validityTime, variable)
+                //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
+                var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                try grib2d.load(message: message)
+                grib2d.array.shift180LongitudeAndFlipLatitude()
+                
+                // Scaling before compression with scalefactor
+                if let fma = variable.multiplyAdd {
+                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                // Deaccumulate precipitation
+                if stepType == "accum" {
+                    guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+                        return nil
+                    }
+                    // Store data for averaging in next run
+                    let previous = await previous.set(variable: variable, step: currentStep, data: grib2d.array.data)
+                    // For the overall first timestep or the first step of each repeating section, deaveraging is not required
+                    if let previous, previous.step != startStep {
+                        for l in previous.data.indices {
+                            grib2d.array.data[l] -= previous.data[l]
+                        }
+                    }
+                }
+                
+                let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(timestamp.timeIntervalSince1970).om"
+                try FileManager.default.removeItemIfExists(at: file)
+                logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
+                let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                // Just delete file afterwards. Handle is still open, therefore file is still accessible
+                try FileManager.default.removeItemIfExists(at: file)
+                return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
+            }.collect().compactMap({$0})
+        }
         await curl.printStatistics()
         Process.alarm(seconds: 0)
-        //return handles
-        fatalError()
+        return handles
+    }
+    
+    func getVariable(shortName: String, levelStr: String) -> ArpaeSurfaceVariable? {
+        switch (shortName, levelStr) {
+        case ("2t", "2"):
+            return .temperature_2m
+        case ("tp", "0"):
+            return .precipitation
+        case ("pmsl", "0"):
+              return .pressure_msl
+        case ("t_g", "0"):
+              return .surface_temperature
+        case ("10v", "10"):
+              return .wind_v_component_10m
+        case ("10u", "10"):
+              return .wind_u_component_10m
+        case ("2d", "2"):
+              return .dewpoint_2m
+        case ("clct", "0"):
+              return .cloud_cover
+        case ("w_snow", "0"):
+              return .snowfall_water_equivalent
+        case ("snow_gsp", "0"):
+              return .snowfall_water_equivalent
+        default: return nil
+        }
     }
     
     /// Check the Mistral API for a new run
+    /// Uses metadata endpoint like https://meteohub.mistralportal.it/api/datasets/COSMO-2I/opendata
     fileprivate func waitForRun(curl: Curl, domain: ArpaeDomain, run: Timestamp) async throws -> ArpaeMetaResponse {
         let progress = TimeoutTracker(logger: curl.logger, deadline: Date().addingTimeInterval(2*3600))
         while true {
-            guard let meta = try await curl.downloadInMemoryAsync(url: "https://meteohub.mistralportal.it/api/datasets/\(domain.apiName)/opendata", minSize: nil).readJSONDecodable([ArpaeMetaResponse].self)?.first(where: {$0.date == run.iso8601_YYYY_MM_dd && $0.run == "\(run.hh):00"}) else {
+            guard let meta = try await curl.downloadInMemoryAsync(url: ArpaeMetaResponse.metaUrl(for: domain), minSize: nil).readJSONDecodable([ArpaeMetaResponse].self)?.first(where: {$0.date == run.iso8601_YYYY_MM_dd && $0.run == "\(run.hh):00"}) else {
                 try await progress.check(error: CurlError.timeoutReached, delay: 5)
                 continue
             }
@@ -90,10 +173,34 @@ struct DownloadArpaeCommand: AsyncCommand {
     }
 }
 
+extension String {
+    /// Assuming the string contains to 2 integers split by a dash like `0-10`, return both numbers
+    func splitTo2Integer() -> (Int, Int)? {
+        let splited = split(separator: "-")
+        guard
+            splited.count == 2,
+            let left = Int(splited[0]),
+            let right = Int(splited[1])
+        else {
+            return nil
+        }
+        return (left, right)
+    }
+}
+
+/// Response of the Mistral metadata API
 fileprivate struct ArpaeMetaResponse: Decodable {
     let date: String
     let run: String
     let filename: String
+    
+    var url: String {
+        "https://meteohub.mistralportal.it/api/opendata/\(filename)"
+    }
+    
+    static func metaUrl(for domain: ArpaeDomain) -> String {
+        "https://meteohub.mistralportal.it/api/datasets/\(domain.apiName)/opendata"
+    }
 }
 
 extension ByteBuffer {

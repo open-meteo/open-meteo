@@ -1,18 +1,31 @@
 import Foundation
 
 /**
-
+Italian ARPAE models from MISTRAL https://meteohub.mistralportal.it/app/datasets
  */
 enum ArpaeDomain: String, GenericDomain, CaseIterable {
     case cosmo_2i
-    case comos_5m
+    case cosmo_2i_ruc
+    case cosmo_5m
     
     var grid: Gridable {
         switch self {
-        case .cosmo_2i:
-            return RegularGrid(nx: 2048, ny: 1536, latMin: -89.941406, lonMin: -179.912109, dx: 360/2048, dy: 180/1536)
-        case .comos_5m:
-            return RegularGrid(nx: 800, ny: 600, latMin: -89.85, lonMin: -179.775, dx: 360/800, dy: 180/600)
+        case .cosmo_2i, .cosmo_2i_ruc:
+            return ProjectionGrid(
+                nx: 576, 
+                ny: 701,
+                latitude: 34.39697...47.973446,
+                longitude: 5.443863...21.491043,
+                projection: RotatedLatLonProjection(latitude: -47, longitude: 10)
+            )
+        case .cosmo_5m:
+            return ProjectionGrid(
+                nx: 1083, 
+                ny: 559,
+                latitude: 25.821411...49.898006,
+                longitude: -17.5374...47.080597,
+                projection: RotatedLatLonProjection(latitude: -47, longitude: 10)
+            )
         }
     }
     
@@ -20,7 +33,9 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .cosmo_2i:
             return .arpae_cosmo_2i
-        case .comos_5m:
+        case.cosmo_2i_ruc:
+            return .arpae_cosmo_2i_ruc
+        case .cosmo_5m:
             return .arpae_cosmo_5m
         }
     }
@@ -29,7 +44,9 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .cosmo_2i:
             return "COSMO-2I"
-        case .comos_5m:
+        case .cosmo_2i_ruc:
+            return "COSMO-2I-RUC"
+        case .cosmo_5m:
             return "COSMO-5M"
         }
     }
@@ -43,10 +60,7 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        switch self {
-        case .cosmo_2i: return 3600
-        case .comos_5m: return 3*3600
-        }
+        return 3600
     }
     
     var hasYearlyFiles: Bool {
@@ -59,8 +73,9 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
     
     var omFileLength: Int {
         switch self {
-        case .cosmo_2i: return 240+48
-        case .comos_5m: return (240+48) / 3
+        case .cosmo_2i: return 48+48
+        case .cosmo_2i_ruc: return 18+24
+        case .cosmo_5m: return 72+48
         }
     }
     
@@ -69,11 +84,14 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
         let t = Timestamp.now()
         switch self {
         case .cosmo_2i:
-            // Delay of 8:50 hours (0/12z) or 7:15 (6/18z) after initialisation with 4 runs a day
-            return t.add(hours: -7).with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
-        case .comos_5m:
-            // Delay of 14:15 hours, 4 runs
-            return t.add(hours: -14).with(hour: ((t.hour - 14 + 24) % 24) / 6 * 6)
+            // Delay of 4:50 hours after initialisation with 2 runs a day
+            return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 12 * 12)
+        case .cosmo_2i_ruc:
+            // Delay of 3:20 hours after initialisation with 4 runs a day
+            return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
+        case .cosmo_5m:
+            // Delay of 3:55 hours, 2 runs
+            return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 12 * 12)
         }
     }
 }

@@ -279,12 +279,9 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
                     
                     if stepType == "accum" {
-                        let splited = stepRange.split(separator: "-")
-                        guard splited.count == 2 else {
+                        guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
                             return nil
                         }
-                        let startStep = Int(splited[0])!
-                        let currentStep = Int(splited[1])!
                         // Store data for averaging in next run
                         let previous = await previous.set(variable: variable, step: currentStep, data: grib2d.array.data)
                         // For the overall first timestep or the first step of each repeating section, deaveraging is not required
