@@ -87,8 +87,8 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
             // Delay of 4:50 hours after initialisation with 2 runs a day
             return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 12 * 12)
         case .cosmo_2i_ruc:
-            // Delay of 3:20 hours after initialisation with 4 runs a day
-            return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
+            // Delay of 3:20 hours after initialisation with 8 runs a day
+            return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 3 * 3)
         case .cosmo_5m:
             // Delay of 3:55 hours, 2 runs
             return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 12 * 12)
