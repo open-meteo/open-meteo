@@ -148,7 +148,7 @@ struct DownloadArpaeCommand: AsyncCommand {
         case ("10u", "10"):
               return .wind_u_component_10m
         case ("2d", "2"):
-              return .dewpoint_2m
+              return .dew_point_2m
         case ("clct", "0"):
               return .cloud_cover
         case ("w_snow", "0"):

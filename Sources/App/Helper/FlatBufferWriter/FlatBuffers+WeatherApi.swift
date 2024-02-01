@@ -564,9 +564,17 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .archive_best_match:
             return .bestMatch
         case .cma_grapes_global:
-            // TODO register GRAPES model in Flatbuffers SDK
-            return .bestMatch
+            return .cmaGrapesGlobal
         case .bom_access_global:
+            return .bomAccessGlobal
+        case .arpae_cosmo_seamless:
+            // TODO register in SDK
+            return .bestMatch
+        case .arpae_cosmo_2i:
+            return .bestMatch
+        case .arpae_cosmo_2i_ruc:
+            return .bestMatch
+        case .aprae_cosmo_5m:
             return .bestMatch
         }
     }
