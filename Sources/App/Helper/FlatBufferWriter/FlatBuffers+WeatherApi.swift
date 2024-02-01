@@ -568,14 +568,13 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .bom_access_global:
             return .bomAccessGlobal
         case .arpae_cosmo_seamless:
-            // TODO register in SDK
-            return .bestMatch
+            return .arpaeCosmoSeamless
         case .arpae_cosmo_2i:
-            return .bestMatch
+            return .arpaeCosmo2i
         case .arpae_cosmo_2i_ruc:
-            return .bestMatch
+            return .arpaeCosmo2iRuc
         case .arpae_cosmo_5m:
-            return .bestMatch
+            return .arpaeCosmo5m
         }
     }
 }
