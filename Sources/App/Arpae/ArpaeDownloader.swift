@@ -97,7 +97,6 @@ struct DownloadArpaeCommand: AsyncCommand {
                 //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 try grib2d.load(message: message)
-                grib2d.array.shift180LongitudeAndFlipLatitude()
                 
                 // Scaling before compression with scalefactor
                 if let fma = variable.multiplyAdd {

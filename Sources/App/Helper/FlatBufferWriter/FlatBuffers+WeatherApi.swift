@@ -574,7 +574,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .bestMatch
         case .arpae_cosmo_2i_ruc:
             return .bestMatch
-        case .aprae_cosmo_5m:
+        case .arpae_cosmo_5m:
             return .bestMatch
         }
     }

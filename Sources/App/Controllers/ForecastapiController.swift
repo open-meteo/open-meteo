@@ -306,7 +306,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case arpae_cosmo_seamless
     case arpae_cosmo_2i
     case arpae_cosmo_2i_ruc
-    case aprae_cosmo_5m
+    case arpae_cosmo_5m
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -452,7 +452,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try ArpaeReader(domain: .cosmo_2i, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .arpae_cosmo_2i_ruc:
             return try ArpaeReader(domain: .cosmo_2i_ruc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .aprae_cosmo_5m:
+        case .arpae_cosmo_5m:
             return try ArpaeReader(domain: .cosmo_5m, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         }
     }
