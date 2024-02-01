@@ -28,7 +28,7 @@ enum ArpaeSurfaceVariable: String, CaseIterable, GenericVariableMixable, Generic
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m, .surface_temperature:
+        case .temperature_2m, .surface_temperature, .dew_point_2m:
             return (1, -273.15)
         case .snowfall_water_equivalent:
             return (100, 0)
