@@ -65,6 +65,10 @@ struct CronjobCommand: Command {
         39 3,15 * * * /usr/local/bin/openmeteo-api download-gem gem_global > ~/log/gem_global.log 2>&1 || cat ~/log/gem_global.log
         
         
+        40 4,16 * * * /usr/local/bin/openmeteo-api download-arpae cosmo_2i --concurrent 4 > ~/log/cosmo_2i.log 2>&1 || cat ~/log/cosmo_2i.log
+        45 3,15 * * * /usr/local/bin/openmeteo-api download-arpae cosmo_5m --concurrent 4 > ~/log/cosmo_5m.log 2>&1 || cat ~/log/cosmo_5m.log
+        50 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download-arpae cosmo_2i_ruc --concurrent 4 > ~/log/cosmo_2i_ruc.log 2>&1 || cat ~/log/cosmo_2i_ruc.log
+        
         
         # Ensemble models
         37 2,14  * * * /usr/local/bin/openmeteo-api download icon-eps > ~/log/icon-eps.log 2>&1 || cat ~/log/icon-eps.log
