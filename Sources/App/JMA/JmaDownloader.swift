@@ -93,12 +93,13 @@ struct JmaDownload: AsyncCommand {
         let filesToDownload: [String]
         switch domain {
         case .gsm:
-            filesToDownload = domain.forecastHours(run: run.hour).map { hour in
+            filesToDownload = domain.forecastHours(run: run).map { hour in
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_GSM_GPV_Rgl_FD\((hour/24).zeroPadded(len: 2))\((hour%24).zeroPadded(len: 2))_grib2.bin"
             }
         case .msm:
             // 0 und 12z run have more data
-            let range = run.hour % 12 == 0 ? ["00-15", "16-33", "34-39", "40-51", "52-78"] : ["00-15", "16-33", "34-39"]
+            let after2021 = run.toComponents().year >= 2021
+            let range = (run.hour % 12 == 0 && after2021) ? ["00-15", "16-33", "34-39", "40-51", "52-78"] : ["00-15", "16-33", "34-39"]
             filesToDownload = range.map { hour in
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_MSM_GPV_Rjp_Lsurf_FH\(hour)_grib2.bin"
             }
@@ -535,13 +536,20 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    func forecastHours(run: Int) -> [Int] {
+    func forecastHours(run: Timestamp) -> [Int] {
+        let hour = run.hour
         switch self {
         case .gsm:
-            let through = run == 00 || run == 12 ? 264 : 136
+            if run.toComponents().year <= 2018 {
+                return Array(stride(from: 0, through: 84, by: 6))
+            }
+            if run.toComponents().year <= 2020 {
+                return Array(stride(from: 0, through: 134, by: 6))
+            }
+            let through = hour == 00 || hour == 12 ? 264 : 136
             return Array(stride(from: 0, through: through, by: 6))
         case .msm:
-            let through = run == 00 || run == 12 ? 78 : 39
+            let through = hour == 00 || hour == 12 ? 78 : 39
             return Array(stride(from: 0, through: through, by: 1))
         }
     }
