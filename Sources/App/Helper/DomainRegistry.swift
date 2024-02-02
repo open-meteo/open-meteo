@@ -79,6 +79,10 @@ enum DomainRegistry: String, CaseIterable {
     case cmip_MRI_AGCM3_2_S
     case cmip_NICAM16_8S
     
+    case arpae_cosmo_2i
+    case arpae_cosmo_2i_ruc
+    case arpae_cosmo_5m
+    
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
@@ -207,6 +211,12 @@ enum DomainRegistry: String, CaseIterable {
             return MeteoFranceDomain.arome_france_15min
         case .meteofrance_arome_france_hd_15min:
             return MeteoFranceDomain.arome_france_hd_15min
+        case .arpae_cosmo_2i:
+            return ArpaeDomain.cosmo_2i
+        case .arpae_cosmo_2i_ruc:
+            return ArpaeDomain.cosmo_2i_ruc
+        case .arpae_cosmo_5m:
+            return ArpaeDomain.cosmo_5m
         }
     }
 }

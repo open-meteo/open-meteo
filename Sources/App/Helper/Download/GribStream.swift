@@ -42,10 +42,27 @@ struct GribAsyncStreamHelper {
             let length: UInt64
         }
         
-        let header = base.advanced(by: offset).assumingMemoryBound(to: GribHeader.self)
-        let length = header.pointee.length.bigEndian
+        let header = base.advanced(by: offset).assumingMemoryBound(to: GribHeader.self).pointee
         
-        guard (1...2).contains(header.pointee.version), length <= (1 << 40) else {
+        // GRIB1 detection
+        if header.version == 1 {
+            // 1-4 identifier = GRIB
+            // 5-7 totalLength = 4284072
+            // 8 editionNumber = 1
+            // Read 24 bytes as bigEndian and turn into UInt32
+            let base = base.advanced(by: offset + 4).assumingMemoryBound(to: UInt32.self).pointee
+            let masked = (base & 0x00ffffff)
+            let shifted = (masked << 8)
+            let length = shifted.bigEndian
+            guard length <= (1 << 24) else {
+                return nil
+            }
+            return (offset, Int(length))
+        }
+        
+        let length = header.length.bigEndian
+        
+        guard (1...2).contains(header.version), length <= (1 << 40) else {
             return nil
         }
         return (offset, Int(length))

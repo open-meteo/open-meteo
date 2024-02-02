@@ -62,6 +62,10 @@ public struct ForecastapiController: RouteCollection {
             has15minutely: false,
             defaultModel: .bom_access_global).query
         )
+        categoriesRoute.getAndPost("arpae", use: WeatherApiController(
+            has15minutely: false,
+            defaultModel: .arpae_cosmo_seamless).query
+        )
         
         categoriesRoute.getAndPost("elevation", use: DemController().query)
         categoriesRoute.getAndPost("air-quality", use: CamsController().query)
@@ -299,6 +303,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case era5_land
     case ecmwf_ifs
     
+    case arpae_cosmo_seamless
+    case arpae_cosmo_2i
+    case arpae_cosmo_2i_ruc
+    case arpae_cosmo_5m
+    
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol] {
@@ -437,6 +446,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .bom_access_global:
             return try BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .arpae_cosmo_seamless:
+            return try ArpaeMixer(domains: [.cosmo_5m, .cosmo_2i, .cosmo_2i_ruc], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+        case .arpae_cosmo_2i:
+            return try ArpaeReader(domain: .cosmo_2i, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .arpae_cosmo_2i_ruc:
+            return try ArpaeReader(domain: .cosmo_2i_ruc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .arpae_cosmo_5m:
+            return try ArpaeReader(domain: .cosmo_5m, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         }
     }
     
