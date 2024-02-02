@@ -20,9 +20,6 @@ struct GemDownload: AsyncCommand {
         @Option(name: "run")
         var run: String?
         
-        @Option(name: "past-days")
-        var pastDays: Int?
-        
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
@@ -110,7 +107,6 @@ struct GemDownload: AsyncCommand {
         logger.info("Downloading height and elevation data")
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
-        
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         var height: [Float]
@@ -160,7 +156,6 @@ struct GemDownload: AsyncCommand {
         }
         
         //try Array2D(data: height, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
-        
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height)
     }
     
@@ -198,8 +193,6 @@ struct GemDownload: AsyncCommand {
                 if !variable.includedFor(hour: hour, domain: domain) {
                     continue
                 }
-                let filenameDest = "\(downloadDirectory)\(variable.omFileName.file)_\(h3).om"
-                
                 let url = domain.getUrl(run: run, hour: hour, gribName: gribName, server: server)
                 
                 for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
@@ -248,8 +241,6 @@ struct GemDownload: AsyncCommand {
                                 fn: fn,
                                 skipHour0: variable.skipHour0
                             ))
-                            
-                            
                             grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
                         }
                     }
