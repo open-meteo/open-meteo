@@ -23,9 +23,6 @@ struct GemDownload: AsyncCommand {
         @Option(name: "past-days")
         var pastDays: Int?
         
-        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
-        var skipExisting: Bool
-        
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
@@ -37,6 +34,9 @@ struct GemDownload: AsyncCommand {
         
         @Option(name: "server", help: "Server base URL. Default 'https://hpfx.collab.science.gc.ca/YYYYMMDD/WXO-DD/'. Alternative 'https://dd.weather.gc.ca/'")
         var server: String?
+        
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
@@ -50,6 +50,7 @@ struct GemDownload: AsyncCommand {
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try GemDomain.load(rawValue: signature.domain)
+        let nConcurrent = signature.concurrent ?? 1
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
@@ -88,8 +89,8 @@ struct GemDownload: AsyncCommand {
         try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
         
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server)
-        try await download(application: context.application, domain: domain, variables: variables, run: run, skipFilesIfExisting: signature.skipExisting, server: signature.server)
-        try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -164,7 +165,7 @@ struct GemDownload: AsyncCommand {
     }
     
     /// Download data and store as compressed files for each timestep
-    func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, skipFilesIfExisting: Bool, server: String?) async throws {
+    func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, server: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5) // 12 hours and 6 hours interval so we let 1 hour for data conversion
         let downloadDirectory = domain.downloadDirectory
@@ -174,6 +175,7 @@ struct GemDownload: AsyncCommand {
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        var handles = [GenericVariableHandle]()
         
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
         let deaverager = GribDeaverager()
@@ -197,9 +199,6 @@ struct GemDownload: AsyncCommand {
                     continue
                 }
                 let filenameDest = "\(downloadDirectory)\(variable.omFileName.file)_\(h3).om"
-                if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameDest) {
-                    continue
-                }
                 
                 let url = domain.getUrl(run: run, hour: hour, gribName: gribName, server: server)
                 
@@ -241,88 +240,33 @@ struct GemDownload: AsyncCommand {
                                 fatalError("Wind speed calculation requires \(windspeedVariable) to download")
                             }
                             let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
-                            try writer.write(file: "\(downloadDirectory)\(windspeedVariable.omFileName.file)_\(h3)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: windspeedVariable.scalefactor, all: windspeed, overwrite: true)
+                            let fn = try writer.write(file: "\(downloadDirectory)\(windspeedVariable.omFileName.file)_\(h3)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: windspeedVariable.scalefactor, all: windspeed, overwrite: true)
+                            handles.append(GenericVariableHandle(
+                                variable: windspeedVariable,
+                                time: run.add(hours: hour),
+                                member: member,
+                                fn: fn,
+                                skipHour0: variable.skipHour0
+                            ))
+                            
+                            
                             grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
                         }
                     }
                     
-                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).nc")
-                    try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
+                    let fn = try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
+                    handles.append(GenericVariableHandle(
+                        variable: variable,
+                        time: run.add(hours: hour),
+                        member: member,
+                        fn: fn,
+                        skipHour0: variable.skipHour0
+                    ))
                 }
             }
         }
         await curl.printStatistics()
-    }
-    
-    /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, createNetcdf: Bool) throws {
-        let downloadDirectory = domain.downloadDirectory
-        let grid = domain.grid
-        let nMembers = domain.ensembleMembers
-        
-        let forecastHours = domain.getForecastHours(run: run)
-        let nTime = forecastHours.max()! / domain.dtHours + 1
-        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
-        let nLocations = grid.nx * grid.ny
-        
-        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
-        let nLocationsPerChunk = om.nLocationsPerChunk
-        
-        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
-        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-
-        for variable in variables {
-            guard variable.gribName(domain: domain) != nil else {
-                continue
-            }
-            let skip = variable.skipHour0 ? 1 : 0
-
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
-            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try forecastHours.compactMap({ hour in
-                if hour == 0 && variable.skipHour0 {
-                    return nil
-                }
-                if !variable.includedFor(hour: hour, domain: domain) {
-                    return nil
-                }
-                let h3 = hour.zeroPadded(len: 3)
-                let readers = try (0..<nMembers).map { member in
-                    let memberStr = member > 0 ? "_\(member)" : ""
-                    return try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).om")
-                }
-                return (hour, readers)
-            })
-            
-            let storePreviousForecast = variable.storePreviousForecast && domain.ensembleMembers <= 1
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, scalefactor: variable.scalefactor, storePreviousForecast: storePreviousForecast) { offset in
-                let d0offset = offset / nMembers
-                
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data3d.data.fillWithNaNs()
-                for reader in readers {
-                    for (i, memberReader) in reader.reader.enumerated() {
-                        try memberReader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data3d[0..<locationRange.count, i, reader.hour / domain.dtHours] = readTemp
-                    }
-                }
-                
-                if domain.dtHours == 3 {
-                    /// interpolate 6 to 3 hours for ensemble 0.5°
-                    data3d.interpolateInplace(
-                        type: variable.interpolation,
-                        skipFirst: skip,
-                        time: time,
-                        grid: domain.grid,
-                        locationRange: locationRange
-                    )
-                }
-                
-                progress.add(locationRange.count * nMembers)
-                return data3d.data[0..<locationRange.count * nMembers * nTime]
-            }
-            progress.finish()
-        }
+        return handles
     }
 }
 
