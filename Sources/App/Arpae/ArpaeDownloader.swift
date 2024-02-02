@@ -150,8 +150,6 @@ struct DownloadArpaeCommand: AsyncCommand {
               return .dew_point_2m
         case ("clct", "0"):
               return .cloud_cover
-        case ("w_snow", "0"):
-              return .snowfall_water_equivalent
         case ("snow_gsp", "0"):
               return .snowfall_water_equivalent
         default: return nil
