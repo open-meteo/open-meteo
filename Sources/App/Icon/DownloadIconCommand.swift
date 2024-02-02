@@ -25,8 +25,11 @@ struct DownloadIconCommand: AsyncCommand {
         @Option(name: "run")
         var run: String?
 
-        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
-        var skipExisting: Bool
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
+        
+        @Flag(name: "create-netcdf")
+        var createNetcdf: Bool
         
         @Option(name: "group")
         var group: String?
@@ -95,7 +98,7 @@ struct DownloadIconCommand: AsyncCommand {
     
     
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, skipFilesIfExisting: Bool, variables: [IconVariableDownloadable]) async throws {
+    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [IconVariableDownloadable]) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -120,6 +123,8 @@ struct DownloadIconCommand: AsyncCommand {
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        var handles = [GenericVariableHandle]()
+        var handles15minIconD2 = [GenericVariableHandle]()
         
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         lazy var domainElevation = {
@@ -132,6 +137,7 @@ struct DownloadIconCommand: AsyncCommand {
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
+            let timestamp = run.add(hours: hour)
             let h3 = hour.zeroPadded(len: 3)
             
             /// Keep temperature 2m in memory if required for sea level pressure conversion
@@ -153,11 +159,6 @@ struct DownloadIconCommand: AsyncCommand {
                 
                 let url = "\(serverPrefix)\(v.variable)/\(filenameFrom)"
                 
-                let filenameDest = "single-level_\(h3)_\(variable.omFileName.file.uppercased()).fpg"
-                if skipFilesIfExisting && FileManager.default.fileExists(atPath: "\(downloadDirectory)\(filenameDest)") {
-                    continue
-                }
-                
                 var messages = try await cdo.downloadAndRemap(url)
                 if domain == .iconD2 && messages.count > 1 {
                     // Write 15min D2 icon data
@@ -165,6 +166,7 @@ struct DownloadIconCommand: AsyncCommand {
                     try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
                     for (i, message) in messages.enumerated() {
                         let h3 = (hour*4+i).zeroPadded(len: 3)
+                        let timestamp = run.add(hour*3600 + i*900)
                         let filenameDest = "single-level_\(h3)_\(variable.omFileName.file.uppercased()).fpg"
                         try grib2d.load(message: message)
                         var data = grib2d.array.data
@@ -173,7 +175,17 @@ struct DownloadIconCommand: AsyncCommand {
                             data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                        try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
+                        let fn = try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
+                        handles15minIconD2.append(GenericVariableHandle(
+                            variable: variable,
+                            time: timestamp,
+                            member: 0,
+                            fn: fn,
+                            skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run),
+                            isAveragedOverTime: variable.isAveragedOverForecastTime,
+                            isAccumulatedSinceModelStart: variable.isAccumulatedSinceModelStart
+                        ))
+                        try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
                     }
                     messages = [messages[0]]
                 }
@@ -260,107 +272,30 @@ struct DownloadIconCommand: AsyncCommand {
                     
                     //logger.info("Compressing and writing data to \(filenameDest)")
                     let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    handles.append(GenericVariableHandle(
+                        variable: variable,
+                        time: timestamp,
+                        member: member,
+                        fn: fn,
+                        skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run),
+                        isAveragedOverTime: variable.isAveragedOverForecastTime,
+                        isAccumulatedSinceModelStart: variable.isAccumulatedSinceModelStart
+                    ))
+                    try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
                 }
                 // icon global downloads tend to use a lot of memory due to numerous allocations
                 chelper_malloc_trim()
             }
         }
         await curl.printStatistics()
-    }
-
-    /// unompress and remap
-    /// Process variable after variable
-    func convertIcon(logger: Logger, domain: IconDomains, run: Timestamp, variables: [IconVariableDownloadable]) throws {
-        let downloadDirectory = domain.downloadDirectory
-        let grid = domain.grid
-        let nMembers = domain.ensembleMembers
-        
-        let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        let nTime = forecastSteps.max()! * 3600 / domain.dtSeconds + 1
-        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
-        let nLocations = grid.count
-        
-        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
-        let nLocationsPerChunk = om.nLocationsPerChunk
-        //print("nLocationsPerChunk \(nLocationsPerChunk)... \(nLocations/nLocationsPerChunk) iterations")
-
-        // ICON global + eu only have 3h data after 78 hours
-        // ICON global 6z and 18z have 120 instead of 180 forecast hours
-        // Stategy: Read each variable in a spatial array and interpolate missing values
-        // Afterwards merge into temporal data files
-        
-        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
-        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-
-        for variable in variables {
-            guard variable.getVarAndLevel(domain: domain) != nil else {
-                continue
-            }
-            let v = variable.omFileName.file.uppercased()
-            let skip = variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run) ? 1 : 0
-            
-            // For ICON-EPS, `direct radiation` only contains 3-hourly data. Remove them from `forecastSteps` for interpolation
-            let forecastSteps = forecastSteps.filter({
-                $0 == 0 || !variable.skipHour(hour: $0, domain: domain, forDownload: false, run: run)
-            })
-            
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
-            
-            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try forecastSteps.compactMap({ hour in
-                if hour < skip {
-                    return nil
-                }
-                let readers = try (0..<nMembers).map { member in
-                    let memberStr = member > 0 ? "_\(member)" : ""
-                    return try OmFileReader(file: "\(downloadDirectory)single-level_\(hour.zeroPadded(len: 3))_\(v)\(memberStr).fpg")
-                }
-                return (hour, readers)
-            })
-            
-            let storePreviousForecast = variable.storePreviousForecast && domain.ensembleMembers <= 1
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, scalefactor: variable.scalefactor, storePreviousForecast: storePreviousForecast) { offset in
-                let d0offset = offset / nMembers
-                
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data3d.data.fillWithNaNs()
-                for reader in readers {
-                    for (i, memberReader) in reader.reader.enumerated() {
-                        try memberReader.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data3d[0..<data3d.nLocations, i, reader.hour /*/ domain.dtHours*/] = readTemp
-                    }
-                }
-                
-                // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
-                if variable.isAveragedOverForecastTime {
-                    data3d.deavergeOverTime()
-                }
-
-                
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
-                    data3d.deaccumulateOverTime()
-                }
-                
-                // Interpolate all missing values
-                // ICON-EPS ensemble model has 12-hourly values after 120 hours of forecast
-                // EPS ensemble models have 6-hourly data after 2 or 3 days of forecast
-                // Fill in missing hourly values after switching to 3h
-                data3d.interpolateInplace(type: variable.interpolation, skipFirst: skip, time: time, grid: domain.grid, locationRange: locationRange)
-                
-                progress.add(locationRange.count * nMembers)
-                return data3d.data[0..<locationRange.count * nTime * nMembers]
-            }
-            progress.finish()
-        }
-        //try "\(run.timeIntervalSince1970)".write(toFile: domain.initFileNameOm, atomically: true, encoding: .utf8)
+        return (handles, handles15minIconD2)
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let domain = try IconDomains.load(rawValue: signature.domain)
-        
+        let nConcurrent = signature.concurrent ?? 1
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         if signature.onlyVariables != nil && signature.group != nil {
@@ -424,11 +359,11 @@ struct DownloadIconCommand: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
         
-        try await downloadIcon(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables)
-        try convertIcon(logger: logger, domain: domain, run: run, variables: variables)
+        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
         if domain == .iconD2 {
-            // ICON-D2 download 15min data as well
-            try convertIcon(logger: logger, domain: .iconD2_15min, run: run, variables: variables)
+            // ICON-D2 downloads 15min data as well
+            try await GenericVariableHandle.convert(logger: logger, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, nMembers: IconDomains.iconD2_15min.ensembleMembers, handles: handles15minIconD2, concurrent: nConcurrent)
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
