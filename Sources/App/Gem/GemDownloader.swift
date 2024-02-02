@@ -175,8 +175,8 @@ struct GemDownload: AsyncCommand {
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        /// Keep data from previous timestep in memory to deaccumulate the next timestep
-        var previousData = [String: (step: Int, data: [Float])]()
+        /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
+        let deaverager = GribDeaverager()
                 
         let forecastHours = domain.getForecastHours(run: run)
         for hour in forecastHours {
@@ -220,24 +220,15 @@ struct GemDownload: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    guard let stepRange = message.get(attribute: "stepRange") else {
+                    guard let stepRange = message.get(attribute: "stepRange"),
+                          let stepType = message.get(attribute: "stepType") else {
                         fatalError("could not get step range")
                     }
-                    if stepRange.contains("-") {
-                        // data is accumulated since model start
-                        let startStep = Int(stepRange.split(separator: "-")[0])!
-                        let currentStep = Int(stepRange.split(separator: "-")[1])!
-                        let previous = previousData["\(variable.rawValue)\(memberStr)"]
-                        // Store data for the next run
-                        previousData["\(variable.rawValue)\(memberStr)"] = (currentStep, grib2d.array.data)
-                        if let previous, previous.step != startStep {
-                            /// For 6 hourly, divide it by 2, so interpolation does not need to care about precip sums
-                            let deltaHours = Float((currentStep - previous.step) / domain.dtHours)
-                            for l in previous.data.indices {
-                                grib2d.array.data[l] = (grib2d.array.data[l] - previous.data[l]) / deltaHours
-                            }
-                        }
+                    // Deaccumulate precipitation
+                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        continue
                     }
+                    
                     // GEM ensemble does not have wind speed and direction directly, calculate from u/v components
                     if domain == .gem_global_ensemble, let variable = variable as? GemSurfaceVariable {
                         // keep wind speed in memory, which actually contains wind U-component

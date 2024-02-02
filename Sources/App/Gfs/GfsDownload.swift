@@ -297,8 +297,8 @@ struct GfsDownload: AsyncCommand {
         
         let variablesHour0 = variables.filter({!$0.variable.skipHour0(for: domain)})
         
-        /// Keep data from previous timestep in memory to deaverage the next timestep
-        var previousData = [String: (step: Int, data: [Float])]()
+        /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
+        let deaverager = GribDeaverager()
         
         /// Variables that are kept in memory
         /// For GFS013, keep pressure and temperature in memory to convert specific humidity to relative
@@ -345,25 +345,9 @@ struct GfsDownload: AsyncCommand {
                         fatalError("could not get step range or type")
                     }
                     
-                    // Deaverage data
-                    if stepType == "avg" {
-                        let startStep = Int(stepRange.split(separator: "-")[0])!
-                        let currentStep = Int(stepRange.split(separator: "-")[1])!
-                        let previous = previousData["\(variable.variable.rawValue)\(memberStr)"]
-                        // Store data for averaging in next run
-                        previousData["\(variable.variable.rawValue)\(memberStr)"] = (currentStep, grib2d.array.data)
-                        // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-                        if let previous, previous.step != startStep {
-                            let deltaHours = Float(currentStep - startStep)
-                            let deltaHoursPrevious = Float(previous.step - startStep)
-                            for l in previous.data.indices {
-                                grib2d.array.data[l] = (grib2d.array.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious) / (deltaHours - deltaHoursPrevious)
-                            }
-                        }
-                    }
-                    
-                    if stepType == "acc" {
-                        fatalError("stepType=acc not supported")
+                    // Deaccumulate precipitation
+                    guard await deaverager.deaccumulateIfRequired(variable: variable.variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        continue
                     }
                     
                     // Convert specific humidity to relative humidity
