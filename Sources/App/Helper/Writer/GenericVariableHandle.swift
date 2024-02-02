@@ -123,3 +123,53 @@ struct GenericVariableHandle {
         }
     }
 }
+
+
+/// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
+actor GribDeaverager {
+    var data = [String: (step: Int, data: [Float])]()
+    
+    /// Set new value and get previous value out
+    func set(variable: GenericVariable, member: Int, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
+        let previous = data[variable.rawValue]
+        data["\(variable)_member\(member)"] = (step, d)
+        return previous
+    }
+    
+    /// Returns false if step should be skipped
+    func deaccumulateIfRequired(variable: GenericVariable, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D) async -> Bool {
+        // Deaccumulate precipitation
+        if stepType == "accum" {
+            guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+                return false
+            }
+            // Store data for next timestep
+            let previous = set(variable: variable, member: member, step: currentStep, data: grib2d.array.data)
+            // For the overall first timestep or the first step of each repeating section, deaveraging is not required
+            if let previous, previous.step != startStep {
+                for l in previous.data.indices {
+                    grib2d.array.data[l] -= previous.data[l]
+                }
+            }
+        }
+        
+        // Deaverage data
+        if stepType == "avg" {
+            guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+                return false
+            }
+            // Store data for next timestep
+            let previous = set(variable: variable, member: member, step: currentStep, data: grib2d.array.data)
+            // For the overall first timestep or the first step of each repeating section, deaveraging is not required
+            if let previous, previous.step != startStep {
+                let deltaHours = Float(currentStep - startStep)
+                let deltaHoursPrevious = Float(previous.step - startStep)
+                for l in previous.data.indices {
+                    grib2d.array.data[l] = (grib2d.array.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious) / (deltaHours - deltaHoursPrevious)
+                }
+            }
+        }
+        
+        return true
+    }
+}

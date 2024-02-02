@@ -61,18 +61,7 @@ struct DownloadArpaeCommand: AsyncCommand {
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        
-        /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
-        actor PreviousData {
-            var data = [String: (step: Int, data: [Float])]()
-            
-            func set(variable: ArpaeSurfaceVariable, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
-                let previous = data[variable.rawValue]
-                data[variable.rawValue] = (step, d)
-                return previous
-            }
-        }
-        let previous = PreviousData()
+        let previous = GribDeaverager()
         
         let meta = try await waitForRun(curl: curl, domain: domain, run: run)
         let handles = try await curl.withGribStream(url: meta.url, bzip2Decode: false, nConcurrent: concurrent) { messages in
@@ -104,18 +93,8 @@ struct DownloadArpaeCommand: AsyncCommand {
                 }
                 
                 // Deaccumulate precipitation
-                if stepType == "accum" {
-                    guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
-                        return nil
-                    }
-                    // Store data for averaging in next run
-                    let previous = await previous.set(variable: variable, step: currentStep, data: grib2d.array.data)
-                    // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-                    if let previous, previous.step != startStep {
-                        for l in previous.data.indices {
-                            grib2d.array.data[l] -= previous.data[l]
-                        }
-                    }
+                guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                    return nil
                 }
                 
                 let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(timestamp.timeIntervalSince1970).om"
