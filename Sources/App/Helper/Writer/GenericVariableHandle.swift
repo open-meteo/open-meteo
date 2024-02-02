@@ -11,6 +11,18 @@ struct GenericVariableHandle {
     let member: Int
     let fn: FileHandle
     let skipHour0: Bool
+    let isAveragedOverTime: Bool
+    let isAccumulatedSinceModelStart: Bool
+    
+    public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle, skipHour0: Bool, isAveragedOverTime: Bool = false, isAccumulatedSinceModelStart: Bool = false) {
+        self.variable = variable
+        self.time = time
+        self.member = member
+        self.fn = fn
+        self.skipHour0 = skipHour0
+        self.isAveragedOverTime = isAveragedOverTime
+        self.isAccumulatedSinceModelStart = isAccumulatedSinceModelStart
+    }
     
     /// Process concurrently
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self], concurrent: Int) async throws {
@@ -44,6 +56,8 @@ struct GenericVariableHandle {
             let variable = handles[0].variable
             
             let skip = handles[0].skipHour0 ? 1 : 0
+            let isAveragedOverTime = handles[0].isAveragedOverTime
+            let isAccumulatedSinceModelStart = handles[0].isAccumulatedSinceModelStart
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
             let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
@@ -81,6 +95,16 @@ struct GenericVariableHandle {
                         try r.fn.read(into: &readTemp, arrayDim1Range: (0..<locationRange.count), arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
                         data3d[0..<locationRange.count, r.member, time.index(of: reader.time)!] = readTemp
                     }
+                }
+                
+                // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
+                if isAveragedOverTime {
+                    data3d.deavergeOverTime()
+                }
+                
+                // De-accumulate precipitation
+                if isAccumulatedSinceModelStart {
+                    data3d.deaccumulateOverTime()
                 }
                 
                 // Interpolate all missing values

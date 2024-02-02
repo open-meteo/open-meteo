@@ -30,6 +30,9 @@ struct JmaDownload: AsyncCommand {
         @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
         var upperLevel: Bool
 
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
+        
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
     }
@@ -70,7 +73,8 @@ struct JmaDownload: AsyncCommand {
         
         //try await downloadElevation(application: context.application, domain: domain)
         let handles = try await download(application: context.application, domain: domain, run: run, server: server)
-        try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf, handles: handles)
+        let nConcurrent = signature.concurrent ?? 1
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles, concurrent: nConcurrent)
         logger.info("Finished in \(start.timeElapsedPretty())")
 
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -80,7 +84,7 @@ struct JmaDownload: AsyncCommand {
     
     /// MSM or GSM domain
     /// Return open file handles, to ensure overlapping runs are not conflicting
-    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws -> [(variable: JmaVariableDownloadable, hour: Int, fn: FileHandle)] {
+    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = domain == .gsm ? 3 : 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
@@ -112,7 +116,7 @@ struct JmaDownload: AsyncCommand {
         
         let handles = try await filesToDownload.asyncFlatMap { filename in
             let grib = try await curl.downloadGrib(url: "\(server)\(filename)", bzip2Decode: false)
-            return try grib.compactMap { message -> (JmaVariableDownloadable, Int, FileHandle)? in
+            return try grib.compactMap { message -> GenericVariableHandle? in
                 guard let variable = message.toJmaVariable(),
                       let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
                     return nil
@@ -120,6 +124,7 @@ struct JmaDownload: AsyncCommand {
                 if hour == 0 && variable.skipHour0 {
                     return nil
                 }
+                let timestamp = run.add(hours: hour)
                 try grib2d.load(message: message)
                 if domain.isGlobal {
                     grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -140,60 +145,14 @@ struct JmaDownload: AsyncCommand {
                 //let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                 let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 
-                return (variable, hour, fn)
+                // Precipitation in MSM is not accumulated
+                let isAccumulated = variable.isAccumulatedSinceModelStart && domain != .msm
+                return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: variable.skipHour0, isAccumulatedSinceModelStart: isAccumulated)
             }
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)
         return handles
-    }
-    
-    /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: JmaDomain, variables: [JmaVariableDownloadable], run: Timestamp, createNetcdf: Bool, handles: [(variable: JmaVariableDownloadable, hour: Int, fn: FileHandle)]) throws {
-        let om = OmFileSplitter(domain)
-        let nLocationsPerChunk = om.nLocationsPerChunk
-        let forecastHours = domain.forecastHours(run: run.hour)
-        let nTime = forecastHours.max()! / domain.dtHours + 1
-        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
-        
-        let grid = domain.grid
-        let nLocations = grid.count
-        
-        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
-        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-        
-        for variable in variables {
-            let skip = variable.skipHour0 ? 1 : 0
-            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
-            
-            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try handles.compactMap({ handle in
-                guard handle.variable.omFileName == variable.omFileName else {
-                    return nil
-                }
-                let reader = try OmFileReader(fn: handle.fn)
-                return (handle.hour, reader)
-            })
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { d0offset in
-                
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data2d.data.fillWithNaNs()
-                for reader in readers {
-                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
-                }
-                
-                // De-accumulate precipitation
-                // Precipitation in MSM is not accumulated
-                if variable.isAccumulatedSinceModelStart && domain != .msm {
-                    data2d.deaccumulateOverTime()
-                }
-                
-                progress.add(locationRange.count)
-                return data2d.data[0..<locationRange.count * nTime]
-            }
-            progress.finish()
-        }
     }
 }
 
