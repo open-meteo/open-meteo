@@ -53,7 +53,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let ensembleVariables = EcmwfVariable.allCases.filter({$0.includeInEnsemble != nil})
-        let defaultVariables = domain == .ifs04_ensemble ? ensembleVariables : EcmwfVariable.allCases
+        let defaultVariables = domain.isEnsemble ? ensembleVariables : EcmwfVariable.allCases
         let variables = onlyVariables ?? defaultVariables
         
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
@@ -205,7 +205,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     inMemory[.init(variable, member)] = grib2d.array.data
                 }
                 
-                if domain == .ifs04_ensemble && variable.includeInEnsemble != .downloadAndProcess {
+                if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
                     // do not generate some database files for ensemble
                     continue
                 }
@@ -343,9 +343,9 @@ extension EcmwfDomain {
         let twoHoursAgo = Timestamp.now().add(-7200)
         let t = Timestamp.now()
         switch self {
-        case .ifs04_ensemble:
+        case .ifs04_ensemble, .ifs025_ensemble:
             fallthrough
-        case .ifs04:
+        case .ifs04,. ifs025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
         }
@@ -360,6 +360,15 @@ extension EcmwfDomain {
             return "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
         case .ifs04_ensemble:
             return "\(base)\(dateStr)/\(runStr)z/0p4-beta/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
+        case .ifs025:
+            let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            return "\(base)\(dateStr)/\(runStr)z/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
+        case .ifs025_ensemble:
+            return "\(base)\(dateStr)/\(runStr)z/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
         }
+    }
+    
+    fileprivate var isEnsemble: Bool {
+        return ensembleMembers > 1
     }
 }
