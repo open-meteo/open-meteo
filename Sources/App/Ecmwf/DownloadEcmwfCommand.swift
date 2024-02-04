@@ -21,8 +21,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "server", help: "Root server path. Default: 'https://data.ecmwf.int/forecasts/'")
         var server: String?
 
-        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
-        var skipExisting: Bool
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
+        
+        @Flag(name: "create-netcdf")
+        var createNetcdf: Bool
         
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -53,15 +56,16 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let ensembleVariables = EcmwfVariable.allCases.filter({$0.includeInEnsemble != nil})
-        let defaultVariables = domain == .ifs04_ensemble ? ensembleVariables : EcmwfVariable.allCases
+        let defaultVariables = domain.isEnsemble ? ensembleVariables : EcmwfVariable.allCases
         let variables = onlyVariables ?? defaultVariables
         
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
-        try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables)
-        try convertEcmwf(logger: logger, domain: domain, run: run, variables: variables)
+        let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables)
+        let nConcurrent = signature.concurrent ?? 1
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
@@ -128,7 +132,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
     
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, skipFilesIfExisting: Bool, variables: [EcmwfVariable]) async throws {
+    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
@@ -141,13 +145,13 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
+        var handles = [GenericVariableHandle]()
+        let deaverager = GribDeaverager()
+        
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
+            let timestamp = run.add(hours: hour)
             
-            let variables = variables.filter { variable in
-                let file = "\(downloadDirectory)\(variable.omFileName.file)_\(hour).om"
-                return !skipFilesIfExisting || FileManager.default.fileExists(atPath: file)
-            }
             if variables.isEmpty {
                 continue
             }
@@ -163,7 +167,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     return entry.param == variable.gribName
                 })
             }) {
-                let shortName = message.get(attribute: "shortName")!
+                guard let shortName = message.get(attribute: "shortName"),
+                      let stepRange = message.get(attribute: "stepRange"),
+                      let stepType = message.get(attribute: "stepType") else {
+                    fatalError("could not get step range or type")
+                }
                 if shortName == "lsm" {
                     continue
                 }
@@ -200,12 +208,17 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
+                // Deaccumulate precipitation
+                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                    continue
+                }
+                
                 // Keep relative humidity in memory to generate total cloud cover files
                 if variable.gribName == "r" {
                     inMemory[.init(variable, member)] = grib2d.array.data
                 }
                 
-                if domain == .ifs04_ensemble && variable.includeInEnsemble != .downloadAndProcess {
+                if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
                     // do not generate some database files for ensemble
                     continue
                 }
@@ -214,7 +227,16 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 let file = "\(downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr).om"
                 
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
+                try FileManager.default.removeItemIfExists(at: file)
+                let fn = try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
+                try FileManager.default.removeItemIfExists(at: file)
+                handles.append(GenericVariableHandle(
+                    variable: variable,
+                    time: timestamp,
+                    member: member,
+                    fn: fn,
+                    skipHour0: false
+                ))
             }
             
             // Calculate mid/low/high/total cloudocover
@@ -248,91 +270,44 @@ struct DownloadEcmwfCommand: AsyncCommand {
                                    Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 50)))
                 }
                 let memberStr = member > 0 ? "_\(member)" : ""
-                try writer.write(file: "\(downloadDirectory)cloud_cover_low_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverLow, overwrite: true)
-                try writer.write(file: "\(downloadDirectory)cloud_cover_mid_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverMid, overwrite: true)
-                try writer.write(file: "\(downloadDirectory)cloud_cover_high_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverHigh, overwrite: true)
+                let fnCloudCoverLow = try writer.write(file: "\(downloadDirectory)cloud_cover_low_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverLow, overwrite: true)
+                let fnCloudCoverMid = try writer.write(file: "\(downloadDirectory)cloud_cover_mid_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverMid, overwrite: true)
+                let fnCloudCoverHigh = try writer.write(file: "\(downloadDirectory)cloud_cover_high_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverHigh, overwrite: true)
                 let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
-                try writer.write(file: "\(downloadDirectory)cloud_cover_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover, overwrite: true)
+                let fnCloudCover = try writer.write(file: "\(downloadDirectory)cloud_cover_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover, overwrite: true)
+                
+                handles.append(GenericVariableHandle(
+                    variable: EcmwfVariable.cloud_cover_low,
+                    time: timestamp,
+                    member: member,
+                    fn: fnCloudCoverLow,
+                    skipHour0: false
+                ))
+                handles.append(GenericVariableHandle(
+                    variable: EcmwfVariable.cloud_cover_mid,
+                    time: timestamp,
+                    member: member,
+                    fn: fnCloudCoverMid,
+                    skipHour0: false
+                ))
+                handles.append(GenericVariableHandle(
+                    variable: EcmwfVariable.cloud_cover_high,
+                    time: timestamp,
+                    member: member,
+                    fn: fnCloudCoverHigh,
+                    skipHour0: false
+                ))
+                handles.append(GenericVariableHandle(
+                    variable: EcmwfVariable.cloud_cover,
+                    time: timestamp,
+                    member: member,
+                    fn: fnCloudCover,
+                    skipHour0: false
+                ))
             }
         }
         await curl.printStatistics()
-    }
-    
-    func convertEcmwf(logger: Logger, domain: EcmwfDomain, run: Timestamp, variables: [EcmwfVariable]) throws {
-        let downloadDirectory = domain.downloadDirectory
-        let nMembers = domain.ensembleMembers
-        
-        let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        let nTime = forecastSteps.max()! / domain.dtHours + 1
-        
-        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
-        
-        let nLocations = domain.grid.nx * domain.grid.ny
-        
-        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
-        let nLocationsPerChunk = om.nLocationsPerChunk
-        
-        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: nTime)
-        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-        
-        for variable in variables {
-            if domain == .ifs04_ensemble && variable.includeInEnsemble != .downloadAndProcess {
-                // do not generate some database files for ensemble
-                continue
-            }
-            
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
-            let skip = 0
-        
-            let readers: [(hour: Int, reader: [OmFileReader<MmapFile>])] = try forecastSteps.compactMap({ hour in
-                let readers = try (0..<nMembers).map { member in
-                    let memberStr = member > 0 ? "_\(member)" : ""
-                    return try OmFileReader(file: "\(downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr).om")
-                }
-                return (hour, readers)
-            })
-            
-            let storePreviousForecast = variable.storePreviousForecast && domain.ensembleMembers <= 1
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, scalefactor: variable.scalefactor, storePreviousForecast: storePreviousForecast) { offset in
-                let d0offset = offset / nMembers
-                
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data3d.data.fillWithNaNs()
-                for reader in readers {
-                    for (i, memberReader) in reader.reader.enumerated() {
-                        try memberReader.read(into: &readTemp, arrayRange: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data3d[0..<data3d.nLocations, i, reader.hour / domain.dtHours] = readTemp
-                    }
-                }
-                
-                // De-accumulate precipitation
-                if variable.isAccumulatedSinceModelStart {
-                    data3d.deaccumulateOverTime()
-                }
-                
-                // Interpolate all missing values
-                data3d.interpolateInplace(
-                    type: variable.interpolation,
-                    skipFirst: skip,
-                    time: time,
-                    grid: domain.grid,
-                    locationRange: locationRange
-                )
-                
-                progress.add(locationRange.count * nMembers)
-                return data3d.data[0..<locationRange.count * nTime * nMembers]
-            }
-            progress.finish()
-        }
-        
-        /*var indexTimeEnd = run.timeIntervalSince1970 + 241 * 3600
-        if run.hour == 6 || run.hour == 18 {
-            // run 6 and 18 only have 90 instead 240
-            indexTimeEnd += (240 - 90) * 3600
-        }
-        let indexTimeStart = indexTimeEnd - domain.omFileLength * domain.dtSeconds + 12 * 3600*/
-        //try "\(run.timeIntervalSince1970),\(domain.omFileLength),\(indexTimeStart),\(indexTimeEnd)".write(toFile: "\(domain.omfileDirectory)init.txt", atomically: true, encoding: .utf8)
+        return handles
     }
 }
 
@@ -343,9 +318,9 @@ extension EcmwfDomain {
         let twoHoursAgo = Timestamp.now().add(-7200)
         let t = Timestamp.now()
         switch self {
-        case .ifs04_ensemble:
+        case .ifs04_ensemble, .ifs025_ensemble:
             fallthrough
-        case .ifs04:
+        case .ifs04,. ifs025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
         }
@@ -360,6 +335,11 @@ extension EcmwfDomain {
             return "\(base)\(dateStr)/\(runStr)z/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
         case .ifs04_ensemble:
             return "\(base)\(dateStr)/\(runStr)z/0p4-beta/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
+        case .ifs025:
+            let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            return "\(base)\(dateStr)/\(runStr)z/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
+        case .ifs025_ensemble:
+            return "\(base)\(dateStr)/\(runStr)z/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
         }
     }
 }
