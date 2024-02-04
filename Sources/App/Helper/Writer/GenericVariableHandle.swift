@@ -131,8 +131,9 @@ actor GribDeaverager {
     
     /// Set new value and get previous value out
     func set(variable: GenericVariable, member: Int, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
-        let previous = data[variable.rawValue]
-        data["\(variable)_member\(member)"] = (step, d)
+        let key = "\(variable)_member\(member)"
+        let previous = data[key]
+        data[key] = (step, d)
         return previous
     }
     
