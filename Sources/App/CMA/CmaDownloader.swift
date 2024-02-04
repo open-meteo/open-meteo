@@ -223,18 +223,7 @@ struct DownloadCmaCommand: AsyncCommand {
         let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        
-        /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
-        actor PreviousData {
-            var data = [String: (step: Int, data: [Float])]()
-            
-            func set(variable: CmaVariableDownloadable, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
-                let previous = data[variable.rawValue]
-                data[variable.rawValue] = (step, d)
-                return previous
-            }
-        }
-        let previous = PreviousData()
+        let previous = GribDeaverager()
         
         let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
@@ -242,9 +231,9 @@ struct DownloadCmaCommand: AsyncCommand {
             let timestamp = run.add(hours: forecastHour)
             // Split download into 16 MB parts and download concurrently
             // In case processing is too slow, incoming data will be buffered
-            let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
                 // Process each grib message concurrently. Independent from download thread
-                let handles = try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                     /*
                      if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                          try await writeElevation(grib: grib, domain: domain)
@@ -278,18 +267,9 @@ struct DownloadCmaCommand: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    if stepType == "accum" {
-                        guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
-                            return nil
-                        }
-                        // Store data for averaging in next run
-                        let previous = await previous.set(variable: variable, step: currentStep, data: grib2d.array.data)
-                        // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-                        if let previous, previous.step != startStep {
-                            for l in previous.data.indices {
-                                grib2d.array.data[l] -= previous.data[l]
-                            }
-                        }
+                    // Deaccumulate precipitation
+                    guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        return nil
                     }
                     
                     let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(forecastHour).om"
@@ -299,13 +279,8 @@ struct DownloadCmaCommand: AsyncCommand {
                     let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
                 }.collect().compactMap({$0})
-                logger.info("Handles in stream: \(handles.count)")
-                return handles
             }
-            logger.info("Handles in this timestep \(timestamp): \(handles.count)")
-            return handles
         }
-        logger.info("Handles total: \(handles.count)")
         await curl.printStatistics()
         Process.alarm(seconds: 0)
         return handles

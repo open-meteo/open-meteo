@@ -29,7 +29,13 @@ struct JmaDownload: AsyncCommand {
         
         @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
         var upperLevel: Bool
+        
+        @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        var timeinterval: String?
 
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
+        
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
     }
@@ -42,53 +48,41 @@ struct JmaDownload: AsyncCommand {
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try JmaDomain.load(rawValue: signature.domain)
-        
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-
+        let nConcurrent = signature.concurrent ?? 1
         guard let server = signature.server else {
             fatalError("Parameter server required")
         }
-        
-        let variables: [JmaVariableDownloadable]
-        switch domain {
-        case .gsm:
-            variables = JmaSurfaceVariable.allCases.filter({$0 != .shortwave_radiation}) + domain.levels.flatMap {
-                level in JmaPressureVariableType.allCases.compactMap { variable in
-                    if variable == .relative_humidity && level <= 250 {
-                        return nil
-                    }
-                    return JmaPressureVariable(variable: variable, level: level)
-                }
-            }
-        case .msm:
-            variables = JmaSurfaceVariable.allCases
-        }
-        
-        logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
-        //try await downloadElevation(application: context.application, domain: domain)
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server)
-        try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf, handles: handles)
+        if let timeinterval = signature.timeinterval {
+            for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
+                let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles, concurrent: nConcurrent)
+            }
+            return
+        }
+        
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles, concurrent: nConcurrent)
         logger.info("Finished in \(start.timeElapsedPretty())")
 
         if let uploadS3Bucket = signature.uploadS3Bucket {
+            let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
     }
     
     /// MSM or GSM domain
     /// Return open file handles, to ensure overlapping runs are not conflicting
-    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String) async throws -> [(variable: JmaVariableDownloadable, hour: Int, fn: FileHandle)] {
+    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
+        logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let deadLineHours: Double = domain == .gsm ? 3 : 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         let runDate = run.toComponents()
         let server = server.replacingOccurrences(of: "YYYY", with: runDate.year.zeroPadded(len: 4))
@@ -99,101 +93,68 @@ struct JmaDownload: AsyncCommand {
         let filesToDownload: [String]
         switch domain {
         case .gsm:
-            filesToDownload = domain.forecastHours(run: run.hour).map { hour in
+            filesToDownload = domain.forecastHours(run: run).map { hour in
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_GSM_GPV_Rgl_FD\((hour/24).zeroPadded(len: 2))\((hour%24).zeroPadded(len: 2))_grib2.bin"
             }
         case .msm:
             // 0 und 12z run have more data
-            let range = run.hour % 12 == 0 ? ["00-15", "16-33", "34-39", "40-51", "52-78"] : ["00-15", "16-33", "34-39"]
+            let after2021 = run.toComponents().year >= 2021
+            let range = (run.hour % 12 == 0 && after2021) ? ["00-15", "16-33", "34-39", "40-51", "52-78"] : ["00-15", "16-33", "34-39"]
             filesToDownload = range.map { hour in
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_MSM_GPV_Rjp_Lsurf_FH\(hour)_grib2.bin"
             }
         }
         
-        let handles = try await filesToDownload.asyncFlatMap { filename in
-            let grib = try await curl.downloadGrib(url: "\(server)\(filename)", bzip2Decode: false)
-            return try grib.compactMap { message -> (JmaVariableDownloadable, Int, FileHandle)? in
-                guard let variable = message.toJmaVariable(),
-                      let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
-                    return nil
-                }
-                if hour == 0 && variable.skipHour0 {
-                    return nil
-                }
-                try grib2d.load(message: message)
-                if domain.isGlobal {
-                    grib2d.array.shift180LongitudeAndFlipLatitude()
-                } else {
-                    grib2d.array.flipLatitude()
-                }
-                
-                // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd {
-                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-                
-                //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).nc")
-                let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om"
-                try FileManager.default.removeItemIfExists(at: file)
-                
-                logger.info("Compressing and writing data to \(variable.omFileName.file)_\(hour).om")
-                //let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                
-                return (variable, hour, fn)
+        /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
+        let deaverager = GribDeaverager()
+        
+        let handles = try await filesToDownload.asyncFlatMap { filename -> [GenericVariableHandle] in
+            let url = "\(server)\(filename)"
+            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+                return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                    guard let variable = message.toJmaVariable(),
+                          let stepRange = message.get(attribute: "stepRange"),
+                          let stepType = message.get(attribute: "stepType"),
+                          let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
+                        return nil
+                    }
+                    if hour == 0 && variable.skipHour0 {
+                        return nil
+                    }
+                    let timestamp = run.add(hours: hour)
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    try grib2d.load(message: message)
+                    if domain.isGlobal {
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                    } else {
+                        grib2d.array.flipLatitude()
+                    }
+                    
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.multiplyAdd {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    // Deaccumulate precipitation
+                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        return nil
+                    }
+                    
+                    //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).nc")
+                    let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om"
+                    try FileManager.default.removeItemIfExists(at: file)
+                    
+                    logger.info("Compressing and writing data to \(variable.omFileName.file)_\(hour).om")
+                    //let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
+                    let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    
+                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: variable.skipHour0)
+                }.collect().compactMap({$0})
             }
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)
         return handles
-    }
-    
-    /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: JmaDomain, variables: [JmaVariableDownloadable], run: Timestamp, createNetcdf: Bool, handles: [(variable: JmaVariableDownloadable, hour: Int, fn: FileHandle)]) throws {
-        let om = OmFileSplitter(domain)
-        let nLocationsPerChunk = om.nLocationsPerChunk
-        let forecastHours = domain.forecastHours(run: run.hour)
-        let nTime = forecastHours.max()! / domain.dtHours + 1
-        let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: domain.dtSeconds)
-        
-        let grid = domain.grid
-        let nLocations = grid.count
-        
-        var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
-        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-        
-        for variable in variables {
-            let skip = variable.skipHour0 ? 1 : 0
-            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
-            
-            let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try handles.compactMap({ handle in
-                guard handle.variable.omFileName == variable.omFileName else {
-                    return nil
-                }
-                let reader = try OmFileReader(fn: handle.fn)
-                return (handle.hour, reader)
-            })
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { d0offset in
-                
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                data2d.data.fillWithNaNs()
-                for reader in readers {
-                    try reader.reader.read(into: &readTemp, arrayRange: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                    data2d[0..<data2d.nLocations, reader.hour / domain.dtHours] = readTemp
-                }
-                
-                // De-accumulate precipitation
-                // Precipitation in MSM is not accumulated
-                if variable.isAccumulatedSinceModelStart && domain != .msm {
-                    data2d.deaccumulateOverTime()
-                }
-                
-                progress.add(locationRange.count)
-                return data2d.data[0..<locationRange.count * nTime]
-            }
-            progress.finish()
-        }
     }
 }
 
@@ -575,13 +536,20 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    func forecastHours(run: Int) -> [Int] {
+    func forecastHours(run: Timestamp) -> [Int] {
+        let hour = run.hour
         switch self {
         case .gsm:
-            let through = run == 00 || run == 12 ? 264 : 136
+            if run.toComponents().year <= 2018 {
+                return Array(stride(from: 0, through: 84, by: 6))
+            }
+            if run.toComponents().year <= 2020 {
+                return Array(stride(from: 0, through: 134, by: 6))
+            }
+            let through = hour == 00 || hour == 12 ? 264 : 136
             return Array(stride(from: 0, through: through, by: 6))
         case .msm:
-            let through = run == 00 || run == 12 ? 78 : 39
+            let through = hour == 00 || hour == 12 ? 78 : 39
             return Array(stride(from: 0, through: through, by: 1))
         }
     }

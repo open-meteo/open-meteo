@@ -11,6 +11,18 @@ struct GenericVariableHandle {
     let member: Int
     let fn: FileHandle
     let skipHour0: Bool
+    let isAveragedOverTime: Bool
+    let isAccumulatedSinceModelStart: Bool
+    
+    public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle, skipHour0: Bool, isAveragedOverTime: Bool = false, isAccumulatedSinceModelStart: Bool = false) {
+        self.variable = variable
+        self.time = time
+        self.member = member
+        self.fn = fn
+        self.skipHour0 = skipHour0
+        self.isAveragedOverTime = isAveragedOverTime
+        self.isAccumulatedSinceModelStart = isAccumulatedSinceModelStart
+    }
     
     /// Process concurrently
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self], concurrent: Int) async throws {
@@ -44,6 +56,8 @@ struct GenericVariableHandle {
             let variable = handles[0].variable
             
             let skip = handles[0].skipHour0 ? 1 : 0
+            let isAveragedOverTime = handles[0].isAveragedOverTime
+            let isAccumulatedSinceModelStart = handles[0].isAccumulatedSinceModelStart
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
             let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
@@ -83,6 +97,16 @@ struct GenericVariableHandle {
                     }
                 }
                 
+                // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
+                if isAveragedOverTime {
+                    data3d.deavergeOverTime()
+                }
+                
+                // De-accumulate precipitation
+                if isAccumulatedSinceModelStart {
+                    data3d.deaccumulateOverTime()
+                }
+                
                 // Interpolate all missing values
                 data3d.interpolateInplace(
                     type: variable.interpolation,
@@ -97,5 +121,55 @@ struct GenericVariableHandle {
             }
             progress.finish()
         }
+    }
+}
+
+
+/// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
+actor GribDeaverager {
+    var data = [String: (step: Int, data: [Float])]()
+    
+    /// Set new value and get previous value out
+    func set(variable: GenericVariable, member: Int, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
+        let previous = data[variable.rawValue]
+        data["\(variable)_member\(member)"] = (step, d)
+        return previous
+    }
+    
+    /// Returns false if step should be skipped
+    func deaccumulateIfRequired(variable: GenericVariable, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D) async -> Bool {
+        // Deaccumulate precipitation
+        if stepType == "accum" {
+            guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+                return false
+            }
+            // Store data for next timestep
+            let previous = set(variable: variable, member: member, step: currentStep, data: grib2d.array.data)
+            // For the overall first timestep or the first step of each repeating section, deaveraging is not required
+            if let previous, previous.step != startStep {
+                for l in previous.data.indices {
+                    grib2d.array.data[l] -= previous.data[l]
+                }
+            }
+        }
+        
+        // Deaverage data
+        if stepType == "avg" {
+            guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+                return false
+            }
+            // Store data for next timestep
+            let previous = set(variable: variable, member: member, step: currentStep, data: grib2d.array.data)
+            // For the overall first timestep or the first step of each repeating section, deaveraging is not required
+            if let previous, previous.step != startStep {
+                let deltaHours = Float(currentStep - startStep)
+                let deltaHoursPrevious = Float(previous.step - startStep)
+                for l in previous.data.indices {
+                    grib2d.array.data[l] = (grib2d.array.data[l] * deltaHours - previous.data[l] * deltaHoursPrevious) / (deltaHours - deltaHoursPrevious)
+                }
+            }
+        }
+        
+        return true
     }
 }
