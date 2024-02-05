@@ -144,7 +144,6 @@ struct JmaDownload: AsyncCommand {
                     
                     //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).nc")
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(hour).om")
-                    //let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: variable.skipHour0)
                 }.collect().compactMap({$0})
@@ -159,7 +158,6 @@ struct JmaDownload: AsyncCommand {
 protocol JmaVariableDownloadable: GenericVariable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var skipHour0: Bool { get }
-    var isAccumulatedSinceModelStart: Bool { get }
 }
 
 extension GribMessage {
@@ -248,15 +246,6 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
     
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        switch self {
-        case .precipitation:
-            return true
-        default:
-            return false
-        }
     }
     
     var scalefactor: Float {
@@ -398,10 +387,6 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
     
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        return false
     }
     
     var scalefactor: Float {

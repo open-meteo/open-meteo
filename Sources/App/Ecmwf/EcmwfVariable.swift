@@ -599,14 +599,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return nil
         }
     }
-
-    var isAccumulatedSinceModelStart: Bool {
-        switch self {
-        case .precipitation: fallthrough
-        case .runoff: return true
-        default: return false
-        }
-    }
     
     var interpolation: ReaderInterpolation {
         switch self {

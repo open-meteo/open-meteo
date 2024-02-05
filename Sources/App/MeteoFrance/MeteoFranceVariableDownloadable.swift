@@ -2,8 +2,6 @@
 protocol MeteoFranceVariableDownloadable: GenericVariable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     func skipHour0(domain: MeteoFranceDomain) -> Bool
-    var isAveragedOverForecastTime: Bool { get }
-    var isAccumulatedSinceModelStart: Bool { get }
     
     /// AROME france HD has very few variables
     func availableFor(domain: MeteoFranceDomain, forecastSecond: Int) -> Bool
@@ -236,19 +234,6 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             return nil
         }
     }
-    
-    var isAveragedOverForecastTime: Bool {
-        return false
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        switch self {
-        case .precipitation: fallthrough
-        case .snowfall_water_equivalent: return true
-        case .shortwave_radiation: return true
-        default: return false
-        }
-    }
 }
 
 extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
@@ -295,13 +280,5 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
         default:
             return nil
         }
-    }
-    
-    var isAveragedOverForecastTime: Bool {
-        return false
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        return false
     }
 }

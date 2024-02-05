@@ -223,8 +223,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     continue
                 }
                 
-                let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                let fn = try writer.writeTemporary(compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 handles.append(GenericVariableHandle(
                     variable: variable,
                     time: timestamp,
