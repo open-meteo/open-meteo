@@ -233,7 +233,7 @@ struct GemDownload: AsyncCommand {
                                 fatalError("Wind speed calculation requires \(windspeedVariable) to download")
                             }
                             let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
-                            let fn = try writer.write(file: "\(downloadDirectory)\(windspeedVariable.omFileName.file)_\(h3)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: windspeedVariable.scalefactor, all: windspeed, overwrite: true)
+                            let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: windspeedVariable.scalefactor, all: windspeed)
                             handles.append(GenericVariableHandle(
                                 variable: windspeedVariable,
                                 time: run.add(hours: hour),
@@ -245,7 +245,7 @@ struct GemDownload: AsyncCommand {
                         }
                     }
                     
-                    let fn = try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable,
                         time: run.add(hours: hour),

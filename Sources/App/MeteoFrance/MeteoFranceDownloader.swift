@@ -13,9 +13,6 @@ struct MeteoFranceDownload: AsyncCommand {
 
         @Option(name: "run")
         var run: String?
-
-        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
-        var skipExisting: Bool
         
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
@@ -70,7 +67,7 @@ struct MeteoFranceDownload: AsyncCommand {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         try await downloadElevation2(application: context.application, domain: domain, run: run)
-        let handles = try await download2(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting)
+        let handles = try await download2(application: context.application, domain: domain, run: run, variables: variables)
         try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles)
         //try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -113,8 +110,7 @@ struct MeteoFranceDownload: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
     }
     
-    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
-        
+    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable]) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY") else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -141,19 +137,6 @@ struct MeteoFranceDownload: AsyncCommand {
                 if seconds == 0 && variable.skipHour0(domain: domain) {
                     continue
                 }
-                let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(seconds).om"
-                
-                if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
-                    handles.append(GenericVariableHandle(
-                        variable: variable,
-                        time: timestamp,
-                        member: 0,
-                        fn: try FileHandle.openFileReading(file: file),
-                        skipHour0: variable.skipHour0(domain: domain)
-                    ))
-                    continue
-                }
-                
                 let coverage = variable.getCoverageId()
                 let subsetHeight = coverage.height.map { "&subset=height(\($0))" } ?? ""
                 let subsetPressure = coverage.pressure.map { "&subset=pressure(\($0))" } ?? ""
@@ -177,10 +160,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                
-                
-                try FileManager.default.removeItemIfExists(at: file)
-                let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 handles.append(GenericVariableHandle(
                     variable: variable,
                     time: timestamp,

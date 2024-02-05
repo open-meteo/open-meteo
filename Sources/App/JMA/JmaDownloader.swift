@@ -143,13 +143,9 @@ struct JmaDownload: AsyncCommand {
                     }
                     
                     //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).nc")
-                    let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(hour).om"
-                    try FileManager.default.removeItemIfExists(at: file)
-                    
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(hour).om")
                     //let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: variable.skipHour0)
                 }.collect().compactMap({$0})
             }

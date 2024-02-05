@@ -96,13 +96,8 @@ struct DownloadArpaeCommand: AsyncCommand {
                 guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                     return nil
                 }
-                
-                let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(timestamp.timeIntervalSince1970).om"
-                try FileManager.default.removeItemIfExists(at: file)
                 logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                // Just delete file afterwards. Handle is still open, therefore file is still accessible
-                try FileManager.default.removeItemIfExists(at: file)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
             }.collect().compactMap({$0})
         }

@@ -272,11 +272,8 @@ struct DownloadCmaCommand: AsyncCommand {
                         return nil
                     }
                     
-                    let file = "\(domain.downloadDirectory)\(variable.omFileName.file)_\(forecastHour).om"
-                    try FileManager.default.removeItemIfExists(at: file)
-                    
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
                 }.collect().compactMap({$0})
             }

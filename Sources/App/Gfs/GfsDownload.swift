@@ -273,10 +273,7 @@ struct GfsDownload: AsyncCommand {
                             grib2d.array.data[i] /= factor.data[i]
                         }
                     }
-                    
-                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(timestep/15).fpg"
-                    try FileManager.default.removeItemIfExists(at: file)
-                    let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable.variable,
                         time: timestamp,
@@ -390,10 +387,6 @@ struct GfsDownload: AsyncCommand {
                         }
                     }
                     
-                    //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.rawValue)_\(forecastHour).nc")
-                    let file = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr).fpg"
-                    try FileManager.default.removeItemIfExists(at: file)
-                    
                     // Scaling before compression with scalefactor
                     if let fma = variable.variable.multiplyAdd(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
@@ -414,7 +407,7 @@ struct GfsDownload: AsyncCommand {
                         continue
                     }
                     
-                    let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable.variable,
                         time: timestamp,
@@ -494,9 +487,7 @@ struct GfsDownload: AsyncCommand {
                 }
                 previous[member] = grib2d.array.data
             }
-            //try Array2D(data: greater01, nx: grid.nx, ny: grid.ny).writeNetcdf(filename: "\(domain.downloadDirectory)precipitation_probability_\(forecastHour).nc")
-            try FileManager.default.removeItemIfExists(at: file)
-            let fn = try writer.write(file: file, compressionType: .p4nzdec256, scalefactor: 1, all: greater01)
+            let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: greater01)
             handles.append(GenericVariableHandle(
                 variable: GfsSurfaceVariable.precipitation_probability,
                 time: run.add(hours: forecastHour),

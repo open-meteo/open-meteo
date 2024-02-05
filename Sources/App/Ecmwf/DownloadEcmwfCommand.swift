@@ -223,13 +223,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     continue
                 }
                 
-                let memberStr = member > 0 ? "_\(member)" : ""
-                let file = "\(downloadDirectory)\(variable.omFileName.file)_\(hour)\(memberStr).om"
-                
                 let compression = variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                try FileManager.default.removeItemIfExists(at: file)
-                let fn = try writer.write(file: file, compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
-                try FileManager.default.removeItemIfExists(at: file)
+                let fn = try writer.writeTemporary(compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 handles.append(GenericVariableHandle(
                     variable: variable,
                     time: timestamp,
@@ -270,11 +265,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                                    Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 50)))
                 }
                 let memberStr = member > 0 ? "_\(member)" : ""
-                let fnCloudCoverLow = try writer.write(file: "\(downloadDirectory)cloud_cover_low_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverLow, overwrite: true)
-                let fnCloudCoverMid = try writer.write(file: "\(downloadDirectory)cloud_cover_mid_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverMid, overwrite: true)
-                let fnCloudCoverHigh = try writer.write(file: "\(downloadDirectory)cloud_cover_high_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverHigh, overwrite: true)
+                let fnCloudCoverLow = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverLow)
+                let fnCloudCoverMid = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverMid)
+                let fnCloudCoverHigh = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverHigh)
                 let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
-                let fnCloudCover = try writer.write(file: "\(downloadDirectory)cloud_cover_\(hour)\(memberStr).om", compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover, overwrite: true)
+                let fnCloudCover = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover)
                 
                 handles.append(GenericVariableHandle(
                     variable: EcmwfVariable.cloud_cover_low,

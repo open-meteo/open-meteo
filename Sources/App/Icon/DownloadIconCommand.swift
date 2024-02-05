@@ -165,17 +165,14 @@ struct DownloadIconCommand: AsyncCommand {
                     let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
                     try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
                     for (i, message) in messages.enumerated() {
-                        let h3 = (hour*4+i).zeroPadded(len: 3)
                         let timestamp = run.add(hour*3600 + i*900)
-                        let filenameDest = "single-level_\(h3)_\(variable.omFileName.file.uppercased()).fpg"
                         try grib2d.load(message: message)
                         var data = grib2d.array.data
-                        try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
                         if let fma = variable.multiplyAdd {
                             data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                        let fn = try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: data)
+                        let fn = try writer.writeTemporary(compressionType: compression, scalefactor: variable.scalefactor, all: data)
                         handles15minIconD2.append(GenericVariableHandle(
                             variable: variable,
                             time: timestamp,
@@ -185,7 +182,6 @@ struct DownloadIconCommand: AsyncCommand {
                             isAveragedOverTime: variable.isAveragedOverForecastTime,
                             isAccumulatedSinceModelStart: variable.isAccumulatedSinceModelStart
                         ))
-                        try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
                     }
                     messages = [messages[0]]
                 }
@@ -193,11 +189,6 @@ struct DownloadIconCommand: AsyncCommand {
                 // Contains more than 1 message for ensemble models
                 for (member, message) in messages.enumerated() {
                     try grib2d.load(message: message)
-                    let memberStr = member > 0 ? "_\(member)" : ""
-                    let filenameDest = "single-level_\(h3)_\(variable.omFileName.file.uppercased())\(memberStr).fpg"
-                    
-                    // Write data as encoded floats to disk
-                    try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
                     
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd {
@@ -267,12 +258,9 @@ struct DownloadIconCommand: AsyncCommand {
                             }
                         }
                     }
-                    
-                    //try grib2d.array.writeNetcdf(filename: "\(downloadDirectory)\(variable.omFileName.file)\(memberStr)_\(h3).nc")
-                    
                     //logger.info("Compressing and writing data to \(filenameDest)")
                     let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    let fn = try writer.write(file: "\(downloadDirectory)\(filenameDest)", compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable,
                         time: timestamp,
@@ -282,7 +270,6 @@ struct DownloadIconCommand: AsyncCommand {
                         isAveragedOverTime: variable.isAveragedOverForecastTime,
                         isAccumulatedSinceModelStart: variable.isAccumulatedSinceModelStart
                     ))
-                    try FileManager.default.removeItemIfExists(at: "\(downloadDirectory)\(filenameDest)")
                 }
                 // icon global downloads tend to use a lot of memory due to numerous allocations
                 chelper_malloc_trim()
