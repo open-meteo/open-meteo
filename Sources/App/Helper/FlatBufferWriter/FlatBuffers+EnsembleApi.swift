@@ -151,8 +151,7 @@ extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
         case .ecmwf_ifs04:
             return .ecmwfIfs04
         case .ecmwf_ifs025:
-            // TODO register ifs 0.25°
-            return .ecmwfIfs04
+            return .ecmwfIfs025
         case .gem_global:
             return .gemGlobal
         case .gfs_seamless:

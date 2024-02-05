@@ -576,8 +576,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .arpae_cosmo_5m:
             return .arpaeCosmo5m
         case .ecmwf_ifs025:
-            // TODO refister IFS 0.25
-            return .ecmwfIfs04
+            return .ecmwfIfs025
         }
     }
 }
