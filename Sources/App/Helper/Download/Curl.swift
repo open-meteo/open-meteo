@@ -90,8 +90,8 @@ final class Curl {
             try await head.waitAfterLastModified(logger: logger, wait: waitAfterLastModifiedBeforeDownload)
         }
         
-        if nConcurrent > 1 && range == nil {
-            return try await initiateDownloadConcurrent(url: _url, range: nil, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
+        if nConcurrent > 1 {
+            return try await initiateDownloadConcurrent(url: _url, range: range, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
         }
         
         // URL might contain password, strip them from logging
@@ -159,16 +159,35 @@ final class Curl {
     
     /// Spit download into chunks and perform HTTP range downloads concurrently. Default chunk size 16 MB. Response is streamed to allow combination with GRIB stream decoding
     private func initiateDownloadConcurrent(url: String, range: String?, minSize: Int?, deadline: Date?, nConcurrent: Int) async throws -> HTTPClientResponse {
-        
         let deadline = deadline ?? self.deadline
-        let head = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil)
-        guard let length = try head.contentLength(), length >= nConcurrent else {
-            throw CurlError.couldNotGetContentLengthForConcurrentDownload
-        }
-        let chunks = (0..<length.divideRoundedUp(divisor: chunkSize)).map {
-            return $0 * chunkSize ..< min(($0 + 1) * chunkSize, length)
-        }
         
+        let chunks: [Range<Int>]
+        let headers: HTTPHeaders
+        let length: Int
+        if let range {
+            let parts = range.split(separator: ",")
+            chunks = parts.flatMap { part in
+                guard let (start, stop) = String(part).splitTo2Integer() else {
+                    fatalError()
+                }
+                let length = (stop-start+1)
+                return (0..<length.divideRoundedUp(divisor: chunkSize)).map {
+                    return (start + $0 * chunkSize) ..< (start + min(($0 + 1) * chunkSize, length))
+                }
+            }
+            length = chunks.reduce(0, {$0 + $1.count})
+            headers = HTTPHeaders([("content-length", "\(length)")])
+        } else {
+            let head = try await initiateDownload(url: url, range: nil, minSize: nil, method: .HEAD, deadline: deadline, nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil)
+            headers = head.headers
+            guard let lengthHeader = try head.contentLength(), lengthHeader >= nConcurrent else {
+                throw CurlError.couldNotGetContentLengthForConcurrentDownload
+            }
+            length = lengthHeader
+            chunks = (0..<length.divideRoundedUp(divisor: chunkSize)).map {
+                return $0 * chunkSize ..< min(($0 + 1) * chunkSize, length)
+            }
+        }
         logger.info("Initiate concurrent download nConcurrent=\(nConcurrent) nChunks=\(chunks.count) length=\(length.bytesHumanReadable) chunkLength=\(chunkSize.bytesHumanReadable)")
 
         let stream = chunks.mapStream(nConcurrent: nConcurrent) { chunk in
@@ -207,8 +226,7 @@ final class Curl {
                 }
             }
         }
-        
-        return HTTPClientResponse(status: .ok, headers: head.headers, body: .stream(stream))
+        return HTTPClientResponse(status: .ok, headers: headers, body: .stream(stream))
     }
     
     /// Cache all HTTP download in temporary files. Only used for debugging.

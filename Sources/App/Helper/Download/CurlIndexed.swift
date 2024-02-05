@@ -42,8 +42,8 @@ extension Curl {
             fatalError("Empty grib selection")
         }
         let ranges = index.indexToRange()
-        return ranges.mapStream(nConcurrent: concurrent, body: {
-            range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize)
+        return ranges.mapStream(nConcurrent: 1, body: {
+            range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize, nConcurrent: concurrent)
         }).flatMap({$0.mapStream(nConcurrent: 1, body: {$0})}).eraseToAnyAsyncSequence()
     }
     
@@ -197,7 +197,7 @@ extension Array where Element == Curl.EcmwfIndexEntry {
                 let entry = self[i]
                 if entry._offset != end {
                     range += "\(end)"
-                    if range.count > 4000 || size > 16*1024*1024 {
+                    if range.count > 4000 || size > 64*1024*1024 {
                         results.append((range,size))
                         range = ""
                         size = 0
