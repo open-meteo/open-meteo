@@ -138,7 +138,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let downloadDirectory = domain.downloadDirectory
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         let nMembers = domain.ensembleMembers
@@ -263,7 +262,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                                max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 200),
                                    Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 50)))
                 }
-                let memberStr = member > 0 ? "_\(member)" : ""
                 let fnCloudCoverLow = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverLow)
                 let fnCloudCoverMid = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverMid)
                 let fnCloudCoverHigh = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcoverHigh)

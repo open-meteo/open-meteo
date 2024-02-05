@@ -198,7 +198,6 @@ struct GemDownload: AsyncCommand {
                 for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                     let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                     let memberStr = member > 0 ? "_\(member)" : ""
-                    let filenameDest = "\(downloadDirectory)\(variable.omFileName.file)_\(h3)\(memberStr).om"
                     //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
                     //fatalError()
                     try grib2d.load(message: message)

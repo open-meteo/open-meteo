@@ -68,7 +68,6 @@ struct SyncCommand: AsyncCommand {
         guard serverSet.count == modelsSet.count else {
            fatalError("Number of servers and models sets must be the same")
         }
-        let serverAndModels = zip(modelsSet, serverSet).flatMap { (models, server) in models.map {(server, $0)} }
         let pastDays = signature.pastDays ?? 7
         let variables = signature.variables.split(separator: ",").map(String.init) + ["static"]
         let concurrent = signature.concurrent ?? 4
