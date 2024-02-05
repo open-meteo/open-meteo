@@ -186,3 +186,16 @@ extension AsyncSequence {
         }
     }
 }
+
+/// Thread safe dictionary
+actor DictionaryActor<Key: Hashable, Value> {
+    private var variables = [Key: Value]()
+    
+    func set(_ key: Key, _ value: Value) {
+        variables[key] = value
+    }
+    
+    func get(_ key: Key) -> Value? {
+        return variables[key]
+    }
+}

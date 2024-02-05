@@ -35,18 +35,16 @@ extension Curl {
     }
     
     /// Download a ECMWF grib file from the opendata server, but selectively get messages and download only partial file
-    func downloadEcmwfIndexed(url: String, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> [GribMessage] {
+    func downloadEcmwfIndexed(url: String, concurrent: Int, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
         let urlIndex = url.replacingOccurrences(of: ".grib2", with: ".index")
         let index = try await downloadInMemoryAsync(url: urlIndex, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
         guard !index.isEmpty else {
             fatalError("Empty grib selection")
         }
         let ranges = index.indexToRange()
-        var results = [GribMessage]()
-        for range in ranges {
-            results.append(contentsOf: try await downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize))
-        }
-        return results
+        return ranges.mapStream(nConcurrent: concurrent, body: {
+            range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize)
+        }).flatMap({$0.mapStream(nConcurrent: 1, body: {$0})}).eraseToAnyAsyncSequence()
     }
     
     /// Download index file and match against curl variable
@@ -199,7 +197,7 @@ extension Array where Element == Curl.EcmwfIndexEntry {
                 let entry = self[i]
                 if entry._offset != end {
                     range += "\(end)"
-                    if range.count > 4000 || size > 64*1024*1024 {
+                    if range.count > 4000 || size > 16*1024*1024 {
                         results.append((range,size))
                         range = ""
                         size = 0

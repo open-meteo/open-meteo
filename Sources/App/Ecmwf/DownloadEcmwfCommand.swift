@@ -58,13 +58,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let ensembleVariables = EcmwfVariable.allCases.filter({$0.includeInEnsemble != nil})
         let defaultVariables = domain.isEnsemble ? ensembleVariables : EcmwfVariable.allCases
         let variables = onlyVariables ?? defaultVariables
-        
+        let nConcurrent = signature.concurrent ?? 1
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
-        let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables)
-        let nConcurrent = signature.concurrent ?? 1
+        let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -86,7 +85,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         logger.info("Downloading height and elevation data")
         let url = domain.getUrl(base: base, run: run, hour: 0)
-        for message in try await curl.downloadEcmwfIndexed(url: url, isIncluded: { entry in
+        for try await message in try await curl.downloadEcmwfIndexed(url: url, concurrent: 1, isIncluded: { entry in
             guard entry.number == nil else {
                 // ignore ensemble members, only use control
                 return false
@@ -132,14 +131,13 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
     
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable]) async throws -> [GenericVariableHandle] {
+    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
         
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         let nMembers = domain.ensembleMembers
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -154,10 +152,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
             if variables.isEmpty {
                 continue
             }
-            var inMemory = [VariableAndMemberAndControl<EcmwfVariable>: [Float]]()
+            let inMemory = DictionaryActor<VariableAndMemberAndControl<EcmwfVariable>, [Float]>()
             
             let url = domain.getUrl(base: base, run: run, hour: hour)
-            for message in try await curl.downloadEcmwfIndexed(url: url, isIncluded: { entry in
+            let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     if let level = entry.level {
                         // entry is a pressure level variable
@@ -165,14 +163,14 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     return entry.param == variable.gribName
                 })
-            }) {
+            }).mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                 guard let shortName = message.get(attribute: "shortName"),
                       let stepRange = message.get(attribute: "stepRange"),
                       let stepType = message.get(attribute: "stepType") else {
                     fatalError("could not get step range or type")
                 }
                 if shortName == "lsm" {
-                    continue
+                    return nil
                 }
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
@@ -198,7 +196,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     fatalError("Got unknown variable \(shortName) \(levelhPa)")
                 }
                 //logger.info("Processing \(variable)")
-                
+                var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 try grib2d.load(message: message)
                 grib2d.array.flipLatitude()
                 
@@ -209,41 +207,42 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 
                 // Deaccumulate precipitation
                 guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                    continue
+                    return nil
                 }
                 
                 // Keep relative humidity in memory to generate total cloud cover files
                 if variable.gribName == "r" {
-                    inMemory[.init(variable, member)] = grib2d.array.data
+                    await inMemory.set(.init(variable, member), grib2d.array.data)
                 }
                 
                 if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
                     // do not generate some database files for ensemble
-                    continue
+                    return nil
                 }
                 
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                handles.append(GenericVariableHandle(
+                return GenericVariableHandle(
                     variable: variable,
                     time: timestamp,
                     member: member,
                     fn: fn,
                     skipHour0: false
-                ))
-            }
+                )
+            }.collect().compactMap({$0})
+            handles.append(contentsOf: h)
             
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating cloud cover")
             for member in 0..<domain.ensembleMembers {
-                guard let rh1000 = inMemory[.init(.relative_humidity_1000hPa, member)],
-                      let rh925 = inMemory[.init(.relative_humidity_925hPa, member)],
-                      let rh850 = inMemory[.init(.relative_humidity_850hPa, member)],
-                      let rh700 = inMemory[.init(.relative_humidity_700hPa, member)],
-                      let rh500 = inMemory[.init(.relative_humidity_500hPa, member)],
-                      let rh300 = inMemory[.init(.relative_humidity_300hPa, member)],
-                      let rh250 = inMemory[.init(.relative_humidity_250hPa, member)],
-                      let rh200 = inMemory[.init(.relative_humidity_200hPa, member)],
-                      let rh50 = inMemory[.init(.relative_humidity_50hPa, member)] else {
+                guard let rh1000 = await inMemory.get(.init(.relative_humidity_1000hPa, member)),
+                      let rh925 = await inMemory.get(.init(.relative_humidity_925hPa, member)),
+                      let rh850 = await inMemory.get(.init(.relative_humidity_850hPa, member)),
+                      let rh700 = await inMemory.get(.init(.relative_humidity_700hPa, member)),
+                      let rh500 = await inMemory.get(.init(.relative_humidity_500hPa, member)),
+                      let rh300 = await inMemory.get(.init(.relative_humidity_300hPa, member)),
+                      let rh250 = await inMemory.get(.init(.relative_humidity_250hPa, member)),
+                      let rh200 = await inMemory.get(.init(.relative_humidity_200hPa, member)),
+                      let rh50 = await inMemory.get(.init(.relative_humidity_50hPa, member)) else {
                     logger.warning("Pressure level relative humidity unavailable")
                     continue
                 }

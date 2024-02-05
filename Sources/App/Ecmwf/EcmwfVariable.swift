@@ -135,8 +135,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             fallthrough
         case .temperature_2m:
             fallthrough
-        case .divergence_of_wind_50hPa:
-            fallthrough
         case .cloud_cover:
             fallthrough
         case .temperature_500hPa, .temperature_850hPa:
