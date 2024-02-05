@@ -14,9 +14,6 @@ struct MetNoDownloader: AsyncCommand {
 
         @Option(name: "run")
         var run: String?
-
-        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
-        var skipExisting: Bool
         
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
@@ -45,7 +42,6 @@ struct MetNoDownloader: AsyncCommand {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
-        //try await download(application: context.application, domain: domain, run: date, skipFilesIfExisting: signature.skipExisting)
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
         

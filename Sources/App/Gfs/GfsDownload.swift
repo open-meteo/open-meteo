@@ -13,9 +13,6 @@ struct GfsDownload: AsyncCommand {
 
         @Option(name: "run")
         var run: String?
-
-        @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
-        var skipExisting: Bool
         
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
@@ -79,7 +76,7 @@ struct GfsDownload: AsyncCommand {
         switch domain {
         case .gfs025_ensemble:
             variables = [GfsSurfaceVariable.precipitation_probability]
-            let handles = try await downloadPrecipitationProbability(application: context.application, run: run, skipFilesIfExisting: signature.skipExisting)
+            let handles = try await downloadPrecipitationProbability(application: context.application, run: run)
             try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles)
         case .gfs05_ens:
             fallthrough
@@ -112,7 +109,7 @@ struct GfsDownload: AsyncCommand {
             
             variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
             
-            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, skipFilesIfExisting: signature.skipExisting, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
             
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
@@ -180,7 +177,7 @@ struct GfsDownload: AsyncCommand {
     }
     
     /// download GFS025 and NAM CONUS
-    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], skipFilesIfExisting: Bool, secondFlush: Bool, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let logger = application.logger
         
@@ -230,27 +227,11 @@ struct GfsDownload: AsyncCommand {
             for forecastHour in 0...(maxForecastHour ?? 18) {
                 logger.info("Downloading forecastHour \(forecastHour)")
                 
-                let variables: [GfsVariableAndDomain] = try (variables.flatMap({ v in
+                let variables: [GfsVariableAndDomain] = (variables.flatMap({ v in
                     return forecastHour == 0 ? [GfsVariableAndDomain(variable: v, domain: domain, timestep: 0)] : (0..<4).map {
                         GfsVariableAndDomain(variable: v, domain: domain, timestep: (forecastHour-1) * 60 + ($0+1) * 15)
                     }
-                })).filter { variable in
-                    guard let timestep = variable.timestep else {
-                        return false
-                    }
-                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(timestep/15).fpg"
-                    if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
-                        handles.append(GenericVariableHandle(
-                            variable: variable.variable,
-                            time: run.add(timestep * 60),
-                            member: 0,
-                            fn: try FileHandle.openFileReading(file: fileDest),
-                            skipHour0: variable.variable.skipHour0(for: domain)
-                        ))
-                        return false
-                    }
-                    return true
-                }
+                }))
                 
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0)
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables) {
@@ -309,20 +290,7 @@ struct GfsDownload: AsyncCommand {
             
             for member in 0..<nMembers {
                 let memberStr = member > 0 ? "_\(member)" : ""
-                let variables = try (forecastHour == 0 ? variablesHour0 : variables).filter { variable in
-                    let fileDest = "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(forecastHour)\(memberStr).fpg"
-                    if skipFilesIfExisting && FileManager.default.fileExists(atPath: fileDest) {
-                        handles.append(GenericVariableHandle(
-                            variable: variable.variable,
-                            time: timestamp,
-                            member: member,
-                            fn: try FileHandle.openFileReading(file: fileDest),
-                            skipHour0: variable.variable.skipHour0(for: domain)
-                        ))
-                        return false
-                    }
-                    return true
-                }
+                let variables = (forecastHour == 0 ? variablesHour0 : variables)
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
                                
                 /// Keep data from previous timestep in memory to deaverage the next timestep
@@ -422,7 +390,7 @@ struct GfsDownload: AsyncCommand {
     }
     
     /// Download precipitation members from GFS ensemble and calculate probability
-    func downloadPrecipitationProbability(application: Application, run: Timestamp, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
+    func downloadPrecipitationProbability(application: Application, run: Timestamp) async throws -> [GenericVariableHandle] {
         let domain = GfsDomain.gfs025_ensemble
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
@@ -449,16 +417,6 @@ struct GfsDownload: AsyncCommand {
         
         for forecastHour in forecastHours {
             if forecastHour == 0 {
-                continue
-            }
-            let file = "\(domain.downloadDirectory)precipitation_probability_\(forecastHour).fpg"
-            if skipFilesIfExisting && FileManager.default.fileExists(atPath: file) {
-                handles.append(GenericVariableHandle(
-                    variable: GfsSurfaceVariable.precipitation_probability,
-                    time: run.add(hours: forecastHour),
-                    member: 0,
-                    fn: try FileHandle.openFileReading(file: file), skipHour0: false
-                ))
                 continue
             }
             /// Probability 0-100
