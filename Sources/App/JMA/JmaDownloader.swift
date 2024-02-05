@@ -135,9 +135,11 @@ struct JmaDownload: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    // Deaccumulate precipitation
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        return nil
+                    // Deaccumulate precipitation. MSM model falsely marks `stepType` as accumulation for precipitation, resulting in negative values
+                    if domain != .msm {
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                            return nil
+                        }
                     }
                     
                     //try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).nc")
