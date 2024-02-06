@@ -17,11 +17,11 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
     }
     
-    func prefetchData(raw: VariableAndMemberAndControl<EcmwfVariable>, time: TimerangeDt) throws {
+    func prefetchData(raw: VariableAndMemberAndControl<EcmwfVariable>, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
     
-    func get(raw: VariableAndMemberAndControl<EcmwfVariable>, time: TimerangeDt) throws -> DataAndUnit {
+    func get(raw: VariableAndMemberAndControl<EcmwfVariable>, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         /// Adjust surface pressure to target elevation. Surface pressure is stored for `modelElevation`, but we want to get the pressure on `targetElevation`
         if raw.variable == .surface_pressure {
             let pressure = try reader.get(variable: raw, time: time)
@@ -31,7 +31,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         return try reader.get(variable: raw, time: time)
     }
     
-    func get(derived: Derived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: Derived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let member = derived.member
         switch derived.variable {
         case .wind_speed_10m:
@@ -252,7 +252,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let precipitation = try get(raw: .init(.precipitation, member), time: time)
             return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 1 : 0) }), .millimetre)
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .relativehumidity_1000hPa:
             return try get(raw: .init(.relative_humidity_1000hPa, member), time: time)
         case .relativehumidity_925hPa:
@@ -368,7 +368,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }
     
-    func prefetchData(derived: Derived, time: TimerangeDt) throws {
+    func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
         let member = derived.member
         switch derived.variable {
         case .wind_speed_10m:

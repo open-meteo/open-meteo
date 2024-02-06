@@ -47,7 +47,7 @@ struct CmipController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let dailyVariables = paramsDaily {
-                            try reader.prefetchData(variables: dailyVariables, time: time.dailyRead)
+                            try reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings())
                         }
                     },
                     current: nil,
@@ -55,7 +55,7 @@ struct CmipController {
                     daily: paramsDaily.map { paramsDaily in
                         return {
                             return ApiSection(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable in
-                                let d = try reader.get(variable: variable, time: time.dailyRead).convertAndRound(params: params)
+                                let d = try reader.get(variable: variable, time: time.dailyRead.toSettings()).convertAndRound(params: params)
                                 assert(time.dailyRead.count == d.data.count)
                                 return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
                             })
@@ -77,8 +77,8 @@ struct CmipController {
 }
 
 protocol Cmip6Readerable {
-    func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDt) throws
-    func get(variable: Cmip6VariableOrDerivedPostBias, time: TimerangeDt) throws -> DataAndUnit
+    func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDtAndSettings) throws
+    func get(variable: Cmip6VariableOrDerivedPostBias, time: TimerangeDtAndSettings) throws -> DataAndUnit
     var modelLat: Float { get }
     var modelLon: Float { get }
     var modelElevation: ElevationOrSea { get }
@@ -262,7 +262,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     }
     
     
-    func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let raw = try reader.get(variable: variable, time: time)
         var data = raw.data
         
@@ -271,7 +271,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         }
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.reader.position..<reader.reader.position+1, dim1: 0..<controlWeightFile.dim1))
         let referenceWeights = try getEra5BiasCorrectionWeights(for: variable)
-        referenceWeights.weights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
+        referenceWeights.weights.applyOffset(on: &data, otherWeights: controlWeights, time: time.time, type: variable.biasCorrectionType)
         if let bounds = variable.biasCorrectionType.bounds {
             for i in data.indices {
                 data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
@@ -290,11 +290,11 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         return DataAndUnit(data, raw.unit)
     }
     
-    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws {
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: variable, time: time)
     }
     
-    func prefetchData(variables: [Cmip6VariableOrDerived], time: TimerangeDt) throws {
+    func prefetchData(variables: [Cmip6VariableOrDerived], time: TimerangeDtAndSettings) throws {
         for variable in variables {
             try prefetchData(variable: variable, time: time)
         }
@@ -366,7 +366,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         return referenceElevation
     }
     
-    func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let raw = try reader.get(variable: variable, time: time)
         var data = raw.data
         
@@ -380,7 +380,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         }
         let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.readInterpolated(dim0: referencePosition, dim0Nx: referenceDomain.grid.nx, dim1: 0..<referenceWeightFile.dim1))
         
-        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
+        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time.time, type: variable.biasCorrectionType)
         if let bounds = variable.biasCorrectionType.bounds {
             for i in data.indices {
                 data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
@@ -402,7 +402,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         return DataAndUnit(data, raw.unit)
     }
     
-    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws {
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: variable, time: time)
     }
     
@@ -457,7 +457,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         return try referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition, file: file)
     }
     
-    func get(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let raw = try reader.get(variable: variable, time: time)
         var data = raw.data
         
@@ -471,7 +471,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         }
         let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.read(dim0Slow: referencePosition..<referencePosition+1, dim1: 0..<referenceWeightFile.dim1))
         
-        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time, type: variable.biasCorrectionType)
+        referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time.time, type: variable.biasCorrectionType)
         if let bounds = variable.biasCorrectionType.bounds {
             for i in data.indices {
                 data[i] = Swift.min(Swift.max(data[i], bounds.lowerBound), bounds.upperBound)
@@ -490,7 +490,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         return DataAndUnit(data, raw.unit)
     }
     
-    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDt) throws {
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: variable, time: time)
     }
     
@@ -537,7 +537,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
         self.domain = domain
     }
 
-    func get(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .snowfall_sum:
             let snowwater = try get(raw: .raw(.snowfall_water_equivalent_sum), time: time).data
@@ -579,7 +579,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
                 // 0 = water
-                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
             let soilMoisture = try get(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
@@ -588,7 +588,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
                 throw ForecastapiError.generic(message: "Could not read soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
             let soilMoisture = try get(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
@@ -616,7 +616,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
         }
     }
     
-    func prefetchData(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDt) throws {
+    func prefetchData(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .snowfall_sum:
             try prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time)
@@ -673,7 +673,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
         self.domain = domain
     }
 
-    func get(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .et0_fao_evapotranspiration_sum:
             let tempmax = try get(raw: .temperature_2m_max, time: time).data
@@ -681,7 +681,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             let tempmean = try get(raw: .temperature_2m_mean, time: time).data
             let wind = try get(raw: .wind_speed_10m_mean, time: time).data
             let radiation = try get(raw: .shortwave_radiation_sum, time: time).data
-            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.with(dtSeconds: 3600)).sum(by: 24)
+            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time.with(dtSeconds: 3600)).sum(by: 24)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
             let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
@@ -800,7 +800,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
         }
     }
     
-    func prefetchData(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDt) throws {
+    func prefetchData(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .et0_fao_evapotranspiration_sum:
             try prefetchData(raw: .temperature_2m_max, time: time)

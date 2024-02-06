@@ -1211,7 +1211,7 @@ struct DownloadCmipCommand: AsyncCommand {
     func generateBiasCorrectionFields(logger: Logger, domain: Cmip6Domain, variables: [Cmip6Variable]) throws {
         logger.info("Calculating bias correction fields")
         let binsPerYear = 6
-        let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
+        let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600).toSettings()
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
         let variables = Cmip6Variable.allCases.map({ Cmip6VariableOrDerived.raw($0) }) + Cmip6VariableDerivedBiasCorrected.allCases.map({ Cmip6VariableOrDerived.derived($0) })
         
@@ -1229,7 +1229,7 @@ struct DownloadCmipCommand: AsyncCommand {
                     let reader = Cmip6ReaderPreBiasCorrection(reader: try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, position: gridpoint), domain: domain)
                     try reader.prefetchData(variable: variable, time: time)
                     let data = try reader.get(variable: variable, time: time).data
-                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(data), time: time, binsPerYear: binsPerYear).meansPerYear)
+                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(data), time: time.time, binsPerYear: binsPerYear).meansPerYear)
                 }
                 progress.add(bias.nLocations)
                 return ArraySlice(bias.data)

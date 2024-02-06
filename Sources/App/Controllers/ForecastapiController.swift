@@ -1,4 +1,5 @@
 import Foundation
+import OpenMeteoSdk
 import Vapor
 
 
@@ -141,22 +142,22 @@ struct WeatherApiController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange)
+                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
                         }
                         if let paramsMinutely {
-                            try reader.prefetchData(variables: paramsMinutely, time: time.minutely15)
+                            try reader.prefetchData(variables: paramsMinutely, time: time.minutely15.toSettings())
                         }
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead)
+                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead.toSettings())
                         }
                         if let paramsDaily {
-                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead)
+                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
                         }
                     },
                     current: paramsCurrent.map { variables in
                         return {
                             .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: currentTimeRange)?.convertAndRound(params: params) else {
+                                guard let d = try reader.get(variable: variable.remapped, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
@@ -166,7 +167,7 @@ struct WeatherApiController {
                     hourly: paramsHourly.map { variables in
                         return {
                             return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: time.hourlyRead)?.convertAndRound(params: params) else {
+                                guard let d = try reader.get(variable: variable.remapped, time: time.hourlyRead.toSettings())?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(time.hourlyRead.count == d.data.count)
@@ -193,7 +194,7 @@ struct WeatherApiController {
                                     return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
                                 }
                                 
-                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead) else {
+                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
                                     return nil
                                 }
                                 assert(time.dailyRead.count == d.data.count)
@@ -205,7 +206,7 @@ struct WeatherApiController {
                     minutely15: paramsMinutely.map { variables in
                         return {
                             return .init(name: "minutely_15", time: time.minutely15, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: time.minutely15)?.convertAndRound(params: params) else {
+                                guard let d = try reader.get(variable: variable.remapped, time: time.minutely15.toSettings())?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(time.minutely15.count == d.data.count)

@@ -40,7 +40,7 @@ enum DailyCfsVariable: String, RawRepresentableString {
 }
 
 extension SeasonalForecastReader {
-    func prefetchData(variable: SeasonalForecastVariable, member: Int, time: TimerangeDt) throws {
+    func prefetchData(variable: SeasonalForecastVariable, member: Int, time: TimerangeDtAndSettings) throws {
         switch variable {
         case .raw(let variable):
             try prefetchData(variable: VariableAndMemberAndControlSplitFiles(variable, member), time: time)
@@ -59,7 +59,7 @@ extension SeasonalForecastReader {
         }
     }
     
-    func get(variable: SeasonalForecastVariable, member: Int, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: SeasonalForecastVariable, member: Int, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch variable {
         case .raw(let variable):
             return try get(variable: VariableAndMemberAndControlSplitFiles(variable, member), time: time)
@@ -83,7 +83,7 @@ extension SeasonalForecastReader {
         }
     }
     
-    func prefetchData(variable: DailyCfsVariable, member: Int, time timeDaily: TimerangeDt) throws {
+    func prefetchData(variable: DailyCfsVariable, member: Int, time timeDaily: TimerangeDtAndSettings) throws {
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:
@@ -106,7 +106,7 @@ extension SeasonalForecastReader {
         }
     }
     
-    func getDaily(variable: DailyCfsVariable, member: Int, params: ApiQueryParameter, time timeDaily: TimerangeDt) throws -> DataAndUnit {
+    func getDaily(variable: DailyCfsVariable, member: Int, params: ApiQueryParameter, time timeDaily: TimerangeDtAndSettings) throws -> DataAndUnit {
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:
@@ -185,14 +185,14 @@ struct SeasonalForecastController {
                         if let paramsSixHourly {
                             for varible in paramsSixHourly {
                                 for member in members {
-                                    try reader.prefetchData(variable: varible, member: member, time: time.dailyRead)
+                                    try reader.prefetchData(variable: varible, member: member, time: time.dailyRead.toSettings())
                                 }
                             }
                         }
                         if let paramsDaily {
                             for varible in paramsDaily {
                                 for member in members {
-                                    try reader.prefetchData(variable: varible, member: member, time: timeSixHourlyRead)
+                                    try reader.prefetchData(variable: varible, member: member, time: timeSixHourlyRead.toSettings())
                                 }
                             }
                         }
@@ -204,7 +204,7 @@ struct SeasonalForecastController {
                             return ApiSection<DailyCfsVariable>(name: "daily", time: time.dailyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try members.compactMap { member in
-                                    let d = try reader.getDaily(variable: variable, member: member, params: params, time: time.dailyRead)
+                                    let d = try reader.getDaily(variable: variable, member: member, params: params, time: time.dailyRead.toSettings())
                                     unit = d.unit
                                     assert(time.dailyRead.count == d.data.count)
                                     return ApiArray.float(d.data)
@@ -221,7 +221,7 @@ struct SeasonalForecastController {
                             return .init(name: "six_hourly", time: timeSixHourlyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try members.compactMap { member in
-                                    let d = try reader.get(variable: variable, member: member, time: timeSixHourlyRead).convertAndRound(params: params)
+                                    let d = try reader.get(variable: variable, member: member, time: timeSixHourlyRead.toSettings()).convertAndRound(params: params)
                                     unit = d.unit
                                     assert(timeSixHourlyRead.count == d.data.count)
                                     return ApiArray.float(d.data)

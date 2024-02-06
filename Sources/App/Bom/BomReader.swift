@@ -76,23 +76,23 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
     
-    func get(raw: VariableAndMemberAndControl<BomVariable>, time: TimerangeDt) throws -> DataAndUnit {
+    func get(raw: VariableAndMemberAndControl<BomVariable>, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }
     
-    func prefetchData(raw: VariableAndMemberAndControl<BomVariable>, time: TimerangeDt) throws {
+    func prefetchData(raw: VariableAndMemberAndControl<BomVariable>, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
     
-    func get(raw: BomVariable, member: Int, time: TimerangeDt) throws -> DataAndUnit {
+    func get(raw: BomVariable, member: Int, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: .init(raw, member), time: time)
     }
     
-    func prefetchData(raw: BomVariable, member: Int, time: TimerangeDt) throws {
+    func prefetchData(raw: BomVariable, member: Int, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: .init(raw, member), time: time)
     }
     
-    func prefetchData(derived: VariableAndMemberAndControl<BomVariableDerived>, time: TimerangeDt) throws {
+    func prefetchData(derived: VariableAndMemberAndControl<BomVariableDerived>, time: TimerangeDtAndSettings) throws {
         let member = derived.member
         switch derived.variable {
         case .apparent_temperature:
@@ -185,7 +185,7 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }
     
-    func get(derived: VariableAndMemberAndControl<BomVariableDerived>, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: VariableAndMemberAndControl<BomVariableDerived>, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let member = derived.member
         switch derived.variable {
         case .windspeed_10m:
@@ -216,7 +216,7 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .et0_fao_evapotranspiration:
-            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             let swrad = try get(raw: .shortwave_radiation, member: member, time: time).data
             let temperature = try get(raw: .temperature_2m, member: member, time: time).data
             let windspeed = try get(raw: .wind_speed_10m, member: member, time: time).data
@@ -234,11 +234,11 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
         case .terrestrial_radiation:
             /// Use center averaged
-            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(solar, .wattPerSquareMetre)
         case .terrestrial_radiation_instant:
             /// Use center averaged
-            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(solar, .wattPerSquareMetre)
         case .dewpoint_2m, .dew_point_2m:
             let temperature = try get(raw: .temperature_2m, member: member, time: time)
@@ -246,15 +246,15 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .shortwave_radiation_instant:
             let sw = try get(raw: .shortwave_radiation, member: member, time: time)
-            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
         case .direct_normal_irradiance:
             let dhi = try get(raw: .direct_radiation, member: member, time: time).data
-            let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(dni, .wattPerSquareMetre)
         case .direct_normal_irradiance_instant:
             let direct = try get(derived: .init(.direct_radiation_instant, member), time: time)
-            let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(dni, direct.unit)
         case .diffuse_radiation:
             let swrad = try get(raw: .shortwave_radiation, member: member, time: time)
@@ -262,16 +262,16 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(zip(swrad.data, dhi.data).map(-), swrad.unit)
         case .direct_radiation_instant:
             let direct = try get(raw: .direct_radiation, member: member, time: time)
-            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
         case .diffuse_radiation_instant:
             let diff = try get(derived: .init(.diffuse_radiation, member), time: time)
-            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
         case .weathercode:
             return try get(raw: .weather_code, member: member, time: time)
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .wet_bulb_temperature_2m:
             let temperature = try get(raw: .temperature_2m, member: member, time: time)
             let rh = try get(raw: .relative_humidity_2m, member: member, time: time)
@@ -288,7 +288,7 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             return try get(raw: .wind_gusts_10m, member: member, time: time)
         case .sunshine_duration:
             let directRadiation = try get(raw: .direct_radiation, member: member, time: time)
-            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(duration, .seconds)
         case .rain:
             let precipitation = try get(raw: .precipitation, member: member, time: time)
@@ -314,13 +314,13 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             let directRadiation = try get(raw: .direct_radiation, member: member, time: time).data
             let ghi = try get(raw: .shortwave_radiation, member: member, time: time).data
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
             return DataAndUnit(gti, .wattPerSquareMetre)
         case .global_tilted_irradiance_instant:
             let directRadiation = try get(raw: .direct_radiation, member: member, time: time).data
             let ghi = try get(raw: .shortwave_radiation, member: member, time: time).data
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }

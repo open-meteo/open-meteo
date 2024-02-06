@@ -41,7 +41,7 @@ public struct EnsembleApiController {
                                     EnsembleVariable(variable, $0)
                                 }
                             }
-                            try reader.prefetchData(variables: variables, time: time.hourlyRead)
+                            try reader.prefetchData(variables: variables, time: time.hourlyRead.toSettings())
                         }
                     },
                     current: nil,
@@ -50,7 +50,7 @@ public struct EnsembleApiController {
                             return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                    guard let d = try reader.get(variable: .init(variable, member), time: time.hourlyRead)?.convertAndRound(params: params) else {
+                                    guard let d = try reader.get(variable: .init(variable, member), time: time.hourlyRead.toSettings())?.convertAndRound(params: params) else {
                                         return nil
                                     }
                                     unit = d.unit

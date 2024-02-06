@@ -139,17 +139,17 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
     
-    func get(raw: MeteoFranceVariable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(raw: MeteoFranceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }
     
-    func prefetchData(raw: MeteoFranceVariable, time: TimerangeDt) throws {
+    func prefetchData(raw: MeteoFranceVariable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
     
     
     /// TODO partly duplicate code with ICON
-    /*private func interpolatePressureLevel(variable: MeteoFrancePressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDt) throws -> DataAndUnit {
+    /*private func interpolatePressureLevel(variable: MeteoFrancePressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let lower = try get(raw: .pressure(MeteoFrancePressureVariable(variable: variable, level: lowerLevel)), time: time)
         let upper = try get(raw: .pressure(MeteoFrancePressureVariable(variable: variable, level: upperLevel)), time: time)
         
@@ -184,15 +184,15 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }*/
     
-    func prefetchData(variable: MeteoFranceSurfaceVariable, time: TimerangeDt) throws {
+    func prefetchData(variable: MeteoFranceSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(variable: .raw(.surface(variable)), time: time)
     }
     
-    func get(raw: MeteoFranceSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(raw: MeteoFranceSurfaceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try get(variable: .raw(.surface(raw)), time: time)
     }
     
-    func prefetchData(derived: MeteoFranceVariableDerived, time: TimerangeDt) throws {
+    func prefetchData(derived: MeteoFranceVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let surface):
             switch surface {
@@ -296,7 +296,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }
     
-    func get(derived: MeteoFranceVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: MeteoFranceVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .surface(let variableDerivedSurface):
             switch variableDerivedSurface {
@@ -322,7 +322,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .et0_fao_evapotranspiration:
-                let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .shortwave_radiation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
@@ -345,11 +345,11 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
             case .terrestrial_radiation:
                 /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(solar, .wattPerSquareMetre)
             case .terrestrial_radiation_instant:
                 /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(solar, .wattPerSquareMetre)
             case .dewpoint_2m, .dew_point_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
@@ -357,31 +357,31 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .shortwave_radiation_instant:
                 let sw = try get(raw: .shortwave_radiation, time: time)
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
             case .direct_normal_irradiance:
                 let dhi = try get(derived: .surface(.direct_radiation), time: time).data
-                let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(dni, .wattPerSquareMetre)
             case .direct_normal_irradiance_instant:
                 let direct = try get(derived: .surface(.direct_radiation_instant), time: time)
-                let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(dni, direct.unit)
             case .diffuse_radiation:
                 let swrad = try get(raw: .shortwave_radiation, time: time)
-                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(diffuse, swrad.unit)
             case .direct_radiation:
                 let swrad = try get(raw: .shortwave_radiation, time: time)
-                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(zip(swrad.data, diffuse).map(-), swrad.unit)
             case .direct_radiation_instant:
                 let direct = try get(derived: .surface(.direct_radiation), time: time)
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
             case .diffuse_radiation_instant:
                 let diff = try get(derived: .surface(.diffuse_radiation), time: time)
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
             case .weathercode, .weather_code:
                 let cloudcover = try get(raw: .cloud_cover, time: time).data
@@ -402,7 +402,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                     modelDtSeconds: time.dtSeconds), .wmoCode
                 )
             case .is_day:
-                return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+                return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
             case .windspeed_20m, .wind_speed_20m:
                 let u = try get(raw: .wind_u_component_20m, time: time).data
                 let v = try get(raw: .wind_v_component_20m, time: time).data
@@ -505,7 +505,7 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
                 return try get(raw: .wind_gusts_10m, time: time)
             case .sunshine_duration:
                 let directRadiation = try get(derived: .surface(.direct_radiation), time: time)
-                let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+                let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(duration, .seconds)
             case .rain:
                 let precipitation = try get(raw: .precipitation, time: time)
@@ -514,12 +514,12 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
             case .global_tilted_irradiance:
                 let directRadiation = try get(derived: .surface(.direct_radiation), time: time).data
                 let diffuseRadiation = try get(derived: .surface(.diffuse_radiation), time: time).data
-                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
                 return DataAndUnit(gti, .wattPerSquareMetre)
             case .global_tilted_irradiance_instant:
                 let directRadiation = try get(derived: .surface(.direct_radiation), time: time).data
                 let diffuseRadiation = try get(derived: .surface(.diffuse_radiation), time: time).data
-                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
                 return DataAndUnit(gti, .wattPerSquareMetre)
             }
         case .pressure(let v):

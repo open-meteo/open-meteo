@@ -61,19 +61,19 @@ struct IconWaveController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead)
+                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead.toSettings())
                         }
                         if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange)
+                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
                         }
                         if let paramsDaily {
-                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead)
+                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
                         }
                     },
                     current: paramsCurrent.map { variables in
                         return {
                             return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable, time: currentTimeRange)?.convertAndRound(params: params) else {
+                                guard let d = try reader.get(variable: variable, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
@@ -83,7 +83,7 @@ struct IconWaveController {
                     hourly: paramsHourly.map { variables in
                         return {
                             return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable, time: time.hourlyRead)?.convertAndRound(params: params) else {
+                                guard let d = try reader.get(variable: variable, time: time.hourlyRead.toSettings())?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(time.hourlyRead.count == d.data.count)
@@ -94,7 +94,7 @@ struct IconWaveController {
                     daily: paramsDaily.map { paramsDaily in
                         return {
                             return ApiSection(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.compactMap { variable in
-                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead) else {
+                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
                                     return nil
                                 }
                                 assert(time.dailyRead.count == d.data.count)
