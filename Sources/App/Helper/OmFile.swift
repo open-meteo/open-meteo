@@ -64,16 +64,16 @@ struct OmFileSplitter {
     }
 
     /// Prefetch all required data into memory
-    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDt) throws {
+    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) throws {
         // TODO: maybe we can keep the file handles better in scope
-        let indexTime = time.toIndexTime()
+        let indexTime = time.time.toIndexTime()
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var start = indexTime.lowerBound
         
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             if let offsets = indexTime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0)),
+               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)),
                 omFile.dim0 % nLocations == 0 {
                 let nLevels = omFile.dim0 / nLocations
                 if nLevels > 1 && location.count > 1 {
@@ -101,7 +101,7 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year)) else {
+                guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
                     continue
                 }
                 guard omFile.dim0 % nLocations == 0 else {
@@ -128,7 +128,7 @@ struct OmFileSplitter {
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 continue
             }
-            guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)) else {
+            guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
                 continue
             }
             guard omFile.dim0 % nLocations == 0 else {
@@ -146,17 +146,17 @@ struct OmFileSplitter {
         }
     }
     
-    func read2D(variable: String, location: Range<Int>, level: Int, time: TimerangeDt) throws -> Array2DFastTime {
+    func read2D(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) throws -> Array2DFastTime {
         let data = try read(variable: variable, location: location, level: level, time: time)
-        return Array2DFastTime(data: data, nLocations: location.count, nTime: time.count)
+        return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
     
     /**
      TODO:
      - `level` implementation could be moved to a 3D file level
      */
-    func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDt) throws -> [Float] {
-        let indexTime = time.toIndexTime()
+    func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) throws -> [Float] {
+        let indexTime = time.time.toIndexTime()
         var start = indexTime.lowerBound
         /// If yearly files are present, the start parameter is moved to read fewer files later
         var out = [Float](repeating: .nan, count: indexTime.count * location.count)
@@ -164,7 +164,7 @@ struct OmFileSplitter {
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             if let offsets = indexTime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0)),
+               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)),
                 omFile.dim0 % nLocations == 0 {
                 let nLevels = omFile.dim0 / nLocations
                 if nLevels > 1 && location.count > 1 {
@@ -172,7 +172,7 @@ struct OmFileSplitter {
                 }
                 if level < nLevels {
                     let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-                    try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: time.count, dim0Slow: dim0, dim1: offsets.file)
+                    try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: time.time.count, dim0Slow: dim0, dim1: offsets.file)
                     start = fileTime.upperBound
                 }
             }
@@ -189,7 +189,7 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year)) else {
+                guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
                     continue
                 }
                 guard omFile.dim0 % nLocations == 0 else {
@@ -219,7 +219,7 @@ struct OmFileSplitter {
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
-            guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)) else {
+            guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
                 continue
             }
             guard omFile.dim0 % nLocations == 0 else {
@@ -235,7 +235,7 @@ struct OmFileSplitter {
                 continue
             }
             let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-            try omFile.read(into: &out, arrayDim1Range: offsets.array.add(delta), arrayDim1Length: time.count, dim0Slow: dim0, dim1: offsets.file)
+            try omFile.read(into: &out, arrayDim1Range: offsets.array.add(delta), arrayDim1Length: time.time.count, dim0Slow: dim0, dim1: offsets.file)
         }
         return out
     }
@@ -286,9 +286,7 @@ struct OmFileSplitter {
             
             return try (0..<nPreviousDays).map { previousDay -> WriterPerStep in
                 let skip = previousDay > 0 ? previousDay * 86400 / time.dtSeconds : skipFirst
-                let variable = previousDay > 0 ? "\(variable)_previous_day\(previousDay)" : variable
-                
-                let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk)
+                let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                 try readFile.createDirectory()
                 let omRead = try readFile.openRead()
                 try omRead?.willNeed()

@@ -275,7 +275,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
 extension GenericDomain {
     /// Get the file path to a linear bias seasonal file for a given variable
     func getBiasCorrectionFile(for variable: String) -> OmFileManagerReadable {
-        return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil)
+        return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil, ensembleMember: 0, previousDay: 0)
     }
     
     func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {

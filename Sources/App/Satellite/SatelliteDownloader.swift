@@ -54,7 +54,7 @@ struct SatelliteDownloadCommand: AsyncCommand {
             fatalError("no master file defined")
         }
         let masterTime = TimerangeDt(range: master, dtSeconds: domain.dtSeconds)
-        let masterFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "precipitation_sum", type: .master, chunk: 0)
+        let masterFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "precipitation_sum", type: .master, chunk: 0, ensembleMember: 0, previousDay: 0)
         if !FileManager.default.fileExists(atPath: masterFile.getFilePath()) {
             try downloadImergDaily(logger: logger, domain: .imerg_daily, timerange: masterTime)
             
@@ -88,8 +88,8 @@ struct SatelliteDownloadCommand: AsyncCommand {
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
-                try reader.willNeed(variable: variable.omFileName.file, location: locationRange, level: 0, time: time)
-                let data = try reader.read2D(variable: variable.omFileName.file, location: locationRange, level: 0, time: time)
+                try reader.willNeed(variable: variable.omFileName.file, location: locationRange, level: 0, time: time.toSettings())
+                let data = try reader.read2D(variable: variable.omFileName.file, location: locationRange, level: 0, time: time.toSettings())
                 for l in 0..<locationRange.count {
                     bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(data[l, 0..<time.count], time: time, binsPerYear: binsPerYear).meansPerYear)
                 }

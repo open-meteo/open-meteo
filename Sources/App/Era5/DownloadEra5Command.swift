@@ -875,7 +875,7 @@ struct DownloadEra5Command: AsyncCommand {
         // convert to yearly file
         for variable in variables {
             let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Convert \(variable) year \(year)")
-            let writeFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "\(variable)", type: .year, chunk: year)
+            let writeFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "\(variable)", type: .year, chunk: year, ensembleMember: 0, previousDay: 0)
             if !forceUpdate && FileManager.default.fileExists(atPath: writeFile.getFilePath()) {
                 continue
             }
