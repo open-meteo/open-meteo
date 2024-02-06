@@ -288,6 +288,49 @@ extension ForecastSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .globalTiltedIrradiance)
         case .global_tilted_irradiance_instant:
             return .init(variable: .globalTiltedIrradianceInstant)
+        case .cloud_cover_previous_day1:
+            // TODO encode previous day attributes
+            return .init(variable: .cloudCover)
+        case .cloud_cover_previous_day2:
+            return .init(variable: .cloudCover)
+        case .cloud_cover_previous_day3:
+            return .init(variable: .cloudCover)
+        case .cloud_cover_previous_day4:
+            return .init(variable: .cloudCover)
+        case .cloud_cover_previous_day5:
+            return .init(variable: .cloudCover)
+        case .cloud_cover_previous_day6:
+            return .init(variable: .cloudCover)
+        case .cloud_cover_previous_day7:
+            return .init(variable: .cloudCover)
+        case .dew_point_2m_previous_day1:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .dew_point_2m_previous_day2:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .dew_point_2m_previous_day3:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .dew_point_2m_previous_day4:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .dew_point_2m_previous_day5:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .dew_point_2m_previous_day6:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .dew_point_2m_previous_day7:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .temperature_2m_previous_day1:
+            return .init(variable: .temperature, altitude: 2)
+        case .temperature_2m_previous_day2:
+            return .init(variable: .temperature, altitude: 2)
+        case .temperature_2m_previous_day3:
+            return .init(variable: .temperature, altitude: 2)
+        case .temperature_2m_previous_day4:
+            return .init(variable: .temperature, altitude: 2)
+        case .temperature_2m_previous_day5:
+            return .init(variable: .temperature, altitude: 2)
+        case .temperature_2m_previous_day6:
+            return .init(variable: .temperature, altitude: 2)
+        case .temperature_2m_previous_day7:
+            return .init(variable: .temperature, altitude: 2)
         }
     }
 }

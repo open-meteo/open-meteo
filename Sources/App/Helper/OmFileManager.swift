@@ -22,9 +22,9 @@ enum OmFileManagerReadable: Hashable {
             let ensembleMember = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
             let previousDay = previousDay > 0 ? "_previous_day\(previousDay)" : ""
             if let chunk {
-                return "\(domain.directory)\(variable)/\(type)\(previousDay)\(ensembleMember)_\(chunk).om"
+                return "\(domain.directory)\(variable)\(previousDay)\(ensembleMember)/\(type)_\(chunk).om"
             }
-            return "\(domain.directory)\(variable)/\(type)\(previousDay)\(ensembleMember).om"
+            return "\(domain.directory)\(variable)\(previousDay)\(ensembleMember)/\(type).om"
         case .staticFile(let domain, let variable, let chunk):
             if let chunk {
                 // E.g. DEM model '/copernicus_dem90/static/lat_-1.om'

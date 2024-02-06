@@ -157,7 +157,8 @@ struct WeatherApiController {
                     current: paramsCurrent.map { variables in
                         return {
                             .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                guard let d = try reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
@@ -167,7 +168,8 @@ struct WeatherApiController {
                     hourly: paramsHourly.map { variables in
                         return {
                             return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: time.hourlyRead.toSettings())?.convertAndRound(params: params) else {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                guard let d = try reader.get(variable: v, time: time.hourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(time.hourlyRead.count == d.data.count)
@@ -206,7 +208,8 @@ struct WeatherApiController {
                     minutely15: paramsMinutely.map { variables in
                         return {
                             return .init(name: "minutely_15", time: time.minutely15, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: time.minutely15.toSettings())?.convertAndRound(params: params) else {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                guard let d = try reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(time.minutely15.count == d.data.count)
@@ -492,11 +495,25 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cloudcover_low
     case cloudcover_mid
     case cloud_cover
+    case cloud_cover_previous_day1
+    case cloud_cover_previous_day2
+    case cloud_cover_previous_day3
+    case cloud_cover_previous_day4
+    case cloud_cover_previous_day5
+    case cloud_cover_previous_day6
+    case cloud_cover_previous_day7
     case cloud_cover_high
     case cloud_cover_low
     case cloud_cover_mid
     case dewpoint_2m
     case dew_point_2m
+    case dew_point_2m_previous_day1
+    case dew_point_2m_previous_day2
+    case dew_point_2m_previous_day3
+    case dew_point_2m_previous_day4
+    case dew_point_2m_previous_day5
+    case dew_point_2m_previous_day6
+    case dew_point_2m_previous_day7
     case diffuse_radiation
     case diffuse_radiation_instant
     case direct_normal_irradiance
@@ -579,6 +596,13 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case temperature_150m
     case temperature_180m
     case temperature_2m
+    case temperature_2m_previous_day1
+    case temperature_2m_previous_day2
+    case temperature_2m_previous_day3
+    case temperature_2m_previous_day4
+    case temperature_2m_previous_day5
+    case temperature_2m_previous_day6
+    case temperature_2m_previous_day7
     case temperature_20m
     case temperature_200m
     case temperature_50m
@@ -655,8 +679,21 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
     
+    var variableAndPreviousDay: (Self, Int) {
+        switch self {
+        case .temperature_2m_previous_day1: return (.temperature_2m, 1)
+        case .temperature_2m_previous_day2: return (.temperature_2m, 2)
+        case .temperature_2m_previous_day3: return (.temperature_2m, 3)
+        case .temperature_2m_previous_day4: return (.temperature_2m, 4)
+        case .temperature_2m_previous_day5: return (.temperature_2m, 5)
+        case .temperature_2m_previous_day6: return (.temperature_2m, 6)
+        case .temperature_2m_previous_day7: return (.temperature_2m, 7)
+        default: return (remapped, 0)
+        }
+    }
+    
     /// Some variables are kept for backwards compatibility
-    var remapped: Self {
+    private var remapped: Self {
         switch self {
         case .temperature:
             return .temperature_2m
@@ -728,13 +765,13 @@ struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariable
 typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable, ForecastPressureVariable>
 
 extension ForecastVariable {
-    /// Some variables are kept for backwards compatibility
-    var remapped: Self {
+    var variableAndPreviousDay: (Self, Int) {
         switch self {
         case .surface(let surface):
-            return .surface(surface.remapped)
+            let res = surface.variableAndPreviousDay
+            return (.surface(res.0), res.1)
         case .pressure(_):
-            return self
+            return (self, 0)
         }
     }
 }
