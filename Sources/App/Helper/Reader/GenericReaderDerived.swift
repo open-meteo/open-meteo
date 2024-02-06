@@ -30,7 +30,7 @@ struct GenericReaderOptions {
     
     /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.
     func getTilt() throws -> Float {
-        guard tilt >= 0 && tilt <= 90 else {
+        guard tilt.isNaN || (tilt >= 0 && tilt <= 90) else {
             throw ForecastapiError.generic(message: "Parameter `&tilt=` must be within 0° and 90°")
         }
         return tilt
@@ -38,7 +38,7 @@ struct GenericReaderOptions {
     
     /// Azimuth of a solar panel for GTI calculation. 0° south, -90° east, 90° west. Throws out of bounds error.
     func getAzimuth() throws -> Float {
-        guard azimuth >= -90 && azimuth <= 90 else {
+        guard azimuth.isNaN || (azimuth >= -180 && azimuth <= 180) else {
             throw ForecastapiError.generic(message: "Parameter `&azimuth=` must be within -90° and 90°")
         }
         return azimuth
