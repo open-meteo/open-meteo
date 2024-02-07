@@ -60,14 +60,16 @@ struct FlatBufferVariableMeta {
     let pressureLevel: Int16
     let depth: Int16
     let depthTo: Int16
+    let previousDay: Int16
     
-    init(variable: openmeteo_sdk_Variable, aggregation: openmeteo_sdk_Aggregation = .none_, altitude: Int16 = 0, pressureLevel: Int16 = 0, depth: Int16 = 0, depthTo: Int16 = 0) {
+    init(variable: openmeteo_sdk_Variable, aggregation: openmeteo_sdk_Aggregation = .none_, altitude: Int16 = 0, pressureLevel: Int16 = 0, depth: Int16 = 0, depthTo: Int16 = 0, previousDay: Int16 = 0) {
         self.variable = variable
         self.aggregation = aggregation
         self.altitude = altitude
         self.pressureLevel = pressureLevel
         self.depth = depth
         self.depthTo = depthTo
+        self.previousDay = previousDay
     }
     
     fileprivate func encodeToFlatBuffers(_ fbb: inout FlatBufferBuilder) {
@@ -77,6 +79,7 @@ struct FlatBufferVariableMeta {
         openmeteo_sdk_VariableWithValues.add(pressureLevel: pressureLevel, &fbb)
         openmeteo_sdk_VariableWithValues.add(depth: depth, &fbb)
         openmeteo_sdk_VariableWithValues.add(depthTo: depthTo, &fbb)
+        openmeteo_sdk_VariableWithValues.add(previousDay: previousDay, &fbb)
     }
 }
 

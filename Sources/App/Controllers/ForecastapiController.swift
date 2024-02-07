@@ -113,7 +113,7 @@ struct WeatherApiController {
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
         let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
-        let defaultCurrentWeather = [ForecastVariable.surface(.temperature), .surface(.windspeed), .surface(.winddirection), .surface(.is_day), .surface(.weathercode)]
+        let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
         let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
@@ -495,25 +495,11 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cloudcover_low
     case cloudcover_mid
     case cloud_cover
-    case cloud_cover_previous_day1
-    case cloud_cover_previous_day2
-    case cloud_cover_previous_day3
-    case cloud_cover_previous_day4
-    case cloud_cover_previous_day5
-    case cloud_cover_previous_day6
-    case cloud_cover_previous_day7
     case cloud_cover_high
     case cloud_cover_low
     case cloud_cover_mid
     case dewpoint_2m
     case dew_point_2m
-    case dew_point_2m_previous_day1
-    case dew_point_2m_previous_day2
-    case dew_point_2m_previous_day3
-    case dew_point_2m_previous_day4
-    case dew_point_2m_previous_day5
-    case dew_point_2m_previous_day6
-    case dew_point_2m_previous_day7
     case diffuse_radiation
     case diffuse_radiation_instant
     case direct_normal_irradiance
@@ -596,13 +582,6 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case temperature_150m
     case temperature_180m
     case temperature_2m
-    case temperature_2m_previous_day1
-    case temperature_2m_previous_day2
-    case temperature_2m_previous_day3
-    case temperature_2m_previous_day4
-    case temperature_2m_previous_day5
-    case temperature_2m_previous_day6
-    case temperature_2m_previous_day7
     case temperature_20m
     case temperature_200m
     case temperature_50m
@@ -679,21 +658,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
     
-    var variableAndPreviousDay: (Self, Int) {
-        switch self {
-        case .temperature_2m_previous_day1: return (.temperature_2m, 1)
-        case .temperature_2m_previous_day2: return (.temperature_2m, 2)
-        case .temperature_2m_previous_day3: return (.temperature_2m, 3)
-        case .temperature_2m_previous_day4: return (.temperature_2m, 4)
-        case .temperature_2m_previous_day5: return (.temperature_2m, 5)
-        case .temperature_2m_previous_day6: return (.temperature_2m, 6)
-        case .temperature_2m_previous_day7: return (.temperature_2m, 7)
-        default: return (remapped, 0)
-        }
-    }
-    
     /// Some variables are kept for backwards compatibility
-    private var remapped: Self {
+    var remapped: Self {
         switch self {
         case .temperature:
             return .temperature_2m
@@ -762,16 +728,15 @@ struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariable
     }
 }
 
-typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable, ForecastPressureVariable>
+typealias ForecastVariable = SurfaceAndPressureVariable<VariableAndPreviousDay, ForecastPressureVariable>
 
 extension ForecastVariable {
-    var variableAndPreviousDay: (Self, Int) {
+    var variableAndPreviousDay: (ForecastVariable, Int) {
         switch self {
         case .surface(let surface):
-            let res = surface.variableAndPreviousDay
-            return (.surface(res.0), res.1)
-        case .pressure(_):
-            return (self, 0)
+            return (ForecastVariable.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
+        case .pressure(let pressure):
+            return (ForecastVariable.pressure(pressure), 0)
         }
     }
 }
@@ -870,6 +835,7 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     
     
     var aggregation: DailyAggregation<ForecastVariable> {
+        /*
         switch self {
         case .temperature_2m_max:
             return .max(.surface(.temperature_2m))
@@ -1019,6 +985,7 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .none
         case .sunshine_duration:
             return .sum(.surface(.sunshine_duration))
-        }
+        }*/
+        fatalError()
     }
 }

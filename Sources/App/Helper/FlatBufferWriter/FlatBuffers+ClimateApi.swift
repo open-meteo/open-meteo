@@ -111,7 +111,7 @@ extension Cmip6VariableDerivedBiasCorrected: FlatBuffersVariable {
 }
 
 extension Cmip6Domain: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = ForecastSurfaceVariable
+    typealias HourlyVariable = EnsembleSurfaceVariable
     
     typealias HourlyPressureType = ForecastPressureVariableType
     
