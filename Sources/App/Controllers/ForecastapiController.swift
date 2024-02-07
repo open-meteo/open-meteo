@@ -835,157 +835,155 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     
     
     var aggregation: DailyAggregation<ForecastVariable> {
-        /*
         switch self {
         case .temperature_2m_max:
-            return .max(.surface(.temperature_2m))
+            return .max(.surface(.init(.temperature_2m, 0)))
         case .temperature_2m_min:
-            return .min(.surface(.temperature_2m))
+            return .min(.surface(.init(.temperature_2m, 0)))
         case .temperature_2m_mean:
-            return .mean(.surface(.temperature_2m))
+            return .mean(.surface(.init(.temperature_2m, 0)))
         case .apparent_temperature_max:
-            return .max(.surface(.apparent_temperature))
+            return .max(.surface(.init(.apparent_temperature, 0)))
         case .apparent_temperature_mean:
-            return .mean(.surface(.apparent_temperature))
+            return .mean(.surface(.init(.apparent_temperature, 0)))
         case .apparent_temperature_min:
-            return .min(.surface(.apparent_temperature))
+            return .min(.surface(.init(.apparent_temperature, 0)))
         case .precipitation_sum:
-            return .sum(.surface(.precipitation))
+            return .sum(.surface(.init(.precipitation, 0)))
         case .snowfall_sum:
-            return .sum(.surface(.snowfall))
+            return .sum(.surface(.init(.snowfall, 0)))
         case .rain_sum:
-            return .sum(.surface(.rain))
+            return .sum(.surface(.init(.rain, 0)))
         case .showers_sum:
-            return .sum(.surface(.showers))
+            return .sum(.surface(.init(.showers, 0)))
         case .weathercode, .weather_code:
-            return .max(.surface(.weathercode))
+            return .max(.surface(.init(.weathercode, 0)))
         case .shortwave_radiation_sum:
-            return .radiationSum(.surface(.shortwave_radiation))
+            return .radiationSum(.surface(.init(.shortwave_radiation, 0)))
         case .windspeed_10m_max, .wind_speed_10m_max:
-            return .max(.surface(.windspeed_10m))
+            return .max(.surface(.init(.windspeed_10m, 0)))
         case .windspeed_10m_min, .wind_speed_10m_min:
-            return .min(.surface(.windspeed_10m))
+            return .min(.surface(.init(.windspeed_10m, 0)))
         case .windspeed_10m_mean, .wind_speed_10m_mean:
-            return .mean(.surface(.windspeed_10m))
+            return .mean(.surface(.init(.windspeed_10m, 0)))
         case .windgusts_10m_max, .wind_gusts_10m_max:
-            return .max(.surface(.windgusts_10m))
+            return .max(.surface(.init(.windgusts_10m, 0)))
         case .windgusts_10m_min, .wind_gusts_10m_min:
-            return .min(.surface(.windgusts_10m))
+            return .min(.surface(.init(.windgusts_10m, 0)))
         case .windgusts_10m_mean, .wind_gusts_10m_mean:
-            return .mean(.surface(.windgusts_10m))
+            return .mean(.surface(.init(.windgusts_10m, 0)))
         case .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            return .dominantDirection(velocity: .surface(.windspeed_10m), direction: .surface(.winddirection_10m))
+            return .dominantDirection(velocity: .surface(.init(.windspeed_10m, 0)), direction: .surface(.init(.winddirection_10m, 0)))
         case .precipitation_hours:
-            return .precipitationHours(.surface(.precipitation))
+            return .precipitationHours(.surface(.init(.precipitation, 0)))
         case .sunrise:
             return .none
         case .sunset:
             return .none
         case .et0_fao_evapotranspiration:
-            return .sum(.surface(.et0_fao_evapotranspiration))
+            return .sum(.surface(.init(.et0_fao_evapotranspiration, 0)))
         case .visibility_max:
-            return .max(.surface(.visibility))
+            return .max(.surface(.init(.visibility, 0)))
         case .visibility_min:
-            return .min(.surface(.visibility))
+            return .min(.surface(.init(.visibility, 0)))
         case .visibility_mean:
-            return .mean(.surface(.visibility))
+            return .mean(.surface(.init(.visibility, 0)))
         case .pressure_msl_max:
-            return .max(.surface(.pressure_msl))
+            return .max(.surface(.init(.pressure_msl, 0)))
         case .pressure_msl_min:
-            return .min(.surface(.pressure_msl))
+            return .min(.surface(.init(.pressure_msl, 0)))
         case .pressure_msl_mean:
-            return .mean(.surface(.pressure_msl))
+            return .mean(.surface(.init(.pressure_msl, 0)))
         case .surface_pressure_max:
-            return .max(.surface(.surface_pressure))
+            return .max(.surface(.init(.surface_pressure, 0)))
         case .surface_pressure_min:
-            return .min(.surface(.surface_pressure))
+            return .min(.surface(.init(.surface_pressure, 0)))
         case .surface_pressure_mean:
-            return .mean(.surface(.surface_pressure))
+            return .mean(.surface(.init(.surface_pressure, 0)))
         case .cape_max:
-            return .max(.surface(.cape))
+            return .max(.surface(.init(.cape, 0)))
         case .cape_min:
-            return .min(.surface(.cape))
+            return .min(.surface(.init(.cape, 0)))
         case .cape_mean:
-            return .mean(.surface(.cape))
+            return .mean(.surface(.init(.cape, 0)))
         case .cloudcover_max, .cloud_cover_max:
-            return .max(.surface(.cloudcover))
+            return .max(.surface(.init(.cloudcover, 0)))
         case .cloudcover_min, .cloud_cover_min:
-            return .min(.surface(.cloudcover))
+            return .min(.surface(.init(.cloudcover, 0)))
         case .cloudcover_mean, .cloud_cover_mean:
-            return .mean(.surface(.cloudcover))
+            return .mean(.surface(.init(.cloudcover, 0)))
         case .uv_index_max:
-            return .max(.surface(.uv_index))
+            return .max(.surface(.init(.uv_index, 0)))
         case .uv_index_clear_sky_max:
-            return .max(.surface(.uv_index_clear_sky))
+            return .max(.surface(.init(.uv_index_clear_sky, 0)))
         case .precipitation_probability_max:
-            return .max(.surface(.precipitation_probability))
+            return .max(.surface(.init(.precipitation_probability, 0)))
         case .precipitation_probability_min:
-            return .min(.surface(.precipitation_probability))
+            return .min(.surface(.init(.precipitation_probability, 0)))
         case .precipitation_probability_mean:
-            return .mean(.surface(.precipitation_probability))
+            return .mean(.surface(.init(.precipitation_probability, 0)))
         case .dewpoint_2m_max, .dew_point_2m_max:
-            return .max(.surface(.dewpoint_2m))
+            return .max(.surface(.init(.dewpoint_2m, 0)))
         case .dewpoint_2m_mean, .dew_point_2m_mean:
-            return .mean(.surface(.dewpoint_2m))
+            return .mean(.surface(.init(.dewpoint_2m, 0)))
         case .dewpoint_2m_min, .dew_point_2m_min:
-            return .min(.surface(.dewpoint_2m))
+            return .min(.surface(.init(.dewpoint_2m, 0)))
         case .et0_fao_evapotranspiration_sum:
-            return .sum(.surface(.et0_fao_evapotranspiration))
+            return .sum(.surface(.init(.et0_fao_evapotranspiration, 0)))
         case .growing_degree_days_base_0_limit_50:
-            return .sum(.surface(.growing_degree_days_base_0_limit_50))
+            return .sum(.surface(.init(.growing_degree_days_base_0_limit_50, 0)))
         case .leaf_wetness_probability_mean:
-            return .mean(.surface(.leaf_wetness_probability))
+            return .mean(.surface(.init(.leaf_wetness_probability, 0)))
         case .relative_humidity_2m_max:
-            return .max(.surface(.relativehumidity_2m))
+            return .max(.surface(.init(.relativehumidity_2m, 0)))
         case .relative_humidity_2m_mean:
-            return .mean(.surface(.relativehumidity_2m))
+            return .mean(.surface(.init(.relativehumidity_2m, 0)))
         case .relative_humidity_2m_min:
-            return .min(.surface(.relativehumidity_2m))
+            return .min(.surface(.init(.relativehumidity_2m, 0)))
         case .snowfall_water_equivalent_sum:
-            return .sum(.surface(.snowfall_water_equivalent))
+            return .sum(.surface(.init(.snowfall_water_equivalent, 0)))
         case .soil_moisture_0_to_100cm_mean:
-            return .mean(.surface(.soil_moisture_0_to_100cm))
+            return .mean(.surface(.init(.soil_moisture_0_to_100cm, 0)))
         case .soil_moisture_0_to_10cm_mean:
-            return .mean(.surface(.soil_moisture_0_to_10cm))
+            return .mean(.surface(.init(.soil_moisture_0_to_10cm, 0)))
         case .soil_moisture_0_to_7cm_mean:
-            return .mean(.surface(.soil_moisture_0_to_7cm))
+            return .mean(.surface(.init(.soil_moisture_0_to_7cm, 0)))
         case .soil_moisture_28_to_100cm_mean:
-            return .mean(.surface(.soil_moisture_28_to_100cm))
+            return .mean(.surface(.init(.soil_moisture_28_to_100cm, 0)))
         case .soil_moisture_7_to_28cm_mean:
-            return .mean(.surface(.soil_moisture_7_to_28cm))
+            return .mean(.surface(.init(.soil_moisture_7_to_28cm, 0)))
         case .soil_moisture_index_0_to_100cm_mean:
-            return .mean(.surface(.soil_moisture_index_0_to_100cm))
+            return .mean(.surface(.init(.soil_moisture_index_0_to_100cm, 0)))
         case .soil_moisture_index_0_to_7cm_mean:
-            return .mean(.surface(.soil_moisture_index_0_to_7cm))
+            return .mean(.surface(.init(.soil_moisture_index_0_to_7cm, 0)))
         case .soil_moisture_index_100_to_255cm_mean:
-            return .mean(.surface(.soil_moisture_index_100_to_255cm))
+            return .mean(.surface(.init(.soil_moisture_index_100_to_255cm, 0)))
         case .soil_moisture_index_28_to_100cm_mean:
-            return .mean(.surface(.soil_moisture_index_28_to_100cm))
+            return .mean(.surface(.init(.soil_moisture_index_28_to_100cm, 0)))
         case .soil_moisture_index_7_to_28cm_mean:
-            return .mean(.surface(.soil_moisture_index_7_to_28cm))
+            return .mean(.surface(.init(.soil_moisture_index_7_to_28cm, 0)))
         case .soil_temperature_0_to_100cm_mean:
-            return .mean(.surface(.soil_temperature_0_to_100cm))
+            return .mean(.surface(.init(.soil_temperature_0_to_100cm, 0)))
         case .soil_temperature_0_to_7cm_mean:
-            return .mean(.surface(.soil_temperature_0_to_7cm))
+            return .mean(.surface(.init(.soil_temperature_0_to_7cm, 0)))
         case .soil_temperature_28_to_100cm_mean:
-            return .mean(.surface(.soil_temperature_28_to_100cm))
+            return .mean(.surface(.init(.soil_temperature_28_to_100cm, 0)))
         case .soil_temperature_7_to_28cm_mean:
-            return .mean(.surface(.soil_temperature_7_to_28cm))
+            return .mean(.surface(.init(.soil_temperature_7_to_28cm, 0)))
         case .updraft_max:
-            return .max(.surface(.updraft))
+            return .max(.surface(.init(.updraft, 0)))
         case .vapor_pressure_deficit_max, .vapour_pressure_deficit_max:
-            return .max(.surface(.vapor_pressure_deficit))
+            return .max(.surface(.init(.vapor_pressure_deficit, 0)))
         case .wet_bulb_temperature_2m_max:
-            return .max(.surface(.wet_bulb_temperature_2m))
+            return .max(.surface(.init(.wet_bulb_temperature_2m, 0)))
         case .wet_bulb_temperature_2m_min:
-            return .min(.surface(.wet_bulb_temperature_2m))
+            return .min(.surface(.init(.wet_bulb_temperature_2m, 0)))
         case .wet_bulb_temperature_2m_mean:
-            return .mean(.surface(.wet_bulb_temperature_2m))
+            return .mean(.surface(.init(.wet_bulb_temperature_2m, 0)))
         case .daylight_duration:
             return .none
         case .sunshine_duration:
-            return .sum(.surface(.sunshine_duration))
-        }*/
-        fatalError()
+            return .sum(.surface(.init(.sunshine_duration, 0)))
+        }
     }
 }
