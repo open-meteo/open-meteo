@@ -144,26 +144,23 @@ struct WeatherApiController {
                         if let paramsCurrent {
                             for variable in paramsCurrent {
                                 let (v, previousDay) = variable.variableAndPreviousDay
-                                try reader.prefetchData(variables: v, time: currentTimeRange.toSettings(previousDay: previousDay))
+                                try reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))
                             }
                         }
                         if let paramsMinutely {
                             for variable in paramsMinutely {
                                 let (v, previousDay) = variable.variableAndPreviousDay
-                                try reader.prefetchData(variables: v, time: time.minutely15.toSettings(previousDay: previousDay))
+                                try reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))
                             }
                         }
                         if let paramsHourly {
                             for variable in paramsHourly {
                                 let (v, previousDay) = variable.variableAndPreviousDay
-                                try reader.prefetchData(variables: v, time: time.hourlyRead.toSettings(previousDay: previousDay))
+                                try reader.prefetchData(variable: v, time: time.hourlyRead.toSettings(previousDay: previousDay))
                             }
                         }
                         if let paramsDaily {
-                            for variable in paramsDaily {
-                                let (v, previousDay) = variable.variableAndPreviousDay
-                                try reader.prefetchData(variables: v, time: time.dailyRead.toSettings(previousDay: previousDay))
-                            }
+                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
                         }
                     },
                     current: paramsCurrent.map { variables in
