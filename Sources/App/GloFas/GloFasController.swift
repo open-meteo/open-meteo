@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 
-typealias GloFasVariableMember = VariableAndMemberAndControlSplitFiles<GloFasVariable>
+typealias GloFasVariableMember = GloFasVariable
 
 struct GloFasMixer: GenericReaderMixer {
     let reader: [GloFasReader]
@@ -45,13 +45,13 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     
     func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) throws {
         for member in 0..<51 {
-            try reader.prefetchData(variable: .init(.river_discharge, member), time: time)
+            try reader.prefetchData(variable: .river_discharge, time: time.with(ensembleMember: member))
         }
     }
     
     func get(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let data = try (0..<51).map({
-            try reader.get(variable: .init(.river_discharge, $0), time: time).data
+            try reader.get(variable: .river_discharge, time: time.with(ensembleMember: $0)).data
         })
         if data[0].onlyNaN() {
             return DataAndUnit(data[0], .cubicMetrePerSecond)
@@ -116,18 +116,14 @@ struct GloFasController {
                     longitude: reader.modelLon,
                     elevation: reader.targetElevation,
                     prefetch: {
-                        // convert variables
-                        let variablesMember: [GloFasVariableOrDerivedMember] = paramsDaily.map {
-                            switch $0 {
-                            case .raw(let raw):
-                                return .raw(.init(raw, 0))
-                            case .derived(let derived):
-                                return .derived(derived)
+                        for param in paramsDaily {
+                            try reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
+                        }
+                        if params.ensemble {
+                            for member in 1..<51 {
+                                try reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
                             }
                         }
-                        /// Variables wih 51 members if requested
-                        let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
-                        try reader.prefetchData(variables: variables, time: time.dailyRead.toSettings())
                     },
                     current: nil,
                     hourly: nil,
@@ -136,7 +132,7 @@ struct GloFasController {
                             switch variable {
                             case .raw(_):
                                 let d = try (params.ensemble ? (0..<51) : (0..<1)).map { member -> ApiArray in
-                                    let d = try reader.get(variable: .raw(.init(.river_discharge, member)), time: time.dailyRead.toSettings()).convertAndRound(params: params)
+                                    let d = try reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
                                     assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                     return ApiArray.float(d.data)
                                 }

@@ -142,16 +142,28 @@ struct WeatherApiController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
+                            for variable in paramsCurrent {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                try reader.prefetchData(variables: v, time: currentTimeRange.toSettings(previousDay: previousDay))
+                            }
                         }
                         if let paramsMinutely {
-                            try reader.prefetchData(variables: paramsMinutely, time: time.minutely15.toSettings())
+                            for variable in paramsMinutely {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                try reader.prefetchData(variables: v, time: time.minutely15.toSettings(previousDay: previousDay))
+                            }
                         }
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead.toSettings())
+                            for variable in paramsHourly {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                try reader.prefetchData(variables: v, time: time.hourlyRead.toSettings(previousDay: previousDay))
+                            }
                         }
                         if let paramsDaily {
-                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
+                            for variable in paramsDaily {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                try reader.prefetchData(variables: v, time: time.dailyRead.toSettings(previousDay: previousDay))
+                            }
                         }
                     },
                     current: paramsCurrent.map { variables in

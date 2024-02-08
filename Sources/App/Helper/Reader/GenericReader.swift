@@ -21,6 +21,7 @@ protocol GenericReaderProtocol {
  */
 struct TimerangeDtAndSettings: Hashable {
     let time: TimerangeDt
+    /// Member stored in separate files
     let ensembleMember: Int
     let previousDay: Int
     
@@ -34,6 +35,10 @@ struct TimerangeDtAndSettings: Hashable {
     
     func with(start: Timestamp) -> TimerangeDtAndSettings {
         return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, previousDay: previousDay)
+    }
+    
+    func with(ensembleMember: Int) -> TimerangeDtAndSettings {
+        return TimerangeDtAndSettings(time: time, ensembleMember: ensembleMember, previousDay: previousDay)
     }
     
     func with(dtSeconds: Int) -> TimerangeDtAndSettings {
