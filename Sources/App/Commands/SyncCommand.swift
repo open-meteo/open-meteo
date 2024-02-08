@@ -64,6 +64,9 @@ struct SyncCommand: AsyncCommand {
         let modelsSet = try signature.models.split(separator: ";").map({
             try DomainRegistry.load(commaSeparated: String($0))
         })
+        guard Curl.cacheDirectory == nil else {
+            fatalError("HTTP_CACHE enabled")
+        }
 
         guard serverSet.count == modelsSet.count else {
            fatalError("Number of servers and models sets must be the same")

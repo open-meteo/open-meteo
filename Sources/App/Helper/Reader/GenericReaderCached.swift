@@ -9,7 +9,7 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
     /// Used as key for cache
     struct VariableAndTime: Hashable {
         let variable: Variable
-        let time: TimerangeDt
+        let time: TimerangeDtAndSettings
     }
     
     /// Elevation of the grid point
@@ -46,7 +46,7 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
         self.cache = .init()
     }
     
-    func get(variable: Variable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Variable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         if let value = cache[VariableAndTime(variable: variable, time: time)] {
             return value
         }
@@ -58,7 +58,7 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
         return try reader.getStatic(type: type)
     }
     
-    func prefetchData(variable: Variable, time: TimerangeDt) throws {
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: variable, time: time)
     }
 }

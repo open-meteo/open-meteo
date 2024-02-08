@@ -36,7 +36,7 @@ struct CamsController {
                 let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfaceAndPressureVariable>)? = paramsHourly.map { variables in
                     return {
                         return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
-                            let d = try reader.get(variable: variable, time: time.hourlyRead).convertAndRound(params: params)
+                            let d = try reader.get(variable: variable, time: time.hourlyRead.toSettings()).convertAndRound(params: params)
                             assert(time.hourlyRead.count == d.data.count)
                             return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
                         })
@@ -46,7 +46,7 @@ struct CamsController {
                 let currentFn: (() throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfaceAndPressureVariable>)? = paramsCurrent.map { variables in
                     return {
                         return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
-                            let d = try reader.get(variable: variable, time: currentTimeRange).convertAndRound(params: params)
+                            let d = try reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
                             return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
                         })
                     }
@@ -59,10 +59,10 @@ struct CamsController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange)
+                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
                         }
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead)
+                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead.toSettings())
                         }
                     },
                     current: currentFn,
@@ -124,7 +124,7 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     
     let reader: GenericReaderCached<CamsDomain, CamsVariable>
     
-    func get(derived: CamsVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: CamsVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .european_aqi:
             let pm2_5 = try get(derived: .european_aqi_pm2_5, time: time).data
@@ -208,11 +208,11 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let co = try get(raw: .carbon_monoxide, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
             return DataAndUnit(co.map({UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000)}), .usAirQualityIndex)
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         }
     }
     
-    func prefetchData(derived: CamsVariableDerived, time: TimerangeDt) throws {
+    func prefetchData(derived: CamsVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .european_aqi:
             try prefetchData(derived: .european_aqi_pm2_5, time: time)

@@ -251,7 +251,7 @@ struct DownloadEra5Command: AsyncCommand {
                 logger.info("Skipping \(variable), because unavailable for ERA5-Land")
                 continue
             }
-            let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)
+            let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600).toSettings()
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
@@ -268,7 +268,7 @@ struct DownloadEra5Command: AsyncCommand {
                     guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
                         fatalError("Could not get \(era5Variable)")
                     }
-                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(dataFlat), time: time, binsPerYear: binsPerYear).meansPerYear)
+                    bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(dataFlat), time: time.time, binsPerYear: binsPerYear).meansPerYear)
                 }
                 progress.add(bias.nLocations)
                 return ArraySlice(bias.data)
@@ -875,7 +875,7 @@ struct DownloadEra5Command: AsyncCommand {
         // convert to yearly file
         for variable in variables {
             let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Convert \(variable) year \(year)")
-            let writeFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "\(variable)", type: .year, chunk: year)
+            let writeFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "\(variable)", type: .year, chunk: year, ensembleMember: 0, previousDay: 0)
             if !forceUpdate && FileManager.default.fileExists(atPath: writeFile.getFilePath()) {
                 continue
             }

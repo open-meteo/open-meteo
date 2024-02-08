@@ -450,7 +450,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         self.options = options
     }
     
-    func prefetchData(variables: [Era5HourlyVariable], time: TimerangeDt) throws {
+    func prefetchData(variables: [Era5HourlyVariable], time: TimerangeDtAndSettings) throws {
         for variable in variables {
             switch variable {
             case .raw(let v):
@@ -461,7 +461,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         }
     }
     
-    func prefetchData(derived: Era5VariableDerived, time: TimerangeDt) throws {
+    func prefetchData(derived: Era5VariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .wind_speed_10m:
             fallthrough
@@ -588,7 +588,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         }
     }
     
-    func get(variable: Era5HourlyVariable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: Era5HourlyVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch variable {
         case .raw(let variable):
             return try get(raw: variable, time: time)
@@ -597,7 +597,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         }
     }
     
-    func get(derived: Era5VariableDerived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: Era5VariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .wind_speed_10m:
             fallthrough
@@ -647,7 +647,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let dewpoint = try get(raw: .dew_point_2m, time: time).data
             return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .et0_fao_evapotranspiration:
-            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time)
+            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time.time)
             let swrad = try get(raw: .shortwave_radiation, time: time).data
             let temperature = try get(raw: .temperature_2m, time: time).data
             let windspeed = try get(derived: .windspeed_10m, time: time).data
@@ -679,7 +679,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return DataAndUnit(snowfall, .centimetre)
         case .direct_normal_irradiance:
             let dhi = try get(raw: .direct_radiation, time: time).data
-            let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, timerange: time)
+            let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, timerange: time.time)
             return DataAndUnit(dni, .wattPerSquareMetre)
         case .rain:
             let snowwater = try get(raw: .snowfall_water_equivalent, time: time)
@@ -742,7 +742,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
             let soilMoisture = try get(raw: .soil_moisture_0_to_7cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
@@ -751,7 +751,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
             let soilMoisture = try get(raw: .soil_moisture_7_to_28cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
@@ -760,7 +760,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
             let soilMoisture = try get(raw: .soil_moisture_28_to_100cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
@@ -769,7 +769,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
             let soilMoisture = try get(raw: .soil_moisture_100_to_255cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
@@ -778,33 +778,33 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
-                return DataAndUnit([Float](repeating: .nan, count: time.count), .fraction)
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
             let soilMoisture = try get(derived: .soil_moisture_0_to_100cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .terrestrial_radiation:
-            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(solar, .wattPerSquareMetre)
         case .terrestrial_radiation_instant:
-            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(solar, .wattPerSquareMetre)
         case .shortwave_radiation_instant:
             let sw = try get(raw: .shortwave_radiation, time: time)
-            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
         case .direct_normal_irradiance_instant:
             let direct = try get(derived: .direct_radiation_instant, time: time)
-            let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(dni, direct.unit)
         case .direct_radiation_instant:
             let direct = try get(raw: .direct_radiation, time: time)
-            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
         case .diffuse_radiation_instant:
             let diff = try get(derived: .diffuse_radiation, time: time)
-            let factor = Zensun.backwardsAveragedToInstantFactor(time: time, latitude: reader.modelLat, longitude: reader.modelLon)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
         case .wet_bulb_temperature_2m:
             let temperature = try get(raw: .temperature_2m, time: time)
@@ -823,19 +823,19 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return try get(raw: .dew_point_2m, time: time)
         case .sunshine_duration:
             let directRadiation = try get(raw: .direct_radiation, time: time)
-            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time)
+            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(duration, .seconds)
         case .global_tilted_irradiance:
             let directRadiation = try get(raw: .direct_radiation, time: time).data
             let ghi = try get(raw: .shortwave_radiation, time: time).data
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: false)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
             return DataAndUnit(gti, .wattPerSquareMetre)
         case .global_tilted_irradiance_instant:
             let directRadiation = try get(raw: .direct_radiation, time: time).data
             let ghi = try get(raw: .shortwave_radiation, time: time).data
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time, convertBackwardsToInstant: true)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }

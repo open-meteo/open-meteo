@@ -179,9 +179,17 @@ struct GemDownload: AsyncCommand {
         for hour in forecastHours {
             logger.info("Downloading hour \(hour)")
             let h3 = hour.zeroPadded(len: 3)
-            
+            struct GemSurfaceVariableMember: Hashable {
+                let variable: GemSurfaceVariable
+                let member: Int
+                
+                init(_ variable: GemSurfaceVariable, _ member: Int) {
+                    self.variable = variable
+                    self.member = member
+                }
+            }
             /// Keep wind vectors in memory to calculate wind speed / direction for ensemble
-            var inMemory = [VariableAndMemberAndControl<GemSurfaceVariable>: [Float]]()
+            var inMemory = [GemSurfaceVariableMember: [Float]]()
             
             for variable in variables {
                 guard let gribName = variable.gribName(domain: domain) else {

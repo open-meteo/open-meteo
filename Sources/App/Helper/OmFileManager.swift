@@ -12,17 +12,19 @@ enum OmFileManagerType: String {
 }
 
 enum OmFileManagerReadable: Hashable {
-    case domainChunk(domain: DomainRegistry, variable: String, type: OmFileManagerType, chunk: Int?)
+    case domainChunk(domain: DomainRegistry, variable: String, type: OmFileManagerType, chunk: Int?, ensembleMember: Int, previousDay: Int)
     case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
     
     /// Assemble the full file system path
     func getFilePath() -> String {
         switch self {
-        case .domainChunk(let domain, let variable, let type, let chunk):
+        case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
+            let ensembleMember = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
+            let previousDay = previousDay > 0 ? "_previous_day\(previousDay)" : ""
             if let chunk {
-                return "\(domain.directory)\(variable)/\(type)_\(chunk).om"
+                return "\(domain.directory)\(variable)\(previousDay)\(ensembleMember)/\(type)_\(chunk).om"
             }
-            return "\(domain.directory)\(variable)/\(type).om"
+            return "\(domain.directory)\(variable)\(previousDay)\(ensembleMember)/\(type).om"
         case .staticFile(let domain, let variable, let chunk):
             if let chunk {
                 // E.g. DEM model '/copernicus_dem90/static/lat_-1.om'

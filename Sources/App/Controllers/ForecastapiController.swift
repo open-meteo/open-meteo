@@ -1,4 +1,5 @@
 import Foundation
+import OpenMeteoSdk
 import Vapor
 
 
@@ -112,7 +113,7 @@ struct WeatherApiController {
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
         let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
-        let defaultCurrentWeather = [ForecastVariable.surface(.temperature), .surface(.windspeed), .surface(.winddirection), .surface(.is_day), .surface(.weathercode)]
+        let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
         let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
         let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
         let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
@@ -141,22 +142,32 @@ struct WeatherApiController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange)
+                            for variable in paramsCurrent {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                try reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))
+                            }
                         }
                         if let paramsMinutely {
-                            try reader.prefetchData(variables: paramsMinutely, time: time.minutely15)
+                            for variable in paramsMinutely {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                try reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))
+                            }
                         }
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead)
+                            for variable in paramsHourly {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                try reader.prefetchData(variable: v, time: time.hourlyRead.toSettings(previousDay: previousDay))
+                            }
                         }
                         if let paramsDaily {
-                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead)
+                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
                         }
                     },
                     current: paramsCurrent.map { variables in
                         return {
                             .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: currentTimeRange)?.convertAndRound(params: params) else {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                guard let d = try reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
@@ -166,7 +177,8 @@ struct WeatherApiController {
                     hourly: paramsHourly.map { variables in
                         return {
                             return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: time.hourlyRead)?.convertAndRound(params: params) else {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                guard let d = try reader.get(variable: v, time: time.hourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(time.hourlyRead.count == d.data.count)
@@ -193,7 +205,7 @@ struct WeatherApiController {
                                     return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
                                 }
                                 
-                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead) else {
+                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
                                     return nil
                                 }
                                 assert(time.dailyRead.count == d.data.count)
@@ -205,7 +217,8 @@ struct WeatherApiController {
                     minutely15: paramsMinutely.map { variables in
                         return {
                             return .init(name: "minutely_15", time: time.minutely15, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable.remapped, time: time.minutely15)?.convertAndRound(params: params) else {
+                                let (v, previousDay) = variable.variableAndPreviousDay
+                                guard let d = try reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
                                     return nil
                                 }
                                 assert(time.minutely15.count == d.data.count)
@@ -724,16 +737,15 @@ struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariable
     }
 }
 
-typealias ForecastVariable = SurfaceAndPressureVariable<ForecastSurfaceVariable, ForecastPressureVariable>
+typealias ForecastVariable = SurfaceAndPressureVariable<VariableAndPreviousDay, ForecastPressureVariable>
 
 extension ForecastVariable {
-    /// Some variables are kept for backwards compatibility
-    var remapped: Self {
+    var variableAndPreviousDay: (ForecastVariable, Int) {
         switch self {
         case .surface(let surface):
-            return .surface(surface.remapped)
-        case .pressure(_):
-            return self
+            return (ForecastVariable.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
+        case .pressure(let pressure):
+            return (ForecastVariable.pressure(pressure), 0)
         }
     }
 }
@@ -834,153 +846,153 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     var aggregation: DailyAggregation<ForecastVariable> {
         switch self {
         case .temperature_2m_max:
-            return .max(.surface(.temperature_2m))
+            return .max(.surface(.init(.temperature_2m, 0)))
         case .temperature_2m_min:
-            return .min(.surface(.temperature_2m))
+            return .min(.surface(.init(.temperature_2m, 0)))
         case .temperature_2m_mean:
-            return .mean(.surface(.temperature_2m))
+            return .mean(.surface(.init(.temperature_2m, 0)))
         case .apparent_temperature_max:
-            return .max(.surface(.apparent_temperature))
+            return .max(.surface(.init(.apparent_temperature, 0)))
         case .apparent_temperature_mean:
-            return .mean(.surface(.apparent_temperature))
+            return .mean(.surface(.init(.apparent_temperature, 0)))
         case .apparent_temperature_min:
-            return .min(.surface(.apparent_temperature))
+            return .min(.surface(.init(.apparent_temperature, 0)))
         case .precipitation_sum:
-            return .sum(.surface(.precipitation))
+            return .sum(.surface(.init(.precipitation, 0)))
         case .snowfall_sum:
-            return .sum(.surface(.snowfall))
+            return .sum(.surface(.init(.snowfall, 0)))
         case .rain_sum:
-            return .sum(.surface(.rain))
+            return .sum(.surface(.init(.rain, 0)))
         case .showers_sum:
-            return .sum(.surface(.showers))
+            return .sum(.surface(.init(.showers, 0)))
         case .weathercode, .weather_code:
-            return .max(.surface(.weathercode))
+            return .max(.surface(.init(.weathercode, 0)))
         case .shortwave_radiation_sum:
-            return .radiationSum(.surface(.shortwave_radiation))
+            return .radiationSum(.surface(.init(.shortwave_radiation, 0)))
         case .windspeed_10m_max, .wind_speed_10m_max:
-            return .max(.surface(.windspeed_10m))
+            return .max(.surface(.init(.windspeed_10m, 0)))
         case .windspeed_10m_min, .wind_speed_10m_min:
-            return .min(.surface(.windspeed_10m))
+            return .min(.surface(.init(.windspeed_10m, 0)))
         case .windspeed_10m_mean, .wind_speed_10m_mean:
-            return .mean(.surface(.windspeed_10m))
+            return .mean(.surface(.init(.windspeed_10m, 0)))
         case .windgusts_10m_max, .wind_gusts_10m_max:
-            return .max(.surface(.windgusts_10m))
+            return .max(.surface(.init(.windgusts_10m, 0)))
         case .windgusts_10m_min, .wind_gusts_10m_min:
-            return .min(.surface(.windgusts_10m))
+            return .min(.surface(.init(.windgusts_10m, 0)))
         case .windgusts_10m_mean, .wind_gusts_10m_mean:
-            return .mean(.surface(.windgusts_10m))
+            return .mean(.surface(.init(.windgusts_10m, 0)))
         case .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            return .dominantDirection(velocity: .surface(.windspeed_10m), direction: .surface(.winddirection_10m))
+            return .dominantDirection(velocity: .surface(.init(.windspeed_10m, 0)), direction: .surface(.init(.winddirection_10m, 0)))
         case .precipitation_hours:
-            return .precipitationHours(.surface(.precipitation))
+            return .precipitationHours(.surface(.init(.precipitation, 0)))
         case .sunrise:
             return .none
         case .sunset:
             return .none
         case .et0_fao_evapotranspiration:
-            return .sum(.surface(.et0_fao_evapotranspiration))
+            return .sum(.surface(.init(.et0_fao_evapotranspiration, 0)))
         case .visibility_max:
-            return .max(.surface(.visibility))
+            return .max(.surface(.init(.visibility, 0)))
         case .visibility_min:
-            return .min(.surface(.visibility))
+            return .min(.surface(.init(.visibility, 0)))
         case .visibility_mean:
-            return .mean(.surface(.visibility))
+            return .mean(.surface(.init(.visibility, 0)))
         case .pressure_msl_max:
-            return .max(.surface(.pressure_msl))
+            return .max(.surface(.init(.pressure_msl, 0)))
         case .pressure_msl_min:
-            return .min(.surface(.pressure_msl))
+            return .min(.surface(.init(.pressure_msl, 0)))
         case .pressure_msl_mean:
-            return .mean(.surface(.pressure_msl))
+            return .mean(.surface(.init(.pressure_msl, 0)))
         case .surface_pressure_max:
-            return .max(.surface(.surface_pressure))
+            return .max(.surface(.init(.surface_pressure, 0)))
         case .surface_pressure_min:
-            return .min(.surface(.surface_pressure))
+            return .min(.surface(.init(.surface_pressure, 0)))
         case .surface_pressure_mean:
-            return .mean(.surface(.surface_pressure))
+            return .mean(.surface(.init(.surface_pressure, 0)))
         case .cape_max:
-            return .max(.surface(.cape))
+            return .max(.surface(.init(.cape, 0)))
         case .cape_min:
-            return .min(.surface(.cape))
+            return .min(.surface(.init(.cape, 0)))
         case .cape_mean:
-            return .mean(.surface(.cape))
+            return .mean(.surface(.init(.cape, 0)))
         case .cloudcover_max, .cloud_cover_max:
-            return .max(.surface(.cloudcover))
+            return .max(.surface(.init(.cloudcover, 0)))
         case .cloudcover_min, .cloud_cover_min:
-            return .min(.surface(.cloudcover))
+            return .min(.surface(.init(.cloudcover, 0)))
         case .cloudcover_mean, .cloud_cover_mean:
-            return .mean(.surface(.cloudcover))
+            return .mean(.surface(.init(.cloudcover, 0)))
         case .uv_index_max:
-            return .max(.surface(.uv_index))
+            return .max(.surface(.init(.uv_index, 0)))
         case .uv_index_clear_sky_max:
-            return .max(.surface(.uv_index_clear_sky))
+            return .max(.surface(.init(.uv_index_clear_sky, 0)))
         case .precipitation_probability_max:
-            return .max(.surface(.precipitation_probability))
+            return .max(.surface(.init(.precipitation_probability, 0)))
         case .precipitation_probability_min:
-            return .min(.surface(.precipitation_probability))
+            return .min(.surface(.init(.precipitation_probability, 0)))
         case .precipitation_probability_mean:
-            return .mean(.surface(.precipitation_probability))
+            return .mean(.surface(.init(.precipitation_probability, 0)))
         case .dewpoint_2m_max, .dew_point_2m_max:
-            return .max(.surface(.dewpoint_2m))
+            return .max(.surface(.init(.dewpoint_2m, 0)))
         case .dewpoint_2m_mean, .dew_point_2m_mean:
-            return .mean(.surface(.dewpoint_2m))
+            return .mean(.surface(.init(.dewpoint_2m, 0)))
         case .dewpoint_2m_min, .dew_point_2m_min:
-            return .min(.surface(.dewpoint_2m))
+            return .min(.surface(.init(.dewpoint_2m, 0)))
         case .et0_fao_evapotranspiration_sum:
-            return .sum(.surface(.et0_fao_evapotranspiration))
+            return .sum(.surface(.init(.et0_fao_evapotranspiration, 0)))
         case .growing_degree_days_base_0_limit_50:
-            return .sum(.surface(.growing_degree_days_base_0_limit_50))
+            return .sum(.surface(.init(.growing_degree_days_base_0_limit_50, 0)))
         case .leaf_wetness_probability_mean:
-            return .mean(.surface(.leaf_wetness_probability))
+            return .mean(.surface(.init(.leaf_wetness_probability, 0)))
         case .relative_humidity_2m_max:
-            return .max(.surface(.relativehumidity_2m))
+            return .max(.surface(.init(.relativehumidity_2m, 0)))
         case .relative_humidity_2m_mean:
-            return .mean(.surface(.relativehumidity_2m))
+            return .mean(.surface(.init(.relativehumidity_2m, 0)))
         case .relative_humidity_2m_min:
-            return .min(.surface(.relativehumidity_2m))
+            return .min(.surface(.init(.relativehumidity_2m, 0)))
         case .snowfall_water_equivalent_sum:
-            return .sum(.surface(.snowfall_water_equivalent))
+            return .sum(.surface(.init(.snowfall_water_equivalent, 0)))
         case .soil_moisture_0_to_100cm_mean:
-            return .mean(.surface(.soil_moisture_0_to_100cm))
+            return .mean(.surface(.init(.soil_moisture_0_to_100cm, 0)))
         case .soil_moisture_0_to_10cm_mean:
-            return .mean(.surface(.soil_moisture_0_to_10cm))
+            return .mean(.surface(.init(.soil_moisture_0_to_10cm, 0)))
         case .soil_moisture_0_to_7cm_mean:
-            return .mean(.surface(.soil_moisture_0_to_7cm))
+            return .mean(.surface(.init(.soil_moisture_0_to_7cm, 0)))
         case .soil_moisture_28_to_100cm_mean:
-            return .mean(.surface(.soil_moisture_28_to_100cm))
+            return .mean(.surface(.init(.soil_moisture_28_to_100cm, 0)))
         case .soil_moisture_7_to_28cm_mean:
-            return .mean(.surface(.soil_moisture_7_to_28cm))
+            return .mean(.surface(.init(.soil_moisture_7_to_28cm, 0)))
         case .soil_moisture_index_0_to_100cm_mean:
-            return .mean(.surface(.soil_moisture_index_0_to_100cm))
+            return .mean(.surface(.init(.soil_moisture_index_0_to_100cm, 0)))
         case .soil_moisture_index_0_to_7cm_mean:
-            return .mean(.surface(.soil_moisture_index_0_to_7cm))
+            return .mean(.surface(.init(.soil_moisture_index_0_to_7cm, 0)))
         case .soil_moisture_index_100_to_255cm_mean:
-            return .mean(.surface(.soil_moisture_index_100_to_255cm))
+            return .mean(.surface(.init(.soil_moisture_index_100_to_255cm, 0)))
         case .soil_moisture_index_28_to_100cm_mean:
-            return .mean(.surface(.soil_moisture_index_28_to_100cm))
+            return .mean(.surface(.init(.soil_moisture_index_28_to_100cm, 0)))
         case .soil_moisture_index_7_to_28cm_mean:
-            return .mean(.surface(.soil_moisture_index_7_to_28cm))
+            return .mean(.surface(.init(.soil_moisture_index_7_to_28cm, 0)))
         case .soil_temperature_0_to_100cm_mean:
-            return .mean(.surface(.soil_temperature_0_to_100cm))
+            return .mean(.surface(.init(.soil_temperature_0_to_100cm, 0)))
         case .soil_temperature_0_to_7cm_mean:
-            return .mean(.surface(.soil_temperature_0_to_7cm))
+            return .mean(.surface(.init(.soil_temperature_0_to_7cm, 0)))
         case .soil_temperature_28_to_100cm_mean:
-            return .mean(.surface(.soil_temperature_28_to_100cm))
+            return .mean(.surface(.init(.soil_temperature_28_to_100cm, 0)))
         case .soil_temperature_7_to_28cm_mean:
-            return .mean(.surface(.soil_temperature_7_to_28cm))
+            return .mean(.surface(.init(.soil_temperature_7_to_28cm, 0)))
         case .updraft_max:
-            return .max(.surface(.updraft))
+            return .max(.surface(.init(.updraft, 0)))
         case .vapor_pressure_deficit_max, .vapour_pressure_deficit_max:
-            return .max(.surface(.vapor_pressure_deficit))
+            return .max(.surface(.init(.vapor_pressure_deficit, 0)))
         case .wet_bulb_temperature_2m_max:
-            return .max(.surface(.wet_bulb_temperature_2m))
+            return .max(.surface(.init(.wet_bulb_temperature_2m, 0)))
         case .wet_bulb_temperature_2m_min:
-            return .min(.surface(.wet_bulb_temperature_2m))
+            return .min(.surface(.init(.wet_bulb_temperature_2m, 0)))
         case .wet_bulb_temperature_2m_mean:
-            return .mean(.surface(.wet_bulb_temperature_2m))
+            return .mean(.surface(.init(.wet_bulb_temperature_2m, 0)))
         case .daylight_duration:
             return .none
         case .sunshine_duration:
-            return .sum(.surface(.sunshine_duration))
+            return .sum(.surface(.init(.sunshine_duration, 0)))
         }
     }
 }

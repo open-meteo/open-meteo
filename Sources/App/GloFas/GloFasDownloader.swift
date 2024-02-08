@@ -378,7 +378,7 @@ struct GloFasDownloader: AsyncCommand {
         logger.info("Converting daily files time series")
         let time = TimerangeDt(range: Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1), dtSeconds: 3600*24)
         let nt = time.count
-        let yearlyFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "river_discharge", type: .year, chunk: year)
+        let yearlyFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "river_discharge", type: .year, chunk: year, ensembleMember: 0, previousDay: 0)
         
         let omFiles = try time.map { time -> OmFileReader in
             let omFile = "\(downloadDir)glofas_\(time.format_YYYYMMdd).om"

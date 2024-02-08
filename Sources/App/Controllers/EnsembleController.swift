@@ -36,12 +36,11 @@ public struct EnsembleApiController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let hourlyVariables = paramsHourly {
-                            let variables = hourlyVariables.flatMap { variable in
-                                (0..<reader.domain.countEnsembleMember).map {
-                                    EnsembleVariable(variable, $0)
+                            for variable in hourlyVariables {
+                                for member in 0..<reader.domain.countEnsembleMember {
+                                    try reader.prefetchData(variable: variable, time: time.hourlyRead.toSettings(ensembleMemberLevel: member))
                                 }
                             }
-                            try reader.prefetchData(variables: variables, time: time.hourlyRead)
                         }
                     },
                     current: nil,
@@ -50,7 +49,7 @@ public struct EnsembleApiController {
                             return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                    guard let d = try reader.get(variable: .init(variable, member), time: time.hourlyRead)?.convertAndRound(params: params) else {
+                                    guard let d = try reader.get(variable: variable, time: time.hourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                         return nil
                                     }
                                     unit = d.unit
@@ -287,7 +286,7 @@ struct EnsemblePressureVariable: PressureVariableRespresentable, GenericVariable
 
 typealias EnsembleVariableWithoutMember = SurfaceAndPressureVariable<EnsembleSurfaceVariable, EnsemblePressureVariable>
 
-typealias EnsembleVariable = VariableAndMemberAndControl<EnsembleVariableWithoutMember>
+typealias EnsembleVariable = EnsembleVariableWithoutMember
 
 /// Available daily aggregations
 /*enum EnsembleVariableDaily: String, DailyVariableCalculatable, RawRepresentableString {

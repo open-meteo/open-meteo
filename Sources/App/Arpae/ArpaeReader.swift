@@ -48,15 +48,15 @@ struct ArpaeReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
     
-    func get(raw: ArpaeSurfaceVariable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(raw: ArpaeSurfaceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }
     
-    func prefetchData(raw: ArpaeSurfaceVariable, time: TimerangeDt) throws {
+    func prefetchData(raw: ArpaeSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
     
-    func prefetchData(derived: ArpaeVariableDerived, time: TimerangeDt) throws {
+    func prefetchData(derived: ArpaeVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .apparent_temperature:
             try prefetchData(raw: .temperature_2m, time: time)
@@ -98,7 +98,7 @@ struct ArpaeReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }
     
-    func get(derived: ArpaeVariableDerived, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: ArpaeVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .windspeed_10m,. wind_speed_10m:
             let u = try get(raw: .wind_u_component_10m, time: time).data
@@ -148,7 +148,7 @@ struct ArpaeReader: GenericReaderDerived, GenericReaderProtocol {
                 modelDtSeconds: time.dtSeconds), .wmoCode
             )
         case .is_day:
-            return DataAndUnit(Zensun.calculateIsDay(timeRange: time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
+            return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .wet_bulb_temperature_2m:
             let dewpoint = try get(raw: .dew_point_2m, time: time)
             let temperature = try get(raw: .temperature_2m, time: time)

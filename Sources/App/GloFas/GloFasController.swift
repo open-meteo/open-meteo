@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 
-typealias GloFasVariableMember = VariableAndMemberAndControlSplitFiles<GloFasVariable>
+typealias GloFasVariableMember = GloFasVariable
 
 struct GloFasMixer: GenericReaderMixer {
     let reader: [GloFasReader]
@@ -43,42 +43,42 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
     }
     
-    func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDt) throws {
+    func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) throws {
         for member in 0..<51 {
-            try reader.prefetchData(variable: .init(.river_discharge, member), time: time)
+            try reader.prefetchData(variable: .river_discharge, time: time.with(ensembleMember: member))
         }
     }
     
-    func get(derived: GlofasDerivedVariable, time: TimerangeDt) throws -> DataAndUnit {
+    func get(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let data = try (0..<51).map({
-            try reader.get(variable: .init(.river_discharge, $0), time: time).data
+            try reader.get(variable: .river_discharge, time: time.with(ensembleMember: $0)).data
         })
         if data[0].onlyNaN() {
             return DataAndUnit(data[0], .cubicMetrePerSecond)
         }
         switch derived {
         case .river_discharge_mean:
-            return DataAndUnit((0..<time.count).map { t in
+            return DataAndUnit((0..<time.time.count).map { t in
                 data.reduce(0, {$0 + $1[t]}) / Float(data.count)
             }, .cubicMetrePerSecond)
         case .river_discharge_min:
-            return DataAndUnit((0..<time.count).map { t in
+            return DataAndUnit((0..<time.time.count).map { t in
                 data.reduce(Float.nan, { $0.isNaN || $1[t] < $0 ? $1[t] : $0 })
             }, .cubicMetrePerSecond)
         case .river_discharge_max:
-            return DataAndUnit((0..<time.count).map { t in
+            return DataAndUnit((0..<time.time.count).map { t in
                 data.reduce(Float.nan, { $0.isNaN || $1[t] > $0 ? $1[t] : $0 })
             }, .cubicMetrePerSecond)
         case .river_discharge_median:
-            return DataAndUnit((0..<time.count).map { t in
+            return DataAndUnit((0..<time.time.count).map { t in
                 data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.5), (Float(data.count)*0.5).truncatingRemainder(dividingBy: 1) )
             }, .cubicMetrePerSecond)
         case .river_discharge_p25:
-            return DataAndUnit((0..<time.count).map { t in
+            return DataAndUnit((0..<time.time.count).map { t in
                 data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.25), (Float(data.count)*0.25).truncatingRemainder(dividingBy: 1) )
             }, .cubicMetrePerSecond)
         case .river_discharge_p75:
-            return DataAndUnit((0..<time.count).map { t in
+            return DataAndUnit((0..<time.time.count).map { t in
                 data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.75), (Float(data.count)*0.75).truncatingRemainder(dividingBy: 1) )
             }, .cubicMetrePerSecond)
         }
@@ -116,18 +116,14 @@ struct GloFasController {
                     longitude: reader.modelLon,
                     elevation: reader.targetElevation,
                     prefetch: {
-                        // convert variables
-                        let variablesMember: [GloFasVariableOrDerivedMember] = paramsDaily.map {
-                            switch $0 {
-                            case .raw(let raw):
-                                return .raw(.init(raw, 0))
-                            case .derived(let derived):
-                                return .derived(derived)
+                        for param in paramsDaily {
+                            try reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
+                        }
+                        if params.ensemble {
+                            for member in 1..<51 {
+                                try reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
                             }
                         }
-                        /// Variables wih 51 members if requested
-                        let variables = variablesMember + (params.ensemble ? (1..<51).map({.raw(.init(.river_discharge, $0))}) : [])
-                        try reader.prefetchData(variables: variables, time: time.dailyRead)
                     },
                     current: nil,
                     hourly: nil,
@@ -136,13 +132,13 @@ struct GloFasController {
                             switch variable {
                             case .raw(_):
                                 let d = try (params.ensemble ? (0..<51) : (0..<1)).map { member -> ApiArray in
-                                    let d = try reader.get(variable: .raw(.init(.river_discharge, member)), time: time.dailyRead).convertAndRound(params: params)
+                                    let d = try reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
                                     assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                     return ApiArray.float(d.data)
                                 }
                                 return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
                             case .derived(let derived):
-                                let d = try reader.get(variable: .derived(derived), time: time.dailyRead).convertAndRound(params: params)
+                                let d = try reader.get(variable: .derived(derived), time: time.dailyRead.toSettings()).convertAndRound(params: params)
                                 assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                 return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
                             }

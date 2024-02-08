@@ -444,7 +444,7 @@ struct ExportCommand: AsyncCommand {
                     
                     // Read data
                     let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
-                    guard let data = try reader.get(mixed: variable, time: time) else {
+                    guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
                         fatalError("Invalid variable \(variable)")
                     }
                     let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
@@ -458,7 +458,7 @@ struct ExportCommand: AsyncCommand {
             for gridpoint in 0..<grid.count {
                 // Read data
                 let reader = try domain.getReader(position: gridpoint)
-                guard let data = try reader.get(mixed: variable, time: time)?.data else {
+                guard let data = try reader.get(mixed: variable, time: time.toSettings())?.data else {
                     fatalError("Invalid variable \(variable)")
                 }
                 let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
@@ -493,7 +493,7 @@ struct ExportCommand: AsyncCommand {
                 
                 // Read data
                 let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
-                guard let data = try reader.get(mixed: variable, time: time) else {
+                guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
                     fatalError("Invalid variable \(variable)")
                 }
                 try ncVariable.write(data.data, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, time.count])
@@ -507,7 +507,7 @@ struct ExportCommand: AsyncCommand {
         for gridpoint in 0..<grid.count {
             // Read data
             let reader = try domain.getReader(position: gridpoint)
-            guard let data = try reader.get(mixed: variable, time: time) else {
+            guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
                 fatalError("Invalid variable \(variable)")
             }
             try ncVariable.write(data.data, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])

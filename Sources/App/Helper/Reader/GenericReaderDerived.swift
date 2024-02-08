@@ -8,11 +8,11 @@ protocol GenericReaderDerived: GenericReaderProtocol {
     
     var reader: ReaderNext { get }
 
-    func get(derived: Derived, time: TimerangeDt) throws -> DataAndUnit
-    func prefetchData(derived: Derived, time: TimerangeDt) throws
+    func get(derived: Derived, time: TimerangeDtAndSettings) throws -> DataAndUnit
+    func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws
     
-    func get(raw: ReaderNext.MixingVar, time: TimerangeDt) throws -> DataAndUnit
-    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDt) throws
+    func get(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws -> DataAndUnit
+    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws
 }
 
 /// Parameters for tilted radiation calculation
@@ -70,7 +70,7 @@ extension GenericReaderDerived {
         reader.targetElevation
     }
     
-    func prefetchData(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDt) throws {
+    func prefetchData(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDtAndSettings) throws {
         switch variable {
         case .raw(let raw):
             return try prefetchData(raw: raw, time: time)
@@ -79,7 +79,7 @@ extension GenericReaderDerived {
         }
     }
     
-    func get(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDt) throws -> DataAndUnit {
+    func get(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch variable {
         case .raw(let raw):
             return try get(raw: raw, time: time)
@@ -92,7 +92,7 @@ extension GenericReaderDerived {
         return try reader.getStatic(type: type)
     }
     
-    func prefetchData(variables: [VariableOrDerived<ReaderNext.MixingVar, Derived>], time: TimerangeDt) throws {
+    func prefetchData(variables: [VariableOrDerived<ReaderNext.MixingVar, Derived>], time: TimerangeDtAndSettings) throws {
         try variables.forEach { variable in
             try prefetchData(variable: variable, time: time)
         }
@@ -105,11 +105,11 @@ protocol GenericReaderDerivedSimple: GenericReaderDerived {
 }
 
 extension GenericReaderDerivedSimple {
-    func get(raw: ReaderNext.MixingVar, time: TimerangeDt) throws -> DataAndUnit {
+    func get(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         try reader.get(variable: raw, time: time)
     }
     
-    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDt) throws {
+    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
 }
