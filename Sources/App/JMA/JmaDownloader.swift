@@ -98,7 +98,8 @@ struct JmaDownload: AsyncCommand {
             }
         case .msm:
             // 0 und 12z run have more data
-            let after2022july = run.toComponents().year >= 2022 && run.toComponents().month >= 7
+            let runc = run.toComponents()
+            let after2022july = (runc.year >= 2022 && runc.month >= 7) || runc.year >= 2023
             let range = (run.hour % 12 == 0 && after2022july) ? ["00-15", "16-33", "34-39", "40-51", "52-78"] : ["00-15", "16-33", "34-39"]
             filesToDownload = range.map { hour in
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_MSM_GPV_Rjp_Lsurf_FH\(hour)_grib2.bin"
