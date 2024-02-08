@@ -251,7 +251,7 @@ struct DownloadEra5Command: AsyncCommand {
                 logger.info("Skipping \(variable), because unavailable for ERA5-Land")
                 continue
             }
-            let time = TimerangeDtAndSettings(time: TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600), ensembleMember: 0, ensembleMemberLevel: 0, previousDay: 0)
+            let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600).toSettings()
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
             try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)

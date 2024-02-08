@@ -152,7 +152,16 @@ struct DownloadEcmwfCommand: AsyncCommand {
             if variables.isEmpty {
                 continue
             }
-            let inMemory = DictionaryActor<VariableAndMemberAndControl<EcmwfVariable>, [Float]>()
+            struct EcmwfVariableMember: Hashable {
+                let variable: EcmwfVariable
+                let member: Int
+                
+                init(_ variable: EcmwfVariable, _ member: Int) {
+                    self.variable = variable
+                    self.member = member
+                }
+            }
+            let inMemory = DictionaryActor<EcmwfVariableMember, [Float]>()
             
             let url = domain.getUrl(base: base, run: run, hour: hour)
             let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
