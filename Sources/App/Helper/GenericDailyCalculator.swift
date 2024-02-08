@@ -55,7 +55,7 @@ enum DailyAggregation<WeatherVariable> {
 
 extension GenericReaderMulti {
     func getDaily<V: DailyVariableCalculatable, Units: ApiUnitsSelectable>(variable: V, params: Units, time timeDaily: TimerangeDtAndSettings) throws -> DataAndUnit? where V.Variable == Variable {
-        let time = TimerangeDtAndSettings(time: timeDaily.time.with(dtSeconds: 3600), ensembleMember: timeDaily.ensembleMember, previousDay: timeDaily.previousDay)
+        let time = timeDaily.with(dtSeconds: 3600)
         
         switch variable.aggregation {
         case .none:
@@ -111,7 +111,7 @@ extension GenericReaderMulti {
     
 
     func prefetchData<V: DailyVariableCalculatable>(variables: [V], time timeDaily: TimerangeDtAndSettings) throws where V.Variable == Variable {
-        let time = TimerangeDtAndSettings(time: timeDaily.time.with(dtSeconds: 3600), ensembleMember: timeDaily.ensembleMember, previousDay: timeDaily.previousDay)
+        let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             if let v0 = variable.aggregation.variables.0 {
                 try prefetchData(variable: v0, time: time)

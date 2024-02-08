@@ -36,7 +36,7 @@ struct CamsController {
                 let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfaceAndPressureVariable>)? = paramsHourly.map { variables in
                     return {
                         return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
-                            let d = try reader.get(variable: variable, time: TimerangeDtAndSettings(time: time.hourlyRead, ensembleMember: 0, previousDay: 0)).convertAndRound(params: params)
+                            let d = try reader.get(variable: variable, time: time.hourlyRead.toSettings()).convertAndRound(params: params)
                             assert(time.hourlyRead.count == d.data.count)
                             return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
                         })
@@ -46,7 +46,7 @@ struct CamsController {
                 let currentFn: (() throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfaceAndPressureVariable>)? = paramsCurrent.map { variables in
                     return {
                         return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
-                            let d = try reader.get(variable: variable, time: TimerangeDtAndSettings(time: currentTimeRange, ensembleMember: 0, previousDay: 0)).convertAndRound(params: params)
+                            let d = try reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
                             return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
                         })
                     }
@@ -59,10 +59,10 @@ struct CamsController {
                     elevation: reader.targetElevation,
                     prefetch: {
                         if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: TimerangeDtAndSettings(time: currentTimeRange, ensembleMember: 0, previousDay: 0))
+                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
                         }
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: TimerangeDtAndSettings(time: time.hourlyRead, ensembleMember: 0, previousDay: 0))
+                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead.toSettings())
                         }
                     },
                     current: currentFn,

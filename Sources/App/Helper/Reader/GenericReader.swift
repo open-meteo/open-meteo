@@ -23,6 +23,9 @@ struct TimerangeDtAndSettings: Hashable {
     let time: TimerangeDt
     /// Member stored in separate files
     let ensembleMember: Int
+    /// Member stored as an addiitonal dimention int the same file
+    let ensembleMemberLevel: Int
+    
     let previousDay: Int
     
     var dtSeconds: Int {
@@ -34,21 +37,21 @@ struct TimerangeDtAndSettings: Hashable {
     }
     
     func with(start: Timestamp) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
     
     func with(ensembleMember: Int) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time, ensembleMember: ensembleMember, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time, ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
     
     func with(dtSeconds: Int) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
 }
 
 extension TimerangeDt {
-    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil) -> TimerangeDtAndSettings{
-        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, previousDay: previousDay ?? 0)
+    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil) -> TimerangeDtAndSettings{
+        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0)
     }
 }
 
@@ -155,7 +158,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         let interpolationType = variable.interpolation
         
         let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
-        let read = try readAndScale(variable: variable, time: .init(time: timeLow, ensembleMember: time.ensembleMember, previousDay: time.previousDay))
+        let read = try readAndScale(variable: variable, time: .init(time: timeLow, ensembleMember: time.ensembleMember, ensembleMemberLevel: time.ensembleMemberLevel, previousDay: time.previousDay))
         let dataLow = read.data
         
         let data = dataLow.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
