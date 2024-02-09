@@ -50,6 +50,8 @@ struct SyncCommand: AsyncCommand {
         var concurrent: Int?
     }
     
+    static var previousDayVariables = ["temperature_2m", "dew_point_2m", "relative_humidity_2m", "precipitation", "snowfall_water_equivalent", "snowfall", "frozen_precipitation_percent", "pressure_msl", "cloud_cover", "wind_u_component_10m", "wind_v_component_10m", "showers", "shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_gusts_10m", "wind_speed_10m", "wind_direction_10m", "weather_code", "cape", "relative_humidity_1000hPa", "lifted_index"]
+    
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         
@@ -72,10 +74,14 @@ struct SyncCommand: AsyncCommand {
            fatalError("Number of servers and models sets must be the same")
         }
         let pastDays = signature.pastDays ?? 7
-        let variables = signature.variables.split(separator: ",").map(String.init) + ["static"]
+        var variablesSig = signature.variables.split(separator: ",").map(String.init) + ["static"]
         let concurrent = signature.concurrent ?? 4
         /// Undocumented switch to download all weather variables. This can generate immense traffic!
-        let downloadAllVariables = signature.variables == "really_download_all_variables"
+        let downloadAllVariables = variablesSig.contains("really_download_all_variables")
+        let downloadAllPreviousDay = variablesSig.contains("really_download_all_previous_day")
+        let downloadAllPressureLevel = variablesSig.contains("really_download_all_pressure_levels")
+        let downloadAllSurface = variablesSig.contains("really_download_all_surface_levels")
+        let variables = downloadAllPreviousDay ? Self.previousDayVariables : variablesSig
         
         /// Download from each server concurrently
         await zip(serverSet, modelsSet).foreachConcurrent(nConcurrent: serverSet.count) { (server, models) in
@@ -96,7 +102,18 @@ struct SyncCommand: AsyncCommand {
                     
                     /// Filter variables to download
                     let toDownload: [S3DataController.S3ListV2File] = try await remotes.mapConcurrent(nConcurrent: concurrent) { (model, remoteDirectory) -> [S3DataController.S3ListV2File] in
-                        if !downloadAllVariables && !variables.contains(where: {"data/\(model.rawValue)/\($0)/" == remoteDirectory}) {
+                        guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
+                            fatalError("could not get variable from string")
+                        }
+                        let variable = remoteDirectory[variablePos..<remoteDirectory.index(before: remoteDirectory.endIndex)]
+                        let isPreviousDay = variable.contains("_previous_day")
+                        let isPressureLevel = variable.contains("hPa")
+                        let isSurface = !isPressureLevel && !variable.contains("_previous_day")
+                        guard downloadAllVariables ||
+                                (downloadAllPressureLevel && isPressureLevel) ||
+                                (downloadAllSurface && isSurface) ||
+                                (downloadAllPreviousDay && isPreviousDay) ||
+                                variables.contains(where: {$0 == variable}) else {
                             return []
                         }
                         let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey, deadLineHours: 0.1)
