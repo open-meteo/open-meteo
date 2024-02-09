@@ -21,7 +21,7 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.getAndPost("archive", use: era5.query)
         
         categoriesRoute.getAndPost("forecast", use: WeatherApiController(
-            defaultModel: .best_match, alias: "historical-forecast-api").query
+            defaultModel: .best_match, alias: ["historical-forecast-api", "previous-runs-api"]).query
         )
         categoriesRoute.getAndPost("dwd-icon", use: WeatherApiController(
             defaultModel: .icon_seamless).query
@@ -86,11 +86,11 @@ struct WeatherApiController {
     let hasCurrentWeather: Bool
     let defaultModel: MultiDomains
     let subdomain: String
-    let alias: String?
+    let alias: [String]
     /// ecmwf v1 uses 3 hourly data in hourly field..
     let put3HourlyDataIntoHourly: Bool
     
-    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2020, 1, 1), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: String? = nil, put3HourlyDataIntoHourly: Bool = false) {
+    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2020, 1, 1), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = [], put3HourlyDataIntoHourly: Bool = false) {
         self.forecastDay = forecastDay
         self.forecastDaysMax = forecastDaysMax
         self.historyStartDate = historyStartDate

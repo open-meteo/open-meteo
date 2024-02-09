@@ -173,12 +173,12 @@ enum RateLimitError: Error, AbortError {
 
 extension Request {
     /// On open-meteo servers, make sure, the right domain is active
-    func ensureSubdomain(_ subdomain: String, alias: String? = nil) async throws {
+    func ensureSubdomain(_ subdomain: String, alias: [String] = []) async throws {
         guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
             return
         }
-        let isFreeApi = host.starts(with: subdomain) || alias.map({host.starts(with: $0)}) == true
-        let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.map({host.starts(with: "customer-\($0)")}) == true
+        let isFreeApi = host.starts(with: subdomain) || alias.contains(where: {host.starts(with: $0)}) == true
+        let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.contains(where: {host.starts(with: "customer-\($0)")}) == true
         
         if !(isFreeApi || isCustomerApi) {
             throw Abort.init(.notFound)
@@ -193,11 +193,11 @@ extension Request {
     }
     
     /// For customer API endpoints, check API key.
-    func ensureApiKey(_ subdomain: String, alias: String? = nil, apikey: String?) throws {
+    func ensureApiKey(_ subdomain: String, alias: [String] = [], apikey: String?) throws {
         guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
             return
         }
-        let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.map({host.starts(with: "customer-\($0)")}) == true
+        let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.contains(where: {host.starts(with: "customer-\($0)")}) == true
         
         /// API node dedicated to customers
         if !ApiKeyManager.apiKeys.isEmpty && isCustomerApi {
