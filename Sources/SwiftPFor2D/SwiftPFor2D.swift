@@ -4,6 +4,7 @@ import Foundation
 
 public enum SwiftPFor2DError: Error {
     case cannotOpenFile(filename: String, errno: Int32, error: String)
+    case cannotTruncateFile(filename: String, errno: Int32, error: String)
     case cannotOpenFile(errno: Int32, error: String)
     case cannotMoveFile(from: String, to: String, errno: Int32, error: String)
     case chunkHasWrongNumberOfElements
@@ -669,6 +670,39 @@ extension OmFileReader where Backend == MmapFile {
     public convenience init(fn: FileHandle) throws {
         let mmap = try MmapFile(fn: fn)
         try self.init(fn: mmap)
+    }
+    
+    /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
+    public func wasDeleted() -> Bool {
+        fn.wasDeleted()
+    }
+}
+
+extension OmFileReader where Backend == MmapFileCached {
+    public convenience init(file: String, cacheFile: String?) throws {
+        let fn = try FileHandle.openFileReading(file: file)
+        
+        guard let cacheFile else {
+            try self.init(fn: try MmapFileCached(backend: fn, frontend: nil, cacheFile: nil))
+            return
+        }
+        
+        let backendStats = fn.fileSizeAndModificationTime()
+        
+        if let cacheFn = try? FileHandle.openFileReadWrite(file: cacheFile) {
+            let cacheStats = cacheFn.fileSizeAndModificationTime()
+            if cacheStats.size == backendStats.size && cacheStats.modificationTime >= backendStats.modificationTime {
+                // cache file exists and usable
+                try self.init(fn: MmapFileCached(backend: fn, frontend: cacheFn, cacheFile: cacheFile))
+                return
+            }
+        }
+        let cacheFn = try FileHandle.createNewFile(file: cacheFile, sparseSize: backendStats.size)
+        let mmap = try MmapFileCached(backend: fn, frontend: cacheFn, cacheFile: cacheFile)
+        // load 1 MB from cache. TODO maybe need to load more
+        mmap.prefetchData(offset: 0, count: 1024*1024)
+        try self.init(fn: mmap)
+        
     }
     
     /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
