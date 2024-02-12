@@ -29,17 +29,7 @@ public final class MmapFileCached {
     /// Check if data is in cache, otherwise load data from backend into cache
     public func prefetchData(offset: Int, count: Int) {
         if let frontend {
-            // Check for sparse hole and promote data from backend
-            let blockSize = 128*1024
-            let blockStart = offset.floor(to: blockSize)
-            let blockEnd = (offset + count).ceil(to: blockSize)
-            for block in stride(from: blockStart, to: blockEnd, by: blockSize) {
-                let range = block..<min(block+blockSize, backend.data.count)
-                if frontend.data.allZero(range) {
-                    let backendData = UnsafeMutableBufferPointer(mutating: backend.data)
-                    frontend.data[range] = backendData[range]
-                }
-            }
+            frontend.prefetchData(offset: offset, count: count)
         } else {
             backend.prefetchData(offset: offset, count: count)
         }
@@ -47,6 +37,23 @@ public final class MmapFileCached {
 }
 
 extension MmapFileCached: OmFileReaderBackend {
+    public func preRead(offset: Int, count: Int) {
+        guard let frontend else {
+            return
+        }
+        // Check for sparse hole and promote data from backend
+        let blockSize = 128*1024
+        let blockStart = offset.floor(to: blockSize)
+        let blockEnd = (offset + count).ceil(to: blockSize)
+        for block in stride(from: blockStart, to: blockEnd, by: blockSize) {
+            let range = block..<min(block+blockSize, backend.data.count)
+            if frontend.data.allZero(range) {
+                let backendData = UnsafeMutableBufferPointer(mutating: backend.data)
+                frontend.data[range] = backendData[range]
+            }
+        }
+    }
+    
     public var count: Int {
         return backend.count
     }
@@ -86,6 +93,17 @@ public final class MmapMutableFile {
     /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
     public func wasDeleted() -> Bool {
         file.wasDeleted()
+    }
+    
+    public func prefetchData(offset: Int, count: Int) {
+        let pageStart = offset.floor(to: 4096)
+        let pageEnd = (offset + count).ceil(to: 4096)
+        let length = pageEnd - pageStart
+        let ret = madvise(UnsafeMutableRawPointer(mutating: data.baseAddress!.advanced(by: pageStart)), length, MADV_WILLNEED)
+        guard ret == 0 else {
+            let error = String(cString: strerror(errno))
+            fatalError("madvice failed! ret=\(ret), errno=\(errno), \(error)")
+        }
     }
 
     deinit {
